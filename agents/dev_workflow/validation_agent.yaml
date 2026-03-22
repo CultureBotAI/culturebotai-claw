@@ -1,0 +1,117 @@
+agent:
+  name: validation_agent
+  type: dev_workflow
+  description: "Schema and ontology validation across all repositories"
+  version: "1.0.0"
+
+model:
+  provider: anthropic
+  model: claude-haiku-4-5
+  temperature: 0.1
+  max_tokens: 4096
+
+workspace:
+  base_dir: ${OPENCLAW_WORKSPACE}/validation_agent
+  allowed_paths:
+    - "${CULTUREMECH_ROOT}/**/*.yaml"
+    - "${MEDIAINGREDIENTMECH_ROOT}/**/*.yaml"
+    - "${COMMUNITYMECH_ROOT}/**/*.yaml"
+    - "${CULTUREMECH_ROOT}/src/schema/*.yaml"
+    - "${MEDIAINGREDIENTMECH_ROOT}/src/schema/*.yaml"
+    - "${COMMUNITYMECH_ROOT}/src/schema/*.yaml"
+  read_only: true
+
+tools:
+  - name: linkml_validator
+    type: plugin
+    plugin: linkml_validator
+    config:
+      strict_mode: true
+      validate_imports: true
+
+  - name: just_runner
+    type: plugin
+    plugin: just_runner
+    config:
+      allowed_recipes:
+        - validate-all
+        - validate-schema
+        - validate-data
+        - gen-python
+
+  - name: file_reader
+    type: builtin
+    description: "Read YAML and schema files"
+
+capabilities:
+  - validate_linkml_schema
+  - validate_yaml_data
+  - run_validation_suites
+  - generate_validation_reports
+  - check_cross_repo_consistency
+
+tasks:
+  validate_all:
+    description: "Run full validation suite across all repositories"
+    workflow:
+      - step: validate_schemas
+        action: validate_all_schemas
+        repositories:
+          - culturemech
+          - mediaingredientmech
+          - communitymech
+
+      - step: validate_data
+        action: validate_data_files
+        repositories:
+          - culturemech
+          - mediaingredientmech
+          - communitymech
+
+      - step: generate_report
+        action: create_validation_report
+        output: validation_report.md
+
+  validate_schema:
+    description: "Validate LinkML schemas"
+    parameters:
+      - repo: {type: string, required: true, enum: [culturemech, mediaingredientmech, communitymech]}
+      - schema_path: {type: path, required: false}
+    workflow:
+      - step: run_linkml_validation
+        tool: linkml_validator
+        params:
+          schema: ${schema_path}
+
+  validate_data:
+    description: "Validate data files against schema"
+    parameters:
+      - repo: {type: string, required: true}
+      - data_path: {type: path, required: true}
+    workflow:
+      - step: validate_yaml
+        tool: linkml_validator
+        params:
+          data: ${data_path}
+
+  check_consistency:
+    description: "Check cross-repository data consistency"
+    workflow:
+      - step: extract_ingredient_ids
+        description: "Get all ingredient IDs from CultureMech"
+      - step: check_mapping_coverage
+        description: "Verify ingredients are mapped in MediaIngredientMech"
+      - step: generate_consistency_report
+
+output:
+  format: markdown
+  include_metrics: true
+  save_to: ${OPENCLAW_WORKSPACE}/validation_agent/reports/
+
+error_handling:
+  on_validation_error:
+    action: report_and_continue
+    create_issue: false
+  on_schema_error:
+    action: report_and_halt
+    create_issue: true

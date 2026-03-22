@@ -1,0 +1,369 @@
+agent:
+  name: etl_coordinator_agent
+  type: data_pipeline
+  description: "Coordinate cross-repo ETL operations and data synchronization"
+  version: "1.0.0"
+
+model:
+  provider: anthropic
+  model: claude-haiku-4-5-20251001  # ETL is structured work, use cheaper model
+  temperature: 0.0
+  max_tokens: 4096
+
+workspace:
+  base_dir: ${OPENCLAW_WORKSPACE}
+  allowed_paths:
+    - ${CULTUREMECH_ROOT}/data/**
+    - ${CULTUREMECH_ROOT}/output/**
+    - ${MEDIAINGREDIENTMECH_ROOT}/data/**
+    - ${MEDIAINGREDIENTMECH_ROOT}/scripts/**
+    - ${COMMUNITYMECH_ROOT}/kb/**
+  create_backups: true
+  backup_dir: ${OPENCLAW_WORKSPACE}/.backups/etl
+
+tools:
+  # File operations
+  - name: file_sync
+    type: builtin
+    description: "Copy files between repos with validation"
+
+  # Justfile integration
+  - name: just_runner
+    type: plugin
+    plugin: just_runner
+    description: "Execute justfile recipes"
+
+  # Data validation
+  - name: linkml_validator
+    type: plugin
+    plugin: linkml_validator
+    description: "Validate data against LinkML schemas"
+
+  # Ontology validation
+  - name: oak_query
+    type: plugin
+    plugin: oak_query
+    description: "Validate ontology IDs"
+
+safety:
+  dry_run_default: true
+  require_approval_for:
+    - cross_repo_copy
+    - data_imports
+    - merge_operations
+  validation_required: true
+  check_role_preservation: true
+  detect_duplicates: true
+
+monitoring:
+  track_costs: true
+  max_cost_per_run: 2.00  # USD (Haiku is cheap)
+  log_all_transfers: true
+  track_sync_status: true
+
+data_flows:
+  # Define the 3 main data flows
+  culturemech_to_mediaingredient:
+    source: ${CULTUREMECH_ROOT}/output/mapped_ingredients.yaml
+    target: ${MEDIAINGREDIENTMECH_ROOT}/data/imports/culturemech_ingredients.yaml
+    validation:
+      - check_ingredient_format
+      - validate_ontology_ids
+      - detect_duplicates
+    post_process:
+      - merge_with_existing
+      - preserve_roles
+      - update_curation_history
+
+  mediaingredient_to_culturemech:
+    source: ${MEDIAINGREDIENTMECH_ROOT}/data/curated/mapped_ingredients.yaml
+    target: ${CULTUREMECH_ROOT}/data/merge_yaml/ingredient_mappings.yaml
+    validation:
+      - check_mapping_format
+      - validate_chebi_ids
+      - check_role_completeness
+    post_process:
+      - update_recipes
+      - regenerate_normalized_yaml
+
+  communitymech_to_culturemech:
+    source: ${COMMUNITYMECH_ROOT}/kb/communities/*.yaml
+    target: ${CULTUREMECH_ROOT}/data/community_metadata/
+    validation:
+      - check_taxon_ids
+      - validate_interactions
+    post_process:
+      - extract_media_requirements
+      - update_cultivation_metadata
+
+tasks:
+  # Task 1: CultureMech → MediaIngredientMech sync
+  culturemech_to_mediaingredient:
+    description: "Export ingredients from CultureMech to MediaIngredientMech"
+    parameters:
+      - name: dry_run
+        type: bool
+        default: true
+      - name: include_unmapped_only
+        type: bool
+        default: false
+        description: "Only export unmapped ingredients"
+    workflow:
+      - step: export_from_culturemech
+        action: "Run 'just export-ingredients' in CultureMech"
+      - step: validate_export
+        action: "Validate exported YAML against schema"
+      - step: check_duplicates
+        action: "Detect duplicates with existing MediaIngredientMech data"
+      - step: copy_to_mediaingredient
+        action: "Copy to imports/ directory"
+        condition: "not dry_run"
+      - step: run_merge_script
+        action: "Execute merge_culturemech_updates.py"
+        params:
+          - dry_run: true
+          - verbose: true
+      - step: validate_roles_preserved
+        action: "Check that curation roles are maintained"
+      - step: return_summary
+        output:
+          - common_ingredients
+          - new_ingredients
+          - removed_ingredients
+          - roles_preserved
+          - duplicates_detected
+          - sync_timestamp
+
+  # Task 2: MediaIngredientMech → CultureMech reverse sync
+  mediaingredient_to_culturemech:
+    description: "Import curated mappings back to CultureMech"
+    parameters:
+      - name: dry_run
+        type: bool
+        default: true
+      - name: validate_all
+        type: bool
+        default: true
+    workflow:
+      - step: export_from_mediaingredient
+        action: "Run 'just export-mapped' in MediaIngredientMech"
+      - step: validate_mappings
+        action: "Validate CHEBI IDs using OAK"
+      - step: check_role_completeness
+        action: "Ensure all role annotations present"
+      - step: copy_to_culturemech
+        action: "Copy to merge_yaml/ directory"
+        condition: "not dry_run"
+      - step: update_recipes
+        action: "Run CultureMech update script"
+      - step: regenerate_normalized
+        action: "Run 'just normalize' in CultureMech"
+        condition: "not dry_run"
+      - step: return_summary
+        output:
+          - mappings_imported
+          - recipes_updated
+          - validation_failures
+          - sync_timestamp
+
+  # Task 3: Detect sync conflicts
+  detect_conflicts:
+    description: "Detect data inconsistencies between repos"
+    parameters:
+      - name: check_all_repos
+        type: bool
+        default: true
+    workflow:
+      - step: load_culturemech_data
+        action: "Load ingredients from CultureMech"
+      - step: load_mediaingredient_data
+        action: "Load ingredients from MediaIngredientMech"
+      - step: compare_mappings
+        action: "Find conflicting ontology IDs"
+      - step: compare_roles
+        action: "Find role mismatches"
+      - step: check_duplicates
+        action: "Find duplicate ingredients"
+      - step: check_timestamps
+        action: "Identify stale data"
+      - step: return_report
+        output:
+          - mapping_conflicts
+          - role_mismatches
+          - duplicates
+          - stale_data
+          - recommended_actions
+
+  # Task 4: Scheduled sync
+  scheduled_sync:
+    description: "Automated periodic sync (for cron/scheduling)"
+    parameters:
+      - name: direction
+        type: string
+        required: true
+        choices: ["culturemech_to_mediaingredient", "mediaingredient_to_culturemech", "bidirectional"]
+      - name: auto_resolve_conflicts
+        type: bool
+        default: false
+    workflow:
+      - step: check_sync_status
+        action: "Get last sync timestamp"
+      - step: detect_changes
+        action: "Check if sync is needed"
+      - step: run_sync
+        action: "Execute sync based on direction"
+        condition: "changes_detected"
+      - step: detect_conflicts
+        action: "Check for conflicts"
+      - step: resolve_conflicts
+        action: "Auto-resolve if enabled, otherwise report"
+        condition: "conflicts_detected"
+      - step: send_notification
+        action: "Notify about sync status"
+      - step: return_summary
+        output:
+          - sync_performed
+          - changes_synced
+          - conflicts_found
+          - conflicts_resolved
+          - next_sync_recommended
+
+  # Task 5: Extract unmapped ingredients
+  extract_unmapped:
+    description: "Extract ingredients without ontology mappings"
+    parameters:
+      - name: source_repo
+        type: string
+        default: "culturemech"
+      - name: min_occurrences
+        type: int
+        default: 1
+        description: "Minimum recipe occurrences"
+      - name: output_format
+        type: string
+        default: "yaml"
+        choices: ["yaml", "json", "csv"]
+    workflow:
+      - step: load_ingredients
+        action: "Load all ingredients from source"
+      - step: filter_unmapped
+        action: "Filter ingredients without ontology_id"
+      - step: count_occurrences
+        action: "Count occurrences in recipes"
+      - step: filter_by_threshold
+        action: "Keep only ingredients >= min_occurrences"
+      - step: sort_by_priority
+        action: "Sort by occurrences (highest first)"
+      - step: export
+        action: "Save to output file"
+      - step: return_summary
+        output:
+          - total_unmapped
+          - high_priority_count
+          - output_file
+          - top_10_unmapped
+
+  # Task 6: Validate cross-repo consistency
+  validate_consistency:
+    description: "Validate data consistency across all repos"
+    parameters:
+      - name: fix_issues
+        type: bool
+        default: false
+    workflow:
+      - step: load_all_data
+        action: "Load ingredient data from all repos"
+      - step: check_mapping_consistency
+        action: "Verify same ingredient has same mapping"
+      - step: check_role_consistency
+        action: "Verify role annotations are consistent"
+      - step: check_ontology_validity
+        action: "Validate all CHEBI IDs using OAK"
+      - step: check_schema_compliance
+        action: "Validate against LinkML schemas"
+      - step: generate_fix_plan
+        action: "Create plan to fix issues"
+        condition: "issues_found"
+      - step: apply_fixes
+        action: "Apply fixes if enabled"
+        condition: "fix_issues == true"
+      - step: return_report
+        output:
+          - total_inconsistencies
+          - mapping_conflicts
+          - role_conflicts
+          - invalid_ontology_ids
+          - schema_violations
+          - fixes_applied
+
+  # Task 7: Export for curation pipeline
+  export_for_curation:
+    description: "Prepare data for ingredient curation pipeline"
+    parameters:
+      - name: batch_size
+        type: int
+        default: 50
+      - name: priority_threshold
+        type: int
+        default: 10
+        description: "Minimum occurrences for high priority"
+    workflow:
+      - step: extract_unmapped
+        action: "Get unmapped ingredients"
+      - step: gather_context
+        action: "Extract recipe context for each ingredient"
+      - step: prioritize
+        action: "Sort by occurrences and media diversity"
+      - step: create_batches
+        action: "Split into batches of batch_size"
+      - step: export_batches
+        action: "Save as separate YAML files"
+      - step: return_summary
+        output:
+          - total_ingredients
+          - high_priority
+          - batch_count
+          - output_directory
+
+integration:
+  # Integration with existing scripts
+  existing_scripts:
+    culturemech_merge: "${MEDIAINGREDIENTMECH_ROOT}/scripts/merge_culturemech_updates.py"
+    culturemech_export: "${CULTUREMECH_ROOT}/scripts/export_ingredients.py"
+
+  justfile_commands:
+    culturemech:
+      - export-ingredients
+      - normalize
+      - validate-all
+    mediaingredientmech:
+      - merge-culturemech
+      - export-mapped
+      - validate-all
+    communitymech:
+      - validate-communities
+
+sync_schedule:
+  # Recommended sync schedule
+  culturemech_to_mediaingredient:
+    frequency: "daily"
+    time: "02:00"  # 2 AM
+    auto_approve: false
+
+  mediaingredient_to_culturemech:
+    frequency: "weekly"
+    time: "03:00"  # 3 AM Sunday
+    auto_approve: false
+
+  conflict_detection:
+    frequency: "hourly"
+    auto_report: true
+
+reporting:
+  format: yaml
+  include:
+    - sync_summary
+    - conflict_report
+    - validation_results
+    - timestamp_log
+  save_to: ${OPENCLAW_WORKSPACE}/reports/etl/

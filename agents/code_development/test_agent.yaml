@@ -1,0 +1,47 @@
+agent:
+  name: test_agent
+  type: code_development
+  description: "Generate tests, run pytest, analyze coverage"
+  version: "1.0.0"
+
+model:
+  provider: anthropic
+  model: claude-sonnet-4-20250514
+  temperature: 0.1
+  max_tokens: 8192
+
+workspace:
+  base_dir: ${OPENCLAW_WORKSPACE}
+  allowed_paths:
+    - ${CULTUREMECH_ROOT}/tests
+    - ${MEDIAINGREDIENTMECH_ROOT}/tests
+    - ${COMMUNITYMECH_ROOT}/tests
+
+safety:
+  dry_run_default: false  # Running tests is non-destructive
+  require_approval_for:
+    - create_test_file
+    - modify_test_config
+
+tasks:
+  run_all_tests:
+    description: "Run pytest across all repositories"
+    workflow:
+      - run_culturemech_tests
+      - run_mediaingredient_tests
+      - run_communitymech_tests
+      - aggregate_results
+
+  generate_tests:
+    description: "Generate unit tests for uncovered code"
+    parameters:
+      - name: target_coverage
+        type: float
+        default: 0.80
+
+  analyze_coverage:
+    description: "Analyze test coverage and identify gaps"
+    workflow:
+      - run_pytest_with_coverage
+      - parse_coverage_report
+      - identify_uncovered_code

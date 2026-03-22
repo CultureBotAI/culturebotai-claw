@@ -1,0 +1,238 @@
+agent:
+  name: ingredient_curation_agent
+  type: data_pipeline
+  description: "LLM-assisted ingredient ontology mapping using MediaIngredientMech's LLMCurator"
+  version: "1.0.0"
+
+model:
+  provider: anthropic
+  model: claude-sonnet-4-20250514
+  temperature: 0.0  # Deterministic for consistency with existing LLMCurator
+  max_tokens: 4096
+
+workspace:
+  base_dir: ${MEDIAINGREDIENTMECH_ROOT}
+  allowed_paths:
+    - "data/curated/**"
+    - "data/unmapped/**"
+    - "data/imports/**"
+  create_backups: true
+  backup_dir: ${OPENCLAW_WORKSPACE}/.backups/ingredient_curation
+
+tools:
+  # Wrap existing MediaIngredientMech classes
+  - name: llm_curator
+    type: python_module
+    module: mediaingredientmech.utils.llm_curator
+    class: LLMCurator
+    description: "LLM-based ontology mapping suggestions"
+
+  - name: ingredient_curator
+    type: python_module
+    module: mediaingredientmech.curation.ingredient_curator
+    class: IngredientCurator
+    description: "Ingredient curation data management"
+
+  - name: ontology_validator
+    type: plugin
+    plugin: oak_query
+    method: validate_term
+    description: "Validate ontology terms using OAK"
+
+  - name: ontology_search
+    type: plugin
+    plugin: oak_query
+    method: search
+    description: "Search ontologies for matching terms"
+
+safety:
+  dry_run_default: true
+  require_approval_for:
+    - accept_mapping
+    - batch_accept
+    - save_changes
+  validation_required: true
+  max_batch_size: 100
+  auto_accept_threshold: 0.90  # Only auto-accept high-confidence mappings
+
+monitoring:
+  track_costs: true
+  max_cost_per_run: 5.00  # USD
+  log_all_suggestions: true
+
+tasks:
+  # Task 1: Suggest mapping for a single ingredient
+  suggest_mapping:
+    description: "Generate ontology mapping suggestion for one ingredient"
+    parameters:
+      - name: ingredient_name
+        type: string
+        required: true
+        description: "Name of the ingredient to map"
+      - name: context
+        type: dict
+        required: false
+        description: "Additional context (occurrences, recipe examples, etc.)"
+    workflow:
+      - step: initialize_llm_curator
+        action: "Load LLMCurator with Claude Sonnet 4"
+      - step: generate_suggestion
+        action: "Call llm_curator.suggest_mapping(ingredient_name, context)"
+      - step: validate_suggestion
+        action: "Validate suggestion using OAK"
+      - step: return_result
+        output:
+          - ontology_id
+          - label
+          - source
+          - confidence
+          - reasoning
+          - is_valid
+
+  # Task 2: Batch curate unmapped ingredients
+  batch_curate:
+    description: "Process batch of unmapped ingredients with LLM assistance"
+    parameters:
+      - name: batch_size
+        type: int
+        default: 20
+        description: "Number of ingredients to process"
+      - name: auto_accept_threshold
+        type: float
+        default: 0.90
+        description: "Confidence threshold for auto-acceptance"
+      - name: dry_run
+        type: bool
+        default: true
+        description: "If true, don't save changes"
+      - name: filter_by_occurrences
+        type: int
+        required: false
+        description: "Only process ingredients with >= this many occurrences"
+    workflow:
+      - step: load_unmapped
+        action: "Load unmapped ingredients from data/curated/unmapped_ingredients.yaml"
+      - step: filter_candidates
+        action: "Filter by occurrences if specified"
+      - step: batch_suggest
+        action: "Generate suggestions for batch"
+        loop:
+          - generate_suggestion
+          - validate_with_oak
+          - compute_confidence
+      - step: auto_accept_high_confidence
+        action: "Auto-accept suggestions >= threshold"
+        condition: "confidence >= auto_accept_threshold"
+      - step: manual_review_queue
+        action: "Queue lower-confidence suggestions for review"
+      - step: save_if_not_dry_run
+        action: "Save accepted mappings"
+        condition: "not dry_run"
+      - step: generate_report
+        output:
+          - total_processed
+          - auto_accepted
+          - manual_review_needed
+          - validation_failures
+          - cost_usd
+
+  # Task 3: Curate with CultureMech recipe context
+  curate_with_context:
+    description: "Enhanced curation using recipe context from CultureMech"
+    parameters:
+      - name: ingredient_name
+        type: string
+        required: true
+      - name: culturemech_recipes
+        type: list
+        required: false
+        description: "List of recipes containing this ingredient"
+    workflow:
+      - step: build_rich_context
+        action: "Extract co-occurring ingredients, media types, organism info"
+      - step: suggest_with_context
+        action: "Generate suggestion with enhanced context"
+      - step: validate
+        action: "Validate using OAK"
+      - step: return_result
+        output:
+          - suggestion
+          - context_used
+          - confidence
+
+  # Task 4: Review and accept suggestions
+  review_suggestions:
+    description: "Interactive review of pending suggestions"
+    parameters:
+      - name: max_review
+        type: int
+        default: 10
+      - name: sort_by
+        type: string
+        default: "confidence"
+        choices: ["confidence", "occurrences", "name"]
+    workflow:
+      - step: load_pending
+        action: "Load suggestions awaiting review"
+      - step: sort_and_filter
+        action: "Sort by specified criterion"
+      - step: interactive_review
+        action: "Present suggestions for approval/rejection"
+      - step: save_decisions
+        action: "Apply accepted mappings, discard rejected"
+      - step: generate_report
+        output:
+          - reviewed
+          - accepted
+          - rejected
+
+  # Task 5: Validate existing mappings
+  validate_mappings:
+    description: "Validate existing ontology mappings using OAK"
+    parameters:
+      - name: fix_invalid
+        type: bool
+        default: false
+    workflow:
+      - step: load_mapped_ingredients
+        action: "Load all ingredients with mappings"
+      - step: validate_each
+        action: "Check each ontology ID with OAK"
+        loop:
+          - validate_term
+          - check_label_match
+      - step: report_invalid
+        action: "List invalid or deprecated IDs"
+      - step: attempt_fix
+        action: "Try to find replacements for invalid IDs"
+        condition: "fix_invalid == true"
+      - step: generate_report
+        output:
+          - total_checked
+          - valid_count
+          - invalid_count
+          - fixed_count
+          - invalid_details
+
+integration:
+  # Integration with existing MediaIngredientMech code
+  import_paths:
+    - ${MEDIAINGREDIENTMECH_ROOT}/src
+
+  existing_scripts:
+    curate_unmapped: "scripts/curate_unmapped.py"
+    merge_culturemech: "scripts/merge_culturemech_updates.py"
+
+  compatibility:
+    preserves_curation_history: true
+    uses_same_llm_model: true
+    follows_same_validation: true
+
+reporting:
+  format: yaml
+  include:
+    - summary_stats
+    - cost_breakdown
+    - validation_results
+    - suggestions_by_confidence
+  save_to: ${OPENCLAW_WORKSPACE}/reports/ingredient_curation/

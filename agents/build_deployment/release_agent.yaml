@@ -1,0 +1,258 @@
+agent:
+  name: release_agent
+  type: build_deployment
+  description: "Coordinated release management and versioning across repositories"
+  version: "1.0.0"
+
+model:
+  provider: anthropic
+  model: claude-sonnet-4-20250514
+  temperature: 0.1
+  max_tokens: 4096
+
+workspace:
+  base_dir: ${OPENCLAW_WORKSPACE}
+  allowed_paths:
+    - ${CULTUREMECH_ROOT}
+    - ${MEDIAINGREDIENTMECH_ROOT}
+    - ${COMMUNITYMECH_ROOT}
+  create_backups: true
+  backup_dir: ${OPENCLAW_WORKSPACE}/.backups/releases
+
+tools:
+  - name: git_operations
+    type: plugin
+    plugin: git_integration
+    description: "Git tagging, branching, pushing"
+
+  - name: build_coordinator
+    type: agent
+    agent: build_coordinator_agent
+    description: "Trigger builds and validation"
+
+  - name: just_runner
+    type: plugin
+    plugin: just_runner
+    description: "Execute release commands"
+
+safety:
+  dry_run_default: true
+  require_approval_for:
+    - git_tag
+    - git_push
+    - version_bump
+    - publish_release
+  validation_required: true
+  pre_release_checks:
+    - all_tests_passing
+    - git_status_clean
+    - no_uncommitted_changes
+    - changelog_updated
+
+monitoring:
+  track_release_metrics: true
+  log_all_operations: true
+  notify_on_failure: true
+
+tasks:
+  # Task 1: Prepare coordinated release
+  prepare_release:
+    description: "Prepare all repositories for synchronized release"
+    parameters:
+      - name: version_type
+        type: string
+        choices: ["major", "minor", "patch"]
+        required: true
+      - name: dry_run
+        type: bool
+        default: true
+    workflow:
+      - step: validate_current_state
+        action: "Check all repos are clean, tests passing"
+      - step: calculate_new_versions
+        action: "Determine new version numbers for each repo"
+      - step: update_version_files
+        action: "Update pyproject.toml in all repos"
+        targets:
+          - "CultureMech/pyproject.toml"
+          - "MediaIngredientMech/pyproject.toml"
+          - "CommunityMech/pyproject.toml"
+      - step: generate_changelogs
+        action: "Generate changelog entries from git log"
+      - step: run_final_tests
+        action: "Full validation and test suite"
+
+  # Task 2: Create release tags
+  create_release_tags:
+    description: "Create git tags for synchronized release"
+    parameters:
+      - name: versions
+        type: dict
+        required: true
+        description: "Version map: {culturemech: v1.2.0, ...}"
+      - name: dry_run
+        type: bool
+        default: true
+    workflow:
+      - step: create_culturemech_tag
+        action: "git tag -a vX.Y.Z -m 'Release vX.Y.Z'"
+      - step: create_mediaingredient_tag
+        action: "git tag -a vX.Y.Z -m 'Release vX.Y.Z'"
+      - step: create_communitymech_tag
+        action: "git tag -a vX.Y.Z -m 'Release vX.Y.Z'"
+      - step: verify_tags
+        action: "git tag -l | grep vX.Y.Z"
+      - step: push_tags_if_approved
+        action: "git push origin --tags"
+        condition: "not dry_run and approved"
+
+  # Task 3: Generate changelog
+  generate_changelog:
+    description: "Auto-generate changelog from git commits"
+    parameters:
+      - name: since_tag
+        type: string
+        required: false
+        description: "Previous release tag to compare against"
+      - name: repo
+        type: string
+        choices: ["culturemech", "mediaingredientmech", "communitymech", "all"]
+        default: "all"
+    workflow:
+      - step: get_commit_history
+        action: "git log --pretty=format:'%h %s' since_tag..HEAD"
+      - step: categorize_commits
+        action: "Group by: feat, fix, docs, refactor, test, chore"
+      - step: format_changelog
+        action: "Generate markdown changelog"
+        format: |
+          ## [vX.Y.Z] - YYYY-MM-DD
+
+          ### Added
+          - New features
+
+          ### Changed
+          - Enhancements
+
+          ### Fixed
+          - Bug fixes
+
+          ### Dependencies
+          - Version updates
+      - step: append_to_changelog
+        action: "Prepend to CHANGELOG.md"
+
+  # Task 4: Version bump
+  bump_version:
+    description: "Increment version numbers across all repos"
+    parameters:
+      - name: bump_type
+        type: string
+        choices: ["major", "minor", "patch"]
+        required: true
+      - name: repos
+        type: list
+        default: ["culturemech", "mediaingredientmech", "communitymech"]
+    workflow:
+      - step: read_current_versions
+        action: "Parse pyproject.toml for current versions"
+      - step: calculate_new_versions
+        action: "Apply semver bump"
+        examples:
+          major: "1.2.3 → 2.0.0"
+          minor: "1.2.3 → 1.3.0"
+          patch: "1.2.3 → 1.2.4"
+      - step: update_pyproject_toml
+        action: "Write new version to pyproject.toml"
+      - step: update_version_constants
+        action: "Update __version__ in __init__.py if exists"
+      - step: commit_version_bumps
+        action: "git commit -m 'Bump version to vX.Y.Z'"
+
+  # Task 5: Check release readiness
+  check_release_ready:
+    description: "Validate all repos are ready for release"
+    workflow:
+      - step: git_status_check
+        action: "Ensure no uncommitted changes"
+        expected: "working tree clean"
+      - step: run_all_tests
+        action: "pytest, validation, integration tests"
+        expected: "all passing"
+      - step: check_dependencies
+        action: "uv lock --check (no dependency conflicts)"
+      - step: check_changelog
+        action: "Verify CHANGELOG.md updated"
+      - step: check_version_consistency
+        action: "All version references match"
+      - step: generate_readiness_report
+        output:
+          - status: "ready" | "not_ready"
+          - blockers: [list of issues]
+          - recommendations: [suggested actions]
+
+  # Task 6: Rollback release
+  rollback_release:
+    description: "Rollback a failed release"
+    parameters:
+      - name: release_tag
+        type: string
+        required: true
+      - name: repos
+        type: list
+        default: ["culturemech", "mediaingredientmech", "communitymech"]
+    workflow:
+      - step: delete_tags
+        action: "git tag -d TAG && git push origin :refs/tags/TAG"
+      - step: revert_version_bumps
+        action: "git revert VERSION_BUMP_COMMIT"
+      - step: restore_from_backup
+        action: "Restore pyproject.toml from backup"
+      - step: notify_rollback
+        action: "Log rollback event"
+
+  # Task 7: Create GitHub release (if applicable)
+  create_github_release:
+    description: "Create GitHub release with changelog"
+    parameters:
+      - name: tag
+        type: string
+        required: true
+      - name: repo
+        type: string
+        required: true
+      - name: draft
+        type: bool
+        default: true
+    workflow:
+      - step: format_release_notes
+        action: "Format changelog for GitHub"
+      - step: create_release
+        action: "gh release create TAG --title 'Release TAG' --notes-file NOTES.md"
+        condition: "github CLI available"
+
+integration:
+  version_files:
+    - path: "pyproject.toml"
+      field: "tool.poetry.version"
+    - path: "src/{repo}/__init__.py"
+      pattern: '__version__ = "X.Y.Z"'
+
+  changelog_format: "markdown"
+  changelog_location: "CHANGELOG.md"
+
+  git_config:
+    tag_prefix: "v"
+    release_branch: "main"
+    require_signed_tags: false
+
+reporting:
+  format: yaml
+  include:
+    - release_version
+    - repositories_updated
+    - changelogs_generated
+    - tags_created
+    - tests_status
+    - release_timestamp
+  save_to: ${OPENCLAW_WORKSPACE}/reports/releases/

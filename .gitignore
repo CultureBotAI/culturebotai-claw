@@ -1,0 +1,48 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# OpenClaw workspace and logs
+workspace/
+!workspace/.gitkeep
+*.log
+logs/
+completions/
+locks/
+messages/
+tasks/
+
+# Environment variables (contains API keys)
+.env
+.env.local
+
+# Backup files
+*.backup
+.backups/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# uv lock files (optional - comment out if you want to commit)
+# uv.lock

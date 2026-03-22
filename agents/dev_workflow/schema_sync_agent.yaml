@@ -1,0 +1,275 @@
+agent:
+  name: schema_sync_agent
+  type: dev_workflow
+  description: "Schema change propagation and datamodel regeneration across repositories"
+  version: "1.0.0"
+
+model:
+  provider: anthropic
+  model: claude-haiku-4-5-20250115
+  temperature: 0.1
+  max_tokens: 4096
+
+workspace:
+  base_dir: ${OPENCLAW_WORKSPACE}
+  allowed_paths:
+    - ${CULTUREMECH_ROOT}
+    - ${MEDIAINGREDIENTMECH_ROOT}
+    - ${COMMUNITYMECH_ROOT}
+  create_backups: true
+  backup_dir: ${OPENCLAW_WORKSPACE}/.backups/schemas
+
+tools:
+  - name: linkml_validator
+    type: plugin
+    plugin: linkml_validator
+    description: "Validate schemas and data"
+
+  - name: just_runner
+    type: plugin
+    plugin: just_runner
+    description: "Run gen-python commands"
+
+  - name: git_operations
+    type: plugin
+    plugin: git_integration
+    description: "Create branches for schema changes"
+
+safety:
+  dry_run_default: true
+  require_approval_for:
+    - regenerate_datamodel
+    - schema_migration
+    - breaking_changes
+  validation_required: true
+  pre_change_checks:
+    - schema_validates
+    - data_validates
+    - tests_passing
+
+monitoring:
+  track_schema_changes: true
+  log_regenerations: true
+  detect_breaking_changes: true
+
+tasks:
+  # Task 1: Detect schema changes
+  detect_schema_changes:
+    description: "Monitor schema files for changes and identify impacts"
+    parameters:
+      - name: repo
+        type: string
+        choices: ["culturemech", "mediaingredientmech", "communitymech"]
+        required: true
+      - name: since_commit
+        type: string
+        required: false
+    workflow:
+      - step: git_diff_schemas
+        action: "Find changes in schema/*.yaml files"
+      - step: parse_changes
+        action: "Identify added/removed/modified classes and slots"
+      - step: analyze_impact
+        action: "Determine if changes are breaking"
+        breaking_changes:
+          - removed_class
+          - removed_required_slot
+          - changed_slot_type
+          - changed_slot_range
+      - step: identify_affected_repos
+        action: "Determine which repos depend on changed schema"
+      - step: generate_report
+        output:
+          - changed_files
+          - breaking: true/false
+          - affected_repos: [list]
+          - recommended_actions: [list]
+
+  # Task 2: Regenerate datamodel from schema
+  regenerate_datamodel:
+    description: "Regenerate Python datamodel from LinkML schema"
+    parameters:
+      - name: repo
+        type: string
+        required: true
+      - name: validate_after
+        type: bool
+        default: true
+    workflow:
+      - step: backup_current_datamodel
+        action: "Copy current src/{repo}/datamodel/ to backup"
+      - step: run_gen_python
+        action: "just gen-python"
+        command: "gen-linkml --format python schema/{repo}.yaml > src/{repo}/datamodel.py"
+      - step: format_generated_code
+        action: "black src/{repo}/datamodel.py"
+      - step: validate_schema
+        action: "linkml-validate"
+        condition: "validate_after"
+      - step: run_tests
+        action: "pytest tests/"
+      - step: check_for_issues
+        action: "Detect import errors, type mismatches"
+
+  # Task 3: Propagate schema changes
+  propagate_schema_changes:
+    description: "Propagate schema changes to dependent repositories"
+    parameters:
+      - name: source_repo
+        type: string
+        required: true
+      - name: dry_run
+        type: bool
+        default: true
+    workflow:
+      - step: detect_dependencies
+        action: "Identify downstream repos"
+        dependencies:
+          culturemech: ["communitymech"]
+          mediaingredientmech: ["culturemech", "communitymech"]
+          communitymech: []
+      - step: notify_downstream
+        action: "Create GitHub issues or notifications"
+      - step: auto_update_if_safe
+        action: "Regenerate downstream datamodels if non-breaking"
+        condition: "not breaking_change"
+      - step: generate_migration_guide
+        action: "Create manual migration instructions if breaking"
+        condition: "breaking_change"
+
+  # Task 4: Validate data against new schema
+  validate_data_after_change:
+    description: "Validate all data files against updated schema"
+    parameters:
+      - name: repo
+        type: string
+        required: true
+      - name: data_pattern
+        type: string
+        default: "**/*.yaml"
+    workflow:
+      - step: find_data_files
+        action: "glob data/{data_pattern}"
+      - step: validate_each_file
+        action: "linkml-validate -s schema/{repo}.yaml FILE"
+        loop: "all data files"
+      - step: collect_errors
+        action: "Aggregate validation errors"
+      - step: categorize_errors
+        categories:
+          - missing_required_field
+          - invalid_type
+          - invalid_range
+          - unknown_field
+      - step: generate_report
+        output:
+          - total_files: N
+          - valid_files: N
+          - invalid_files: N
+          - errors_by_category: dict
+
+  # Task 5: Create migration script
+  create_migration_script:
+    description: "Generate data migration script for breaking schema changes"
+    parameters:
+      - name: old_schema
+        type: string
+        required: true
+      - name: new_schema
+        type: string
+        required: true
+      - name: repo
+        type: string
+        required: true
+    workflow:
+      - step: diff_schemas
+        action: "Compare old vs new schema"
+      - step: identify_migrations_needed
+        patterns:
+          - renamed_field: "old_name → new_name"
+          - type_change: "str → int (requires conversion)"
+          - new_required_field: "needs default value"
+      - step: generate_python_script
+        action: "Create scripts/migrate_schema_vX_to_vY.py"
+        template: |
+          """
+          Migrate data from schema vX to vY
+          """
+          import yaml
+          from pathlib import Path
+
+          def migrate_file(file_path):
+              # Load data
+              # Transform based on schema changes
+              # Save updated data
+              pass
+
+          if __name__ == "__main__":
+              # Apply to all data files
+              pass
+      - step: test_migration
+        action: "Run on sample data, verify results"
+
+  # Task 6: Watch for schema changes (event-driven)
+  watch_schema_files:
+    description: "Monitor schema files and trigger auto-regeneration"
+    parameters:
+      - name: repos
+        type: list
+        default: ["culturemech", "mediaingredientmech", "communitymech"]
+      - name: auto_regenerate
+        type: bool
+        default: false
+    workflow:
+      - step: setup_file_watcher
+        action: "watchdog on schema/*.yaml"
+      - step: on_change_detected
+        trigger: "file_modified"
+        actions:
+          - log_change
+          - run_detection_task
+          - regenerate_if_approved
+          - notify_user
+
+  # Task 7: Update documentation
+  update_schema_docs:
+    description: "Regenerate schema documentation after changes"
+    parameters:
+      - name: repo
+        type: string
+        required: true
+    workflow:
+      - step: generate_markdown_docs
+        action: "gen-doc --format markdown schema/{repo}.yaml > docs/schema.md"
+      - step: generate_html_docs
+        action: "gen-doc --format html schema/{repo}.yaml > docs/schema.html"
+      - step: update_readme
+        action: "Update schema section in README.md if needed"
+
+integration:
+  schema_paths:
+    culturemech: "src/culturemech/schema/culturemech.yaml"
+    mediaingredientmech: "src/mediaingredientmech/schema/mediaingredientmech.yaml"
+    communitymech: "src/communitymech/schema/communitymech.yaml"
+
+  datamodel_paths:
+    culturemech: "src/culturemech/datamodel.py"
+    mediaingredientmech: "src/mediaingredientmech/datamodel.py"
+    communitymech: "src/communitymech/datamodel.py"
+
+  dependency_graph:
+    # Arrows show schema dependency direction
+    mediaingredientmech: []
+    culturemech: ["mediaingredientmech"]
+    communitymech: ["culturemech", "mediaingredientmech"]
+
+reporting:
+  format: yaml
+  include:
+    - schema_changes_detected
+    - breaking_changes: true/false
+    - datamodels_regenerated
+    - validation_results
+    - migration_scripts_created
+    - affected_repositories
+  save_to: ${OPENCLAW_WORKSPACE}/reports/schema_sync/

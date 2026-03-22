@@ -1,0 +1,223 @@
+agent:
+  name: build_coordinator_agent
+  type: build_deployment
+  description: "Multi-repository build coordination and justfile orchestration"
+  version: "1.0.0"
+
+model:
+  provider: anthropic
+  model: claude-haiku-4-5-20250115
+  temperature: 0.1
+  max_tokens: 4096
+
+workspace:
+  base_dir: ${OPENCLAW_WORKSPACE}
+  allowed_paths:
+    - ${CULTUREMECH_ROOT}
+    - ${MEDIAINGREDIENTMECH_ROOT}
+    - ${COMMUNITYMECH_ROOT}
+  create_backups: false  # Build artifacts don't need backup
+  backup_dir: ${OPENCLAW_WORKSPACE}/.backups/builds
+
+tools:
+  - name: just_runner
+    type: plugin
+    plugin: just_runner
+    description: "Execute justfile recipes across repositories"
+
+  - name: git_status
+    type: plugin
+    plugin: git_integration
+    method: status
+    description: "Check git status across repositories"
+
+  - name: validation
+    type: plugin
+    plugin: linkml_validator
+    description: "Validate data against LinkML schemas"
+
+safety:
+  dry_run_default: true
+  require_approval_for:
+    - build_all_repos
+    - publish_artifacts
+  validation_required: true
+  pre_build_checks:
+    - git_status_clean
+    - all_tests_passing
+
+monitoring:
+  track_build_time: true
+  log_all_commands: true
+  generate_build_report: true
+
+tasks:
+  # Task 1: Validate all repositories before build
+  validate_all_repos:
+    description: "Run validation across all three repositories"
+    parameters:
+      - name: quick
+        type: bool
+        default: false
+        description: "Quick validation (schema only) vs full validation"
+    workflow:
+      - step: validate_culturemech
+        action: "Run 'just validate-all' in CultureMech"
+      - step: validate_mediaingredient
+        action: "Run 'just validate-all' in MediaIngredientMech"
+      - step: validate_communitymech
+        action: "Run 'just validate-all' in CommunityMech"
+      - step: aggregate_results
+        output:
+          - culturemech_status
+          - mediaingredient_status
+          - communitymech_status
+          - overall_status
+
+  # Task 2: Build all repositories in correct order
+  build_all_repos:
+    description: "Execute builds across repositories in dependency order"
+    parameters:
+      - name: skip_tests
+        type: bool
+        default: false
+      - name: dry_run
+        type: bool
+        default: true
+    workflow:
+      - step: check_git_status
+        action: "Ensure working directories are clean"
+      - step: build_mediaingredient
+        action: "Build MediaIngredientMech (no dependencies)"
+        commands:
+          - "just gen-python"
+          - "just validate-all"
+      - step: build_culturemech
+        action: "Build CultureMech (depends on MediaIngredientMech)"
+        commands:
+          - "just enrich-with-hierarchy"
+          - "just validate-all"
+      - step: build_communitymech
+        action: "Build CommunityMech (depends on both)"
+        commands:
+          - "just link-media"
+          - "just validate-all"
+      - step: run_tests
+        action: "Run test suites if not skipped"
+        condition: "not skip_tests"
+      - step: generate_report
+        output:
+          - build_duration
+          - tests_passed
+          - validation_status
+
+  # Task 3: Coordinate fresh build from scratch
+  fresh_build:
+    description: "Bootstrap build sequence for cold start"
+    workflow:
+      - step: phase1_culturemech_initial
+        action: "CultureMech initial build (no MediaIngredientMech)"
+        commands:
+          - "just fetch-raw-data"
+          - "just import-all"
+          - "just extract-ingredients"
+          - "just aggregate-mapped-ingredients"
+      - step: phase2_mediaingredient_initial
+        action: "MediaIngredientMech import"
+        commands:
+          - "just import-data"
+          - "just validate-all"
+      - step: phase3_culturemech_enrichment
+        action: "CultureMech enrichment (with MediaIngredientMech)"
+        commands:
+          - "just enrich-with-hierarchy"
+          - "just assign-ingredient-roles"
+          - "just merge-recipes"
+          - "just validate-all"
+      - step: phase4_communitymech
+        action: "CommunityMech final build"
+        commands:
+          - "just validate-all"
+          - "just link-media"
+          - "just gen-all"
+
+  # Task 4: Generate build artifacts
+  generate_artifacts:
+    description: "Generate browser exports, KGX files, visualizations"
+    parameters:
+      - name: formats
+        type: list
+        default: ["browser", "kgx", "umap"]
+    workflow:
+      - step: culturemech_exports
+        action: "Generate CultureMech artifacts"
+        commands:
+          - "just kgx-export"
+          - "just gen-browser-data"
+      - step: mediaingredient_exports
+        action: "Generate MediaIngredientMech artifacts"
+        commands:
+          - "just export-individual"
+          - "just export-browser"
+      - step: communitymech_exports
+        action: "Generate CommunityMech artifacts"
+        commands:
+          - "just gen-all"
+
+  # Task 5: Check build status across repos
+  check_build_status:
+    description: "Check current build state of all repositories"
+    workflow:
+      - step: git_status_all
+        action: "Check git status (uncommitted changes, branches)"
+      - step: last_build_time
+        action: "Check timestamps of generated files"
+      - step: validation_status
+        action: "Quick validation check"
+      - step: generate_report
+        output:
+          - repo_states
+          - build_freshness
+          - validation_results
+
+  # Task 6: Incremental build (only what changed)
+  incremental_build:
+    description: "Smart rebuild based on what changed"
+    parameters:
+      - name: since_commit
+        type: string
+        required: false
+        description: "Git commit to compare against"
+    workflow:
+      - step: detect_changes
+        action: "Git diff to find changed files"
+      - step: identify_affected_repos
+        action: "Determine which repos need rebuilding"
+      - step: minimal_rebuild
+        action: "Run only necessary build steps"
+
+integration:
+  justfile_paths:
+    culturemech: ${CULTUREMECH_ROOT}/project.justfile
+    mediaingredientmech: ${MEDIAINGREDIENTMECH_ROOT}/justfile
+    communitymech: ${COMMUNITYMECH_ROOT}/justfile
+
+  build_order:
+    phase1: ["mediaingredientmech"]
+    phase2: ["culturemech"]
+    phase3: ["communitymech"]
+
+  critical_commands:
+    - "validate-all"
+    - "gen-python"
+    - "enrich-with-hierarchy"
+
+reporting:
+  format: yaml
+  include:
+    - build_duration_per_repo
+    - validation_results
+    - test_results
+    - artifact_sizes
+    - git_status
+  save_to: ${OPENCLAW_WORKSPACE}/reports/builds/

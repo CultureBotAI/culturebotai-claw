@@ -1,0 +1,286 @@
+agent:
+  name: network_repair_agent
+  type: data_pipeline
+  description: "Network integrity auditing and LLM-assisted repair using CommunityMech's LLMNetworkRepairer"
+  version: "1.0.0"
+
+model:
+  provider: anthropic
+  model: claude-opus-4-6  # Use Opus for complex reasoning about network structures
+  temperature: 0.1
+  max_tokens: 8192
+
+workspace:
+  base_dir: ${COMMUNITYMECH_ROOT}
+  allowed_paths:
+    - "kb/communities/**"
+    - "kb/core_interactions.yaml"
+  create_backups: true
+  backup_dir: ${OPENCLAW_WORKSPACE}/.backups/network_repair
+
+tools:
+  # Wrap existing CommunityMech classes
+  - name: llm_repairer
+    type: python_module
+    module: communitymech.network.llm_repair
+    class: LLMNetworkRepairer
+    description: "LLM-assisted network repair orchestrator"
+
+  - name: auditor
+    type: python_module
+    module: communitymech.network.auditor
+    class: NetworkIntegrityAuditor
+    description: "Network integrity auditing (5 issue types)"
+
+  - name: validator
+    type: python_module
+    module: communitymech.network.validators
+    class: SuggestionValidator
+    description: "Validate repair suggestions"
+
+safety:
+  dry_run_default: true
+  require_approval_for:
+    - apply_repairs
+    - modify_community_file
+    - delete_interactions
+  validation_required: true
+  automatic_backup: true
+  max_repairs_per_run: 50
+
+monitoring:
+  track_costs: true
+  max_cost_per_run: 10.00  # USD (Opus is expensive)
+  log_all_repairs: true
+  track_issue_types: true
+
+issue_types:
+  # The 5 types detected by NetworkIntegrityAuditor
+  - DISCONNECTED_TAXON: "Taxa in communities but not in core_interactions.yaml"
+  - INVALID_ONTOLOGY_ID: "Malformed or invalid ontology IDs"
+  - MISSING_REQUIRED_FIELD: "Missing name, role, or ontology_id"
+  - DUPLICATE_TAXON: "Same taxon appears multiple times"
+  - INTERACTION_MISMATCH: "Interaction references non-existent taxa"
+
+tasks:
+  # Task 1: Audit a single community
+  audit_community:
+    description: "Audit network integrity for one community file"
+    parameters:
+      - name: yaml_path
+        type: path
+        required: true
+        description: "Path to community YAML file (relative to CommunityMech root)"
+    workflow:
+      - step: initialize_auditor
+        action: "Create NetworkIntegrityAuditor instance"
+      - step: run_audit
+        action: "Call auditor.audit_community(yaml_path)"
+      - step: categorize_issues
+        action: "Group issues by type"
+      - step: return_report
+        output:
+          - total_issues
+          - issues_by_type
+          - repairable_count
+          - manual_review_count
+          - issue_details
+
+  # Task 2: Repair a single community
+  repair_community:
+    description: "Repair network integrity issues in one community"
+    parameters:
+      - name: yaml_path
+        type: path
+        required: true
+      - name: dry_run
+        type: bool
+        default: true
+      - name: auto_approve
+        type: bool
+        default: false
+        description: "Auto-approve high-confidence suggestions"
+      - name: max_repairs
+        type: int
+        required: false
+        description: "Limit number of repairs (for testing)"
+    workflow:
+      - step: create_backup
+        action: "Backup community file"
+      - step: audit
+        action: "Find integrity issues"
+      - step: initialize_repairer
+        action: "Create LLMNetworkRepairer with Opus 4.6"
+      - step: repair
+        action: "Call repairer.repair_community(yaml_path, dry_run, auto_approve, max_repairs)"
+      - step: validate_repairs
+        action: "Re-audit to verify repairs"
+      - step: return_summary
+        output:
+          - status
+          - total_issues
+          - repairable_issues
+          - repairs_attempted
+          - repairs_succeeded
+          - repairs_failed
+          - cost_usd
+          - backup_path
+
+  # Task 3: Batch repair multiple communities
+  batch_repair:
+    description: "Repair multiple community files"
+    parameters:
+      - name: community_pattern
+        type: string
+        default: "kb/communities/*.yaml"
+        description: "Glob pattern for community files"
+      - name: dry_run
+        type: bool
+        default: true
+      - name: auto_approve
+        type: bool
+        default: false
+      - name: max_repairs_per_file
+        type: int
+        default: 10
+      - name: stop_on_failure
+        type: bool
+        default: false
+    workflow:
+      - step: discover_communities
+        action: "Find all matching community files"
+      - step: audit_all
+        action: "Quick audit to prioritize"
+      - step: batch_repair
+        action: "Repair each community"
+        loop:
+          - backup_file
+          - repair_community
+          - validate_repairs
+          - log_results
+        condition: "not stop_on_failure or all_successful"
+      - step: aggregate_results
+        output:
+          - total_communities
+          - communities_repaired
+          - total_issues_found
+          - total_repairs_succeeded
+          - total_cost_usd
+          - failed_communities
+
+  # Task 4: Restore from backup
+  restore_from_backup:
+    description: "Restore a community file from backup"
+    parameters:
+      - name: yaml_path
+        type: path
+        required: true
+      - name: backup_timestamp
+        type: string
+        required: false
+        description: "Specific backup to restore (latest if not specified)"
+    workflow:
+      - step: find_backup
+        action: "Locate backup file"
+      - step: validate_backup
+        action: "Ensure backup is valid YAML"
+      - step: restore
+        action: "Copy backup to original location"
+      - step: verify
+        action: "Validate restored file"
+      - step: return_result
+        output:
+          - restored_from
+          - restored_to
+          - timestamp
+          - success
+
+  # Task 5: Analyze repair patterns
+  analyze_repairs:
+    description: "Analyze repair history and patterns"
+    parameters:
+      - name: days_back
+        type: int
+        default: 7
+    workflow:
+      - step: load_repair_logs
+        action: "Load repair history from logs"
+      - step: aggregate_by_issue_type
+        action: "Group by DISCONNECTED_TAXON, INVALID_ONTOLOGY_ID, etc."
+      - step: compute_success_rates
+        action: "Calculate repair success rate by type"
+      - step: identify_problematic_files
+        action: "Find files with recurring issues"
+      - step: cost_analysis
+        action: "Total cost breakdown"
+      - step: return_report
+        output:
+          - total_repairs
+          - success_rate_by_type
+          - most_common_issues
+          - highest_cost_files
+          - recommendations
+
+  # Task 6: Validate all communities
+  validate_all:
+    description: "Audit all community files without repairs"
+    parameters:
+      - name: report_format
+        type: string
+        default: "yaml"
+        choices: ["yaml", "json", "markdown"]
+    workflow:
+      - step: discover_communities
+        action: "Find all kb/communities/*.yaml"
+      - step: audit_each
+        action: "Run auditor on each file"
+        parallel: true
+      - step: aggregate_results
+        action: "Combine results"
+      - step: generate_report
+        output:
+          - total_communities
+          - communities_with_issues
+          - total_issues
+          - issues_by_type
+          - top_10_problematic_files
+      - step: save_report
+        action: "Save to workspace/reports/"
+
+integration:
+  # Integration with existing CommunityMech code
+  import_paths:
+    - ${COMMUNITYMECH_ROOT}/src
+
+  existing_scripts:
+    llm_repair: "src/communitymech/network/llm_repair.py"
+    auditor: "src/communitymech/network/auditor.py"
+    validators: "src/communitymech/network/validators.py"
+
+  compatibility:
+    uses_same_llm_client: true
+    follows_same_validation: true
+    preserves_backup_system: true
+    maintains_repair_strategies: true
+
+  justfile_integration:
+    # Leverage existing justfile commands
+    audit_network: "just audit-network"
+    validate_community: "just validate kb/communities/<file>"
+
+cost_optimization:
+  # Opus is expensive, optimize usage
+  cache_llm_responses: true
+  batch_similar_issues: true
+  use_cheaper_model_for_validation: true  # Use Haiku for pre-validation
+  parallel_processing: false  # Avoid rate limits with Opus
+
+reporting:
+  format: yaml
+  include:
+    - summary_stats
+    - cost_breakdown_by_file
+    - repair_details
+    - validation_results
+    - backup_locations
+  save_to: ${OPENCLAW_WORKSPACE}/reports/network_repair/

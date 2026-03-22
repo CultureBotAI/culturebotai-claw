@@ -1,0 +1,82 @@
+openclaw:
+  version: "2026.3.12"
+  mode: local
+  log_level: INFO
+  workspace: ${OPENCLAW_WORKSPACE}
+
+repositories:
+  culturemech:
+    path: ${CULTUREMECH_ROOT}
+    type: python
+    package_manager: uv
+    task_runner: just
+    description: "Knowledge base with 10,657 culture media recipes"
+
+  mediaingredientmech:
+    path: ${MEDIAINGREDIENTMECH_ROOT}
+    type: python
+    package_manager: uv
+    task_runner: just
+    description: "LLM-assisted curation system for 1,131 ingredients"
+
+  communitymech:
+    path: ${COMMUNITYMECH_ROOT}
+    type: python
+    package_manager: uv
+    task_runner: just
+    description: "Microbial community modeling with ecological interactions"
+
+agents:
+  discovery_paths:
+    - agents/code_development
+    - agents/data_pipeline
+    - agents/build_deployment
+    - agents/dev_workflow
+
+  defaults:
+    temperature: 0.1
+    max_tokens: 4096
+    timeout: 300
+    retry_on_failure: true
+    max_retries: 3
+
+plugins:
+  enabled:
+    - just_runner
+    - linkml_validator
+    - oak_query
+    - git_integration
+
+  paths:
+    - plugins/
+
+safety:
+  require_approval_for:
+    - git_push
+    - file_deletion
+    - schema_changes
+    - data_imports
+    - cross_repo_operations
+
+  create_backups: true
+  backup_directory: ${OPENCLAW_WORKSPACE}/.backups
+
+  allowed_operations:
+    read: true
+    write_new_files: true
+    edit_existing_files: true
+    delete_files: false  # Requires approval
+    git_operations: true
+    network_access: true
+
+monitoring:
+  enable_logging: true
+  log_directory: ${OPENCLAW_WORKSPACE}/logs
+  metrics_enabled: true
+  cost_tracking: true
+  max_cost_per_run: 10.00  # USD
+
+performance:
+  parallel_agents: 3
+  cache_enabled: true
+  cache_ttl: 3600  # seconds

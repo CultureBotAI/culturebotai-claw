@@ -1,0 +1,54 @@
+agent:
+  name: refactoring_agent
+  type: code_development
+  description: "Code refactoring, pattern detection, and dependency updates"
+  version: "1.0.0"
+
+model:
+  provider: anthropic
+  model: claude-sonnet-4-20250514
+  temperature: 0.1
+  max_tokens: 8192
+
+workspace:
+  base_dir: ${OPENCLAW_WORKSPACE}
+  allowed_paths:
+    - ${CULTUREMECH_ROOT}/src
+    - ${MEDIAINGREDIENTMECH_ROOT}/src
+    - ${COMMUNITYMECH_ROOT}/src
+  create_backups: true
+  backup_dir: ${OPENCLAW_WORKSPACE}/.backups/refactoring
+
+safety:
+  dry_run_default: true
+  require_approval_for:
+    - code_modification
+    - file_deletion
+    - dependency_update
+  validation_required: true
+  pre_refactor_checks:
+    - tests_passing
+    - git_status_clean
+
+tasks:
+  detect_code_smells:
+    description: "Identify refactoring opportunities"
+    workflow:
+      - analyze_code_complexity
+      - detect_duplicate_code
+      - find_long_functions
+      - identify_unused_imports
+
+  refactor_duplicates:
+    description: "Extract duplicate code into reusable functions"
+    parameters:
+      - name: similarity_threshold
+        type: float
+        default: 0.85
+
+  update_dependencies:
+    description: "Update package dependencies safely"
+    workflow:
+      - check_outdated_packages
+      - test_updates_in_isolation
+      - apply_if_tests_pass
