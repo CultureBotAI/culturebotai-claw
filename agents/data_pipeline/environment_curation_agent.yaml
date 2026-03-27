@@ -1,0 +1,277 @@
+agent:
+  name: environment_curation_agent
+  type: data_pipeline
+  description: "Citation-backed environment curation using ENVO ontology terms and PubMed validation"
+  version: "1.0.0"
+
+model:
+  provider: anthropic
+  model: claude-sonnet-4-20250514
+  temperature: 0.0  # Deterministic for consistency
+  max_tokens: 4096
+
+workspace:
+  base_dir: ${CULTUREMECH_ROOT}
+  allowed_paths:
+    - "data/**/*.yaml"
+  create_backups: true
+  backup_dir: ${OPENCLAW_WORKSPACE}/.backups/environment_curation
+
+tools:
+  # Environment curation logic
+  - name: environment_curator
+    type: python_module
+    module: plugins.environment_curator
+    description: "Environment prioritization and quality scoring"
+
+  # PubMed citation validation
+  - name: pubmed_client
+    type: python_module
+    module: plugins.pubmed_client
+    description: "PubMed API for citation validation"
+
+  # ENVO ontology validation
+  - name: oak_query
+    type: plugin
+    plugin: oak_query
+    method: validate_term
+    description: "Validate ENVO terms using OAK"
+
+  # Pipeline orchestration
+  - name: environment_pipeline
+    type: python_module
+    module: pipelines.environment_curation_pipeline
+    class: EnvironmentCurationPipeline
+    description: "Environment curation pipeline orchestration"
+
+safety:
+  dry_run_default: true
+  require_approval_for:
+    - save_environment_curation
+    - batch_accept
+    - update_media_records
+  auto_accept_threshold: 0.90
+  manual_review_threshold: 0.70
+  max_batch_size: 100
+  max_cost_per_batch: 100.00
+
+tasks:
+  # Main task: batch curate environments
+  curate_batch:
+    description: "Curate environment fields for a batch of media with citation validation"
+    parameters:
+      - name: media_ids
+        type: list
+        required: true
+        description: "List of media IDs to curate"
+      - name: tier
+        type: integer
+        required: false
+        description: "Target tier (1, 2, or 3) for prioritization"
+      - name: batch_size
+        type: integer
+        required: false
+        default: 20
+        description: "Number of media to process"
+      - name: auto_accept_threshold
+        type: float
+        required: false
+        default: 0.90
+        description: "Confidence threshold for auto-acceptance"
+      - name: require_citations
+        type: boolean
+        required: false
+        default: true
+        description: "Require PMIDs (no INFERRED auto-accept)"
+      - name: dry_run
+        type: boolean
+        required: false
+        default: true
+        description: "If true, don't save changes"
+
+    workflow:
+      - step: load_media_records
+        description: "Load media records from CultureMech"
+        action: read_media_yaml
+        inputs: [media_ids]
+        output: media_records
+
+      - step: run_pipeline
+        description: "Execute environment curation pipeline"
+        action: environment_pipeline.run
+        inputs:
+          - media_records
+          - batch_size
+          - tier
+          - auto_accept_threshold
+          - dry_run
+          - require_citations
+        output: curation_results
+
+      - step: save_results
+        description: "Save curation results"
+        action: write_results
+        condition: "not dry_run"
+        inputs: [curation_results]
+
+      - step: generate_report
+        description: "Generate curation report"
+        action: create_report
+        inputs: [curation_results]
+        output: report
+
+  # Review task: process manual review queue
+  review_pending:
+    description: "Review and approve/reject pending environment suggestions"
+    parameters:
+      - name: review_file
+        type: string
+        required: true
+        description: "Path to pending review YAML file"
+
+    workflow:
+      - step: load_review_queue
+        description: "Load pending suggestions"
+        action: read_yaml
+        inputs: [review_file]
+        output: pending_suggestions
+
+      - step: interactive_review
+        description: "Interactive review of each suggestion"
+        action: prompt_for_decision
+        inputs: [pending_suggestions]
+        output: reviewed_suggestions
+
+      - step: apply_approved
+        description: "Apply approved curations"
+        action: save_approved_curations
+        inputs: [reviewed_suggestions]
+
+      - step: update_review_file
+        description: "Mark reviewed items as processed"
+        action: update_yaml
+        inputs: [review_file, reviewed_suggestions]
+
+  # Prioritization task: identify high-value candidates
+  prioritize_candidates:
+    description: "Identify high-priority media for curation"
+    parameters:
+      - name: tier
+        type: integer
+        required: true
+        description: "Target tier (1, 2, or 3)"
+      - name: limit
+        type: integer
+        required: false
+        default: 100
+        description: "Maximum candidates to return"
+
+    workflow:
+      - step: load_all_media
+        description: "Load all media from CultureMech"
+        action: scan_media_directory
+        output: all_media
+
+      - step: score_media
+        description: "Score all media for prioritization"
+        action: environment_curator.score_media
+        inputs: [all_media]
+        output: scored_media
+
+      - step: filter_by_tier
+        description: "Filter to target tier"
+        action: filter_tier
+        inputs: [scored_media, tier]
+        output: tier_candidates
+
+      - step: select_top_n
+        description: "Select top N by score"
+        action: sort_and_limit
+        inputs: [tier_candidates, limit]
+        output: prioritized_media_ids
+
+  # Validation task: validate a single suggestion
+  validate_suggestion:
+    description: "Validate a single environment suggestion through all gates"
+    parameters:
+      - name: media_id
+        type: string
+        required: true
+      - name: environment_suggestion
+        type: object
+        required: true
+        description: "Environment suggestion to validate"
+
+    workflow:
+      - step: schema_validation
+        description: "Gate 1: Validate against LinkML schema"
+        action: validate_schema
+        inputs: [environment_suggestion]
+        output: schema_valid
+
+      - step: ontology_validation
+        description: "Gate 2: Validate ENVO term via OAK"
+        action: oak_query.validate_term
+        inputs: [environment_suggestion.envo_id]
+        output: ontology_valid
+
+      - step: citation_validation
+        description: "Gate 3: Validate PMID via PubMed"
+        action: pubmed_client.validate_citation
+        inputs:
+          - environment_suggestion.evidence.reference
+          - environment_suggestion.evidence.snippet
+        output: citation_valid
+
+      - step: score_quality
+        description: "Gate 5: Score evidence quality"
+        action: environment_curator.score_evidence_quality
+        inputs:
+          - citation_valid
+          - ontology_valid
+          - environment_suggestion.reasoning
+        output: quality_scores
+
+      - step: determine_decision
+        description: "Determine AUTO_ACCEPT, MANUAL_REVIEW, or REJECT"
+        action: make_decision
+        inputs: [quality_scores]
+        output: decision
+
+metrics:
+  track:
+    - suggestion_count
+    - auto_accept_rate
+    - pmid_discovery_rate
+    - validation_failure_rate
+    - cost_per_media
+    - processing_time_per_media
+
+  thresholds:
+    auto_accept_rate_target: 0.80  # Tier 1 target
+    pmid_discovery_rate_target: 0.60
+    validation_failure_rate_max: 0.05
+
+reporting:
+  format: json
+  include:
+    - summary_stats
+    - auto_accepted_list
+    - manual_review_list
+    - rejected_list
+    - pmid_discovery_breakdown
+    - tier_distribution
+    - cost_summary
+  save_to: ${OPENCLAW_WORKSPACE}/reports/environment_curation/
+
+error_handling:
+  on_pmid_validation_failure:
+    action: continue
+    log_warning: true
+  on_oak_unavailable:
+    action: fallback_to_format_validation
+    log_warning: true
+  on_llm_error:
+    action: retry
+    max_retries: 2
+    backoff: exponential

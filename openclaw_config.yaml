@@ -46,9 +46,31 @@ plugins:
     - linkml_validator
     - oak_query
     - git_integration
+    - lock_manager
+    - ingredient_deduplicator
+    - ingredient_repo_synchronizer
 
   paths:
     - plugins/
+
+pipelines:
+  unified_ingredient_mapping:
+    description: "Unified ingredient mapping orchestration across CultureMech and MediaIngredientMech"
+    batch_size: 20
+    auto_accept_threshold: 0.90
+    max_cost_per_run: 5.00
+    dry_run_default: true
+    quality_gates:
+      - schema_validation
+      - ontology_validation
+      - confidence_threshold
+    canonical_storage: ${OPENCLAW_WORKSPACE}/canonical_ingredients
+    sync_mode: bidirectional
+    deduplication_strategies:
+      - exact_match
+      - chebi_id_match
+      - synonym_overlap
+    min_synonym_overlap: 0.5
 
 safety:
   require_approval_for:

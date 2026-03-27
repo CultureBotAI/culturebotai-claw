@@ -1,0 +1,175 @@
+agent:
+  name: unified_ingredient_mapping_agent
+  type: data_pipeline
+  description: "Orchestrates unified ingredient mapping across CultureMech and MediaIngredientMech with canonical storage"
+  version: "1.0.0"
+
+model:
+  provider: anthropic
+  model: claude-haiku-4-5  # Fast model for batch processing
+  temperature: 0.1
+  max_tokens: 4096
+
+workspace:
+  allowed_paths:
+    - "${CULTUREMECH_ROOT}/**"
+    - "${MEDIAINGREDIENTMECH_ROOT}/**"
+    - "${OPENCLAW_WORKSPACE}/canonical_ingredients/**"
+    - "${OPENCLAW_WORKSPACE}/reports/**"
+    - "${OPENCLAW_WORKSPACE}/locks/**"
+  read_only: false
+  create_backups: true
+
+tools:
+  - name: llm_curator
+    type: plugin
+    plugin: environment_llm_curator
+    description: "LLM-assisted ontology mapping"
+    config:
+      max_cost_per_ingredient: 0.10
+
+  - name: oak_query
+    type: plugin
+    plugin: oak_query
+    description: "Ontology Access Kit for CHEBI/FOODON validation"
+    config:
+      sources:
+        - CHEBI
+        - FOODON
+      cache_enabled: true
+
+  - name: lock_manager
+    type: plugin
+    plugin: lock_manager
+    description: "Distributed locking for multi-Claude coordination"
+    config:
+      locks_dir: ${OPENCLAW_WORKSPACE}/locks
+      default_timeout: 3600  # 1 hour
+
+  - name: linkml_validator
+    type: plugin
+    plugin: linkml_validator
+    description: "Validate against MediaIngredientMech schema"
+
+  - name: git_integration
+    type: plugin
+    plugin: git_integration
+    description: "Safe git operations for tracking changes"
+
+safety:
+  dry_run_default: true
+  approval_required:
+    - update_canonical_store
+    - sync_to_culturemech
+    - sync_to_mediaingredientmech
+  max_cost_per_run: 5.00
+  max_files_modified: 1000
+
+tasks:
+  map_batch:
+    description: "Map a batch of unmapped ingredients"
+    parameters:
+      batch_size:
+        type: integer
+        default: 20
+      auto_accept_threshold:
+        type: float
+        default: 0.90
+      min_occurrences:
+        type: integer
+        default: 2
+      dry_run:
+        type: boolean
+        default: true
+
+    workflow:
+      - step: validate_prerequisites
+        description: "Ensure environment is ready"
+        checks:
+          - ANTHROPIC_API_KEY set
+          - Both repos accessible
+          - Canonical store initialized
+          - No stale locks
+        timeout: 30
+
+      - step: deduplicate_unmapped
+        description: "Merge and deduplicate unmapped ingredients from both repos"
+        tool: ingredient_deduplicator
+        input:
+          culturemech: ${CULTUREMECH_ROOT}/output/unmapped_ingredients.yaml
+          mediaingredientmech: ${MEDIAINGREDIENTMECH_ROOT}/data/curated/unmapped_ingredients.yaml
+        output: ${OPENCLAW_WORKSPACE}/canonical_ingredients/unmapped_ingredients.yaml
+        timeout: 300
+
+      - step: llm_curation
+        description: "Generate mapping suggestions with LLM + OAK validation"
+        tool: llm_curator
+        batch_size: ${batch_size}
+        max_cost: ${max_cost_per_run}
+        validation: oak_query
+        timeout: 600
+
+      - step: validate_mappings
+        description: "Validate suggested mappings against schema and ontologies"
+        validations:
+          - schema: linkml_validator
+          - ontology: oak_query
+          - confidence_threshold: ${auto_accept_threshold}
+        timeout: 180
+
+      - step: sync_to_repos
+        description: "Synchronize approved mappings to both repositories"
+        if: not ${dry_run}
+        targets:
+          - repository: culturemech
+            method: update_mediaingredientmech_term
+            validation: linkml_validator
+          - repository: mediaingredientmech
+            method: append_to_mapped
+            validation: linkml_validator
+        create_backups: true
+        timeout: 300
+
+monitoring:
+  track_metrics:
+    - ingredients_processed
+    - auto_accepted_count
+    - manual_review_count
+    - rejected_count
+    - culturemech_files_modified
+    - mediaingredientmech_additions
+    - total_cost
+    - execution_time
+
+  alerts:
+    - condition: total_cost > max_cost_per_run
+      action: abort
+      message: "Cost limit exceeded"
+
+    - condition: conflicts_detected > 10
+      action: warn
+      message: "High number of deduplication conflicts - review required"
+
+    - condition: rejected_count > auto_accepted_count
+      action: warn
+      message: "Rejection rate high - consider lowering threshold or improving LLM prompts"
+
+logging:
+  level: INFO
+  log_to_file: true
+  log_file: ${OPENCLAW_WORKSPACE}/logs/unified_ingredient_mapping.log
+  include_timestamps: true
+  include_cost_tracking: true
+
+cost_control:
+  max_cost_per_run: 5.00
+  max_cost_per_ingredient: 0.25
+  abort_on_limit: true
+  warn_at_percentage: 80
+
+error_handling:
+  on_lock_failure: abort
+  on_validation_failure: skip_and_continue
+  on_sync_failure: rollback
+  max_retries: 3
+  retry_delay_seconds: 5

@@ -1,0 +1,246 @@
+agent:
+  name: map_ingredients_skill
+  type: cross_repo_skill
+  description: "Unified ingredient mapping orchestration across CultureMech and MediaIngredientMech with canonical storage and bidirectional sync"
+  version: "1.0.0"
+
+model:
+  provider: anthropic
+  model: claude-sonnet-4-20250514
+  temperature: 0.1
+  max_tokens: 8192
+
+workspace:
+  base_dir: ${OPENCLAW_WORKSPACE}/map_ingredients
+  allowed_paths:
+    - "${CULTUREMECH_ROOT}/output/**"
+    - "${CULTUREMECH_ROOT}/normalized_yaml/**"
+    - "${MEDIAINGREDIENTMECH_ROOT}/data/**"
+    - "${OPENCLAW_WORKSPACE}/canonical_ingredients/**"
+    - "${OPENCLAW_WORKSPACE}/reports/**"
+    - "${OPENCLAW_WORKSPACE}/locks/**"
+  create_backups: true
+  backup_dir: ${OPENCLAW_WORKSPACE}/.backups/map_ingredients
+
+tools:
+  # Coordination tools
+  - name: lock_manager
+    type: python_module
+    module: plugins.lock_manager
+    class: LockManager
+    description: "Multi-Claude coordination locks"
+
+  - name: ingredient_deduplicator
+    type: python_module
+    module: plugins.ingredient_deduplicator
+    class: IngredientDeduplicator
+    description: "Deduplicate unmapped ingredients from both repos"
+
+  - name: ingredient_synchronizer
+    type: python_module
+    module: plugins.ingredient_repo_synchronizer
+    class: IngredientRepoSynchronizer
+    description: "Bidirectional sync of mappings to repos"
+
+  # LLM curation (reuse environment pattern)
+  - name: llm_curator
+    type: plugin
+    plugin: environment_llm_curator
+    description: "LLM-assisted ontology mapping suggestions"
+
+  # Ontology validation
+  - name: oak_query
+    type: plugin
+    plugin: oak_query
+    description: "Validate ontology terms against CHEBI/FOODON"
+
+  # Pipeline execution
+  - name: unified_pipeline
+    type: python_module
+    module: pipelines.unified_ingredient_mapping_pipeline
+    class: UnifiedIngredientMappingPipeline
+    description: "Core 8-step orchestration workflow"
+
+safety:
+  dry_run_default: true
+  require_approval_for:
+    - sync_to_culturemech
+    - sync_to_mediaingredientmech
+    - update_canonical_store
+    - curate_batch
+  max_concurrent_locks: 2
+  max_cost_per_run: 5.00
+
+parameters:
+  - name: batch_size
+    type: integer
+    default: 20
+    description: "Number of ingredients to process in this run"
+    min: 1
+    max: 100
+
+  - name: auto_accept_threshold
+    type: float
+    default: 0.90
+    description: "Confidence threshold for auto-accepting mappings (0.0-1.0)"
+    min: 0.7
+    max: 1.0
+
+  - name: min_occurrences
+    type: integer
+    default: 2
+    description: "Only process ingredients with at least this many occurrences"
+    min: 1
+
+  - name: dry_run
+    type: boolean
+    default: true
+    description: "If true, don't save changes (preview mode)"
+
+tasks:
+  # Main workflow: Unified ingredient mapping
+  map_ingredients:
+    description: "End-to-end workflow for unified ingredient mapping with canonical storage and bidirectional sync"
+    workflow:
+      - step: validate_environment
+        description: "Check that both repos are accessible and API key is set"
+        required_env_vars:
+          - CULTUREMECH_ROOT
+          - MEDIAINGREDIENTMECH_ROOT
+          - ANTHROPIC_API_KEY
+
+      - step: acquire_locks
+        description: "Acquire locks on both CultureMech and MediaIngredientMech"
+        timeout: 30
+        on_failure: abort
+
+      - step: extract_unmapped
+        description: "Extract unmapped ingredients from both repositories"
+        sources:
+          - CultureMech/output/unmapped_ingredients.yaml
+          - MediaIngredientMech/data/curated/unmapped_ingredients.yaml
+
+      - step: deduplicate
+        description: "Merge and deduplicate unmapped lists using exact match, CHEBI ID, and synonym overlap"
+        tool: ingredient_deduplicator
+        output: workspace/canonical_ingredients/unmapped_ingredients.yaml
+
+      - step: prioritize
+        description: "Sort by occurrence count and select top batch_size ingredients"
+        sort_by: occurrence_count
+        order: descending
+
+      - step: curate
+        description: "Get LLM suggestions and validate against ontologies"
+        tool: llm_curator
+        validation_tool: oak_query
+        max_cost: ${max_cost_per_run}
+
+      - step: quality_gate
+        description: "Route by confidence score: auto-accept, manual review, or reject"
+        thresholds:
+          auto_accept: ${auto_accept_threshold}
+          manual_review: 0.70
+          reject: 0.70
+
+      - step: update_canonical
+        description: "Add auto-accepted mappings to canonical store"
+        if: not ${dry_run}
+        target: workspace/canonical_ingredients/mapped_ingredients.yaml
+        audit_trail: workspace/canonical_ingredients/mapping_audit_trail.yaml
+
+      - step: bidirectional_sync
+        description: "Sync mappings back to both repositories"
+        if: not ${dry_run}
+        tool: ingredient_synchronizer
+        targets:
+          - CultureMech (update mediaingredientmech_term fields)
+          - MediaIngredientMech (append to mapped_ingredients.yaml)
+
+      - step: release_locks
+        description: "Release locks on both repositories"
+        always_run: true
+
+      - step: generate_report
+        description: "Create execution report with stats and next steps"
+        output: workspace/reports/unified_ingredient_mapping/run_{{timestamp}}.yaml
+
+  # Utility task: Preview sync diff
+  preview_sync:
+    description: "Preview what would change in each repo without applying"
+    workflow:
+      - step: load_canonical
+        source: workspace/canonical_ingredients/mapped_ingredients.yaml
+
+      - step: generate_diff
+        tool: ingredient_synchronizer
+        method: generate_sync_diff
+        output: console
+
+  # Utility task: Resolve conflicts
+  resolve_conflicts:
+    description: "Interactive resolution of deduplication conflicts"
+    workflow:
+      - step: load_conflicts
+        source: workspace/canonical_ingredients/unmapped_ingredients.yaml
+        filter: conflicts_detected > 0
+
+      - step: present_conflict
+        for_each: conflict
+        show:
+          - ingredient_a (CultureMech)
+          - ingredient_b (MediaIngredientMech)
+          - conflict_type
+          - suggested_resolution
+
+      - step: apply_resolution
+        if: user_confirmed
+        update: workspace/canonical_ingredients/unmapped_ingredients.yaml
+
+usage_examples:
+  - name: "Dry-run with small batch"
+    command: "claude /map-ingredients --batch-size 5 --threshold 0.95 --dry-run"
+    description: "Preview mapping 5 high-confidence ingredients without saving"
+
+  - name: "Production run with moderate batch"
+    command: "claude /map-ingredients --batch-size 20 --threshold 0.90"
+    description: "Map 20 ingredients with 90% confidence threshold and save to both repos"
+
+  - name: "Aggressive batch for common ingredients"
+    command: "claude /map-ingredients --batch-size 50 --threshold 0.85 --min-occurrences 10"
+    description: "Map 50 frequently-occurring ingredients with 85% confidence"
+
+  - name: "Preview sync changes"
+    command: "claude /map-ingredients:preview-sync"
+    description: "Show what would change in each repo without applying"
+
+documentation:
+  overview: |
+    The map_ingredients skill provides unified ingredient mapping orchestration
+    across CultureMech and MediaIngredientMech repositories. It replaces separate
+    tooling with a centralized workflow that maintains a canonical ingredient store
+    and ensures bidirectional synchronization.
+
+  workflow_description: |
+    1. Extract unmapped ingredients from both repos
+    2. Deduplicate using exact match, CHEBI ID, and synonym overlap
+    3. Prioritize by occurrence count
+    4. Curate with LLM + ontology validation
+    5. Apply quality gates (auto-accept >= threshold, manual review 0.70-threshold, reject < 0.70)
+    6. Update canonical store with auto-accepted mappings
+    7. Sync to CultureMech (mediaingredientmech_term fields)
+    8. Sync to MediaIngredientMech (mapped_ingredients.yaml)
+
+  benefits:
+    - Single source of truth eliminates divergence between repos
+    - Automatic bidirectional sync keeps both repos current
+    - Multi-gate validation ensures high-quality mappings only
+    - Full audit trail for provenance tracking
+    - Cost control with configurable batch size and thresholds
+    - Safe by default with dry-run mode and approval gates
+
+  troubleshooting:
+    lock_conflicts: "If locks fail to acquire, check workspace/locks/ for stale locks and remove manually"
+    llm_failures: "If LLM curator fails, check ANTHROPIC_API_KEY and network connectivity"
+    sync_errors: "If sync fails, check file permissions in both repos and validate YAML syntax"
+    conflicts: "Use /map-ingredients:resolve-conflicts to interactively resolve deduplication conflicts"

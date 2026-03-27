@@ -1,0 +1,425 @@
+agent:
+  name: add_community_skill
+  type: cross_repo_skill
+  description: "Comprehensive skill for researching, extracting, and adding new microbial community records with cross-repository coordination and environmental linking"
+  version: "2.0.0"
+  # Version 2.0.0 adds environmental linking capabilities:
+  # - Extract ENVO terms from publications and link to communities
+  # - Add source_environment field to CultureMech media records
+  # - Add environmental_context field to MediaIngredientMech ingredients
+  # - Add related_media and related_ingredients to CommunityMech communities
+  # - Enable environment-based cross-repository queries and discovery
+
+model:
+  provider: anthropic
+  model: claude-sonnet-4-20250514
+  temperature: 0.1
+  max_tokens: 8192
+
+workspace:
+  base_dir: ${OPENCLAW_WORKSPACE}/add_community
+  allowed_paths:
+    - "${COMMUNITYMECH_ROOT}/data/**"
+    - "${CULTUREMECH_ROOT}/data/**"
+    - "${MEDIAINGREDIENTMECH_ROOT}/data/**"
+  create_backups: true
+  backup_dir: ${OPENCLAW_WORKSPACE}/.backups/add_community
+
+tools:
+  # Research tools
+  - name: web_research
+    type: builtin
+    description: "Fetch and analyze scientific publications"
+
+  # CommunityMech tools
+  - name: linkml_validator
+    type: plugin
+    plugin: linkml_validator
+    description: "Validate community YAML against schema"
+
+  # CultureMech tools
+  - name: culturemech_search
+    type: plugin
+    plugin: just_runner
+    config:
+      repository: culturemech
+      allowed_recipes:
+        - search-media
+        - validate-all
+
+  # MediaIngredientMech tools
+  - name: ingredient_search
+    type: plugin
+    plugin: oak_query
+    method: search
+    description: "Search for ingredient ontology mappings"
+
+  # Coordination tools
+  - name: lock_manager
+    type: python_module
+    module: plugins.lock_manager
+    class: LockManager
+    description: "Multi-Claude coordination locks"
+
+safety:
+  dry_run_default: true
+  require_approval_for:
+    - create_community_record
+    - add_media_record
+    - add_ingredient_record
+    - commit_changes
+  max_concurrent_locks: 3
+
+tasks:
+  # Main workflow: Add a complete community record
+  add_community:
+    description: "End-to-end workflow for adding a new community with cross-repo coordination"
+    parameters:
+      - name: github_issue_url
+        type: string
+        required: true
+        description: "GitHub issue URL with community details"
+      - name: pmids
+        type: list
+        required: false
+        description: "List of PubMed IDs to research"
+      - name: dois
+        type: list
+        required: false
+        description: "List of DOIs to research"
+      - name: community_name
+        type: string
+        required: true
+        description: "Name for the community record"
+
+    workflow:
+      # Phase 1: Research and Information Extraction
+      - step: extract_issue_details
+        description: "Extract community information from GitHub issue"
+        action: fetch_github_issue
+        output: issue_data
+
+      - step: research_publications
+        description: "Fetch and analyze all referenced publications"
+        action: research_pmids_dois
+        inputs:
+          - pmids
+          - dois
+        output: publication_data
+        substeps:
+          - fetch_pubmed_abstracts
+          - fetch_full_text_if_available
+          - extract_microbial_taxa
+          - extract_environmental_conditions
+          - extract_media_information
+          - extract_interaction_data
+
+      # Phase 2: Extract Structured Data
+      - step: identify_taxa
+        description: "Extract all microbial taxa mentioned"
+        action: extract_taxa_with_ncbi_ids
+        output: taxa_list
+        substeps:
+          - search_ncbi_taxonomy
+          - validate_taxonomy_ids
+          - determine_functional_roles
+          - estimate_abundance_levels
+
+      - step: identify_media
+        description: "Extract growth media information"
+        action: extract_media_details
+        output: media_list
+        substeps:
+          - parse_media_names
+          - extract_ingredient_lists
+          - extract_concentrations
+          - match_against_culturemech
+
+      - step: identify_ingredients
+        description: "Extract ingredient information"
+        action: extract_ingredients
+        output: ingredient_list
+        substeps:
+          - parse_ingredient_names
+          - extract_concentrations
+          - match_ontology_terms
+
+      - step: extract_interactions
+        description: "Identify ecological interactions"
+        action: extract_ecological_interactions
+        output: interactions_list
+        substeps:
+          - identify_interaction_types
+          - map_metabolites
+          - link_biological_processes
+          - extract_evidence
+
+      - step: extract_environmental_factors
+        description: "Extract environmental parameters"
+        action: extract_env_factors
+        output: environmental_factors
+        substeps:
+          - temperature
+          - pH
+          - oxygen_levels
+          - other_conditions
+
+      - step: identify_environment_terms
+        description: "Identify ENVO terms for source environments"
+        action: extract_envo_terms
+        output: environment_terms
+        substeps:
+          - extract_environment_descriptions
+          - search_envo_ontology
+          - validate_envo_ids
+          - map_to_media_and_ingredients
+
+      # Phase 3: Cross-Repository Coordination
+      - step: acquire_locks
+        description: "Acquire locks for all repositories that will be modified"
+        action: acquire_multi_repo_locks
+        repositories:
+          - communitymech  # Always needed
+          - culturemech    # If new media needed
+          - mediaingredientmech  # If new ingredients needed
+
+      # Phase 4: CultureMech Integration
+      - step: match_media
+        description: "Match media against CultureMech or create new entries with environmental linking"
+        action: culturemech_media_matching
+        condition: "media_list is not empty"
+        output: media_mapping
+        substeps:
+          - search_existing_media
+          - create_new_media_if_needed
+          - add_source_environment_field  # NEW: Link media to ENVO terms
+          - validate_media_records
+          - get_culturemech_ids
+
+      # Phase 5: MediaIngredientMech Integration
+      - step: match_ingredients
+        description: "Match ingredients against MediaIngredientMech or add new ones with environmental context"
+        action: mediaingredient_matching
+        condition: "ingredient_list is not empty"
+        output: ingredient_mapping
+        substeps:
+          - search_existing_ingredients
+          - suggest_ontology_mappings
+          - validate_mappings
+          - create_new_ingredient_records
+          - add_environmental_context_field  # NEW: Link ingredients to environments
+          - get_ingredient_ids
+
+      # Phase 6: Create CommunityMech Record
+      - step: build_community_yaml
+        description: "Construct complete community YAML record with cross-repo linking"
+        action: construct_community_record
+        inputs:
+          - issue_data
+          - publication_data
+          - taxa_list
+          - media_mapping
+          - ingredient_mapping
+          - interactions_list
+          - environmental_factors
+          - environment_terms
+        output: community_yaml
+        substeps:
+          - set_metadata_fields
+          - add_taxonomy_section
+          - add_interactions_section
+          - add_environmental_factors
+          - add_environment_term  # NEW: Add ENVO term to community
+          - add_related_media  # NEW: Cross-repo media linking
+          - add_related_ingredients  # NEW: Cross-repo ingredient linking
+          - add_evidence_items
+          - validate_against_schema
+
+      - step: validate_community
+        description: "Validate community YAML against LinkML schema"
+        action: validate_linkml
+        tool: linkml_validator
+        params:
+          schema: ${COMMUNITYMECH_ROOT}/src/communitymech/schema/communitymech.yaml
+          data: ${community_yaml}
+
+      - step: save_community_record
+        description: "Save community YAML to CommunityMech data directory"
+        action: save_file
+        path: ${COMMUNITYMECH_ROOT}/data/isolates/${community_name}.yaml
+        content: ${community_yaml}
+        condition: "not dry_run"
+
+      # Phase 7: Generate Report
+      - step: generate_report
+        description: "Create comprehensive report of additions"
+        action: create_cross_repo_report
+        output: report
+        includes:
+          - community_record_summary
+          - new_media_added
+          - new_ingredients_added
+          - validation_results
+          - github_issue_reference
+          - publication_citations
+
+      # Phase 8: Cleanup
+      - step: release_locks
+        description: "Release all acquired locks"
+        action: release_multi_repo_locks
+        repositories:
+          - communitymech
+          - culturemech
+          - mediaingredientmech
+
+      - step: return_results
+        output:
+          - community_yaml_path
+          - new_media_count
+          - new_ingredients_count
+          - validation_status
+          - report
+
+  # Subtask: Research publications
+  research_publications:
+    description: "Fetch and analyze scientific publications for community data"
+    parameters:
+      - name: pmids
+        type: list
+        required: false
+      - name: dois
+        type: list
+        required: false
+    workflow:
+      - step: fetch_pubmed
+        action: fetch_from_pubmed
+        loop: pmids
+      - step: fetch_doi
+        action: fetch_from_doi_resolver
+        loop: dois
+      - step: extract_data
+        action: parse_publication_content
+        extract:
+          - taxa
+          - media
+          - environmental_conditions
+          - interactions
+          - methods
+
+  # Subtask: Match media against CultureMech
+  match_culturemech_media:
+    description: "Find or create media records in CultureMech"
+    parameters:
+      - name: media_list
+        type: list
+        required: true
+    workflow:
+      - step: search_existing
+        action: search_culturemech_data
+        method: fuzzy_name_match
+      - step: create_new
+        action: create_culturemech_media
+        condition: "no match found"
+      - step: return_ids
+        output: culturemech_media_ids
+
+  # Subtask: Match ingredients against MediaIngredientMech
+  match_mediaingredient:
+    description: "Find or create ingredient records in MediaIngredientMech"
+    parameters:
+      - name: ingredient_list
+        type: list
+        required: true
+    workflow:
+      - step: search_existing
+        action: search_ingredient_data
+      - step: suggest_mappings
+        action: llm_ontology_mapping
+        condition: "new ingredients found"
+      - step: validate_with_oak
+        action: oak_validation
+      - step: return_ids
+        output: ingredient_ids
+
+  # Subtask: Environment-based resource discovery
+  discover_environment_resources:
+    description: "Find media and ingredients relevant to community environment via ENVO terms"
+    parameters:
+      - name: environment_term
+        type: string
+        required: true
+        description: "ENVO CURIE (e.g., ENVO:00000044)"
+    workflow:
+      - step: search_media_by_environment
+        description: "Find CultureMech media with matching source_environment"
+        action: query_culturemech_by_envo
+        output: related_media_list
+      - step: search_ingredients_by_environment
+        description: "Find MediaIngredientMech ingredients with matching environmental_context"
+        action: query_mediaingredient_by_envo
+        output: related_ingredients_list
+      - step: rank_by_relevance
+        description: "Rank resources by relevance to community"
+        action: llm_ranking
+        inputs:
+          - community_description
+          - related_media_list
+          - related_ingredients_list
+        output: ranked_resources
+      - step: return_resources
+        output:
+          - top_media
+          - top_ingredients
+
+integration:
+  cross_repo_coordination:
+    enabled: true
+    lock_timeout: 3600  # 1 hour
+    auto_release: true
+
+  repositories:
+    - name: communitymech
+      role: primary
+      operations:
+        - create_community_record
+        - validate_community
+
+    - name: culturemech
+      role: dependency
+      operations:
+        - search_media
+        - create_media
+
+    - name: mediaingredientmech
+      role: dependency
+      operations:
+        - search_ingredients
+        - suggest_mappings
+        - create_ingredients
+
+reporting:
+  format: markdown
+  include:
+    - summary_stats
+    - taxa_identified
+    - environment_terms_identified  # NEW: ENVO terms found
+    - media_matched_or_created
+    - media_environment_links  # NEW: source_environment fields added
+    - ingredients_matched_or_created
+    - ingredient_environment_links  # NEW: environmental_context fields added
+    - cross_repo_links  # NEW: related_media and related_ingredients
+    - interactions_documented
+    - publications_cited
+    - validation_results
+  save_to: ${OPENCLAW_WORKSPACE}/reports/add_community/
+
+error_handling:
+  on_lock_failure:
+    action: retry
+    max_retries: 3
+    backoff: exponential
+  on_validation_error:
+    action: report_and_halt
+  on_missing_data:
+    action: report_and_continue
+    log_warnings: true
