@@ -32,3 +32,6 @@ dev = [
 
 [tool.setuptools]
 packages = ["cli", "plugins", "pipelines"]
+
+[tool.uv]
+package = true
