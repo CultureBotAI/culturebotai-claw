@@ -1,0 +1,368 @@
+priority	category	preferred_term	ontology_id	ontology_label	ontology_source	mapping_status	has_chebi_id	synonym_count	synonyms	filename	file_path
+HIGH	Hydrated Salts (x notation)	(NH4)2Ni(SO4)2 x 6 H2O	CHEBI:86149	(NH4)2Ni(SO4)2 x 6 H2O	CHEBI	MAPPED	True	1	Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component	Nh42ni_So42_X_6_H2o.yaml	data/ingredients/mapped/Nh42ni_So42_X_6_H2o.yaml
+HIGH	Hydrated Salts (x notation)	Al2(SO4)3 x 18 H2O	CHEBI:74779	Al2(SO4)3 x 18 H2O	CHEBI	MAPPED	True	0		Al2_So43_X_18_H2o.yaml	data/ingredients/mapped/Al2_So43_X_18_H2o.yaml
+HIGH	Hydrated Salts (x notation)	AlCl3 x 6 H2O	CHEBI:30115	AlCl3 x 6 H2O	CHEBI	MAPPED	True	1	Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component	Alcl3_X_6_H2o.yaml	data/ingredients/mapped/Alcl3_X_6_H2o.yaml
+HIGH	Hydrated Salts (x notation)	AlK(SO4)2 x 12 H2O	CHEBI:86465	AlK(SO4)2 x 12 H2O	CHEBI	MAPPED	True	1	Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component	Alk_So42_X_12_H2o.yaml	data/ingredients/mapped/Alk_So42_X_12_H2o.yaml
+HIGH	Hydrated Salts (x notation)	BaCl2 x 2 H2O	CHEBI:86153	BaCl2 x 2 H2O	CHEBI	MAPPED	True	0		Bacl2_X_2_H2o.yaml	data/ingredients/mapped/Bacl2_X_2_H2o.yaml
+HIGH	Hydrated Salts (x notation)	Ca(NO3)2 x 4 H2O	CHEBI:86159	Ca(NO3)2 x 4 H2O	CHEBI	MAPPED	True	0		Ca_No32_X_4_H2o.yaml	data/ingredients/mapped/Ca_No32_X_4_H2o.yaml
+HIGH	Hydrated Salts (x notation)	CaCl2 x 2 H2O	CHEBI:86158	CaCl2 x 2 H2O	CHEBI	MAPPED	True	5	Role: Mineral source; Properties: Defined component, Inorganic compound, Simple component|Role: Mineral source; Properties: Defined component, Simple component, Inorganic compound|Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component	Cacl2_X_2_H2o.yaml	data/ingredients/mapped/Cacl2_X_2_H2o.yaml
+HIGH	Hydrated Salts (x notation)	CaCl2 x 6 H2O	CHEBI:91243	CaCl2 x 6 H2O	CHEBI	MAPPED	True	1	Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component	Cacl2_X_6_H2o.yaml	data/ingredients/mapped/Cacl2_X_6_H2o.yaml
+HIGH	Hydrated Salts (x notation)	CaCl2 x 7 H2O	CHEBI:3312	CaCl2 x 7 H2O	CHEBI	MAPPED	True	1	Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component	Cacl2_X_7_H2o.yaml	data/ingredients/mapped/Cacl2_X_7_H2o.yaml
+HIGH	Hydrated Salts (x notation)	CaCl2 x H2O	CHEBI:3312	CaCl2 x H2O	CHEBI	MAPPED	True	0		Cacl2_X_H2o.yaml	data/ingredients/mapped/Cacl2_X_H2o.yaml
+HIGH	Hydrated Salts (x notation)	CaSO4 x 2 H2O	CHEBI:32583	CaSO4 x 2 H2O	CHEBI	MAPPED	True	1	Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component	Caso4_X_2_H2o.yaml	data/ingredients/mapped/Caso4_X_2_H2o.yaml
+HIGH	Hydrated Salts (x notation)	CaSO4 x 7 H2O	CHEBI:31346	CaSO4 x 7 H2O	CHEBI	MAPPED	True	0		Caso4_X_7_H2o.yaml	data/ingredients/mapped/Caso4_X_7_H2o.yaml
+HIGH	Hydrated Salts (x notation)	Cd(NO3)2 x 4 H2O	CHEBI:86156	Cd(NO3)2 x 4 H2O	CHEBI	MAPPED	True	0		Cd_No32_X_4_H2o.yaml	data/ingredients/mapped/Cd_No32_X_4_H2o.yaml
+HIGH	Hydrated Salts (x notation)	CeCl3 x 7 H2O	CHEBI:35458	CeCl3 x 7 H2O	CHEBI	MAPPED	True	0		Cecl3_X_7_H2o.yaml	data/ingredients/mapped/Cecl3_X_7_H2o.yaml
+HIGH	Hydrated Salts (x notation)	Citric acid x H2O	CHEBI:31404	Citric acid x H2O	CHEBI	MAPPED	True	0		Citric_Acid_X_H2o.yaml	data/ingredients/mapped/Citric_Acid_X_H2o.yaml
+HIGH	Hydrated Salts (x notation)	Co(NO3)2 x 6 H2O	CHEBI:86214	Co(NO3)2 x 6 H2O	CHEBI	MAPPED	True	1	Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component	Co_No32_X_6_H2o.yaml	data/ingredients/mapped/Co_No32_X_6_H2o.yaml
+HIGH	Hydrated Salts (x notation)	CoCl2 x 2 H2O	CHEBI:35696	CoCl2 x 2 H2O	CHEBI	MAPPED	True	0		Cocl2_X_2_H2o.yaml	data/ingredients/mapped/Cocl2_X_2_H2o.yaml
+HIGH	Hydrated Salts (x notation)	CoCl2 x 4 H2O	CHEBI:35696	CoCl2 x 4 H2O	CHEBI	MAPPED	True	0		Cocl2_X_4_H2o.yaml	data/ingredients/mapped/Cocl2_X_4_H2o.yaml
+HIGH	Hydrated Salts (x notation)	CoCl2 x 6 H2O	CHEBI:35696	CoCl2 x 6 H2O	CHEBI	MAPPED	True	1	Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component	Cocl2_X_6_H2o.yaml	data/ingredients/mapped/Cocl2_X_6_H2o.yaml
+HIGH	Hydrated Salts (x notation)	CoSO4 x 7 H2O	CHEBI:53470	CoSO4 x 7 H2O	CHEBI	MAPPED	True	2	Role: Mineral source; Properties: Defined component, Inorganic compound, Simple component|Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component	Coso4_X_7_H2o.yaml	data/ingredients/mapped/Coso4_X_7_H2o.yaml
+HIGH	Hydrated Salts (x notation)	Cr(NO3)3 x 7 H2O	CHEBI:86206	Cr(NO3)3 x 7 H2O	CHEBI	MAPPED	True	0		Cr_No33_X_7_H2o.yaml	data/ingredients/mapped/Cr_No33_X_7_H2o.yaml
+HIGH	Hydrated Salts (x notation)	Cu(NO3)2 x 3 H2O	CHEBI:78036	Cu(NO3)2 x 3 H2O	CHEBI	MAPPED	True	0		Cu_No32_X_3_H2o.yaml	data/ingredients/mapped/Cu_No32_X_3_H2o.yaml
+HIGH	Hydrated Salts (x notation)	CuCl2 x 2 H2O	CHEBI:86318	CuCl2 x 2 H2O	CHEBI	MAPPED	True	2	Role: Mineral source; Properties: Defined component, Inorganic compound, Simple component|Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component	Cucl2_X_2_H2o.yaml	data/ingredients/mapped/Cucl2_X_2_H2o.yaml
+HIGH	Hydrated Salts (x notation)	CuCl2 x 5 H2O	CHEBI:91245	CuCl2 x 5 H2O	CHEBI	MAPPED	True	0		Cucl2_X_5_H2o.yaml	data/ingredients/mapped/Cucl2_X_5_H2o.yaml
+HIGH	Hydrated Salts (x notation)	CuCl2 x 6 H2O	CHEBI:49553	CuCl2 x 6 H2O	CHEBI	MAPPED	True	0		Cucl2_X_6_H2o.yaml	data/ingredients/mapped/Cucl2_X_6_H2o.yaml
+HIGH	Hydrated Salts (x notation)	CuCl2 x H2O	CHEBI:49553	CuCl2 x H2O	CHEBI	MAPPED	True	0		Cucl2_X_H2o.yaml	data/ingredients/mapped/Cucl2_X_H2o.yaml
+HIGH	Hydrated Salts (x notation)	CuSO4 x 2 H2O	CHEBI:23414	CuSO4 x 2 H2O	CHEBI	MAPPED	True	0		Cuso4_X_2_H2o.yaml	data/ingredients/mapped/Cuso4_X_2_H2o.yaml
+HIGH	Hydrated Salts (x notation)	CuSO4 x 4 H2O	CHEBI:23414	CuSO4 x 4 H2O	CHEBI	MAPPED	True	0		Cuso4_X_4_H2o.yaml	data/ingredients/mapped/Cuso4_X_4_H2o.yaml
+HIGH	Hydrated Salts (x notation)	CuSO4 x 5 H2O	CHEBI:31440	CuSO4 x 5 H2O	CHEBI	MAPPED	True	1	Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component	Cuso4_X_5_H2o.yaml	data/ingredients/mapped/Cuso4_X_5_H2o.yaml
+HIGH	Hydrated Salts (x notation)	CuSO4 x 6 H2O	CHEBI:91246	CuSO4 x 6 H2O	CHEBI	MAPPED	True	0		Cuso4_X_6_H2o.yaml	data/ingredients/mapped/Cuso4_X_6_H2o.yaml
+HIGH	Hydrated Salts (x notation)	CuSO4 x H2O	CHEBI:23414	CuSO4 x H2O	CHEBI	MAPPED	True	0		Cuso4_X_H2o.yaml	data/ingredients/mapped/Cuso4_X_H2o.yaml
+HIGH	Hydrated Salts (x notation)	Fe SO4 x 7 H2O	CHEBI:75836	Fe SO4 x 7 H2O	CHEBI	MAPPED	True	0		Fe_So4_X_7_H2o.yaml	data/ingredients/mapped/Fe_So4_X_7_H2o.yaml
+HIGH	Hydrated Salts (x notation)	Fe(III)PO4 x 4 H2O	CHEBI:131372	Fe(III)PO4 x 4 H2O	CHEBI	MAPPED	True	0		Fe_Iiipo4_X_4_H2o.yaml	data/ingredients/mapped/Fe_Iiipo4_X_4_H2o.yaml
+HIGH	Hydrated Salts (x notation)	Fe(NH4)2(SO4)2 x 6 H2O	CHEBI:76181		CHEBI	MAPPED	True	1	Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component	Fe_Nh42_So42_X_6_H2o.yaml	data/ingredients/mapped/Fe_Nh42_So42_X_6_H2o.yaml
+HIGH	Hydrated Salts (x notation)	Fe(NH4)2(SO4)2 x 6 H2O (0.1% w/v)	CHEBI:76181		CHEBI	MAPPED	True	1	Role: Mineral source; Properties: Inorganic compound, Solution, Defined component	Fe_Nh42_So42_X_6_H2o_01_Wv.yaml	data/ingredients/mapped/Fe_Nh42_So42_X_6_H2o_01_Wv.yaml
+HIGH	Hydrated Salts (x notation)	Fe(NH4)2(SO4)2 x 7 H2O	CHEBI:131378	Fe(NH4)2(SO4)2 x 7 H2O	CHEBI	MAPPED	True	0		Fe_Nh42_So42_X_7_H2o.yaml	data/ingredients/mapped/Fe_Nh42_So42_X_7_H2o.yaml
+HIGH	Hydrated Salts (x notation)	FeCl2 x 4 H2O	CHEBI:86249	FeCl2 x 4 H2O	CHEBI	MAPPED	True	3	Role: Mineral source; Properties: Defined component, Inorganic compound, Simple component|Role: Mineral source; Properties: Defined component, Simple component, Inorganic compound|Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component	Fecl2_X_4_H2o.yaml	data/ingredients/mapped/Fecl2_X_4_H2o.yaml
+HIGH	Hydrated Salts (x notation)	FeCl2 x 6 H2O	CHEBI:30812	FeCl2 x 6 H2O	CHEBI	MAPPED	True	0		Fecl2_X_6_H2o.yaml	data/ingredients/mapped/Fecl2_X_6_H2o.yaml
+HIGH	Hydrated Salts (x notation)	FeCl2 x 7 H2O	CHEBI:30812	FeCl2 x 7 H2O	CHEBI	MAPPED	True	0		Fecl2_X_7_H2o.yaml	data/ingredients/mapped/Fecl2_X_7_H2o.yaml
+HIGH	Hydrated Salts (x notation)	FeCl3 x 4 H2O	CHEBI:30808	FeCl3 x 4 H2O	CHEBI	MAPPED	True	0		Fecl3_X_4_H2o.yaml	data/ingredients/mapped/Fecl3_X_4_H2o.yaml
+HIGH	Hydrated Salts (x notation)	FeCl3 x 6 H2O	CHEBI:86254	FeCl3 x 6 H2O	CHEBI	MAPPED	True	1	Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component	Fecl3_X_6_H2o.yaml	data/ingredients/mapped/Fecl3_X_6_H2o.yaml
+HIGH	Hydrated Salts (x notation)	FeSO4 x 5 H2O	CHEBI:75832	FeSO4 x 5 H2O	CHEBI	MAPPED	True	0		Feso4_X_5_H2o.yaml	data/ingredients/mapped/Feso4_X_5_H2o.yaml
+HIGH	Hydrated Salts (x notation)	FeSO4 x 6 H2O	CHEBI:75832	FeSO4 x 6 H2O	CHEBI	MAPPED	True	0		Feso4_X_6_H2o.yaml	data/ingredients/mapped/Feso4_X_6_H2o.yaml
+HIGH	Hydrated Salts (x notation)	FeSO4 x 7 H2O	CHEBI:75836	FeSO4 x 7 H2O	CHEBI	MAPPED	True	5	Role: Mineral source; Properties: Defined component, Inorganic compound, Simple component|Role: Mineral source; Properties: Defined component, Simple component, Inorganic compound|Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component	Feso4_X_7_H2o.yaml	data/ingredients/mapped/Feso4_X_7_H2o.yaml
+HIGH	Hydrated Salts (x notation)	FeSO4 x H2O	CHEBI:75834	FeSO4 x H2O	CHEBI	MAPPED	True	0		Feso4_X_H2o.yaml	data/ingredients/mapped/Feso4_X_H2o.yaml
+HIGH	Hydrated Salts (x notation)	K2HPO4 x 3 H2O	CHEBI:131527	K2HPO4 x 3 H2O	CHEBI	MAPPED	True	2	Role: Buffer; Properties: Inorganic compound, Defined component, Simple component|Role: Buffer; Properties: Simple component, Inorganic compound, Defined component	K2hpo4_X_3_H2o.yaml	data/ingredients/mapped/K2hpo4_X_3_H2o.yaml
+HIGH	Hydrated Salts (x notation)	K2SO4 x 7 H2O	CHEBI:32036	K2SO4 x 7 H2O	CHEBI	MAPPED	True	0		K2so4_X_7_H2o.yaml	data/ingredients/mapped/K2so4_X_7_H2o.yaml
+HIGH	Hydrated Salts (x notation)	Maltose x H2O	CHEBI:17306	Maltose x H2O	CHEBI	MAPPED	True	0		Maltose_X_H2o.yaml	data/ingredients/mapped/Maltose_X_H2o.yaml
+HIGH	Hydrated Salts (x notation)	MgCl2 x 2 H2O	CHEBI:131394	MgCl2 x 2 H2O	CHEBI	MAPPED	True	0		Mgcl2_X_2_H2o.yaml	data/ingredients/mapped/Mgcl2_X_2_H2o.yaml
+HIGH	Hydrated Salts (x notation)	MgCl2 x 6 H2O	CHEBI:86345	MgCl2 x 6 H2O	CHEBI	MAPPED	True	5	Role: Mineral source; Properties: Defined component, Inorganic compound, Simple component|Role: Mineral source; Properties: Defined component, Simple component, Inorganic compound|Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component	Mgcl2_X_6_H2o.yaml	data/ingredients/mapped/Mgcl2_X_6_H2o.yaml
+HIGH	Hydrated Salts (x notation)	MgCl2 x H2O	CHEBI:86355	MgCl2 x H2O	CHEBI	MAPPED	True	0		Mgcl2_X_H2o.yaml	data/ingredients/mapped/Mgcl2_X_H2o.yaml
+HIGH	Hydrated Salts (x notation)	MgSO4 x 6 H2O	CHEBI:32599	MgSO4 x 6 H2O	CHEBI	MAPPED	True	0		Mgso4_X_6_H2o.yaml	data/ingredients/mapped/Mgso4_X_6_H2o.yaml
+HIGH	Hydrated Salts (x notation)	MgSO4 x 7 H2O	CHEBI:31795	MgSO4 x 7 H2O	CHEBI	MAPPED	True	5	Role: Mineral source; Properties: Defined component, Inorganic compound, Simple component|Role: Mineral source; Properties: Defined component, Simple component, Inorganic compound|Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component	Mgso4_X_7_H2o.yaml	data/ingredients/mapped/Mgso4_X_7_H2o.yaml
+HIGH	Hydrated Salts (x notation)	MgSO4 x H2O	CHEBI:32599	MgSO4 x H2O	CHEBI	MAPPED	True	0		Mgso4_X_H2o.yaml	data/ingredients/mapped/Mgso4_X_H2o.yaml
+HIGH	Hydrated Salts (x notation)	MnCl2 x 4 H2O	CHEBI:86368	MnCl2 x 4 H2O	CHEBI	MAPPED	True	0		Mncl2_X_4_H2o.yaml	data/ingredients/mapped/Mncl2_X_4_H2o.yaml
+HIGH	Hydrated Salts (x notation)	MnSO4 x 1 H2O	CHEBI:86360	MnSO4 x 1 H2O	CHEBI	MAPPED	True	0		Mnso4_X_1_H2o.yaml	data/ingredients/mapped/Mnso4_X_1_H2o.yaml
+HIGH	Hydrated Salts (x notation)	MnSO4 x 2 H2O	CHEBI:86356	MnSO4 x 2 H2O	CHEBI	MAPPED	True	0		Mnso4_X_2_H2o.yaml	data/ingredients/mapped/Mnso4_X_2_H2o.yaml
+HIGH	Hydrated Salts (x notation)	MnSO4 x 4 H2O	CHEBI:86358	MnSO4 x 4 H2O	CHEBI	MAPPED	True	2	Role: Mineral source; Properties: Defined component, Inorganic compound, Simple component|Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component	Mnso4_X_4_H2o.yaml	data/ingredients/mapped/Mnso4_X_4_H2o.yaml
+HIGH	Hydrated Salts (x notation)	MnSO4 x 5 H2O	CHEBI:131524	MnSO4 x 5 H2O	CHEBI	MAPPED	True	1	Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component	Mnso4_X_5_H2o.yaml	data/ingredients/mapped/Mnso4_X_5_H2o.yaml
+HIGH	Hydrated Salts (x notation)	MnSO4 x 6 H2O	CHEBI:131523	MnSO4 x 6 H2O	CHEBI	MAPPED	True	0		Mnso4_X_6_H2o.yaml	data/ingredients/mapped/Mnso4_X_6_H2o.yaml
+HIGH	Hydrated Salts (x notation)	MnSO4 x 7 H2O	CHEBI:86360	MnSO4 x 7 H2O	CHEBI	MAPPED	True	0		Mnso4_X_7_H2o.yaml	data/ingredients/mapped/Mnso4_X_7_H2o.yaml
+HIGH	Hydrated Salts (x notation)	MnSO4 x H2O	CHEBI:86364	MnSO4 x H2O	CHEBI	MAPPED	True	4	Role: Mineral source; Properties: Defined component, Simple component, Inorganic compound|Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component|Role: Mineral source; Properties: Inorganic compound, Simple component, Defined component	Mnso4_X_H2o.yaml	data/ingredients/mapped/Mnso4_X_H2o.yaml
+HIGH	Hydrated Salts (x notation)	Na2 MoO4 x 2 H2O	CHEBI:75213	Na2 MoO4 x 2 H2O	CHEBI	MAPPED	True	0		Na2_Moo4_X_2_H2o.yaml	data/ingredients/mapped/Na2_Moo4_X_2_H2o.yaml
+HIGH	Hydrated Salts (x notation)	Na2HAsO4 x 7 H2O	CHEBI:91257	Na2HAsO4 x 7 H2O	CHEBI	MAPPED	True	0		Na2haso4_X_7_H2o.yaml	data/ingredients/mapped/Na2haso4_X_7_H2o.yaml
+HIGH	Hydrated Salts (x notation)	Na2HPO4 x 12 H2O	CHEBI:34683	Na2HPO4 x 12 H2O	CHEBI	MAPPED	True	1	Role: Buffer; Properties: Inorganic compound, Defined component, Simple component	Na2hpo4_X_12_H2o.yaml	data/ingredients/mapped/Na2hpo4_X_12_H2o.yaml
+HIGH	Hydrated Salts (x notation)	Na2HPO4 x 2 H2O	CHEBI:34683	Na2HPO4 x 2 H2O	CHEBI	MAPPED	True	1	Role: Buffer; Properties: Inorganic compound, Defined component, Simple component	Na2hpo4_X_2_H2o.yaml	data/ingredients/mapped/Na2hpo4_X_2_H2o.yaml
+HIGH	Hydrated Salts (x notation)	Na2HPO4 x 3 H2O	CHEBI:34683	Na2HPO4 x 3 H2O	CHEBI	MAPPED	True	1	Role: Buffer; Properties: Inorganic compound, Defined component, Simple component	Na2hpo4_X_3_H2o.yaml	data/ingredients/mapped/Na2hpo4_X_3_H2o.yaml
+HIGH	Hydrated Salts (x notation)	Na2HPO4 x 6 H2O	CHEBI:34683	Na2HPO4 x 6 H2O	CHEBI	MAPPED	True	0		Na2hpo4_X_6_H2o.yaml	data/ingredients/mapped/Na2hpo4_X_6_H2o.yaml
+HIGH	Hydrated Salts (x notation)	Na2HPO4 x 7 H2O	CHEBI:34683	Na2HPO4 x 7 H2O	CHEBI	MAPPED	True	0		Na2hpo4_X_7_H2o.yaml	data/ingredients/mapped/Na2hpo4_X_7_H2o.yaml
+HIGH	Hydrated Salts (x notation)	Na2HPO4 x H2O	CHEBI:34683	Na2HPO4 x H2O	CHEBI	MAPPED	True	0		Na2hpo4_X_H2o.yaml	data/ingredients/mapped/Na2hpo4_X_H2o.yaml
+HIGH	Hydrated Salts (x notation)	Na2MoO4 x 2 H2O	CHEBI:75213	Na2MoO4 x 2 H2O	CHEBI	MAPPED	True	4	Role: Mineral source; Properties: Defined component, Inorganic compound, Simple component|Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component|Role: Mineral source; Properties: Inorganic compound, Simple component, Defined component	Na2moo4_X_2_H2o.yaml	data/ingredients/mapped/Na2moo4_X_2_H2o.yaml
+HIGH	Hydrated Salts (x notation)	Na2MoO4 x 7 H2O	CHEBI:86473	Na2MoO4 x 7 H2O	CHEBI	MAPPED	True	0		Na2moo4_X_7_H2o.yaml	data/ingredients/mapped/Na2moo4_X_7_H2o.yaml
+HIGH	Hydrated Salts (x notation)	Na2MoO4 x H2O	CHEBI:75215	Na2MoO4 x H2O	CHEBI	MAPPED	True	0		Na2moo4_X_H2o.yaml	data/ingredients/mapped/Na2moo4_X_H2o.yaml
+HIGH	Hydrated Salts (x notation)	Na2MoSO4 x 2 H2O	CHEBI:75213		CHEBI	MAPPED	True	0		Na2moso4_X_2_H2o.yaml	data/ingredients/mapped/Na2moso4_X_2_H2o.yaml
+HIGH	Hydrated Salts (x notation)	Na2S x 9 H2O	CHEBI:76209	Na2S x 9 H2O	CHEBI	MAPPED	True	4	Role: Reducing agent; Properties: Defined component, Inorganic compound, Simple component|Role: Reducing agent; Properties: Defined component, Simple component, Inorganic compound|Role: Reducing agent; Properties: Inorganic compound, Defined component, Simple component	Na2s_X_9_H2o.yaml	data/ingredients/mapped/Na2s_X_9_H2o.yaml
+HIGH	Hydrated Salts (x notation)	Na2S x H2O	CHEBI:76208	Na2S x H2O	CHEBI	MAPPED	True	0		Na2s_X_H2o.yaml	data/ingredients/mapped/Na2s_X_H2o.yaml
+HIGH	Hydrated Salts (x notation)	Na2S2O3 x 5 H2O	CHEBI:32150	Na2S2O3 x 5 H2O	CHEBI	MAPPED	True	2	Properties: Defined component, Inorganic compound, Simple component|Properties: Inorganic compound, Simple component, Defined component	Na2s2o3_X_5_H2o.yaml	data/ingredients/mapped/Na2s2o3_X_5_H2o.yaml
+HIGH	Hydrated Salts (x notation)	Na2SO3 x 5 H2O	CHEBI:86477	Na2SO3 x 5 H2O	CHEBI	MAPPED	True	0		Na2so3_X_5_H2o.yaml	data/ingredients/mapped/Na2so3_X_5_H2o.yaml
+HIGH	Hydrated Salts (x notation)	Na2SO4 x 10 H2O	CHEBI:32586	Na2SO4 x 10 H2O	CHEBI	MAPPED	True	0		Na2so4_X_10_H2o.yaml	data/ingredients/mapped/Na2so4_X_10_H2o.yaml
+HIGH	Hydrated Salts (x notation)	Na2SeO3 x 5 H2O	CHEBI:131361	Na2SeO3 x 5 H2O	CHEBI	MAPPED	True	2	Role: Mineral source; Properties: Defined component, Inorganic compound, Simple component|Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component	Na2seo3_X_5_H2o.yaml	data/ingredients/mapped/Na2seo3_X_5_H2o.yaml
+HIGH	Hydrated Salts (x notation)	Na2SiO3 x 9 H2O	CHEBI:132108	Na2SiO3 x 9 H2O	CHEBI	MAPPED	True	0		Na2sio3_X_9_H2o.yaml	data/ingredients/mapped/Na2sio3_X_9_H2o.yaml
+HIGH	Hydrated Salts (x notation)	Na2WO4 x 2 H2O	CHEBI:63939	Na2WO4 x 2 H2O	CHEBI	MAPPED	True	1	Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component	Na2wo4_X_2_H2o.yaml	data/ingredients/mapped/Na2wo4_X_2_H2o.yaml
+HIGH	Hydrated Salts (x notation)	Na3-citrate x 2 H2O	CHEBI:32142		CHEBI	MAPPED	True	2	Role: Buffer; Properties: Defined component, Organic compound, Simple component|Role: Buffer; Properties: Organic compound, Defined component, Simple component	Na3-citrate_X_2_H2o.yaml	data/ingredients/mapped/Na3-citrate_X_2_H2o.yaml
+HIGH	Hydrated Salts (x notation)	NaH2PO4 x 2 H2O	CHEBI:37585	NaH2PO4 x 2 H2O	CHEBI	MAPPED	True	0		Nah2po4_X_2_H2o.yaml	data/ingredients/mapped/Nah2po4_X_2_H2o.yaml
+HIGH	Hydrated Salts (x notation)	NaH2PO4 x H2O	CHEBI:37585	NaH2PO4 x H2O	CHEBI	MAPPED	True	1	Role: Buffer; Properties: Inorganic compound, Defined component, Simple component	Nah2po4_X_H2o.yaml	data/ingredients/mapped/Nah2po4_X_H2o.yaml
+HIGH	Hydrated Salts (x notation)	NaS2O3 x 5 H2O	CHEBI:32150		CHEBI	MAPPED	True	0		Nas2o3_X_5_H2o.yaml	data/ingredients/mapped/Nas2o3_X_5_H2o.yaml
+HIGH	Hydrated Salts (x notation)	NaVO3 x H2O	CHEBI:132095	NaVO3 x H2O	CHEBI	MAPPED	True	1	Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component	Navo3_X_H2o.yaml	data/ingredients/mapped/Navo3_X_H2o.yaml
+HIGH	Hydrated Salts (x notation)	NiCl2 x 2 H2O	CHEBI:34887	NiCl2 x 2 H2O	CHEBI	MAPPED	True	0		Nicl2_X_2_H2o.yaml	data/ingredients/mapped/Nicl2_X_2_H2o.yaml
+HIGH	Hydrated Salts (x notation)	NiCl2 x 5 H2O	CHEBI:34887	NiCl2 x 5 H2O	CHEBI	MAPPED	True	0		Nicl2_X_5_H2o.yaml	data/ingredients/mapped/Nicl2_X_5_H2o.yaml
+HIGH	Hydrated Salts (x notation)	NiCl2 x 6 H2O	CHEBI:34887	NiCl2 x 6 H2O	CHEBI	MAPPED	True	1	Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component	Nicl2_X_6_H2o.yaml	data/ingredients/mapped/Nicl2_X_6_H2o.yaml
+HIGH	Hydrated Salts (x notation)	NiCl2 x H2O	CHEBI:34887	NiCl2 x H2O	CHEBI	MAPPED	True	0		Nicl2_X_H2o.yaml	data/ingredients/mapped/Nicl2_X_H2o.yaml
+HIGH	Hydrated Salts (x notation)	NiSO4 x 6 H2O	CHEBI:53001	NiSO4 x 6 H2O	CHEBI	MAPPED	True	0		Niso4_X_6_H2o.yaml	data/ingredients/mapped/Niso4_X_6_H2o.yaml
+HIGH	Hydrated Salts (x notation)	NiSO4 x 7 H2O	CHEBI:53001	NiSO4 x 7 H2O	CHEBI	MAPPED	True	0		Niso4_X_7_H2o.yaml	data/ingredients/mapped/Niso4_X_7_H2o.yaml
+HIGH	Hydrated Salts (x notation)	SnCl2 x 2 H2O	CHEBI:78074	SnCl2 x 2 H2O	CHEBI	MAPPED	True	0		Sncl2_X_2_H2o.yaml	data/ingredients/mapped/Sncl2_X_2_H2o.yaml
+HIGH	Hydrated Salts (x notation)	SrCl2 x 6 H2O	CHEBI:36385	SrCl2 x 6 H2O	CHEBI	MAPPED	True	1	Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component	Srcl2_X_6_H2o.yaml	data/ingredients/mapped/Srcl2_X_6_H2o.yaml
+HIGH	Hydrated Salts (x notation)	VOSO4 x 2 H2O	CHEBI:87009	VOSO4 x 2 H2O	CHEBI	MAPPED	True	2	Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component|Role: Mineral source; Properties: Simple component, Defined component, Inorganic compound	Voso4_X_2_H2o.yaml	data/ingredients/mapped/Voso4_X_2_H2o.yaml
+HIGH	Hydrated Salts (x notation)	VOSO4 x 5 H2O	CHEBI:132758	VOSO4 x 5 H2O	CHEBI	MAPPED	True	1	Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component	Voso4_X_5_H2o.yaml	data/ingredients/mapped/Voso4_X_5_H2o.yaml
+HIGH	Hydrated Salts (x notation)	ZnSO4 x 6 H2O	CHEBI:132762	ZnSO4 x 6 H2O	CHEBI	MAPPED	True	0		Znso4_X_6_H2o.yaml	data/ingredients/mapped/Znso4_X_6_H2o.yaml
+HIGH	Hydrated Salts (x notation)	ZnSO4 x 7 H2O	CHEBI:32312	ZnSO4 x 7 H2O	CHEBI	MAPPED	True	2	Role: Mineral source; Properties: Defined component, Inorganic compound, Simple component|Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component	Znso4_X_7_H2o.yaml	data/ingredients/mapped/Znso4_X_7_H2o.yaml
+MEDIUM	Abbreviations	(NH4)2SO4	CHEBI:62946	(NH4)2SO4	CHEBI	MAPPED	True	5	Role: Nitrogen source; Properties: Defined component, Inorganic compound, Simple component|Role: Nitrogen source; Properties: Defined component, Simple component, Inorganic compound|Role: Nitrogen source; Properties: Inorganic compound, Defined component, Simple component	Nh42so4.yaml	data/ingredients/mapped/Nh42so4.yaml
+MEDIUM	Abbreviations	(NH4)H2PO4	CHEBI:62982		CHEBI	MAPPED	True	1	Role: Nitrogen source; Properties: Simple component, Inorganic compound, Defined component	Nh4h2po4_2.yaml	data/ingredients/mapped/Nh4h2po4_2.yaml
+MEDIUM	Abbreviations	D-Maltose	CHEBI:17306	D-Maltose	CHEBI	MAPPED	True	0		D-maltose.yaml	data/ingredients/mapped/D-maltose.yaml
+MEDIUM	Abbreviations	DNA	CHEBI:16991	DNA	CHEBI	MAPPED	True	0		Dna.yaml	data/ingredients/mapped/Dna.yaml
+MEDIUM	Abbreviations	FE EDTA				UNMAPPED	False	1	FE EDTA	Fe_Edta.yaml	data/ingredients/unmapped/Fe_Edta.yaml
+MEDIUM	Abbreviations	H3BO				UNMAPPED	False	1	H3BO3(Baker 0084)	H3bo.yaml	data/ingredients/unmapped/H3bo.yaml
+MEDIUM	Abbreviations	H3BO2	CHEBI:38267	H3BO2	CHEBI	MAPPED	True	0		H3bo2.yaml	data/ingredients/mapped/H3bo2.yaml
+MEDIUM	Abbreviations	K2HPO				UNMAPPED	False	1	K2HPO4(Sigma P 3786)	K2hpo.yaml	data/ingredients/unmapped/K2hpo.yaml
+MEDIUM	Abbreviations	K2S4O6	CHEBI:86466		CHEBI	MAPPED	True	2	Properties: Defined component, Inorganic compound, Simple component|Properties: Defined component, Simple component, Inorganic compound	K2s4o6.yaml	data/ingredients/mapped/K2s4o6.yaml
+MEDIUM	Abbreviations	KH2PO				UNMAPPED	False	1	KH2PO4(Sigma P 0662)	Kh2po.yaml	data/ingredients/unmapped/Kh2po.yaml
+MEDIUM	Abbreviations	KNO				UNMAPPED	False	1	KNO3(Baker 3190)	Kno.yaml	data/ingredients/unmapped/Kno.yaml
+MEDIUM	Abbreviations	L-Arginine x HCl	CHEBI:31235		CHEBI	MAPPED	True	0		L-arginine_X_Hcl.yaml	data/ingredients/mapped/L-arginine_X_Hcl.yaml
+MEDIUM	Abbreviations	L-Cysteine HCl x H2O	CHEBI:91248	L-Cysteine HCl x H2O	CHEBI	MAPPED	True	2	Properties: Defined component, Organic compound, Simple component|Properties: Simple component, Defined component, Organic compound	L-cysteine_Hcl_X_H2o.yaml	data/ingredients/mapped/L-cysteine_Hcl_X_H2o.yaml
+MEDIUM	Abbreviations	NH4HCO3	CHEBI:184335		CHEBI	MAPPED	True	2	Role: Nitrogen source; Properties: Inorganic compound, Defined component, Simple component|Role: Nitrogen source; Properties: Inorganic compound, Simple component, Defined component	Nh4hco3.yaml	data/ingredients/mapped/Nh4hco3.yaml
+MEDIUM	Abbreviations	NH4NO				UNMAPPED	False	1	NH4NO3(CAS: 6484-52-2)	Nh4no.yaml	data/ingredients/unmapped/Nh4no.yaml
+MEDIUM	Abbreviations	NH4NO3	CHEBI:63038		CHEBI	MAPPED	True	5	Role: Nitrogen source; Properties: Defined component, Inorganic compound, Simple component|Role: Nitrogen source; Properties: Defined component, Simple component, Inorganic compound|Role: Nitrogen source; Properties: Inorganic compound, Defined component, Simple component	Nh4no3_2.yaml	data/ingredients/mapped/Nh4no3_2.yaml
+MEDIUM	Complex Notation	CaCl2•2H2O				UNMAPPED	False	3	CaCl2•2H2O (Sigma C-3881)|CaCl2•2H2O(CAS: 10035-04-8)|CaCl2•2H2O(Sigma C-3881)	Cacl22h2o.yaml	data/ingredients/unmapped/Cacl22h2o.yaml
+MEDIUM	Complex Notation	CaSO4•2H2O				UNMAPPED	False	1	CaSO4•2H2O(Mallinckroft 4300)	Caso42h2o.yaml	data/ingredients/unmapped/Caso42h2o.yaml
+MEDIUM	Complex Notation	Citric Acid•H2O				UNMAPPED	False	1	Citric Acid•H2O(Fisher A 104)	Citric_Acidh2o.yaml	data/ingredients/unmapped/Citric_Acidh2o.yaml
+MEDIUM	Complex Notation	Fe(NH4)2(SO4)2·6H2O	CHEBI:76181		CHEBI	MAPPED	True	3	Role: Mineral source; Properties: Defined component, Simple component, Inorganic compound|Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component|Role: Mineral source; Properties: Simple component, Inorganic compound, Defined component	Fe_Nh42_So426h2o.yaml	data/ingredients/mapped/Fe_Nh42_So426h2o.yaml
+MEDIUM	Complex Notation	MgSO4·H2O	CHEBI:31795		CHEBI	MAPPED	True	1	Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component	Mgso4h2o.yaml	data/ingredients/mapped/Mgso4h2o.yaml
+MEDIUM	Complex Notation	MgSO4•7H2O				UNMAPPED	False	3	MgSO4•7H2O (Sigma 230391)|MgSO4•7H2O(CAS: 10034-99-8)|MgSO4•7H2O(Sigma 230391)	Mgso47h2o.yaml	data/ingredients/unmapped/Mgso47h2o.yaml
+MEDIUM	Complex Notation	Na2EDTA•2H2O				UNMAPPED	False	1	Na2EDTA•2H2O(Sigma ED255)	Na2edta2h2o.yaml	data/ingredients/unmapped/Na2edta2h2o.yaml
+MEDIUM	Complex Notation	Na2Glycerophosphate•5H2O				UNMAPPED	False	1	Na2Glycerophosphate•5H2O(CAS: 13408-09-8)	Na2glycerophosphate5h2o_3.yaml	data/ingredients/unmapped/Na2glycerophosphate5h2o_3.yaml
+MEDIUM	Complex Notation	Na2HPO4•7H2O				UNMAPPED	False	2	Na2HPO4•7H2O(Sigma S-9390)|Na2HPO4•7H2O(autoclave before adding) (Sigma S-9390)	Na2hpo47h2o.yaml	data/ingredients/unmapped/Na2hpo47h2o.yaml
+MEDIUM	Complex Notation	Na2SiO3·9H2O	CHEBI:132108		CHEBI	MAPPED	True	1	Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component	Na2sio39h2o.yaml	data/ingredients/mapped/Na2sio39h2o.yaml
+MEDIUM	Complex Notation	Na2SiO3•9H2O				UNMAPPED	False	2	Na2SiO3•9H2O(CAS: 13517-24-3)|Na2SiO3•9H2O(Sigma 307815)	Na2sio39h2o.yaml	data/ingredients/unmapped/Na2sio39h2o.yaml
+MEDIUM	Complex Notation	Na2glycerophosphate•5H2O				UNMAPPED	False	2	Na2glycerophosphate•5H2O(CAS: 13408-09-8)|Na2glycerophosphate•5H2O(CAS:  13408-09-8)	Na2glycerophosphate5h2o.yaml	data/ingredients/unmapped/Na2glycerophosphate5h2o.yaml
+MEDIUM	Complex Notation	NaH2PO4•H2O				UNMAPPED	False	1	NaH2PO4•H2O(MCIB 742)	Nah2po4h2o.yaml	data/ingredients/unmapped/Nah2po4h2o.yaml
+MEDIUM	Complex Notation	SnCl2·2H2O	CHEBI:78074	tin(II) chloride dihydrate	CHEBI	MAPPED	True	1	Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component	Sncl22h2o.yaml	data/ingredients/mapped/Sncl22h2o.yaml
+MEDIUM	Other/Uncategorized					UNKNOWN	False	0		complex_mixture.yaml	data/ingredients/unmapped/complex_mixture.yaml
+MEDIUM	Other/Uncategorized					UNKNOWN	False	0		environmental.yaml	data/ingredients/unmapped/environmental.yaml
+MEDIUM	Other/Uncategorized					UNKNOWN	False	0		incomplete.yaml	data/ingredients/unmapped/incomplete.yaml
+MEDIUM	Other/Uncategorized					UNKNOWN	False	0		placeholder.yaml	data/ingredients/unmapped/placeholder.yaml
+MEDIUM	Other/Uncategorized					UNKNOWN	False	0		simple_chemical.yaml	data/ingredients/unmapped/simple_chemical.yaml
+MEDIUM	Other/Uncategorized					UNKNOWN	False	0		unknown.yaml	data/ingredients/unmapped/unknown.yaml
+MEDIUM	Other/Uncategorized	(DL)-alpha-Lipoic acid	CHEBI:16494	(DL)-alpha-Lipoic acid	CHEBI	MAPPED	True	1	Role: Growth factor; Properties: Organic compound, Defined component, Simple component	Dl-alpha-lipoic_Acid.yaml	data/ingredients/mapped/Dl-alpha-lipoic_Acid.yaml
+MEDIUM	Other/Uncategorized	(NH4)2 citrate	CHEBI:63076		CHEBI	MAPPED	True	0		Nh42_Citrate.yaml	data/ingredients/mapped/Nh42_Citrate.yaml
+MEDIUM	Other/Uncategorized	(NH4)2MoO4	CHEBI:91249	(NH4)2MoO4	CHEBI	MAPPED	True	0		Nh42moo4.yaml	data/ingredients/mapped/Nh42moo4.yaml
+MEDIUM	Other/Uncategorized	(NH4)2Ni(SO4)2	CHEBI:86149	(NH4)2Ni(SO4)2	CHEBI	MAPPED	True	0		Nh42ni_So42.yaml	data/ingredients/mapped/Nh42ni_So42.yaml
+MEDIUM	Other/Uncategorized	(NH4)3 citrate	CHEBI:63037	(NH4)3 citrate	CHEBI	MAPPED	True	1	Role: Nitrogen source; Properties: Defined component, Organic compound, Simple component	Nh43_Citrate.yaml	data/ingredients/mapped/Nh43_Citrate.yaml
+MEDIUM	Other/Uncategorized	2-Mercaptoethanesulfonate	CHEBI:17905	2-Mercaptoethanesulfonate	CHEBI	MAPPED	True	1	Cross-references: KEGG:com	2-mercaptoethanesulfonate.yaml	data/ingredients/mapped/2-mercaptoethanesulfonate.yaml
+MEDIUM	Other/Uncategorized	A+ Trace Components				UNMAPPED	False	1	A+ Trace Components (sterilize before adding)	A_Trace_Components.yaml	data/ingredients/unmapped/A_Trace_Components.yaml
+MEDIUM	Other/Uncategorized	BCYE agar	CHEBI:2509	BCYE agar	CHEBI	MAPPED	True	1	Properties: Undefined component, Complex component	Bcye_Agar.yaml	data/ingredients/mapped/Bcye_Agar.yaml
+MEDIUM	Other/Uncategorized	BL Agar	CHEBI:2509	BL Agar	CHEBI	MAPPED	True	0		Bl_Agar.yaml	data/ingredients/mapped/Bl_Agar.yaml
+MEDIUM	Other/Uncategorized	Barley grains				UNMAPPED	False	1	Barley grains(add after dH2O)	Barley_Grains.yaml	data/ingredients/unmapped/Barley_Grains.yaml
+MEDIUM	Other/Uncategorized	Barley grains autoclaved				UNMAPPED	False	1	Barley grains autoclaved	Barley_Grains_Autoclaved.yaml	data/ingredients/unmapped/Barley_Grains_Autoclaved.yaml
+MEDIUM	Other/Uncategorized	Biotine	CHEBI:15956	Biotine	CHEBI	MAPPED	True	0		Biotine.yaml	data/ingredients/mapped/Biotine.yaml
+MEDIUM	Other/Uncategorized	Brewer anaerobic agar	CHEBI:2509	Brewer anaerobic agar	CHEBI	MAPPED	True	0		Brewer_Anaerobic_Agar.yaml	data/ingredients/mapped/Brewer_Anaerobic_Agar.yaml
+MEDIUM	Other/Uncategorized	Brucella agar	CHEBI:2509	Brucella agar	CHEBI	MAPPED	True	0		Brucella_Agar.yaml	data/ingredients/mapped/Brucella_Agar.yaml
+MEDIUM	Other/Uncategorized	CaCO				UNMAPPED	False	3	CaCO3(Fisher C 64)|CaCO3(optional) (Fisher C 64)|CaCO3(optional)(Fisher C 64)	Caco.yaml	data/ingredients/unmapped/Caco.yaml
+MEDIUM	Other/Uncategorized	Carboxymethyl cellulose	CHEBI:85146	Carboxymethyl cellulose	CHEBI	MAPPED	True	1	( sodium salt)	Carboxymethyl_Cellulose.yaml	data/ingredients/mapped/Carboxymethyl_Cellulose.yaml
+MEDIUM	Other/Uncategorized	Casamino acid	CHEBI:78020	heptacosanoate	CHEBI	MAPPED	True	1	Properties: Undefined component	Casamino_Acid.yaml	data/ingredients/mapped/Casamino_Acid.yaml
+MEDIUM	Other/Uncategorized	Catalase	CHEBI:3463	Catalase	CHEBI	MAPPED	True	2	Properties: Defined component, Simple component|Properties: Simple component, Defined component	Catalase.yaml	data/ingredients/mapped/Catalase.yaml
+MEDIUM	Other/Uncategorized	Co Carboxylase	CHEBI:45395	Co Carboxylase	CHEBI	MAPPED	True	0		Co_Carboxylase.yaml	data/ingredients/mapped/Co_Carboxylase.yaml
+MEDIUM	Other/Uncategorized	Coenzyme A	CHEBI:15346	Coenzyme A	CHEBI	MAPPED	True	1	Role: Growth factor; Properties: Organic compound, Defined component, Simple component	Coenzyme_A.yaml	data/ingredients/mapped/Coenzyme_A.yaml
+MEDIUM	Other/Uncategorized	Coenzyme M	CHEBI:17905	Coenzyme M	CHEBI	MAPPED	True	1	Role: Growth factor; Properties: Organic compound, Defined component, Simple component	Coenzyme_M.yaml	data/ingredients/mapped/Coenzyme_M.yaml
+MEDIUM	Other/Uncategorized	Columbia blood agar base	CHEBI:2509	Columbia blood agar base	CHEBI	MAPPED	True	0		Columbia_Blood_Agar_Base.yaml	data/ingredients/mapped/Columbia_Blood_Agar_Base.yaml
+MEDIUM	Other/Uncategorized	Corn meal agar	CHEBI:2509	Corn meal agar	CHEBI	MAPPED	True	0		Corn_Meal_Agar.yaml	data/ingredients/mapped/Corn_Meal_Agar.yaml
+MEDIUM	Other/Uncategorized	Cr2(SO4)3 x n H2O	CHEBI:53471	Cr2(SO4)3 x n H2O	CHEBI	MAPPED	True	0		Cr2_So43_X_N_H2o.yaml	data/ingredients/mapped/Cr2_So43_X_N_H2o.yaml
+MEDIUM	Other/Uncategorized	Cysteine	CHEBI:15356	Cysteine	CHEBI	MAPPED	True	5	Role: Nitrogen source; Properties: Defined component, Organic compound, Simple component|Role: Nitrogen source; Properties: Defined component, Simple component, Organic compound|Role: Nitrogen source; Properties: Organic compound, Defined component, Simple component	Cysteine.yaml	data/ingredients/mapped/Cysteine.yaml
+MEDIUM	Other/Uncategorized	Czapek Dox agar	CHEBI:2509	Czapek Dox agar	CHEBI	MAPPED	True	0		Czapek_Dox_Agar.yaml	data/ingredients/mapped/Czapek_Dox_Agar.yaml
+MEDIUM	Other/Uncategorized	D-(+)-biotin	CHEBI:15956	D-(+)-biotin	CHEBI	MAPPED	True	0		D-_-biotin.yaml	data/ingredients/mapped/D-_-biotin.yaml
+MEDIUM	Other/Uncategorized	DAS Vitamin Cocktail				UNMAPPED	False	1	DAS Vitamin Cocktail	Das_Vitamin_Cocktail.yaml	data/ingredients/unmapped/Das_Vitamin_Cocktail.yaml
+MEDIUM	Other/Uncategorized	DL-2-Methylbutyric acid	CHEBI:37070	DL-2-Methylbutyric acid	CHEBI	MAPPED	True	1	Role: Carbon source; Properties: Organic compound, Defined component, Simple component	Dl-2-methylbutyric_Acid.yaml	data/ingredients/mapped/Dl-2-methylbutyric_Acid.yaml
+MEDIUM	Other/Uncategorized	DL-6,8-thioctic acid	CHEBI:16494	DL-6,8-thioctic acid	CHEBI	MAPPED	True	0		Dl-68-thioctic_Acid.yaml	data/ingredients/mapped/Dl-68-thioctic_Acid.yaml
+MEDIUM	Other/Uncategorized	DL-Calcium pantothenate	CHEBI:31345	DL-Calcium pantothenate	CHEBI	MAPPED	True	2	Role: Vitamin; Properties: Defined component, Organic compound, Simple component|Role: Vitamin; Properties: Organic compound, Defined component, Simple component	Dl-calcium_Pantothenate.yaml	data/ingredients/mapped/Dl-calcium_Pantothenate.yaml
+MEDIUM	Other/Uncategorized	DL-Dithiothreitol	CHEBI:18320	DL-Dithiothreitol	CHEBI	MAPPED	True	1	Properties: Defined component, Inorganic compound, Simple component	Dl-dithiothreitol.yaml	data/ingredients/mapped/Dl-dithiothreitol.yaml
+MEDIUM	Other/Uncategorized	DL-Methionine	CHEBI:16811	DL-Methionine	CHEBI	MAPPED	True	1	Role: Nitrogen source; Properties: Defined component, Organic compound, Simple component	Dl-methionine_2.yaml	data/ingredients/mapped/Dl-methionine_2.yaml
+MEDIUM	Other/Uncategorized	DL-Na-malate	CHEBI:91261	DL-Na-malate	CHEBI	MAPPED	True	0		Dl-na-malate.yaml	data/ingredients/mapped/Dl-na-malate.yaml
+MEDIUM	Other/Uncategorized	DL-Sodium malate	CHEBI:91261	DL-Sodium malate	CHEBI	MAPPED	True	0		Dl-sodium_Malate.yaml	data/ingredients/mapped/Dl-sodium_Malate.yaml
+MEDIUM	Other/Uncategorized	DL-alpha-Methyl butyric acid	CHEBI:37070	DL-alpha-Methyl butyric acid	CHEBI	MAPPED	True	0		Dl-alpha-methyl_Butyric_Acid.yaml	data/ingredients/mapped/Dl-alpha-methyl_Butyric_Acid.yaml
+MEDIUM	Other/Uncategorized	DL-alpha-lipoic acid	CHEBI:16494	DL-alpha-lipoic acid	CHEBI	MAPPED	True	0		Dl-alpha-lipoic_Acid_2.yaml	data/ingredients/mapped/Dl-alpha-lipoic_Acid_2.yaml
+MEDIUM	Other/Uncategorized	Demineralized water	CHEBI:15377	Demineralized water	CHEBI	MAPPED	True	0		Demineralized_Water.yaml	data/ingredients/mapped/Demineralized_Water.yaml
+MEDIUM	Other/Uncategorized	Dipotassium Phosphate	CHEBI:131527	Dipotassium Phosphate	CHEBI	MAPPED	True	1	Role: Buffer; Properties: Simple component, Inorganic compound, Defined component	Dipotassium_Phosphate.yaml	data/ingredients/mapped/Dipotassium_Phosphate.yaml
+MEDIUM	Other/Uncategorized	Distilled water	CHEBI:15377	Distilled water	CHEBI	MAPPED	True	5	Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component|Role: Solvating media; Properties: Defined component, Inorganic compound, Simple component|Role: Solvating media; Properties: Defined component, Simple component, Inorganic compound	Distilled_Water.yaml	data/ingredients/mapped/Distilled_Water.yaml
+MEDIUM	Other/Uncategorized	Double distilled water	CHEBI:15377	Double distilled water	CHEBI	MAPPED	True	1	Role: Solvating media; Properties: Inorganic compound, Defined component, Simple component	Double_Distilled_Water.yaml	data/ingredients/mapped/Double_Distilled_Water.yaml
+MEDIUM	Other/Uncategorized	Elemental sulphur	CHEBI:33403	Elemental sulphur	CHEBI	MAPPED	True	0		Elemental_Sulphur.yaml	data/ingredients/mapped/Elemental_Sulphur.yaml
+MEDIUM	Other/Uncategorized	Fastidious Anaerobe Agar	CHEBI:2509	Fastidious Anaerobe Agar	CHEBI	MAPPED	True	0		Fastidious_Anaerobe_Agar.yaml	data/ingredients/mapped/Fastidious_Anaerobe_Agar.yaml
+MEDIUM	Other/Uncategorized	Fe(III) citrate	CHEBI:144421	Fe(III) citrate	CHEBI	MAPPED	True	1	Role: Mineral source; Properties: Organic compound, Defined component, Simple component	Fe_Iii_Citrate.yaml	data/ingredients/mapped/Fe_Iii_Citrate.yaml
+MEDIUM	Other/Uncategorized	Fe(NH4)citrate	CHEBI:31604	Fe(NH4)citrate	CHEBI	MAPPED	True	0		Fe_Nh4citrate.yaml	data/ingredients/mapped/Fe_Nh4citrate.yaml
+MEDIUM	Other/Uncategorized	Fe2(SO4)3 x n H2O	CHEBI:53438	Fe2(SO4)3 x n H2O	CHEBI	MAPPED	True	0		Fe2_So43_X_N_H2o.yaml	data/ingredients/mapped/Fe2_So43_X_N_H2o.yaml
+MEDIUM	Other/Uncategorized	Fe4(PO4)2	CHEBI:132767	Fe4(PO4)2	CHEBI	MAPPED	True	0		Fe4_Po42.yaml	data/ingredients/mapped/Fe4_Po42.yaml
+MEDIUM	Other/Uncategorized	Ferric citrate monohydrate	CHEBI:77732		CHEBI	MAPPED	True	0		Ferric_Citrate_Monohydrate.yaml	data/ingredients/mapped/Ferric_Citrate_Monohydrate.yaml
+MEDIUM	Other/Uncategorized	Ferrihydrite	CHEBI:192761		CHEBI	MAPPED	True	1	Role: Mineral source	Ferrihydrite.yaml	data/ingredients/mapped/Ferrihydrite.yaml
+MEDIUM	Other/Uncategorized	Full composition available at source database				UNMAPPED	False	1	Full composition available at source database	Full_Composition_Available_At_Source_Database.yaml	data/ingredients/unmapped/Full_Composition_Available_At_Source_Database.yaml
+MEDIUM	Other/Uncategorized	GAM agar	CHEBI:2509	GAM agar	CHEBI	MAPPED	True	1	( modified)	Gam_Agar.yaml	data/ingredients/mapped/Gam_Agar.yaml
+MEDIUM	Other/Uncategorized	Gelatine	CHEBI:5291	Gelatine	CHEBI	MAPPED	True	0		Gelatine.yaml	data/ingredients/mapped/Gelatine.yaml
+MEDIUM	Other/Uncategorized	Gellan Gum	CHEBI:85248	Gellan Gum	CHEBI	MAPPED	True	0		Gellan_Gum.yaml	data/ingredients/mapped/Gellan_Gum.yaml
+MEDIUM	Other/Uncategorized	Gellan gum	CHEBI:85248	Gellan Gum	CHEBI	MAPPED	True	1	Role: Solidifying component; Properties: Undefined component, Organic compound	Gellan_Gum_3.yaml	data/ingredients/mapped/Gellan_Gum_3.yaml
+MEDIUM	Other/Uncategorized	Gelrite	CHEBI:85248	Gelrite	CHEBI	MAPPED	True	2	Role: Solidifying component; Properties: Organic compound, Undefined component|Role: Solidifying component; Properties: Simple component	Gelrite.yaml	data/ingredients/mapped/Gelrite.yaml
+MEDIUM	Other/Uncategorized	Glycerol-asparagine agar	CHEBI:2509	Glycerol-asparagine agar	CHEBI	MAPPED	True	0		Glycerol-asparagine_Agar.yaml	data/ingredients/mapped/Glycerol-asparagine_Agar.yaml
+MEDIUM	Other/Uncategorized	H2SeO3	CHEBI:26642	H2SeO3	CHEBI	MAPPED	True	1	Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component	H2seo3.yaml	data/ingredients/mapped/H2seo3.yaml
+MEDIUM	Other/Uncategorized	Hexachlorocyclo-hexane	CHEBI:24536	Hexachlorocyclo-hexane	CHEBI	MAPPED	True	0		Hexachlorocyclo-hexane.yaml	data/ingredients/mapped/Hexachlorocyclo-hexane.yaml
+MEDIUM	Other/Uncategorized	Histidine	CHEBI:27570	Histidine	CHEBI	MAPPED	True	1	Role: Nitrogen source; Properties: Organic compound, Defined component, Simple component	Histidine.yaml	data/ingredients/mapped/Histidine.yaml
+MEDIUM	Other/Uncategorized	Indigocarmine	CHEBI:31695	Indigocarmine	CHEBI	MAPPED	True	0		Indigocarmine.yaml	data/ingredients/mapped/Indigocarmine.yaml
+MEDIUM	Other/Uncategorized	Iron powder	CHEBI:82664	Iron powder	CHEBI	MAPPED	True	0		Iron_Powder.yaml	data/ingredients/mapped/Iron_Powder.yaml
+MEDIUM	Other/Uncategorized	KAl(SO4)2	CHEBI:86463	KAl(SO4)2	CHEBI	MAPPED	True	0		Kal_So42.yaml	data/ingredients/mapped/Kal_So42.yaml
+MEDIUM	Other/Uncategorized	L-cystine	CHEBI:16283	L-cystine	CHEBI	MAPPED	True	1	Role: Nitrogen source; Properties: Defined component, Simple component, Organic compound	L-cystine_2.yaml	data/ingredients/mapped/L-cystine_2.yaml
+MEDIUM	Other/Uncategorized	Legionella agar enrichment	CHEBI:2509	Legionella agar enrichment	CHEBI	MAPPED	True	0		Legionella_Agar_Enrichment.yaml	data/ingredients/mapped/Legionella_Agar_Enrichment.yaml
+MEDIUM	Other/Uncategorized	MES acids	CHEBI:39005		CHEBI	MAPPED	True	0		Mes_Acids.yaml	data/ingredients/mapped/Mes_Acids.yaml
+MEDIUM	Other/Uncategorized	Malic acid	CHEBI:6650	Malic acid	CHEBI	MAPPED	True	0		Malic_Acid.yaml	data/ingredients/mapped/Malic_Acid.yaml
+MEDIUM	Other/Uncategorized	Maltose	CHEBI:17306	Maltose	CHEBI	MAPPED	True	5	Cross-references: KEGG:malt|Role: Carbon source; Properties: Defined component, Organic compound, Simple component|Role: Carbon source; Properties: Defined component, Simple component, Organic compound	Maltose.yaml	data/ingredients/mapped/Maltose.yaml
+MEDIUM	Other/Uncategorized	Methylamine-HCl	CHEBI:64700		CHEBI	MAPPED	True	1	Role: Carbon source; Properties: Organic compound, Defined component, Simple component	Methylamine-hcl.yaml	data/ingredients/mapped/Methylamine-hcl.yaml
+MEDIUM	Other/Uncategorized	MgCO				UNMAPPED	False	1	MgCO3(MCIB CB486)	Mgco.yaml	data/ingredients/unmapped/Mgco.yaml
+MEDIUM	Other/Uncategorized	Middlebrook 7H10 agar	CHEBI:2509	Middlebrook 7H10 agar	CHEBI	MAPPED	True	0		Middlebrook_7h10_Agar.yaml	data/ingredients/mapped/Middlebrook_7h10_Agar.yaml
+MEDIUM	Other/Uncategorized	Minor Nutrients				UNMAPPED	False	1	Minor Nutrients	Minor_Nutrients.yaml	data/ingredients/unmapped/Minor_Nutrients.yaml
+MEDIUM	Other/Uncategorized	Morpholinopropane sulfonic acid	CHEBI:44115	Morpholinopropane sulfonic acid	CHEBI	MAPPED	True	0		Morpholinopropane_Sulfonic_Acid.yaml	data/ingredients/mapped/Morpholinopropane_Sulfonic_Acid.yaml
+MEDIUM	Other/Uncategorized	Mueller Hinton II agar	CHEBI:2509	Mueller Hinton II agar	CHEBI	MAPPED	True	0		Mueller_Hinton_Ii_Agar.yaml	data/ingredients/mapped/Mueller_Hinton_Ii_Agar.yaml
+MEDIUM	Other/Uncategorized	Myo-inositol	CHEBI:17268	Myo-inositol	CHEBI	MAPPED	True	0		Myo-inositol_2.yaml	data/ingredients/mapped/Myo-inositol_2.yaml
+MEDIUM	Other/Uncategorized	N-acetylglucosamine	CHEBI:59640	N-acetylglucosamine	CHEBI	MAPPED	True	1	Role: Carbon source; Properties: Organic compound, Defined component, Simple component	N-acetylglucosamine_2.yaml	data/ingredients/mapped/N-acetylglucosamine_2.yaml
+MEDIUM	Other/Uncategorized	NH4-oxalate	CHEBI:91241	NH4-oxalate	CHEBI	MAPPED	True	0		Nh4-oxalate.yaml	data/ingredients/mapped/Nh4-oxalate.yaml
+MEDIUM	Other/Uncategorized	NH4MgPO				UNMAPPED	False	1	NH4MgPO4(Sigma 529354)	Nh4mgpo.yaml	data/ingredients/unmapped/Nh4mgpo.yaml
+MEDIUM	Other/Uncategorized	Na Acetate	CHEBI:32954	Na acetate	CHEBI	MAPPED	True	1	Role: Buffer; Properties: Organic compound, Defined component, Simple component	Na_Acetate_2.yaml	data/ingredients/mapped/Na_Acetate_2.yaml
+MEDIUM	Other/Uncategorized	Na NO3	CHEBI:63005		CHEBI	MAPPED	True	0		Na_No3.yaml	data/ingredients/mapped/Na_No3.yaml
+MEDIUM	Other/Uncategorized	Na acetate	CHEBI:32954	Na acetate	CHEBI	MAPPED	True	0		Na_Acetate.yaml	data/ingredients/mapped/Na_Acetate.yaml
+MEDIUM	Other/Uncategorized	Na gluconate	CHEBI:84997	Na gluconate	CHEBI	MAPPED	True	0		Na_Gluconate.yaml	data/ingredients/mapped/Na_Gluconate.yaml
+MEDIUM	Other/Uncategorized	Na glutamate	CHEBI:64220	Na glutamate	CHEBI	MAPPED	True	0		Na_Glutamate.yaml	data/ingredients/mapped/Na_Glutamate.yaml
+MEDIUM	Other/Uncategorized	Na malate	CHEBI:91261	Na malate	CHEBI	MAPPED	True	0		Na_Malate.yaml	data/ingredients/mapped/Na_Malate.yaml
+MEDIUM	Other/Uncategorized	Na pyruvate	CHEBI:50144	Na pyruvate	CHEBI	MAPPED	True	0		Na_Pyruvate.yaml	data/ingredients/mapped/Na_Pyruvate.yaml
+MEDIUM	Other/Uncategorized	Na silicate	CHEBI:60720	Na silicate	CHEBI	MAPPED	True	0		Na_Silicate.yaml	data/ingredients/mapped/Na_Silicate.yaml
+MEDIUM	Other/Uncategorized	Na-(L)-lactate	CHEBI:232798		CHEBI	MAPPED	True	1	Role: Carbon source; Properties: Organic compound, Defined component, Simple component	Na-_L-lactate.yaml	data/ingredients/mapped/Na-_L-lactate.yaml
+MEDIUM	Other/Uncategorized	Na2 alpha-ketoglutarate	CHEBI:16810	Na2 alpha-ketoglutarate	CHEBI	MAPPED	True	0		Na2_Alpha-ketoglutarate.yaml	data/ingredients/mapped/Na2_Alpha-ketoglutarate.yaml
+MEDIUM	Other/Uncategorized	Na2-DL-malate	CHEBI:91261	Na2-DL-malate	CHEBI	MAPPED	True	0		Na2-dl-malate.yaml	data/ingredients/mapped/Na2-dl-malate.yaml
+MEDIUM	Other/Uncategorized	Na2-EDTA	CHEBI:64734	Na2-EDTA	CHEBI	MAPPED	True	1	Properties: Defined component, Organic compound, Simple component	Na2-edta.yaml	data/ingredients/mapped/Na2-edta.yaml
+MEDIUM	Other/Uncategorized	Na2-citrate	CHEBI:53258	Na2-citrate	CHEBI	MAPPED	True	0		Na2-citrate.yaml	data/ingredients/mapped/Na2-citrate.yaml
+MEDIUM	Other/Uncategorized	Na2-fumarate	CHEBI:115156	Na2-fumarate	CHEBI	MAPPED	True	2	Properties: Defined component, Simple component, Organic compound|Properties: Simple component, Organic compound, Defined component	Na2-fumarate.yaml	data/ingredients/mapped/Na2-fumarate.yaml
+MEDIUM	Other/Uncategorized	Na2-glutamate	CHEBI:64220	Na2-glutamate	CHEBI	MAPPED	True	1	Role: Nitrogen source; Properties: Organic compound, Defined component, Simple component	Na2-glutamate.yaml	data/ingredients/mapped/Na2-glutamate.yaml
+MEDIUM	Other/Uncategorized	Na2-glyoxalate	CHEBI:91251	Na2-glyoxalate	CHEBI	MAPPED	True	1	Role: Carbon source; Properties: Organic compound, Defined component, Simple component	Na2-glyoxalate.yaml	data/ingredients/mapped/Na2-glyoxalate.yaml
+MEDIUM	Other/Uncategorized	Na2-ß-glycerolphosphate	CHEBI:132089	Na2-ß-glycerolphosphate	CHEBI	MAPPED	True	0		Na2-ß-glycerolphosphate.yaml	data/ingredients/mapped/Na2-ß-glycerolphosphate.yaml
+MEDIUM	Other/Uncategorized	Na2CO				UNMAPPED	False	1	Na2CO3(Baker 3604)	Na2co.yaml	data/ingredients/unmapped/Na2co.yaml
+MEDIUM	Other/Uncategorized	Na2CO3 anhydrous	CHEBI:29377	Na2CO3 anhydrous	CHEBI	MAPPED	True	2	Role: Buffer; Properties: Defined component, Simple component, Inorganic compound|Role: Buffer; Properties: Inorganic compound, Simple component, Defined component	Na2co3_Anhydrous.yaml	data/ingredients/mapped/Na2co3_Anhydrous.yaml
+MEDIUM	Other/Uncategorized	Na2Glycerophosphate.5H2O				UNMAPPED	False	1	Na2Glycerophosphate.5H2O(CAS:  13408-09-8)	Na2glycerophosphate5h2o_2.yaml	data/ingredients/unmapped/Na2glycerophosphate5h2o_2.yaml
+MEDIUM	Other/Uncategorized	Na3-EDTA	CHEBI:63125	Na3-EDTA	CHEBI	MAPPED	True	2	Properties: Defined component, Organic compound, Simple component|Properties: Defined component, Simple component, Organic compound	Na3-edta.yaml	data/ingredients/mapped/Na3-edta.yaml
+MEDIUM	Other/Uncategorized	Na3-citrate	CHEBI:53258	Na3-citrate	CHEBI	MAPPED	True	3	Role: Buffer; Properties: Defined component, Organic compound, Simple component|Role: Buffer; Properties: Defined component, Simple component, Organic compound|Role: Buffer; Properties: Organic compound, Defined component, Simple component	Na3-citrate.yaml	data/ingredients/mapped/Na3-citrate.yaml
+MEDIUM	Other/Uncategorized	NaCO3	CHEBI:29377		CHEBI	MAPPED	True	1	Role: Buffer; Properties: Inorganic compound, Simple component, Defined component	Naco3.yaml	data/ingredients/mapped/Naco3.yaml
+MEDIUM	Other/Uncategorized	NaHCO				UNMAPPED	False	1	NaHCO3(Fisher S 233)	Nahco.yaml	data/ingredients/unmapped/Nahco.yaml
+MEDIUM	Other/Uncategorized	NaNO				UNMAPPED	False	3	NaNO3(CAS: 7631-99-4)|NaNO3(Fisher BP360-500)|NaNO3(autoclave before adding)(Fisher BP360-500)	Nano.yaml	data/ingredients/unmapped/Nano.yaml
+MEDIUM	Other/Uncategorized	NaS2O3	CHEBI:132112		CHEBI	MAPPED	True	0		Nas2o3.yaml	data/ingredients/mapped/Nas2o3.yaml
+MEDIUM	Other/Uncategorized	NaVO3 x n H2O	CHEBI:132095	NaVO3 x n H2O	CHEBI	MAPPED	True	0		Navo3_X_N_H2o.yaml	data/ingredients/mapped/Navo3_X_N_H2o.yaml
+MEDIUM	Other/Uncategorized	Nicotinic acid amide	CHEBI:17154	Nicotinic acid amide	CHEBI	MAPPED	True	0		Nicotinic_Acid_Amide.yaml	data/ingredients/mapped/Nicotinic_Acid_Amide.yaml
+MEDIUM	Other/Uncategorized	Oatmeal agar	CHEBI:2509	Oatmeal agar	CHEBI	MAPPED	True	0		Oatmeal_Agar.yaml	data/ingredients/mapped/Oatmeal_Agar.yaml
+MEDIUM	Other/Uncategorized	Pea				UNMAPPED	False	2	Pea|Pea(add after dH2O)	Pea.yaml	data/ingredients/unmapped/Pea.yaml
+MEDIUM	Other/Uncategorized	Poly(3-hydroxybutyrate)	CHEBI:53389	Poly(3-hydroxybutyrate)	CHEBI	MAPPED	True	1	Role: Carbon source	Poly_3-hydroxybutyrate.yaml	data/ingredients/mapped/Poly_3-hydroxybutyrate.yaml
+MEDIUM	Other/Uncategorized	Potassium Phosphate	CHEBI:63036	Potassium Phosphate	CHEBI	MAPPED	True	1	(dibasic)	Potassium_Phosphate.yaml	data/ingredients/mapped/Potassium_Phosphate.yaml
+MEDIUM	Other/Uncategorized	Potassium tetrathionate	CHEBI:86466	Potassium tetrathionate	CHEBI	MAPPED	True	0		Potassium_Tetrathionate.yaml	data/ingredients/mapped/Potassium_Tetrathionate.yaml
+MEDIUM	Other/Uncategorized	Pyridoxamine hydrochloride	CHEBI:131531	Pyridoxamine hydrochloride	CHEBI	MAPPED	True	0		Pyridoxamine_Hydrochloride.yaml	data/ingredients/mapped/Pyridoxamine_Hydrochloride.yaml
+MEDIUM	Other/Uncategorized	R agar	CHEBI:2509	R agar	CHEBI	MAPPED	True	0		R_Agar.yaml	data/ingredients/mapped/R_Agar.yaml
+MEDIUM	Other/Uncategorized	R2A agar	CHEBI:2509	R2A agar	CHEBI	MAPPED	True	0		R2a_Agar.yaml	data/ingredients/mapped/R2a_Agar.yaml
+MEDIUM	Other/Uncategorized	Riboflavine	CHEBI:17015	Riboflavine	CHEBI	MAPPED	True	1	Role: Vitamin; Properties: Organic compound, Defined component, Simple component	Riboflavine.yaml	data/ingredients/mapped/Riboflavine.yaml
+MEDIUM	Other/Uncategorized	Sodium DL-lactate	CHEBI:75228	Sodium DL-lactate	CHEBI	MAPPED	True	1	Role: Carbon source; Properties: Simple component, Defined component, Organic compound	Sodium_Dl-lactate.yaml	data/ingredients/mapped/Sodium_Dl-lactate.yaml
+MEDIUM	Other/Uncategorized	Sodium DL-malate	CHEBI:91261	Sodium DL-malate	CHEBI	MAPPED	True	4	Properties: Defined component, Organic compound, Simple component|Properties: Defined component, Simple component, Organic compound|Properties: Organic compound, Simple component, Defined component	Sodium_Dl-malate.yaml	data/ingredients/mapped/Sodium_Dl-malate.yaml
+MEDIUM	Other/Uncategorized	Sodium L-malate	CHEBI:91261	Sodium L-malate	CHEBI	MAPPED	True	0		Sodium_L-malate.yaml	data/ingredients/mapped/Sodium_L-malate.yaml
+MEDIUM	Other/Uncategorized	Sodium ascorbate	CHEBI:113451	Sodium ascorbate	CHEBI	MAPPED	True	2	Properties: Defined component, Organic compound, Simple component|Properties: Defined component, Simple component, Organic compound	Sodium_Ascorbate.yaml	data/ingredients/mapped/Sodium_Ascorbate.yaml
+MEDIUM	Other/Uncategorized	Sodium beta-glycerophosphate	CHEBI:132089	Sodium beta-glycerophosphate	CHEBI	MAPPED	True	0		Sodium_Beta-glycerophosphate.yaml	data/ingredients/mapped/Sodium_Beta-glycerophosphate.yaml
+MEDIUM	Other/Uncategorized	Sodium thioglycollate	CHEBI:86481	Sodium thioglycollate	CHEBI	MAPPED	True	2	Properties: Defined component, Organic compound, Simple component|Properties: Defined component, Simple component, Organic compound	Sodium_Thioglycollate.yaml	data/ingredients/mapped/Sodium_Thioglycollate.yaml
+MEDIUM	Other/Uncategorized	Sodium thiosulphate	CHEBI:132112	Sodium thiosulphate	CHEBI	MAPPED	True	0		Sodium_Thiosulphate.yaml	data/ingredients/mapped/Sodium_Thiosulphate.yaml
+MEDIUM	Other/Uncategorized	Soytone	CHEBI:8150		CHEBI	MAPPED	True	1	Properties: Undefined component	Soytone.yaml	data/ingredients/mapped/Soytone.yaml
+MEDIUM	Other/Uncategorized	Sterile dH2O				UNMAPPED	False	1	Sterile dH2O	Sterile_Dh2o_2.yaml	data/ingredients/unmapped/Sterile_Dh2o_2.yaml
+MEDIUM	Other/Uncategorized	Sulfur powder	CHEBI:14258	Sulfur powder	CHEBI	MAPPED	True	1	Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component	Sulfur_Powder_2.yaml	data/ingredients/mapped/Sulfur_Powder_2.yaml
+MEDIUM	Other/Uncategorized	Tap water	CHEBI:15377	Tap water	CHEBI	MAPPED	True	1	Role: Solvating media; Properties: Undefined component	Tap_Water.yaml	data/ingredients/mapped/Tap_Water.yaml
+MEDIUM	Other/Uncategorized	Tetramethyl ammonium	CHEBI:46020		CHEBI	MAPPED	True	1	Role: Nutrient source; Properties: Inorganic compound, Defined component, Simple component	Tetramethyl_Ammonium.yaml	data/ingredients/mapped/Tetramethyl_Ammonium.yaml
+MEDIUM	Other/Uncategorized	Thiamine hydrochloride	CHEBI:49105	Thiamine hydrochloride	CHEBI	MAPPED	True	1	Role: Vitamin; Properties: Organic compound, Defined component, Simple component	Thiamine_Hydrochloride.yaml	data/ingredients/mapped/Thiamine_Hydrochloride.yaml
+MEDIUM	Other/Uncategorized	Thiosulfate	CHEBI:26977	Thiosulfate	CHEBI	MAPPED	True	0		Thiosulfate.yaml	data/ingredients/mapped/Thiosulfate.yaml
+MEDIUM	Other/Uncategorized	Trehalose	CHEBI:27082	Trehalose	CHEBI	MAPPED	True	1	Role: Carbon source; Properties: Defined component, Simple component, Organic compound	Trehalose.yaml	data/ingredients/mapped/Trehalose.yaml
+MEDIUM	Other/Uncategorized	Trimethylamine-HCl	CHEBI:64700		CHEBI	MAPPED	True	1	Role: Nutrient source; Properties: Organic compound, Defined component, Simple component	Trimethylamine-hcl.yaml	data/ingredients/mapped/Trimethylamine-hcl.yaml
+MEDIUM	Other/Uncategorized	Trimethylammonium chloride	CHEBI:64700	Trimethylammonium chloride	CHEBI	MAPPED	True	0		Trimethylammonium_Chloride.yaml	data/ingredients/mapped/Trimethylammonium_Chloride.yaml
+MEDIUM	Other/Uncategorized	Tris base	CHEBI:9754	Tris base	CHEBI	MAPPED	True	4	Role: Buffer; Properties: Defined component, Organic compound, Simple component|Role: Buffer; Properties: Defined component, Simple component, Organic compound|Role: Buffer; Properties: Organic compound, Defined component, Simple component	Tris_Base.yaml	data/ingredients/mapped/Tris_Base.yaml
+MEDIUM	Other/Uncategorized	Tris(hydroxymethyl)methylamine	CHEBI:9754	Tris(hydroxymethyl)methylamine	CHEBI	MAPPED	True	0		Tris_Hydroxymethylmethylamine.yaml	data/ingredients/mapped/Tris_Hydroxymethylmethylamine.yaml
+MEDIUM	Other/Uncategorized	Trisodium citrate	CHEBI:53258	Trisodium citrate	CHEBI	MAPPED	True	5	Role: Buffer; Properties: Defined component, Organic compound, Simple component|Role: Buffer; Properties: Defined component, Simple component, Organic compound|Role: Buffer; Properties: Organic compound, Defined component, Simple component	Trisodium_Citrate.yaml	data/ingredients/mapped/Trisodium_Citrate.yaml
+MEDIUM	Other/Uncategorized	Trizma Base pH				UNMAPPED	False	1	Trizma Base pH 8.2	Trizma_Base_Ph.yaml	data/ingredients/unmapped/Trizma_Base_Ph.yaml
+MEDIUM	Other/Uncategorized	Tween 40	CHEBI:53423	Tween 40	CHEBI	MAPPED	True	0		Tween_40.yaml	data/ingredients/mapped/Tween_40.yaml
+MEDIUM	Other/Uncategorized	Tween 60	CHEBI:53425	polysorbate 60	CHEBI	MAPPED	True	2	Properties: Defined component, Organic compound, Simple component|Properties: Organic compound, Defined component, Simple component	Tween_60.yaml	data/ingredients/mapped/Tween_60.yaml
+MEDIUM	Other/Uncategorized	VOSO4 x n H2O	CHEBI:87020	VOSO4 x n H2O	CHEBI	MAPPED	True	0		Voso4_X_N_H2o.yaml	data/ingredients/mapped/Voso4_X_N_H2o.yaml
+MEDIUM	Other/Uncategorized	Water	CHEBI:15377	Water	CHEBI	MAPPED	True	1	Role: Solvating media	Water_2.yaml	data/ingredients/mapped/Water_2.yaml
+MEDIUM	Other/Uncategorized	Xylan	CHEBI:37166	Xylan	CHEBI	MAPPED	True	1	Role: Carbon source; Properties: Undefined component	Xylan.yaml	data/ingredients/mapped/Xylan.yaml
+MEDIUM	Other/Uncategorized	ZnSO4	CHEBI:35176	ZnSO4	CHEBI	MAPPED	True	4	Role: Mineral source; Properties: Defined component, Inorganic compound, Simple component|Role: Mineral source; Properties: Defined component, Simple component, Inorganic compound|Role: Mineral source; Properties: Inorganic compound, Defined component, Simple component	Znso4.yaml	data/ingredients/mapped/Znso4.yaml
+MEDIUM	Other/Uncategorized	casamino acid	CHEBI:78020	heptacosanoate	CHEBI	MAPPED	True	1	Properties: Undefined component	Casamino_Acid_2.yaml	data/ingredients/mapped/Casamino_Acid_2.yaml
+MEDIUM	Other/Uncategorized	cellobiose	CHEBI:17057	cellobiose	CHEBI	MAPPED	True	1	Role: Carbon source; Properties: Defined component, Organic compound, Solution	Cellobiose_2.yaml	data/ingredients/mapped/Cellobiose_2.yaml
+MEDIUM	Other/Uncategorized	dH2O				UNMAPPED	False	1	dH2O	Dh2o.yaml	data/ingredients/unmapped/Dh2o.yaml
+MEDIUM	Other/Uncategorized	demineralized water	CHEBI:15377	Demineralized water	CHEBI	MAPPED	True	1	Role: Solvating media; Properties: Defined component, Inorganic compound, Simple component	Demineralized_Water_2.yaml	data/ingredients/mapped/Demineralized_Water_2.yaml
+MEDIUM	Other/Uncategorized	dextrin	CHEBI:28675	dextrin	CHEBI	MAPPED	True	1	Role: Carbon source; Properties: Simple component, Organic compound, Defined component	Dextrin_2.yaml	data/ingredients/mapped/Dextrin_2.yaml
+MEDIUM	Other/Uncategorized	gelatine	CHEBI:5291	Gelatine	CHEBI	MAPPED	True	1	Role: Solidifying component; Properties: Undefined component	Gelatine_2.yaml	data/ingredients/mapped/Gelatine_2.yaml
+MEDIUM	Other/Uncategorized	gellan gum	CHEBI:85248	Gellan Gum	CHEBI	MAPPED	True	2	Role: Solidifying component; Properties: Organic compound, Undefined component|Role: Solidifying component; Properties: Undefined component, Organic compound	Gellan_Gum_2.yaml	data/ingredients/mapped/Gellan_Gum_2.yaml
+MEDIUM	Other/Uncategorized	gelrite	CHEBI:85248	Gelrite	CHEBI	MAPPED	True	1	Role: Solidifying component; Properties: Organic compound, Undefined component	Gelrite_2.yaml	data/ingredients/mapped/Gelrite_2.yaml
+MEDIUM	Other/Uncategorized	iso-Butyric acid	CHEBI:16135	iso-Butyric acid	CHEBI	MAPPED	True	1	Role: Carbon source; Properties: Organic compound, Defined component, Simple component	Iso-butyric_Acid.yaml	data/ingredients/mapped/Iso-butyric_Acid.yaml
+MEDIUM	Other/Uncategorized	n-Butyric acid	CHEBI:30772	n-Butyric acid	CHEBI	MAPPED	True	1	Role: Carbon source; Properties: Organic compound, Defined component, Simple component	N-butyric_Acid.yaml	data/ingredients/mapped/N-butyric_Acid.yaml
+MEDIUM	Other/Uncategorized	n-Decane	CHEBI:41808	n-Decane	CHEBI	MAPPED	True	0		N-decane.yaml	data/ingredients/mapped/N-decane.yaml
+MEDIUM	Other/Uncategorized	p-Aminobenzoate	CHEBI:17836	p-Aminobenzoate	CHEBI	MAPPED	True	0		P-aminobenzoate.yaml	data/ingredients/mapped/P-aminobenzoate.yaml
+MEDIUM	Other/Uncategorized	pyridoxamine	CHEBI:16410	pyridoxamine	CHEBI	MAPPED	True	1	Role: Vitamin; Properties: Organic compound, Defined component, Simple component	Pyridoxamine_2.yaml	data/ingredients/mapped/Pyridoxamine_2.yaml
+MEDIUM	Other/Uncategorized	sodium ascorbate	CHEBI:113451	sodium ascorbate	CHEBI	MAPPED	True	1	Properties: Defined component, Organic compound, Solution	Sodium_Ascorbate_2.yaml	data/ingredients/mapped/Sodium_Ascorbate_2.yaml
+MEDIUM	Other/Uncategorized	sterile dH2O				UNMAPPED	False	1	sterile dH2O	Sterile_Dh2o.yaml	data/ingredients/unmapped/Sterile_Dh2o.yaml
+MEDIUM	Other/Uncategorized	tap water	CHEBI:15377	Tap water	CHEBI	MAPPED	True	1	Role: Solvating media; Properties: Undefined component	Tap_Water_2.yaml	data/ingredients/mapped/Tap_Water_2.yaml
+MEDIUM	Other/Uncategorized	tetramethyl ammonium	CHEBI:46020		CHEBI	MAPPED	True	1	Role: Nutrient source; Properties: Defined component, Inorganic compound, Simple component	Tetramethyl_Ammonium_2.yaml	data/ingredients/mapped/Tetramethyl_Ammonium_2.yaml
+MEDIUM	Other/Uncategorized	thiosulfate	CHEBI:26977	Thiosulfate	CHEBI	MAPPED	True	1	Role: Growth factor; Properties: Defined component, Inorganic compound, Simple component	Thiosulfate_2.yaml	data/ingredients/mapped/Thiosulfate_2.yaml
+MEDIUM	Other/Uncategorized	xylose	CHEBI:18222	xylose	CHEBI	MAPPED	True	2	Role: Carbon source|Role: Carbon source; Properties: Simple component, Organic compound, Defined component	Xylose_2.yaml	data/ingredients/mapped/Xylose_2.yaml
+LOW	Commercial Products	Bacto Middlebrook 7H10 agar	CHEBI:2509	Bacto Middlebrook 7H10 agar	CHEBI	MAPPED	True	0		Bacto_Middlebrook_7h10_Agar.yaml	data/ingredients/mapped/Bacto_Middlebrook_7h10_Agar.yaml
+LOW	Commercial Products	Bacto Soytone	CHEBI:8150		CHEBI	MAPPED	True	1	Properties: Undefined component	Bacto_Soytone.yaml	data/ingredients/mapped/Bacto_Soytone.yaml
+LOW	Commercial Products	Marine agar 2216	CHEBI:2509	Marine agar 2216	CHEBI	MAPPED	True	0		Marine_Agar_2216.yaml	data/ingredients/mapped/Marine_Agar_2216.yaml
+LOW	Incomplete Formulas	KF	CHEBI:73605	KF	CHEBI	MAPPED	True	1	Role: Mineral source	Kf.yaml	data/ingredients/mapped/Kf.yaml
+UNMAPPABLE	Natural Products	CR1 Soil				UNMAPPED	False	1	CR1 Soil	Cr1_Soil.yaml	data/ingredients/unmapped/Cr1_Soil.yaml
+UNMAPPABLE	Natural Products	Green House Soil				UNMAPPED	False	1	Green House Soil	Green_House_Soil.yaml	data/ingredients/unmapped/Green_House_Soil.yaml
+UNMAPPABLE	Natural Products	Inorganic salts-starch agar	CHEBI:2509	Inorganic salts-starch agar	CHEBI	MAPPED	True	0		Inorganic_Salts-starch_Agar.yaml	data/ingredients/mapped/Inorganic_Salts-starch_Agar.yaml
+UNMAPPABLE	Natural Products	Liver extract infusion				UNMAPPED	False	1	Liver extract infusion	Liver_Extract_Infusion.yaml	data/ingredients/unmapped/Liver_Extract_Infusion.yaml
+UNMAPPABLE	Natural Products	Malt extract agar	CHEBI:2509	Malt extract agar	CHEBI	MAPPED	True	0		Malt_Extract_Agar.yaml	data/ingredients/mapped/Malt_Extract_Agar.yaml
+UNMAPPABLE	Natural Products	Natural sea-salt				UNMAPPED	False	1	Natural sea-salt	Natural_Sea-salt.yaml	data/ingredients/unmapped/Natural_Sea-salt.yaml
+UNMAPPABLE	Natural Products	Organic Peat				UNMAPPED	False	1	Organic Peat	Organic_Peat.yaml	data/ingredients/unmapped/Organic_Peat.yaml
+UNMAPPABLE	Natural Products	Pasteurized Seawater				UNMAPPED	False	1	Pasteurized Seawater	Pasteurized_Seawater.yaml	data/ingredients/unmapped/Pasteurized_Seawater.yaml
+UNMAPPABLE	Natural Products	Seawater				UNMAPPED	False	2	Seawater (30 ppt)|Seawater(non-sterilized)	Seawater.yaml	data/ingredients/unmapped/Seawater.yaml
+UNMAPPABLE	Natural Products	Sphagnum extract				UNMAPPED	False	1	Sphagnum extract	Sphagnum_Extract.yaml	data/ingredients/unmapped/Sphagnum_Extract.yaml
+UNMAPPABLE	Natural Products	Vermont Soil				UNMAPPED	False	1	Vermont Soil	Vermont_Soil.yaml	data/ingredients/unmapped/Vermont_Soil.yaml
+UNMAPPABLE	Placeholders/Errors	CHEBI:1	CHEBI:1		CHEBI	MAPPED	True	0		Chebi1.yaml	data/ingredients/mapped/Chebi1.yaml
+UNMAPPABLE	Placeholders/Errors	Original amount: (NH4)2HPO4(Fisher A686)				UNMAPPED	False	1	(NH4)2HPO4(Fisher A686)	Original_Amount_Nh42hpo4_Fisher_A686.yaml	data/ingredients/unmapped/Original_Amount_Nh42hpo4_Fisher_A686.yaml
+UNMAPPABLE	Placeholders/Errors	Original amount: (NH4)2SO4(Fisher A 702)				UNMAPPED	False	1	(NH4)2SO4(Fisher A 702)	Original_Amount_Nh42so4_Fisher_A_702.yaml	data/ingredients/unmapped/Original_Amount_Nh42so4_Fisher_A_702.yaml
+UNMAPPABLE	Placeholders/Errors	See source for composition				UNMAPPED	False	0		See_Source_For_Composition.yaml	data/ingredients/unmapped/See_Source_For_Composition.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Algal Trace Elements Solution				UNMAPPED	False	1	Algal Trace Elements Solution	Algal_Trace_Elements_Solution.yaml	data/ingredients/unmapped/Algal_Trace_Elements_Solution.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Allen Medium				UNMAPPED	False	1	Allen Medium	Allen_Medium.yaml	data/ingredients/unmapped/Allen_Medium.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	BG-11 Medium				UNMAPPED	False	1	BG-11 Medium	Bg-11_Medium.yaml	data/ingredients/unmapped/Bg-11_Medium.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	BG-11 Trace Metals Solution				UNMAPPED	False	1	BG-11 Trace Metals Solution	Bg-11_Trace_Metals_Solution.yaml	data/ingredients/unmapped/Bg-11_Trace_Metals_Solution.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Beijerinck's Solution				UNMAPPED	False	1	Beijerinck's Solution	Beijerincks_Solution.yaml	data/ingredients/unmapped/Beijerincks_Solution.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Biotin Vitamin Solution				UNMAPPED	False	1	Biotin Vitamin Solution	Biotin_Vitamin_Solution.yaml	data/ingredients/unmapped/Biotin_Vitamin_Solution.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Bold 1NV Medium				UNMAPPED	False	1	Bold 1NV Medium	Bold_1nv_Medium.yaml	data/ingredients/unmapped/Bold_1nv_Medium.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Bold Trace Stock				UNMAPPED	False	1	Bold Trace Stock	Bold_Trace_Stock.yaml	data/ingredients/unmapped/Bold_Trace_Stock.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Boron Stock				UNMAPPED	False	1	Boron Stock	Boron_Stock.yaml	data/ingredients/unmapped/Boron_Stock.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Bristol Medium				UNMAPPED	False	1	Bristol Medium	Bristol_Medium.yaml	data/ingredients/unmapped/Bristol_Medium.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	CAPS buffer	CHEBI:191088		CHEBI	MAPPED	True	0		Caps_Buffer.yaml	data/ingredients/mapped/Caps_Buffer.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	CaSO4•2H2Osaturated solution				UNMAPPED	False	1	CaSO4•2H2Osaturated solution (Mallinckroft 4300)	Caso42h2osaturated_Solution.yaml	data/ingredients/unmapped/Caso42h2osaturated_Solution.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Chelated Iron Solution				UNMAPPED	False	1	Chelated Iron Solution	Chelated_Iron_Solution.yaml	data/ingredients/unmapped/Chelated_Iron_Solution.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Chu Stock Solution				UNMAPPED	False	1	Chu Stock Solution	Chu_Stock_Solution.yaml	data/ingredients/unmapped/Chu_Stock_Solution.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	DAS Macro Solution				UNMAPPED	False	1	DAS Macro Solution	Das_Macro_Solution.yaml	data/ingredients/unmapped/Das_Macro_Solution.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	DYIII Medium				UNMAPPED	False	1	DYIII Medium	Dyiii_Medium.yaml	data/ingredients/unmapped/Dyiii_Medium.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	DYV Metal Solution				UNMAPPED	False	1	DYV Metal Solution	Dyv_Metal_Solution.yaml	data/ingredients/unmapped/Dyv_Metal_Solution.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	EDTA Stock				UNMAPPED	False	1	EDTA Stock	Edta_Stock.yaml	data/ingredients/unmapped/Edta_Stock.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Enriched Seawater Medium				UNMAPPED	False	1	Enriched Seawater Medium	Enriched_Seawater_Medium.yaml	data/ingredients/unmapped/Enriched_Seawater_Medium.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Enrichment Solution for Seawater Medium				UNMAPPED	False	1	Enrichment Solution for Seawater Medium	Enrichment_Solution_For_Seawater_Medium.yaml	data/ingredients/unmapped/Enrichment_Solution_For_Seawater_Medium.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Erdschreiber's Medium				UNMAPPED	False	1	Erdschreiber's Medium	Erdschreibers_Medium.yaml	data/ingredients/unmapped/Erdschreibers_Medium.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Euglena Medium				UNMAPPED	False	1	Euglena Medium	Euglena_Medium.yaml	data/ingredients/unmapped/Euglena_Medium.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	F/2 Medium				UNMAPPED	False	1	F/2 Medium	F2_Medium.yaml	data/ingredients/unmapped/F2_Medium.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Fatty acid mixture (see Medium No. 266)	CHEBI:35366	Fatty acid mixture (see Medium No. 266)	CHEBI	MAPPED	True	0		Fatty_Acid_Mixture_See_Medium_No_266.yaml	data/ingredients/mapped/Fatty_Acid_Mixture_See_Medium_No_266.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	G9 Trace Metals for J medium				UNMAPPED	False	1	G9 Trace Metals for J medium	G9_Trace_Metals_For_J_Medium.yaml	data/ingredients/unmapped/G9_Trace_Metals_For_J_Medium.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	HEPES buffer	CHEBI:19708	HEPES buffer	CHEBI	MAPPED	True	1	Role: Buffer; Properties: Defined component, Solution	Hepes_Buffer.yaml	data/ingredients/mapped/Hepes_Buffer.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	HEPES buffer				UNMAPPED	False	2	HEPES buffer(CAS: 7365-45-9)|HEPES buffer(Sigma H-3375)	Hepes_Buffer.yaml	data/ingredients/unmapped/Hepes_Buffer.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Hunter's Trace Stock Solution				UNMAPPED	False	1	Hunter's Trace Stock Solution	Hunters_Trace_Stock_Solution.yaml	data/ingredients/unmapped/Hunters_Trace_Stock_Solution.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Iron Stock				UNMAPPED	False	1	Iron Stock	Iron_Stock.yaml	data/ingredients/unmapped/Iron_Stock.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	MOPS buffer	CHEBI:44115		CHEBI	MAPPED	True	2	Role: Buffer; Properties: Defined component, Organic compound, Solution|Role: Buffer; Properties: Organic compound, Defined component, Solution	Mops_Buffer.yaml	data/ingredients/mapped/Mops_Buffer.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	MWC Metal Solution				UNMAPPED	False	1	MWC Metal Solution	Mwc_Metal_Solution.yaml	data/ingredients/unmapped/Mwc_Metal_Solution.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Macro Component 1 for J Medium				UNMAPPED	False	1	Macro Component 1 for J Medium	Macro_Component_1_For_J_Medium.yaml	data/ingredients/unmapped/Macro_Component_1_For_J_Medium.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Macro Component 2 for J medium				UNMAPPED	False	1	Macro Component 2 for J medium	Macro_Component_2_For_J_Medium.yaml	data/ingredients/unmapped/Macro_Component_2_For_J_Medium.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Modified Bold 3N Medium				UNMAPPED	False	1	Modified Bold 3N Medium	Modified_Bold_3n_Medium.yaml	data/ingredients/unmapped/Modified_Bold_3n_Medium.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Modified COMBO Medium				UNMAPPED	False	1	Modified COMBO Medium	Modified_Combo_Medium.yaml	data/ingredients/unmapped/Modified_Combo_Medium.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Modified P-IV chelated Micronutrient Solution				UNMAPPED	False	1	Modified P-IV chelated Micronutrient Solution	Modified_P-iv_Chelated_Micronutrient_Solution.yaml	data/ingredients/unmapped/Modified_P-iv_Chelated_Micronutrient_Solution.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Na2CO3-CO2 buffer	CHEBI:29377	Na2CO3-CO2 buffer	CHEBI	MAPPED	True	0		Na2co3-co2_Buffer.yaml	data/ingredients/mapped/Na2co3-co2_Buffer.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	P-II Metal Solution				UNMAPPED	False	1	P-II Metal Solution	P-ii_Metal_Solution.yaml	data/ingredients/unmapped/P-ii_Metal_Solution.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	P-IV Metal Solution				UNMAPPED	False	1	P-IV Metal Solution	P-iv_Metal_Solution.yaml	data/ingredients/unmapped/P-iv_Metal_Solution.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Phosphate Buffer Stock Solution				UNMAPPED	False	1	Phosphate Buffer Stock Solution	Phosphate_Buffer_Stock_Solution.yaml	data/ingredients/unmapped/Phosphate_Buffer_Stock_Solution.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Soil+Seawater Medium				UNMAPPED	False	1	Soil+Seawater Medium	Soilseawater_Medium.yaml	data/ingredients/unmapped/Soilseawater_Medium.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Soilwater: GR+ Medium				UNMAPPED	False	1	Soilwater: GR+ Medium	Soilwater_Gr_Medium.yaml	data/ingredients/unmapped/Soilwater_Gr_Medium.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Soilwater: GR- Medium				UNMAPPED	False	1	Soilwater: GR- Medium	Soilwater_Gr-_Medium.yaml	data/ingredients/unmapped/Soilwater_Gr-_Medium.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Soilwater: Peat Medium				UNMAPPED	False	1	Soilwater: Peat Medium	Soilwater_Peat_Medium.yaml	data/ingredients/unmapped/Soilwater_Peat_Medium.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Spir solution				UNMAPPED	False	2	Spir solution 1|Spir solution 2	Spir_Solution.yaml	data/ingredients/unmapped/Spir_Solution.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Supplemented Seawater				UNMAPPED	False	1	Supplemented Seawater	Supplemented_Seawater.yaml	data/ingredients/unmapped/Supplemented_Seawater.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Thiamine Vitamin Solution				UNMAPPED	False	1	Thiamine Vitamin Solution	Thiamine_Vitamin_Solution.yaml	data/ingredients/unmapped/Thiamine_Vitamin_Solution.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Trace Metals Solution				UNMAPPED	False	1	Trace Metals Solution	Trace_Metals_Solution.yaml	data/ingredients/unmapped/Trace_Metals_Solution.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Tris Acetate Stock Solution				UNMAPPED	False	1	Tris Acetate Stock Solution	Tris_Acetate_Stock_Solution.yaml	data/ingredients/unmapped/Tris_Acetate_Stock_Solution.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Tris buffer	CHEBI:9754	Tris buffer	CHEBI	MAPPED	True	1	Role: Buffer; Properties: Defined component, Complex component, Solution	Tris_Buffer.yaml	data/ingredients/mapped/Tris_Buffer.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Volvox Medium				UNMAPPED	False	1	Volvox Medium	Volvox_Medium.yaml	data/ingredients/unmapped/Volvox_Medium.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	WC Trace Elements Solution				UNMAPPED	False	1	WC Trace Elements Solution	Wc_Trace_Elements_Solution.yaml	data/ingredients/unmapped/Wc_Trace_Elements_Solution.yaml
+UNMAPPABLE	Stock Solutions/Mixtures	Waris Medium				UNMAPPED	False	1	Waris Medium	Waris_Medium.yaml	data/ingredients/unmapped/Waris_Medium.yaml
