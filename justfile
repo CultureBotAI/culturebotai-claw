@@ -112,6 +112,7 @@ feba-enrich-ontology-test:
         --ontology-report workspace/feba_ontology_coverage_report.yaml \
         --cas-mapping-results workspace/feba_notation_mapping_results.yaml \
         --cas-resolvable-results workspace/feba_resolvable_resolution_results.yaml \
+        --culturemech ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech \
         --output workspace/feba_chebi_enrichment_results.yaml \
         --max-queries 10
 
@@ -122,6 +123,7 @@ feba-enrich-ontology:
         --ontology-report workspace/feba_ontology_coverage_report.yaml \
         --cas-mapping-results workspace/feba_notation_mapping_results.yaml \
         --cas-resolvable-results workspace/feba_resolvable_resolution_results.yaml \
+        --culturemech ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech \
         --output workspace/feba_chebi_enrichment_results.yaml
     @echo "✅ Enrichment complete. Check workspace/feba_chebi_enrichment_results.yaml"
 
@@ -140,6 +142,22 @@ feba-apply-enrichments:
         --culturemech ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech \
         --enrichment-file workspace/feba_chebi_enrichment_results.yaml
     @echo "✅ Enrichments applied to CultureMech media files"
+
+# Update MediaIngredientMech with ChEBI enrichments (dry-run)
+feba-update-mim-dry:
+    @echo "Testing MediaIngredientMech update (dry-run)..."
+    python scripts/update_mim_with_enrichments.py \
+        --mim ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech \
+        --enrichment-file workspace/feba_chebi_enrichment_results.yaml \
+        --dry-run
+
+# Update MediaIngredientMech with ChEBI enrichments
+feba-update-mim:
+    @echo "Updating MediaIngredientMech with ChEBI enrichments..."
+    python scripts/update_mim_with_enrichments.py \
+        --mim ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech \
+        --enrichment-file workspace/feba_chebi_enrichment_results.yaml
+    @echo "✅ MediaIngredientMech updated"
 
 # =============================================================================
 # Utility Commands

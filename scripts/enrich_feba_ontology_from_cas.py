@@ -246,10 +246,65 @@ def load_cas_rn_mappings(cas_results_file: Path) -> Dict[str, str]:
     return mappings
 
 
+def extract_cas_from_media_files(culturemech_root: Path) -> Dict[str, str]:
+    """
+    Extract CAS-RN directly from CultureMech media files' notes fields.
+
+    Returns: Dict of ingredient_name -> cas_rn
+    """
+    import re
+
+    cas_mappings = {}
+    normalized_yaml = culturemech_root / 'data/normalized_yaml'
+
+    # Pattern to extract CAS-RN: "CAS: XXXXX-XX-X"
+    cas_pattern = re.compile(r'CAS:\s*(\d{2,7}-\d{2}-\d)')
+
+    for yaml_file in normalized_yaml.rglob('*.yaml'):
+        try:
+            with open(yaml_file) as f:
+                media = yaml.safe_load(f)
+
+            if not media:
+                continue
+
+            # Check if FEBA media
+            notes = media.get('notes', '')
+            if 'FEBA media definitions' not in notes:
+                continue
+
+            # Extract CAS-RN from ingredient notes
+            for ingredient in media.get('ingredients', []):
+                preferred_term = ingredient.get('preferred_term', '')
+                ingredient_notes = ingredient.get('notes', '')
+
+                if not preferred_term:
+                    continue
+
+                # Check if ingredient already has ontology ID
+                term = ingredient.get('term', {})
+                if term.get('id'):
+                    continue  # Skip if already mapped
+
+                # Extract CAS-RN from notes
+                match = cas_pattern.search(ingredient_notes)
+                if match:
+                    cas_rn = match.group(1)
+                    # Store first occurrence (avoid overwriting)
+                    if preferred_term not in cas_mappings:
+                        cas_mappings[preferred_term] = cas_rn
+
+        except Exception as e:
+            continue
+
+    return cas_mappings
+
+
 def extract_unmapped_with_cas(
     ontology_report: Path,
     cas_mapping_results: Path,
-    cas_resolvable_results: Path
+    cas_resolvable_results: Path,
+    culturemech_root: Path = None
 ) -> Dict[str, str]:
     """
     Extract ingredients that have CAS-RN but no ontology ID.
@@ -286,6 +341,16 @@ def extract_unmapped_with_cas(
             name = result.get('original_name')
             cas_rn = result.get('cas_rn')
             if name and cas_rn:
+                cas_mappings[name] = cas_rn
+
+    # From CultureMech media files (NEW: parse notes field)
+    if culturemech_root and culturemech_root.exists():
+        print("Extracting CAS-RN from CultureMech media file notes...")
+        media_cas = extract_cas_from_media_files(culturemech_root)
+        print(f"  Found {len(media_cas)} ingredients with CAS-RN in notes")
+        # Merge with existing mappings (don't overwrite)
+        for name, cas_rn in media_cas.items():
+            if name not in cas_mappings:
                 cas_mappings[name] = cas_rn
 
     # Match unmapped ingredients with CAS-RN
@@ -330,6 +395,12 @@ def main():
         type=int,
         help='Maximum number of queries (for testing)'
     )
+    parser.add_argument(
+        '--culturemech',
+        type=Path,
+        default=Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech',
+        help='Path to CultureMech repository (for extracting CAS-RN from media notes)'
+    )
 
     args = parser.parse_args()
 
@@ -339,7 +410,8 @@ def main():
     ingredients_with_cas = extract_unmapped_with_cas(
         args.ontology_report,
         args.cas_mapping_results,
-        args.cas_resolvable_results
+        args.cas_resolvable_results,
+        args.culturemech
     )
 
     print(f"Found {len(ingredients_with_cas)} ingredients with CAS-RN but no ontology ID\n")
