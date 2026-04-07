@@ -94,6 +94,54 @@ cas-export-unmapped:
     @echo "✅ TSV generated: UNMAPPED_CAS_RN_INGREDIENTS.tsv"
 
 # =============================================================================
+# FEBA Ontology Enrichment Workflows
+# =============================================================================
+
+# Analyze FEBA ontology coverage
+feba-analyze-ontology:
+    @echo "Analyzing FEBA ontology coverage..."
+    python scripts/analyze_feba_ontology_coverage.py \
+        --culturemech ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech \
+        --output-report workspace/feba_ontology_coverage_report.yaml \
+        --output-unmapped workspace/feba_ontology_unmapped_ingredients.txt
+
+# Enrich FEBA ontology mappings using CAS-RN (test mode with 10 ingredients)
+feba-enrich-ontology-test:
+    @echo "Testing ChEBI enrichment (10 ingredients)..."
+    python scripts/enrich_feba_ontology_from_cas.py \
+        --ontology-report workspace/feba_ontology_coverage_report.yaml \
+        --cas-mapping-results workspace/feba_notation_mapping_results.yaml \
+        --cas-resolvable-results workspace/feba_resolvable_resolution_results.yaml \
+        --output workspace/feba_chebi_enrichment_results.yaml \
+        --max-queries 10
+
+# Enrich FEBA ontology mappings using CAS-RN (full run)
+feba-enrich-ontology:
+    @echo "Enriching FEBA ontology mappings via ChEBI API..."
+    python scripts/enrich_feba_ontology_from_cas.py \
+        --ontology-report workspace/feba_ontology_coverage_report.yaml \
+        --cas-mapping-results workspace/feba_notation_mapping_results.yaml \
+        --cas-resolvable-results workspace/feba_resolvable_resolution_results.yaml \
+        --output workspace/feba_chebi_enrichment_results.yaml
+    @echo "✅ Enrichment complete. Check workspace/feba_chebi_enrichment_results.yaml"
+
+# Apply ChEBI enrichments to CultureMech media files (dry-run)
+feba-apply-enrichments-dry:
+    @echo "Testing enrichment application (dry-run)..."
+    python scripts/apply_ontology_enrichments.py \
+        --culturemech ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech \
+        --enrichment-file workspace/feba_chebi_enrichment_results.yaml \
+        --dry-run
+
+# Apply ChEBI enrichments to CultureMech media files
+feba-apply-enrichments:
+    @echo "Applying ChEBI enrichments to CultureMech media files..."
+    python scripts/apply_ontology_enrichments.py \
+        --culturemech ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech \
+        --enrichment-file workspace/feba_chebi_enrichment_results.yaml
+    @echo "✅ Enrichments applied to CultureMech media files"
+
+# =============================================================================
 # Utility Commands
 # =============================================================================
 
