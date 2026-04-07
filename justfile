@@ -159,6 +159,24 @@ feba-update-mim:
         --enrichment-file workspace/feba_chebi_enrichment_results.yaml
     @echo "✅ MediaIngredientMech updated"
 
+# Create MIM ingredient files for enriched ingredients (dry-run)
+feba-create-mim-ingredients-dry:
+    @echo "Testing MIM ingredient file creation (dry-run)..."
+    python scripts/create_mim_ingredients_from_enrichments.py \
+        --mim ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech \
+        --culturemech ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech \
+        --enrichment-file workspace/feba_chebi_enrichment_results.yaml \
+        --dry-run
+
+# Create MIM ingredient files for enriched ingredients
+feba-create-mim-ingredients:
+    @echo "Creating MIM ingredient files for enriched ingredients..."
+    python scripts/create_mim_ingredients_from_enrichments.py \
+        --mim ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech \
+        --culturemech ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech \
+        --enrichment-file workspace/feba_chebi_enrichment_results.yaml
+    @echo "✅ MIM ingredient files created"
+
 # =============================================================================
 # Utility Commands
 # =============================================================================
