@@ -1,0 +1,84 @@
+mappability	category	ingredient	cas_rn	resolution_strategy	reasoning	pubchem_url
+RESOLVED	complex_biological	Pancreatic digest of casein	91079-46-8	original		https://pubchem.ncbi.nlm.nih.gov/#query=Pancreatic%20digest%20of%20casein
+RESOLVED	gases	#Ar	7440-37-1	gas_notation_normalized		https://pubchem.ncbi.nlm.nih.gov/#query=argon
+RESOLVED	gases	#N2	7727-37-9	gas_notation_normalized		https://pubchem.ncbi.nlm.nih.gov/#query=nitrogen
+RESOLVED	gases	#N2O	10024-97-2	gas_notation_normalized		https://pubchem.ncbi.nlm.nih.gov/#query=nitrous%20oxide
+RESOLVED	gases	#argon	7440-37-1	gas_notation_normalized		https://pubchem.ncbi.nlm.nih.gov/#query=argon
+RESOLVED	hydrated_salts_variants	Calcium Chloride Dihydrate	10035-04-8	original		https://pubchem.ncbi.nlm.nih.gov/#query=Calcium%20Chloride%20Dihydrate
+RESOLVED	hydrated_salts_variants	L-Aspartic Acid sodium salt monohydrate	323194-76-9	original		https://pubchem.ncbi.nlm.nih.gov/#query=L-Aspartic%20Acid%20sodium%20salt%20monohydrate
+RESOLVED	hydrated_salts_variants	aluminum chloride hydrate	682-753-0	original		https://pubchem.ncbi.nlm.nih.gov/#query=aluminum%20chloride%20hydrate
+RESOLVED	hydrated_salts_variants	copper sulfate pentahydrate	7758-99-8	original		https://pubchem.ncbi.nlm.nih.gov/#query=copper%20sulfate%20pentahydrate
+RESOLVED	hydrated_salts_variants	magnesium chloride hexahydrate	616-575-1	original		https://pubchem.ncbi.nlm.nih.gov/#query=magnesium%20chloride%20hexahydrate
+RESOLVED	hydrated_salts_variants	magnesium sulfate heptahydrate	10034-99-8	original		https://pubchem.ncbi.nlm.nih.gov/#query=magnesium%20sulfate%20heptahydrate
+RESOLVED	hydrated_salts_variants	manganese(II) chloride tetrahydrate	603-826-5	original		https://pubchem.ncbi.nlm.nih.gov/#query=manganese%28II%29%20chloride%20tetrahydrate
+RESOLVED	hydrated_salts_variants	sodium citrate dihydrate	6132-04-3	original		https://pubchem.ncbi.nlm.nih.gov/#query=sodium%20citrate%20dihydrate
+RESOLVED	hydrated_salts_variants	sodium molybdate dihydrate	10102-40-6	original		https://pubchem.ncbi.nlm.nih.gov/#query=sodium%20molybdate%20dihydrate
+RESOLVED	hydrated_salts_variants	sodium tungstate dihydrate	10213-10-2	original		https://pubchem.ncbi.nlm.nih.gov/#query=sodium%20tungstate%20dihydrate
+RESOLVED	hydrated_salts_variants	zinc sulfate heptahydrate	7446-20-0	original		https://pubchem.ncbi.nlm.nih.gov/#query=zinc%20sulfate%20heptahydrate
+RESOLVED	other	Ammonium Chloride	12125-02-9	original		https://pubchem.ncbi.nlm.nih.gov/#query=Ammonium%20Chloride
+RESOLVED	other	Benzoic acid	65-85-0	original		https://pubchem.ncbi.nlm.nih.gov/#query=Benzoic%20acid
+RESOLVED	other	Iron(II) Sulfate	7720-78-7	original		https://pubchem.ncbi.nlm.nih.gov/#query=Iron%28II%29%20Sulfate
+RESOLVED	other	L-Cysteine HCL	200-157-7	original		https://pubchem.ncbi.nlm.nih.gov/#query=L-Cysteine%20HCL
+RESOLVED	other	L-Tartaric acid	87-69-4	original		https://pubchem.ncbi.nlm.nih.gov/#query=L-Tartaric%20acid
+RESOLVED	other	L-methionine	63-68-3	original		https://pubchem.ncbi.nlm.nih.gov/#query=L-methionine
+RESOLVED	other	Sodium phosphate dibasic	7558-79-4	original		https://pubchem.ncbi.nlm.nih.gov/#query=Sodium%20phosphate%20dibasic
+RESOLVED	other	Trimethylglycine	107-43-7	original		https://pubchem.ncbi.nlm.nih.gov/#query=Trimethylglycine
+RESOLVED	other	calcium D,L-pantothenate	137-08-6	vitamin_variant_expanded		https://pubchem.ncbi.nlm.nih.gov/#query=Calcium%20pantothenate
+RESOLVED	other	calcium chloride	10043-52-4	original		https://pubchem.ncbi.nlm.nih.gov/#query=calcium%20chloride
+RESOLVED	other	cobalt chloride	231-589-4	original		https://pubchem.ncbi.nlm.nih.gov/#query=cobalt%20chloride
+RESOLVED	other	dithiothreitol	3483-12-3	original		https://pubchem.ncbi.nlm.nih.gov/#query=dithiothreitol
+RESOLVED	other	nicotinic acid	59-67-6	original		https://pubchem.ncbi.nlm.nih.gov/#query=nicotinic%20acid
+RESOLVED	other	p-Amino Benzoic Acid	150-13-0	original		https://pubchem.ncbi.nlm.nih.gov/#query=p-Amino%20Benzoic%20Acid
+RESOLVED	other	sodium chlorate	7775-09-9	original		https://pubchem.ncbi.nlm.nih.gov/#query=sodium%20chlorate
+RESOLVED	other	sodium nitrate	7631-99-4	original		https://pubchem.ncbi.nlm.nih.gov/#query=sodium%20nitrate
+RESOLVED	other	sodium selenate	13410-01-0	original		https://pubchem.ncbi.nlm.nih.gov/#query=sodium%20selenate
+RESOLVED	other	zinc chloride	231-592-0	original		https://pubchem.ncbi.nlm.nih.gov/#query=zinc%20chloride
+RESOLVED	other	zinc sulfate	7733-02-0	original		https://pubchem.ncbi.nlm.nih.gov/#query=zinc%20sulfate
+RESOLVED	vitamins_supplements	Pantothenic Acid	79-83-4	original		https://pubchem.ncbi.nlm.nih.gov/#query=Pantothenic%20Acid
+RESOLVED	vitamins_supplements	pyridoxine HCl	58-56-0	original		https://pubchem.ncbi.nlm.nih.gov/#query=pyridoxine%20HCl
+RESOLVED	vitamins_supplements	pyridoxine hydrochloride	58-56-0	original		https://pubchem.ncbi.nlm.nih.gov/#query=pyridoxine%20hydrochloride
+RESOLVED	vitamins_supplements	thiamine HCl	67-03-8	original		https://pubchem.ncbi.nlm.nih.gov/#query=thiamine%20HCl
+RESOLVABLE_HIGH	hydrated_salts_variants	AlK(SO4)2 12H2O			Space-separated hydrate notation - convertible to standard form	
+RESOLVABLE_HIGH	hydrated_salts_variants	CaCl2*2H2O			Asterisk hydrate notation - convertible to standard form	
+RESOLVABLE_HIGH	hydrated_salts_variants	FeCl2 4H2O			Space-separated hydrate notation - convertible to standard form	
+RESOLVABLE_HIGH	hydrated_salts_variants	FeCl2 tetrahydrate			Spelled-out hydrate - convertible to formula notation	
+RESOLVABLE_HIGH	hydrated_salts_variants	FeSO4 7H2O			Space-separated hydrate notation - convertible to standard form	
+RESOLVABLE_HIGH	hydrated_salts_variants	Iron (III) chloride hexahydrate			Spelled-out hydrate - convertible to formula notation	
+RESOLVABLE_HIGH	hydrated_salts_variants	MgCl*6H2O			Asterisk hydrate notation - convertible to standard form	
+RESOLVABLE_HIGH	hydrated_salts_variants	manganese(II) sulfate dihydrate			Spelled-out hydrate - convertible to formula notation	
+RESOLVABLE_HIGH	hydrated_salts_variants	nickel (II) chloride hexahydrate			Spelled-out hydrate - convertible to formula notation	
+RESOLVABLE_HIGH	other	Manganese sulfate 			Requires manual investigation	
+RESOLVABLE_HIGH	other	sodium acetate 			Requires manual investigation	
+RESOLVABLE_MEDIUM	other	CASamino acids			Chemical acid - likely resolvable with manual lookup	
+RESOLVABLE_MEDIUM	other	D,L-6,8-Thioctic Acid			Chemical acid - likely resolvable with manual lookup	
+RESOLVABLE_MEDIUM	other	lipoic acid			Chemical acid - likely resolvable with manual lookup	
+RESOLVABLE_LOW	other	Casitone			Requires manual investigation	
+RESOLVABLE_LOW	other	Cell lysate 			Requires manual investigation	
+RESOLVABLE_LOW	other	Hemin 			Requires manual investigation	
+RESOLVABLE_LOW	other	Lipopolysaccharide			Requires manual investigation	
+RESOLVABLE_LOW	other	MoLS4			Requires manual investigation	
+RESOLVABLE_LOW	other	MoYLS4			Requires manual investigation	
+RESOLVABLE_LOW	other	R2A			Requires manual investigation	
+RESOLVABLE_LOW	other	SDM_noCarbon			Requires manual investigation	
+RESOLVABLE_LOW	other	Sea salts			Requires manual investigation	
+RESOLVABLE_LOW	other	Starch 			Requires manual investigation	
+RESOLVABLE_LOW	other	Takara_DO_Supp_MinusHisLeuTrp			Requires manual investigation	
+RESOLVABLE_LOW	other	ZMB			Requires manual investigation	
+RESOLVABLE_LOW	other	ZMB_ALS			Requires manual investigation	
+RESOLVABLE_LOW	other	soytone			Requires manual investigation	
+UNMAPPABLE	complex_biological	Beef Heart Infusion 			Complex biological material - no single CAS-RN exists	
+UNMAPPABLE	complex_biological	Beef heart			Complex biological material - no single CAS-RN exists	
+UNMAPPABLE	complex_biological	Calf brains			Complex biological material - no single CAS-RN exists	
+UNMAPPABLE	complex_biological	Casein peptone 			Complex biological material - no single CAS-RN exists	
+UNMAPPABLE	complex_biological	Digested serum			Complex biological material - no single CAS-RN exists	
+UNMAPPABLE	complex_biological	Fetal bovine serum			Complex biological material - no single CAS-RN exists	
+UNMAPPABLE	complex_biological	Infusion from Potatoes			Complex biological material - no single CAS-RN exists	
+UNMAPPABLE	complex_biological	Liver extract			Complex biological material - no single CAS-RN exists	
+UNMAPPABLE	complex_biological	Meat extract			Complex biological material - no single CAS-RN exists	
+UNMAPPABLE	complex_biological	Peptic digest of animal tissue			Complex biological material - no single CAS-RN exists	
+UNMAPPABLE	complex_biological	Peptone			Complex biological material - no single CAS-RN exists	
+UNMAPPABLE	complex_biological	Soya peptone 			Complex biological material - no single CAS-RN exists	
+UNMAPPABLE	media_components	Dv_base_Y_medium			Media mixture or formulation - no single CAS-RN exists	
+UNMAPPABLE	media_components	Dv_base_medium			Media mixture or formulation - no single CAS-RN exists	
+UNMAPPABLE	other	Filtered Seawater			Ambiguous or undefined material	
+UNMAPPABLE	other	Spring sampling GW821 filtered with 0.2uM filter			Ambiguous or undefined material	
