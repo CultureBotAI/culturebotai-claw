@@ -181,6 +181,54 @@ feba-create-mim-ingredients:
 # Utility Commands
 # =============================================================================
 
+# =============================================================================
+# KG-Microbe Matching Workflows
+# =============================================================================
+
+# Match CultureMech media to KG-Microbe nodes (dry-run)
+match-culturemech-dry:
+    @echo "Testing CultureMech → KG-Microbe matching (dry-run)..."
+    python scripts/match_culturemech_to_kg.py \
+        --culturemech ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech \
+        --kg-microbe ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe \
+        --dry-run
+
+# Match CultureMech media to KG-Microbe nodes (populate kg_microbe_match field)
+match-culturemech:
+    @echo "Matching CultureMech media to KG-Microbe nodes..."
+    python scripts/match_culturemech_to_kg.py \
+        --culturemech ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech \
+        --kg-microbe ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe
+    @echo "✅ CultureMech kg_microbe_match fields populated"
+
+# Match MIM ingredients to KG-Microbe nodes (dry-run)
+match-mim-dry:
+    @echo "Testing MIM → KG-Microbe matching (dry-run)..."
+    python scripts/match_mim_to_kg.py \
+        --mim ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech \
+        --kg-microbe ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe \
+        --dry-run
+
+# Match MIM ingredients to KG-Microbe nodes (populate kg_microbe_node_id field)
+match-mim:
+    @echo "Matching MIM ingredients to KG-Microbe nodes..."
+    python scripts/match_mim_to_kg.py \
+        --mim ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech \
+        --kg-microbe ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe
+    @echo "✅ MIM kg_microbe_node_id fields populated"
+
+# Run both KG-Microbe matching workflows (dry-run)
+match-all-dry: match-culturemech-dry match-mim-dry
+    @echo "✅ Dry-run complete"
+
+# Run both KG-Microbe matching workflows
+match-all: match-culturemech match-mim
+    @echo "✅ All KG-Microbe matches populated"
+
+# =============================================================================
+# Utility Commands
+# =============================================================================
+
 # Clean workspace directory
 clean:
     @echo "Cleaning workspace..."
