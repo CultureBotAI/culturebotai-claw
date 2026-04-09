@@ -182,6 +182,19 @@ feba-create-mim-ingredients:
 # =============================================================================
 
 # =============================================================================
+# Unified Ingredient Mapping
+# =============================================================================
+
+# Build unified ingredient mapping across CultureMech, MIM, and CommunityMech
+build-unified-mapping:
+    @echo "Building unified ingredient mapping..."
+    python scripts/build_unified_ingredient_mapping.py \
+        --culturemech ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech \
+        --mim ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech \
+        --output workspace/unified_ingredient_mapping.tsv
+    @echo "✅ Unified mapping: workspace/unified_ingredient_mapping.tsv"
+
+# =============================================================================
 # KG-Microbe Matching Workflows
 # =============================================================================
 
