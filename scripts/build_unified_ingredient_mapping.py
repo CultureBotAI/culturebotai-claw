@@ -35,15 +35,19 @@ DEFAULT_OUTPUT = Path('workspace/unified_ingredient_mapping.tsv')
 # Step 1: Build MIM index (preferred_term + all synonyms → record)
 # ---------------------------------------------------------------------------
 
-def load_mim_index(mim_root: Path) -> tuple[dict, dict]:
+def load_mim_index(mim_root: Path) -> tuple[dict, dict, dict]:
     """
     Returns:
         name_index: normalized_name → MIM record dict
         chebi_index: chebi_id → MIM record dict
+        ontology_index: any ontology ID (CHEBI/FOODON/ENVO) → MIM record dict
+            Enables lookup when CultureMech has a FOODON term.id and MIM has
+            the same ingredient under a CHEBI ID.
     """
     ingredients_dir = mim_root / 'data' / 'ingredients'
     name_index: Dict[str, dict] = {}
     chebi_index: Dict[str, dict] = {}
+    ontology_index: Dict[str, dict] = {}
 
     print("Loading MIM ingredient records...")
     count = 0
@@ -60,6 +64,9 @@ def load_mim_index(mim_root: Path) -> tuple[dict, dict]:
         if not preferred:
             continue
 
+        ont_mapping = data.get('ontology_mapping') or {}
+        ontology_id = ont_mapping.get('ontology_id', '').strip()
+
         record = {
             'mim_id': identifier,
             'preferred_term': preferred,
@@ -67,7 +74,6 @@ def load_mim_index(mim_root: Path) -> tuple[dict, dict]:
             'cas_rn': (data.get('chemical_properties') or {}).get('cas_rn', ''),
             'kg_microbe_node_id': data.get('kg_microbe_node_id', ''),
             'mapping_status': data.get('mapping_status', ''),
-            'ontology_source': (data.get('ontology_mapping') or {}).get('ontology_source', ''),
         }
 
         # Index by normalized preferred_term
@@ -87,14 +93,21 @@ def load_mim_index(mim_root: Path) -> tuple[dict, dict]:
                 if norm_syn and norm_syn not in name_index:
                     name_index[norm_syn] = record
 
-        # Index by CHEBI
+        # Index by CHEBI (primary)
         if record['chebi_id']:
             chebi_index[record['chebi_id']] = record
 
+        # Index by any ontology ID (CHEBI, FOODON, ENVO — for cross-lookup)
+        if ontology_id:
+            ontology_index[ontology_id] = record
+        if identifier:
+            ontology_index[identifier] = record
+
         count += 1
 
-    print(f"  {count} MIM records → {len(name_index)} name entries, {len(chebi_index)} CHEBI entries\n")
-    return name_index, chebi_index
+    print(f"  {count} MIM records → {len(name_index)} name entries, "
+          f"{len(chebi_index)} CHEBI, {len(ontology_index)} ontology IDs\n")
+    return name_index, chebi_index, ontology_index
 
 
 def _normalize(s: str) -> str:
@@ -165,16 +178,22 @@ def resolve_mim_record(
     term_id: str,
     name_index: dict,
     chebi_index: dict,
+    ontology_index: dict,
 ) -> Optional[dict]:
     """
     Find best MIM record for this ingredient name + optional term_id.
-    Priority: term_id CHEBI lookup > name lookup.
-    """
-    # 1. Term ID from CultureMech (CHEBI or FOODON)
-    if term_id and term_id.startswith('CHEBI:') and term_id in chebi_index:
-        return chebi_index[term_id]
 
-    # 2. Name-based lookup
+    Priority:
+      1. CultureMech CHEBI term.id → direct CHEBI index lookup
+      2. Any CultureMech term.id (FOODON/ENVO) → ontology index lookup
+      3. Name/synonym → name index lookup
+    """
+    if term_id:
+        if term_id in chebi_index:
+            return chebi_index[term_id]
+        if term_id in ontology_index:
+            return ontology_index[term_id]
+
     norm = _normalize(name)
     if norm in name_index:
         return name_index[norm]
@@ -186,9 +205,17 @@ def build_unified_rows(
     occurrences: dict,
     name_index: dict,
     chebi_index: dict,
+    ontology_index: dict,
 ) -> list:
     """
     Join CultureMech occurrences with MIM records.
+
+    CHEBI is the primary chemical identifier:
+      - CultureMech term.id (if CHEBI) → used directly as chebi_id
+      - MIM record → fallback source for chebi_id when CultureMech has
+        no CHEBI term (e.g. has FOODON, or is unmapped in CultureMech)
+      - mim_id → fallback identifier when no CHEBI is available at all
+
     Returns list of row dicts, sorted by occurrence count descending.
     """
     rows = []
@@ -196,33 +223,42 @@ def build_unified_rows(
 
     for name, info in occurrences.items():
         term_id = info['term_id']
-        mim = resolve_mim_record(name, term_id, name_index, chebi_index)
+        mim = resolve_mim_record(name, term_id, name_index, chebi_index, ontology_index)
+
+        # CHEBI priority: CultureMech term.id first, MIM as fallback
+        chebi_id = ''
+        if term_id.startswith('CHEBI:'):
+            chebi_id = term_id
+        elif mim and mim['chebi_id']:
+            chebi_id = mim['chebi_id']
 
         row = {
             'ingredient_name': name,
             'culturemech_term_id': term_id,
             'occurrence_count': info['count'],
-            'mim_id': '',
-            'chebi_id': '',
-            'cas_rn': '',
-            'kg_microbe_node_id': '',
-            'mapping_status': 'UNMATCHED_IN_MIM',
+            'chebi_id': chebi_id,
+            'mim_id': mim['mim_id'] if mim else '',
+            'cas_rn': mim['cas_rn'] if mim else '',
+            'kg_microbe_node_id': mim['kg_microbe_node_id'] if mim else '',
+            'mapping_status': '',
             'example_media': '; '.join(info['example_media']),
         }
 
         if mim:
-            row['mim_id'] = mim['mim_id']
-            row['chebi_id'] = mim['chebi_id'] or term_id if term_id.startswith('CHEBI:') else mim['chebi_id']
-            row['cas_rn'] = mim['cas_rn']
-            row['kg_microbe_node_id'] = mim['kg_microbe_node_id']
-            row['mapping_status'] = mim['mapping_status'] or 'MATCHED'
             matched += 1
+            if chebi_id:
+                row['mapping_status'] = mim['mapping_status'] or 'MAPPED'
+            else:
+                # MIM has record but no CHEBI (e.g. UNMAPPED or FOODON-only)
+                row['mapping_status'] = mim['mapping_status'] or 'MIM_NO_CHEBI'
         else:
-            # Still record the CultureMech term_id even without MIM match
-            if term_id:
-                row['chebi_id'] = term_id if term_id.startswith('CHEBI:') else ''
-                row['mapping_status'] = 'HAS_TERM_ID_NO_MIM'
             unmatched += 1
+            if chebi_id:
+                row['mapping_status'] = 'CHEBI_NO_MIM'
+            elif term_id:
+                row['mapping_status'] = 'TERM_ID_NO_MIM'
+            else:
+                row['mapping_status'] = 'UNMAPPED'
 
         rows.append(row)
 
@@ -238,12 +274,12 @@ def build_unified_rows(
 
 COLUMNS = [
     'ingredient_name',
-    'culturemech_term_id',
     'occurrence_count',
-    'mim_id',
-    'chebi_id',
+    'chebi_id',       # primary chemical ID — CultureMech term.id (if CHEBI) or MIM fallback
     'cas_rn',
     'kg_microbe_node_id',
+    'mim_id',         # MIM record fallback identifier
+    'culturemech_term_id',
     'mapping_status',
     'example_media',
 ]
@@ -284,23 +320,33 @@ def write_yaml_summary(rows: list, output: Path) -> None:
 
 
 def print_coverage_report(rows: list) -> None:
+    from collections import Counter
     total = len(rows)
     has_chebi = sum(1 for r in rows if r['chebi_id'])
     has_cas = sum(1 for r in rows if r['cas_rn'])
     has_kg = sum(1 for r in rows if r['kg_microbe_node_id'])
     has_mim = sum(1 for r in rows if r['mim_id'])
     fully_mapped = sum(1 for r in rows if r['chebi_id'] and r['cas_rn'])
+    chebi_from_cm = sum(1 for r in rows if r['chebi_id'] and r['culturemech_term_id'].startswith('CHEBI:'))
+    chebi_from_mim = sum(1 for r in rows if r['chebi_id'] and not r['culturemech_term_id'].startswith('CHEBI:'))
+    status_counts = Counter(r['mapping_status'] for r in rows)
 
     print()
     print("=" * 60)
     print("UNIFIED MAPPING COVERAGE REPORT")
     print("=" * 60)
     print(f"Total unique ingredient names:  {total}")
-    print(f"Matched to MIM record:          {has_mim}  ({100*has_mim//total}%)")
     print(f"Have CHEBI ID:                  {has_chebi}  ({100*has_chebi//total}%)")
+    print(f"  - from CultureMech term.id:   {chebi_from_cm}")
+    print(f"  - from MIM (fallback):        {chebi_from_mim}")
     print(f"Have CAS-RN:                    {has_cas}  ({100*has_cas//total}%)")
     print(f"Have KG-Microbe node ID:        {has_kg}  ({100*has_kg//total}%)")
+    print(f"Matched to MIM record:          {has_mim}  ({100*has_mim//total}%)")
     print(f"Fully mapped (CHEBI + CAS):     {fully_mapped}  ({100*fully_mapped//total}%)")
+    print()
+    print("Status breakdown:")
+    for status, count in sorted(status_counts.items(), key=lambda x: -x[1]):
+        print(f"  {status:<25} {count}")
 
 
 # ---------------------------------------------------------------------------
@@ -332,13 +378,13 @@ def main():
     print()
 
     # Load MIM index
-    name_index, chebi_index = load_mim_index(args.mim)
+    name_index, chebi_index, ontology_index = load_mim_index(args.mim)
 
     # Scan CultureMech
     occurrences = scan_culturemech(args.culturemech)
 
     # Join
-    rows = build_unified_rows(occurrences, name_index, chebi_index)
+    rows = build_unified_rows(occurrences, name_index, chebi_index, ontology_index)
 
     # Print coverage report
     print_coverage_report(rows)
