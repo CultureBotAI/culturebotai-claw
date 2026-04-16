@@ -371,7 +371,7 @@ tp send --wait <slug> "<follow-up>"
 tp kill <slug>
 ```
 
-See the dismech boss skill (monarch-initiative/dismech PR #1150) for full `tp` documentation.
+See the [tmux-pilot documentation](https://github.com/cmungall/tmux-pilot) for full `tp` usage.
 
 ---
 
