@@ -22,15 +22,16 @@ import argparse
 from pathlib import Path
 from datetime import datetime
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from plugins.ingredient_name_normalizer import canonicalize_hydrate
+
 
 CULTUREMECH_ROOT = Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech'
 UNIFIED_MAPPING = Path('workspace/unified_ingredient_mapping.tsv')
 
 
 def _normalize(s: str) -> str:
-    s = s.lower().strip()
-    s = re.sub(r'\s+', ' ', s)
-    return s
+    return canonicalize_hydrate(s)
 
 
 def load_mim_chebi_index(mapping_file: Path) -> dict:

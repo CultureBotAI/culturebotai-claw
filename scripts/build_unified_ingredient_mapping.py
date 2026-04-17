@@ -25,6 +25,9 @@ from pathlib import Path
 from collections import defaultdict
 from typing import Dict, Optional
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from plugins.ingredient_name_normalizer import canonicalize_hydrate
+
 
 CULTUREMECH_ROOT = Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech'
 MIM_ROOT = Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech'
@@ -111,11 +114,9 @@ def load_mim_index(mim_root: Path) -> tuple[dict, dict, dict]:
 
 
 def _normalize(s: str) -> str:
-    """Normalize for matching: lowercase, collapse whitespace."""
-    import re
-    s = s.lower().strip()
-    s = re.sub(r'\s+', ' ', s)
-    return s
+    """Normalize for matching: lowercase, collapse whitespace, canonicalize
+    hydrate-notation separators. See plugins.ingredient_name_normalizer."""
+    return canonicalize_hydrate(s)
 
 
 # ---------------------------------------------------------------------------
