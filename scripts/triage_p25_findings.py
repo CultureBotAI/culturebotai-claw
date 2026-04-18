@@ -52,6 +52,7 @@ ALREADY_FIXED_FILES = {
     "Cysteine-hcl_X_H2o.yaml",
     "L-cysteine-hcl_X_H2o.yaml",
     "L-cysteine-hcl_X_H2o_2.yaml",
+    "Ca_No32.yaml",
 }
 
 
