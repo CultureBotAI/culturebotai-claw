@@ -384,6 +384,11 @@ build-complex-ingredients:
 publish-complex-ingredients:
     /opt/homebrew/bin/python3.13 scripts/build_complex_ingredients_tsv.py --publish
 
+# Generate the canonical mapping-case taxonomy reference. See
+# .claude/skills/mapping-taxonomy/skill.md for what this documents.
+mapping-taxonomy:
+    /opt/homebrew/bin/python3.13 scripts/generate_mapping_taxonomy_report.py
+
 # =============================================================================
 # Utility Commands
 # =============================================================================
