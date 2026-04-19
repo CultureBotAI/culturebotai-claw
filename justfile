@@ -372,6 +372,18 @@ propose-chebi-unmapped:
 # Full reconciliation pipeline, in dependency order.
 reconcile-all: audit-kgm-mim fix-deprecated-chebi fix-label-drift roundtrip-disagree generate-migration-map generate-kgm-xref-patches
 
+# Build the canonical complex-ingredients artifact (FOODON/ENVO MIM rows
+# that kg-microbe's CHEBI-only unified_chemical_mappings.tsv.gz can't
+# absorb). Writes a working copy to workspace/reports/.
+build-complex-ingredients:
+    /opt/homebrew/bin/python3.13 scripts/build_complex_ingredients_tsv.py
+
+# Build AND promote complex_ingredients.tsv{,.gz} to
+# MediaIngredientMech/mappings/ — the canonical location consumed by
+# kg-microbe on its next unified-mappings rebuild.
+publish-complex-ingredients:
+    /opt/homebrew/bin/python3.13 scripts/build_complex_ingredients_tsv.py --publish
+
 # =============================================================================
 # Utility Commands
 # =============================================================================

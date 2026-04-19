@@ -13,18 +13,23 @@ existing CHEBI-only unified_chemical_mappings.tsv.gz.
 
 from __future__ import annotations
 
+import argparse
 import gzip
+import shutil
 from pathlib import Path
 
 WORKSPACE = Path(
     "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/workspace"
 )
-MIM_SSSOM = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
-    "MediaIngredientMech/mappings/ingredient_mappings.sssom.tsv"
+MIM_ROOT = Path(
+    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech"
 )
+MIM_SSSOM = MIM_ROOT / "mappings/ingredient_mappings.sssom.tsv"
 OUT_GZ = WORKSPACE / "reports/complex_ingredients.tsv.gz"
 OUT_TSV_PREVIEW = WORKSPACE / "reports/complex_ingredients_preview.tsv"
+# Canonical published copies in the MIM repo.
+PUBLISH_GZ = MIM_ROOT / "mappings/complex_ingredients.tsv.gz"
+PUBLISH_TSV = MIM_ROOT / "mappings/complex_ingredients.tsv"
 
 COLS = ["id", "category", "canonical_name", "formula", "synonyms", "xrefs", "sources"]
 
@@ -118,6 +123,12 @@ def build() -> list[dict]:
 
 
 def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--publish", action="store_true",
+                    help="Also copy the artifact into MediaIngredientMech/mappings/ "
+                         "as the canonical published location consumed by kg-microbe.")
+    args = ap.parse_args()
+
     rows = build()
     print(f"Built {len(rows)} complex-ingredient rows")
 
@@ -135,6 +146,12 @@ def main() -> None:
         for r in rows:
             f.write("\t".join(str(r.get(c, "")) for c in COLS) + "\n")
     print(f"Wrote {OUT_TSV_PREVIEW}")
+
+    if args.publish:
+        shutil.copy(OUT_GZ, PUBLISH_GZ)
+        shutil.copy(OUT_TSV_PREVIEW, PUBLISH_TSV)
+        print(f"Published → {PUBLISH_GZ}")
+        print(f"Published → {PUBLISH_TSV}")
 
     # Summary
     from collections import Counter
