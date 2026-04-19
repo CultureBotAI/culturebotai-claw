@@ -69,6 +69,30 @@ def load_mim_index(mim_root: Path) -> tuple[dict, dict, dict]:
 
         ont_mapping = data.get('ontology_mapping') or {}
         ontology_id = ont_mapping.get('ontology_id', '').strip()
+        ontology_label = ont_mapping.get('ontology_label', '').strip()
+
+        # Collect distinct synonym surface forms: preferred_term, ontology_label,
+        # and every synonym_text that isn't a structured-metadata dump.
+        syn_set: set[str] = set()
+        if ontology_label and ontology_label.lower() != preferred.lower():
+            syn_set.add(ontology_label)
+        for syn in data.get('synonyms', []) or []:
+            txt = ''
+            if isinstance(syn, dict):
+                txt = (syn.get('synonym_text') or '').strip()
+            elif isinstance(syn, str):
+                txt = syn.strip()
+            if not txt:
+                continue
+            low = txt.lower()
+            # Skip structured-metadata dumps we already keep out of P4.4
+            if any(k in low for k in (
+                'cross-references:', 'role:', 'properties:', 'synonym source:'
+            )):
+                continue
+            if low == preferred.lower():
+                continue
+            syn_set.add(txt)
 
         record = {
             'mim_id': identifier,
@@ -77,6 +101,7 @@ def load_mim_index(mim_root: Path) -> tuple[dict, dict, dict]:
             'cas_rn': (data.get('chemical_properties') or {}).get('cas_rn', ''),
             'kg_microbe_node_id': data.get('kg_microbe_node_id', ''),
             'mapping_status': data.get('mapping_status', ''),
+            'synonyms': sorted(syn_set),
         }
 
         # Index by normalized preferred_term
@@ -242,6 +267,7 @@ def build_unified_rows(
             'cas_rn': mim['cas_rn'] if mim else '',
             'kg_microbe_node_id': mim['kg_microbe_node_id'] if mim else '',
             'mapping_status': '',
+            'synonyms': '|'.join(mim.get('synonyms', [])) if mim else '',
             'example_media': '; '.join(info['example_media']),
         }
 
@@ -282,6 +308,7 @@ COLUMNS = [
     'mim_id',         # MIM record fallback identifier
     'culturemech_term_id',
     'mapping_status',
+    'synonyms',       # pipe-separated alternate labels harvested from MIM
     'example_media',
 ]
 
