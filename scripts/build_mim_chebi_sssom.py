@@ -1,9 +1,10 @@
 """
-Build the canonical MIM → CHEBI SSSOM mapping file.
+Build the canonical MIM → ingredient-ontology SSSOM mapping file.
 
-This is the authoritative cross-repo chemical mapping artifact. Every
+This is the authoritative cross-repo ingredient mapping artifact. Every
 MediaIngredientMech record whose `ontology_mapping.ontology_id` starts
-with `CHEBI:` becomes one SSSOM row with:
+with a supported ingredient ontology prefix (CHEBI / FOODON; UBERON /
+ENVO when populated) becomes one SSSOM row with:
 
   subject_id        MIM:<safe_stem>         -- stable per-YAML CURIE
   subject_label     preferred_term
@@ -11,8 +12,9 @@ with `CHEBI:` becomes one SSSOM row with:
                     skos:narrowMatch        -- MIM is more specific than CHEBI
                     skos:broadMatch         -- MIM is less specific than CHEBI
                     skos:closeMatch         -- SYMMETRIC (both defensible)
-  object_id         CHEBI:X
-  object_label      ontology_label
+  object_id         <CHEBI|FOODON|...>:X
+  object_label      canonical rdfs:label from OAK/OLS (fallback: MIM label)
+  object_source     per-row ontology OWL URI (CHEBI/FOODON/... differ per row)
   mapping_justification  semapv:ManualMappingCuration | semapv:LexicalMatching
   source            MIM:<evidence>|MIM:curator=...|kgm:<sources>  (extension)
   mapping_date      YAML modification date (ISO, UTC)
@@ -22,17 +24,17 @@ with `CHEBI:` becomes one SSSOM row with:
 
 Inputs (all read-only):
   MIM/data/ingredients/mapped/*.yaml
-  kg-microbe/mappings/unified_chemical_mappings.tsv.gz
+  kg-microbe/mappings/unified_chemical_mappings.tsv.gz   (CHEBI-only)
   workspace/reports/kg_microbe_residual_p25_categorized.json   (optional)
-      — enriches predicate / confidence for the 303 triaged cases
+      — enriches predicate / confidence for the 303 triaged CHEBI cases
 
 Outputs:
-  workspace/reports/mim_chebi_mappings.sssom.tsv
+  workspace/reports/mim_ingredient_mappings.sssom.tsv
       — working copy, regenerated on every run
       — validated with `sssom validate` before being written
 
 Use `just publish-sssom` to promote the working copy to
-  MediaIngredientMech/mappings/chemical_mappings.sssom.tsv
+  MediaIngredientMech/mappings/ingredient_mappings.sssom.tsv
 after it passes `sssom validate` + `synonym-review`.
 """
 
@@ -63,11 +65,22 @@ MIM_INGREDIENTS_DIR = MIM_ROOT / "data" / "ingredients" / "mapped"
 KGM_UNIFIED_TSV = KGM_ROOT / "mappings" / "unified_chemical_mappings.tsv.gz"
 REPORT_DIR = CLAW_ROOT / "workspace" / "reports"
 RESIDUAL_JSON = REPORT_DIR / "kg_microbe_residual_p25_categorized.json"
-OUT_TSV = REPORT_DIR / "mim_chebi_mappings.sssom.tsv"
+OUT_TSV = REPORT_DIR / "mim_ingredient_mappings.sssom.tsv"
 
-MAPPING_SET_ID = "https://w3id.org/sssom/mappings/culturebotai_mim_chebi"
+MAPPING_SET_ID = "https://w3id.org/sssom/mappings/culturebotai_mim_ingredient"
 LICENSE = "https://creativecommons.org/publicdomain/zero/1.0/"
 SSSOM_BIN = "sssom"
+
+# Ontologies we emit mappings for. Add a new prefix here and to
+# `_OBJECT_SOURCE_BY_PREFIX` (and plug a label loader into main()) to extend
+# coverage.
+SUPPORTED_OBJECT_PREFIXES: tuple[str, ...] = ("CHEBI:", "FOODON:")
+_OBJECT_SOURCE_BY_PREFIX: dict[str, str] = {
+    "CHEBI:": "obo:chebi.owl",
+    "FOODON:": "obo:foodon.owl",
+    "UBERON:": "obo:uberon.owl",
+    "ENVO:": "obo:envo.owl",
+}
 
 # Matches MIM's kg_microbe_dict.POLLUTION_SYNONYM_THRESHOLD. Any kg-microbe
 # entry above this is contaminated by the upstream row-merge bug (CHEBI:86254
@@ -187,6 +200,46 @@ def _load_chebi_labels(chebi_ids: list[str], batch: int = 80) -> dict[str, str]:
     return out
 
 
+def _load_ols_labels(
+    term_ids: list[str],
+    ontology: str,
+    iri_prefix: str,
+) -> dict[str, str]:
+    """Fetch rdfs:label via EBI OLS4 REST for ontologies without a local
+    OAK sqlite (e.g. FOODON). `ontology` is the OLS ontology slug
+    (\"foodon\"); `iri_prefix` is the OBO IRI stem (
+    \"http://purl.obolibrary.org/obo/FOODON_\").
+
+    Non-fatal — on any network error we return whatever we've resolved so
+    far; the builder falls back to the MIM-stored ontology_label."""
+    out: dict[str, str] = {}
+    if not term_ids:
+        return out
+    try:
+        import urllib.parse
+        import urllib.request
+    except ImportError:
+        return out
+    base = f"https://www.ebi.ac.uk/ols4/api/ontologies/{ontology}/terms"
+    for curie in term_ids:
+        try:
+            local = curie.split(":", 1)[1]
+        except IndexError:
+            continue
+        iri = iri_prefix + local
+        double_encoded = urllib.parse.quote(urllib.parse.quote(iri, safe=""), safe="")
+        url = f"{base}/{double_encoded}"
+        try:
+            with urllib.request.urlopen(url, timeout=10) as resp:
+                payload = json.loads(resp.read().decode("utf-8"))
+        except Exception:
+            continue
+        label = (payload.get("label") or "").strip()
+        if label:
+            out[curie] = label
+    return out
+
+
 def _load_residual_categorization() -> dict[str, dict]:
     """source_file → residual-P2.5 decision, for predicate upgrading."""
     if not RESIDUAL_JSON.exists():
@@ -247,7 +300,7 @@ def _row_from_yaml(
     residual: dict[str, dict],
     kgm_sources: dict[str, str],
     kgm_labels: dict[str, tuple[str, list[str]]],
-    chebi_canonical_labels: dict[str, str],
+    canonical_labels: dict[str, str],
 ) -> dict | None:
     try:
         data = yaml.safe_load(path.read_text()) or {}
@@ -255,9 +308,10 @@ def _row_from_yaml(
         return None
 
     ont = data.get("ontology_mapping") or {}
-    chebi = (ont.get("ontology_id") or "").strip()
-    if not chebi.startswith("CHEBI:"):
+    obj_id = (ont.get("ontology_id") or "").strip()
+    if not any(obj_id.startswith(p) for p in SUPPORTED_OBJECT_PREFIXES):
         return None
+    is_chebi = obj_id.startswith("CHEBI:")
 
     preferred = (data.get("preferred_term") or "").strip()
     ont_label = (ont.get("ontology_label") or "").strip()
@@ -277,13 +331,19 @@ def _row_from_yaml(
         else JUST_MANUAL
     )
     confidence = "0.99" if quality == "EXACT_MATCH" else "0.9"
+    # Non-EXACT_MATCH quality (e.g. CLOSE_MATCH used by FOODON peptones)
+    # earns a closeMatch predicate by default so downstream consumers
+    # don't treat them as identity mappings.
+    if quality and quality != "EXACT_MATCH":
+        predicate = "skos:closeMatch"
     comment = ""
 
     # Residual-P2.5 override: the generator ran a specificity / symmetry
     # analysis for 303 records; use its decision when available. This is
-    # where broad/narrow/closeMatch predicates come from.
+    # where broad/narrow/closeMatch predicates come from. CHEBI-only — the
+    # residual pipeline wasn't run for FOODON/UBERON/ENVO.
     src_file = path.name
-    if src_file in residual:
+    if is_chebi and src_file in residual:
         dec = residual[src_file]
         cat = dec.get("category")
         if cat == "CONSIDER_SPECIFIC":
@@ -292,23 +352,26 @@ def _row_from_yaml(
             kgm_chebi = (dec.get("kg_microbe_chebi") or "").strip()
             kgm_label = (dec.get("kg_microbe_label") or "").strip()
             if kgm_chebi.startswith("CHEBI:"):
-                chebi = kgm_chebi
+                obj_id = kgm_chebi
                 ont_label = kgm_label or ont_label
         predicate = _PREDICATE_BY_CATEGORY.get(cat, predicate)
         confidence = _CONFIDENCE_BY_CATEGORY.get(cat, confidence)
         justification = JUST_MANUAL if cat == "CONSIDER_SPECIFIC" else JUST_LEXICAL
         comment = f"{cat}: {dec.get('rationale', '')}"
 
-    # Prefer CHEBI's canonical rdfs:label for object_label (SSSOM best
-    # practice). Fall back to MIM's stored ontology_label if OAK didn't
-    # resolve. When we replace, keep MIM's stored label in `other` so the
-    # surface form is preserved for downstream tools.
-    canonical_label = chebi_canonical_labels.get(chebi, "")
+    # Prefer the ontology's canonical rdfs:label for object_label (SSSOM
+    # best practice). Fall back to MIM's stored ontology_label if the
+    # label loader didn't resolve. When we replace, keep MIM's stored
+    # label in `other` so the surface form is preserved for downstream
+    # tools.
+    canonical_label = canonical_labels.get(obj_id, "")
     mim_stored_label = ont_label
     if canonical_label:
         ont_label = canonical_label
 
-    kgm_name, kgm_syns = kgm_labels.get(chebi, ("", []))
+    # kg-microbe cross-source data is CHEBI-only.
+    kgm_name, kgm_syns = kgm_labels.get(obj_id, ("", [])) if is_chebi else ("", [])
+    kgm_src = kgm_sources.get(obj_id, "") if is_chebi else ""
     mim_yaml_syns = [
         (s.get("synonym_text") or "").strip()
         for s in (data.get("synonyms") or [])
@@ -316,7 +379,7 @@ def _row_from_yaml(
     ]
     # `other` carries alternate surface forms that downstream consumers can
     # adopt as synonyms. Order: MIM's original ontology_label (preserved
-    # when we replaced it with CHEBI's canonical) → kg-microbe canonical →
+    # when we replaced it with the canonical) → kg-microbe canonical →
     # kg-microbe synonyms → MIM's own EXACT_SYNONYMs. Drop the chosen
     # object_label and the preferred_term so we don't duplicate what's in
     # the dedicated columns.
@@ -330,14 +393,20 @@ def _row_from_yaml(
     ]
     other = _pipe(candidate_alts, drop=drop, max_entries=MAX_OTHER_ENTRIES)
 
+    # Per-row object_source — SSSOM supports per-row override when the
+    # mapping_set mixes ontologies.
+    prefix = next(p for p in SUPPORTED_OBJECT_PREFIXES if obj_id.startswith(p))
+    object_source = _OBJECT_SOURCE_BY_PREFIX.get(prefix, "")
+
     return {
         "subject_id": _mim_curie(src_file),
         "subject_label": preferred,
         "predicate_id": predicate,
-        "object_id": chebi,
+        "object_id": obj_id,
         "object_label": ont_label,
+        "object_source": object_source,
         "mapping_justification": justification,
-        "source": _join_sources(evidence, _last_curator(history), kgm_sources.get(chebi, "")),
+        "source": _join_sources(evidence, _last_curator(history), kgm_src),
         "mapping_date": _mapping_date(path, history),
         "confidence": confidence,
         "comment": comment,
@@ -348,6 +417,9 @@ def _row_from_yaml(
 HEADER_YAML = f"""\
 # curie_map:
 #   CHEBI: "http://purl.obolibrary.org/obo/CHEBI_"
+#   FOODON: "http://purl.obolibrary.org/obo/FOODON_"
+#   UBERON: "http://purl.obolibrary.org/obo/UBERON_"
+#   ENVO: "http://purl.obolibrary.org/obo/ENVO_"
 #   MIM: "https://github.com/KG-Hub/MediaIngredientMech/blob/main/data/ingredients/mapped/"
 #   obo: "http://purl.obolibrary.org/obo/"
 #   semapv: "https://w3id.org/semapv/vocab/"
@@ -357,12 +429,11 @@ HEADER_YAML = f"""\
 # license: "{LICENSE}"
 # mapping_set_id: "{MAPPING_SET_ID}"
 # mapping_set_version: "{{version}}"
-# mapping_set_description: "Canonical MediaIngredientMech → CHEBI mappings. One row per mapped MIM ingredient record. Predicate is skos:exactMatch by default; narrowMatch/broadMatch/closeMatch where residual-P2.5 triage found a specificity or symmetry difference. The `source` extension column records the upstream origin (MIM evidence + kg-microbe source pipeline)."
+# mapping_set_description: "Canonical MediaIngredientMech → ingredient-ontology mappings (CHEBI + FOODON; UBERON/ENVO when populated). One row per mapped MIM ingredient record. Per-row object_source distinguishes ontologies. Predicate is skos:exactMatch by default; narrowMatch/broadMatch/closeMatch where residual-P2.5 triage found a specificity or symmetry difference, or where mapping_quality != EXACT_MATCH. The `source` extension column records the upstream origin (MIM evidence + kg-microbe source pipeline, CHEBI only)."
 # mapping_date: "{{version}}"
 # creator_id:
 #   - "orcid:0000-0001-8175-045X"
 # subject_source: "MIM:ingredients"
-# object_source: "obo:chebi.owl"
 # extension_definitions:
 #   - slot_name: source
 #     property: "cbclaw:provenance-source"
@@ -375,6 +446,7 @@ COLUMNS = [
     "predicate_id",
     "object_id",
     "object_label",
+    "object_source",
     "mapping_justification",
     "source",
     "mapping_date",
@@ -430,34 +502,56 @@ def main():
     yamls = sorted(MIM_INGREDIENTS_DIR.glob("*.yaml"))
     print(f"Scanning {len(yamls)} MIM ingredient YAMLs...", file=sys.stderr)
 
-    # Collect all CHEBI ids we'll emit so we can fetch rdfs:labels in one
-    # batched OAK pass. The residual-P2.5 override can swap the CHEBI to
-    # kg-microbe's more-specific one, so include both sides.
-    needed_chebis: set[str] = set()
+    # Group target term IDs by prefix so we can dispatch the right label
+    # loader (OAK sqlite for CHEBI, OLS4 REST for FOODON, etc.). The
+    # residual-P2.5 override can swap CHEBI to kg-microbe's more-specific
+    # one, so include both sides when collecting CHEBIs.
+    needed_by_prefix: dict[str, set[str]] = {p: set() for p in SUPPORTED_OBJECT_PREFIXES}
     for p in yamls:
         try:
             data = yaml.safe_load(p.read_text()) or {}
         except yaml.YAMLError:
             continue
         cid = ((data.get("ontology_mapping") or {}).get("ontology_id") or "").strip()
-        if cid.startswith("CHEBI:"):
-            needed_chebis.add(cid)
+        for pref in SUPPORTED_OBJECT_PREFIXES:
+            if cid.startswith(pref):
+                needed_by_prefix[pref].add(cid)
+                break
         dec = residual.get(p.name)
         if dec and (dec.get("kg_microbe_chebi") or "").startswith("CHEBI:"):
-            needed_chebis.add(dec["kg_microbe_chebi"])
-    print(f"Fetching rdfs:labels for {len(needed_chebis)} CHEBI ids from OAK...", file=sys.stderr)
-    chebi_canonical_labels = _load_chebi_labels(sorted(needed_chebis))
-    if not chebi_canonical_labels:
-        print("  (OAK unavailable — falling back to MIM-stored ontology_label)", file=sys.stderr)
-    else:
-        print(f"  resolved {len(chebi_canonical_labels)} / {len(needed_chebis)}", file=sys.stderr)
+            needed_by_prefix["CHEBI:"].add(dec["kg_microbe_chebi"])
+
+    canonical_labels: dict[str, str] = {}
+    for pref, ids in needed_by_prefix.items():
+        if not ids:
+            continue
+        ids_sorted = sorted(ids)
+        if pref == "CHEBI:":
+            print(f"Fetching rdfs:labels for {len(ids_sorted)} CHEBI ids from OAK...", file=sys.stderr)
+            resolved = _load_chebi_labels(ids_sorted)
+            if not resolved:
+                print("  (OAK unavailable — falling back to MIM-stored ontology_label)", file=sys.stderr)
+            else:
+                print(f"  resolved {len(resolved)} / {len(ids_sorted)}", file=sys.stderr)
+            canonical_labels.update(resolved)
+        elif pref == "FOODON:":
+            print(f"Fetching rdfs:labels for {len(ids_sorted)} FOODON ids from OLS4...", file=sys.stderr)
+            resolved = _load_ols_labels(
+                ids_sorted,
+                ontology="foodon",
+                iri_prefix="http://purl.obolibrary.org/obo/FOODON_",
+            )
+            print(f"  resolved {len(resolved)} / {len(ids_sorted)}", file=sys.stderr)
+            canonical_labels.update(resolved)
+        else:
+            print(f"  (no label loader for {pref}; falling back to MIM-stored labels)", file=sys.stderr)
 
     rows: list[dict] = []
-    skipped_no_chebi = 0
+    skipped_unsupported = 0
     for p in yamls:
-        row = _row_from_yaml(p, residual, kgm_sources, kgm_labels, chebi_canonical_labels)
+        row = _row_from_yaml(p, residual, kgm_sources, kgm_labels, canonical_labels)
         if row is None:
-            skipped_no_chebi += 1
+            skipped_unsupported += 1
             continue
         rows.append(row)
 
@@ -473,7 +567,11 @@ def main():
     _write_sssom(final, args.output, version=version)
 
     print(f"Wrote {len(final)} rows to {args.output}", file=sys.stderr)
-    print(f"  (skipped {skipped_no_chebi} MIM records without CHEBI ontology_id)", file=sys.stderr)
+    print(
+        f"  (skipped {skipped_unsupported} MIM records without a supported ontology_id "
+        f"prefix: {', '.join(SUPPORTED_OBJECT_PREFIXES)})",
+        file=sys.stderr,
+    )
 
     # Predicate breakdown so we can see at a glance how many rows got
     # upgraded beyond skos:exactMatch by the residual pass.
@@ -483,6 +581,17 @@ def main():
     print("Predicate breakdown:", file=sys.stderr)
     for p, n in sorted(pred_counts.items(), key=lambda kv: -kv[1]):
         print(f"  {p:24s} {n}", file=sys.stderr)
+
+    # Per-prefix row counts (CHEBI vs FOODON vs ...).
+    pref_counts: dict[str, int] = {}
+    for r in final:
+        for pref in SUPPORTED_OBJECT_PREFIXES:
+            if r["object_id"].startswith(pref):
+                pref_counts[pref] = pref_counts.get(pref, 0) + 1
+                break
+    print("Object-prefix breakdown:", file=sys.stderr)
+    for pref, n in sorted(pref_counts.items(), key=lambda kv: -kv[1]):
+        print(f"  {pref:10s} {n}", file=sys.stderr)
 
     if not args.no_validate:
         print(f"\nValidating {args.output.name}...", file=sys.stderr)

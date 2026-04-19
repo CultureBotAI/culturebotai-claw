@@ -259,15 +259,15 @@ match-all: match-culturemech match-mim
     @echo "✅ All KG-Microbe matches populated"
 
 # =============================================================================
-# SSSOM Mapping Product (official MIM→CHEBI artifact)
+# SSSOM Mapping Product (official MIM→ingredient-ontology artifact; CHEBI + FOODON)
 # =============================================================================
 
 # Stage 1: Build the working-copy SSSOM from all MIM ingredient YAMLs
 build-sssom:
-    @echo "Building MIM→CHEBI SSSOM..."
+    @echo "Building MIM→ingredient-ontology SSSOM..."
     python scripts/build_mim_chebi_sssom.py \
-        --output workspace/reports/mim_chebi_mappings.sssom.tsv
-    @echo "Working copy: workspace/reports/mim_chebi_mappings.sssom.tsv"
+        --output workspace/reports/mim_ingredient_mappings.sssom.tsv
+    @echo "Working copy: workspace/reports/mim_ingredient_mappings.sssom.tsv"
 
 # Stage 2: Validate the working-copy SSSOM (JsonSchema + PrefixMap + StrictCurie)
 validate-sssom:
@@ -276,13 +276,13 @@ validate-sssom:
         -V JsonSchema \
         -V PrefixMapCompleteness \
         -V StrictCurieFormat \
-        workspace/reports/mim_chebi_mappings.sssom.tsv
+        workspace/reports/mim_ingredient_mappings.sssom.tsv
 
 # Stage 3: Review synonyms in the working-copy SSSOM via OAK + EBI OLS
 review-sssom:
-    @echo "Reviewing SSSOM synonyms against CHEBI (OAK + OLS)..."
+    @echo "Reviewing SSSOM synonyms against ingredient ontologies (OAK + OLS)..."
     python scripts/review_sssom_synonyms.py \
-        --input workspace/reports/mim_chebi_mappings.sssom.tsv \
+        --input workspace/reports/mim_ingredient_mappings.sssom.tsv \
         --tsv-out workspace/reports/sssom_synonym_review.tsv \
         --md-out workspace/reports/sssom_synonym_review.md
 
@@ -302,7 +302,7 @@ sssom-release: build-sssom validate-sssom review-sssom
     @echo "====================================================================="
     @echo "SSSOM release candidate ready for review"
     @echo "====================================================================="
-    @echo "  Working copy: workspace/reports/mim_chebi_mappings.sssom.tsv"
+    @echo "  Working copy: workspace/reports/mim_ingredient_mappings.sssom.tsv"
     @echo "  Review:       workspace/reports/sssom_synonym_review.md"
     @echo ""
     @echo "Next: inspect the review report, then run 'just publish-sssom' to promote."

@@ -1,17 +1,19 @@
 """
-Review an SSSOM TSV's synonym assertions against two independent CHEBI
+Review an SSSOM TSV's synonym assertions against independent ontology
 authorities:
 
   1. OAK (runoak) against a local CHEBI sqlite — exact + related synonym
-     predicates with OBO semantics.
-  2. EBI OLS4 REST API — the community-facing synonym set CHEBI publishes.
+     predicates with OBO semantics. CHEBI only.
+  2. EBI OLS4 REST API — the community-facing synonym set the target
+     ontology publishes. Dispatches per-ontology (chebi, foodon, ...).
 
 For each row we check:
   * object_label matches the authority's rdfs:label or an exact synonym.
   * every `other` label (the MIM/kg-microbe alternate surface form) is
-    either already a CHEBI synonym OR a defensible new candidate.
+    either already a synonym OR a defensible new candidate.
   * the `subject_label` itself, which is the MIM preferred term — if it's
-    also unknown to CHEBI we flag it as a synonym-enrichment opportunity.
+    also unknown to the authority we flag it as a synonym-enrichment
+    opportunity.
 
 Output:
 
@@ -23,15 +25,15 @@ Verdicts
 CONFIRMED         object_label and every alternate label are known to
                   OAK or OLS (mapping is well-grounded)
 SYNONYM_ENRICH    at least one alternate label is NOT in either source —
-                  candidate to propose upstream to CHEBI as a new synonym
-OLS_MISMATCH      OAK and OLS disagree on the label set for this CHEBI
-                  (possible stale local sqlite or out-of-sync release)
+                  candidate to propose upstream as a new synonym
+OLS_MISMATCH      OAK and OLS disagree on the label set (CHEBI only;
+                  possible stale local sqlite or out-of-sync release)
 LABEL_MISMATCH    our object_label isn't the authority's rdfs:label and
                   isn't listed as an exact synonym — likely a data bug
-UNKNOWN_CHEBI     neither OAK nor OLS resolves the CHEBI ID — the CHEBI
-                  is deprecated/obsolete or the ID is wrong
+UNKNOWN_TERM      neither OAK nor OLS resolves the term — the ID is
+                  deprecated/obsolete or wrong
 
-The script caches OLS responses in workspace/.cache/ols/{CHEBI}.json to
+The script caches OLS responses in workspace/.cache/ols/{TERM}.json to
 keep reruns polite; delete that directory to force a re-fetch.
 
 Defaults to processing all rows. Pass `--limit N` to spot-check.
@@ -53,17 +55,37 @@ from pathlib import Path
 CLAW_ROOT = Path(
     "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw"
 )
-DEFAULT_SSSOM = CLAW_ROOT / "workspace" / "reports" / "residual_p25_mappings.sssom.tsv"
+DEFAULT_SSSOM = CLAW_ROOT / "workspace" / "reports" / "mim_ingredient_mappings.sssom.tsv"
 DEFAULT_TSV_OUT = CLAW_ROOT / "workspace" / "reports" / "sssom_synonym_review.tsv"
 DEFAULT_MD_OUT = CLAW_ROOT / "workspace" / "reports" / "sssom_synonym_review.md"
 OLS_CACHE = CLAW_ROOT / "workspace" / ".cache" / "ols"
 OAK_CACHE = CLAW_ROOT / "workspace" / ".cache" / "oak"
 
-OLS_BASE = "https://www.ebi.ac.uk/ols4/api/ontologies/chebi/terms"
-CHEBI_IRI_BASE = "http://purl.obolibrary.org/obo/CHEBI_"
 RUNOAK = "runoak"
 OAK_INPUT = "sqlite:obo:chebi"
 SSSOM_BIN = "sssom"
+
+# Per-prefix OLS4 dispatch. Adding a prefix here makes the reviewer
+# resolve it via OLS4. OAK is CHEBI-only (no local sqlite for the others).
+_OLS_ONTOLOGY_BY_PREFIX: dict[str, str] = {
+    "CHEBI:": "chebi",
+    "FOODON:": "foodon",
+    "UBERON:": "uberon",
+    "ENVO:": "envo",
+}
+_IRI_BASE_BY_PREFIX: dict[str, str] = {
+    "CHEBI:": "http://purl.obolibrary.org/obo/CHEBI_",
+    "FOODON:": "http://purl.obolibrary.org/obo/FOODON_",
+    "UBERON:": "http://purl.obolibrary.org/obo/UBERON_",
+    "ENVO:": "http://purl.obolibrary.org/obo/ENVO_",
+}
+
+
+def _prefix_for(curie: str) -> str | None:
+    for p in _OLS_ONTOLOGY_BY_PREFIX:
+        if curie.startswith(p):
+            return p
+    return None
 # Hard-error substrings from `sssom validate` stderr — "No attr for ..." and
 # plain "WARNING:" lines are informational and do NOT block review.
 _VALIDATE_ERROR_MARKERS = (
@@ -180,16 +202,22 @@ def oak_aliases_batch(chebi_ids: list[str]) -> dict[str, dict[str, set[str]]]:
 # EBI OLS4 — per-term, cached, single retry
 # ---------------------------------------------------------------------------
 
-def ols_fetch(chebi: str) -> dict | None:
+def ols_fetch(curie: str) -> dict | None:
+    prefix = _prefix_for(curie)
+    if prefix is None:
+        return None
+    ontology = _OLS_ONTOLOGY_BY_PREFIX[prefix]
+    iri_base = _IRI_BASE_BY_PREFIX[prefix]
     OLS_CACHE.mkdir(parents=True, exist_ok=True)
-    cached = OLS_CACHE / f"{chebi.replace(':', '_')}.json"
+    cached = OLS_CACHE / f"{curie.replace(':', '_')}.json"
     if cached.exists():
         try:
             return json.loads(cached.read_text())
         except json.JSONDecodeError:
             cached.unlink()
-    iri = CHEBI_IRI_BASE + chebi.split(":")[1]
-    url = f"{OLS_BASE}?iri={urllib.parse.quote(iri, safe='')}"
+    iri = iri_base + curie.split(":", 1)[1]
+    base = f"https://www.ebi.ac.uk/ols4/api/ontologies/{ontology}/terms"
+    url = f"{base}?iri={urllib.parse.quote(iri, safe='')}"
     for attempt in range(2):
         try:
             with urllib.request.urlopen(url, timeout=15) as resp:
@@ -250,8 +278,8 @@ def verdict_for(
     ols_has = bool(ols_label) or bool(ols_syns)
 
     if not oak_has and not ols_has:
-        return "UNKNOWN_CHEBI", {
-            "reason": "neither OAK nor OLS resolves this CHEBI",
+        return "UNKNOWN_TERM", {
+            "reason": f"neither OAK nor OLS resolves {obj_id}",
             "proposed": all_proposed,
         }
 
@@ -333,7 +361,8 @@ def main():
 
     print(f"Reviewing {len(rows)} SSSOM rows from {args.input}", file=sys.stderr)
 
-    # OAK — batched
+    # OAK — batched. OAK is CHEBI-only (local sqlite); non-CHEBI rows
+    # (FOODON/UBERON/ENVO) are resolved via OLS alone.
     chebi_ids = sorted({r["object_id"] for r in rows if r["object_id"].startswith("CHEBI:")})
     oak_result: dict[str, dict[str, set[str]]] = {}
     for i in range(0, len(chebi_ids), args.oak_batch):
@@ -341,12 +370,14 @@ def main():
         oak_result.update(oak_aliases_batch(batch))
         print(f"  OAK batch {i // args.oak_batch + 1}/{(len(chebi_ids) + args.oak_batch - 1) // args.oak_batch}", file=sys.stderr)
 
-    # OLS — per term, cached
+    # OLS — per term, cached. Hits whatever ontology the CURIE prefix
+    # resolves to via `_OLS_ONTOLOGY_BY_PREFIX`.
+    all_term_ids = sorted({r["object_id"] for r in rows if _prefix_for(r["object_id"]) is not None})
     ols_result: dict[str, tuple[str, set[str]]] = {}
-    for idx, cid in enumerate(chebi_ids):
+    for idx, cid in enumerate(all_term_ids):
         ols_result[cid] = ols_labels(ols_fetch(cid))
         if (idx + 1) % 20 == 0:
-            print(f"  OLS {idx + 1}/{len(chebi_ids)}", file=sys.stderr)
+            print(f"  OLS {idx + 1}/{len(all_term_ids)}", file=sys.stderr)
 
     verdicts: list[dict] = []
     counts = {}
@@ -391,12 +422,12 @@ def main():
     for v in sorted(counts, key=lambda x: -counts[x]):
         md.append(f"| {v} | {counts[v]} |\n")
     md.append("\n## Rows needing attention\n\n")
-    for bucket in ("LABEL_MISMATCH", "UNKNOWN_CHEBI", "OLS_MISMATCH", "SYNONYM_ENRICH"):
+    for bucket in ("LABEL_MISMATCH", "UNKNOWN_TERM", "OLS_MISMATCH", "SYNONYM_ENRICH"):
         sub = [v for v in verdicts if v["verdict"] == bucket]
         if not sub:
             continue
         md.append(f"### {bucket} ({len(sub)})\n\n")
-        md.append("| Subject | CHEBI | Our label | New candidates / notes |\n|---|---|---|---|\n")
+        md.append("| Subject | Object | Our label | New candidates / notes |\n|---|---|---|---|\n")
         for v in sub[:30]:
             extra = v["new_candidates"] or v["notes"] or (v["only_in_oak"] + " / " + v["only_in_ols"])
             md.append(

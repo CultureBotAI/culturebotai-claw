@@ -1,6 +1,6 @@
 ---
 name: publish-sssom
-description: Build, validate, review, and promote the canonical MIM→CHEBI SSSOM mapping file — the official cross-repo chemical/ingredient mapping artifact
+description: Build, validate, review, and promote the canonical MIM→ingredient-ontology SSSOM mapping file (CHEBI + FOODON) — the official cross-repo ingredient mapping artifact
 category: release
 requires_database: true
 requires_internet: true
@@ -12,7 +12,7 @@ tags: [sssom, chebi, mim, release, mapping, cross-repo, provenance]
 
 ## Purpose
 
-`mim_chebi_mappings.sssom.tsv` is the **authoritative chemical/ingredient
+`mim_ingredient_mappings.sssom.tsv` is the **authoritative chemical/ingredient
 mapping artifact** consumed by every downstream repo (CultureMech,
 CommunityMech, kg-microbe, external integrators). This skill runs its
 4-stage release lifecycle:
@@ -31,7 +31,7 @@ leaves the previously-published copy untouched.
 ```bash
 just build-sssom
 # or:
-python scripts/build_mim_chebi_sssom.py --output workspace/reports/mim_chebi_mappings.sssom.tsv
+python scripts/build_mim_chebi_sssom.py --output workspace/reports/mim_ingredient_mappings.sssom.tsv
 ```
 
 Scans all MIM ingredient YAMLs with a CHEBI `ontology_id`, emits one
@@ -88,7 +88,7 @@ Produces:
 Promote only if:
 
 - Zero `LABEL_MISMATCH` (our object_label really is a CHEBI label/synonym)
-- Zero `UNKNOWN_CHEBI` (every CHEBI ID resolves)
+- Zero `UNKNOWN_TERM` (every term ID resolves)
 - `OLS_MISMATCH` count is small and understood (normally a stale local
   CHEBI sqlite — refresh with `rm ~/.data/oaklib/chebi.db` and rerun)
 - `SYNONYM_ENRICH` rows are acceptable: each represents an alternate
@@ -104,7 +104,7 @@ just publish-sssom
 Copies the working-copy file to the canonical publish location:
 
 ```
-MediaIngredientMech/mappings/chemical_mappings.sssom.tsv
+MediaIngredientMech/mappings/ingredient_mappings.sssom.tsv
 ```
 
 Promotion acquires the `mediaingredientmech` lock through
@@ -128,15 +128,15 @@ count, and validator results so the release is auditable.
 
 | Path | Who writes it | How often | Visibility |
 |---|---|---|---|
-| `workspace/reports/mim_chebi_mappings.sssom.tsv` | `build-sssom` | Every build, overwritten freely | Local / PR reviewer |
-| `MediaIngredientMech/mappings/chemical_mappings.sssom.tsv` | `publish-sssom` only | Only after all 4 stages pass | Committed to MIM, distributed |
+| `workspace/reports/mim_ingredient_mappings.sssom.tsv` | `build-sssom` | Every build, overwritten freely | Local / PR reviewer |
+| `MediaIngredientMech/mappings/ingredient_mappings.sssom.tsv` | `publish-sssom` only | Only after all 4 stages pass | Committed to MIM, distributed |
 
 ## Artifact invariants (published file)
 
 Every released copy MUST satisfy:
 
 1. SSSOM validation clean under JsonSchema + PrefixMapCompleteness + StrictCurieFormat
-2. Every `object_id` resolves in OAK **or** OLS (no `UNKNOWN_CHEBI`)
+2. Every `object_id` resolves in OAK **or** OLS (no `UNKNOWN_TERM`)
 3. Every `object_label` is CHEBI's rdfs:label or one of its synonyms (no `LABEL_MISMATCH`)
 4. Row count ≥ last published count minus 5 (guards against accidental truncation)
 5. `mapping_set_version` equals the build date, UTC
@@ -158,10 +158,10 @@ Every released copy MUST satisfy:
 | `scripts/build_mim_chebi_sssom.py` | The builder (stage 1) |
 | `scripts/review_sssom_synonyms.py` | The reviewer (stage 3; invoked via `synonym-review` skill) |
 | `scripts/publish_sssom.py` | The promoter (stage 4) |
-| `workspace/reports/mim_chebi_mappings.sssom.tsv` | Working-copy output |
+| `workspace/reports/mim_ingredient_mappings.sssom.tsv` | Working-copy output |
 | `workspace/reports/sssom_synonym_review.{tsv,md}` | Review stage output |
 | `workspace/status/sssom_promotions.jsonl` | Audit log of every promotion |
-| `MediaIngredientMech/mappings/chemical_mappings.sssom.tsv` | Canonical published file |
+| `MediaIngredientMech/mappings/ingredient_mappings.sssom.tsv` | Canonical published file |
 
 ## Related skills
 

@@ -1,7 +1,7 @@
 """
-Promote the working-copy SSSOM (`workspace/reports/mim_chebi_mappings.sssom.tsv`)
+Promote the working-copy SSSOM (`workspace/reports/mim_ingredient_mappings.sssom.tsv`)
 to the canonical publish location
-(`MediaIngredientMech/mappings/chemical_mappings.sssom.tsv`).
+(`MediaIngredientMech/mappings/ingredient_mappings.sssom.tsv`).
 
 This is stage 4 of the publish-sssom lifecycle. Run only after the first
 three stages (build → validate → review) are green. This script
@@ -37,8 +37,8 @@ CLAW_ROOT = Path(
 MIM_ROOT = Path(
     "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech"
 )
-WORKING_COPY = CLAW_ROOT / "workspace" / "reports" / "mim_chebi_mappings.sssom.tsv"
-PUBLISHED = MIM_ROOT / "mappings" / "chemical_mappings.sssom.tsv"
+WORKING_COPY = CLAW_ROOT / "workspace" / "reports" / "mim_ingredient_mappings.sssom.tsv"
+PUBLISHED = MIM_ROOT / "mappings" / "ingredient_mappings.sssom.tsv"
 AUDIT_LOG = CLAW_ROOT / "workspace" / "status" / "sssom_promotions.jsonl"
 LOCKS_DIR = CLAW_ROOT / "workspace" / "locks"
 ROW_COUNT_DROP_LIMIT = 5
