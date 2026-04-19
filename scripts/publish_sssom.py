@@ -101,6 +101,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--apply", action="store_true", help="actually write the published file")
     ap.add_argument("--dry-run", action="store_true", help="(default) print what would happen")
+    ap.add_argument("--allow-drop", type=int, default=ROW_COUNT_DROP_LIMIT,
+                    help="Max number of rows the new file may drop vs the published "
+                         "file. Default: %(default)s. Set explicitly (with justification) "
+                         "when intentionally consolidating records.")
     args = ap.parse_args()
     apply = args.apply and not args.dry_run
 
@@ -115,13 +119,13 @@ def main():
     prev_rows = _row_count(PUBLISHED)
     prev_hash = _sha256(PUBLISHED) if PUBLISHED.exists() else ""
 
-    if prev_rows and new_rows < prev_rows - ROW_COUNT_DROP_LIMIT:
+    if prev_rows and new_rows < prev_rows - args.allow_drop:
         print(
             f"Refusing to promote: row count would drop from {prev_rows} → {new_rows} "
-            f"(limit: -{ROW_COUNT_DROP_LIMIT}).",
+            f"(limit: -{args.allow_drop}).",
             file=sys.stderr,
         )
-        print("Investigate or override with a higher ROW_COUNT_DROP_LIMIT.", file=sys.stderr)
+        print("Investigate or override with --allow-drop <N>.", file=sys.stderr)
         sys.exit(2)
 
     if prev_hash and prev_hash == new_hash:
