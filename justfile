@@ -265,7 +265,7 @@ match-all: match-culturemech match-mim
 # Stage 1: Build the working-copy SSSOM from all MIM ingredient YAMLs
 build-sssom:
     @echo "Building MIM→ingredient-ontology SSSOM..."
-    python scripts/build_mim_chebi_sssom.py \
+    python scripts/build_mim_ingredient_sssom.py \
         --output workspace/reports/mim_ingredient_mappings.sssom.tsv
     @echo "Working copy: workspace/reports/mim_ingredient_mappings.sssom.tsv"
 

@@ -31,7 +31,7 @@ leaves the previously-published copy untouched.
 ```bash
 just build-sssom
 # or:
-python scripts/build_mim_chebi_sssom.py --output workspace/reports/mim_ingredient_mappings.sssom.tsv
+python scripts/build_mim_ingredient_sssom.py --output workspace/reports/mim_ingredient_mappings.sssom.tsv
 ```
 
 Scans all MIM ingredient YAMLs with a CHEBI `ontology_id`, emits one
@@ -155,7 +155,7 @@ Every released copy MUST satisfy:
 
 | Path | Role |
 |---|---|
-| `scripts/build_mim_chebi_sssom.py` | The builder (stage 1) |
+| `scripts/build_mim_ingredient_sssom.py` | The builder (stage 1) |
 | `scripts/review_sssom_synonyms.py` | The reviewer (stage 3; invoked via `synonym-review` skill) |
 | `scripts/publish_sssom.py` | The promoter (stage 4) |
 | `workspace/reports/mim_ingredient_mappings.sssom.tsv` | Working-copy output |
