@@ -138,11 +138,14 @@ def main() -> None:
         if len(yamls) < 2:
             continue
         # Group by hydration count; we only merge YAMLs with the SAME state.
-        by_hyd: dict[int | None, list[dict]] = defaultdict(list)
+        # Hydration=None canonicalizes to 0 (anhydrous) — a YAML with no
+        # hydration marker is treated as the anhydrous form for merge grouping.
+        by_hyd: dict[int, list[dict]] = defaultdict(list)
         for y in yamls:
-            by_hyd[y["hydration"]].append(y)
+            canon = 0 if y["hydration"] is None else y["hydration"]
+            by_hyd[canon].append(y)
         for hyd, group in by_hyd.items():
-            if hyd is None or len(group) < 2:
+            if len(group) < 2:
                 continue
             ranked = sorted(group, key=_score)
             winner = ranked[0]

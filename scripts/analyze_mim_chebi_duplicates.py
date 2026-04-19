@@ -100,26 +100,33 @@ def main() -> None:
     print(f"{len(dups)} CHEBIs with >1 MIM YAML "
           f"({sum(len(v) for v in dups.values())} YAMLs total)")
 
+    # Hydration=None is semantically equivalent to anhydrous (0) for
+    # merge-grouping purposes — a MIM YAML with no hydration marker in
+    # its preferred_term or filename is, by convention, the anhydrous
+    # form (or a compound with no defined hydrate variants at all).
+    # This collapses the old MIXED bucket into MERGEABLE_DUPES /
+    # LEGITIMATE_VARIANTS like any other hydration state.
+    def _canon_hydr(h: int | None) -> int:
+        return 0 if h is None else h
+
     rows = []
     for chebi, yamls in dups.items():
-        hydrs = [y["hydration"] for y in yamls]
-        unknown_count = sum(1 for h in hydrs if h is None)
-        hydr_counter = Counter(h for h in hydrs if h is not None)
+        hydrs = [_canon_hydr(y["hydration"]) for y in yamls]
+        raw_hydrs = [y["hydration"] for y in yamls]
+        hydr_counter = Counter(hydrs)
+        unknown_count = sum(1 for h in raw_hydrs if h is None)
 
-        # Classification:
-        if unknown_count > 0:
-            kind = "MIXED"
-        elif all(v == 1 for v in hydr_counter.values()):
+        if all(v == 1 for v in hydr_counter.values()):
             kind = "LEGITIMATE_VARIANTS"  # every YAML has unique hydration state
         else:
             kind = "MERGEABLE_DUPES"     # two or more YAMLs share a hydration state
 
         # Build a per-hydration grouping of which files collide.
-        by_hydr: dict[int | None, list[str]] = defaultdict(list)
+        by_hydr: dict[int, list[str]] = defaultdict(list)
         for y in yamls:
-            by_hydr[y["hydration"]].append(y["file"])
+            by_hydr[_canon_hydr(y["hydration"])].append(y["file"])
         mergeable_groups = [files for h, files in by_hydr.items()
-                            if h is not None and len(files) > 1]
+                            if len(files) > 1]
 
         rows.append({
             "chebi": chebi,
