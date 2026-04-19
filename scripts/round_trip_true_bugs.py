@@ -24,6 +24,8 @@ Writes workspace/reports/kg_microbe_true_bugs_round_tripped.{json,md}.
 
 from __future__ import annotations
 
+import argparse
+import csv
 import json
 import re
 import sys
@@ -154,48 +156,88 @@ def classify(preferred_term: str, ols_label: str) -> tuple[str, str]:
     return "MIM_WRONG", "no-shared-stems"
 
 
-def main():
+def _load_sweep_true_bugs() -> list[dict]:
     src = REPORT_DIR / "kg_microbe_sweep_triaged.json"
     data = json.loads(src.read_text())
-    true_bugs = data["buckets"].get("TRUE_BUG", [])
-    print(f"{len(true_bugs)} TRUE_BUG findings to round-trip...", flush=True)
+    return [
+        {
+            "source_file": f["source_file"],
+            "preferred_term": f["preferred_term"],
+            "mim_chebi": f["mim_chebi"],
+            "mim_label_stored": f["evidence"].get("mim_label", ""),
+            "kg_microbe_chebi": f["evidence"].get("kg_microbe_chebi"),
+            "kg_microbe_label": f["evidence"].get("kg_microbe_label"),
+        }
+        for f in data["buckets"].get("TRUE_BUG", [])
+    ]
 
+
+def _load_audit_disagree() -> list[dict]:
+    src = REPORT_DIR / "kgm_mim_audit.tsv"
+    items: list[dict] = []
+    with src.open() as f:
+        for r in csv.DictReader(f, delimiter="\t"):
+            if r.get("bucket") != "DISAGREE":
+                continue
+            if not r.get("mim_chebi"):
+                continue
+            items.append({
+                "source_file": r["mim_id"].replace("MIM:", "") + ".yaml",
+                "preferred_term": r["mim_label"],
+                "mim_chebi": r["mim_chebi"],
+                "mim_label_stored": r.get("mim_object_label", ""),
+                "kg_microbe_chebi": r.get("kgm_chebi", ""),
+                "kg_microbe_label": r.get("kgm_label", ""),
+            })
+    return items
+
+
+def _load_prior_decisions(path: Path) -> dict[tuple[str, str], dict]:
+    """Key existing decisions by (mim_chebi, kg_microbe_chebi) to dedupe."""
+    if not path.exists():
+        return {}
+    data = json.loads(path.read_text())
+    out = {}
+    for r in data.get("results", []):
+        key = (r.get("mim_chebi", ""), r.get("kg_microbe_chebi", ""))
+        out[key] = r
+    return out
+
+
+def _process_items(items: list[dict]) -> tuple[list[dict], float]:
     cache: dict[str, str] = {}
-
-    results = []
+    results: list[dict] = []
     start = time.time()
     with ThreadPoolExecutor(max_workers=6) as ex:
         futures = {
-            ex.submit(fetch_ols_label, f["mim_chebi"], cache): f for f in true_bugs
+            ex.submit(fetch_ols_label, it["mim_chebi"], cache): it for it in items
         }
         for i, fut in enumerate(as_completed(futures), 1):
-            f = futures[fut]
+            it = futures[fut]
             ols_label = fut.result()
-            bucket, rationale = classify(f["preferred_term"], ols_label)
-            results.append(
-                {
-                    "source_file": f["source_file"],
-                    "preferred_term": f["preferred_term"],
-                    "mim_chebi": f["mim_chebi"],
-                    "mim_label_stored": f["evidence"].get("mim_label", ""),
-                    "ols_label_now": ols_label,
-                    "kg_microbe_chebi": f["evidence"].get("kg_microbe_chebi"),
-                    "kg_microbe_label": f["evidence"].get("kg_microbe_label"),
-                    "decision": bucket,
-                    "rationale": rationale,
-                }
-            )
-            if i % 10 == 0:
-                print(f"  {i}/{len(true_bugs)} in {time.time() - start:.0f}s", flush=True)
+            bucket, rationale = classify(it["preferred_term"], ols_label)
+            results.append({
+                "source_file": it["source_file"],
+                "preferred_term": it["preferred_term"],
+                "mim_chebi": it["mim_chebi"],
+                "mim_label_stored": it["mim_label_stored"],
+                "ols_label_now": ols_label,
+                "kg_microbe_chebi": it["kg_microbe_chebi"],
+                "kg_microbe_label": it["kg_microbe_label"],
+                "decision": bucket,
+                "rationale": rationale,
+            })
+            if i % 25 == 0:
+                print(f"  {i}/{len(items)} in {time.time() - start:.0f}s", flush=True)
+    return results, time.time() - start
 
-    elapsed = time.time() - start
-    print(f"Done in {elapsed:.0f}s.", flush=True)
 
+def _write_outputs(results: list[dict], elapsed: float, out_prefix: str) -> None:
     by_bucket = defaultdict(list)
     for r in results:
         by_bucket[r["decision"]].append(r)
 
-    out_json = REPORT_DIR / "kg_microbe_true_bugs_round_tripped.json"
+    out_json = REPORT_DIR / f"{out_prefix}.json"
     out_json.write_text(
         json.dumps(
             {
@@ -208,9 +250,8 @@ def main():
     )
     print(f"JSON: {out_json}")
 
-    lines = []
-    lines.append("# TRUE_BUG Round-Trip Decisions\n\n")
-    lines.append("**Date:** 2026-04-18\n")
+    lines: list[str] = []
+    lines.append("# Round-Trip Decisions\n\n")
     lines.append(f"**Findings analyzed:** {len(results)}\n")
     lines.append(f"**OLS round-trip duration:** {elapsed:.0f}s\n\n")
     lines.append("## Summary\n\n")
@@ -262,26 +303,55 @@ def main():
 
     lines.append("## MIM_OK — no action (kg-microbe noise)\n\n")
     ok = by_bucket.get("MIM_OK", [])
-    if not ok:
-        lines.append("_None_\n\n")
-    else:
-        lines.append(f"_{len(ok)} findings where MIM's stored CHEBI ")
-        lines.append("matches its preferred_term via OLS; the kg-microbe ")
-        lines.append("disagreement is noise (synonym contamination). File list:_\n\n")
-        for r in sorted(ok, key=lambda x: x["source_file"]):
-            lines.append(
-                f"- `{r['source_file']}` — {r['preferred_term']} "
-                f"(`{r['mim_chebi']}` / OLS: {r['ols_label_now']})\n"
-            )
-        lines.append("\n")
+    lines.append(
+        f"_{len(ok)} findings where MIM's stored CHEBI matches its "
+        f"preferred_term via OLS._\n\n"
+    )
 
-    out_md = REPORT_DIR / "kg_microbe_true_bugs_round_tripped.md"
+    out_md = REPORT_DIR / f"{out_prefix}.md"
     out_md.write_text("".join(lines))
     print(f"Markdown: {out_md}")
-    print()
-    print("Final decisions:")
-    for b in ("MIM_WRONG", "AMBIGUOUS", "MIM_OK"):
-        print(f"  {b:12s} {len(by_bucket.get(b, []))}")
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--source", choices=("sweep", "audit"), default="sweep",
+        help="sweep: P2.5 TRUE_BUG findings (legacy). audit: DISAGREE rows from kgm_mim_audit.tsv.",
+    )
+    args = parser.parse_args()
+
+    if args.source == "sweep":
+        items = _load_sweep_true_bugs()
+        out_prefix = "kg_microbe_true_bugs_round_tripped"
+        prior_path = REPORT_DIR / f"{out_prefix}.json"
+        prior: dict[tuple[str, str], dict] = {}  # full re-run for sweep mode
+    else:
+        items = _load_audit_disagree()
+        out_prefix = "kgm_mim_disagree_roundtrip"
+        # Dedupe against the existing sweep-mode roundtrip so we don't re-hit
+        # OLS for the 72 TRUE_BUG rows already done.
+        prior = _load_prior_decisions(REPORT_DIR / "kg_microbe_true_bugs_round_tripped.json")
+
+    if prior:
+        remaining = [it for it in items if (it["mim_chebi"], it["kg_microbe_chebi"]) not in prior]
+        reused = len(items) - len(remaining)
+        print(f"{len(items)} DISAGREE rows; {reused} already round-tripped; {len(remaining)} new", flush=True)
+    else:
+        remaining = items
+        reused = 0
+        print(f"{len(items)} items to round-trip...", flush=True)
+
+    results, elapsed = _process_items(remaining)
+
+    # Fold in prior decisions so the output is a complete view.
+    for it in items:
+        key = (it["mim_chebi"], it["kg_microbe_chebi"])
+        if key in prior:
+            results.append(prior[key])
+
+    print(f"Done: {len(remaining)} new fetches in {elapsed:.0f}s; {reused} reused from prior run.")
+    _write_outputs(results, elapsed, out_prefix)
 
 
 if __name__ == "__main__":

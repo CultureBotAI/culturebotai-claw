@@ -331,6 +331,48 @@ sssom-release: build-sssom validate-sssom review-sssom
     @echo "Next: inspect the review report, then run 'just publish-sssom' to promote."
 
 # =============================================================================
+# MIM ↔ kg-microbe Reconciliation Audit
+# =============================================================================
+
+# Produce the canonical reconciliation report (AGREE/DISAGREE/MIM_ONLY/
+# KGM_ONLY/UNMAPPED_PENDING_CURATION). Feeds every other recipe below.
+audit-kgm-mim:
+    @echo "Running MIM ↔ kg-microbe reconciliation audit..."
+    /opt/homebrew/bin/python3.13 scripts/audit_kgm_mim_reconciliation.py
+
+# Emit MIM YAML patch proposals for ingredients using deprecated CHEBIs.
+fix-deprecated-chebi:
+    /opt/homebrew/bin/python3.13 scripts/fix_deprecated_chebi.py
+
+# Emit MIM YAML patch proposals for ingredients whose SSSOM object_label
+# drifted from CHEBI's canonical label (or whose CHEBI was removed).
+fix-label-drift:
+    /opt/homebrew/bin/python3.13 scripts/fix_label_drift.py
+
+# OLS round-trip every DISAGREE row in the audit; dedup against the
+# 72-row TRUE_BUG run. Classifies each as MIM_WRONG / MIM_OK / AMBIGUOUS.
+roundtrip-disagree:
+    /opt/homebrew/bin/python3.13 scripts/round_trip_true_bugs.py --source audit
+
+# Build old MediaIngredientMech:000xxx → current MIM:<slug> migration map
+# from KGM_ONLY rows in the audit.
+generate-migration-map:
+    /opt/homebrew/bin/python3.13 scripts/generate_mim_migration_map.py
+
+# Generate kg-microbe xref patches (consumes the migration map). Output
+# is the input for a future kg-microbe PR.
+generate-kgm-xref-patches:
+    /opt/homebrew/bin/python3.13 scripts/generate_kgm_xref_patches.py
+
+# Propose candidate CHEBI IDs for the 430 UNMAPPED_PENDING_CURATION
+# entries via OLS search. Slow (API-bound); results are cached.
+propose-chebi-unmapped:
+    /opt/homebrew/bin/python3.13 scripts/propose_chebi_for_unmapped.py
+
+# Full reconciliation pipeline, in dependency order.
+reconcile-all: audit-kgm-mim fix-deprecated-chebi fix-label-drift roundtrip-disagree generate-migration-map generate-kgm-xref-patches
+
+# =============================================================================
 # Utility Commands
 # =============================================================================
 
