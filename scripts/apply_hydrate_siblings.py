@@ -124,11 +124,17 @@ def _load_existing_chebi_index() -> dict[str, list[str]]:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--apply", action="store_true")
+    ap.add_argument("--include-medium", action="store_true",
+                    help="Also apply MEDIUM-confidence proposals (single lexical match, "
+                         "not exact label). Still subject to CHEBI + slug collision guards.")
     args = ap.parse_args()
 
     data = json.loads(IN_JSON.read_text())
-    high = [p for p in data["proposals"] if p["confidence"] == "HIGH"]
-    print(f"{'APPLY' if args.apply else 'DRY-RUN'}: {len(high)} HIGH proposals\n")
+    levels = ("HIGH", "MEDIUM") if args.include_medium else ("HIGH",)
+    proposals_to_apply = [p for p in data["proposals"] if p["confidence"] in levels]
+    print(f"{'APPLY' if args.apply else 'DRY-RUN'}: "
+          f"{len(proposals_to_apply)} {'+'.join(levels)} proposals\n")
+    high = proposals_to_apply
 
     # Index existing MIM YAMLs by CHEBI so we skip creating duplicates.
     existing = _load_existing_chebi_index()
