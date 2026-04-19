@@ -411,6 +411,11 @@ def _row_from_yaml(
         "confidence": confidence,
         "comment": comment,
         "other": other,
+        # Populated by scripts/review_sssom_synonyms.py on the next review
+        # pass — left blank here so every fresh build signals "needs
+        # re-review". Format: "{authorities}|{verdict}|{date}", e.g.
+        # "OAK+OLS:chebi|CONFIRMED|2026-04-18".
+        "validation_method": "",
     }
 
 
@@ -438,6 +443,9 @@ HEADER_YAML = f"""\
 #   - slot_name: source
 #     property: "cbclaw:provenance-source"
 #     type_hint: "xsd:string"
+#   - slot_name: validation_method
+#     property: "cbclaw:validation-method"
+#     type_hint: "xsd:string"
 """
 
 COLUMNS = [
@@ -453,6 +461,7 @@ COLUMNS = [
     "confidence",
     "comment",
     "other",
+    "validation_method",
 ]
 
 

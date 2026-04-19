@@ -249,12 +249,62 @@ def ols_labels(data: dict | None) -> tuple[str, set[str]]:
 # Row-level logic
 # ---------------------------------------------------------------------------
 
-def _load_sssom(path: Path) -> tuple[list[str], list[dict]]:
-    """Read an SSSOM TSV, skipping `#`-prefixed YAML frontmatter."""
+def _load_sssom(path: Path) -> tuple[list[str], list[dict], str]:
+    """Read an SSSOM TSV. Returns (fieldnames, rows, header_text) where
+    header_text is the raw `#`-prefixed YAML frontmatter, preserved so we
+    can round-trip the file and update the validation_method column in
+    place."""
     with path.open() as f:
-        lines = [ln for ln in f if not ln.startswith("#")]
-    reader = csv.DictReader(lines, delimiter="\t")
-    return list(reader.fieldnames or []), list(reader)
+        all_lines = f.readlines()
+    header_lines = [ln for ln in all_lines if ln.startswith("#")]
+    body_lines = [ln for ln in all_lines if not ln.startswith("#")]
+    reader = csv.DictReader(body_lines, delimiter="\t")
+    return list(reader.fieldnames or []), list(reader), "".join(header_lines)
+
+
+def _write_sssom_inplace(
+    path: Path, fieldnames: list[str], rows: list[dict], header_text: str
+) -> None:
+    """Write the SSSOM back preserving the `#`-prefixed YAML frontmatter
+    and all columns. Called after the review pass so the
+    `validation_method` column is populated for every row. Writes
+    atomically via a sibling temp file."""
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    with tmp.open("w", newline="") as f:
+        if header_text:
+            f.write(header_text)
+            if not header_text.endswith("\n"):
+                f.write("\n")
+        w = csv.DictWriter(
+            f,
+            fieldnames=fieldnames,
+            delimiter="\t",
+            extrasaction="ignore",
+            lineterminator="\n",
+        )
+        w.writeheader()
+        w.writerows(rows)
+    tmp.replace(path)
+
+
+def _validation_method_for(row: dict, oak_known: bool, ols_has: bool, verdict: str, review_date: str) -> str:
+    """Stamp per-row which authorities were consulted + the verdict.
+    Read by downstream consumers (and on the next review pass, this
+    entire column is overwritten fresh). Empty string means the row has
+    not been reviewed yet since the last build."""
+    authorities: list[str] = []
+    if oak_known:
+        authorities.append("OAK")
+    if ols_has:
+        # Include the OLS ontology slug so the provenance is explicit
+        # for mixed-ontology rows (CHEBI vs FOODON vs ENVO ...).
+        obj_id = row.get("object_id", "")
+        prefix = _prefix_for(obj_id)
+        slug = _OLS_ONTOLOGY_BY_PREFIX.get(prefix or "", "")
+        authorities.append(f"OLS:{slug}" if slug else "OLS")
+    if not authorities:
+        authorities = ["none"]
+    return f"{'+'.join(authorities)}|{verdict}|{review_date}"
 
 
 def _split_other(s: str) -> list[str]:
@@ -355,7 +405,7 @@ def main():
             sys.exit(2)
         print("  OK (no hard errors)", file=sys.stderr)
 
-    _, rows = _load_sssom(args.input)
+    fieldnames, rows, header_text = _load_sssom(args.input)
     if args.limit:
         rows = rows[: args.limit]
 
@@ -379,6 +429,9 @@ def main():
         if (idx + 1) % 20 == 0:
             print(f"  OLS {idx + 1}/{len(all_term_ids)}", file=sys.stderr)
 
+    from datetime import datetime, timezone
+    review_date = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
+
     verdicts: list[dict] = []
     counts = {}
     for row in rows:
@@ -387,6 +440,7 @@ def main():
         # An OAK miss is represented as empty sets — distinguish from None
         oak_known = oak is not None and (oak["label"] or oak["exact"] or oak["related"])
         ols_label, ols_syns = ols_result.get(cid, ("", set()))
+        ols_has = bool(ols_label) or bool(ols_syns)
         v, detail = verdict_for(
             row,
             oak if oak_known else None,
@@ -394,6 +448,11 @@ def main():
             ols_syns,
         )
         counts[v] = counts.get(v, 0) + 1
+        # Stamp validation_method in place on the row dict so we can
+        # write the SSSOM back with the new column populated.
+        row["validation_method"] = _validation_method_for(
+            row, oak_known=oak_known, ols_has=ols_has, verdict=v, review_date=review_date
+        )
         verdicts.append(
             {
                 "subject_id": row["subject_id"],
@@ -407,6 +466,14 @@ def main():
                 "notes": detail.get("reason", ""),
             }
         )
+
+    # Write the SSSOM back with validation_method populated. Only do
+    # this when we reviewed every row (no --limit); a partial review
+    # would leave most rows with empty validation_method and create a
+    # misleading artifact.
+    if not args.limit:
+        _write_sssom_inplace(args.input, fieldnames, rows, header_text)
+        print(f"  stamped validation_method on {len(rows)} rows of {args.input.name}", file=sys.stderr)
 
     args.tsv_out.parent.mkdir(parents=True, exist_ok=True)
     with args.tsv_out.open("w") as f:
