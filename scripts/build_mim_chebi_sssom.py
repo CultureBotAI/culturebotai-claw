@@ -74,7 +74,7 @@ SSSOM_BIN = "sssom"
 # Ontologies we emit mappings for. Add a new prefix here and to
 # `_OBJECT_SOURCE_BY_PREFIX` (and plug a label loader into main()) to extend
 # coverage.
-SUPPORTED_OBJECT_PREFIXES: tuple[str, ...] = ("CHEBI:", "FOODON:")
+SUPPORTED_OBJECT_PREFIXES: tuple[str, ...] = ("CHEBI:", "FOODON:", "UBERON:", "ENVO:")
 _OBJECT_SOURCE_BY_PREFIX: dict[str, str] = {
     "CHEBI:": "obo:chebi.owl",
     "FOODON:": "obo:foodon.owl",
@@ -534,12 +534,14 @@ def main():
             else:
                 print(f"  resolved {len(resolved)} / {len(ids_sorted)}", file=sys.stderr)
             canonical_labels.update(resolved)
-        elif pref == "FOODON:":
-            print(f"Fetching rdfs:labels for {len(ids_sorted)} FOODON ids from OLS4...", file=sys.stderr)
+        elif pref in ("FOODON:", "UBERON:", "ENVO:"):
+            ontology = pref.rstrip(":").lower()
+            iri_prefix = f"http://purl.obolibrary.org/obo/{pref.rstrip(':')}_"
+            print(f"Fetching rdfs:labels for {len(ids_sorted)} {pref.rstrip(':')} ids from OLS4...", file=sys.stderr)
             resolved = _load_ols_labels(
                 ids_sorted,
-                ontology="foodon",
-                iri_prefix="http://purl.obolibrary.org/obo/FOODON_",
+                ontology=ontology,
+                iri_prefix=iri_prefix,
             )
             print(f"  resolved {len(resolved)} / {len(ids_sorted)}", file=sys.stderr)
             canonical_labels.update(resolved)
