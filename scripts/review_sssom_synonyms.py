@@ -32,6 +32,11 @@ LABEL_MISMATCH    our object_label isn't the authority's rdfs:label and
                   isn't listed as an exact synonym — likely a data bug
 UNKNOWN_TERM      neither OAK nor OLS resolves the term — the ID is
                   deprecated/obsolete or wrong
+UNVERIFIED        not emitted by this serial script. Reserved for the
+                  agent-team path (`team-review-sssom` skill) where an
+                  agent ran but couldn't confidently classify the row,
+                  or never returned — the merge step stamps UNVERIFIED
+                  on any row missing from every shard output.
 
 The script caches OLS responses in workspace/.cache/ols/{TERM}.json to
 keep reruns polite; delete that directory to force a re-fetch.

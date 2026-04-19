@@ -286,6 +286,29 @@ review-sssom:
         --tsv-out workspace/reports/sssom_synonym_review.tsv \
         --md-out workspace/reports/sssom_synonym_review.md
 
+# Stage 3 (alternate): Shard the SSSOM for agent-team review. The orchestrating
+# Claude session then dispatches 4 sub-agents via the Agent tool — see the
+# team-review-sssom skill. This recipe only handles stage 1 (shard) and the
+# final merge; agent dispatch is Claude-side.
+review-sssom-team-shard:
+    @echo "Sharding SSSOM for agent-team review..."
+    python scripts/shard_sssom_for_review.py \
+        --input workspace/reports/mim_ingredient_mappings.sssom.tsv \
+        --n 4
+    @echo ""
+    @echo "Shards written to workspace/shards/sssom_review/shard_{0..3}.tsv"
+    @echo "Now invoke /team-review-sssom in the main Claude session so it can"
+    @echo "dispatch the 4 Agent sub-agents. When their JSONL results are all"
+    @echo "under workspace/results/sssom_review_shard_*.jsonl, run:"
+    @echo "  just review-sssom-team-merge"
+
+# Stage 3 (alternate, final step): Merge per-shard agent JSONL into the SSSOM.
+# Stamps validation_method per row; rows missing from every shard get
+# none|UNVERIFIED|{date}.
+review-sssom-team-merge:
+    @echo "Merging per-shard agent reviews into the SSSOM..."
+    python scripts/merge_sssom_shard_reviews.py
+
 # Stage 4: Promote the working copy to MediaIngredientMech/mappings/ (dry-run)
 publish-sssom-dry:
     @echo "Previewing SSSOM promotion (dry-run)..."

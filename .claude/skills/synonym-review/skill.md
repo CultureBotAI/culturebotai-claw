@@ -50,7 +50,7 @@ Each row is assigned one of five verdicts:
 | `SYNONYM_ENRICH` | at least one alternate label is unknown to both authorities | Candidate to propose as a new CHEBI synonym |
 | `LABEL_MISMATCH` | our `object_label` is not the CHEBI rdfs:label and not an exact synonym | Likely a data bug — fix in the mapping generator |
 | `OLS_MISMATCH` | OAK and OLS disagree by ≥3 terms each way | Local sqlite is stale or OLS is out of sync; check CHEBI release |
-| `UNKNOWN_CHEBI` | neither OAK nor OLS resolve the CHEBI ID | Deprecated / obsolete ID; fix in the source MIM YAML |
+| `UNKNOWN_TERM` | neither OAK nor OLS resolve the term ID | Deprecated / obsolete ID; fix in the source MIM YAML |
 
 ## Run it
 
@@ -149,6 +149,12 @@ humans and for issue filing.
 
 ## Related skills
 
+- `team-review-sssom` — parallel agent-team variant of this skill.
+  Four sub-agents review row-shards in parallel, each emitting a
+  per-row verdict with a human-readable `notes` field; stamps the
+  same `validation_method` column. Use for release gates and
+  audit-worthy reviews. Adds a sixth `UNVERIFIED` verdict for rows
+  the agents couldn't classify.
 - `review-ingredients` (MediaIngredientMech) — upstream curator that
   produces the kg-microbe sweep reports feeding the SSSOM generator
 - `cross-repo-sync` (this repo) — rebuilds the unified ingredient

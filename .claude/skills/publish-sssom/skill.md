@@ -74,16 +74,28 @@ error.
 
 ### 3. Review
 
+Two variants — pick one per release. Both stamp the same
+`validation_method` column; promotion requires one to have run.
+
 ```bash
-just review-sssom
+just review-sssom          # fast lexical path (synonym-review skill)
+just review-sssom-team     # parallel agent-team path (team-review-sssom skill)
 ```
 
-Invokes the **synonym-review** skill to cross-check every row's label
-and `other` synonyms against CHEBI via OAK (local sqlite) and EBI OLS4.
-Produces:
+- `review-sssom` (serial, ~4–8 min): invokes **synonym-review** to
+  cross-check every row's label and `other` synonyms against CHEBI
+  via OAK (local sqlite) and EBI OLS4. Five verdicts: CONFIRMED,
+  SYNONYM_ENRICH, LABEL_MISMATCH, OLS_MISMATCH, UNKNOWN_TERM.
+  Outputs `workspace/reports/sssom_synonym_review.{tsv,md}`.
+- `review-sssom-team` (parallel, ~8–10 min, audit-grade): invokes
+  **team-review-sssom** to shard the SSSOM into 4 chunks and
+  dispatch 4 sub-agents via the Agent tool. Six verdicts (adds
+  UNVERIFIED for rows no agent classified). Emits per-row
+  human-readable notes. Outputs
+  `workspace/reports/sssom_team_review.{tsv,md}`.
 
-- `workspace/reports/sssom_synonym_review.tsv` — per-row verdict
-- `workspace/reports/sssom_synonym_review.md` — bucketed summary
+Use the serial path for quick re-checks after a CHEBI release
+refresh; use the team path as the release gate.
 
 Promote only if:
 
