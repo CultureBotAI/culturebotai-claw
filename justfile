@@ -389,6 +389,12 @@ publish-complex-ingredients:
 mapping-taxonomy:
     /opt/homebrew/bin/python3.13 scripts/generate_mapping_taxonomy_report.py
 
+# Diff MIM's published SSSOM against kg-microbe's consolidated SSSOM on
+# the chemical-mappings-mim-priority branch. See
+# .claude/skills/kg-microbe-review/skill.md for the full methodology.
+kg-microbe-review:
+    /opt/homebrew/bin/python3.13 scripts/generate_kg_microbe_review.py
+
 # =============================================================================
 # Utility Commands
 # =============================================================================
