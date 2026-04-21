@@ -105,15 +105,40 @@ def load_kgm_source_tags(kgm_mim_rows: dict[str, dict]) -> dict[str, int]:
 
 # ---------- diff ----------
 
-def classify(mim_row: dict, kgm_row: dict | None) -> tuple[str, str]:
-    """Return (class, note).
+def _expected_labels_for_chebi(mim_rows: list[dict]) -> set[str]:
+    """All labels kg-microbe's canonical_name legitimately could be for a CHEBI.
 
-    Per kg-microbe's README (priority-11 rule): for `skos:exactMatch` /
-    `skos:closeMatch` MIM rows, kg-microbe's `object_label` should be
-    MIM's `subject_label` (the ingredient surface form). For
-    `skos:narrowMatch` / `broadMatch`, kg-microbe's `object_label`
-    should stay as CHEBI's canonical (MIM `object_label`).
+    Multiple MIM subjects can share a CHEBI (e.g. MIM:Alcl3 narrowMatch +
+    MIM:Alcl3_X_6_H2o exactMatch both → CHEBI:30115). kg-microbe emits
+    one canonical per CHEBI; ANY of the contributing MIM rows' expected
+    canonical is a valid match — the consolidator picks one deterministically.
     """
+    out: set[str] = set()
+    for row in mim_rows:
+        predicate = row.get("predicate_id", "")
+        subj = (row.get("subject_label") or "").strip()
+        obj = (row.get("object_label") or "").strip()
+        if predicate in ("skos:exactMatch", "skos:closeMatch"):
+            if subj:
+                out.add(subj.lower())
+        elif predicate in ("skos:narrowMatch", "skos:broadMatch"):
+            if obj:
+                out.add(obj.lower())
+        # Fall back: accept either side so unclassified-predicate rows
+        # don't produce spurious drift.
+        if subj:
+            out.add(subj.lower())
+        if obj:
+            out.add(obj.lower())
+    return out
+
+
+def classify(
+    mim_row: dict,
+    kgm_row: dict | None,
+    mim_rows_by_chebi: dict[str, list[dict]],
+) -> tuple[str, str]:
+    """Return (class, note)."""
     if kgm_row is None:
         if not mim_row.get("object_id", "").startswith("CHEBI:"):
             return "MIM_ONLY_NON_CHEBI", (
@@ -131,29 +156,26 @@ def classify(mim_row: dict, kgm_row: dict | None) -> tuple[str, str]:
             f"MIM object_id={mim_obj}, kg-microbe object_id={kgm_obj}"
         )
 
-    # Determine the label kg-microbe SHOULD have per priority-11 rule.
-    predicate = mim_row.get("predicate_id", "")
-    mim_subject_label = (mim_row.get("subject_label") or "").strip()
-    mim_object_label = (mim_row.get("object_label") or "").strip()
     kgm_lbl = (kgm_row.get("object_label") or "").strip()
-
-    if predicate in ("skos:exactMatch", "skos:closeMatch"):
-        expected = mim_subject_label
-        rule = "priority-11 rule: MIM subject_label → kg-microbe object_label"
-    elif predicate in ("skos:narrowMatch", "skos:broadMatch"):
-        expected = mim_object_label
-        rule = "narrow/broad rule: CHEBI canonical label stays"
-    else:
-        # No expected form — can't classify drift.
+    if not mim_obj:
         return "IN_SYNC", ""
 
-    if expected and kgm_lbl and expected.lower() == kgm_lbl.lower():
+    # Expected label set = every label MIM asserts for this CHEBI across
+    # ALL MIM rows sharing the CHEBI. This avoids spurious drift when
+    # MIM has multiple subjects (hydrate variant + anhydrous, etc.)
+    # mapping to the same CHEBI.
+    expected_set = _expected_labels_for_chebi(mim_rows_by_chebi.get(mim_obj, []))
+    if kgm_lbl and kgm_lbl.lower() in expected_set:
         return "IN_SYNC", ""
-    if expected and not kgm_lbl:
-        return "LABEL_DRIFTED", f"expected '{expected}' (${rule}); kg-microbe has none"
-    if expected and kgm_lbl:
+    if kgm_lbl and expected_set:
+        sample = ", ".join(f"'{e}'" for e in sorted(expected_set)[:3])
         return "LABEL_DRIFTED", (
-            f"expected '{expected}' ({rule}); kg-microbe has '{kgm_lbl}'"
+            f"kg-microbe has '{kgm_lbl}'; MIM's candidates for {mim_obj} "
+            f"are {{{sample}{'...' if len(expected_set) > 3 else ''}}}"
+        )
+    if not kgm_lbl and expected_set:
+        return "LABEL_DRIFTED", (
+            f"kg-microbe has no object_label; MIM has candidates for {mim_obj}"
         )
     return "IN_SYNC", ""
 
@@ -322,10 +344,17 @@ def main() -> None:
     kgm_source_tags = load_kgm_source_tags(kgm_mim)
 
     print("[3/4] Classifying each MIM row")
+    # Group MIM rows by object_id so we can accept any MIM-asserted label.
+    mim_rows_by_chebi: dict[str, list[dict]] = defaultdict(list)
+    for r in mim.values():
+        obj = r.get("object_id", "")
+        if obj:
+            mim_rows_by_chebi[obj].append(r)
+
     classified: list[tuple[str, dict, dict | None, str]] = []
     for sid, mim_row in mim.items():
         kgm_row = kgm_mim.get(sid)
-        cls, note = classify(mim_row, kgm_row)
+        cls, note = classify(mim_row, kgm_row, mim_rows_by_chebi)
         classified.append((cls, mim_row, kgm_row, note))
 
     # STALE: kg-microbe rows whose MIM subject is not in MIM's current SSSOM.
