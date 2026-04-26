@@ -74,12 +74,16 @@ SSSOM_BIN = "sssom"
 # Ontologies we emit mappings for. Add a new prefix here and to
 # `_OBJECT_SOURCE_BY_PREFIX` (and plug a label loader into main()) to extend
 # coverage.
-SUPPORTED_OBJECT_PREFIXES: tuple[str, ...] = ("CHEBI:", "FOODON:", "UBERON:", "ENVO:")
+SUPPORTED_OBJECT_PREFIXES: tuple[str, ...] = (
+    "CHEBI:", "FOODON:", "UBERON:", "ENVO:", "NCIT:", "kgmicrobe.compound:",
+)
 _OBJECT_SOURCE_BY_PREFIX: dict[str, str] = {
     "CHEBI:": "obo:chebi.owl",
     "FOODON:": "obo:foodon.owl",
     "UBERON:": "obo:uberon.owl",
     "ENVO:": "obo:envo.owl",
+    "NCIT:": "obo:ncit.owl",
+    "kgmicrobe.compound:": "kgm:compound",
 }
 
 # Matches MIM's kg_microbe_dict.POLLUTION_SYNONYM_THRESHOLD. Any kg-microbe
@@ -425,8 +429,11 @@ HEADER_YAML = f"""\
 #   FOODON: "http://purl.obolibrary.org/obo/FOODON_"
 #   UBERON: "http://purl.obolibrary.org/obo/UBERON_"
 #   ENVO: "http://purl.obolibrary.org/obo/ENVO_"
+#   NCIT: "http://purl.obolibrary.org/obo/NCIT_"
+#   kgmicrobe.compound: "https://w3id.org/kg-microbe/compound/"
 #   MIM: "https://github.com/KG-Hub/MediaIngredientMech/blob/main/data/ingredients/mapped/"
 #   obo: "http://purl.obolibrary.org/obo/"
+#   kgm: "https://w3id.org/kg-microbe/"
 #   semapv: "https://w3id.org/semapv/vocab/"
 #   skos: "http://www.w3.org/2004/02/skos/core#"
 #   orcid: "https://orcid.org/"
