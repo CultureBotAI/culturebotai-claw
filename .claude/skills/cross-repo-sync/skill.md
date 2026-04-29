@@ -1,6 +1,6 @@
 ---
 name: cross-repo-sync
-description: Sync identifiers, CHEBI mappings, and KG-Microbe node matches across CultureMech, MediaIngredientMech, and the unified ingredient mapping — the standard integration pipeline
+description: Sync identifiers, CHEBI mappings, and KG-Microbe node matches across CultureMech, MIM, and the unified ingredient mapping — the standard integration pipeline
 category: integration
 requires_database: false
 requires_internet: false
@@ -124,7 +124,7 @@ just build-unified-mapping
 
 ## Related Skills
 
-- `build-unified-mapping` (MediaIngredientMech) — same workflow, documented from MIM side
+- `build-unified-mapping` (MIM) — same workflow, documented from MIM side
 - `feba-integration` (this repo) — FEBA enrichment that feeds new CHEBIs into MIM, then rerun cross-repo-sync
 - `cas-rn-integration` (this repo) — adds CAS-RNs to MIM, then rebuild unified mapping
 - `match-kg-microbe` (CultureMech) — per-recipe KG matching from within CultureMech

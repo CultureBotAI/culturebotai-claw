@@ -1,6 +1,6 @@
 ---
 name: cas-rn-integration
-description: Enrich MediaIngredientMech ingredient records with CAS Registry Numbers using CultureBotHT CSV and PubChem API, and export unmapped CAS-RN ingredients for review
+description: Enrich MIM ingredient records with CAS Registry Numbers using CultureBotHT CSV and PubChem API, and export unmapped CAS-RN ingredients for review
 category: integration
 requires_database: false
 requires_internet: true
@@ -12,7 +12,7 @@ tags: [cas-rn, pubchem, enrichment, mim, chemical-identity, chebi]
 
 ## Overview
 
-Adds CAS Registry Numbers (CAS-RNs) to MediaIngredientMech ingredient YAML files
+Adds CAS Registry Numbers (CAS-RNs) to MIM ingredient YAML files
 using two complementary strategies:
 
 1. **CultureBotHT CSV match** — name-normalized lookup against `compounds_to_cas.csv`
@@ -129,7 +129,7 @@ python scripts/enrich_mim_cas_rn.py --max-queries 50
 
 1. Rebuild unified mapping: `just build-unified-mapping`
    (CAS-RN column will now be populated for newly-enriched ingredients)
-2. Commit MediaIngredientMech changes
+2. Commit MIM changes
 3. If running FEBA enrichment next: `just feba-enrich-ontology` benefits from higher CAS-RN coverage
 
 ---

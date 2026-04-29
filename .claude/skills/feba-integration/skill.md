@@ -44,7 +44,7 @@ feba-enrich-ontology            → workspace/feba_chebi_enrichment_results.yaml
          ↓
 feba-apply-enrichments          → CultureMech media files updated in-place
          ↓
-feba-update-mim                 → MediaIngredientMech ingredient files updated
+feba-update-mim                 → MIM ingredient files updated
          ↓
 feba-create-mim-ingredients     → new MIM ingredient YAML files created
 ```

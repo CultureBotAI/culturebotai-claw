@@ -7,8 +7,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 CultureBotAI-CLAW is an AI agent orchestration system for coordinating development across three interconnected microbial knowledge base repositories:
 
 - **CultureMech**: `/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech` - 10,657 culture media recipes
-- **MediaIngredientMech**: `/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech` - 1,131 ingredients with ontology mappings
+- **MIM** (MediaIngredientMech): `/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech` - ingredients with ontology mappings (CHEBI / FOODON / NCIT / cas: / kgmicrobe.compound:)
 - **CommunityMech**: `/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CommunityMech/CommunityMech` - 35+ microbial communities
+
+> **Acronym convention**: Throughout this repo (CLAUDE.md, skills, README, scripts), `MIM` is the canonical acronym for MediaIngredientMech. Use the verbose `MediaIngredientMech` only in (a) filesystem paths, (b) repository URLs, (c) environment variable names like `MEDIAINGREDIENTMECH_ROOT`, and (d) the first introduction (here) where the acronym is defined.
 
 ## Multi-Claude Coordination Architecture
 
@@ -205,7 +207,7 @@ All operations default to safe mode:
 ```bash
 ANTHROPIC_API_KEY=           # API key for programmatic LLM access
 CULTUREMECH_ROOT=            # Path to CultureMech repo
-MEDIAINGREDIENTMECH_ROOT=    # Path to MediaIngredientMech repo
+MEDIAINGREDIENTMECH_ROOT=    # Path to MIM repo
 COMMUNITYMECH_ROOT=          # Path to CommunityMech repo
 OPENCLAW_WORKSPACE=          # Workspace directory (default: ./workspace)
 ```

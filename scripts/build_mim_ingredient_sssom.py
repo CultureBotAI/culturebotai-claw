@@ -75,7 +75,8 @@ SSSOM_BIN = "sssom"
 # `_OBJECT_SOURCE_BY_PREFIX` (and plug a label loader into main()) to extend
 # coverage.
 SUPPORTED_OBJECT_PREFIXES: tuple[str, ...] = (
-    "CHEBI:", "FOODON:", "UBERON:", "ENVO:", "NCIT:", "kgmicrobe.compound:",
+    "CHEBI:", "FOODON:", "UBERON:", "ENVO:", "NCIT:",
+    "kgmicrobe.compound:", "cas:",
 )
 _OBJECT_SOURCE_BY_PREFIX: dict[str, str] = {
     "CHEBI:": "obo:chebi.owl",
@@ -84,6 +85,7 @@ _OBJECT_SOURCE_BY_PREFIX: dict[str, str] = {
     "ENVO:": "obo:envo.owl",
     "NCIT:": "obo:ncit.owl",
     "kgmicrobe.compound:": "kgm:compound",
+    "cas:": "registry:cas",
 }
 
 # Matches MIM's kg_microbe_dict.POLLUTION_SYNONYM_THRESHOLD. Any kg-microbe
@@ -431,6 +433,8 @@ HEADER_YAML = f"""\
 #   ENVO: "http://purl.obolibrary.org/obo/ENVO_"
 #   NCIT: "http://purl.obolibrary.org/obo/NCIT_"
 #   kgmicrobe.compound: "https://w3id.org/kg-microbe/compound/"
+#   cas: "https://commonchemistry.cas.org/detail?cas_rn="
+#   registry: "https://w3id.org/kg-microbe/registry/"
 #   MIM: "https://github.com/KG-Hub/MediaIngredientMech/blob/main/data/ingredients/mapped/"
 #   obo: "http://purl.obolibrary.org/obo/"
 #   kgm: "https://w3id.org/kg-microbe/"

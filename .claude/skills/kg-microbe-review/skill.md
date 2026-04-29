@@ -50,7 +50,7 @@ section.
 | `LABEL_DRIFTED` | Same CHEBI but kg-microbe's object_label ≠ MIM's object_label | Priority-11 rule should force MIM label — check consolidator pipeline |
 | `MISSING_IN_KGM` | MIM has the row; kg-microbe's SSSOM does not | Rerun consolidator (or MIM SSSOM wasn't picked up yet) |
 | `STALE_IN_KGM` | kg-microbe's SSSOM has a `MIM:*` subject that MIM's current SSSOM does not | Rerun consolidator — MIM dropped/merged the record |
-| `MIM_LEGACY_IN_KGM` | kg-microbe still references `MediaIngredientMech:<id>` legacy | Rerun consolidator — the migration should drop these |
+| `MIM_LEGACY_IN_KGM` | kg-microbe still references `MIM:<id>` legacy | Rerun consolidator — the migration should drop these |
 
 ## Invocation
 

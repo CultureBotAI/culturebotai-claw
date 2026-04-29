@@ -3,7 +3,7 @@
 AI agent orchestration layer for coordinating development across three interconnected microbial knowledge base repositories:
 
 - **CultureMech**: 10,657 culture media recipes from 10 international sources
-- **MediaIngredientMech**: LLM-assisted curation system for 1,131 ingredients with ontology mappings
+- **MIM**: LLM-assisted curation system for 1,131 ingredients with ontology mappings
 - **CommunityMech**: Microbial community modeling (35+ communities) with ecological interactions
 
 ## Overview

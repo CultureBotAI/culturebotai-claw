@@ -155,7 +155,7 @@ humans and for issue filing.
   same `validation_method` column. Use for release gates and
   audit-worthy reviews. Adds a sixth `UNVERIFIED` verdict for rows
   the agents couldn't classify.
-- `review-ingredients` (MediaIngredientMech) — upstream curator that
+- `review-ingredients` (MIM) — upstream curator that
   produces the kg-microbe sweep reports feeding the SSSOM generator
 - `cross-repo-sync` (this repo) — rebuilds the unified ingredient
   mapping that the SSSOM file depends on
