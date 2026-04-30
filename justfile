@@ -395,6 +395,17 @@ mapping-taxonomy:
 kg-microbe-review:
     /opt/homebrew/bin/python3.13 scripts/generate_kg_microbe_review.py
 
+# Import a new ingredient/compound source into MIM. See
+# .claude/skills/ingredient-mapping/skill.md for the full source→resolver→emit
+# cascade. Defaults to dry-run; pass --apply to write YAMLs.
+#
+# Examples:
+#   just import-ingredients --source culturebotht --apply
+#   just import-ingredients --source kgm-unmapped --apply
+#   just import-ingredients --source mim-queue --apply --accept-medium
+import-ingredients *ARGS:
+    /opt/homebrew/bin/python3.13 scripts/import_ingredients.py {{ARGS}}
+
 # =============================================================================
 # Utility Commands
 # =============================================================================
