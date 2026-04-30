@@ -73,6 +73,8 @@ class Candidate:
     name: str
     cas: str = ""
     source_id: str = ""
+    preset_id: str = ""    # already-resolved ontology CURIE; bypasses OLS/OAK
+    preset_label: str = "" # ontology label that came with the preset_id
     synonyms: list[str] = dataclasses.field(default_factory=list)
     panels: list[str] = dataclasses.field(default_factory=list)
     media_uses: list[str] = dataclasses.field(default_factory=list)
@@ -246,6 +248,15 @@ class Resolver:
         self.accept_medium = accept_medium
 
     def resolve(self, c: Candidate) -> ResolveResult:
+        # Tier 0: source has a pre-set authoritative ontology ID
+        # (e.g. kg-microbe metatraits chemical_mappings already
+        # carries a CHEBI/FOODON/ENVO/NCIT object_id).
+        if c.preset_id and c.preset_id.startswith(
+            ("CHEBI:", "FOODON:", "UBERON:", "ENVO:", "NCIT:")
+        ):
+            return ResolveResult(c.preset_id, c.preset_label or c.name,
+                                 "source-preset", "HIGH")
+
         # Tier 2: OLS exact label/synonym in CHEBI
         hit = ols_search_by_name(c.name, "chebi", self.ols_cache)
         if hit and "chebi" in hit:
@@ -490,8 +501,68 @@ def src_mim_queue() -> Iterable[Candidate]:
             )
 
 
+def src_kgm_metatraits() -> Iterable[Candidate]:
+    """kg-microbe's out-of-SSSOM chemical mappings:
+       kg_microbe/transform_utils/metatraits/mappings/{chemical_mappings,
+       special_chemical_mappings}.tsv. Each row already carries an
+       authoritative ontology ID, so the resolver's preset tier accepts
+       it directly.
+    """
+    base = (KGM_ROOT / "kg_microbe/transform_utils/metatraits/mappings")
+    seen: set[str] = set()  # dedupe by name (these files have repeats)
+
+    chem_path = base / "chemical_mappings.tsv"
+    if chem_path.exists():
+        with chem_path.open() as f:
+            header = f.readline().rstrip("\n").split("\t")
+            for line in f:
+                parts = line.rstrip("\n").split("\t")
+                if len(parts) < len(header):
+                    parts += [""] * (len(header) - len(parts))
+                row = dict(zip(header, parts))
+                raw = (row.get("subject_label") or "").strip()
+                # "produces: ethanol" → "ethanol"
+                name = raw.split(":", 1)[-1].strip() if ":" in raw else raw
+                if not name or name.lower() in seen:
+                    continue
+                obj = (row.get("object_id") or "").strip()
+                if not obj:
+                    continue
+                seen.add(name.lower())
+                yield Candidate(
+                    name=name.capitalize() if name.islower() else name,
+                    preset_id=obj,
+                    preset_label=(row.get("object_label") or "").strip(),
+                    source_id=f"kgm.metatraits.chemical:{name.replace(' ', '_')}",
+                )
+
+    sp_path = base / "special_chemical_mappings.tsv"
+    if sp_path.exists():
+        with sp_path.open() as f:
+            header = f.readline().rstrip("\n").split("\t")
+            for line in f:
+                parts = line.rstrip("\n").split("\t")
+                if len(parts) < len(header):
+                    parts += [""] * (len(header) - len(parts))
+                row = dict(zip(header, parts))
+                name = (row.get("chemical_name") or "").strip()
+                if not name or name.lower() in seen:
+                    continue
+                obj = (row.get("ontology_id") or "").strip()
+                if not obj:
+                    continue
+                seen.add(name.lower())
+                yield Candidate(
+                    name=name.capitalize() if name.islower() else name,
+                    preset_id=obj,
+                    preset_label=(row.get("ontology_name") or "").strip(),
+                    source_id=f"kgm.metatraits.special:{name.replace(' ', '_')}",
+                )
+
+
 _SOURCES: dict[str, Callable[[], Iterable[Candidate]]] = {
     "kgm-unmapped": src_kgm_unmapped,
+    "kgm-metatraits": src_kgm_metatraits,
     "culturebotht": src_culturebotht,
     "mim-queue": src_mim_queue,
 }
