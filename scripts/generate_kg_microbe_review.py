@@ -40,6 +40,10 @@ KGM_LEGACY_TSV_GZ = Path(
     "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
     "kg-microbe/mappings/unified_chemical_mappings.tsv.gz"
 )
+KGM_METATRAITS_DIR = Path(
+    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
+    "kg-microbe/kg_microbe/transform_utils/metatraits/mappings"
+)
 OUT = Path(
     "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
     "culturebotai-claw/workspace/reports/kg_microbe_review.md"
@@ -90,6 +94,93 @@ def load_kgm_mim_rows() -> tuple[dict[str, dict], list[dict]]:
             elif sid.startswith("MediaIngredientMech:"):
                 legacy.append(row)
     return mim_rows, legacy
+
+
+def load_metatraits_chemical() -> tuple[list[dict], list[dict]]:
+    """Load kg-microbe's metatraits chemical mappings — these are
+    chemistry-relevant mapping files outside the unified SSSOM that
+    should also be reflected in MIM.
+
+    Returns (chemical_mappings_rows, special_chemical_mappings_rows).
+    Both lists carry dict-shaped rows with at least `name` and `chebi`.
+    """
+    chem_path = KGM_METATRAITS_DIR / "chemical_mappings.tsv"
+    special_path = KGM_METATRAITS_DIR / "special_chemical_mappings.tsv"
+
+    def _load_sssom_shape(path):
+        if not path.exists():
+            return []
+        out = []
+        with path.open() as f:
+            header = f.readline().rstrip("\n").split("\t")
+            for line in f:
+                parts = line.rstrip("\n").split("\t")
+                if len(parts) < len(header):
+                    parts += [""] * (len(header) - len(parts))
+                row = dict(zip(header, parts))
+                # subject_label is "produces: ethanol" — strip the
+                # predicate prefix to get the chemical name.
+                raw = (row.get("subject_label") or "").strip()
+                name = raw.split(":", 1)[-1].strip() if ":" in raw else raw
+                obj = (row.get("object_id") or "").strip()
+                out.append({
+                    "name": name,
+                    "raw_subject_label": raw,
+                    "chebi": obj,
+                    "object_label": (row.get("object_label") or "").strip(),
+                    "predicate": (row.get("predicate_id") or "").strip(),
+                    "curator": (row.get("curator") or "").strip(),
+                    "source_dataset": (row.get("source_dataset") or "").strip(),
+                })
+        return out
+
+    def _load_special(path):
+        if not path.exists():
+            return []
+        out = []
+        with path.open() as f:
+            header = f.readline().rstrip("\n").split("\t")
+            for line in f:
+                parts = line.rstrip("\n").split("\t")
+                if len(parts) < len(header):
+                    parts += [""] * (len(header) - len(parts))
+                row = dict(zip(header, parts))
+                out.append({
+                    "name": (row.get("chemical_name") or "").strip(),
+                    "trait_pattern": (row.get("trait_pattern") or "").strip(),
+                    "chebi": (row.get("ontology_id") or "").strip(),
+                    "object_label": (row.get("ontology_name") or "").strip(),
+                    "category": (row.get("category") or "").strip(),
+                    "notes": (row.get("notes") or "").strip(),
+                })
+        return out
+
+    return _load_sssom_shape(chem_path), _load_special(special_path)
+
+
+def diff_metatraits_against_mim(rows: list[dict], mim_by_chebi: dict[str, list[dict]],
+                                mim_label_index: dict[str, str]) -> dict[str, list[dict]]:
+    """Classify each metatraits row vs MIM:
+      IN_MIM_AGREE      kg-microbe chebi == MIM's chebi for the same chemical name (or chebi already present)
+      IN_MIM_DIVERGE    chemical exists in MIM under a different CHEBI
+      MISSING_IN_MIM    chemical not in MIM at all (candidate import)
+    """
+    out = {"IN_MIM_AGREE": [], "IN_MIM_DIVERGE": [], "MISSING_IN_MIM": []}
+    for r in rows:
+        chebi = r.get("chebi", "")
+        name = (r.get("name") or "").lower().strip()
+        # Agreement check: chebi already in MIM
+        if chebi and chebi in mim_by_chebi:
+            r["_mim_record"] = mim_by_chebi[chebi][0].get("subject_id", "")
+            out["IN_MIM_AGREE"].append(r)
+            continue
+        # Divergence: name in MIM index but with different CHEBI
+        if name and name in mim_label_index:
+            r["_mim_chebi"] = mim_label_index[name]
+            out["IN_MIM_DIVERGE"].append(r)
+            continue
+        out["MISSING_IN_MIM"].append(r)
+    return out
 
 
 def load_kgm_source_tags(kgm_mim_rows: dict[str, dict]) -> dict[str, int]:
@@ -189,6 +280,8 @@ def render(
     kgm_source_tags: dict[str, int],
     mim_total: int,
     kgm_mim_total: int,
+    metatraits_chem: dict | None = None,
+    metatraits_special: dict | None = None,
 ) -> str:
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     counts: dict[str, int] = defaultdict(int)
@@ -290,6 +383,66 @@ def render(
             )
         out.append("\n")
 
+    # Metatraits chemical mappings comparison
+    if metatraits_chem is not None or metatraits_special is not None:
+        out.append("## Metatraits chemical mappings (out-of-SSSOM)\n")
+        out.append(
+            "Coverage check for kg-microbe's `kg_microbe/transform_utils/"
+            "metatraits/mappings/chemical_mappings.tsv` (trait → CHEBI for "
+            "carbon/nitrogen substrates) and `special_chemical_mappings.tsv` "
+            "(trait_pattern → ontology). These are chemistry-relevant "
+            "mappings that live outside the unified SSSOM and should also "
+            "be reflected in MIM.\n\n",
+        )
+        out.append("| File | Total | IN_MIM_AGREE | IN_MIM_DIVERGE | MISSING_IN_MIM |\n")
+        out.append("|---|---:|---:|---:|---:|\n")
+        if metatraits_chem is not None:
+            t = sum(len(v) for v in metatraits_chem.values())
+            out.append(
+                f"| `chemical_mappings.tsv` | {t} | "
+                f"{len(metatraits_chem.get('IN_MIM_AGREE', []))} | "
+                f"{len(metatraits_chem.get('IN_MIM_DIVERGE', []))} | "
+                f"{len(metatraits_chem.get('MISSING_IN_MIM', []))} |\n"
+            )
+        if metatraits_special is not None:
+            t = sum(len(v) for v in metatraits_special.values())
+            out.append(
+                f"| `special_chemical_mappings.tsv` | {t} | "
+                f"{len(metatraits_special.get('IN_MIM_AGREE', []))} | "
+                f"{len(metatraits_special.get('IN_MIM_DIVERGE', []))} | "
+                f"{len(metatraits_special.get('MISSING_IN_MIM', []))} |\n"
+            )
+        out.append("\n")
+        # Show sample diverges + missing
+        for label, diff in (("chemical_mappings", metatraits_chem),
+                            ("special_chemical_mappings", metatraits_special)):
+            if diff is None:
+                continue
+            divs = diff.get("IN_MIM_DIVERGE", [])
+            miss = diff.get("MISSING_IN_MIM", [])
+            if divs:
+                out.append(f"### {label} — DIVERGE ({len(divs)} rows)\n")
+                out.append("| Name | kg-microbe CHEBI | MIM CHEBI |\n|---|---|---|\n")
+                for r in divs[:10]:
+                    out.append(
+                        f"| {r.get('name', '')} | `{r.get('chebi', '')}` | "
+                        f"`{r.get('_mim_chebi', '')}` |\n"
+                    )
+                out.append("\n")
+            if miss:
+                out.append(f"### {label} — MISSING_IN_MIM (first 10 of {len(miss)})\n")
+                out.append("| Name | kg-microbe CHEBI | Source |\n|---|---|---|\n")
+                for r in miss[:10]:
+                    out.append(
+                        f"| {r.get('name', '')} | `{r.get('chebi', '')}` | "
+                        f"{label} |\n"
+                    )
+                out.append("\n")
+        out.append("**Out-of-scope (no chemistry overlap with MIM):** "
+                   "`enzyme_mappings.tsv`, `enzyme_name_to_go.tsv`, "
+                   "`pathway_mappings.tsv`, `phenotype_mappings.tsv`, "
+                   "`metpo_alias_mappings.tsv`. Not reviewed.\n\n")
+
     out.append("## Recommended contribution scope\n")
     out.append(
         "Based on this diff, candidate commits for the "
@@ -343,6 +496,33 @@ def main() -> None:
 
     kgm_source_tags = load_kgm_source_tags(kgm_mim)
 
+    print(f"[2b/4] Loading metatraits chemical mappings")
+    chem_rows, special_rows = load_metatraits_chemical()
+    print(f"      chemical_mappings.tsv: {len(chem_rows)} rows")
+    print(f"      special_chemical_mappings.tsv: {len(special_rows)} rows")
+
+    # Build a label-keyed MIM index for diverge detection.
+    mim_label_index: dict[str, str] = {}
+    for sid, mim_row in mim.items():
+        sl = (mim_row.get("subject_label") or "").lower().strip()
+        ol = (mim_row.get("object_label") or "").lower().strip()
+        ch = mim_row.get("object_id", "")
+        if sl and ch:
+            mim_label_index.setdefault(sl, ch)
+        if ol and ch:
+            mim_label_index.setdefault(ol, ch)
+
+    chem_diff = diff_metatraits_against_mim(chem_rows, mim_rows_by_chebi_for_meta := defaultdict(list, {
+        m["object_id"]: [m] for m in mim.values() if m.get("object_id")
+    }), mim_label_index)
+    special_diff = diff_metatraits_against_mim(special_rows, mim_rows_by_chebi_for_meta, mim_label_index)
+    print(f"      chemical_mappings: AGREE={len(chem_diff['IN_MIM_AGREE'])} "
+          f"DIVERGE={len(chem_diff['IN_MIM_DIVERGE'])} "
+          f"MISSING={len(chem_diff['MISSING_IN_MIM'])}")
+    print(f"      special_chemical_mappings: AGREE={len(special_diff['IN_MIM_AGREE'])} "
+          f"DIVERGE={len(special_diff['IN_MIM_DIVERGE'])} "
+          f"MISSING={len(special_diff['MISSING_IN_MIM'])}")
+
     print("[3/4] Classifying each MIM row")
     # Group MIM rows by object_id so we can accept any MIM-asserted label.
     mim_rows_by_chebi: dict[str, list[dict]] = defaultdict(list)
@@ -362,7 +542,9 @@ def main() -> None:
 
     print("[4/4] Writing report")
     report = render(classified, stale, legacy, kgm_source_tags,
-                    mim_total=len(mim), kgm_mim_total=len(kgm_mim))
+                    mim_total=len(mim), kgm_mim_total=len(kgm_mim),
+                    metatraits_chem=chem_diff,
+                    metatraits_special=special_diff)
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(report)
     print(f"Wrote {OUT}")

@@ -43,6 +43,8 @@ section.
 
 ## Diff classifications
 
+### Primary diff: MIM SSSOM vs kg-microbe `unified_ingredient_mappings.sssom.tsv.gz`
+
 | Class | Meaning | Suggested kg-microbe action |
 |---|---|---|
 | `IN_SYNC` | MIM row's (CHEBI, object_label) match kg-microbe's | None — rerun of consolidator will idempotently reproduce |
@@ -50,7 +52,27 @@ section.
 | `LABEL_DRIFTED` | Same CHEBI but kg-microbe's object_label ≠ MIM's object_label | Priority-11 rule should force MIM label — check consolidator pipeline |
 | `MISSING_IN_KGM` | MIM has the row; kg-microbe's SSSOM does not | Rerun consolidator (or MIM SSSOM wasn't picked up yet) |
 | `STALE_IN_KGM` | kg-microbe's SSSOM has a `MIM:*` subject that MIM's current SSSOM does not | Rerun consolidator — MIM dropped/merged the record |
-| `MIM_LEGACY_IN_KGM` | kg-microbe still references `MIM:<id>` legacy | Rerun consolidator — the migration should drop these |
+| `MIM_LEGACY_IN_KGM` | kg-microbe still references legacy `MediaIngredientMech:*` IDs | Rerun consolidator — the migration should drop these |
+
+### Secondary diff: kg-microbe metatraits chemical mappings vs MIM
+
+The review additionally checks two **out-of-SSSOM** files in
+`kg-microbe/kg_microbe/transform_utils/metatraits/mappings/`:
+
+- `chemical_mappings.tsv` — trait → CHEBI for carbon/nitrogen substrates
+- `special_chemical_mappings.tsv` — trait_pattern → ontology overrides
+
+| Class | Meaning | Suggested action |
+|---|---|---|
+| `IN_MIM_AGREE` | kg-microbe's CHEBI is already a primary ID in MIM | None |
+| `IN_MIM_DIVERGE` | Same chemical name in MIM but with a different CHEBI | Manual review — pick the right one (often charge-state / hydration variants like glucose vs D-glucopyranose) |
+| `MISSING_IN_MIM` | Chemical not in MIM — candidate for `import-ingredients` skill | Add to MIM (it has a CHEBI/FOODON/ENVO ID, so HIGH-confidence) |
+
+**Out-of-scope** (no chemistry overlap with MIM): `enzyme_mappings.tsv`,
+`enzyme_name_to_go.tsv`, `pathway_mappings.tsv`,
+`phenotype_mappings.tsv`, `metpo_alias_mappings.tsv`. These are not
+reviewed because MIM's mandate is ingredient/chemical mappings, not
+enzymes/pathways/phenotypes.
 
 ## Invocation
 
