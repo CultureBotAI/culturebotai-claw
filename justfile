@@ -420,6 +420,24 @@ validate-evidence *args:
 propose-evidence *args:
     /opt/homebrew/bin/python3.13 scripts/propose_evidence.py {{args}}
 
+# Backfill chemical_properties.molecular_formula/smiles/inchi for every
+# CHEBI-mapped MIM ingredient using the local CHEBI sqlite. Default
+# dry-run; pass --apply to write YAMLs.
+backfill-chemistry *args:
+    /opt/homebrew/bin/python3.13 scripts/backfill_chebi_chemistry.py {{args}}
+
+# Apply propose-evidence drafts: parse workspace/reports/evidence_proposals/
+# and append validated literature evidence (Phase 1 substring check) to
+# the target MIM YAMLs. Default dry-run; pass --apply to write YAMLs.
+apply-evidence *args:
+    /opt/homebrew/bin/python3.13 scripts/apply_evidence_proposals.py {{args}}
+
+# Generate the curator-review report covering UNDEFINED_MIXTURE
+# classifications + unset records, with heuristic suggestions and an
+# `action` column for batch overrides. Read-only.
+review-classifications:
+    /opt/homebrew/bin/python3.13 scripts/review_ingredient_classifications.py
+
 # Import a new ingredient/compound source into MIM. See
 # .claude/skills/ingredient-mapping/skill.md for the full source→resolver→emit
 # cascade. Defaults to dry-run; pass --apply to write YAMLs.
