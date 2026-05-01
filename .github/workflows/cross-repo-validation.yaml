@@ -1,0 +1,122 @@
+name: Cross-repo validation
+
+on:
+  schedule:
+    - cron: "27 7 * * *"   # daily at 07:27 UTC
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/validate_evidence_references.py"
+      - "scripts/inventory_unmapped_ingredients.py"
+      - "scripts/generate_kg_microbe_review.py"
+      - ".github/workflows/cross-repo-validation.yaml"
+
+permissions:
+  contents: read
+  issues: write   # to open follow-up issues on failure
+
+concurrency:
+  group: cross-repo-validation
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout claw
+        uses: actions/checkout@v4
+        with:
+          path: culturebotai-claw
+
+      - name: Checkout MediaIngredientMech
+        uses: actions/checkout@v4
+        with:
+          repository: CultureBotAI/MediaIngredientMech
+          path: MediaIngredientMech
+
+      - name: Checkout CultureMech
+        uses: actions/checkout@v4
+        with:
+          repository: CultureBotAI/CultureMech
+          path: CultureMech
+        continue-on-error: true   # private repo may not be accessible
+
+      - name: Checkout CommunityMech
+        uses: actions/checkout@v4
+        with:
+          repository: CultureBotAI/CommunityMech
+          path: CommunityMech-outer
+        continue-on-error: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pyyaml jinja2 matplotlib
+
+      - name: Validate evidence references (MIM)
+        working-directory: culturebotai-claw
+        env:
+          MEDIAINGREDIENTMECH_ROOT: ${{ github.workspace }}/MediaIngredientMech
+        run: |
+          python3 scripts/validate_evidence_references.py
+        continue-on-error: false
+
+      - name: Inventory unmapped ingredients
+        working-directory: culturebotai-claw
+        env:
+          MEDIAINGREDIENTMECH_ROOT: ${{ github.workspace }}/MediaIngredientMech
+          CULTUREMECH_ROOT: ${{ github.workspace }}/CultureMech
+          COMMUNITYMECH_ROOT: ${{ github.workspace }}/CommunityMech-outer/CommunityMech
+        run: |
+          python3 scripts/inventory_unmapped_ingredients.py || true
+
+      - name: Upload inventory + validation reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: cross-repo-validation-${{ github.run_id }}
+          path: |
+            culturebotai-claw/workspace/reports/evidence_reference_validation.tsv
+            culturebotai-claw/workspace/reports/evidence_reference_validation.md
+            culturebotai-claw/workspace/reports/unmapped_inventory.tsv
+            culturebotai-claw/workspace/reports/unmapped_inventory.md
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Open issue on validation failure
+        if: failure() && github.event_name == 'schedule'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const today = new Date().toISOString().slice(0, 10);
+            const title = `Cross-repo validation failed (${today})`;
+            const body = `Daily cross-repo validation failed in [run #${context.runNumber}](${context.payload.repository.html_url}/actions/runs/${context.runId}).\n\n` +
+              `Likely cause: a snippet in MIM evidence does not match its cached PubMed abstract, or another validator gate.\n\n` +
+              `Inspect the workflow artifacts for the per-row TSV/MD reports.`;
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: "cross-repo-validation",
+              state: "open",
+            });
+            if (issues.length === 0) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ["cross-repo-validation", "bug"],
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issues[0].number,
+                body,
+              });
+            }

@@ -413,6 +413,13 @@ fetch-pubmed *args:
 validate-evidence *args:
     /opt/homebrew/bin/python3.13 scripts/validate_evidence_references.py {{args}}
 
+# Propose PMID + snippet candidates via PubMed search for MIM ingredient
+# evidence claims (Phase 4). Outputs to workspace/reports/evidence_proposals/.
+# Curators review, paste into MIM YAMLs, then validate-evidence confirms.
+# See .claude/skills/evidence-curation/skill.md.
+propose-evidence *args:
+    /opt/homebrew/bin/python3.13 scripts/propose_evidence.py {{args}}
+
 # Import a new ingredient/compound source into MIM. See
 # .claude/skills/ingredient-mapping/skill.md for the full source→resolver→emit
 # cascade. Defaults to dry-run; pass --apply to write YAMLs.
