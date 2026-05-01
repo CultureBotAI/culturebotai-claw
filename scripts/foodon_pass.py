@@ -152,10 +152,15 @@ def ols_foodon_search(term: str) -> dict:
 #   ENVO  — environmental samples (manure, soil, seawater, sediment)
 #   CHEBI — single chemicals; some food reagents (gelatin etc.) live here
 #   NCIT  — pharmaceuticals and clinical reagents (catches "Beef" and similar)
+#   MICRO — microbiology-domain ontology (covers peptone, tryptone, etc.)
+#   mesh  — broad-domain medical/biological terms (catches branded
+#           variants like Bacto-peptone, Proteose-peptone)
 _FALLBACK_ONTOLOGIES = (
     ("envo", "ENVO:"),
     ("chebi", "CHEBI:"),
     ("ncit", "NCIT:"),
+    ("micro", "MICRO:"),
+    ("mesh", "mesh:"),
 )
 
 
