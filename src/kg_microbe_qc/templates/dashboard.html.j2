@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{ stats.repo_name }} — QC Dashboard</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+         margin: 2em; color: #222; max-width: 1100px; }
+  h1 { border-bottom: 2px solid #ddd; padding-bottom: 0.3em; }
+  .meta { color: #666; font-size: 0.9em; margin-bottom: 1.5em; }
+  .stat-grid { display: flex; gap: 1.5em; margin: 1em 0 2em 0; }
+  .stat { flex: 1; padding: 1em; border-radius: 6px; background: #f6f8fa;
+          border: 1px solid #d0d7de; }
+  .stat .label { color: #666; font-size: 0.85em; text-transform: uppercase;
+                 letter-spacing: 0.05em; }
+  .stat .value { font-size: 2em; font-weight: 600; margin-top: 0.2em; }
+  .pass { color: #2c8a3a; }
+  .warn { color: #d68f00; }
+  .fail { color: #b8302c; }
+  table { border-collapse: collapse; width: 100%; margin-top: 1em;
+          font-size: 0.9em; }
+  th, td { padding: 0.5em 0.8em; text-align: left;
+           border-bottom: 1px solid #e5e7eb; }
+  th { background: #f6f8fa; font-weight: 600; }
+  td.right { text-align: right; font-variant-numeric: tabular-nums; }
+  .badge { display: inline-block; padding: 0.15em 0.55em; border-radius: 3px;
+           font-size: 0.8em; font-weight: 600; }
+  .badge.pass { background: #dafbe1; color: #1a7f37; }
+  .badge.warn { background: #fff8c5; color: #9a6700; }
+  .badge.fail { background: #ffebe9; color: #cf222e; }
+  img { max-width: 100%; margin-top: 1em; border: 1px solid #e5e7eb;
+        border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<h1>{{ stats.repo_name }} — QC Dashboard</h1>
+<div class="meta">Generated {{ stats.timestamp }}</div>
+
+<div class="stat-grid">
+  <div class="stat">
+    <div class="label">Records</div>
+    <div class="value">{{ "{:,}".format(stats.record_count) }}</div>
+  </div>
+  <div class="stat">
+    <div class="label">Slots tracked</div>
+    <div class="value">{{ stats.scores|length }}</div>
+  </div>
+  <div class="stat">
+    <div class="label">Overall coverage</div>
+    <div class="value">{{ "{:.1%}".format(stats.overall_coverage) }}</div>
+  </div>
+  <div class="stat">
+    <div class="label">FAIL slots</div>
+    <div class="value {% if stats.fail_count %}fail{% else %}pass{% endif %}">
+      {{ stats.fail_count }}
+    </div>
+  </div>
+</div>
+
+{% if stats.scores %}
+<img src="coverage.png" alt="Slot coverage chart">
+
+<h2>Per-slot detail</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Slot</th>
+      <th class="right">Populated</th>
+      <th class="right">Coverage</th>
+      <th class="right">Threshold</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for s in stats.scores %}
+    <tr>
+      <td><code>{{ s.slot }}</code></td>
+      <td class="right">{{ "{:,}".format(s.populated) }} / {{ "{:,}".format(s.expected) }}</td>
+      <td class="right">{{ "{:.1%}".format(s.coverage) }}</td>
+      <td class="right">{{ "{:.0%}".format(s.threshold) }}</td>
+      <td>
+        <span class="badge {{ s.status|lower }}">{{ s.status }}</span>
+        {% if s.required %}<small style="color:#666"> required</small>{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p><em>No slots configured.</em></p>
+{% endif %}
+
+</body>
+</html>
