@@ -178,6 +178,30 @@ cd ../kg-microbe && poetry run python scripts/consolidate_chemical_mappings.py
 - **Provenance**: source_id from the queue's `source_id` column.
 - **Skips**: rows already with `already_in_mim=yes`.
 
+### `--source culturemech-pending`
+
+- **Reads**: `CultureMech/data/import_tracking/new_solution_ingredients_vs_mediaingredientmech.tsv`
+- **Format**: 7-column TSV (Preferred Term, CHEBI ID, CHEBI Label,
+  Example Concentration, Source Solution, MediaIngredientMech Status,
+  Action Needed)
+- **Filter**: only rows where `MediaIngredientMech Status` contains
+  "NEW" or "Not in" — i.e., flagged for migration into MIM.
+- **Provenance**: `source_id` = `culturemech.solution_ingredient:<slug>`.
+- **Resolver**: each row already carries an authoritative `CHEBI:N` so
+  the source-preset tier accepts it directly (no OLS round-trip needed).
+
+### `--source communitymech-unmapped`
+
+- **Reads**: `CommunityMech/CommunityMech/reports/ingredient_mapping.csv`
+- **Format**: 6-column CSV (ingredient_name, community_id, media_name,
+  mapped_id, match_score, status)
+- **Filter**: only rows where `status == unmapped`.
+- **Dedupe**: ingredient names repeat across communities — yields one
+  Candidate per distinct normalized name.
+- **Provenance**: `source_id` = `communitymech.ingredient:<slug>`.
+- **Resolver**: no preset; runs full cascade (OLS → OAK CAS → PubChem
+  → NCIT → cas: → UNMAPPED).
+
 ## Adding a new source
 
 1. Subclass `Source` in `scripts/import_ingredients.py`:

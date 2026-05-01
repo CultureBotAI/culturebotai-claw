@@ -116,8 +116,8 @@ get wrong CHEBI IDs).
    │   - kgm:mediadive      → --source mim-queue                 │
    │   - kgm:unmapped       → --source kgm-unmapped              │
    │   - culturebotht       → --source culturebotht              │
-   │   - culturemech:pending→ no loader yet (TODO; manual)       │
-   │   - communitymech:unm  → no loader yet (TODO; manual)       │
+   │   - culturemech:pending→ --source culturemech-pending       │
+   │   - communitymech:unm  → --source communitymech-unmapped    │
    │   - MIM:placeholder/cas→ rerun any source that produced it  │
    │                          after a CHEBI release; the         │
    │                          resolver upgrades placeholders     │

@@ -48,6 +48,12 @@ CULTUREBOT_ROOT = Path(
     "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureBotHT/CultureBotHT"
 )
 KGM_ROOT = Path("/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe")
+CULTUREMECH_ROOT = Path(
+    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech"
+)
+COMMUNITYMECH_ROOT = Path(
+    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CommunityMech/CommunityMech"
+)
 
 OLS_CAS_CACHE = WORKSPACE / "cache/ols_cas_cache.json"
 PUBCHEM_CACHE = WORKSPACE / "cache/pubchem_cas_chebi.json"
@@ -560,11 +566,65 @@ def src_kgm_metatraits() -> Iterable[Candidate]:
                 )
 
 
+def src_culturemech_pending() -> Iterable[Candidate]:
+    """CultureMech ingredients flagged as 'NEW - Not in MediaIngredientMech'
+    in the migration tracking TSV. Each row already carries an authoritative
+    CHEBI ID + label, so the resolver's preset tier accepts it directly."""
+    p = (CULTUREMECH_ROOT / "data/import_tracking"
+         / "new_solution_ingredients_vs_mediaingredientmech.tsv")
+    if not p.exists():
+        return
+    with p.open() as f:
+        for r in csv.DictReader(f, delimiter="\t"):
+            status = (r.get("MediaIngredientMech Status") or "").strip()
+            if "NEW" not in status and "Not in" not in status:
+                continue
+            name = (r.get("Preferred Term") or "").strip()
+            if not name:
+                continue
+            chebi = (r.get("CHEBI ID") or "").strip()
+            yield Candidate(
+                name=name,
+                preset_id=chebi if chebi.startswith("CHEBI:") else "",
+                preset_label=(r.get("CHEBI Label") or "").strip(),
+                source_id=f"culturemech.solution_ingredient:{name.replace(' ', '_')}",
+                raw=dict(r),
+            )
+
+
+def src_communitymech_unmapped() -> Iterable[Candidate]:
+    """CommunityMech ingredients with status=unmapped in the
+    per-community ingredient_mapping report. Names repeat across
+    communities — dedupe on normalized name."""
+    p = COMMUNITYMECH_ROOT / "reports" / "ingredient_mapping.csv"
+    if not p.exists():
+        return
+    seen: set[str] = set()
+    with p.open() as f:
+        for r in csv.DictReader(f):
+            if (r.get("status") or "").strip() != "unmapped":
+                continue
+            name = (r.get("ingredient_name") or "").strip()
+            if not name:
+                continue
+            key = name.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            yield Candidate(
+                name=name,
+                source_id=f"communitymech.ingredient:{name.replace(' ', '_')}",
+                raw=dict(r),
+            )
+
+
 _SOURCES: dict[str, Callable[[], Iterable[Candidate]]] = {
     "kgm-unmapped": src_kgm_unmapped,
     "kgm-metatraits": src_kgm_metatraits,
     "culturebotht": src_culturebotht,
     "mim-queue": src_mim_queue,
+    "culturemech-pending": src_culturemech_pending,
+    "communitymech-unmapped": src_communitymech_unmapped,
 }
 
 
