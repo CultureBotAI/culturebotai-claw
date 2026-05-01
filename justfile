@@ -401,6 +401,18 @@ kg-microbe-review:
 inventory-unmapped:
     /opt/homebrew/bin/python3.13 scripts/inventory_unmapped_ingredients.py
 
+# Fetch missing PubMed abstracts for every PMID referenced by MIM
+# evidence claims. Polite (3 req/s; 10 req/s with NCBI_API_KEY env var).
+# See .claude/skills/evidence-reference-validation/skill.md.
+fetch-pubmed *args:
+    /opt/homebrew/bin/python3.13 scripts/fetch_pubmed_abstracts.py {{args}}
+
+# Verify every literature snippet in MIM evidence claims appears
+# verbatim in its cited PubMed abstract. Anti-hallucination gate.
+# Exits 2 on SNIPPET_NOT_IN_ABSTRACT (CI blocking).
+validate-evidence *args:
+    /opt/homebrew/bin/python3.13 scripts/validate_evidence_references.py {{args}}
+
 # Import a new ingredient/compound source into MIM. See
 # .claude/skills/ingredient-mapping/skill.md for the full source→resolver→emit
 # cascade. Defaults to dry-run; pass --apply to write YAMLs.
