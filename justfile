@@ -395,6 +395,12 @@ mapping-taxonomy:
 kg-microbe-review:
     /opt/homebrew/bin/python3.13 scripts/generate_kg_microbe_review.py
 
+# Inventory all "unmapped / pending-curation" ingredient surfaces across
+# the four repos (MIM, kg-microbe, CultureMech, CommunityMech). See
+# .claude/skills/unmapped-inventory/skill.md for the sync model.
+inventory-unmapped:
+    /opt/homebrew/bin/python3.13 scripts/inventory_unmapped_ingredients.py
+
 # Import a new ingredient/compound source into MIM. See
 # .claude/skills/ingredient-mapping/skill.md for the full source→resolver→emit
 # cascade. Defaults to dry-run; pass --apply to write YAMLs.
