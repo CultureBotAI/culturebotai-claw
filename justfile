@@ -438,6 +438,13 @@ apply-evidence *args:
 review-classifications:
     /opt/homebrew/bin/python3.13 scripts/review_ingredient_classifications.py
 
+# Cascading multi-ontology resolver for heuristic-complex MIM
+# ingredients (yeast extract, peptone, soil, manure, milk, etc.).
+# FOODON → ENVO → CHEBI → NCIT via OLS, with token-subset re-scoring.
+# See .claude/skills/complex-ingredient-resolver/skill.md.
+foodon-pass *args:
+    /opt/homebrew/bin/python3.13 -u scripts/foodon_pass.py {{args}}
+
 # Import a new ingredient/compound source into MIM. See
 # .claude/skills/ingredient-mapping/skill.md for the full source→resolver→emit
 # cascade. Defaults to dry-run; pass --apply to write YAMLs.
