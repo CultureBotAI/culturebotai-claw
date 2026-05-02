@@ -426,6 +426,11 @@ propose-evidence *args:
 backfill-chemistry *args:
     /opt/homebrew/bin/python3.13 scripts/backfill_chebi_chemistry.py {{args}}
 
+# Same for cas:* primaries via PubChem REST (CAS → CID → properties).
+# Cached to workspace/cache/pubchem_cas_chemistry.json.
+backfill-cas-chemistry *args:
+    /opt/homebrew/bin/python3.13 scripts/backfill_cas_chemistry.py {{args}}
+
 # Apply propose-evidence drafts: parse workspace/reports/evidence_proposals/
 # and append validated literature evidence (Phase 1 substring check) to
 # the target MIM YAMLs. Default dry-run; pass --apply to write YAMLs.
