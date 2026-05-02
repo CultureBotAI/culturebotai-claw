@@ -142,7 +142,20 @@ ISOLATION_SOURCE_PROFILE = Profile(
         "treatment", "therapy", "procedure",
         "organization", "company", "registry",
     ),
-    drift_whitelist_subjects=frozenset({"Indoor-Air", "Outdoor-Air"}),
+    drift_whitelist_subjects=frozenset({
+        # Each pair has been manually reviewed; the subject → object
+        # mapping is the curator-approved canonical even though the
+        # lexical drift heuristic flags an extra modifier.
+        "Indoor-Air", "Outdoor-Air",   # ENVO indoor/outdoor air
+        "Aquaculture",                  # ENVO 'aquaculture farm' — sample IS the farm
+        "Biopsy",                       # NCIT 'Biopsy Procedure' — sample IS the procedure
+        "Bladder-stone",                # NCIT 'Urinary Bladder Stone' — only canonical type
+        "Currency",                     # ENVO 'currency note' — paper currency = banknotes
+        "Plaque",                       # UBERON 'dental plaque' — microbiology context
+        "Sandy",                        # ENVO 'sandy desert' — dominant sandy iso-source
+        "Tooth",                        # UBERON 'calcareous tooth' — synonym 'tooth'
+        "Water-treatment-plant",        # ENVO 'drinking water treatment plant'
+    }),
     disallow_reason="diseases/phenotypes are not isolation sources",
     keyword_warning="label contains non-isolation-source keyword",
 )
@@ -282,14 +295,19 @@ def validate(path: Path, profile: Profile, strict: bool = False) -> int:
                 f"{prefix!r} ({profile.disallow_reason}): "
                 f"{oid} ({olabel})")
         elif prefix in profile.mixed_prefixes:
-            low = olabel.lower()
-            hit = next(
-                (k for k in profile.non_target_keywords if k in low),
-                None)
-            if hit:
-                warnings.append(
-                    f"row {i}: '{subj}' → {oid} ({olabel}) — "
-                    f"{profile.keyword_warning} {hit!r}; review")
+            # Whitelisted subjects have been manually reviewed and the
+            # NCIT/mesh hit on a "non-isolation-source" keyword is
+            # accepted as the curator's intended mapping (e.g.
+            # Biopsy → 'Biopsy Procedure'). Skip the keyword warning.
+            if subj not in profile.drift_whitelist_subjects:
+                low = olabel.lower()
+                hit = next(
+                    (k for k in profile.non_target_keywords if k in low),
+                    None)
+                if hit:
+                    warnings.append(
+                        f"row {i}: '{subj}' → {oid} ({olabel}) — "
+                        f"{profile.keyword_warning} {hit!r}; review")
         elif prefix not in profile.allowed_prefixes:
             warnings.append(
                 f"row {i}: '{subj}' → {oid}: ontology {prefix!r} "
