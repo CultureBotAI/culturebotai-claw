@@ -401,6 +401,12 @@ kg-microbe-review:
 inventory-unmapped:
     /opt/homebrew/bin/python3.13 scripts/inventory_unmapped_ingredients.py
 
+# Snapshot kg-microbe dependency files into workspace/kgm_snapshot/.
+# Captures current local kg-microbe state (no git pull). See
+# .claude/skills/kg-microbe-sync/skill.md.
+sync-kgm:
+    /opt/homebrew/bin/python3.13 scripts/sync_kgm_dependencies.py
+
 # Fetch missing PubMed abstracts for every PMID referenced by MIM
 # evidence claims. Polite (3 req/s; 10 req/s with NCBI_API_KEY env var).
 # See .claude/skills/evidence-reference-validation/skill.md.
