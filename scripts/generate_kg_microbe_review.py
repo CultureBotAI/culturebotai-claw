@@ -75,25 +75,45 @@ def load_mim() -> dict[str, dict]:
     return out
 
 
-def load_kgm_mim_rows() -> tuple[dict[str, dict], list[dict]]:
-    """Return ({mim_subject_id -> row}, [legacy_media_rows])."""
-    mim_rows: dict[str, dict] = {}
+def load_kgm_mim_rows() -> tuple[dict[str, list[dict]], list[dict]]:
+    """Return ({mim_subject_id -> [rows]}, [legacy_media_rows]).
+
+    A single MIM:* subject can legitimately have multiple kg-microbe
+    rows (e.g. MIM's dual emission with parent FOODON/ENVO + identity
+    kgmicrobe.ingredient/MICRO/mesh). The classifier picks the row
+    whose object_id matches MIM's expectation; see ``pick_kgm_row``.
+    """
+    mim_rows: dict[str, list[dict]] = {}
     legacy: list[dict] = []
     with gzip.open(KGM_SSSOM_GZ, "rt", encoding="utf-8") as f:
         for _, row in _parse_sssom_header_and_rows(f):
             sid = row.get("subject_id", "")
             if sid.startswith("MIM:"):
-                # Multiple rows may share a MIM: subject (xrefs, lexical,
-                # etc.). Keep the one whose predicate is exactMatch.
-                prior = mim_rows.get(sid)
-                if prior is None:
-                    mim_rows[sid] = row
-                elif (prior.get("predicate_id") != "skos:exactMatch"
-                      and row.get("predicate_id") == "skos:exactMatch"):
-                    mim_rows[sid] = row
+                mim_rows.setdefault(sid, []).append(row)
             elif sid.startswith("MediaIngredientMech:"):
                 legacy.append(row)
     return mim_rows, legacy
+
+
+def pick_kgm_row(mim_row: dict, kgm_rows: list[dict]) -> dict | None:
+    """Pick the kg-microbe row best aligned with MIM's expected object_id.
+
+    1. If MIM has an object_id and any kg-microbe row matches it
+       exactly → return that row (true IN_SYNC).
+    2. Otherwise, prefer ``skos:exactMatch`` over other predicates.
+    3. Otherwise, return the first row encountered.
+    """
+    if not kgm_rows:
+        return None
+    mim_obj = (mim_row.get("object_id") or "").strip()
+    if mim_obj:
+        for r in kgm_rows:
+            if (r.get("object_id") or "").strip() == mim_obj:
+                return r
+    for r in kgm_rows:
+        if r.get("predicate_id") == "skos:exactMatch":
+            return r
+    return kgm_rows[0]
 
 
 def load_metatraits_chemical() -> tuple[list[dict], list[dict]]:
@@ -183,14 +203,19 @@ def diff_metatraits_against_mim(rows: list[dict], mim_by_chebi: dict[str, list[d
     return out
 
 
-def load_kgm_source_tags(kgm_mim_rows: dict[str, dict]) -> dict[str, int]:
-    """Count frequency of each `source` tag across kg-microbe's MIM: rows."""
+def load_kgm_source_tags(kgm_mim_rows: dict[str, list[dict]]) -> dict[str, int]:
+    """Count frequency of each `source` tag across kg-microbe's MIM: rows.
+
+    Counts every row (not just one per subject) so the source
+    distribution reflects the dual-emission topology faithfully.
+    """
     counts: dict[str, int] = defaultdict(int)
-    for row in kgm_mim_rows.values():
-        for tag in (row.get("source", "") or "").split("|"):
-            tag = tag.strip()
-            if tag:
-                counts[tag] += 1
+    for rows in kgm_mim_rows.values():
+        for row in rows:
+            for tag in (row.get("source", "") or "").split("|"):
+                tag = tag.strip()
+                if tag:
+                    counts[tag] += 1
     return counts
 
 
@@ -533,12 +558,13 @@ def main() -> None:
 
     classified: list[tuple[str, dict, dict | None, str]] = []
     for sid, mim_row in mim.items():
-        kgm_row = kgm_mim.get(sid)
+        kgm_rows = kgm_mim.get(sid, [])
+        kgm_row = pick_kgm_row(mim_row, kgm_rows)
         cls, note = classify(mim_row, kgm_row, mim_rows_by_chebi)
         classified.append((cls, mim_row, kgm_row, note))
 
     # STALE: kg-microbe rows whose MIM subject is not in MIM's current SSSOM.
-    stale = [row for sid, row in kgm_mim.items() if sid not in mim]
+    stale = [r for sid, rows in kgm_mim.items() if sid not in mim for r in rows]
 
     print("[4/4] Writing report")
     report = render(classified, stale, legacy, kgm_source_tags,
