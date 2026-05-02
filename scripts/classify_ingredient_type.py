@@ -110,9 +110,13 @@ def classify(record: dict) -> tuple[str, str]:
     onto_id = (om.get("ontology_id") or ident).strip()
     prefix = onto_id.split(":", 1)[0] if ":" in onto_id else ""
 
-    # 0. Unmapped placeholders — curator decides
-    if not ident or ident.startswith("UNMAPPED_"):
-        return "", "unmapped placeholder; curator review needed"
+    # 0. UNMAPPED_* placeholders — fall through to name-pattern
+    # heuristics (no ontology to default from). The pattern matches
+    # below typically catch the obvious cases (yeast extract, peptone,
+    # buffer solution, etc.); the residual stays unset → curator
+    # decides.
+    if not ident:
+        return "", "no identifier; curator review needed"
 
     # 1. Hard rule: a populated molecular_formula / SMILES / InChI means
     # the substance is chemically defined — this trumps name hints (so

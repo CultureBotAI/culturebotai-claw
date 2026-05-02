@@ -76,7 +76,7 @@ SSSOM_BIN = "sssom"
 # coverage.
 SUPPORTED_OBJECT_PREFIXES: tuple[str, ...] = (
     "CHEBI:", "FOODON:", "UBERON:", "ENVO:", "NCIT:",
-    "MICRO:", "mesh:",
+    "MICRO:", "mesh:", "BTO:",
     "kgmicrobe.compound:", "kgmicrobe.ingredient:", "cas:",
 )
 _OBJECT_SOURCE_BY_PREFIX: dict[str, str] = {
@@ -87,6 +87,7 @@ _OBJECT_SOURCE_BY_PREFIX: dict[str, str] = {
     "NCIT:": "obo:ncit.owl",
     "MICRO:": "obo:micro.owl",
     "mesh:": "registry:mesh",
+    "BTO:": "obo:bto.owl",
     "kgmicrobe.compound:": "kgm:compound",
     "kgmicrobe.ingredient:": "kgm:ingredient",
     "cas:": "registry:cas",
@@ -442,6 +443,7 @@ HEADER_YAML = f"""\
 #   NCIT: "http://purl.obolibrary.org/obo/NCIT_"
 #   MICRO: "http://purl.obolibrary.org/obo/MICRO_"
 #   mesh: "http://id.nlm.nih.gov/mesh/"
+#   BTO: "http://purl.obolibrary.org/obo/BTO_"
 #   kgmicrobe.compound: "https://w3id.org/kg-microbe/compound/"
 #   kgmicrobe.ingredient: "https://w3id.org/kg-microbe/ingredient/"
 #   cas: "https://commonchemistry.cas.org/detail?cas_rn="
