@@ -407,6 +407,13 @@ inventory-unmapped:
 sync-kgm:
     /opt/homebrew/bin/python3.13 scripts/sync_kgm_dependencies.py
 
+# Validate kg-microbe's isolation_source_to_ontology.tsv against:
+# CURIE format, ontology category allowlist (no MONDO/DOID/HP), and
+# label-keyword filters for non-isolation-source contexts. Codex-
+# adversarial-review follow-up gate. Exits 2 on errors.
+validate-isolation-source *args:
+    /opt/homebrew/bin/python3.13 scripts/validate_isolation_source_mapping.py {{args}}
+
 # Fetch missing PubMed abstracts for every PMID referenced by MIM
 # evidence claims. Polite (3 req/s; 10 req/s with NCBI_API_KEY env var).
 # See .claude/skills/evidence-reference-validation/skill.md.
