@@ -407,20 +407,11 @@ inventory-unmapped:
 sync-kgm:
     /opt/homebrew/bin/python3.13 scripts/sync_kgm_dependencies.py
 
-# Validate kg-microbe's isolation_source_to_ontology.tsv against:
-# CURIE format, ontology category allowlist (no MONDO/DOID/HP), and
-# label-keyword filters for non-isolation-source contexts. Codex-
-# adversarial-review follow-up gate. Exits 2 on errors.
-validate-isolation-source *args:
-    /opt/homebrew/bin/python3.13 scripts/validate_isolation_source_mapping.py {{args}}
-
-# Validate kg-microbe's ingredient_mappings.sssom.tsv with the same
-# CURIE/predicate/justification/drift checks under the 'ingredient'
-# profile (allows CHEBI/FOODON/UBERON/ENVO/NCIT/MICRO/mesh/BTO/
-# kgmicrobe.*/cas/registry/MIM; rejects MONDO/DOID/HP/UO; tolerates
-# SSSOM YAML preamble and numeric [0,1] confidence). Exits 2 on errors.
-validate-ingredient-sssom *args:
-    /opt/homebrew/bin/python3.13 scripts/validate_isolation_source_mapping.py --profile ingredient {{args}}
+# Mapping-schema validators moved into kg-microbe at
+# mappings/validate_mapping_schema.py (lives next to the data it
+# gates). Invoke from the kg-microbe checkout:
+#   cd $KGMICROBE_ROOT && make validate-isolation-source-schema
+#   cd $KGMICROBE_ROOT && make validate-ingredient-schema
 
 # Fetch missing PubMed abstracts for every PMID referenced by MIM
 # evidence claims. Polite (3 req/s; 10 req/s with NCBI_API_KEY env var).
