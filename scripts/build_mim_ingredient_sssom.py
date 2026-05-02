@@ -77,7 +77,7 @@ SSSOM_BIN = "sssom"
 SUPPORTED_OBJECT_PREFIXES: tuple[str, ...] = (
     "CHEBI:", "FOODON:", "UBERON:", "ENVO:", "NCIT:",
     "MICRO:", "mesh:",
-    "kgmicrobe.compound:", "cas:",
+    "kgmicrobe.compound:", "kgmicrobe.ingredient:", "cas:",
 )
 _OBJECT_SOURCE_BY_PREFIX: dict[str, str] = {
     "CHEBI:": "obo:chebi.owl",
@@ -88,6 +88,7 @@ _OBJECT_SOURCE_BY_PREFIX: dict[str, str] = {
     "MICRO:": "obo:micro.owl",
     "mesh:": "registry:mesh",
     "kgmicrobe.compound:": "kgm:compound",
+    "kgmicrobe.ingredient:": "kgm:ingredient",
     "cas:": "registry:cas",
 }
 
@@ -345,6 +346,10 @@ def _row_from_yaml(
     # don't treat them as identity mappings.
     if quality and quality != "EXACT_MATCH":
         predicate = "skos:closeMatch"
+    # NARROW_MATCH (typically minted kgmicrobe.ingredient:* primaries)
+    # asserts the MIM term is narrower than the parent ontology term.
+    if quality == "NARROW_MATCH":
+        predicate = "skos:narrowMatch"
     comment = ""
 
     # Residual-P2.5 override: the generator ran a specificity / symmetry
@@ -438,6 +443,7 @@ HEADER_YAML = f"""\
 #   MICRO: "http://purl.obolibrary.org/obo/MICRO_"
 #   mesh: "http://id.nlm.nih.gov/mesh/"
 #   kgmicrobe.compound: "https://w3id.org/kg-microbe/compound/"
+#   kgmicrobe.ingredient: "https://w3id.org/kg-microbe/ingredient/"
 #   cas: "https://commonchemistry.cas.org/detail?cas_rn="
 #   registry: "https://w3id.org/kg-microbe/registry/"
 #   MIM: "https://github.com/KG-Hub/MediaIngredientMech/blob/main/data/ingredients/mapped/"

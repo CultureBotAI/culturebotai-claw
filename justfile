@@ -445,6 +445,19 @@ review-classifications:
 foodon-pass *args:
     /opt/homebrew/bin/python3.13 -u scripts/foodon_pass.py {{args}}
 
+# Detect MIM mappings where the ontology term is more general than the
+# named ingredient (e.g. "Vermont Soil" → ENVO:soil). Read-only review.
+# See .claude/skills/specificity-loss-review/skill.md.
+detect-specificity-loss:
+    /opt/homebrew/bin/python3.13 scripts/detect_specificity_loss.py
+
+# Mint a kgmicrobe.ingredient:* custom term to preserve specificity.
+# See .claude/skills/specificity-loss-review/skill.md.
+#   just mint-kgm-ingredient --slug Vermont_Soil
+#   just mint-kgm-ingredient --from-tsv workspace/reports/specificity_loss_review.tsv
+mint-kgm-ingredient *args:
+    /opt/homebrew/bin/python3.13 scripts/mint_kgm_ingredient.py {{args}}
+
 # Import a new ingredient/compound source into MIM. See
 # .claude/skills/ingredient-mapping/skill.md for the full source→resolver→emit
 # cascade. Defaults to dry-run; pass --apply to write YAMLs.
