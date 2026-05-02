@@ -312,16 +312,30 @@ def _row_from_yaml(
     kgm_sources: dict[str, str],
     kgm_labels: dict[str, tuple[str, list[str]]],
     canonical_labels: dict[str, str],
-) -> dict | None:
+) -> list[dict]:
+    """Returns a list of SSSOM rows for one MIM YAML.
+
+    Most records yield exactly one row. Records whose primary
+    `identifier` is a registry/custom CURIE (`cas:`, `kgmicrobe.compound:`,
+    `kgmicrobe.ingredient:`) AND whose `ontology_mapping.ontology_id`
+    points to a *different* ontology parent (typically backfilled by
+    `backfill_parent_terms.py`) emit TWO rows so downstream consumers
+    keep both joins:
+
+      Row A (parent):   subject → ontology parent  (skos:narrowMatch)
+      Row B (registry): subject → identifier       (skos:exactMatch)
+
+    Returns [] for records with no supported ontology_id prefix.
+    """
     try:
         data = yaml.safe_load(path.read_text()) or {}
     except yaml.YAMLError:
-        return None
+        return []
 
     ont = data.get("ontology_mapping") or {}
     obj_id = (ont.get("ontology_id") or "").strip()
     if not any(obj_id.startswith(p) for p in SUPPORTED_OBJECT_PREFIXES):
-        return None
+        return []
     is_chebi = obj_id.startswith("CHEBI:")
 
     preferred = (data.get("preferred_term") or "").strip()
@@ -413,7 +427,7 @@ def _row_from_yaml(
     prefix = next(p for p in SUPPORTED_OBJECT_PREFIXES if obj_id.startswith(p))
     object_source = _OBJECT_SOURCE_BY_PREFIX.get(prefix, "")
 
-    return {
+    parent_row = {
         "subject_id": _mim_curie(src_file),
         "subject_label": preferred,
         "predicate_id": predicate,
@@ -432,6 +446,40 @@ def _row_from_yaml(
         # "OAK+OLS:chebi|CONFIRMED|2026-04-18".
         "validation_method": "",
     }
+
+    # Dual-emission: when the MIM record's `identifier` is a custom
+    # registry CURIE (cas:, kgmicrobe.compound:, kgmicrobe.ingredient:)
+    # AND the ontology_mapping points to a *different* parent term,
+    # emit a second row preserving the registry-form identity. This
+    # protects downstream joins on the registry CURIE that the
+    # parent-class primary would otherwise displace.
+    primary_id = (data.get("identifier") or "").strip()
+    rows = [parent_row]
+    if (primary_id and primary_id != obj_id and any(
+            primary_id.startswith(p) for p in (
+                "cas:", "kgmicrobe.compound:", "kgmicrobe.ingredient:"))):
+        primary_prefix = next(
+            (p for p in SUPPORTED_OBJECT_PREFIXES
+             if primary_id.startswith(p)), "")
+        if primary_prefix:
+            rows.append({
+                "subject_id": parent_row["subject_id"],
+                "subject_label": preferred,
+                "predicate_id": "skos:exactMatch",
+                "object_id": primary_id,
+                "object_label": preferred,  # registry CURIE: label is the MIM term
+                "object_source": _OBJECT_SOURCE_BY_PREFIX.get(
+                    primary_prefix, ""),
+                "mapping_justification": JUST_MANUAL,
+                "source": parent_row["source"],
+                "mapping_date": parent_row["mapping_date"],
+                "confidence": "0.99",
+                "comment": (f"Registry/identity row preserving "
+                            f"{primary_id} alongside parent {obj_id}."),
+                "other": "",
+                "validation_method": "",
+            })
+    return rows
 
 
 HEADER_YAML = f"""\
@@ -584,18 +632,21 @@ def main():
     rows: list[dict] = []
     skipped_unsupported = 0
     for p in yamls:
-        row = _row_from_yaml(p, residual, kgm_sources, kgm_labels, canonical_labels)
-        if row is None:
+        record_rows = _row_from_yaml(
+            p, residual, kgm_sources, kgm_labels, canonical_labels)
+        if not record_rows:
             skipped_unsupported += 1
             continue
-        rows.append(row)
+        rows.extend(record_rows)
 
-    # Dedup: MIM CURIEs are unique per YAML; but residual CONSIDER_SPECIFIC
-    # can redirect object_id, and we still want one row per MIM subject, so
-    # dedup on subject_id alone (keep the last).
-    uniq: dict[str, dict] = {}
+    # Dedup: registry-CURIE / parent dual emission means a single
+    # subject can legitimately have multiple object rows. Dedup on
+    # (subject_id, object_id) so we don't collapse the parent +
+    # registry pair, but still drop accidental duplicates from
+    # residual-redirect overlap.
+    uniq: dict[tuple[str, str], dict] = {}
     for r in rows:
-        uniq[r["subject_id"]] = r
+        uniq[(r["subject_id"], r["object_id"])] = r
     final = list(uniq.values())
 
     version = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
