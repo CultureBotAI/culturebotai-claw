@@ -99,6 +99,74 @@ _VALID_JUSTIFICATIONS = frozenset({
 
 _VALID_CONFIDENCE = frozenset({"high", "medium", "low", ""})
 
+# Rows whose subject label has been deliberately routed to a generic /
+# parent term. Skip the descendant-drift heuristic for these.
+_DRIFT_WHITELIST_SUBJECTS = frozenset({
+    "Indoor-Air", "Outdoor-Air",  # legitimately ENVO indoor/outdoor air
+})
+
+# Conventional ontology "hedges" — generic taxonomic words that ontology
+# labels append (or prepend) to disambiguate within the ontology, without
+# narrowing the concept beyond the subject. e.g. UBERON labels anatomical
+# entities as "X organ" or "X element"; ENVO labels environments as
+# "X biome" / "X zone" / "X water body". A close-match where the only
+# extra token(s) are hedges is NOT descendant drift.
+_HEDGE_WORDS = frozenset({
+    "organ", "element", "structure", "part", "parts", "system",
+    "tissue", "cell", "fluid", "space", "lumen", "joint",
+    "zone", "biome", "ecosystem", "environment",
+    "material", "facility", "area", "region", "feature", "site",
+    "body", "anatomical",
+    "food", "product", "beverage",
+    "device",
+})
+
+# Multi-word hedge phrases. Replaced with a single placeholder before
+# extra-token tokenization so e.g. "marine water body" → ["water_body"]
+# which is then collapsed to a hedge.
+_HEDGE_PHRASES = (
+    "water body",
+    "anatomical part",
+    "anatomical structure",
+    "climatic zone",
+    "food product",
+)
+
+_PARENS_RE = re.compile(r"\s*\([^)]*\)\s*$")
+
+
+def _normalize_for_drift(s: str) -> str:
+    return s.replace("-", " ").replace("_", " ").strip().lower()
+
+
+def _strip_trailing_parens(label: str) -> str:
+    return _PARENS_RE.sub("", label).strip()
+
+
+def _extras_after_subject(subject_norm: str, label_norm: str) -> list[str] | None:
+    """Return the leftover tokens when subject is a prefix or suffix of label.
+
+    Multi-word hedge phrases in the leftover are collapsed so they can be
+    treated as a single hedge token.
+    """
+    if not subject_norm or not label_norm or subject_norm == label_norm:
+        return None
+    if label_norm.startswith(subject_norm + " "):
+        rest = label_norm[len(subject_norm) + 1:]
+    elif label_norm.endswith(" " + subject_norm):
+        rest = label_norm[: -(len(subject_norm) + 1)]
+    else:
+        return None
+    for phrase in _HEDGE_PHRASES:
+        rest = rest.replace(phrase, "_HEDGE_")
+    return [t for t in rest.split() if t]
+
+
+def _extra_tokens_are_hedges(extras: list[str]) -> bool:
+    """True if every extra token in the object label is a generic hedge."""
+    return bool(extras) and all(
+        t in _HEDGE_WORDS or t == "_HEDGE_" for t in extras)
+
 
 def validate(path: Path, strict: bool = False) -> int:
     if not path.is_file():
@@ -182,6 +250,33 @@ def validate(path: Path, strict: bool = False) -> int:
                 warnings.append(
                     f"line {i}: '{subj}' → {oid}: ontology {prefix!r} "
                     f"not on the isolation-source allowlist; review")
+
+            # Rule 9: NCBITaxon homonym-disambiguator hits
+            # Labels of the form "Calamus <ray-finned fishes>" or
+            # "Theria <mammals>" are nearly always too-specific lexical
+            # hits where the curator wanted the parent rank.
+            if prefix == "NCBITaxon" and "<" in olabel:
+                warnings.append(
+                    f"line {i}: '{subj}' → {oid} ({olabel}) — "
+                    f"NCBITaxon label contains '<>' homonym disambiguator; "
+                    f"often a too-specific lexical hit (use parent rank)")
+
+            # Rule 10: descendant-drift on closeMatch rows
+            # Subject "Indoor" matched to "indoor toilet", "Mushroom" to
+            # "mushroom compost", etc. — when the object label contains
+            # the subject plus an extra non-hedge token, the match has
+            # likely drifted into a descendant subclass. Suppress when
+            # the extra tokens are all conventional ontology hedges
+            # (e.g. "X organ", "X biome").
+            if pred == "skos:closeMatch" and subj not in _DRIFT_WHITELIST_SUBJECTS:
+                ns = _normalize_for_drift(subj)
+                no = _strip_trailing_parens(olabel.lower())
+                extras = _extras_after_subject(ns, no)
+                if extras and not _extra_tokens_are_hedges(extras):
+                    warnings.append(
+                        f"line {i}: '{subj}' → {oid} ({olabel}) — "
+                        f"object label looks like a descendant of subject "
+                        f"(extra token(s) {extras!r}); review")
 
     print(f"errors: {len(errors)}")
     print(f"warnings: {len(warnings)}")
