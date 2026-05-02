@@ -414,6 +414,14 @@ sync-kgm:
 validate-isolation-source *args:
     /opt/homebrew/bin/python3.13 scripts/validate_isolation_source_mapping.py {{args}}
 
+# Validate kg-microbe's ingredient_mappings.sssom.tsv with the same
+# CURIE/predicate/justification/drift checks under the 'ingredient'
+# profile (allows CHEBI/FOODON/UBERON/ENVO/NCIT/MICRO/mesh/BTO/
+# kgmicrobe.*/cas/registry/MIM; rejects MONDO/DOID/HP/UO; tolerates
+# SSSOM YAML preamble and numeric [0,1] confidence). Exits 2 on errors.
+validate-ingredient-sssom *args:
+    /opt/homebrew/bin/python3.13 scripts/validate_isolation_source_mapping.py --profile ingredient {{args}}
+
 # Fetch missing PubMed abstracts for every PMID referenced by MIM
 # evidence claims. Polite (3 req/s; 10 req/s with NCBI_API_KEY env var).
 # See .claude/skills/evidence-reference-validation/skill.md.
