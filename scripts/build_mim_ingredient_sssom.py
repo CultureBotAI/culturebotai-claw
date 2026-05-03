@@ -380,9 +380,35 @@ def _row_from_yaml(
             # becomes that CHEBI, not the MIM one.
             kgm_chebi = (dec.get("kg_microbe_chebi") or "").strip()
             kgm_label = (dec.get("kg_microbe_label") or "").strip()
-            if kgm_chebi.startswith("CHEBI:"):
+            mim_label_for_check = (dec.get("mim_label") or ont_label).strip()
+            # Defensive token-overlap gate: a CONSIDER_SPECIFIC override
+            # is only safe when MIM's label and kg-microbe's label share
+            # at least one significant token. Otherwise the residual
+            # pipeline likely matched on an unrelated chemistry (e.g.
+            # 'kaempferol 3-O-beta-D-glucoside' vs 'manganese(II)
+            # chloride dihydrate' — the bug class Codex review #558
+            # flagged: see PR #2 / fix/remove-bad-narrow-match-rows-pr558).
+            # When overlap fails, keep MIM's CHEBI as authoritative and
+            # downgrade the override to a comment-only marker.
+            _STOP = {"the","a","an","of","and","or","in","on","with",
+                     "no","nr","type","grade","form","powder","solution",
+                     "extract","broth","infusion","agar"}
+            def _toks(s: str) -> set[str]:
+                return {t for t in re.findall(r"[A-Za-z]{3,}", (s or "").lower())
+                        if t not in _STOP}
+            if (kgm_chebi.startswith("CHEBI:")
+                    and _toks(mim_label_for_check) & _toks(kgm_label)):
                 obj_id = kgm_chebi
                 ont_label = kgm_label or ont_label
+            elif kgm_chebi.startswith("CHEBI:"):
+                # Token-overlap zero — keep MIM's CHEBI; flag in comment.
+                cat = "CONSIDER_SPECIFIC_REJECTED"
+                print(
+                    f"  WARNING: rejected CONSIDER_SPECIFIC override for "
+                    f"{src_file}: '{mim_label_for_check}' (MIM "
+                    f"{(ont.get('ontology_id') or '').strip()}) vs "
+                    f"'{kgm_label}' ({kgm_chebi}) — zero token overlap",
+                    file=sys.stderr)
         predicate = _PREDICATE_BY_CATEGORY.get(cat, predicate)
         confidence = _CONFIDENCE_BY_CATEGORY.get(cat, confidence)
         justification = JUST_MANUAL if cat == "CONSIDER_SPECIFIC" else JUST_LEXICAL
