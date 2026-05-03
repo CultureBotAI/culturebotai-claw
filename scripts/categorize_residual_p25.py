@@ -49,15 +49,25 @@ TRIAGED_JSON = REPORT_DIR / "kg_microbe_sweep_triaged.json"
 ROUND_TRIP_JSON = REPORT_DIR / "kg_microbe_true_bugs_round_tripped.json"
 
 
-# Stereo/hydration/anomer specificity markers: if kg-microbe's label has
-# one and MIM's doesn't, kg-microbe is the more specific side.
-_SPECIFICITY_MARKERS = [
+# Stereo/anomer specificity markers — when ONE side has these and the
+# other doesn't, that side names a more specific form of the same
+# molecule (e.g. 'glucose' vs 'D-glucose'). These are true parent-child.
+_STEREO_MARKERS = [
     re.compile(r"\bl-", re.IGNORECASE),
     re.compile(r"\bd-", re.IGNORECASE),
     re.compile(r"\b\(r\)-", re.IGNORECASE),
     re.compile(r"\b\(s\)-", re.IGNORECASE),
     re.compile(r"\balpha-", re.IGNORECASE),
     re.compile(r"\bbeta-", re.IGNORECASE),
+]
+
+# Hydrate markers — separated because hydrate differences denote
+# SIBLING forms (anhydrous vs hydrate vs polyhydrate), NOT parent-child.
+# 'manganese(II) chloride' is NOT a kind-of 'manganese(II) chloride
+# tetrahydrate'; they're different compounds. Codex review #558 caught
+# the bug where Mncl2_anhydrous got narrow-matched to CHEBI:86368
+# (tetrahydrate) because hydrate markers were counted alongside stereo.
+_HYDRATE_MARKERS = [
     re.compile(
         r"\b(mono|di|tri|tetra|penta|hexa|hepta|octa|nona|deca|dodeca)hydrate\b",
         re.IGNORECASE,
@@ -65,12 +75,53 @@ _SPECIFICITY_MARKERS = [
     re.compile(r"\b\d+-?hydrate\b", re.IGNORECASE),
 ]
 
+# Backwards-compatible alias used by any external readers.
+_SPECIFICITY_MARKERS = _STEREO_MARKERS + _HYDRATE_MARKERS
+
+
+# Stop-words for the token-overlap guard. Mirrored from
+# culturebotai-claw/scripts/foodon_pass.py:_STOP_TOKENS so the
+# producer-side gate uses the same vocabulary the build script's
+# defensive gate uses (build_mim_ingredient_sssom.py — the
+# CONSIDER_SPECIFIC override there refuses zero-overlap pairs too).
+_STOP_TOKENS = frozenset({
+    "the", "a", "an", "of", "and", "or", "in", "on", "with",
+    "no", "nr", "type", "grade", "form", "powder", "solution",
+    "extract", "broth", "infusion", "agar",
+})
+
+
+def _tokens(s: str) -> set[str]:
+    """Lowercase tokens (alpha runs of length ≥ 3), minus stop words."""
+    return {
+        t for t in re.findall(r"[A-Za-z]{3,}", (s or "").lower())
+        if t not in _STOP_TOKENS
+    }
+
 
 def _more_specific_side(a: str, b: str) -> str | None:
     """Return 'a' / 'b' / None depending on which side carries a
-    specificity marker the other lacks."""
-    a_hits = sum(1 for r in _SPECIFICITY_MARKERS if r.search(a))
-    b_hits = sum(1 for r in _SPECIFICITY_MARKERS if r.search(b))
+    specificity marker the other lacks.
+
+    Two guards prevent the bug class Codex review #558 caught:
+
+    1. Zero token-overlap → return None. A specificity-marker delta
+       only counts as "more specific" if the two labels share at
+       least one significant token; otherwise the delta is across
+       unrelated chemistry. Catches the 'kaempferol 3-O-beta-D-
+       glucoside' vs 'manganese(II) chloride dihydrate' class.
+
+    2. Stereo markers only count for the verdict, NOT hydrate
+       markers. Hydrate differences denote sibling forms (anhydrous
+       vs mono/di/tetra/...hydrate), not parent-child. Catches the
+       'manganese(II) chloride' vs 'manganese(II) chloride
+       tetrahydrate' class — those are different compounds, and
+       narrowMatching anhydrous to tetrahydrate is wrong.
+    """
+    if not _tokens(a) & _tokens(b):
+        return None
+    a_hits = sum(1 for r in _STEREO_MARKERS if r.search(a))
+    b_hits = sum(1 for r in _STEREO_MARKERS if r.search(b))
     if a_hits > b_hits:
         return "a"
     if b_hits > a_hits:
@@ -84,6 +135,21 @@ def _categorize(finding: dict) -> tuple[str, str]:
     kgm = (ev.get("kg_microbe_label") or "").strip()
     bucket = finding.get("_rationale", "")
     tri_bucket = None  # the heuristic bucket from triage_p25_findings
+
+    # Late-detected TRUE_BUG: zero significant-token overlap between
+    # MIM and kg-microbe labels means they describe unrelated chemistry,
+    # not a defensible variant. Triage upstream should have caught this
+    # but didn't (the heuristic triage buckets like HYDRATION fire on
+    # numeric-prefix matches without checking the chemistry root).
+    # Filtering here so the build script doesn't emit any predicate
+    # for these pairs — MIM's YAML-default exactMatch flows through.
+    if mim and kgm and not (_tokens(mim) & _tokens(kgm)):
+        return "TRUE_BUG_LATE_DETECTED", (
+            f"zero token-overlap between MIM and kg-microbe labels "
+            f"({mim!r} vs {kgm!r}); flagged by categorizer's defensive "
+            f"gate. Inspect upstream triage_p25_findings to see why "
+            f"this slipped past TRUE_BUG bucketing."
+        )
 
     # kg-microbe side is strictly more specific
     side = _more_specific_side(mim, kgm)
@@ -133,9 +199,25 @@ def main():
     decisions: list[dict] = []
     cat_counter: Counter = Counter()
     by_cat_triage: dict[str, Counter] = defaultdict(Counter)
+    late_bugs: list[dict] = []  # TRUE_BUG_LATE_DETECTED findings — do NOT
+    # ship to build_mim_ingredient_sssom; only audit-log them.
 
     for f in residual:
         cat, rationale = _categorize(f)
+        if cat == "TRUE_BUG_LATE_DETECTED":
+            late_bugs.append({
+                "source_file": f["source_file"],
+                "preferred_term": f["preferred_term"],
+                "mim_chebi": f["mim_chebi"],
+                "mim_label": f["evidence"].get("mim_label", ""),
+                "kg_microbe_chebi": f["evidence"].get("kg_microbe_chebi"),
+                "kg_microbe_label": f["evidence"].get("kg_microbe_label", ""),
+                "triage_bucket": f["_triage_bucket"],
+                "rationale": rationale,
+            })
+            cat_counter[cat] += 1
+            by_cat_triage[cat][f["_triage_bucket"]] += 1
+            continue
         decisions.append(
             {
                 "source_file": f["source_file"],
@@ -164,6 +246,7 @@ def main():
                     },
                 },
                 "decisions": decisions,
+                "true_bug_late_detected": late_bugs,
             },
             indent=2,
         )
