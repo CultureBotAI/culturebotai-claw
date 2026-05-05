@@ -4,25 +4,52 @@ Generate workspace/reports/kg_microbe_review.md — a row-level diff
 of MIM's published SSSOM against kg-microbe's SSSOM-first consolidated
 artifact on the chemical-mappings-mim-priority branch.
 
-Output classifies every MIM subject_id into one of:
-  IN_SYNC              both sides agree on (CHEBI, object_label)
-  CHEBI_DIVERGED       kg-microbe has MIM's subject but different CHEBI
-  LABEL_DRIFTED        same CHEBI, different object_label
-  MISSING_IN_KGM       MIM publishes it; kg-microbe doesn't have it
-  MIM_ONLY_NON_CHEBI   MIM row maps to FOODON/ENVO (covered by complex_ingredients)
+Why this script changed (2026-05-04)
+------------------------------------
+kg-microbe's consolidator collapses MIM:* subjects into entity-anchored
+records: a MIM row ``MIM:Glucose skos:exactMatch CHEBI:17234`` is *not*
+preserved in the unified SSSOM as a ``MIM:Glucose``-keyed row. Instead,
+the consolidator emits many xref rows ``cas:50-99-7 → CHEBI:17234``,
+``kegg.compound:C00031 → CHEBI:17234``, etc., and accumulates source
+contributors (including ``mediaingredientmech_reviewed``) on the
+``source`` column of those rows.
+
+The previous classifier looked for ``subject_id == MIM:*`` matches in
+kg-microbe's unified SSSOM and reported 1338 ``MISSING_IN_KGM`` —
+nearly all of which were artefacts: the MIM mapping had landed via
+xref-row propagation, just not under a ``MIM:*`` subject. The new
+classifier anchors on ``object_id`` instead.
+
+Output classes
+--------------
+  IN_SYNC                        kg-microbe has ≥1 row with this MIM-asserted
+                                 object_id AND `mediaingredientmech_*` in source.
+  IN_SYNC_SUBJECT_PRESERVED      Residual MIM:* subject preserved in kg-microbe
+                                 (no xref collapse possible) and matches MIM's object.
+  DIVERGED_OBJECT                Residual MIM:* subject preserved in kg-microbe but
+                                 with a different object_id than MIM asserts.
+  PROVENANCE_LOST                Object exists in kg-microbe SSSOM but no row
+                                 carries `mediaingredientmech_*` source — consolidator
+                                 dropped MIM provenance, or hasn't re-run yet.
+  OBJECT_NOT_IN_KGM              MIM-asserted object_id is absent from kg-microbe
+                                 entirely. True propagation backlog.
+  REGISTRY_LANDED                MIM registry row (object = `kgmicrobe.{ingredient,compound}:*`)
+                                 — that CURIE has its own subject row in kg-microbe.
+  REGISTRY_NOT_LANDED            Same shape, but kg-microbe doesn't yet have a
+                                 row for that registry CURIE (informational —
+                                 happens when MIM mints a new registry CURIE
+                                 with no canonical CHEBI anchor for kg-microbe
+                                 to synthesise around).
 
 Also scans kg-microbe's SSSOM for:
-  STALE_IN_KGM         MIM:* subjects in kg-microbe that MIM no longer publishes
-  MIM_LEGACY_IN_KGM    any MediaIngredientMech:* subjects remaining
-
-The report is designed for sharing with a kg-microbe reviewer and
-for deriving the PR scope for chemical-mappings-mim-priority.
+  STALE_IN_KGM         MIM:* subjects in kg-microbe that MIM no longer publishes.
+  MIM_LEGACY_IN_KGM    Any `MediaIngredientMech:*` subjects remaining.
 """
 
 from __future__ import annotations
 
 import gzip
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
 
@@ -67,53 +94,65 @@ def _parse_sssom_header_and_rows(lines):
         yield header, dict(zip(header, parts))
 
 
-def load_mim() -> dict[str, dict]:
-    out: dict[str, dict] = {}
+def load_mim() -> list[dict]:
+    """Return ALL MIM SSSOM rows (no dedup; one MIM subject can have many rows)."""
+    rows: list[dict] = []
     with MIM_SSSOM.open() as f:
         for _, row in _parse_sssom_header_and_rows(f):
-            out[row["subject_id"]] = row
-    return out
+            rows.append(row)
+    return rows
 
 
-def load_kgm_mim_rows() -> tuple[dict[str, list[dict]], list[dict]]:
-    """Return ({mim_subject_id -> [rows]}, [legacy_media_rows]).
+def load_kgm_indexes() -> dict:
+    """Build the indexes the new classifier needs.
 
-    A single MIM:* subject can legitimately have multiple kg-microbe
-    rows (e.g. MIM's dual emission with parent FOODON/ENVO + identity
-    kgmicrobe.ingredient/MICRO/mesh). The classifier picks the row
-    whose object_id matches MIM's expectation; see ``pick_kgm_row``.
+    Returns dict with keys:
+      objects_with_mim       set[str] — object_ids in rows tagged `mediaingredientmech_*`
+      all_objects            set[str] — every object_id seen
+      mim_subject_rows       dict[str, list[dict]] — residual `MIM:*` subjects
+      kgmicrobe_subjects     set[str] — kgmicrobe.{ingredient,compound}:* subject_ids
+      legacy_rows            list[dict] — MediaIngredientMech:* subjects
+      mim_subject_source     dict[str, set[str]] — source-tag set per MIM:* subject
     """
-    mim_rows: dict[str, list[dict]] = {}
-    legacy: list[dict] = []
+    objects_with_mim: set[str] = set()
+    all_objects: set[str] = set()
+    mim_subject_rows: dict[str, list[dict]] = defaultdict(list)
+    kgmicrobe_subjects: set[str] = set()
+    legacy_rows: list[dict] = []
+    mim_subject_source: dict[str, set[str]] = defaultdict(set)
+
     with gzip.open(KGM_SSSOM_GZ, "rt", encoding="utf-8") as f:
         for _, row in _parse_sssom_header_and_rows(f):
-            sid = row.get("subject_id", "")
+            obj = (row.get("object_id") or "").strip()
+            sid = (row.get("subject_id") or "").strip()
+            src = (row.get("source") or "")
+            src_lower = src.lower()
+            has_mim = "mediaingredient" in src_lower
+
+            if obj:
+                all_objects.add(obj)
+                if has_mim:
+                    objects_with_mim.add(obj)
+
             if sid.startswith("MIM:"):
-                mim_rows.setdefault(sid, []).append(row)
+                mim_subject_rows[sid].append(row)
+                for tag in src.split("|"):
+                    tag = tag.strip()
+                    if tag:
+                        mim_subject_source[sid].add(tag)
             elif sid.startswith("MediaIngredientMech:"):
-                legacy.append(row)
-    return mim_rows, legacy
+                legacy_rows.append(row)
+            elif sid.startswith("kgmicrobe."):
+                kgmicrobe_subjects.add(sid)
 
-
-def pick_kgm_row(mim_row: dict, kgm_rows: list[dict]) -> dict | None:
-    """Pick the kg-microbe row best aligned with MIM's expected object_id.
-
-    1. If MIM has an object_id and any kg-microbe row matches it
-       exactly → return that row (true IN_SYNC).
-    2. Otherwise, prefer ``skos:exactMatch`` over other predicates.
-    3. Otherwise, return the first row encountered.
-    """
-    if not kgm_rows:
-        return None
-    mim_obj = (mim_row.get("object_id") or "").strip()
-    if mim_obj:
-        for r in kgm_rows:
-            if (r.get("object_id") or "").strip() == mim_obj:
-                return r
-    for r in kgm_rows:
-        if r.get("predicate_id") == "skos:exactMatch":
-            return r
-    return kgm_rows[0]
+    return {
+        "objects_with_mim": objects_with_mim,
+        "all_objects": all_objects,
+        "mim_subject_rows": dict(mim_subject_rows),
+        "kgmicrobe_subjects": kgmicrobe_subjects,
+        "legacy_rows": legacy_rows,
+        "mim_subject_source": dict(mim_subject_source),
+    }
 
 
 def load_metatraits_chemical() -> tuple[list[dict], list[dict]]:
@@ -138,8 +177,6 @@ def load_metatraits_chemical() -> tuple[list[dict], list[dict]]:
                 if len(parts) < len(header):
                     parts += [""] * (len(header) - len(parts))
                 row = dict(zip(header, parts))
-                # subject_label is "produces: ethanol" — strip the
-                # predicate prefix to get the chemical name.
                 raw = (row.get("subject_label") or "").strip()
                 name = raw.split(":", 1)[-1].strip() if ":" in raw else raw
                 obj = (row.get("object_id") or "").strip()
@@ -180,208 +217,187 @@ def load_metatraits_chemical() -> tuple[list[dict], list[dict]]:
 
 def diff_metatraits_against_mim(rows: list[dict], mim_by_chebi: dict[str, list[dict]],
                                 mim_label_index: dict[str, str]) -> dict[str, list[dict]]:
-    """Classify each metatraits row vs MIM:
-      IN_MIM_AGREE      kg-microbe chebi == MIM's chebi for the same chemical name (or chebi already present)
-      IN_MIM_DIVERGE    chemical exists in MIM under a different CHEBI
-      MISSING_IN_MIM    chemical not in MIM at all (candidate import)
-    """
-    out = {"IN_MIM_AGREE": [], "IN_MIM_DIVERGE": [], "MISSING_IN_MIM": []}
+    out: dict[str, list[dict]] = {"IN_MIM_AGREE": [], "IN_MIM_DIVERGE": [], "MISSING_IN_MIM": []}
     for r in rows:
         chebi = r.get("chebi", "")
         name = (r.get("name") or "").lower().strip()
-        # Agreement check: chebi already in MIM
-        if chebi and chebi in mim_by_chebi:
-            r["_mim_record"] = mim_by_chebi[chebi][0].get("subject_id", "")
+        if chebi in mim_by_chebi:
             out["IN_MIM_AGREE"].append(r)
             continue
-        # Divergence: name in MIM index but with different CHEBI
-        if name and name in mim_label_index:
-            r["_mim_chebi"] = mim_label_index[name]
+        mim_chebi = mim_label_index.get(name, "")
+        if mim_chebi and mim_chebi != chebi:
+            r = dict(r)
+            r["_mim_chebi"] = mim_chebi
             out["IN_MIM_DIVERGE"].append(r)
             continue
         out["MISSING_IN_MIM"].append(r)
     return out
 
 
-def load_kgm_source_tags(kgm_mim_rows: dict[str, list[dict]]) -> dict[str, int]:
-    """Count frequency of each `source` tag across kg-microbe's MIM: rows.
-
-    Counts every row (not just one per subject) so the source
-    distribution reflects the dual-emission topology faithfully.
-    """
-    counts: dict[str, int] = defaultdict(int)
-    for rows in kgm_mim_rows.values():
-        for row in rows:
-            for tag in (row.get("source", "") or "").split("|"):
-                tag = tag.strip()
-                if tag:
-                    counts[tag] += 1
-    return counts
+def load_kgm_source_tags(mim_subject_source: dict[str, set[str]]) -> dict[str, int]:
+    """Count distinct source tags across kg-microbe's residual `MIM:*` rows."""
+    counts: Counter[str] = Counter()
+    for tags in mim_subject_source.values():
+        for tag in tags:
+            counts[tag] += 1
+    return dict(counts)
 
 
 # ---------- diff ----------
 
-def _expected_labels_for_chebi(mim_rows: list[dict]) -> set[str]:
-    """All labels kg-microbe's canonical_name legitimately could be for a CHEBI.
+def classify_row(mim_row: dict, kgm_idx: dict) -> tuple[str, str]:
+    """Classify a single MIM SSSOM row against kg-microbe's unified SSSOM.
 
-    Multiple MIM subjects can share a CHEBI (e.g. MIM:Alcl3 narrowMatch +
-    MIM:Alcl3_X_6_H2o exactMatch both → CHEBI:30115). kg-microbe emits
-    one canonical per CHEBI; ANY of the contributing MIM rows' expected
-    canonical is a valid match — the consolidator picks one deterministically.
+    See module docstring for class semantics.
     """
-    out: set[str] = set()
-    for row in mim_rows:
-        predicate = row.get("predicate_id", "")
-        subj = (row.get("subject_label") or "").strip()
-        obj = (row.get("object_label") or "").strip()
-        if predicate in ("skos:exactMatch", "skos:closeMatch"):
-            if subj:
-                out.add(subj.lower())
-        elif predicate in ("skos:narrowMatch", "skos:broadMatch"):
-            if obj:
-                out.add(obj.lower())
-        # Fall back: accept either side so unclassified-predicate rows
-        # don't produce spurious drift.
-        if subj:
-            out.add(subj.lower())
-        if obj:
-            out.add(obj.lower())
-    return out
+    sid = (mim_row.get("subject_id") or "").strip()
+    obj = (mim_row.get("object_id") or "").strip()
 
+    # Subject-level diagnosis when MIM:* is preserved as subject_id in kg-microbe.
+    # This handles the residual ~14 cases where kg-microbe couldn't collapse the
+    # MIM record into an entity-anchored row (typically because the MIM object is
+    # a standalone ENVO/MICRO/registry CURIE with no other xrefs).
+    mim_subject_rows = kgm_idx["mim_subject_rows"]
+    if sid in mim_subject_rows:
+        kgm_objs = {(r.get("object_id") or "").strip() for r in mim_subject_rows[sid]}
+        if obj in kgm_objs:
+            return "IN_SYNC_SUBJECT_PRESERVED", "kg-microbe preserves MIM:* subject; objects match"
+        # MIM and kg-microbe disagree on the canonical object for this subject.
+        kgm_objs_disp = ", ".join(sorted(o for o in kgm_objs if o)) or "(none)"
+        return "DIVERGED_OBJECT", f"MIM={obj}; kg-microbe={{{kgm_objs_disp}}}"
 
-def classify(
-    mim_row: dict,
-    kgm_row: dict | None,
-    mim_rows_by_chebi: dict[str, list[dict]],
-) -> tuple[str, str]:
-    """Return (class, note)."""
-    if kgm_row is None:
-        if not mim_row.get("object_id", "").startswith("CHEBI:"):
-            return "MIM_ONLY_NON_CHEBI", (
-                f"maps to {mim_row.get('object_source', '?')} "
-                "(covered by complex_ingredients.tsv.gz)"
-            )
-        return "MISSING_IN_KGM", (
-            f"kg-microbe SSSOM has no MIM:{mim_row['subject_id'].split(':', 1)[1]} row"
+    if not obj:
+        return "MIM_NO_OBJECT", "MIM row has empty object_id"
+
+    # Registry rows — MIM-internal pairing of subject ↔ kgmicrobe.* identity CURIE.
+    if obj.startswith("kgmicrobe."):
+        if obj in kgm_idx["kgmicrobe_subjects"]:
+            return "REGISTRY_LANDED", "kgmicrobe.* CURIE has a subject row in kg-microbe"
+        return "REGISTRY_NOT_LANDED", (
+            "kgmicrobe.* CURIE lacks a subject row in kg-microbe (informational — "
+            "happens when MIM mints a registry CURIE without a canonical CHEBI anchor)"
         )
 
-    mim_obj = mim_row.get("object_id", "")
-    kgm_obj = kgm_row.get("object_id", "")
-    if mim_obj and kgm_obj and mim_obj != kgm_obj:
-        return "CHEBI_DIVERGED", (
-            f"MIM object_id={mim_obj}, kg-microbe object_id={kgm_obj}"
+    # Object-level: did the consolidator land MIM as a source contributor for this object?
+    if obj in kgm_idx["objects_with_mim"]:
+        return "IN_SYNC", "object_id present in kg-microbe with mediaingredientmech source"
+    if obj in kgm_idx["all_objects"]:
+        return "PROVENANCE_LOST", (
+            "object_id present in kg-microbe but no row tags mediaingredientmech_* "
+            "— consolidator dropped MIM provenance, or hasn't re-run since MIM update"
         )
-
-    kgm_lbl = (kgm_row.get("object_label") or "").strip()
-    if not mim_obj:
-        return "IN_SYNC", ""
-
-    # Expected label set = every label MIM asserts for this CHEBI across
-    # ALL MIM rows sharing the CHEBI. This avoids spurious drift when
-    # MIM has multiple subjects (hydrate variant + anhydrous, etc.)
-    # mapping to the same CHEBI.
-    expected_set = _expected_labels_for_chebi(mim_rows_by_chebi.get(mim_obj, []))
-    if kgm_lbl and kgm_lbl.lower() in expected_set:
-        return "IN_SYNC", ""
-    if kgm_lbl and expected_set:
-        sample = ", ".join(f"'{e}'" for e in sorted(expected_set)[:3])
-        return "LABEL_DRIFTED", (
-            f"kg-microbe has '{kgm_lbl}'; MIM's candidates for {mim_obj} "
-            f"are {{{sample}{'...' if len(expected_set) > 3 else ''}}}"
-        )
-    if not kgm_lbl and expected_set:
-        return "LABEL_DRIFTED", (
-            f"kg-microbe has no object_label; MIM has candidates for {mim_obj}"
-        )
-    return "IN_SYNC", ""
+    return "OBJECT_NOT_IN_KGM", "object_id absent from kg-microbe SSSOM (true backlog)"
 
 
 # ---------- report ----------
 
+# Class display order + suggested action text, used to render the summary table.
+CLASS_ROWS: list[tuple[str, str]] = [
+    ("IN_SYNC",
+     "None — consolidator absorbed MIM via xref propagation"),
+    ("IN_SYNC_SUBJECT_PRESERVED",
+     "None — residual MIM:* subject preserved as-is, agrees with MIM"),
+    ("DIVERGED_OBJECT",
+     "Investigate — MIM and consolidator disagree on canonical object"),
+    ("PROVENANCE_LOST",
+     "Rerun consolidator (or audit consolidator's source-merge logic)"),
+    ("OBJECT_NOT_IN_KGM",
+     "True backlog — consolidator hasn't ingested this object"),
+    ("REGISTRY_LANDED",
+     "None — kgmicrobe.* registry CURIE materialised in kg-microbe"),
+    ("REGISTRY_NOT_LANDED",
+     "Informational — registry CURIE awaiting a canonical anchor"),
+    ("MIM_NO_OBJECT",
+     "Curator-side — MIM row has no object_id"),
+]
+
+
 def render(
-    classified: list[tuple[str, dict, dict | None, str]],
+    classified: list[tuple[str, dict, str]],
     stale: list[dict],
     legacy: list[dict],
     kgm_source_tags: dict[str, int],
     mim_total: int,
-    kgm_mim_total: int,
+    kgm_mim_subject_total: int,
     metatraits_chem: dict | None = None,
     metatraits_special: dict | None = None,
 ) -> str:
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     counts: dict[str, int] = defaultdict(int)
-    for cls, _, _, _ in classified:
+    for cls, _, _ in classified:
         counts[cls] += 1
 
-    out = [
-        "# kg-microbe Review (SSSOM-first, chemical-mappings-mim-priority)\n",
-        f"_Generated {now} by `scripts/generate_kg_microbe_review.py`._\n\n",
+    out: list[str] = []
+    out.append("# kg-microbe Review (SSSOM-first, chemical-mappings-mim-priority)\n")
+    out.append(f"_Generated {now} by `scripts/generate_kg_microbe_review.py`._\n\n")
+    out.append(
         "Row-level diff of MIM's published SSSOM vs kg-microbe's "
         "consolidated SSSOM (`kgmicrobe_unified_entity_mappings.sssom.tsv.gz`) "
-        "on the `chemical-mappings-mim-priority` branch.\n\n",
-        "## Scope\n",
-        f"- MIM published SSSOM: **{mim_total}** rows "
-        f"(`{MIM_SSSOM.relative_to(MIM_SSSOM.parents[3])}`)\n",
-        f"- kg-microbe consolidated SSSOM, `MIM:*` subjects only: "
-        f"**{kgm_mim_total}** rows\n",
-        f"- Legacy `MediaIngredientMech:*` subjects in kg-microbe "
-        f"SSSOM: **{len(legacy)}**\n\n",
-        "## Diff summary\n",
-        "| Class | Rows | Suggested kg-microbe action |\n",
-        "|---|---:|---|\n",
-    ]
-    for cls, action in [
-        ("IN_SYNC", "None — consolidator will idempotently reproduce"),
-        ("CHEBI_DIVERGED",
-         "Rerun consolidator after refreshing MIM SSSOM input"),
-        ("LABEL_DRIFTED",
-         "Verify priority-11 `mediaingredientmech_reviewed` wins the name tiebreaker"),
-        ("MISSING_IN_KGM", "Rerun consolidator — MIM SSSOM not picked up"),
-        ("MIM_ONLY_NON_CHEBI",
-         "Accept `complex_ingredients.tsv.gz` companion artifact"),
-    ]:
-        out.append(f"| `{cls}` | {counts.get(cls, 0)} | {action} |\n")
+        "on the `chemical-mappings-mim-priority` branch.\n\n"
+    )
+    out.append(
+        "**Classification anchors on `object_id`**, not `subject_id`. "
+        "kg-microbe's consolidator collapses `MIM:*` subjects into "
+        "entity-anchored xref rows tagging `mediaingredientmech_*` in the "
+        "`source` column; the previous subject-anchored classifier mis-reported "
+        "such consolidations as missing.\n\n"
+    )
+
+    out.append("## Scope\n")
+    rel_mim = MIM_SSSOM.relative_to(MIM_SSSOM.parents[3])
+    out.append(f"- MIM published SSSOM: **{mim_total}** rows (`{rel_mim}`)\n")
+    out.append(
+        f"- kg-microbe consolidated SSSOM: residual **{kgm_mim_subject_total}** "
+        "rows still keyed at a `MIM:*` subject; the rest collapsed into "
+        "entity-anchored xrefs.\n"
+    )
+    out.append(f"- Legacy `MediaIngredientMech:*` subjects in kg-microbe SSSOM: **{len(legacy)}**\n\n")
+
+    out.append("## Diff summary\n")
+    out.append("| Class | Rows | Suggested action |\n|---|---:|---|\n")
+    for cls, action in CLASS_ROWS:
+        n = counts.get(cls, 0)
+        if n == 0:
+            continue
+        out.append(f"| `{cls}` | {n} | {action} |\n")
     out.append(f"| `STALE_IN_KGM` | {len(stale)} | "
                "Rerun consolidator — MIM dropped these |\n")
     out.append(f"| `MIM_LEGACY_IN_KGM` | {len(legacy)} | "
-               "Should be zero after this branch merges |\n")
+               "Should be zero on chemical-mappings-mim-priority |\n")
     out.append("\n")
 
-    out.append("## kg-microbe source tag distribution (on `MIM:*` rows)\n")
-    out.append("Sanity check that `mediaingredientmech_reviewed` "
-               "dominates, as priority-11 intends.\n\n")
-    out.append("| Source tag | Rows |\n|---|---:|\n")
+    out.append("## kg-microbe source tag distribution (residual `MIM:*` rows)\n")
+    out.append(
+        "Distinct subjects per source tag across the small set of `MIM:*` "
+        "subjects that kg-microbe couldn't collapse via xref propagation. "
+        "Sanity check that `mediaingredientmech_reviewed` dominates.\n\n"
+    )
+    out.append("| Source tag | Subjects |\n|---|---:|\n")
     for tag, n in sorted(kgm_source_tags.items(), key=lambda x: -x[1])[:15]:
         out.append(f"| `{tag}` | {n} |\n")
     out.append("\n")
 
-    # Per-class sample tables
+    # Per-class sample tables — only for classes that flag something actionable.
     def sample(cls: str, limit: int = 25) -> None:
-        rows = [(m, k, note) for c, m, k, note in classified
-                if c == cls][:limit]
+        rows = [(m, note) for c, m, note in classified if c == cls][:limit]
         if not rows:
             return
         out.append(f"## {cls} (showing {len(rows)} of {counts[cls]})\n\n")
-        out.append("| MIM subject | MIM object | kg-microbe object | Note |\n")
+        out.append("| MIM subject | MIM predicate | MIM object | Note |\n")
         out.append("|---|---|---|---|\n")
-        for m, k, note in rows:
-            mim_obj = m.get("object_id", "")
-            mim_lbl = m.get("object_label", "")
-            if k:
-                kgm_obj = k.get("object_id", "")
-                kgm_lbl = k.get("object_label", "")
-                kgm_str = f"`{kgm_obj}` — {kgm_lbl}" if kgm_obj else "_(row present, no obj)_"
-            else:
-                kgm_str = "_(missing)_"
+        for m, note in rows:
             out.append(
-                f"| `{m['subject_id']}` | `{mim_obj}` — {mim_lbl} | {kgm_str} | {note} |\n"
+                f"| `{m.get('subject_id', '')}` | "
+                f"`{m.get('predicate_id', '')}` | "
+                f"`{m.get('object_id', '')}` — {m.get('object_label', '')} | "
+                f"{note} |\n"
             )
         out.append("\n")
 
-    sample("CHEBI_DIVERGED")
-    sample("LABEL_DRIFTED")
-    sample("MISSING_IN_KGM")
-    sample("MIM_ONLY_NON_CHEBI")
+    sample("DIVERGED_OBJECT")
+    sample("PROVENANCE_LOST")
+    sample("OBJECT_NOT_IN_KGM")
+    sample("REGISTRY_NOT_LANDED", limit=15)
 
     if stale:
         out.append(f"## STALE_IN_KGM (showing {min(20, len(stale))} of {len(stale)})\n\n")
@@ -438,7 +454,6 @@ def render(
                 f"{len(metatraits_special.get('MISSING_IN_MIM', []))} |\n"
             )
         out.append("\n")
-        # Show sample diverges + missing
         for label, diff in (("chemical_mappings", metatraits_chem),
                             ("special_chemical_mappings", metatraits_special)):
             if diff is None:
@@ -463,46 +478,68 @@ def render(
                         f"{label} |\n"
                     )
                 out.append("\n")
-        out.append("**Out-of-scope (no chemistry overlap with MIM):** "
-                   "`enzyme_mappings.tsv`, `enzyme_name_to_go.tsv`, "
-                   "`pathway_mappings.tsv`, `phenotype_mappings.tsv`, "
-                   "`metpo_alias_mappings.tsv`. Not reviewed.\n\n")
+        out.append(
+            "**Out-of-scope (no chemistry overlap with MIM):** "
+            "`enzyme_mappings.tsv`, `enzyme_name_to_go.tsv`, "
+            "`pathway_mappings.tsv`, `phenotype_mappings.tsv`, "
+            "`metpo_alias_mappings.tsv`. Not reviewed.\n\n"
+        )
 
     out.append("## Recommended contribution scope\n")
-    out.append(
-        "Based on this diff, candidate commits for the "
-        "`chemical-mappings-mim-priority` branch:\n\n"
+    actionable = (
+        counts.get("DIVERGED_OBJECT", 0)
+        + counts.get("PROVENANCE_LOST", 0)
+        + counts.get("OBJECT_NOT_IN_KGM", 0)
     )
-    out.append(
-        f"1. **Rerun consolidator** to absorb the {counts.get('MISSING_IN_KGM', 0)} "
-        f"`MISSING_IN_KGM` + {counts.get('CHEBI_DIVERGED', 0)} `CHEBI_DIVERGED` "
-        f"+ {len(stale)} `STALE_IN_KGM` rows and drop {len(legacy)} "
-        f"`MIM_LEGACY_IN_KGM` rows.\n"
-    )
-    label_drift = counts.get("LABEL_DRIFTED", 0)
-    if label_drift:
+    if actionable == 0 and len(stale) == 0 and len(legacy) == 0:
         out.append(
-            f"2. **Priority-11 tiebreaker audit** — {label_drift} rows where "
-            "kg-microbe's `object_label` differs from MIM's. If MIM is "
-            "priority-11, its label should win; if it doesn't, the "
-            "consolidator has a tiebreaker bug.\n"
+            "kg-microbe is fully in sync with MIM at the object-anchor level — "
+            "no actionable backlog. Recurring tasks remain:\n\n"
         )
+    else:
+        out.append("Based on this diff, the actionable items are:\n\n")
+        if counts.get("OBJECT_NOT_IN_KGM", 0):
+            out.append(
+                f"1. **Rerun kg-microbe consolidator** to absorb the "
+                f"{counts['OBJECT_NOT_IN_KGM']} `OBJECT_NOT_IN_KGM` rows.\n"
+            )
+        if counts.get("PROVENANCE_LOST", 0):
+            out.append(
+                f"2. **Audit consolidator source-merge** — {counts['PROVENANCE_LOST']} "
+                "rows where kg-microbe has the canonical object but no "
+                "`mediaingredientmech_*` source tag. Either the consolidator "
+                "stripped MIM provenance during a merge, or it hasn't re-run "
+                "since the MIM SSSOM was published.\n"
+            )
+        if counts.get("DIVERGED_OBJECT", 0):
+            out.append(
+                f"3. **Reconcile {counts['DIVERGED_OBJECT']} `DIVERGED_OBJECT` rows** — "
+                "MIM and the consolidator disagree on which canonical entity "
+                "the MIM subject should resolve to. Typical: MICRO vs FOODON, "
+                "minted `kgmicrobe.ingredient:*` vs ENVO parent.\n"
+            )
+        if len(stale):
+            out.append(
+                f"4. **Drop {len(stale)} STALE_IN_KGM rows** — MIM no longer "
+                "publishes these subjects; consolidator carries them stale.\n"
+            )
+        if len(legacy):
+            out.append(
+                f"5. **Drop {len(legacy)} `MediaIngredientMech:*` legacy rows** — "
+                "should be zero after the namespace migration.\n"
+            )
     out.append(
-        "3. **Accept `complex_ingredients.tsv.gz`** — the FOODON/ENVO "
-        "companion artifact covering the MIM_ONLY_NON_CHEBI rows.\n"
+        "- **Surface MIM curator provenance** — MIM SSSOM's `source` column "
+        "embeds `MIM:curator=<name>` tags that flatten to "
+        "`mediaingredientmech_reviewed[curator=...]` in kg-microbe; the "
+        "distribution table above is a sanity check on that propagation.\n"
     )
     out.append(
-        "4. **Surface MIM curator provenance** — MIM SSSOM's `source` "
-        "column embeds `MIM:curator=<name>` tags that currently flatten "
-        "to `mediaingredientmech_reviewed` in kg-microbe. A small "
-        "consolidator enhancement could preserve the curator attribution.\n"
+        "- **Accept `complex_ingredients.tsv.gz`** — the FOODON/ENVO "
+        "companion artifact covering rows that the CHEBI-scoped review "
+        "would otherwise treat as `MIM_ONLY_NON_CHEBI` (now folded into "
+        "`IN_SYNC` since the consolidator already absorbs them).\n"
     )
-    if counts.get("MIM_ONLY_NON_CHEBI", 0) > 0:
-        out.append(
-            "5. **Regression test fixtures** — the `MISSING_IN_KGM` and "
-            "`STALE_IN_KGM` rows are useful as test inputs for the "
-            "consolidator.\n"
-        )
     out.append("\n---\n\n_Review complete._\n")
 
     return "".join(out)
@@ -512,73 +549,85 @@ def render(
 
 def main() -> None:
     print(f"[1/4] Loading MIM SSSOM from {MIM_SSSOM}")
-    mim = load_mim()
-    print(f"      {len(mim)} rows")
+    mim_rows = load_mim()
+    print(f"      {len(mim_rows)} rows (no dedup; multi-row subjects preserved)")
 
-    print(f"[2/4] Loading kg-microbe SSSOM from {KGM_SSSOM_GZ}")
-    kgm_mim, legacy = load_kgm_mim_rows()
-    print(f"      {len(kgm_mim)} MIM:* rows, {len(legacy)} legacy MediaIngredientMech:* rows")
+    print(f"[2/4] Building kg-microbe indexes from {KGM_SSSOM_GZ.name}")
+    kgm_idx = load_kgm_indexes()
+    print(
+        f"      objects_with_mim={len(kgm_idx['objects_with_mim'])} "
+        f"all_objects={len(kgm_idx['all_objects'])} "
+        f"residual MIM:* subjects={len(kgm_idx['mim_subject_rows'])} "
+        f"kgmicrobe.* subjects={len(kgm_idx['kgmicrobe_subjects'])} "
+        f"legacy={len(kgm_idx['legacy_rows'])}"
+    )
+    kgm_source_tags = load_kgm_source_tags(kgm_idx["mim_subject_source"])
 
-    kgm_source_tags = load_kgm_source_tags(kgm_mim)
-
-    print(f"[2b/4] Loading metatraits chemical mappings")
+    print("[2b/4] Loading metatraits chemical mappings")
     chem_rows, special_rows = load_metatraits_chemical()
     print(f"      chemical_mappings.tsv: {len(chem_rows)} rows")
     print(f"      special_chemical_mappings.tsv: {len(special_rows)} rows")
 
-    # Build a label-keyed MIM index for diverge detection.
+    # Build label → CHEBI index for metatraits diverge detection.
     mim_label_index: dict[str, str] = {}
-    for sid, mim_row in mim.items():
-        sl = (mim_row.get("subject_label") or "").lower().strip()
-        ol = (mim_row.get("object_label") or "").lower().strip()
-        ch = mim_row.get("object_id", "")
+    for r in mim_rows:
+        sl = (r.get("subject_label") or "").lower().strip()
+        ol = (r.get("object_label") or "").lower().strip()
+        ch = r.get("object_id", "")
         if sl and ch:
             mim_label_index.setdefault(sl, ch)
         if ol and ch:
             mim_label_index.setdefault(ol, ch)
-
-    chem_diff = diff_metatraits_against_mim(chem_rows, mim_rows_by_chebi_for_meta := defaultdict(list, {
-        m["object_id"]: [m] for m in mim.values() if m.get("object_id")
-    }), mim_label_index)
-    special_diff = diff_metatraits_against_mim(special_rows, mim_rows_by_chebi_for_meta, mim_label_index)
-    print(f"      chemical_mappings: AGREE={len(chem_diff['IN_MIM_AGREE'])} "
-          f"DIVERGE={len(chem_diff['IN_MIM_DIVERGE'])} "
-          f"MISSING={len(chem_diff['MISSING_IN_MIM'])}")
-    print(f"      special_chemical_mappings: AGREE={len(special_diff['IN_MIM_AGREE'])} "
-          f"DIVERGE={len(special_diff['IN_MIM_DIVERGE'])} "
-          f"MISSING={len(special_diff['MISSING_IN_MIM'])}")
-
-    print("[3/4] Classifying each MIM row")
-    # Group MIM rows by object_id so we can accept any MIM-asserted label.
-    mim_rows_by_chebi: dict[str, list[dict]] = defaultdict(list)
-    for r in mim.values():
+    mim_by_chebi = defaultdict(list)
+    for r in mim_rows:
         obj = r.get("object_id", "")
         if obj:
-            mim_rows_by_chebi[obj].append(r)
+            mim_by_chebi[obj].append(r)
+    chem_diff = diff_metatraits_against_mim(chem_rows, mim_by_chebi, mim_label_index)
+    special_diff = diff_metatraits_against_mim(special_rows, mim_by_chebi, mim_label_index)
+    print(
+        f"      chemical_mappings: AGREE={len(chem_diff['IN_MIM_AGREE'])} "
+        f"DIVERGE={len(chem_diff['IN_MIM_DIVERGE'])} "
+        f"MISSING={len(chem_diff['MISSING_IN_MIM'])}"
+    )
+    print(
+        f"      special_chemical_mappings: AGREE={len(special_diff['IN_MIM_AGREE'])} "
+        f"DIVERGE={len(special_diff['IN_MIM_DIVERGE'])} "
+        f"MISSING={len(special_diff['MISSING_IN_MIM'])}"
+    )
 
-    classified: list[tuple[str, dict, dict | None, str]] = []
-    for sid, mim_row in mim.items():
-        kgm_rows = kgm_mim.get(sid, [])
-        kgm_row = pick_kgm_row(mim_row, kgm_rows)
-        cls, note = classify(mim_row, kgm_row, mim_rows_by_chebi)
-        classified.append((cls, mim_row, kgm_row, note))
+    print("[3/4] Classifying each MIM row")
+    classified: list[tuple[str, dict, str]] = []
+    for row in mim_rows:
+        cls, note = classify_row(row, kgm_idx)
+        classified.append((cls, row, note))
 
-    # STALE: kg-microbe rows whose MIM subject is not in MIM's current SSSOM.
-    stale = [r for sid, rows in kgm_mim.items() if sid not in mim for r in rows]
+    # STALE: residual MIM:* subjects in kg-microbe whose subject is not in MIM's current SSSOM.
+    mim_subject_set = {r.get("subject_id", "") for r in mim_rows if r.get("subject_id")}
+    stale = [
+        r for sid, rows in kgm_idx["mim_subject_rows"].items()
+        if sid not in mim_subject_set
+        for r in rows
+    ]
 
     print("[4/4] Writing report")
-    report = render(classified, stale, legacy, kgm_source_tags,
-                    mim_total=len(mim), kgm_mim_total=len(kgm_mim),
-                    metatraits_chem=chem_diff,
-                    metatraits_special=special_diff)
+    report = render(
+        classified,
+        stale,
+        kgm_idx["legacy_rows"],
+        kgm_source_tags,
+        mim_total=len(mim_rows),
+        kgm_mim_subject_total=len(kgm_idx["mim_subject_rows"]),
+        metatraits_chem=chem_diff,
+        metatraits_special=special_diff,
+    )
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(report)
     print(f"Wrote {OUT}")
 
-    from collections import Counter
-    c = Counter(x[0] for x in classified)
-    print(f"\nDiff classes: {dict(c)}")
-    print(f"STALE_IN_KGM: {len(stale)}  MIM_LEGACY_IN_KGM: {len(legacy)}")
+    counter = Counter(x[0] for x in classified)
+    print(f"\nDiff classes: {dict(counter)}")
+    print(f"STALE_IN_KGM: {len(stale)}  MIM_LEGACY_IN_KGM: {len(kgm_idx['legacy_rows'])}")
 
 
 if __name__ == "__main__":

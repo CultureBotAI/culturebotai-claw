@@ -35,11 +35,12 @@ contribute upstream directly.
      (current: ~613 rows)                      (current: ~596k rows, of which ~640 are MIM:*)
 ```
 
-The comparison is keyed by `subject_id` when it's a MIM CURIE.
-kg-microbe may have additional rows for kg-microbe-only provenance
-(`kgm.name:*`, `kgmicrobe.compound:*`, etc.) — those are out of
-scope for this diff but noted in the review's "not-in-MIM context"
-section.
+**Comparison is keyed on `object_id`**, not on `subject_id`.
+kg-microbe's consolidator collapses MIM:* subjects into entity-anchored
+xref rows (`cas:50-99-7 → CHEBI:17234` carrying `mediaingredientmech_*`
+in the `source` column). A subject-anchored diff would mis-report
+1300+ correctly-propagated rows as missing; the object-anchored diff
+matches the consolidator's actual data model.
 
 ## Diff classifications
 
@@ -47,12 +48,15 @@ section.
 
 | Class | Meaning | Suggested kg-microbe action |
 |---|---|---|
-| `IN_SYNC` | MIM row's (CHEBI, object_label) match kg-microbe's | None — rerun of consolidator will idempotently reproduce |
-| `CHEBI_DIVERGED` | Both sides have the MIM subject but differ on object_id | Investigate: did MIM just change CHEBI? If yes, rerun consolidator |
-| `LABEL_DRIFTED` | Same CHEBI but kg-microbe's object_label ≠ MIM's object_label | Priority-11 rule should force MIM label — check consolidator pipeline |
-| `MISSING_IN_KGM` | MIM has the row; kg-microbe's SSSOM does not | Rerun consolidator (or MIM SSSOM wasn't picked up yet) |
-| `STALE_IN_KGM` | kg-microbe's SSSOM has a `MIM:*` subject that MIM's current SSSOM does not | Rerun consolidator — MIM dropped/merged the record |
-| `MIM_LEGACY_IN_KGM` | kg-microbe still references legacy `MediaIngredientMech:*` IDs | Rerun consolidator — the migration should drop these |
+| `IN_SYNC` | kg-microbe has ≥1 row with this MIM-asserted `object_id` AND `mediaingredientmech_*` in `source` | None — consolidator absorbed it via xref propagation |
+| `IN_SYNC_SUBJECT_PRESERVED` | kg-microbe still keys this MIM:* subject as a row, and the object matches MIM's | None — residual subject preserved (typically standalone ENVO/MICRO with no other xrefs) |
+| `DIVERGED_OBJECT` | MIM:* subject preserved in kg-microbe but with a different `object_id` than MIM asserts | Investigate: typical cases are MICRO vs FOODON (peptone family), or MIM-minted `kgmicrobe.ingredient:*` collapsed to ENVO parent (Vermont Soil) |
+| `PROVENANCE_LOST` | Object exists in kg-microbe but no row tags `mediaingredientmech_*` | Rerun consolidator OR audit its source-merge logic |
+| `OBJECT_NOT_IN_KGM` | MIM-asserted `object_id` absent from kg-microbe's SSSOM entirely | True backlog — consolidator hasn't ingested this object |
+| `REGISTRY_LANDED` | MIM registry row (object = `kgmicrobe.{ingredient,compound}:*`); CURIE has its own subject row in kg-microbe | None — registry CURIE materialised |
+| `REGISTRY_NOT_LANDED` | Same shape but no kg-microbe row for that CURIE | Informational — happens when MIM mints a registry CURIE without a canonical CHEBI anchor for the consolidator to synthesise around |
+| `STALE_IN_KGM` | kg-microbe still has a `MIM:*` subject row that MIM's current SSSOM does not | Rerun consolidator — MIM dropped/merged the record |
+| `MIM_LEGACY_IN_KGM` | Any `MediaIngredientMech:*` subjects remaining | Rerun consolidator — namespace migration should drop these |
 
 ### Secondary diff: kg-microbe metatraits chemical mappings vs MIM
 
