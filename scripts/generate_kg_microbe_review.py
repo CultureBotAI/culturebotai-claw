@@ -245,6 +245,10 @@ def load_kgm_source_tags(mim_subject_source: dict[str, set[str]]) -> dict[str, i
 
 # ---------- diff ----------
 
+_SYMMETRIC_PREDICATES = {"skos:exactMatch", "skos:closeMatch"}
+_ASYMMETRIC_PREDICATES = {"skos:narrowMatch", "skos:broadMatch"}
+
+
 def classify_row(mim_row: dict, kgm_idx: dict) -> tuple[str, str]:
     """Classify a single MIM SSSOM row against kg-microbe's unified SSSOM.
 
@@ -252,33 +256,53 @@ def classify_row(mim_row: dict, kgm_idx: dict) -> tuple[str, str]:
     """
     sid = (mim_row.get("subject_id") or "").strip()
     obj = (mim_row.get("object_id") or "").strip()
-
-    # Subject-level diagnosis when MIM:* is preserved as subject_id in kg-microbe.
-    # This handles the residual ~14 cases where kg-microbe couldn't collapse the
-    # MIM record into an entity-anchored row (typically because the MIM object is
-    # a standalone ENVO/MICRO/registry CURIE with no other xrefs).
-    mim_subject_rows = kgm_idx["mim_subject_rows"]
-    if sid in mim_subject_rows:
-        kgm_objs = {(r.get("object_id") or "").strip() for r in mim_subject_rows[sid]}
-        if obj in kgm_objs:
-            return "IN_SYNC_SUBJECT_PRESERVED", "kg-microbe preserves MIM:* subject; objects match"
-        # MIM and kg-microbe disagree on the canonical object for this subject.
-        kgm_objs_disp = ", ".join(sorted(o for o in kgm_objs if o)) or "(none)"
-        return "DIVERGED_OBJECT", f"MIM={obj}; kg-microbe={{{kgm_objs_disp}}}"
+    pred = (mim_row.get("predicate_id") or "").strip()
 
     if not obj:
         return "MIM_NO_OBJECT", "MIM row has empty object_id"
 
-    # Registry rows — MIM-internal pairing of subject ↔ kgmicrobe.* identity CURIE.
-    if obj.startswith("kgmicrobe."):
-        if obj in kgm_idx["kgmicrobe_subjects"]:
-            return "REGISTRY_LANDED", "kgmicrobe.* CURIE has a subject row in kg-microbe"
-        return "REGISTRY_NOT_LANDED", (
-            "kgmicrobe.* CURIE lacks a subject row in kg-microbe (informational — "
-            "happens when MIM mints a registry CURIE without a canonical CHEBI anchor)"
+    # Asymmetric rows (skos:narrowMatch / broadMatch) are parent-of relations,
+    # NOT identity/primary claims. The consolidator stores them in a separate
+    # parent_relations list rather than as xrefs of the parent entity, so a
+    # subject-level "is the parent CURIE among kg-microbe's xrefs of MIM:Foo?"
+    # check would (correctly) say no — but that's not a divergence, it's the
+    # expected design. Classify these on object presence: if kg-microbe knows
+    # the parent ontology term at all, the asymmetric relation propagates
+    # implicitly via xref/synonym propagation on that term.
+    if pred in _ASYMMETRIC_PREDICATES:
+        if obj in kgm_idx["all_objects"]:
+            return "IN_SYNC", (
+                f"asymmetric ({pred}); parent object_id present in kg-microbe"
+            )
+        return "OBJECT_NOT_IN_KGM", (
+            f"asymmetric ({pred}); parent object absent from kg-microbe SSSOM"
         )
 
-    # Object-level: did the consolidator land MIM as a source contributor for this object?
+    # Symmetric rows: prefer subject-level diagnosis when MIM:* is preserved
+    # as a subject in kg-microbe. Post-2026-05-04 consolidator fix, almost
+    # every MIM:* subject is preserved (xrefs of the canonical entity).
+    mim_subject_rows = kgm_idx["mim_subject_rows"]
+    if pred in _SYMMETRIC_PREDICATES and sid in mim_subject_rows:
+        kgm_objs = {(r.get("object_id") or "").strip() for r in mim_subject_rows[sid]}
+        if obj in kgm_objs:
+            return "IN_SYNC_SUBJECT_PRESERVED", "kg-microbe preserves MIM:* subject; objects match"
+        kgm_objs_disp = ", ".join(sorted(o for o in kgm_objs if o)) or "(none)"
+        return "DIVERGED_OBJECT", f"MIM={obj}; kg-microbe={{{kgm_objs_disp}}}"
+
+    # Registry rows — MIM-internal pairing of subject ↔ kgmicrobe.* identity CURIE.
+    # In kg-microbe's data model, kgmicrobe.* CURIEs are canonical entity *objects*
+    # (subjects of canonical_name + synonym rows via kgm.name:*). Treat the CURIE
+    # as landed if it appears in either subject_id or object_id position.
+    if obj.startswith("kgmicrobe."):
+        if obj in kgm_idx["kgmicrobe_subjects"] or obj in kgm_idx["all_objects"]:
+            return "REGISTRY_LANDED", "kgmicrobe.* CURIE materialised in kg-microbe"
+        return "REGISTRY_NOT_LANDED", (
+            "kgmicrobe.* CURIE not present in kg-microbe (consolidator hasn't synthesised "
+            "an entity record — typical when MIM mints a registry CURIE without a CHEBI anchor)"
+        )
+
+    # Fallback object-level diagnosis — covers symmetric rows whose MIM:* subject
+    # didn't land as a residual subject in kg-microbe (rare).
     if obj in kgm_idx["objects_with_mim"]:
         return "IN_SYNC", "object_id present in kg-microbe with mediaingredientmech source"
     if obj in kgm_idx["all_objects"]:
