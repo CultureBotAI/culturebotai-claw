@@ -145,7 +145,7 @@ get wrong CHEBI IDs).
    │                                                              │
    │  - kg-microbe consolidator: copies MIM SSSOM →              │
    │    kg-microbe/mappings/ingredient_mappings.sssom.tsv,       │
-   │    rebuilds unified_ingredient_mappings.sssom.tsv.gz        │
+   │    rebuilds kgmicrobe_unified_entity_mappings.sssom.tsv.gz │
    │  - CultureMech: needs sync recipe (TODO)                    │
    │  - CommunityMech: needs sync recipe (TODO)                  │
    │                                                              │

@@ -15,7 +15,7 @@ tags: [kg-microbe, sssom, mim, review, diff, pr-prep, chemical-mappings-mim-prio
 Since kg-microbe has moved to SSSOM-first on the
 `chemical-mappings-mim-priority` branch, the authoritative kg-microbe
 mapping product is now
-`mappings/unified_ingredient_mappings.sssom.tsv.gz` — emitted by
+`mappings/kgmicrobe_unified_entity_mappings.sssom.tsv.gz` — emitted by
 `scripts/consolidate_chemical_mappings.py` with a documented
 **priority system** where `mediaingredientmech_reviewed` sits at
 priority 11 (highest). The legacy flat TSV
@@ -31,7 +31,7 @@ contribute upstream directly.
 
 ```
   MediaIngredientMech/mappings/              kg-microbe/mappings/
-  └─ ingredient_mappings.sssom.tsv    VS    └─ unified_ingredient_mappings.sssom.tsv.gz
+  └─ ingredient_mappings.sssom.tsv    VS    └─ kgmicrobe_unified_entity_mappings.sssom.tsv.gz
      (current: ~613 rows)                      (current: ~596k rows, of which ~640 are MIM:*)
 ```
 
@@ -43,7 +43,7 @@ section.
 
 ## Diff classifications
 
-### Primary diff: MIM SSSOM vs kg-microbe `unified_ingredient_mappings.sssom.tsv.gz`
+### Primary diff: MIM SSSOM vs kg-microbe `kgmicrobe_unified_entity_mappings.sssom.tsv.gz`
 
 | Class | Meaning | Suggested kg-microbe action |
 |---|---|---|

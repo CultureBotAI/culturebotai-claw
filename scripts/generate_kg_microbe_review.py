@@ -34,7 +34,7 @@ MIM_SSSOM = Path(
 )
 KGM_SSSOM_GZ = Path(
     "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
-    "kg-microbe/mappings/unified_ingredient_mappings.sssom.tsv.gz"
+    "kg-microbe/mappings/kgmicrobe_unified_entity_mappings.sssom.tsv.gz"
 )
 KGM_LEGACY_TSV_GZ = Path(
     "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
@@ -317,7 +317,7 @@ def render(
         "# kg-microbe Review (SSSOM-first, chemical-mappings-mim-priority)\n",
         f"_Generated {now} by `scripts/generate_kg_microbe_review.py`._\n\n",
         "Row-level diff of MIM's published SSSOM vs kg-microbe's "
-        "consolidated SSSOM (`unified_ingredient_mappings.sssom.tsv.gz`) "
+        "consolidated SSSOM (`kgmicrobe_unified_entity_mappings.sssom.tsv.gz`) "
         "on the `chemical-mappings-mim-priority` branch.\n\n",
         "## Scope\n",
         f"- MIM published SSSOM: **{mim_total}** rows "
