@@ -137,6 +137,57 @@ def _mim_curie(source_file: str) -> str:
     return f"MIM:{safe}"
 
 
+# Ontology prefixes that imply a chemically-defined SINGLE_INGREDIENT
+# (-> kgmicrobe.compound:* registry namespace) when the parent term is
+# in this list. Mirrors classify_ingredient_type.classify():
+# CHEBI / NCIT / cas: / mesh: are pure-compound registries; FOODON /
+# UBERON / ENVO / BTO / MICRO / kgmicrobe.ingredient: are
+# complex/biological/anatomical -> kgmicrobe.ingredient:*.
+_COMPOUND_PARENT_PREFIXES: frozenset[str] = frozenset({
+    "CHEBI:", "NCIT:", "cas:", "mesh:", "kgmicrobe.compound:",
+})
+_INGREDIENT_PARENT_PREFIXES: frozenset[str] = frozenset({
+    "FOODON:", "UBERON:", "ENVO:", "BTO:", "MICRO:",
+    "kgmicrobe.ingredient:",
+})
+
+
+def _kgmicrobe_namespace_for(parent_obj_id: str) -> str:
+    """Given the ontology parent CURIE that the MIM subject narrowMatches,
+    decide which kgmicrobe registry namespace the synthesized B1
+    registry row belongs in (`kgmicrobe.compound:` vs
+    `kgmicrobe.ingredient:`).
+
+    Mirrors classify_ingredient_type.classify(): chemistry registries
+    (CHEBI, NCIT, cas:, mesh:) → compound; food / environmental /
+    anatomical / tissue ontologies → ingredient. Falls back to
+    `kgmicrobe.ingredient:` when the prefix is unrecognized — that's
+    the safer default for "complex/uncertain"."""
+    for pref in _COMPOUND_PARENT_PREFIXES:
+        if parent_obj_id.startswith(pref):
+            return "kgmicrobe.compound:"
+    for pref in _INGREDIENT_PARENT_PREFIXES:
+        if parent_obj_id.startswith(pref):
+            return "kgmicrobe.ingredient:"
+    return "kgmicrobe.ingredient:"
+
+
+def _registry_slug_for_curie(mim_curie: str) -> str:
+    """`MIM:Vermont_Soil` -> `vermont_soil` — lowercased subject slug
+    used as the local part of the synthesized
+    `kgmicrobe.{ingredient,compound}:<slug>` registry CURIE.
+
+    Matches `validate_sssom_invariants._registry_slug_for`: the
+    validator lowercases everything after `MIM:` and the regex
+    expects an exact match against that string. We preserve the
+    `~HEX` percent-encoding (already lowercase via the encoder)
+    rather than trying to round-trip it back to original
+    characters — the registry CURIE is opaque to consumers."""
+    if not mim_curie.startswith("MIM:"):
+        return mim_curie
+    return mim_curie[4:].lower()
+
+
 def _load_kgm_source_index() -> dict[str, str]:
     """CHEBI:X → pipe-separated kg-microbe `sources` string."""
     out: dict[str, str] = {}
@@ -502,6 +553,49 @@ def _row_from_yaml(
                 "confidence": "0.99",
                 "comment": (f"Registry/identity row preserving "
                             f"{primary_id} alongside parent {obj_id}."),
+                "other": "",
+                "validation_method": "",
+            })
+
+    # B1 backfill: every subject whose parent row is asymmetric
+    # (narrowMatch / broadMatch) is required by Rule B1 to also carry a
+    # `kgmicrobe.{ingredient,compound}:<slug_lc>` registry exactMatch
+    # row. The dual-emission block above already covers the cases where
+    # `identifier:` is `kgmicrobe.{ingredient,compound}:<slug>`. For the
+    # 162 narrowMatch subjects whose `identifier:` is `cas:` / `mesh:` /
+    # `NCIT:` / a same-as-parent CHEBI, we synthesize the missing
+    # registry row here. Namespace decision mirrors
+    # classify_ingredient_type: chemistry registries -> compound,
+    # complex/biological/anatomical -> ingredient. Slug is the
+    # lowercased subject slug — matches Rule B1's
+    # `subject_id[4:].lower()` regex anchor exactly.
+    if parent_row["predicate_id"] in ("skos:narrowMatch", "skos:broadMatch"):
+        slug_lc = _registry_slug_for_curie(parent_row["subject_id"])
+        kgm_namespace = _kgmicrobe_namespace_for(obj_id)
+        kgm_curie = f"{kgm_namespace}{slug_lc}"
+        # Skip if the dual-emission block (or some prior row in `rows`)
+        # already produced this exact registry CURIE — avoid duplicates
+        # that would trip Rule B2.
+        already_emitted = any(
+            r["object_id"] == kgm_curie
+            and r["predicate_id"] == "skos:exactMatch"
+            for r in rows
+        )
+        if not already_emitted:
+            rows.append({
+                "subject_id": parent_row["subject_id"],
+                "subject_label": preferred,
+                "predicate_id": "skos:exactMatch",
+                "object_id": kgm_curie,
+                "object_label": preferred,
+                "object_source": _OBJECT_SOURCE_BY_PREFIX.get(kgm_namespace, ""),
+                "mapping_justification": JUST_MANUAL,
+                "source": parent_row["source"],
+                "mapping_date": parent_row["mapping_date"],
+                "confidence": "0.99",
+                "comment": (f"Registry/identity row (Rule B1) for "
+                            f"narrowMatch subject; kg-microbe primary id "
+                            f"{kgm_curie} alongside parent {obj_id}."),
                 "other": "",
                 "validation_method": "",
             })
