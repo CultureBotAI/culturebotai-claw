@@ -188,6 +188,55 @@ def _registry_slug_for_curie(mim_curie: str) -> str:
     return mim_curie[4:].lower()
 
 
+def _load_existing_validation_method(
+    path: Path,
+) -> dict[tuple[str, str, str], str]:
+    """Return ``{(subject_id, predicate_id, object_id) → validation_method}``
+    parsed from an existing SSSOM TSV at ``path``.
+
+    Why this exists
+    ---------------
+    The downstream MIM curation pipeline (OAK+OLS audit, UNKNOWN_TERM triage,
+    `sssom_synonym_enrich_review_*` passes) post-stamps the ``validation_method``
+    extension column directly on the published TSV. Those stamps don't live
+    in the source YAMLs — they're a property of the *emitted SSSOM row*
+    keyed by (subject, predicate, object). A naive rebuild would emit
+    column 13 empty and wipe ~2k OAK+OLS audit stamps.
+
+    This loader reads the previous emission and returns a stamp index the
+    writer can replay onto matching rows.
+
+    Quietly returns ``{}`` if the file is missing or doesn't yet carry the
+    column (first-ever build).
+    """
+    if not path.exists():
+        return {}
+    out: dict[tuple[str, str, str], str] = {}
+    with path.open() as f:
+        header: list[str] | None = None
+        for line in f:
+            if line.startswith("#"):
+                continue
+            parts = line.rstrip("\n").split("\t")
+            if header is None:
+                header = parts
+                if "validation_method" not in header:
+                    return {}
+                continue
+            row = dict(zip(header, parts))
+            stamp = (row.get("validation_method") or "").strip()
+            if not stamp:
+                continue
+            key = (
+                (row.get("subject_id") or "").strip(),
+                (row.get("predicate_id") or "").strip(),
+                (row.get("object_id") or "").strip(),
+            )
+            if all(key):
+                out[key] = stamp
+    return out
+
+
 def _load_kgm_source_index() -> dict[str, str]:
     """CHEBI:X → pipe-separated kg-microbe `sources` string."""
     out: dict[str, str] = {}
@@ -694,6 +743,13 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--output", type=Path, default=OUT_TSV)
     ap.add_argument("--no-validate", action="store_true", help="skip post-write sssom validate")
+    ap.add_argument(
+        "--no-preserve-validation",
+        action="store_true",
+        help="don't replay validation_method stamps from the existing "
+             "SSSOM (default: re-stamp matching rows so the OAK+OLS "
+             "audit pass isn't clobbered).",
+    )
     args = ap.parse_args()
 
     residual = _load_residual_categorization()
@@ -768,6 +824,26 @@ def main():
     for r in rows:
         uniq[(r["subject_id"], r["object_id"])] = r
     final = list(uniq.values())
+
+    # Replay validation_method stamps from the existing SSSOM so a
+    # downstream OAK+OLS audit pass isn't wiped on every rebuild. Only
+    # rows whose (subject, predicate, object) triple matches an existing
+    # row receive a stamp; newly-emitted rows stay blank.
+    if not args.no_preserve_validation:
+        prior_stamps = _load_existing_validation_method(args.output)
+        replayed = 0
+        for r in final:
+            key = (r["subject_id"], r["predicate_id"], r["object_id"])
+            stamp = prior_stamps.get(key)
+            if stamp and not (r.get("validation_method") or "").strip():
+                r["validation_method"] = stamp
+                replayed += 1
+        if prior_stamps:
+            print(
+                f"Replayed {replayed} validation_method stamps from "
+                f"{args.output.name} ({len(prior_stamps)} stamps available)",
+                file=sys.stderr,
+            )
 
     version = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
     _write_sssom(final, args.output, version=version)
