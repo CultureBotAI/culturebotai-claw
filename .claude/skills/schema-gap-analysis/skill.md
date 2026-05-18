@@ -1,23 +1,34 @@
 ---
 name: schema-gap-analysis
-description: Find gaps between a Mech-repo LinkML schema, its YAML instances, and the code that generates them. Uses linkml-validate as ground truth and reports along three axes (schema / instances / process). Generalized from the MIM-specific original to apply to any Mech repo (CultureMech, MIM, CommunityMech, TraitMech).
+description: Cross-Mech reference + bootstrap template for the schema-gap-analysis methodology. The operational, copy-paste-runnable version lives in each Mech repo's own .claude/skills/schema-gap-analysis/ — use this version for the conceptual framework or to bootstrap a new Mech.
 category: quality
 requires_database: false
 requires_internet: false
-version: 2.0.0
+version: 2.1.0
 ---
 
-# Schema gap analysis (cross-Mech)
+# Schema gap analysis (cross-Mech reference)
+
+> **Day-to-day use**: invoke this skill from inside the Mech repo you're auditing. Each Mech ships its own customized version with paths baked in (no substitution needed):
+>
+> | Mech | Operational skill |
+> |---|---|
+> | CultureMech | `.claude/skills/schema-gap-analysis/SKILL.md` (companion to the deeper `audit-schema-gaps`) |
+> | MIM | `.claude/skills/schema-gap-analysis/skill.md` |
+> | CommunityMech | `.claude/skills/schema-gap-analysis/skill.md` |
+> | TraitMech | `.claude/skills/schema-gap-analysis/skill.md` |
+>
+> **This file** is the cross-Mech reference — where the methodology lives once (so framework changes can be propagated by re-syncing the per-Mech copies) and where to bootstrap a new Mech.
 
 ## When to use
 
-Run this skill when:
+Run the per-Mech operational version when:
 
 - The schema and live data look drifted: tolerant project validators report clean while curation tooling is happily writing keys the schema doesn't declare.
 - A new field is being added in code and you want to know whether the schema needs updating, the data needs migrating, or both.
 - Onboarding: "is this YAML valid?" needs a more rigorous answer than "the project's custom validator says yes."
 
-The skill applies to any Mech repo (CultureMech, MIM, CommunityMech, TraitMech). Each Mech ships its own custom validator (intentionally permissive to keep CI green during active curation). `linkml-validate` is the stricter ground truth this skill anchors on.
+Each Mech ships its own custom validator (intentionally permissive to keep CI green during active curation). `linkml-validate` is the stricter ground truth this skill anchors on.
 
 ## Per-Mech configuration
 
