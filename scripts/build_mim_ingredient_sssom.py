@@ -666,7 +666,7 @@ HEADER_YAML = f"""\
 #   kgmicrobe.ingredient: "https://w3id.org/kg-microbe/ingredient/"
 #   cas: "https://commonchemistry.cas.org/detail?cas_rn="
 #   registry: "https://w3id.org/kg-microbe/registry/"
-#   MIM: "https://github.com/KG-Hub/MediaIngredientMech/blob/main/data/ingredients/mapped/"
+#   MIM: "https://github.com/CultureBotAI/MediaIngredientMech/blob/main/data/ingredients/mapped/"
 #   obo: "http://purl.obolibrary.org/obo/"
 #   kgm: "https://w3id.org/kg-microbe/"
 #   semapv: "https://w3id.org/semapv/vocab/"

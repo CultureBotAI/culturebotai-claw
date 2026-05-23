@@ -169,7 +169,7 @@ def _choose_object(dec: dict) -> tuple[str, str, str, str]:
 HEADER_YAML = f"""\
 # curie_map:
 #   CHEBI: "http://purl.obolibrary.org/obo/CHEBI_"
-#   MIM: "https://github.com/KG-Hub/MediaIngredientMech/blob/main/data/ingredients/mapped/"
+#   MIM: "https://github.com/CultureBotAI/MediaIngredientMech/blob/main/data/ingredients/mapped/"
 #   obo: "http://purl.obolibrary.org/obo/"
 #   semapv: "https://w3id.org/semapv/vocab/"
 #   skos: "http://www.w3.org/2004/02/skos/core#"
