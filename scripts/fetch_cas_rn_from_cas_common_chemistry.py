@@ -54,7 +54,7 @@ class CASCommonChemistryFetcher:
         self.session = requests.Session()
         # Set user agent to identify research use
         self.session.headers.update({
-            'User-Agent': 'MediaIngredientMech/1.0 (Research; +https://github.com/KG-Hub/KG-Microbe)'
+            'User-Agent': 'MediaIngredientMech/1.0 (Research; +https://github.com/Knowledge-Graph-Hub/kg-microbe)'
         })
 
     def search_by_name(self, name: str) -> Optional[str]:
