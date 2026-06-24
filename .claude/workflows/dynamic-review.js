@@ -20,7 +20,14 @@ export const meta = {
 //   postComments true to post inline GH comments                        (default false)
 //   dimensions   optional [{key,guidance}] override of review dimensions
 // ---------------------------------------------------------------------------
-const a = (args && typeof args === 'object') ? args : {}
+// args may arrive as an object or as a JSON-encoded string depending on how the
+// workflow was invoked — accept both, fall back to {} (all defaults) otherwise.
+let a = {}
+if (args && typeof args === 'object') {
+  a = args
+} else if (typeof args === 'string' && args.trim()) {
+  try { a = JSON.parse(args) } catch (e) { a = {} }
+}
 const REPO = a.repo || '.'
 const TARGET = a.target || 'branch'
 const BASE = a.base || 'origin/main'
@@ -28,6 +35,11 @@ const DEPTH = ['quick', 'standard', 'thorough'].includes(a.depth) ? a.depth : 's
 const POST = a.postComments === true
 const VOTES = DEPTH === 'thorough' ? 3 : DEPTH === 'quick' ? 0 : 1
 const DIM_OVERRIDE = Array.isArray(a.dimensions) && a.dimensions.length ? a.dimensions : null
+// Model for the review/verify swarm. Default: omit -> inherit the session model
+// (always available). Override with e.g. reviewModel:"haiku" (cheaper) or "fable"
+// (when accessible). Never hardcode a model that may be unavailable.
+const REVIEW_MODEL = (typeof a.reviewModel === 'string' && a.reviewModel.trim()) ? a.reviewModel.trim() : null
+const modelOpt = REVIEW_MODEL ? { model: REVIEW_MODEL } : {}
 
 const dirOf = (p) => {
   const i = String(p).lastIndexOf('/')
@@ -249,10 +261,10 @@ const tasks = dims.flatMap((d) => shards.map((s) => ({ dim: d, shard: s })))
 const lenses = ['correctness — is the claim technically right?', 'reproduce — does it actually occur in THIS diff?', 'convention-accuracy — does the cited repo rule really exist and apply?']
 
 phase('Review')
-const reviewed = await pipeline(
-  tasks,
-  // stage 1: review one (dimension x shard)
-  (t) => agent(
+// Barrier (not pipeline) so a FAILED finder (agent returns null) is distinguishable
+// from a genuinely clean one — a degraded run must never look like "no issues".
+const reviewResults = await parallel(tasks.map((t) => () =>
+  agent(
     [
       `You are a meticulous code reviewer for the "${t.dim.key}" dimension. Review ONLY the diff.`,
       `Repo: ${scope.repo}  (${scope.repoName || ''})`,
@@ -269,36 +281,43 @@ const reviewed = await pipeline(
       'you are confident, else null. If nothing real, return an empty findings array. Be precise; a',
       'false positive is worse than a miss.',
     ].join('\n'),
-    { schema: FINDINGS_SCHEMA, model: 'fable', phase: 'Review', label: `review:${t.dim.key}${t.shard.name === 'all' ? '' : ':' + t.shard.name}` }
-  ),
-  // stage 2: adversarially verify each finding from this task
-  (review, t) => parallel(((review && review.findings) || []).map((f) => () => {
-    if (VOTES === 0) return Promise.resolve({ ...f, shard: t.shard.name, verdict: { real: true, votes: 'unverified (quick)' } })
-    return parallel(Array.from({ length: VOTES }, (_, i) => () =>
-      agent(
-        [
-          'You are an adversarial verifier. Try to REFUTE the finding below. Default to refuted=true',
-          'when uncertain, when it is not clearly caused by this diff, or when it is a nitpick.',
-          `Lens for this pass: ${lenses[i % lenses.length]}`,
-          `Repo: ${scope.repo}`,
-          `Reproduce the diff with: ${scope.diffCmd}`,
-          '',
-          `Finding: ${JSON.stringify({ file: f.file, line: f.line, severity: f.severity, dimension: f.dimension, title: f.title, rationale: f.rationale })}`,
-          '',
-          'Inspect the actual diff/files to check it. Return refuted (boolean) + a one-line reason.',
-        ].join('\n'),
-        { schema: VERDICT_SCHEMA, model: 'fable', phase: 'Verify', label: `verify:${f.file}` }
-      )
-    )).then((vs) => {
-      const valid = vs.filter(Boolean)
-      const kept = valid.filter((v) => !v.refuted).length
-      const real = valid.length === 0 ? true : kept > valid.length / 2
-      return { ...f, shard: t.shard.name, verdict: { real, kept, of: valid.length, votes: valid } }
-    })
-  }))
-)
+    { schema: FINDINGS_SCHEMA, ...modelOpt, phase: 'Review', label: `review:${t.dim.key}${t.shard.name === 'all' ? '' : ':' + t.shard.name}` }
+  ).then((r) => ({ task: t, review: r }))
+))
 
-const confirmed = reviewed.flat().filter(Boolean).filter((f) => f.verdict && f.verdict.real)
+const reviewFailures = reviewResults.filter((r) => !r || r.review == null).length
+const rawFindings = reviewResults
+  .filter((r) => r && r.review && Array.isArray(r.review.findings))
+  .flatMap((r) => r.review.findings.map((f) => ({ ...f, shard: r.task.shard.name })))
+if (reviewFailures > 0) log(`WARNING: ${reviewFailures}/${tasks.length} review agents failed — this review is INCOMPLETE.`)
+
+phase('Verify')
+const verified = await parallel(rawFindings.map((f) => () => {
+  if (VOTES === 0) return Promise.resolve({ ...f, verdict: { real: true, votes: 'unverified (quick)' } })
+  return parallel(Array.from({ length: VOTES }, (_, i) => () =>
+    agent(
+      [
+        'You are an adversarial verifier. Try to REFUTE the finding below. Default to refuted=true',
+        'when uncertain, when it is not clearly caused by this diff, or when it is a nitpick.',
+        `Lens for this pass: ${lenses[i % lenses.length]}`,
+        `Repo: ${scope.repo}`,
+        `Reproduce the diff with: ${scope.diffCmd}`,
+        '',
+        `Finding: ${JSON.stringify({ file: f.file, line: f.line, severity: f.severity, dimension: f.dimension, title: f.title, rationale: f.rationale })}`,
+        '',
+        'Inspect the actual diff/files to check it. Return refuted (boolean) + a one-line reason.',
+      ].join('\n'),
+      { schema: VERDICT_SCHEMA, ...modelOpt, phase: 'Verify', label: `verify:${f.file}` }
+    )
+  )).then((vs) => {
+    const valid = vs.filter(Boolean)
+    const kept = valid.filter((v) => !v.refuted).length
+    const real = valid.length === 0 ? true : kept > valid.length / 2
+    return { ...f, verdict: { real, kept, of: valid.length, votes: valid } }
+  })
+}))
+
+const confirmed = verified.filter(Boolean).filter((f) => f.verdict && f.verdict.real)
 
 // dedup by file+line+title
 const seen = new Set()
@@ -317,6 +336,10 @@ const report = await agent(
     'You are the synthesis step. Produce the final review.',
     `Repo: ${scope.repo}  Target: ${TARGET}  Depth: ${DEPTH}`,
     `PR number: ${scope.prNumber == null ? '(none)' : scope.prNumber}  ownerRepo: ${scope.ownerRepo || '(none)'}  headSha: ${scope.headSha || '(none)'}`,
+    `Review coverage: ${tasks.length - reviewFailures}/${tasks.length} review agents succeeded.` +
+      (reviewFailures > 0
+        ? ` ${reviewFailures} FAILED. This review is INCOMPLETE — do NOT call it "clean"; state prominently at the top that ${reviewFailures} review agent(s) did not run and findings may be missing.`
+        : ''),
     '',
     `Confirmed review findings (already adversarially verified):\n${JSON.stringify(deduped, null, 2)}`,
     '',
@@ -353,6 +376,10 @@ return {
   counts: report.counts || null,
   gateFailures: (gate && gate.failures) || [],
   confirmedFindings: deduped.length,
+  reviewTasks: tasks.length,
+  reviewFailures,
+  degraded: reviewFailures > 0,
+  reviewModel: REVIEW_MODEL || '(inherited session model)',
   posted: report.posted === true,
   postedCount: report.postedCount || 0,
   report: report.markdown,
