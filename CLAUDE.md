@@ -260,6 +260,22 @@ Defines repositories, agents, plugins, and safety settings. Key sections:
 - **Plugin errors**: Test individual plugins with `openclaw-cli plugin test <plugin_name>`
 - **Configuration issues**: Run `openclaw-cli config validate`
 
+## Code Review: `/dynamic-review`
+
+`.claude/workflows/dynamic-review.js` is a **dynamic workflow** (Claude Code's script-orchestrated
+multi-agent primitive) for repo-agnostic code review of a PR or branch diff. It scopes the diff and
+profiles the target repo **at runtime** (reads the repo's `CLAUDE.md` + `justfile` + LinkML schema,
+and an optional `.claude/review-profile.yaml`), runs that repo's **own** validators as a static gate,
+reviews across dynamically-chosen dimensions (Fable 5 agents), adversarially verifies each finding,
+then synthesizes a ranked report.
+
+- **Run it**: `/dynamic-review` (current branch vs `origin/main` in the cwd repo), or pass args, e.g.
+  `Run /dynamic-review on PR 90`, or `{repo, target:"PR:<n>"|"branch"|"diff:<a>..<b>"|"local", base, depth:"quick"|"standard"|"thorough", postComments}`.
+- **Default = report to session.** Inline GitHub PR comments are posted only when `postComments: true`
+  (uses the `gh api .../pulls/<n>/comments` + suggestion-block pattern).
+- The canonical copy lives at `~/.claude/workflows/dynamic-review.js` (so `/dynamic-review` works in
+  every repo); this committed copy is the version-controlled source of truth — keep the two in sync.
+
 ## Documentation References
 
 - **Architecture**: `FINAL_ARCHITECTURE_COMPLETE.md` - Complete multi-Claude coordination design
