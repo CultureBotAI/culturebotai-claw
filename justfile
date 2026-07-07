@@ -188,7 +188,7 @@ feba-create-mim-ingredients:
 # Build unified ingredient mapping across CultureMech, MIM, and CommunityMech
 build-unified-mapping:
     @echo "Building unified ingredient mapping..."
-    python scripts/build_unified_ingredient_mapping.py \
+    uv run python scripts/build_unified_ingredient_mapping.py \
         --culturemech ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech \
         --mim ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech \
         --output workspace/unified_ingredient_mapping.tsv
@@ -201,7 +201,7 @@ build-unified-mapping:
 # Sync MIM CHEBI mappings into CultureMech ingredient term.id fields (dry-run)
 sync-mim-to-culturemech-dry:
     @echo "Syncing MIM CHEBI → CultureMech (dry-run)..."
-    python scripts/sync_mim_to_culturemech.py \
+    uv run python scripts/sync_mim_to_culturemech.py \
         --culturemech ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech \
         --mapping workspace/unified_ingredient_mapping.tsv \
         --dry-run
@@ -209,7 +209,7 @@ sync-mim-to-culturemech-dry:
 # Sync MIM CHEBI mappings into CultureMech ingredient term.id fields (apply)
 sync-mim-to-culturemech:
     @echo "Syncing MIM CHEBI → CultureMech..."
-    python scripts/sync_mim_to_culturemech.py \
+    uv run python scripts/sync_mim_to_culturemech.py \
         --culturemech ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech \
         --mapping workspace/unified_ingredient_mapping.tsv
     @echo "✅ MIM CHEBI IDs synced to CultureMech ingredient term.id fields"
