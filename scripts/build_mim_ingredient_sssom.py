@@ -477,43 +477,44 @@ def _row_from_yaml(
         dec = residual[src_file]
         cat = dec.get("category")
         if cat == "CONSIDER_SPECIFIC":
-            # Residual chose kg-microbe's more-specific CHEBI → object
-            # becomes that CHEBI, not the MIM one.
+            # The YAML `ontology_id` is MIM's curated source of truth for
+            # the object. A CONSIDER_SPECIFIC decision proposes swapping it
+            # to kg-microbe's more-specific CHEBI — but a curator may have
+            # deliberately kept the generic term (a choice recorded in the
+            # YAML / on the published SSSOM, and never back-propagated to
+            # this gitignored cache). So the cache may *annotate* but must
+            # never *override* the curated object: honor the decision only
+            # when the YAML already holds the proposed term; otherwise
+            # suppress it so the curated mapping wins and predicate/
+            # confidence fall through to the YAML-quality default.
+            #
+            # This is the self-maintaining successor to the per-file
+            # stale-entry list in prune_residual_for_chebi_fixes.py: no
+            # hand-maintained list can drift out of date, because the
+            # authority is always the current YAML. (Historical context:
+            # the token-overlap gate this replaces still swapped whenever
+            # labels shared a token — which is exactly how curator-rejected
+            # swaps like Xylose→aldehydo-D-xylose kept coming back on
+            # rebuild. See Codex review #558 / PR #2.)
             kgm_chebi = (dec.get("kg_microbe_chebi") or "").strip()
             kgm_label = (dec.get("kg_microbe_label") or "").strip()
-            mim_label_for_check = (dec.get("mim_label") or ont_label).strip()
-            # Defensive token-overlap gate: a CONSIDER_SPECIFIC override
-            # is only safe when MIM's label and kg-microbe's label share
-            # at least one significant token. Otherwise the residual
-            # pipeline likely matched on an unrelated chemistry (e.g.
-            # 'kaempferol 3-O-beta-D-glucoside' vs 'manganese(II)
-            # chloride dihydrate' — the bug class Codex review #558
-            # flagged: see PR #2 / fix/remove-bad-narrow-match-rows-pr558).
-            # When overlap fails, keep MIM's CHEBI as authoritative and
-            # downgrade the override to a comment-only marker.
-            _STOP = {"the","a","an","of","and","or","in","on","with",
-                     "no","nr","type","grade","form","powder","solution",
-                     "extract","broth","infusion","agar"}
-            def _toks(s: str) -> set[str]:
-                return {t for t in re.findall(r"[A-Za-z]{3,}", (s or "").lower())
-                        if t not in _STOP}
-            if (kgm_chebi.startswith("CHEBI:")
-                    and _toks(mim_label_for_check) & _toks(kgm_label)):
-                obj_id = kgm_chebi
+            if kgm_chebi.startswith("CHEBI:") and obj_id == kgm_chebi:
+                # Curator already adopted the specific term in the YAML —
+                # the decision is consistent; keep its label + annotation.
                 ont_label = kgm_label or ont_label
-            elif kgm_chebi.startswith("CHEBI:"):
-                # Token-overlap zero — keep MIM's CHEBI; flag in comment.
-                cat = "CONSIDER_SPECIFIC_REJECTED"
-                print(
-                    f"  WARNING: rejected CONSIDER_SPECIFIC override for "
-                    f"{src_file}: '{mim_label_for_check}' (MIM "
-                    f"{(ont.get('ontology_id') or '').strip()}) vs "
-                    f"'{kgm_label}' ({kgm_chebi}) — zero token overlap",
-                    file=sys.stderr)
-        predicate = _PREDICATE_BY_CATEGORY.get(cat, predicate)
-        confidence = _CONFIDENCE_BY_CATEGORY.get(cat, confidence)
-        justification = JUST_MANUAL if cat == "CONSIDER_SPECIFIC" else JUST_LEXICAL
-        comment = f"{cat}: {dec.get('rationale', '')}"
+            else:
+                if kgm_chebi.startswith("CHEBI:"):
+                    print(
+                        f"  suppressed CONSIDER_SPECIFIC swap for {src_file}: "
+                        f"kept curated YAML object {obj_id} over cache target "
+                        f"{kgm_chebi}",
+                        file=sys.stderr)
+                cat = None  # object + predicate come from the YAML
+        if cat is not None:
+            predicate = _PREDICATE_BY_CATEGORY.get(cat, predicate)
+            confidence = _CONFIDENCE_BY_CATEGORY.get(cat, confidence)
+            justification = JUST_MANUAL if cat == "CONSIDER_SPECIFIC" else JUST_LEXICAL
+            comment = f"{cat}: {dec.get('rationale', '')}"
 
     # Prefer the ontology's canonical rdfs:label for object_label (SSSOM
     # best practice). Fall back to MIM's stored ontology_label if the
