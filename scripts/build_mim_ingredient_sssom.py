@@ -433,6 +433,15 @@ def _row_from_yaml(
     except yaml.YAMLError:
         return []
 
+    # A curator-rejected record must not appear in the canonical mapping
+    # set, even though it can still live under data/ingredients/mapped/
+    # and carry an ontology_mapping.ontology_id. MIM's reconcile_sssom.py
+    # qc gate treats data/curated/mapped_ingredients.yaml as the source of
+    # truth and flags such rows as ORPHANs; honor the curated status here
+    # so rejected mappings never leak in (issue #16).
+    if (data.get("mapping_status") or "").strip().upper() == "REJECTED":
+        return []
+
     ont = data.get("ontology_mapping") or {}
     obj_id = (ont.get("ontology_id") or "").strip()
     if not any(obj_id.startswith(p) for p in SUPPORTED_OBJECT_PREFIXES):
