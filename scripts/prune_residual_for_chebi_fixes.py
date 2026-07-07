@@ -79,10 +79,23 @@ def main():
         print(f"Residual cache not present ({RESIDUAL_JSON}); nothing to prune.")
         return
 
-    data = json.loads(RESIDUAL_JSON.read_text())
-    before = len(data["decisions"])
-    removed = [d for d in data["decisions"] if d["source_file"] in STALE_SOURCE_FILES]
-    kept = [d for d in data["decisions"] if d["source_file"] not in STALE_SOURCE_FILES]
+    # Tolerate a malformed / partial cache: this runs as a build-sssom
+    # pre-step, so a hard parse error or a missing key must degrade to a
+    # no-op rather than aborting the whole build (issue #15). The build
+    # loader is equally lenient (data.get("decisions", [])).
+    try:
+        data = json.loads(RESIDUAL_JSON.read_text())
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"Residual cache unreadable ({e}); skipping prune.")
+        return
+    decisions = data.get("decisions")
+    if not isinstance(decisions, list):
+        print("Residual cache has no 'decisions' list; skipping prune.")
+        return
+
+    before = len(decisions)
+    removed = [d for d in decisions if d.get("source_file") in STALE_SOURCE_FILES]
+    kept = [d for d in decisions if d.get("source_file") not in STALE_SOURCE_FILES]
 
     if not removed:
         # Idempotent: already pruned (or never present). Leave the file
@@ -91,7 +104,8 @@ def main():
         return
 
     data["decisions"] = kept
-    data["summary"]["residual_total"] = len(kept)
+    summary = data.setdefault("summary", {})
+    summary["residual_total"] = len(kept)
 
     # Recompute category counts so summary stays coherent
     cat_counts: dict[str, int] = {}
@@ -110,8 +124,8 @@ def main():
     print(f"Removed {len(removed)} residual entries:")
     for d in removed:
         print(
-            f"  {d['source_file']:28s}  {d['category']:20s}  "
-            f"mim={d['mim_chebi']:15s}  kg={d['kg_microbe_chebi']}"
+            f"  {d.get('source_file',''):28s}  {d.get('category',''):20s}  "
+            f"mim={d.get('mim_chebi',''):15s}  kg={d.get('kg_microbe_chebi','')}"
         )
     print(f"\nResidual decisions: {before} -> {len(kept)}")
 

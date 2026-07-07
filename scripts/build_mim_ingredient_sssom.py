@@ -499,9 +499,15 @@ def _row_from_yaml(
             kgm_chebi = (dec.get("kg_microbe_chebi") or "").strip()
             kgm_label = (dec.get("kg_microbe_label") or "").strip()
             if kgm_chebi.startswith("CHEBI:") and obj_id == kgm_chebi:
-                # Curator already adopted the specific term in the YAML —
-                # the decision is consistent; keep its label + annotation.
+                # Curator already adopted the specific term in the YAML.
+                # Annotate only — keep the label and record the rationale
+                # as a comment, but leave predicate/confidence to the
+                # YAML's mapping_quality. The cache annotates, never
+                # overrides (issue #14): forcing narrowMatch/0.9 here would
+                # silently downgrade a curator's EXACT_MATCH.
                 ont_label = kgm_label or ont_label
+                comment = f"CONSIDER_SPECIFIC: {dec.get('rationale', '')}"
+                cat = None
             else:
                 if kgm_chebi.startswith("CHEBI:"):
                     print(
