@@ -262,8 +262,14 @@ match-all: match-culturemech match-mim
 # SSSOM Mapping Product (official MIM→ingredient-ontology artifact; CHEBI + FOODON)
 # =============================================================================
 
-# Stage 1: Build the working-copy SSSOM from all MIM ingredient YAMLs
+# Stage 1: Build the working-copy SSSOM from all MIM ingredient YAMLs.
+# Prunes the residual-P2.5 cache first: those CONSIDER_SPECIFIC decisions
+# actively swap the emitted CHEBI, and stale entries (curated away in the
+# YAMLs but never removed from the cache) would silently revert curation
+# on rebuild. The prune is idempotent and no-ops when the cache is absent.
 build-sssom:
+    @echo "Pruning stale residual-P2.5 decisions before build..."
+    python scripts/prune_residual_for_chebi_fixes.py
     @echo "Building MIM→ingredient-ontology SSSOM..."
     python scripts/build_mim_ingredient_sssom.py \
         --output workspace/reports/mim_ingredient_mappings.sssom.tsv

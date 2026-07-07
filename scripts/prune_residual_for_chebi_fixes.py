@@ -15,6 +15,20 @@ Stale entries removed (2026-04-18 SSSOM cleanup):
   Folinic_Acid.yaml           — SYMMETRIC, now redundant (mim == kg)
   Starch_soluble.yaml         — SYMMETRIC, stale comparison
   Tween_20.yaml               — SYMMETRIC, now redundant (mim == kg)
+
+Stale entries removed (2026-07-07 rebuild reconciliation):
+  The 18 CONSIDER_SPECIFIC decisions below were reconciled to the generic
+  MIM CHEBI by commit cfd643c ("Reconcile 19 stale SSSOM mappings to
+  curated terms", 2026-06-05) directly on the published SSSOM, but the
+  residual JSON was never pruned to match. A full rebuild re-applied the
+  stale specific-form swaps (e.g. Xylose CHEBI:18222 "xylose" →
+  CHEBI:15936 "aldehydo-D-xylose"), reverting the curation. Each YAML's
+  curated ontology_id equals the published object_id; the override no
+  longer applies. Removing them lets the build honor the curated term.
+    Arginine, Ascorbic_Acid, Asparagine, Cellobiose, Cysteine,
+    D-glucuronic_Acid, Dl-dithiothreitol, Fucose, Gluconic_Acid,
+    Glutamic_Acid, Lactose, Mannitol, Na-ascorbate, Proline, Ribose,
+    Sorbitol, Trehalose, Xylose
 """
 from __future__ import annotations
 
@@ -33,16 +47,65 @@ STALE_SOURCE_FILES = {
     "Folinic_Acid.yaml",
     "Starch_soluble.yaml",
     "Tween_20.yaml",
+    # 2026-07-07: reconciled to generic MIM CHEBI by cfd643c; residual swap
+    # would revert the curation on rebuild. See module docstring.
+    "Arginine.yaml",
+    "Ascorbic_Acid.yaml",
+    "Asparagine.yaml",
+    "Cellobiose.yaml",
+    "Cysteine.yaml",
+    "D-glucuronic_Acid.yaml",
+    "Dl-dithiothreitol.yaml",
+    "Fucose.yaml",
+    "Gluconic_Acid.yaml",
+    "Glutamic_Acid.yaml",
+    "Lactose.yaml",
+    "Mannitol.yaml",
+    "Na-ascorbate.yaml",
+    "Proline.yaml",
+    "Ribose.yaml",
+    "Sorbitol.yaml",
+    "Trehalose.yaml",
+    "Xylose.yaml",
 }
 
 
 def main():
-    data = json.loads(RESIDUAL_JSON.read_text())
-    before = len(data["decisions"])
-    removed = [d for d in data["decisions"] if d["source_file"] in STALE_SOURCE_FILES]
-    kept = [d for d in data["decisions"] if d["source_file"] not in STALE_SOURCE_FILES]
+    # The residual-P2.5 cache is an optional, gitignored runtime artifact
+    # (build_mim_ingredient_sssom.py treats a missing file as "no
+    # overrides"). When it's absent there's nothing to prune — no-op so
+    # this stays safe to run unconditionally as a build-sssom pre-step.
+    if not RESIDUAL_JSON.exists():
+        print(f"Residual cache not present ({RESIDUAL_JSON}); nothing to prune.")
+        return
+
+    # Tolerate a malformed / partial cache: this runs as a build-sssom
+    # pre-step, so a hard parse error or a missing key must degrade to a
+    # no-op rather than aborting the whole build (issue #15). The build
+    # loader is equally lenient (data.get("decisions", [])).
+    try:
+        data = json.loads(RESIDUAL_JSON.read_text())
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"Residual cache unreadable ({e}); skipping prune.")
+        return
+    decisions = data.get("decisions")
+    if not isinstance(decisions, list):
+        print("Residual cache has no 'decisions' list; skipping prune.")
+        return
+
+    before = len(decisions)
+    removed = [d for d in decisions if d.get("source_file") in STALE_SOURCE_FILES]
+    kept = [d for d in decisions if d.get("source_file") not in STALE_SOURCE_FILES]
+
+    if not removed:
+        # Idempotent: already pruned (or never present). Leave the file
+        # untouched so repeated builds don't churn its mtime.
+        print(f"No stale residual entries to prune ({before} decisions unchanged).")
+        return
+
     data["decisions"] = kept
-    data["summary"]["residual_total"] = len(kept)
+    summary = data.setdefault("summary", {})
+    summary["residual_total"] = len(kept)
 
     # Recompute category counts so summary stays coherent
     cat_counts: dict[str, int] = {}
@@ -61,8 +124,8 @@ def main():
     print(f"Removed {len(removed)} residual entries:")
     for d in removed:
         print(
-            f"  {d['source_file']:28s}  {d['category']:20s}  "
-            f"mim={d['mim_chebi']:15s}  kg={d['kg_microbe_chebi']}"
+            f"  {d.get('source_file',''):28s}  {d.get('category',''):20s}  "
+            f"mim={d.get('mim_chebi',''):15s}  kg={d.get('kg_microbe_chebi','')}"
         )
     print(f"\nResidual decisions: {before} -> {len(kept)}")
 
