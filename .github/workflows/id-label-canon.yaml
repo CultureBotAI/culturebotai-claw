@@ -1,0 +1,37 @@
+name: id-label canonical
+
+# claw holds the canonical copy of the id↔label validator vendored into the four
+# Mechs (shared/idlabel/). Run its tests here so the source of truth is proven
+# valid before any Mech syncs from it — a broken canonical copy fails here, not
+# four times over in each spoke.
+
+on:
+  pull_request:
+    paths:
+      - "shared/idlabel/**"
+      - ".github/workflows/id-label-canon.yaml"
+  push:
+    branches: [main]
+    paths:
+      - "shared/idlabel/**"
+      - ".github/workflows/id-label-canon.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install deps
+        run: python -m pip install --upgrade pip pytest oaklib
+      - name: Run canonical id-label tests
+        working-directory: shared/idlabel
+        # the vendored tests resolve the validator at ../scripts relative to
+        # themselves, so this dir is the "repo root" they expect.
+        run: python -m pytest tests/ -q
