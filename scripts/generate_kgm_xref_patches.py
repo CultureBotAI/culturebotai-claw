@@ -24,9 +24,10 @@ Output:
 from __future__ import annotations
 
 import csv
-import gzip
 from collections import defaultdict
 from pathlib import Path
+
+from kgm_unified_mappings import KGM_UNIFIED_SSSOM, load_kgm_entity_index
 
 WORKSPACE = Path(
     "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/workspace"
@@ -35,10 +36,7 @@ MIM_SSSOM = Path(
     "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
     "MediaIngredientMech/mappings/ingredient_mappings.sssom.tsv"
 )
-KGM_DICT = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
-    "kg-microbe/mappings/unified_chemical_mappings.tsv.gz"
-)
+KGM_DICT = KGM_UNIFIED_SSSOM
 MIGRATION_TSV = WORKSPACE / "reports/mim_numeric_namespace_migration.tsv"
 PATCHES_DIR = WORKSPACE / "patches"
 OUT_TSV = PATCHES_DIR / "kgm_xref_patches.tsv"
@@ -69,20 +67,15 @@ def load_mim_sssom_chebi_to_mim() -> dict[str, list[str]]:
 
 def load_kgm_xrefs() -> dict[str, set[str]]:
     """kg-microbe CHEBI -> current xrefs set."""
+    if not KGM_DICT.exists():
+        raise SystemExit(
+            f"kg-microbe unified mapping not found: {KGM_DICT}\n"
+            "Regenerate it in kg-microbe with:\n"
+            "  poetry run python scripts/consolidate_chemical_mappings.py"
+        )
     out: dict[str, set[str]] = defaultdict(set)
-    with gzip.open(KGM_DICT, "rt", encoding="utf-8") as f:
-        header = f.readline().rstrip("\n").split("\t")
-        col = {n: i for i, n in enumerate(header)}
-        id_col = "id" if "id" in col else "chebi_id"
-        for raw in f:
-            parts = raw.rstrip("\n").split("\t")
-            if len(parts) < len(header):
-                continue
-            cid = parts[col[id_col]].strip()
-            if not cid.startswith("CHEBI:"):
-                continue
-            x = parts[col["xrefs"]] if "xrefs" in col else ""
-            out[cid].update(z.strip() for z in x.split("|") if z.strip())
+    for cid, entry in load_kgm_entity_index(KGM_DICT).items():
+        out[cid].update(entry["xrefs"])
     return out
 
 

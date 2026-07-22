@@ -31,6 +31,8 @@ from pathlib import Path
 
 import yaml
 
+from kgm_unified_mappings import load_kgm_source_index
+
 CLAW_ROOT = Path(
     "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw"
 )
@@ -45,7 +47,7 @@ CATEGORIZED_JSON = REPORT_DIR / "kg_microbe_residual_p25_categorized.json"
 OUT_TSV = REPORT_DIR / "residual_p25_mappings.sssom.tsv"
 
 MIM_INGREDIENTS_DIR = MIM_ROOT / "data" / "ingredients" / "mapped"
-KGM_UNIFIED_TSV = KGM_ROOT / "mappings" / "unified_chemical_mappings.tsv.gz"
+KGM_UNIFIED_TSV = KGM_ROOT / "mappings" / "kgmicrobe_unified_entity_mappings.sssom.tsv.gz"
 
 MAPPING_SET_ID = "https://w3id.org/sssom/mappings/culturebotai_residual_p25"
 LICENSE = "https://creativecommons.org/publicdomain/zero/1.0/"
@@ -73,30 +75,14 @@ def _pipe(alts: list[str], drop: set[str]) -> str:
 def _load_kgm_source_index() -> dict[str, str]:
     """CHEBI ID -> pipe-separated kg-microbe `sources` string.
 
-    Reads kg-microbe/mappings/unified_chemical_mappings.tsv.gz, which has a
-    column `sources` listing every upstream pipeline that contributed the
+    Reads kg-microbe/mappings/kgmicrobe_unified_entity_mappings.sssom.tsv.gz,
+    whose `source` column lists every upstream pipeline that contributed the
     CHEBI (chebi_xrefs, mediadive_compounds, bacdive_metabolites,
     primary_mappings[kegg_compound], culturebotai_reviewed, …).
     """
-    out: dict[str, str] = {}
     if not KGM_UNIFIED_TSV.exists():
-        return out
-    with gzip.open(KGM_UNIFIED_TSV, "rt") as f:
-        header = f.readline().rstrip("\n").split("\t")
-        try:
-            id_col = header.index("id")
-            src_col = header.index("sources")
-        except ValueError:
-            return out
-        for line in f:
-            parts = line.rstrip("\n").split("\t")
-            if len(parts) <= max(id_col, src_col):
-                continue
-            cid = parts[id_col].strip()
-            src = parts[src_col].strip()
-            if cid.startswith("CHEBI:") and src:
-                out[cid] = src
-    return out
+        return {}
+    return load_kgm_source_index(KGM_UNIFIED_TSV)
 
 
 def _load_mim_evidence(source_file: str) -> tuple[str, str]:

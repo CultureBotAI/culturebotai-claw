@@ -4,7 +4,7 @@ Bidirectional MIM ↔ kg-microbe ingredient mapping audit.
 
 Joins the canonical MIM SSSOM (MediaIngredientMech/mappings/ingredient_mappings.sssom.tsv)
 against kg-microbe's unified chemical dictionary
-(kg-microbe/mappings/unified_chemical_mappings.tsv.gz) and classifies every
+(kg-microbe/mappings/kgmicrobe_unified_entity_mappings.sssom.tsv.gz) and classifies every
 (label, CHEBI) assertion into one of four reconciliation buckets:
 
     AGREE      both sides map the surface form to the same CHEBI
@@ -28,11 +28,16 @@ Outputs:
 
 from __future__ import annotations
 
-import gzip
 import json
 import re
 from collections import defaultdict
 from pathlib import Path
+
+from kgm_unified_mappings import (
+    KGM_UNIFIED_SSSOM,
+    load_kgm_compound_placeholders,
+    load_kgm_entity_index,
+)
 
 # ---------- paths ----------
 
@@ -40,10 +45,7 @@ MIM_SSSOM = Path(
     "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
     "MediaIngredientMech/mappings/ingredient_mappings.sssom.tsv"
 )
-KGM_DICT = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
-    "kg-microbe/mappings/unified_chemical_mappings.tsv.gz"
-)
+KGM_DICT = KGM_UNIFIED_SSSOM
 KGM_MEDIADIVE_UNMAPPED = Path(
     "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
     "kg-microbe/mappings/mediadive_unmapped_ingredients_to_curate.tsv"
@@ -83,52 +85,13 @@ def load_mim_sssom(path: Path) -> list[dict]:
 
 def load_kgm_dict(path: Path) -> dict[str, dict]:
     """Return CHEBI -> {canonical_name, formula, synonyms:set, xrefs:set, sources:str}."""
-    by_chebi: dict[str, dict] = {}
-    with gzip.open(path, "rt", encoding="utf-8") as f:
-        header = f.readline().rstrip("\n").split("\t")
-        col = {name: i for i, name in enumerate(header)}
-        id_col = "id" if "id" in col else "chebi_id"
-        for raw in f:
-            parts = raw.rstrip("\n").split("\t")
-            if len(parts) < len(header):
-                continue
-            cid = parts[col[id_col]].strip()
-            if not cid.startswith("CHEBI:"):
-                continue
-            canonical = parts[col["canonical_name"]].strip()
-            formula = parts[col["formula"]].strip() if "formula" in col else ""
-            syn_field = parts[col["synonyms"]] if "synonyms" in col else ""
-            xref_field = parts[col["xrefs"]] if "xrefs" in col else ""
-            sources = parts[col["sources"]] if "sources" in col else ""
-
-            synonyms = {
-                s.strip()
-                for s in syn_field.split("|")
-                if s.strip() and s.strip() != cid and not CURIE_RE.match(s.strip())
-            }
-            xrefs = {x.strip() for x in xref_field.split("|") if x.strip()}
-
-            entry = by_chebi.get(cid)
-            if entry is None:
-                by_chebi[cid] = {
-                    "canonical_name": canonical,
-                    "formula": formula,
-                    "synonyms": synonyms,
-                    "xrefs": xrefs,
-                    "sources": sources,
-                }
-            else:
-                entry["synonyms"].update(synonyms)
-                entry["xrefs"].update(xrefs)
-                if not entry["canonical_name"] and canonical:
-                    entry["canonical_name"] = canonical
-
-    # Quarantine pollution victims (row-merge bug upstream).
-    for cid, e in by_chebi.items():
-        if len(e["synonyms"]) > POLLUTION_THRESHOLD:
-            e["synonyms"] = set()
-            e["_polluted"] = True
-    return by_chebi
+    if not path.exists():
+        raise SystemExit(
+            f"kg-microbe unified mapping not found: {path}\n"
+            "Regenerate it in kg-microbe with:\n"
+            "  poetry run python scripts/consolidate_chemical_mappings.py"
+        )
+    return load_kgm_entity_index(path)
 
 
 def build_kgm_synonym_index(kgm: dict[str, dict]) -> dict[str, set[str]]:
@@ -144,30 +107,6 @@ def build_kgm_synonym_index(kgm: dict[str, dict]) -> dict[str, set[str]]:
         for t in terms:
             idx[t.lower()].add(cid)
     return idx
-
-
-def load_kgm_compound_placeholders(path: Path) -> list[dict]:
-    """Load kgmicrobe.compound:* rows (no-CHEBI placeholders)."""
-    rows: list[dict] = []
-    with gzip.open(path, "rt", encoding="utf-8") as f:
-        header = f.readline().rstrip("\n").split("\t")
-        col = {name: i for i, name in enumerate(header)}
-        id_col = "id" if "id" in col else "chebi_id"
-        for raw in f:
-            parts = raw.rstrip("\n").split("\t")
-            if len(parts) < len(header):
-                continue
-            cid = parts[col[id_col]].strip()
-            if not cid.startswith("kgmicrobe.compound:"):
-                continue
-            rows.append({
-                "source_id": cid,
-                "preferred_term": parts[col["canonical_name"]].strip(),
-                "occurrences": 0,
-                "sources": parts[col["sources"]] if "sources" in col else "",
-                "origin": "kgmicrobe.compound",
-            })
-    return rows
 
 
 def load_mediadive_unmapped(path: Path) -> list[dict]:

@@ -24,7 +24,7 @@ ENVO when populated) becomes one SSSOM row with:
 
 Inputs (all read-only):
   MIM/data/ingredients/mapped/*.yaml
-  kg-microbe/mappings/unified_chemical_mappings.tsv.gz   (CHEBI-only)
+  kg-microbe/mappings/kgmicrobe_unified_entity_mappings.sssom.tsv.gz  (CHEBI-only)
   workspace/reports/kg_microbe_residual_p25_categorized.json   (optional)
       — enriches predicate / confidence for the 303 triaged CHEBI cases
 
@@ -51,6 +51,8 @@ from pathlib import Path
 
 import yaml
 
+from kgm_unified_mappings import load_kgm_labels, load_kgm_source_index
+
 CLAW_ROOT = Path(
     "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw"
 )
@@ -63,7 +65,7 @@ KGM_ROOT = Path(
 
 MIM_INGREDIENTS_DIR = MIM_ROOT / "data" / "ingredients" / "mapped"
 MIM_PUBLISHED_SSSOM = MIM_ROOT / "mappings" / "ingredient_mappings.sssom.tsv"
-KGM_UNIFIED_TSV = KGM_ROOT / "mappings" / "unified_chemical_mappings.tsv.gz"
+KGM_UNIFIED_TSV = KGM_ROOT / "mappings" / "kgmicrobe_unified_entity_mappings.sssom.tsv.gz"
 REPORT_DIR = CLAW_ROOT / "workspace" / "reports"
 RESIDUAL_JSON = REPORT_DIR / "kg_microbe_residual_p25_categorized.json"
 OUT_TSV = REPORT_DIR / "mim_ingredient_mappings.sssom.tsv"
@@ -238,55 +240,32 @@ def _load_existing_validation_method(
     return out
 
 
+def _warn_if_kgm_missing() -> bool:
+    """kg-microbe enrichment is optional, but a silent skip is worse than a warning."""
+    if KGM_UNIFIED_TSV.exists():
+        return True
+    print(
+        f"WARNING: kg-microbe unified mapping not found ({KGM_UNIFIED_TSV}); "
+        "building SSSOM with NO kg-microbe cross-reference enrichment. "
+        "Regenerate it in kg-microbe with "
+        "`poetry run python scripts/consolidate_chemical_mappings.py`.",
+        file=sys.stderr,
+    )
+    return False
+
+
 def _load_kgm_source_index() -> dict[str, str]:
-    """CHEBI:X → pipe-separated kg-microbe `sources` string."""
-    out: dict[str, str] = {}
-    if not KGM_UNIFIED_TSV.exists():
-        return out
-    with gzip.open(KGM_UNIFIED_TSV, "rt") as f:
-        header = f.readline().rstrip("\n").split("\t")
-        try:
-            id_col = header.index("id")
-            src_col = header.index("sources")
-        except ValueError:
-            return out
-        for line in f:
-            parts = line.rstrip("\n").split("\t")
-            if len(parts) <= max(id_col, src_col):
-                continue
-            cid = parts[id_col].strip()
-            if cid.startswith("CHEBI:") and parts[src_col].strip():
-                out[cid] = parts[src_col].strip()
-    return out
+    """CHEBI:X → pipe-separated kg-microbe `source` string."""
+    if not _warn_if_kgm_missing():
+        return {}
+    return load_kgm_source_index(KGM_UNIFIED_TSV)
 
 
 def _load_kgm_labels() -> dict[str, tuple[str, list[str]]]:
     """CHEBI:X → (canonical_name, [synonyms...]) from kg-microbe."""
-    out: dict[str, tuple[str, list[str]]] = {}
-    if not KGM_UNIFIED_TSV.exists():
-        return out
-    with gzip.open(KGM_UNIFIED_TSV, "rt") as f:
-        header = f.readline().rstrip("\n").split("\t")
-        try:
-            id_col = header.index("id")
-            name_col = header.index("canonical_name")
-            syn_col = header.index("synonyms")
-        except ValueError:
-            return out
-        for line in f:
-            parts = line.rstrip("\n").split("\t")
-            if len(parts) <= max(id_col, name_col, syn_col):
-                continue
-            cid = parts[id_col].strip()
-            if not cid.startswith("CHEBI:"):
-                continue
-            name = parts[name_col].strip()
-            syns = [s for s in parts[syn_col].split("|") if s.strip()]
-            if len(syns) > POLLUTION_SYNONYM_THRESHOLD:
-                # Polluted entry — keep canonical_name, drop synonyms.
-                syns = []
-            out[cid] = (name, syns)
-    return out
+    if not _warn_if_kgm_missing():
+        return {}
+    return load_kgm_labels(KGM_UNIFIED_TSV)
 
 
 def _load_chebi_labels(chebi_ids: list[str], batch: int = 80) -> dict[str, str]:
