@@ -1,13 +1,21 @@
-# id↔label validator — canonical source
+# id↔label validator — CI-verified mirror
 
-This directory is the **single canonical copy** of the id↔label validator and
-its chemical-formula plausibility helper, vendored byte-identical into the four
-Mech repos (CultureMech / MediaIngredientMech / CommunityMech / TraitMech).
+This directory is a **CI-verified mirror** of the id↔label validator and its
+chemical-formula plausibility helper, which are vendored byte-identical into the
+four Mech repos (CultureMech / MediaIngredientMech / CommunityMech / TraitMech).
 
-Before this existed, one Mech (CultureMech) was the hub and the others pinned
-it. That worked but privileged a data repo as the home for shared tooling.
-culturebotai-claw is the coordination repo across the Mechs, so the shared code
-lives here now; no Mech is canonical.
+**The machine-canonical fetch-hub is the public `CultureBotAI/CultureMech`, not
+this repo.** culturebotai-claw is private, so the Mechs' CI (they are public)
+cannot fetch raw content from it. Each Mech's `scripts/check_vendored_sync.sh`
+therefore diffs against `CultureBotAI/CultureMech` at the commit pinned in its
+`scripts/.vendored_canon_ref`; the nightly `vendored-fleet-audit.yml` in
+CultureMech compares all four copies.
+
+This mirror exists for two reasons: a documented, human-readable home for the
+shared set, and an isolated test-runner (`id-label-canon` CI runs the vendored
+tests here without a full Mech checkout). To stop it becoming a second,
+divergent "source of truth", the `matches-hub` job asserts it is byte-identical
+to `CultureMech@main` on every change — if the two diverge, claw CI fails.
 
 ## Files (canonical)
 
@@ -33,16 +41,20 @@ converged). Seeded from `CultureBotAI/CultureMech@main` at that point.
 
 Each Mech keeps a synced copy under its own `scripts/` + `tests/` (its CI runs
 the validator locally and has no claw checkout). `scripts/check_vendored_sync.sh`
-in each Mech fetches these files from `CultureBotAI/culturebotai-claw` at the
-commit pinned in `scripts/.vendored_canon_ref` and byte-compares — a Mech that
-edits its copy fails CI, because the reference lives here.
+in each Mech fetches these files from `CultureBotAI/CultureMech` (the public
+fetch-hub) at the commit pinned in `scripts/.vendored_canon_ref` and
+byte-compares — a Mech that edits its copy fails CI, because the reference lives
+in another repo.
 
 ## Changing a vendored file
 
-1. Change it **here** (this directory), land it in claw `main`.
-2. In each Mech, sync the changed file(s) from claw and bump
-   `scripts/.vendored_canon_ref` to the new claw commit — the deliberate
+1. Land the change in the fetch-hub, **`CultureBotAI/CultureMech`**, on `main`.
+2. Sync this mirror (`shared/idlabel/*`) from `CultureMech@main` in claw so the
+   `matches-hub` CI job stays green.
+3. In each other Mech, sync the changed file(s) and bump
+   `scripts/.vendored_canon_ref` to the new CultureMech commit — the deliberate
    propagation act. Use the `cross-mech-sync` skill.
 
-Nothing but that sync keeps the copies aligned; the per-Mech pin verifies a copy
-against itself, not across repos, which is why this cross-repo reference exists.
+Nothing but that sync keeps the copies aligned; the retired per-Mech sha256 pin
+verified a copy against itself, not across repos, which is why the cross-repo
+reference (against CultureMech) exists.

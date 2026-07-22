@@ -1,9 +1,19 @@
 name: id-label canonical
 
-# claw holds the canonical copy of the id↔label validator vendored into the four
-# Mechs (shared/idlabel/). Run its tests here so the source of truth is proven
-# valid before any Mech syncs from it — a broken canonical copy fails here, not
-# four times over in each spoke.
+# shared/idlabel/ is a CI-verified MIRROR of the id↔label validator set, kept here
+# as a documented reference + isolated test-runner. It is NOT the fetch source:
+# the four Mechs are public and claw is private, so their CI cannot fetch raw
+# content from claw. The machine-canonical fetch-hub is the (public)
+# CultureBotAI/CultureMech — each Mech's scripts/check_vendored_sync.sh diffs
+# against CultureMech at its pinned commit.
+#
+# To keep this mirror honest (so "canonical copy" is enforced, not decorative)
+# this workflow does two things:
+#   1. `matches-hub` — assert shared/idlabel/* is byte-identical to
+#      CultureMech@main; a silent divergence between the two "canonical" homes
+#      fails here. This is the reconciliation of the two source-of-truth schemes.
+#   2. `test` — run the vendored tests against this copy, so a broken canonical
+#      copy fails here once rather than four times over in the spokes.
 
 on:
   pull_request:
@@ -21,6 +31,43 @@ permissions:
   contents: read
 
 jobs:
+  # Reconciliation guard: this mirror must equal the machine-canonical fetch-hub
+  # (public CultureBotAI/CultureMech@main). Without this, claw/shared/idlabel and
+  # CultureMech are two "sources of truth" that can silently diverge — the same
+  # blind spot the drift check closes for the spokes, one level up. Fast and
+  # dependency-free (curl + cmp), so it blocks before the heavier test job.
+  matches-hub:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert shared/idlabel matches CultureMech@main byte-for-byte
+        run: |
+          set -euo pipefail
+          HUB="CultureBotAI/CultureMech"; REF="main"
+          FILES=(
+            scripts/validate_id_label_correspondence.py
+            scripts/chem_formula.py
+            tests/test_id_label_empty_adapter.py
+            tests/test_id_label_unknown_prefix.py
+            tests/test_id_label_plausibility.py
+          )
+          tmp="$(mktemp)"; trap 'rm -f "$tmp"' EXIT; fail=0
+          for f in "${FILES[@]}"; do
+            local="shared/idlabel/$f"
+            [ -f "$local" ] || { echo "MISSING: $local"; fail=1; continue; }
+            url="https://raw.githubusercontent.com/${HUB}/${REF}/${f}"
+            curl -fsSL "$url" -o "$tmp" || { echo "ERROR: fetch $f from ${HUB}@${REF}"; fail=1; continue; }
+            cmp -s "$tmp" "$local" || { echo "DRIFT: $local differs from ${HUB}@${REF}:$f"; fail=1; }
+          done
+          if [ "$fail" -eq 0 ]; then
+            echo "OK: shared/idlabel matches ${HUB}@${REF}"
+          else
+            echo ""; echo "This mirror has diverged from the canonical hub. Either sync"
+            echo "shared/idlabel/* from ${HUB}@${REF}, or land the intended change in"
+            echo "CultureMech first (it is the fetch-hub the Mechs pin to)."
+            exit 1
+          fi
+
   test:
     runs-on: ubuntu-latest
     steps:
