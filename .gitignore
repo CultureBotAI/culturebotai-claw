@@ -46,3 +46,6 @@ htmlcov/
 
 # uv lock files (optional - comment out if you want to commit)
 # uv.lock
+
+# Local ontology/name lookup cache (grounding scripts) — never commit
+cache/
