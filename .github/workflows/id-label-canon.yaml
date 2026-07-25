@@ -16,6 +16,15 @@ name: id-label canonical
 #      copy fails here once rather than four times over in the spokes.
 
 on:
+  # The path-filtered triggers below all key on THIS repo changing, but the hub
+  # is CultureMech: when CultureMech@main moves (the documented way a vendored
+  # file changes) nothing here changes, so nothing fires and the mirror goes
+  # stale unseen. The nightly run is what actually closes that window — it is
+  # curl + cmp, no Mech checkouts, so it is cheap to run unconditionally.
+  # Scheduled ahead of cross-repo-validation (27 7) so a stale mirror surfaces
+  # before the day's heavier cross-repo runs.
+  schedule:
+    - cron: "41 6 * * *"   # daily at 06:41 UTC
   pull_request:
     paths:
       - "shared/idlabel/**"
