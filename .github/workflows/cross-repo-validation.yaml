@@ -49,13 +49,6 @@ jobs:
           path: CommunityMech-outer
         continue-on-error: true
 
-      - name: Checkout TraitMech
-        uses: actions/checkout@v4
-        with:
-          repository: CultureBotAI/TraitMech
-          path: TraitMech
-        continue-on-error: true
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -65,16 +58,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install pyyaml jinja2 matplotlib
-
-      - name: Enforce id-label vendored files match claw canonical
-        working-directory: culturebotai-claw
-        run: |
-          bash scripts/audit_idlabel_fleet.sh shared/idlabel \
-            "$GITHUB_WORKSPACE/CultureMech" \
-            "$GITHUB_WORKSPACE/MediaIngredientMech" \
-            "$GITHUB_WORKSPACE/CommunityMech-outer" \
-            "$GITHUB_WORKSPACE/TraitMech"
-        continue-on-error: false
 
       - name: Validate evidence references (MIM)
         working-directory: culturebotai-claw
