@@ -120,7 +120,7 @@ on the kg-microbe side between two audit moments.
 
 | Path | Role |
 |---|---|
-| `.claude/skills/kg-microbe-sync/skill.md` | This file |
+| `.claude/skills/kg-microbe-sync/SKILL.md` | This file |
 | `scripts/sync_kgm_dependencies.py` | The snapshotter |
 | `workspace/kgm_snapshot/` | Snapshot output (gitignored) |
 | `workspace/kgm_snapshot/manifest.json` | Per-file provenance |

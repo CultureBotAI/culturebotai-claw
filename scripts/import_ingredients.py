@@ -1,7 +1,7 @@
 #!/usr/bin/env /opt/homebrew/bin/python3.13
 """
 Unified ingredient-import pipeline. See
-.claude/skills/ingredient-mapping/skill.md for the full architecture.
+.claude/skills/ingredient-mapping/SKILL.md for the full architecture.
 
 Source loaders (--source <X>) yield Candidate dicts. The resolver
 cascade tries each tier in order until a match is found. Every

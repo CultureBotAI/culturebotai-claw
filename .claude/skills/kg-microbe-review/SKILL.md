@@ -128,7 +128,7 @@ likely contribution surfaces are:
 
 | Path | Role |
 |---|---|
-| `.claude/skills/kg-microbe-review/skill.md` | This file |
+| `.claude/skills/kg-microbe-review/SKILL.md` | This file |
 | `scripts/generate_kg_microbe_review.py` | The diff generator |
 | `workspace/reports/kg_microbe_review.md` | Generated report |
 

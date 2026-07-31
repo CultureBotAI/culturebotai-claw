@@ -145,7 +145,7 @@ Future upgrades (deferred — see Phase 4 plan):
 
 | Path | Role |
 |---|---|
-| `.claude/skills/evidence-curation/skill.md` | This file |
+| `.claude/skills/evidence-curation/SKILL.md` | This file |
 | `scripts/propose_evidence.py` | Entry point + driver |
 | `scripts/fetch_pubmed_abstracts.py` | Shared cache fetcher (Phase 1) |
 | `MediaIngredientMech/references_cache/PMID_*.md` | Shared abstract cache |

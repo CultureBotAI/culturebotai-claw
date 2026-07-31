@@ -102,6 +102,6 @@ python3 scripts/generate_mapping_taxonomy_report.py
 
 | Path | Role |
 |---|---|
-| `.claude/skills/mapping-taxonomy/skill.md` | This file |
+| `.claude/skills/mapping-taxonomy/SKILL.md` | This file |
 | `scripts/generate_mapping_taxonomy_report.py` | The generator |
 | `workspace/reports/mapping_taxonomy.md` | Generated output |

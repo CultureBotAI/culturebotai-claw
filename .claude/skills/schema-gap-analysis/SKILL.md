@@ -14,9 +14,9 @@ version: 2.1.0
 > | Mech | Operational skill |
 > |---|---|
 > | CultureMech | `.claude/skills/schema-gap-analysis/SKILL.md` (companion to the deeper `audit-schema-gaps`) |
-> | MIM | `.claude/skills/schema-gap-analysis/skill.md` |
-> | CommunityMech | `.claude/skills/schema-gap-analysis/skill.md` |
-> | TraitMech | `.claude/skills/schema-gap-analysis/skill.md` |
+> | MIM | `.claude/skills/schema-gap-analysis/SKILL.md` |
+> | CommunityMech | `.claude/skills/schema-gap-analysis/SKILL.md` |
+> | TraitMech | `.claude/skills/schema-gap-analysis/SKILL.md` |
 >
 > **This file** is the cross-Mech reference — where the methodology lives once (so framework changes can be propagated by re-syncing the per-Mech copies) and where to bootstrap a new Mech.
 

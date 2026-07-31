@@ -215,7 +215,7 @@ the per-source semantics inside `extra`.
 
 | Path | Role |
 |---|---|
-| `.claude/skills/unmapped-inventory/skill.md` | This file |
+| `.claude/skills/unmapped-inventory/SKILL.md` | This file |
 | `scripts/inventory_unmapped_ingredients.py` | The harvester |
 | `workspace/reports/unmapped_inventory.tsv` | Per-row inventory |
 | `workspace/reports/unmapped_inventory.md` | Bucketed summary |
