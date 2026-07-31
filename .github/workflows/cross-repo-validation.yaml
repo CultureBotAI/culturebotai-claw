@@ -40,14 +40,17 @@ jobs:
         with:
           repository: CultureBotAI/CultureMech
           path: CultureMech
-        continue-on-error: true   # private repo may not be accessible
+        # Was continue-on-error with the comment "private repo may not be
+        # accessible". CultureMech is public (verified 2026-07-31), so a failed
+        # checkout is a real fault, and swallowing it let downstream validation
+        # steps silently run against a missing tree.
 
       - name: Checkout CommunityMech
         uses: actions/checkout@v4
         with:
           repository: CultureBotAI/CommunityMech
           path: CommunityMech-outer
-        continue-on-error: true
+        # Also public (verified 2026-07-31) — same reasoning as CultureMech above.
 
       - name: Setup Python
         uses: actions/setup-python@v5
