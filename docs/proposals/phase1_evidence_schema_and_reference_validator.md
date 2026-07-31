@@ -38,7 +38,7 @@ prose that no human or machine has verified against a real abstract.
 | `MediaIngredientMech/references_cache/PMID_NNNNNNNN.md` | NEW DIR | Cached PubMed abstracts, one MD per PMID |
 | `culturebotai-claw/scripts/validate_evidence_references.py` | NEW | Validator: snippet substring match against cache |
 | `culturebotai-claw/scripts/fetch_pubmed_abstracts.py` | NEW | E-utilities client; populates references_cache |
-| `culturebotai-claw/.claude/skills/evidence-reference-validation/skill.md` | NEW | Skill wrapping the validator |
+| `culturebotai-claw/.claude/skills/evidence-reference-validation/SKILL.md` | NEW | Skill wrapping the validator |
 | `MediaIngredientMech/justfile` | EXTEND | `qc-evidence` recipe; gate in `just qc` |
 | `culturebotai-claw/justfile` | EXTEND | `validate-evidence` recipe |
 

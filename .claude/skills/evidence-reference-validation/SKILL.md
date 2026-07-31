@@ -141,7 +141,7 @@ The `excerpt` slot in legacy `RoleCitation` is treated equivalent to
 
 | Path | Role |
 |---|---|
-| `.claude/skills/evidence-reference-validation/skill.md` | This file |
+| `.claude/skills/evidence-reference-validation/SKILL.md` | This file |
 | `scripts/fetch_pubmed_abstracts.py` | Cache fetcher (Step 1) |
 | `scripts/validate_evidence_references.py` | Validator (Step 2) |
 | `MediaIngredientMech/references_cache/` | Cache directory (committed) |

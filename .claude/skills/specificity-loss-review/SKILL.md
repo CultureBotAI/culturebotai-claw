@@ -153,7 +153,7 @@ should be able to disambiguate:
 
 | Path | Role |
 |---|---|
-| `.claude/skills/specificity-loss-review/skill.md` | This file |
+| `.claude/skills/specificity-loss-review/SKILL.md` | This file |
 | `scripts/detect_specificity_loss.py` | Step 1 — detector |
 | `scripts/mint_kgm_ingredient.py` | Step 2 — mint helper |
 | `MediaIngredientMech/data/custom/kgmicrobe_ingredients.tsv` | Canonical custom-terms registry |

@@ -203,7 +203,7 @@ Out of 99 heuristic-complex distinct names:
 
 | Path | Role |
 |---|---|
-| `.claude/skills/complex-ingredient-resolver/skill.md` | This file |
+| `.claude/skills/complex-ingredient-resolver/SKILL.md` | This file |
 | `scripts/foodon_pass.py` | The resolver driver |
 | `workspace/reports/unmapped_inventory.tsv` | Input — distinct heuristic-complex names |
 | `workspace/reports/foodon_pass.{tsv,md}` | Output — per-name verdicts |

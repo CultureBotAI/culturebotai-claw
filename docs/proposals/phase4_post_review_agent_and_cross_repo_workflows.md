@@ -44,7 +44,7 @@ shows compliance trends.
 |---|---|---|
 | `culturebotai-claw/.github/workflows/cross-repo-validation.yaml` | NEW | Daily; runs validators on all 3 mechs in parallel |
 | `culturebotai-claw/.github/workflows/post-review-agent.yaml` | NEW | Hourly; scans review comments, opens follow-up issues |
-| `culturebotai-claw/.claude/skills/evidence-curation/skill.md` | NEW | Deep-research-backed evidence proposer |
+| `culturebotai-claw/.claude/skills/evidence-curation/SKILL.md` | NEW | Deep-research-backed evidence proposer |
 | `culturebotai-claw/.claude/commands/curate.md` | NEW | Slash command orchestrator |
 | `culturebotai-claw/scripts/propose_evidence.py` | NEW | Calls deep-research provider; returns PMID+snippet candidates |
 | `culturebotai-claw/ai.just` | NEW | Repo-local hooks layered on justfile |

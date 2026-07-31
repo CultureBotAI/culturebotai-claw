@@ -391,25 +391,25 @@ publish-complex-ingredients:
     /opt/homebrew/bin/python3.13 scripts/build_complex_ingredients_tsv.py --publish
 
 # Generate the canonical mapping-case taxonomy reference. See
-# .claude/skills/mapping-taxonomy/skill.md for what this documents.
+# .claude/skills/mapping-taxonomy/SKILL.md for what this documents.
 mapping-taxonomy:
     /opt/homebrew/bin/python3.13 scripts/generate_mapping_taxonomy_report.py
 
 # Diff MIM's published SSSOM against kg-microbe's consolidated SSSOM on
 # the chemical-mappings-mim-priority branch. See
-# .claude/skills/kg-microbe-review/skill.md for the full methodology.
+# .claude/skills/kg-microbe-review/SKILL.md for the full methodology.
 kg-microbe-review:
     /opt/homebrew/bin/python3.13 scripts/generate_kg_microbe_review.py
 
 # Inventory all "unmapped / pending-curation" ingredient surfaces across
 # the four repos (MIM, kg-microbe, CultureMech, CommunityMech). See
-# .claude/skills/unmapped-inventory/skill.md for the sync model.
+# .claude/skills/unmapped-inventory/SKILL.md for the sync model.
 inventory-unmapped:
     /opt/homebrew/bin/python3.13 scripts/inventory_unmapped_ingredients.py
 
 # Snapshot kg-microbe dependency files into workspace/kgm_snapshot/.
 # Captures current local kg-microbe state (no git pull). See
-# .claude/skills/kg-microbe-sync/skill.md.
+# .claude/skills/kg-microbe-sync/SKILL.md.
 sync-kgm:
     /opt/homebrew/bin/python3.13 scripts/sync_kgm_dependencies.py
 
@@ -421,7 +421,7 @@ sync-kgm:
 
 # Fetch missing PubMed abstracts for every PMID referenced by MIM
 # evidence claims. Polite (3 req/s; 10 req/s with NCBI_API_KEY env var).
-# See .claude/skills/evidence-reference-validation/skill.md.
+# See .claude/skills/evidence-reference-validation/SKILL.md.
 fetch-pubmed *args:
     /opt/homebrew/bin/python3.13 scripts/fetch_pubmed_abstracts.py {{args}}
 
@@ -434,7 +434,7 @@ validate-evidence *args:
 # Propose PMID + snippet candidates via PubMed search for MIM ingredient
 # evidence claims (Phase 4). Outputs to workspace/reports/evidence_proposals/.
 # Curators review, paste into MIM YAMLs, then validate-evidence confirms.
-# See .claude/skills/evidence-curation/skill.md.
+# See .claude/skills/evidence-curation/SKILL.md.
 propose-evidence *args:
     /opt/homebrew/bin/python3.13 scripts/propose_evidence.py {{args}}
 
@@ -464,25 +464,25 @@ review-classifications:
 # Cascading multi-ontology resolver for heuristic-complex MIM
 # ingredients (yeast extract, peptone, soil, manure, milk, etc.).
 # FOODON → ENVO → CHEBI → NCIT via OLS, with token-subset re-scoring.
-# See .claude/skills/complex-ingredient-resolver/skill.md.
+# See .claude/skills/complex-ingredient-resolver/SKILL.md.
 foodon-pass *args:
     /opt/homebrew/bin/python3.13 -u scripts/foodon_pass.py {{args}}
 
 # Detect MIM mappings where the ontology term is more general than the
 # named ingredient (e.g. "Vermont Soil" → ENVO:soil). Read-only review.
-# See .claude/skills/specificity-loss-review/skill.md.
+# See .claude/skills/specificity-loss-review/SKILL.md.
 detect-specificity-loss:
     /opt/homebrew/bin/python3.13 scripts/detect_specificity_loss.py
 
 # Mint a kgmicrobe.ingredient:* custom term to preserve specificity.
-# See .claude/skills/specificity-loss-review/skill.md.
+# See .claude/skills/specificity-loss-review/SKILL.md.
 #   just mint-kgm-ingredient --slug Vermont_Soil
 #   just mint-kgm-ingredient --from-tsv workspace/reports/specificity_loss_review.tsv
 mint-kgm-ingredient *args:
     /opt/homebrew/bin/python3.13 scripts/mint_kgm_ingredient.py {{args}}
 
 # Import a new ingredient/compound source into MIM. See
-# .claude/skills/ingredient-mapping/skill.md for the full source→resolver→emit
+# .claude/skills/ingredient-mapping/SKILL.md for the full source→resolver→emit
 # cascade. Defaults to dry-run; pass --apply to write YAMLs.
 #
 # Examples:

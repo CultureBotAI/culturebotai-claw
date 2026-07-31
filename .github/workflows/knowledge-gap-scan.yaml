@@ -1,0 +1,167 @@
+name: Knowledge-gap scan
+
+# Weekly Europe PMC knowledge-gap scan across all four Mechs.
+#
+# This runs from claw, not from each Mech, for a hard reason: the scanner library
+# `kg_microbe_kgscan` lives in THIS repo, which is private, while the four Mechs are
+# public. A public Mech's CI cannot check out a private claw without a token, but
+# claw's own CI can freely check out the public Mechs. So the dependency direction
+# decides where the job lives.
+#
+# Deliberately NO agent and NO write access. It runs the same deterministic
+# `just knowledge-gap-scan` a curator runs by hand, in dry-run, and publishes the
+# triage packet as an artifact. Turning packets into issues is a separate, later
+# step — see docs/AUTONOMOUS_LOOPS.md §5.4.
+
+on:
+  schedule:
+    - cron: "0 9 * * 1"   # Monday 09:00 UTC — offset from id-label-canon (06:41)
+                          # and cross-repo-validation (07:27) so they never contend
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Cap records scanned per Mech (0 = all)"
+        required: false
+        default: "0"
+        type: string
+      min_score:
+        description: "Override the per-repo min_score gate (blank = config default)"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: knowledge-gap-scan
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false   # one Mech's failure must not hide the other three
+      matrix:
+        include:
+          - mech: CultureMech
+            repository: CultureBotAI/CultureMech
+            checkout_path: CultureMech
+            workdir: CultureMech
+          - mech: MediaIngredientMech
+            repository: CultureBotAI/MediaIngredientMech
+            checkout_path: MediaIngredientMech
+            workdir: MediaIngredientMech
+          - mech: CommunityMech
+            repository: CultureBotAI/CommunityMech
+            checkout_path: CommunityMech-outer
+            # CommunityMech nests the project one level inside its repo
+            workdir: CommunityMech-outer/CommunityMech
+          - mech: TraitMech
+            repository: CultureBotAI/TraitMech
+            checkout_path: TraitMech
+            workdir: TraitMech
+
+    steps:
+      - name: Checkout claw (hosts kg_microbe_kgscan)
+        uses: actions/checkout@v4
+        with:
+          path: culturebotai-claw
+
+      - name: Checkout ${{ matrix.mech }}
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ matrix.repository }}
+          path: ${{ matrix.checkout_path }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Sync ${{ matrix.mech }} environment
+        working-directory: ${{ matrix.workdir }}
+        # The recipe runs `uv run python`, matching how these repos are actually
+        # used, so the Mech's own environment has to exist. This is heavier than
+        # a bare `pip install pyyaml` — CultureMech in particular pulls a large
+        # tree — but it is the only way the scan runs against the same
+        # dependencies a curator has locally.
+        run: uv sync
+
+      - name: Install just
+        uses: extractions/setup-just@v3
+
+      - name: Run knowledge-gap scan (dry-run)
+        id: scan
+        working-directory: ${{ matrix.workdir }}
+        env:
+          # Absolute path sidesteps the differing relative depths across Mechs
+          # (CommunityMech is nested, the others are not).
+          CLAW_SRC: ${{ github.workspace }}/culturebotai-claw/src
+          # Inputs come through env, never interpolated into the script body:
+          # `${{ }}` is substituted textually before bash parses, so an input
+          # containing $(...) would execute. See #26.
+          SCAN_LIMIT: ${{ inputs.limit || '0' }}
+          SCAN_MIN_SCORE: ${{ inputs.min_score || '' }}
+        run: |
+          set -euo pipefail
+          # Reject non-numeric input before it reaches the scanner, where it
+          # would fail less legibly.
+          case "$SCAN_LIMIT" in
+            ''|*[!0-9]*) echo "limit must be a non-negative integer, got '$SCAN_LIMIT'" >&2; exit 2 ;;
+          esac
+          if [ -n "$SCAN_MIN_SCORE" ]; then
+            case "$SCAN_MIN_SCORE" in
+              *[!0-9]*) echo "min_score must be a non-negative integer, got '$SCAN_MIN_SCORE'" >&2; exit 2 ;;
+            esac
+          fi
+          # `if` rather than `[ ... ] && ...`: under `set -e` a trailing
+          # false `&&` list exits non-zero, so that idiom is safe only while
+          # another command follows it. This form survives reordering.
+          args=""
+          if [ "$SCAN_LIMIT" != "0" ]; then
+            args="$args --limit $SCAN_LIMIT"
+          fi
+          if [ -n "$SCAN_MIN_SCORE" ]; then
+            args="$args --min-score $SCAN_MIN_SCORE"
+          fi
+          # shellcheck disable=SC2086  # deliberate word-splitting of the flag list
+          just knowledge-gap-scan $args | tee scan-output.txt
+
+      - name: Summarise
+        if: always()
+        working-directory: ${{ matrix.workdir }}
+        run: |
+          {
+            echo "## ${{ matrix.mech }} knowledge-gap scan"
+            echo
+            if [ -f scan-output.txt ]; then
+              echo '```'
+              tail -5 scan-output.txt
+              echo '```'
+            else
+              echo "Scan produced no output — the step above failed before writing anything."
+            fi
+            if [ -f reports/knowledge_gap_scan.md ]; then
+              echo
+              echo "<details><summary>Triage packet (first 60 lines)</summary>"
+              echo
+              echo '```markdown'
+              head -60 reports/knowledge_gap_scan.md
+              echo '```'
+              echo
+              echo "</details>"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload triage packet
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: knowledge-gap-scan-${{ matrix.mech }}
+          path: |
+            ${{ matrix.workdir }}/reports/knowledge_gap_scan.json
+            ${{ matrix.workdir }}/reports/knowledge_gap_scan.md
+          if-no-files-found: warn
+          retention-days: 90
