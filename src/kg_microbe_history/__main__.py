@@ -79,6 +79,16 @@ def cmd_new(args: argparse.Namespace) -> int:
         root = args.target_root.rstrip("/")
         target_path = f"{root}/{args.slug}.yaml" if root else f"{args.slug}.yaml"
 
+    # target.path is metadata — it is never opened — but a record claiming a
+    # target outside the repo weakens the audit trail it exists to provide (#28).
+    if Path(target_path).is_absolute() or ".." in Path(target_path).parts:
+        print(
+            f"error: --path must be repo-relative and must not escape the repo "
+            f"root, got '{target_path}'",
+            file=sys.stderr,
+        )
+        return 2
+
     history_root = Path(args.history_root)
     path, session_id, timestamp = new_history_path(
         history_root, args.kind, args.slug or Path(target_path).stem, args.actor_name
@@ -133,16 +143,23 @@ def _iter_records(target: Path) -> list[Path]:
 
 
 def cmd_validate(args: argparse.Namespace) -> int:
+    target = Path(args.target)
+    if not target.exists():
+        # Fail like every other error path here rather than letting the read
+        # blow up with a traceback further down (#27).
+        print(f"error: '{target}' does not exist", file=sys.stderr)
+        return 2
+
     schema = Path(args.schema)
     if not schema.is_file():
         print(
-            f"error: history schema not found at '{schema}'. Pass --schema, or set "
-            "CLAW_ROOT so the default resolves.",
+            f"error: history schema not found at '{schema}'. "
+            "Pass --schema to point at shared/history/history.yaml.",
             file=sys.stderr,
         )
         return 2
 
-    records = _iter_records(Path(args.target))
+    records = _iter_records(target)
     if not records:
         print(f"No history records found under {args.target}", file=sys.stderr)
         return 0
@@ -183,29 +200,38 @@ def cmd_validate(args: argparse.Namespace) -> int:
         print(f"OK (structural): {len(records)} record(s)", file=sys.stderr)
         return 0
 
-    cmd = [
-        "linkml-validate",
-        "--schema",
-        str(schema),
-        "--target-class",
-        "HistoryRecord",
-        *[str(p) for p in records],
-    ]
-    try:
-        proc = subprocess.run(cmd, capture_output=True, text=True)
-    except FileNotFoundError:
-        print(
-            "error: linkml-validate not on PATH. Install it, or pass "
-            "--structural-only to run just the built-in checks.",
-            file=sys.stderr,
-        )
-        return 2
-    if proc.stdout.strip():
-        print(proc.stdout.rstrip(), file=sys.stderr)
-    if proc.returncode != 0:
-        if proc.stderr.strip():
-            print(proc.stderr.rstrip(), file=sys.stderr)
-        return proc.returncode
+    # Batch rather than passing every path at once: the argv ceiling is reachable
+    # at a few tens of thousands of records, and the shell callers already chunk
+    # via xargs, so batching keeps the module consistent with them (#28).
+    batch_size = 500
+    failed = False
+    for start in range(0, len(records), batch_size):
+        batch = records[start : start + batch_size]
+        cmd = [
+            "linkml-validate",
+            "--schema",
+            str(schema),
+            "--target-class",
+            "HistoryRecord",
+            *[str(p) for p in batch],
+        ]
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True)
+        except FileNotFoundError:
+            print(
+                "error: linkml-validate not on PATH. Install it, or pass "
+                "--structural-only to run just the built-in checks.",
+                file=sys.stderr,
+            )
+            return 2
+        if proc.stdout.strip():
+            print(proc.stdout.rstrip(), file=sys.stderr)
+        if proc.returncode != 0:
+            if proc.stderr.strip():
+                print(proc.stderr.rstrip(), file=sys.stderr)
+            failed = True
+    if failed:
+        return 1
     print(f"OK: {len(records)} record(s) valid", file=sys.stderr)
     return 0
 

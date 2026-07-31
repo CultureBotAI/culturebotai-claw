@@ -99,16 +99,34 @@ jobs:
           # Absolute path sidesteps the differing relative depths across Mechs
           # (CommunityMech is nested, the others are not).
           CLAW_SRC: ${{ github.workspace }}/culturebotai-claw/src
+          # Inputs come through env, never interpolated into the script body:
+          # `${{ }}` is substituted textually before bash parses, so an input
+          # containing $(...) would execute. See #26.
+          SCAN_LIMIT: ${{ inputs.limit || '0' }}
+          SCAN_MIN_SCORE: ${{ inputs.min_score || '' }}
         run: |
           set -euo pipefail
+          # Reject non-numeric input before it reaches the scanner, where it
+          # would fail less legibly.
+          case "$SCAN_LIMIT" in
+            ''|*[!0-9]*) echo "limit must be a non-negative integer, got '$SCAN_LIMIT'" >&2; exit 2 ;;
+          esac
+          if [ -n "$SCAN_MIN_SCORE" ]; then
+            case "$SCAN_MIN_SCORE" in
+              *[!0-9]*) echo "min_score must be a non-negative integer, got '$SCAN_MIN_SCORE'" >&2; exit 2 ;;
+            esac
+          fi
+          # `if` rather than `[ ... ] && ...`: under `set -e` a trailing
+          # false `&&` list exits non-zero, so that idiom is safe only while
+          # another command follows it. This form survives reordering.
           args=""
-          if [ "${{ inputs.limit || '0' }}" != "0" ]; then
-            args="$args --limit ${{ inputs.limit }}"
+          if [ "$SCAN_LIMIT" != "0" ]; then
+            args="$args --limit $SCAN_LIMIT"
           fi
-          if [ -n "${{ inputs.min_score || '' }}" ]; then
-            args="$args --min-score ${{ inputs.min_score }}"
+          if [ -n "$SCAN_MIN_SCORE" ]; then
+            args="$args --min-score $SCAN_MIN_SCORE"
           fi
-          # shellcheck disable=SC2086
+          # shellcheck disable=SC2086  # deliberate word-splitting of the flag list
           just knowledge-gap-scan $args | tee scan-output.txt
 
       - name: Summarise
