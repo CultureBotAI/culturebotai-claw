@@ -38,16 +38,15 @@ class IngredientDeduplicator:
     """Deduplicate unmapped ingredients from multiple repositories."""
 
     # Normalization patterns (from MediaIngredientMech)
+    # One alternation rather than a list of patterns applied in order. The old
+    # form put bare `hydrate` first, so it matched the tail of `pentahydrate` and
+    # left `penta` behind — which made every prefixed pattern below it dead code.
+    # Ordering bugs like that cannot recur in a single alternation with an
+    # optional prefix group.
     HYDRATE_PATTERNS = [
         r'[•·.×xX]\s*\d+\s*H2O',  # •2H2O, .7H2O, ×nH2O, x 7 H2O
-        r'\s*hydrate',
         r'\s*\(hydrated\)',
-        r'\s*heptahydrate',
-        r'\s*dihydrate',
-        r'\s*monohydrate',
-        r'\s*trihydrate',
-        r'\s*pentahydrate',
-        r'\s*hexahydrate',
+        r'\s*(?:mono|di|tri|tetra|penta|hexa|hepta|octa|nona|deca)?hydrate',
     ]
 
     CATALOG_PATTERNS = [

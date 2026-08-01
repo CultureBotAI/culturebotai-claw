@@ -1,0 +1,105 @@
+name: tests
+
+# claw had NO pull-request CI at all: its three workflows were schedule- or
+# push-to-main-only. That is how PR #25 merged with a gate that did not gate —
+# it was reviewed by a human and by nothing else. This closes that hole.
+#
+# Deliberately NO `paths:` filter. CultureMech learned this in its own #129/#130:
+# tests here span scripts/, src/, plugins/ and tests/, and a path-filtered gate is
+# precisely how a change lands unchecked.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Sync environment
+        run: uv sync
+
+      - name: Run tests
+        # `python -m pytest`, NOT `uv run pytest`. The latter resolves a pytest
+        # from PATH when one is present outside the project, which locally meant
+        # a different interpreter with a different set of installed packages —
+        # 116 tests collected with import errors instead of 136 clean. `-m`
+        # guarantees the project interpreter.
+        run: uv run python -m pytest -q
+
+  history-round-trip:
+    # The history layer's own guarantee, exercised end to end rather than trusted:
+    # a scaffolded record must validate, and an unfilled one must not.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Sync environment
+        run: uv sync
+
+      - name: Install linkml
+        run: uv pip install linkml
+
+      - name: A filled record validates
+        run: |
+          set -euo pipefail
+          uv run python -m kg_microbe_history new \
+            --kind record --slug ci-probe --target-root data \
+            --summary "CI round-trip probe" \
+            --details "Scaffolded by the tests workflow to prove the layer works end to end." \
+            --history-root "$RUNNER_TEMP/history"
+          uv run python -m kg_microbe_history validate "$RUNNER_TEMP/history" \
+            --schema shared/history/history.yaml
+        env:
+          PYTHONPATH: src
+
+      - name: An unfilled record is rejected by BOTH gates
+        run: |
+          set -euo pipefail
+          uv run python -m kg_microbe_history new \
+            --kind record --slug ci-placeholder --target-root data \
+            --summary "no details supplied" \
+            --history-root "$RUNNER_TEMP/placeholder"
+
+          if uv run python -m kg_microbe_history validate "$RUNNER_TEMP/placeholder" \
+               --structural-only; then
+            echo "::error::the CLI accepted a TODO-placeholder record" >&2
+            exit 1
+          fi
+
+          # The spokes validate with plain linkml-validate against their vendored
+          # copy, so the schema must reject it without our CLI in the loop.
+          record=$(find "$RUNNER_TEMP/placeholder" -name '*.yaml' | head -1)
+          if uv run linkml-validate --schema shared/history/history.yaml \
+               --target-class HistoryRecord "$record"; then
+            echo "::error::the schema accepted a TODO-placeholder record" >&2
+            exit 1
+          fi
+          echo "Both gates rejected the placeholder, as intended."
+        env:
+          PYTHONPATH: src

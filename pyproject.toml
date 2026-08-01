@@ -35,3 +35,20 @@ packages = ["cli", "plugins", "pipelines"]
 
 [tool.uv]
 package = true
+
+[tool.pytest.ini_options]
+# Without pythonpath the suites cannot import `plugins` or `src/` and pytest
+# aborts during collection — which is how 116 collectable tests sat unrun.
+pythonpath = [".", "src"]
+# Only `test_*.py`. The default also matches `*_test.py`, which swept in
+# `run_pilot_test.py` — a one-off pilot driver for the retired LockManager, not
+# a test.
+python_files = ["test_*.py"]
+# shared/idlabel/tests are the VENDORED fleet tests. They are already run by
+# `.github/workflows/id-label-canon.yaml`, which is green nightly and gives them
+# what they need: Python 3.13, a fresh oaklib, and `shared/idlabel` as the working
+# directory (they resolve the validator at ../scripts relative to themselves).
+# Running them from the repo root under this project's 3.10 pin fails on an
+# unrelated oaklib/enum incompatibility, so exclude them here rather than
+# duplicate — and weaken — a check that already exists.
+norecursedirs = ["shared/idlabel", ".venv", "workspace", "cache", "ATTIC"]
