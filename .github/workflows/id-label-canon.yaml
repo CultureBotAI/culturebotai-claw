@@ -28,11 +28,13 @@ on:
   pull_request:
     paths:
       - "shared/idlabel/**"
+      - "scripts/audit_idlabel_fleet.sh"
       - ".github/workflows/id-label-canon.yaml"
   push:
     branches: [main]
     paths:
       - "shared/idlabel/**"
+      - "scripts/audit_idlabel_fleet.sh"
       - ".github/workflows/id-label-canon.yaml"
   workflow_dispatch:
 
@@ -45,37 +47,18 @@ jobs:
   # CultureMech are two "sources of truth" that can silently diverge — the same
   # blind spot the drift check closes for the spokes, one level up. Fast and
   # dependency-free (curl + cmp), so it blocks before the heavier test job.
-  matches-hub:
+  fleet-audit:
+    # One enforcer for both directions: every Mech agrees with the hub, AND
+    # claw's mirror agrees with the hub. Replaces this workflow's old
+    # `matches-hub` job (mirror only) and CultureMech's vendored-fleet-audit
+    # (Mechs only), which between them checked the same invariant twice from
+    # two repos.
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Assert shared/idlabel matches CultureMech@main byte-for-byte
-        run: |
-          set -euo pipefail
-          HUB="CultureBotAI/CultureMech"; REF="main"
-          FILES=(
-            scripts/validate_id_label_correspondence.py
-            scripts/chem_formula.py
-            tests/test_id_label_empty_adapter.py
-            tests/test_id_label_unknown_prefix.py
-            tests/test_id_label_plausibility.py
-          )
-          tmp="$(mktemp)"; trap 'rm -f "$tmp"' EXIT; fail=0
-          for f in "${FILES[@]}"; do
-            local="shared/idlabel/$f"
-            [ -f "$local" ] || { echo "MISSING: $local"; fail=1; continue; }
-            url="https://raw.githubusercontent.com/${HUB}/${REF}/${f}"
-            curl -fsSL "$url" -o "$tmp" || { echo "ERROR: fetch $f from ${HUB}@${REF}"; fail=1; continue; }
-            cmp -s "$tmp" "$local" || { echo "DRIFT: $local differs from ${HUB}@${REF}:$f"; fail=1; }
-          done
-          if [ "$fail" -eq 0 ]; then
-            echo "OK: shared/idlabel matches ${HUB}@${REF}"
-          else
-            echo ""; echo "This mirror has diverged from the canonical hub. Either sync"
-            echo "shared/idlabel/* from ${HUB}@${REF}, or land the intended change in"
-            echo "CultureMech first (it is the fetch-hub the Mechs pin to)."
-            exit 1
-          fi
+      - name: Audit vendored id-label files across the fleet
+        run: bash scripts/audit_idlabel_fleet.sh
 
   test:
     runs-on: ubuntu-latest

@@ -58,3 +58,24 @@ in another repo.
 Nothing but that sync keeps the copies aligned; the retired per-Mech sha256 pin
 verified a copy against itself, not across repos, which is why the cross-repo
 reference (against CultureMech) exists.
+
+## How drift is caught
+
+One check, `scripts/audit_idlabel_fleet.sh`, run by the `fleet-audit` job in
+`.github/workflows/id-label-canon.yaml` nightly at 06:41 UTC and on any PR
+touching this directory or the script.
+
+It asserts both directions against `CultureBotAI/CultureMech@main`:
+
+1. all four Mech repos carry byte-identical copies of the five validator files
+   plus `mech_shared.yaml` (path-mapped to `src/<pkg>/schema/`), and
+2. this mirror carries byte-identical copies of the five validator files.
+
+That is 23 comparisons. It supersedes two earlier checks that asserted the same
+invariant from two repos: this workflow's `matches-hub` job (mirror only) and
+CultureMech's `vendored-fleet-audit` (Mechs only).
+
+**Consolidating the audit did not move canonicity.** CultureMech is still the
+hub and this is still a passive mirror (claw#19, restated in claw#22). The audit
+runs here because one enforcer is easier to reason about than two; it still
+compares everything against CultureMech.
