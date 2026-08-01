@@ -71,9 +71,18 @@ It asserts both directions against `CultureBotAI/CultureMech@main`:
    plus `mech_shared.yaml` (path-mapped to `src/<pkg>/schema/`), and
 2. this mirror carries byte-identical copies of the five validator files.
 
+It also reports any **tracked** file under `shared/idlabel/` that `MANIFEST` does
+not list, since such a file is audited by nothing and vendored nowhere while
+looking canonical.
+
 That is 23 comparisons. It supersedes two earlier checks that asserted the same
 invariant from two repos: this workflow's `matches-hub` job (mirror only) and
 CultureMech's `vendored-fleet-audit` (Mechs only).
+
+**`MANIFEST` is the single list.** The audit reads it rather than restating it,
+and refuses to run against a missing or empty manifest instead of cheerfully
+reporting zero comparisons. Adding a vendored file means editing `MANIFEST` and
+nothing else.
 
 **Consolidating the audit did not move canonicity.** CultureMech is still the
 hub and this is still a passive mirror (claw#19, restated in claw#22). The audit

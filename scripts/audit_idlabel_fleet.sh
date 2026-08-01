@@ -27,21 +27,29 @@ HUB="${HUB:-CultureMech}"
 REF="${REF:-main}"
 REPOS=(CultureMech MediaIngredientMech CommunityMech TraitMech)
 
+# claw's mirror lives here, and its MANIFEST is the single list of vendored
+# files. Read it rather than restating it: a hardcoded copy would be a second
+# list that can drift from the first, which is the exact defect this audit
+# exists to catch (see claw#37).
+MIRROR_ROOT="${MIRROR_ROOT:-shared/idlabel}"
+MANIFEST="${MANIFEST:-${MIRROR_ROOT}/MANIFEST}"
+
+if [ ! -s "$MANIFEST" ]; then
+  echo "ERROR: manifest '$MANIFEST' is missing or empty — refusing to audit nothing." >&2
+  exit 2
+fi
 # Same relative path in every Mech repo.
-FILES=(
-  scripts/validate_id_label_correspondence.py
-  scripts/chem_formula.py
-  tests/test_id_label_empty_adapter.py
-  tests/test_id_label_unknown_prefix.py
-  tests/test_id_label_plausibility.py
-)
+mapfile -t FILES < <(grep -vE '^\s*(#|$)' "$MANIFEST")
+if [ "${#FILES[@]}" -eq 0 ]; then
+  echo "ERROR: manifest '$MANIFEST' lists no files." >&2
+  exit 2
+fi
 # Same bytes, per-repo path src/<lowercased-repo>/<suffix>.
 MAPPED=(
   schema/mech_shared.yaml
 )
-# claw's mirror lives here. It carries the FILES set only — not mech_shared.yaml,
-# which is a schema module rather than part of the id-label validator set.
-MIRROR_ROOT="${MIRROR_ROOT:-shared/idlabel}"
+# Note the mirror carries the manifest set only — not mech_shared.yaml, which is
+# a schema module rather than part of the id-label validator set.
 
 lc() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
 raw() { printf 'https://raw.githubusercontent.com/%s/%s/%s/%s' "$ORG" "$1" "$REF" "$2"; }
@@ -100,6 +108,23 @@ for f in "${FILES[@]}"; do
   cmp -s "$tmp/hub" "$local_path" || { echo "DRIFT: ${local_path} differs from hub"; fail=1; }
   checked=$((checked + 1))
 done
+
+# --- direction 3: the mirror carries nothing the manifest does not list -------
+# An unlisted file under the mirror is never audited and never vendored to the
+# Mechs, so it looks canonical while being local-only.
+#
+# git ls-files, not find: only TRACKED files matter. Untracked local artifacts
+# (__pycache__, editor droppings) are not drift and must not fail the fleet.
+while IFS= read -r present; do
+  rel="${present#"${MIRROR_ROOT}/"}"
+  case "$rel" in MANIFEST|README.md) continue ;; esac
+  listed=0
+  for f in "${FILES[@]}"; do [ "$f" = "$rel" ] && { listed=1; break; }; done
+  if [ "$listed" -eq 0 ]; then
+    echo "UNLISTED: ${present} is not in ${MANIFEST} — it is audited by nothing and vendored nowhere"
+    fail=1
+  fi
+done < <(git ls-files "$MIRROR_ROOT" 2>/dev/null | sort)
 
 echo
 if [ "$fail" -eq 0 ]; then
