@@ -67,9 +67,16 @@ that property is the reason to adopt this ahead of any agent workflow.
 nothing (`no_change`) or an `EDIT` that hit a wall (`blocked`) without inventing
 event types. `no_change` is a real result: it says something was checked.
 
-**`details` is required.** A record without it is just a timestamp. The CLI
-refuses to build one, and writes a TODO placeholder when you omit `--details` so
-the omission is visible rather than silent.
+**`details` is required, and the placeholder is rejected.** A record without it
+is just a timestamp. The CLI refuses to build one, and when you omit `--details`
+it writes a TODO placeholder that **`validate` then fails on** — so a scaffolded
+record that nobody filled in cannot pass the gate. That case matters most for an
+agent that scaffolds and never returns.
+
+**Only `record` and `schema` targets can derive a path from a slug.** Mappings are
+`.sssom.tsv`, reports `.md`, infrastructure a justfile or workflow — so those
+kinds require an explicit `--path`. Records are append-only, which makes a guessed
+extension permanently wrong.
 
 **The path is the last stdout line.** Everything human-facing goes to stderr, so
 callers can capture the record path directly:

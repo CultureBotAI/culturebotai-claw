@@ -63,20 +63,35 @@ def _add_new_args(ap: argparse.ArgumentParser) -> None:
     ap.add_argument("--force", action="store_true")
 
 
+# Kinds whose target is reliably a YAML file, so a path can be derived from a
+# slug. Everything else (mappings are .sssom.tsv, reports .md, infrastructure a
+# justfile or workflow) must say where its target actually lives — records are
+# append-only, so a guessed extension is permanently wrong (#30).
+YAML_KINDS = {"record", "schema"}
+
+
 def cmd_new(args: argparse.Namespace) -> int:
     target_path = args.path
+    if target_path and args.target_root:
+        print(
+            "error: --target-root and --path are mutually exclusive; --path already "
+            "gives the full location",
+            file=sys.stderr,
+        )
+        return 2
     if not target_path:
-        if args.kind == "other":
+        if args.kind not in YAML_KINDS:
             print(
-                "error: --path is required for --kind other (the target cannot be "
-                "derived from a slug)",
+                f"error: --path is required for --kind {args.kind}. Only "
+                f"{'/'.join(sorted(YAML_KINDS))} targets can have a path derived from "
+                "a slug; everything else is not reliably a .yaml file.",
                 file=sys.stderr,
             )
             return 2
         if not args.slug:
             print("error: provide --slug or --path", file=sys.stderr)
             return 2
-        root = args.target_root.rstrip("/")
+        root = args.target_root.strip().rstrip("/")
         target_path = f"{root}/{args.slug}.yaml" if root else f"{args.slug}.yaml"
 
     # target.path is metadata — it is never opened — but a record claiming a
@@ -90,9 +105,22 @@ def cmd_new(args: argparse.Namespace) -> int:
         return 2
 
     history_root = Path(args.history_root)
-    path, session_id, timestamp = new_history_path(
-        history_root, args.kind, args.slug or Path(target_path).stem, args.actor_name
-    )
+    # Strip every suffix, not just the last: Path.stem leaves "foo.sssom" for
+    # foo.sssom.tsv, which would file the same target under two directories
+    # depending on whether --slug or --path was used (#30).
+    derived = Path(target_path).name
+    while True:
+        stem = Path(derived).stem
+        if stem == derived:
+            break
+        derived = stem
+    try:
+        path, session_id, timestamp = new_history_path(
+            history_root, args.kind, args.slug or derived, args.actor_name
+        )
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
 
     details = args.details or (
         "TODO: replace this placeholder before committing.\n"
@@ -136,10 +164,48 @@ def cmd_new(args: argparse.Namespace) -> int:
     return 0
 
 
+PLACEHOLDER_PREFIX = "TODO: replace this placeholder"
+
+
 def _iter_records(target: Path) -> list[Path]:
     if target.is_dir():
-        return sorted(p for p in target.rglob("*.yaml"))
+        # Both extensions: a record saved as .yml would otherwise be silently
+        # unvalidated, which is the exact failure mode this gate exists to stop.
+        return sorted(
+            p for p in target.rglob("*") if p.suffix in {".yaml", ".yml"} and p.is_file()
+        )
     return [target]
+
+
+def _structural_problem(data: object) -> str | None:
+    """Return a human-readable reason the record is malformed, or None.
+
+    Every access is defensive: a scalar where a mapping belongs used to raise and
+    abort the whole scan, losing the results for every other record (#31).
+    """
+    if not isinstance(data, dict):
+        return "top level is not a mapping"
+    session = data.get("session")
+    if not isinstance(session, dict):
+        return "session must be a mapping"
+    actors = session.get("actors")
+    if not isinstance(actors, list) or not actors:
+        return "session.actors must have at least one entry"
+    events = data.get("events")
+    if not isinstance(events, list) or not events:
+        return "events must have at least one entry"
+    for i, event in enumerate(events):
+        if not isinstance(event, dict):
+            return f"events[{i}] is not a mapping"
+        details = event.get("details")
+        if not isinstance(details, str) or not details.strip():
+            return f"events[{i}].details must be a non-empty string"
+        if details.lstrip().startswith(PLACEHOLDER_PREFIX):
+            return (
+                f"events[{i}].details is still the scaffolder's TODO placeholder — "
+                "replace it with what actually happened"
+            )
+    return None
 
 
 def cmd_validate(args: argparse.Namespace) -> int:
@@ -170,26 +236,13 @@ def cmd_validate(args: argparse.Namespace) -> int:
     for record_path in records:
         try:
             data = yaml.safe_load(record_path.read_text(encoding="utf-8"))
-        except yaml.YAMLError as exc:
-            print(f"FAIL {record_path}: unparseable YAML: {exc}", file=sys.stderr)
+        except (yaml.YAMLError, OSError) as exc:
+            print(f"FAIL {record_path}: unreadable: {exc}", file=sys.stderr)
             failures += 1
             continue
-        if not isinstance(data, dict):
-            print(f"FAIL {record_path}: top level is not a mapping", file=sys.stderr)
-            failures += 1
-            continue
-        events = data.get("events") or []
-        if not events:
-            print(f"FAIL {record_path}: events must have at least one entry", file=sys.stderr)
-            failures += 1
-            continue
-        if any(not (e.get("details") or "").strip() for e in events):
-            print(f"FAIL {record_path}: every event needs a non-empty details", file=sys.stderr)
-            failures += 1
-            continue
-        actors = (data.get("session") or {}).get("actors") or []
-        if not actors:
-            print(f"FAIL {record_path}: session.actors must have at least one entry", file=sys.stderr)
+        problem = _structural_problem(data)
+        if problem:
+            print(f"FAIL {record_path}: {problem}", file=sys.stderr)
             failures += 1
 
     if failures:
@@ -197,7 +250,12 @@ def cmd_validate(args: argparse.Namespace) -> int:
         return 1
 
     if args.structural_only:
-        print(f"OK (structural): {len(records)} record(s)", file=sys.stderr)
+        print(
+            f"OK (structural): {len(records)} record(s). NOTE: enum values and the "
+            "timestamp format are NOT checked in this mode — run without "
+            "--structural-only for the full schema gate.",
+            file=sys.stderr,
+        )
         return 0
 
     # Batch rather than passing every path at once: the argv ceiling is reachable
@@ -223,6 +281,9 @@ def cmd_validate(args: argparse.Namespace) -> int:
                 "--structural-only to run just the built-in checks.",
                 file=sys.stderr,
             )
+            return 2
+        except OSError as exc:  # e.g. errno 7, argument list too long
+            print(f"error: could not invoke linkml-validate: {exc}", file=sys.stderr)
             return 2
         if proc.stdout.strip():
             print(proc.stdout.rstrip(), file=sys.stderr)
