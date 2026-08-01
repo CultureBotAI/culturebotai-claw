@@ -15,14 +15,25 @@ name: Knowledge-gap scan
 
 on:
   schedule:
-    - cron: "0 9 * * 1"   # Monday 09:00 UTC — offset from id-label-canon (06:41)
-                          # and cross-repo-validation (07:27) so they never contend
+    # 07:00 UTC = midnight US/Pacific. Sits between id-label-canon (06:41) and
+    # cross-repo-validation (07:27) without overlapping either.
+    #
+    # DAILY, but each run scans a bounded WINDOW rather than the whole corpus —
+    # see the matrix below. A full scan is not viable: measured throughput is
+    # ~2.8 s/record, so CultureMech's 4,287 records would take ~3h20m and MIM's
+    # 1,879 ~1h28m, both of which the 45-minute timeout would kill mid-run.
+    - cron: "0 7 * * *"
   workflow_dispatch:
     inputs:
       limit:
-        description: "Cap records scanned per Mech (0 = all)"
+        description: "Records per Mech this run (0 = the matrix default window)"
         required: false
         default: "0"
+        type: string
+      offset:
+        description: "Start this many records in, wrapping (blank = derived from run number)"
+        required: false
+        default: ""
         type: string
       min_score:
         description: "Override the per-repo min_score gate (blank = config default)"
@@ -49,19 +60,23 @@ jobs:
             repository: CultureBotAI/CultureMech
             checkout_path: CultureMech
             workdir: CultureMech
+            window: 300   # of ~4,287 records — full coverage every ~15 runs
           - mech: MediaIngredientMech
             repository: CultureBotAI/MediaIngredientMech
             checkout_path: MediaIngredientMech
             workdir: MediaIngredientMech
+            window: 300   # of ~1,879 records — full coverage every ~7 runs
           - mech: CommunityMech
             repository: CultureBotAI/CommunityMech
             checkout_path: CommunityMech-outer
             # CommunityMech nests the project one level inside its repo
             workdir: CommunityMech-outer/CommunityMech
+            window: 305   # the whole corpus fits inside one run
           - mech: TraitMech
             repository: CultureBotAI/TraitMech
             checkout_path: TraitMech
             workdir: TraitMech
+            window: 300   # of ~477 records — full coverage every 2 runs
 
     steps:
       - name: Checkout claw (hosts kg_microbe_kgscan)
@@ -104,6 +119,12 @@ jobs:
           # containing $(...) would execute. See #26.
           SCAN_LIMIT: ${{ inputs.limit || '0' }}
           SCAN_MIN_SCORE: ${{ inputs.min_score || '' }}
+          SCAN_OFFSET: ${{ inputs.offset || '' }}
+          SCAN_WINDOW: ${{ matrix.window }}
+          # Advances the window each run so successive scans walk the corpus
+          # instead of re-reading the same head forever. The scanner wraps at the
+          # end, so this can increment without bound.
+          RUN_NUMBER: ${{ github.run_number }}
         run: |
           set -euo pipefail
           # Reject non-numeric input before it reaches the scanner, where it
@@ -116,13 +137,23 @@ jobs:
               *[!0-9]*) echo "min_score must be a non-negative integer, got '$SCAN_MIN_SCORE'" >&2; exit 2 ;;
             esac
           fi
-          # `if` rather than `[ ... ] && ...`: under `set -e` a trailing
+          # A manual --limit overrides the matrix window; otherwise use the window.
+          # `if` blocks rather than `[ ... ] && ...`: under `set -e` a trailing
           # false `&&` list exits non-zero, so that idiom is safe only while
-          # another command follows it. This form survives reordering.
-          args=""
-          if [ "$SCAN_LIMIT" != "0" ]; then
-            args="$args --limit $SCAN_LIMIT"
+          # another command follows it.
+          effective_limit="$SCAN_LIMIT"
+          if [ "$effective_limit" = "0" ]; then
+            effective_limit="$SCAN_WINDOW"
           fi
+          if [ -z "$SCAN_OFFSET" ]; then
+            SCAN_OFFSET=$(( RUN_NUMBER * SCAN_WINDOW ))
+          fi
+          case "$SCAN_OFFSET" in
+            ''|*[!0-9]*) echo "offset must be a non-negative integer, got '$SCAN_OFFSET'" >&2; exit 2 ;;
+          esac
+          echo "Scanning $effective_limit records from offset $SCAN_OFFSET"
+
+          args="--limit $effective_limit --offset $SCAN_OFFSET"
           if [ -n "$SCAN_MIN_SCORE" ]; then
             args="$args --min-score $SCAN_MIN_SCORE"
           fi
