@@ -255,4 +255,11 @@ classes:
           record without it is just a timestamp. Write what a colleague picking
           this up cold would need: what was done, what evidence or provider was
           used, how it was validated, and anything deliberately left undone.
+
+          The pattern rejects the scaffolder's TODO placeholder. That check lives
+          in the schema rather than only in the CLI so that a repo validating with
+          plain `linkml-validate` against its vendored copy — which is how the
+          spokes do it, to avoid depending on this private repo — catches an
+          unfilled record too.
         required: true
+        pattern: '^(?!TODO: replace this placeholder)'
