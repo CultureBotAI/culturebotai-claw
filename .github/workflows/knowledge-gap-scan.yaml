@@ -68,9 +68,11 @@ jobs:
             window: 300   # of ~1,879 records — full coverage every ~7 runs
           - mech: CommunityMech
             repository: CultureBotAI/CommunityMech
-            checkout_path: CommunityMech-outer
-            # CommunityMech nests the project one level inside its repo
-            workdir: CommunityMech-outer/CommunityMech
+            checkout_path: CommunityMech
+            # NOT nested. The extra CommunityMech/ level exists only in the
+            # developer's local clone layout; the repo root holds justfile, conf
+            # and kb directly.
+            workdir: CommunityMech
             window: 305   # the whole corpus fits inside one run
           - mech: TraitMech
             repository: CultureBotAI/TraitMech

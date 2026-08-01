@@ -49,7 +49,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: CultureBotAI/CommunityMech
-          path: CommunityMech-outer
+          path: CommunityMech
         # Also public (verified 2026-07-31) — same reasoning as CultureMech above.
 
       - name: Setup Python
@@ -75,7 +75,10 @@ jobs:
         env:
           MEDIAINGREDIENTMECH_ROOT: ${{ github.workspace }}/MediaIngredientMech
           CULTUREMECH_ROOT: ${{ github.workspace }}/CultureMech
-          COMMUNITYMECH_ROOT: ${{ github.workspace }}/CommunityMech-outer/CommunityMech
+          # Was CommunityMech-outer/CommunityMech, a path that has never existed
+          # on a runner — the extra level is a local clone artifact. The `|| true`
+          # below meant the inventory silently ran without CommunityMech data.
+          COMMUNITYMECH_ROOT: ${{ github.workspace }}/CommunityMech
         run: |
           python3 scripts/inventory_unmapped_ingredients.py || true
 
