@@ -3,7 +3,10 @@ name = "kg-microbe-orchestration"
 version = "0.1.0"
 description = "OpenClaw orchestration layer for KG-Microbe repositories (CultureMech, MediaIngredientMech, CommunityMech)"
 readme = "README.md"
-requires-python = ">=3.10"
+# 3.11 floor so linkml 1.10.x can resolve. Under >=3.10 uv picks linkml 1.9.3
+# against linkml-runtime 1.10.0, an incompatible pair that fails every schema
+# check with "AttributeError: JSON". The Mechs all run 3.13 with linkml 1.10.0.
+requires-python = ">=3.11"
 authors = [
     {name = "KG-Microbe Team"}
 ]
@@ -17,6 +20,17 @@ dependencies = [
     "watchdog>=6.0.0",
     "python-dotenv>=1.2.2",
     "oaklib>=0.6.23",
+    # linkml is a runtime dependency, not a dev one: `kg_microbe_history validate`
+    # shells out to linkml-validate, and that is a core feature of this repo's
+    # tooling. Keeping it here means a plain `uv sync` gives a working validator
+    # instead of the degraded --structural-only path.
+    #
+    # The floor is 1.10 deliberately. linkml 1.9.3 references `Format.JSON`, which
+    # linkml-runtime 1.10 removed (the enum has JSONLD and JSON_SCHEMA, no JSON).
+    # oaklib pulls runtime 1.10 transitively, so a looser pin resolves that broken
+    # pair and every schema check dies with "AttributeError: JSON" — which reads
+    # like a data problem and is not one.
+    "linkml>=1.10",
 ]
 
 [project.scripts]
@@ -28,11 +42,6 @@ dev = [
     "pytest-cov>=4.0.0",
     "black>=23.0.0",
     "mypy>=1.0.0",
-    # The history layer validates via linkml-validate. It was never declared, so
-    # it only ever worked by accident from a stray install — a `uv sync` prunes it
-    # and every schema check starts failing with "AttributeError: JSON", which is
-    # a linkml/linkml-runtime version mismatch rather than anything about our data.
-    "linkml>=1.8",
 ]
 
 [tool.setuptools]
