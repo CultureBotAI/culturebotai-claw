@@ -1,0 +1,108 @@
+# Central cadence configuration for the scheduled agent workflows — and the
+# kill switch.
+#
+# Instead of hand-editing `cron:` lines across workflows, pick a profile here and
+# apply it:
+#
+#     just cron-profile <name>       # rewrite the managed workflows
+#     just cron-profiles             # list profiles, show the active one
+#     uv run python scripts/apply_cron_profile.py <name> --dry-run
+#
+# The applier rewrites ONLY the `on.schedule` block of each managed workflow.
+# Everything else — inputs, jobs, comments outside that block — is untouched.
+#
+# ACTIVE IS `off`, AND THAT IS DELIBERATE. No agent workflow exists yet. Shipping
+# the switch before the thing it switches off means the first agent lands into a
+# fleet that is already dialled down, rather than one where turning it off means
+# editing YAML under pressure.
+#
+# Conventions:
+#   * A profile MUST name every managed workflow. The applier enforces this, so a
+#     profile cannot be half-configured — a missing key would silently leave a
+#     workflow on its old cadence, which is the failure mode this file exists to
+#     prevent.
+#   * Keys are the workflow file stem under .github/workflows/.
+#   * Weekday/weekend splits use two entries: `* * 1-5` and `* * 0,6`.
+#   * An empty list REMOVES that workflow's schedule block, leaving manual
+#     workflow_dispatch intact.
+#   * We deliberately do NOT disable by setting an impossible date such as
+#     Feb 30: GitHub can ignore an invalid cron update and leave the previous
+#     valid schedule registered, so the job would keep running while the file
+#     claims it is off.
+#
+# SCOPE: agent workflows ONLY — anything that spends model tokens.
+# `knowledge-gap-scan` is deliberately NOT managed here. It is deterministic
+# Python with no model in the loop, and putting it under an agent kill switch
+# would mean `off` silently disabled a wanted, benign nightly job. The future
+# `knowledge-gap-triage` step, which turns that scan's packet into issues via an
+# agent, IS managed.
+
+active: "off"
+
+profiles:
+
+  "off":
+    description: >-
+      Kill switch. No scheduled agent runs at any time. Manual workflow_dispatch
+      still works, so a single agent can be triggered by hand for testing while
+      the fleet stays dark.
+    workflows:
+      knowledge-gap-triage: []
+      issue-scanner: []
+      pr-shepherd: []
+      stale-claim-sweep: []
+
+  slow:
+    description: >-
+      Conservative. What DisMech itself runs — worth noting that the reference
+      implementation does not run its own fast profile.
+    workflows:
+      knowledge-gap-triage:
+        - cron: "30 7 * * 1"
+          comment: weekly, after the Monday scan
+      issue-scanner:
+        - cron: "0 */12 * * *"
+          comment: every 12h
+      pr-shepherd:
+        - cron: "37 */12 * * *"
+          comment: every 12h, offset from the scanner
+      stale-claim-sweep:
+        - cron: "0 5 * * 1"
+          comment: weekly
+
+  medium:
+    description: >-
+      Baseline. The cadence to adopt once an agent has been watched for a week
+      or two on `slow` and has not needed rescuing.
+    workflows:
+      knowledge-gap-triage:
+        - cron: "30 7 * * *"
+          comment: daily, 30min after the scan writes its packet
+      issue-scanner:
+        - cron: "0 */6 * * *"
+          comment: every 6h
+      pr-shepherd:
+        - cron: "37 */6 * * *"
+          comment: every 6h, offset from the scanner
+      stale-claim-sweep:
+        - cron: "0 5 * * *"
+          comment: daily, ahead of the scanner
+
+  fast:
+    description: >-
+      Aggressive. Hourly is the ceiling — no profile schedules a sub-hourly cron,
+      because the runs would overlap and the concurrency group would spend its
+      time cancelling itself.
+    workflows:
+      knowledge-gap-triage:
+        - cron: "30 7 * * *"
+          comment: daily; gated by how often the scan produces new material
+      issue-scanner:
+        - cron: "0 * * * *"
+          comment: hourly
+      pr-shepherd:
+        - cron: "37 * * * *"
+          comment: hourly, offset from the scanner
+      stale-claim-sweep:
+        - cron: "0 5 * * *"
+          comment: daily
