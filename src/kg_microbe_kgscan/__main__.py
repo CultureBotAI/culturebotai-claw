@@ -80,6 +80,16 @@ def main() -> int:
     ap.add_argument("--engine", choices=["europepmc", "edison"], default="europepmc")
     ap.add_argument("--apply", action="store_true", help="write proposed Discussions into records")
     ap.add_argument("--limit", type=int, default=0, help="cap records scanned (0 = all)")
+    ap.add_argument(
+        "--offset",
+        type=int,
+        default=0,
+        help=(
+            "start this many records into the corpus, wrapping around the end. "
+            "With --limit it gives a rotating window, so successive scheduled runs "
+            "walk the whole corpus instead of re-scanning the same head every time."
+        ),
+    )
     ap.add_argument("--min-score", type=int, default=None, help="override config min_score")
     ap.add_argument("--page-size", type=int, default=25)
     ap.add_argument("--max-signals", type=int, default=8)
@@ -99,6 +109,13 @@ def main() -> int:
     min_score = args.min_score if args.min_score is not None else int(cfg.get("min_score", 5))
 
     records = list(_load_records(config_dir, cfg["record_glob"]))
+    total = len(records)
+    if args.offset and total:
+        # Rotate rather than slice-and-truncate: an offset past the end should
+        # wrap to the start, so a caller can keep incrementing a run counter
+        # forever without knowing the corpus size.
+        start = args.offset % total
+        records = records[start:] + records[:start]
     if args.limit:
         records = records[: args.limit]
 
