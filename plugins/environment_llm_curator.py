@@ -223,7 +223,7 @@ class EnvironmentLLMCurator:
 **Search Strategy Examples:**
 - For "Marine Agar 2216": Search "Marine Agar 2216 Zobell marine bacteria"
 - For "R2A Medium": Search "R2A medium freshwater bacteria heterotrophic"
-- For custom media: Search "{media_name} {organism type} isolation {environment hint}"
+- For custom media: Search "{media_name} {{organism type}} isolation {{environment hint}}"
 
 **Output only valid JSON. Do not include any text before or after the JSON object.**
 """
