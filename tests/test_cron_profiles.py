@@ -154,3 +154,52 @@ def test_rewrite_output_is_valid_yaml() -> None:
     for entries in ([], [{"cron": "0 3 * * *", "comment": "c"}]):
         out, _ = rewrite(WF, entries)
         yaml.safe_load(out)
+
+
+# --------------------------------------------------------------------------
+# #39 — the applier must not eat comments it does not own
+# --------------------------------------------------------------------------
+
+WF_TRAILING_COMMENT = '''name: demo
+
+on:
+  schedule:
+    - cron: "0 7 * * *"
+
+  # This comment explains workflow_dispatch, not the schedule.
+  workflow_dispatch:
+
+jobs:
+  a:
+    runs-on: ubuntu-latest
+'''
+
+
+def test_removing_a_schedule_keeps_the_next_keys_comment() -> None:
+    """The whole reason this edits lines instead of dumping YAML is comments."""
+    out, _ = rewrite(WF_TRAILING_COMMENT, [])
+    assert "explains workflow_dispatch" in out
+    assert "workflow_dispatch:" in out
+    assert "schedule:" not in out
+
+
+def test_replacing_a_schedule_keeps_the_next_keys_comment() -> None:
+    out, _ = rewrite(WF_TRAILING_COMMENT, [{"cron": "0 3 * * *"}])
+    assert "explains workflow_dispatch" in out
+    assert '- cron: "0 3 * * *"' in out
+
+
+def test_comments_inside_the_schedule_block_are_replaced() -> None:
+    """Those genuinely belong to the schedule and should go with it."""
+    wf = WF_TRAILING_COMMENT.replace(
+        '  schedule:\n    - cron: "0 7 * * *"',
+        '  schedule:\n    # why this hour\n    - cron: "0 7 * * *"',
+    )
+    out, _ = rewrite(wf, [{"cron": "0 3 * * *"}])
+    assert "why this hour" not in out
+    assert "explains workflow_dispatch" in out
+
+
+def test_output_stays_valid_yaml_with_trailing_comment() -> None:
+    for entries in ([], [{"cron": "0 3 * * *"}]):
+        yaml.safe_load(rewrite(WF_TRAILING_COMMENT, entries)[0])

@@ -108,14 +108,25 @@ def rewrite(text: str, entries: list[dict]) -> tuple[str, str]:
         new_lines = lines[: on_idx + 1] + render_schedule(entries) + lines[on_idx + 1 :]
         return "\n".join(new_lines) + "\n", f"added {len(entries)} cron entr(y/ies)"
 
-    # Extent of the existing schedule block: subsequent lines indented deeper.
+    # Extent of the existing schedule block: only lines indented DEEPER than
+    # `  schedule:` belong to it. A comment at two-space indent belongs to the
+    # next key, and swallowing it would discard exactly the prose this script
+    # exists to preserve (#39). Blank lines are consumed only when more of the
+    # block follows, never as trailing padding.
     sched_end = sched_idx + 1
+    pending_blanks = 0
     while sched_end < end:
         line = lines[sched_end]
-        if line.strip() == "" or line.startswith("    ") or line.lstrip().startswith("#"):
+        if line.strip() == "":
+            pending_blanks += 1
+            sched_end += 1
+            continue
+        if line.startswith("    "):
+            pending_blanks = 0
             sched_end += 1
             continue
         break
+    sched_end -= pending_blanks  # hand back trailing blank lines
 
     if not entries:
         new_lines = lines[:sched_idx] + lines[sched_end:]
