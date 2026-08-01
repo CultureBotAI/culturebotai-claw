@@ -28,6 +28,11 @@ dev = [
     "pytest-cov>=4.0.0",
     "black>=23.0.0",
     "mypy>=1.0.0",
+    # The history layer validates via linkml-validate. It was never declared, so
+    # it only ever worked by accident from a stray install — a `uv sync` prunes it
+    # and every schema check starts failing with "AttributeError: JSON", which is
+    # a linkml/linkml-runtime version mismatch rather than anything about our data.
+    "linkml>=1.8",
 ]
 
 [tool.setuptools]

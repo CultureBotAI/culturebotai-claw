@@ -35,7 +35,11 @@ jobs:
           enable-cache: true
 
       - name: Sync environment
-        run: uv sync
+        # --extra dev, and repeated on every `uv run` below: uv re-syncs the
+        # environment to the DEFAULT groups on each run and prunes anything an
+        # extra brought in, so syncing once is not enough. pytest and linkml both
+        # live in the dev extra.
+        run: uv sync --extra dev
 
       - name: Run tests
         # `python -m pytest`, NOT `uv run pytest`. The latter resolves a pytest
@@ -43,7 +47,7 @@ jobs:
         # a different interpreter with a different set of installed packages —
         # 116 tests collected with import errors instead of 136 clean. `-m`
         # guarantees the project interpreter.
-        run: uv run python -m pytest -q
+        run: uv run --extra dev python -m pytest -q
 
   history-round-trip:
     # The history layer's own guarantee, exercised end to end rather than trusted:
@@ -60,20 +64,17 @@ jobs:
           enable-cache: true
 
       - name: Sync environment
-        run: uv sync
-
-      - name: Install linkml
-        run: uv pip install linkml
+        run: uv sync --extra dev
 
       - name: A filled record validates
         run: |
           set -euo pipefail
-          uv run python -m kg_microbe_history new \
+          uv run --extra dev python -m kg_microbe_history new \
             --kind record --slug ci-probe --target-root data \
             --summary "CI round-trip probe" \
             --details "Scaffolded by the tests workflow to prove the layer works end to end." \
             --history-root "$RUNNER_TEMP/history"
-          uv run python -m kg_microbe_history validate "$RUNNER_TEMP/history" \
+          uv run --extra dev python -m kg_microbe_history validate "$RUNNER_TEMP/history" \
             --schema shared/history/history.yaml
         env:
           PYTHONPATH: src
@@ -81,12 +82,12 @@ jobs:
       - name: An unfilled record is rejected by BOTH gates
         run: |
           set -euo pipefail
-          uv run python -m kg_microbe_history new \
+          uv run --extra dev python -m kg_microbe_history new \
             --kind record --slug ci-placeholder --target-root data \
             --summary "no details supplied" \
             --history-root "$RUNNER_TEMP/placeholder"
 
-          if uv run python -m kg_microbe_history validate "$RUNNER_TEMP/placeholder" \
+          if uv run --extra dev python -m kg_microbe_history validate "$RUNNER_TEMP/placeholder" \
                --structural-only; then
             echo "::error::the CLI accepted a TODO-placeholder record" >&2
             exit 1
@@ -95,7 +96,7 @@ jobs:
           # The spokes validate with plain linkml-validate against their vendored
           # copy, so the schema must reject it without our CLI in the loop.
           record=$(find "$RUNNER_TEMP/placeholder" -name '*.yaml' | head -1)
-          if uv run linkml-validate --schema shared/history/history.yaml \
+          if uv run --extra dev linkml-validate --schema shared/history/history.yaml \
                --target-class HistoryRecord "$record"; then
             echo "::error::the schema accepted a TODO-placeholder record" >&2
             exit 1
