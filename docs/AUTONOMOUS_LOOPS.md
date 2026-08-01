@@ -649,6 +649,17 @@ across four repos is far harder than a rename.
 - **Weekly knowledge-gap scan** — `.github/workflows/knowledge-gap-scan.yaml`
   here, running the deterministic scan across all four Mechs with no agent.
 
+**Phase 0 landed 2026-07-31**, apart from the writer App. `.github/agent-config.yaml`
+routes effort tiers to models; `.github/cron-profiles.yaml` carries `off` / `slow`
+/ `medium` / `fast` with **`off` active**, applied by
+`scripts/apply_cron_profile.py` (`just cron-profile <name>`); and the five agent
+labels exist in all six repos.
+
+One scoping correction worth recording: `knowledge-gap-scan` is deliberately NOT
+managed by the cadence config. It spends no tokens, and an early draft that
+managed it would have made the kill switch silently disable a wanted nightly job
+that has no model in the loop. Only token-spending workflows belong under it.
+
 Two portability defects surfaced while doing it, both now fixed in the
 `knowledge-gap-scan` recipe: it hardcoded `/opt/homebrew/bin/python3.13`, and it
 resolved the shared library through a bare relative path into private claw. **25
@@ -658,7 +669,7 @@ alone to keep this change reviewable, but they block any further CI adoption.
 
 | Phase | Scope | Exit criterion |
 |---|---|---|
-| 0 | ~~Normalise skill filenames (§5.9)~~ **done**; labels; `agent-config.yaml`; `cron-profiles.yaml` at `off`; writer App | Manual dispatch produces a correct no-op |
+| 0 | ~~Normalise skill filenames~~, ~~labels~~, ~~`agent-config.yaml`~~, ~~`cron-profiles.yaml` at `off`~~ **done**; writer App remains | Manual dispatch produces a correct no-op |
 | 0b | ~~**`history/` provenance layer** (§2.9)~~ **done in TraitMech** — roll to the other three | Humans and agents both emit records by hand |
 | 1 | `pr-shepherd` in **one** repo (TraitMech) | 10 manual runs, no bad action |
 | 2 | `issue-scanner`, `low_effort` tier only, draft PRs | 20 runs; human merges everything |

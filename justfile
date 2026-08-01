@@ -524,3 +524,21 @@ view-cas-tsv:
     else \
         echo "UNMAPPED_CAS_RN_INGREDIENTS.tsv not found. Run 'just cas-export-unmapped' first."; \
     fi
+
+# ============== Agent cadence (kill switch) ==============
+# .github/cron-profiles.yaml is the single place scheduled AGENT workflows get
+# their cadence, including an `off` profile that removes every schedule while
+# leaving manual workflow_dispatch working. See docs/AUTONOMOUS_LOOPS.md.
+#
+# The deterministic knowledge-gap scan is deliberately NOT managed by this — it
+# spends no tokens, so an agent kill switch has no business disabling it.
+
+# List cadence profiles and show which is active.
+cron-profiles:
+    uv run python scripts/apply_cron_profile.py --list
+
+# Apply a cadence profile to the managed agent workflows.
+#   just cron-profile off      # kill switch
+#   just cron-profile slow
+cron-profile name *args:
+    uv run python scripts/apply_cron_profile.py {{name}} {{args}}

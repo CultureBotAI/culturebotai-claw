@@ -1,0 +1,63 @@
+# Central runtime configuration for the agentic GitHub Actions.
+#
+# Single source of truth for which model backs each agent workflow. Bumping a
+# model fleet-wide is an edit here, not a sweep through workflow YAML.
+#
+# NOTHING CONSUMES THIS YET. No workflow in this org invokes an agent — see
+# docs/AUTONOMOUS_LOOPS.md. It ships first, deliberately: the cost dial and the
+# kill switch (.github/cron-profiles.yaml) should exist before the thing they
+# control, not after. Adopted from monarch-initiative/dismech, which routes
+# effort tiers to models exactly this way.
+#
+# Resolution order, highest priority first:
+#   1. a per-run override (a workflow_dispatch `model:` input)
+#   2. the per-workflow `model:` (or `models:` for a matrix) below
+#   3. `default_model`
+#
+# Keys under `workflows:` are the workflow file stem under .github/workflows/.
+#
+# Scope: this centralises the MODEL only. Cadence lives in cron-profiles.yaml,
+# because GitHub cannot parameterise `schedule:` at run time.
+
+default_model: claude-opus-5
+provider: anthropic
+
+workflows:
+  # The worker loop, when it exists. Fans out across effort tiers in parallel,
+  # each tier bound to a model and a label selector, so a mechanical issue is not
+  # billed at the same rate as a schema change.
+  #
+  # The selectors are negative-chained on purpose: an issue carrying both
+  # low_effort and medium_effort matches only the lower tier rather than being
+  # picked up twice. An item with conflicting labels should be SKIPPED by the
+  # agent rather than guessed at — see the escalation rule in
+  # docs/AUTONOMOUS_LOOPS.md §2.4.
+  issue-scanner:
+    matrix:
+      - effort: low_effort
+        model: claude-haiku-4-5-20251001
+        selector: "label:agent-ok label:low_effort"
+      - effort: medium_effort
+        model: claude-sonnet-5
+        selector: "label:agent-ok label:medium_effort -label:low_effort"
+      - effort: high_effort
+        model: claude-opus-5
+        selector: "label:agent-ok -label:low_effort -label:medium_effort"
+
+  # Moves existing bot-authored PRs toward merge. It cannot invent work, which is
+  # why the research recommends it as the first agent to enable.
+  pr-shepherd:
+    model: claude-opus-5
+
+  # Turns the deterministic knowledge-gap scan's triage packet into issues. The
+  # scan itself is NOT an agent and needs no model — it is plain Python and runs
+  # today. This entry is for the future issue-filing step only.
+  knowledge-gap-triage:
+    model: claude-haiku-4-5-20251001
+
+  # Unassigns agent-held issues that have gone stale. DisMech has no equivalent;
+  # this is an addition, because an issue assigned to an agent that died is
+  # invisible to a scanner that only considers unassigned items, and stays that
+  # way forever.
+  stale-claim-sweep:
+    model: claude-haiku-4-5-20251001
