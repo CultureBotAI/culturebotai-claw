@@ -44,7 +44,7 @@ class SlotScore:
 class DashboardStats:
     repo_name: str
     record_count: int
-    timestamp: str
+    timestamp: str | None
     scores: list[SlotScore]
 
     @property
@@ -76,6 +76,72 @@ def _resolve_slot(record: dict, dotted_path: str) -> Any:
             return None
         cur = cur.get(part)
     return cur
+
+
+#: Dotted paths searched for the corpus timestamp when the config names none.
+#: A segment may resolve to a list, in which case every element is searched.
+DEFAULT_TIMESTAMP_PATHS = ("curation_history.timestamp",)
+
+
+def _iter_path_values(node: Any, parts: tuple[str, ...]) -> Iterable[Any]:
+    """Yield every value at a dotted path, descending into lists on the way."""
+    if isinstance(node, list):
+        for item in node:
+            yield from _iter_path_values(item, parts)
+        return
+    if not parts:
+        yield node
+        return
+    if isinstance(node, dict) and parts[0] in node:
+        yield from _iter_path_values(node[parts[0]], parts[1:])
+
+
+def _parse_timestamp(value: Any) -> _dt.datetime | None:
+    """Coerce an ISO-8601 timestamp to an aware UTC datetime, or None.
+
+    Accepts the str form and the datetime/date that PyYAML produces for an
+    unquoted scalar. A naive value is read as UTC.
+    """
+    if isinstance(value, _dt.datetime):
+        parsed = value
+    elif isinstance(value, _dt.date):
+        parsed = _dt.datetime(value.year, value.month, value.day)
+    elif isinstance(value, str):
+        text = value.strip()
+        if text.endswith(("Z", "z")):
+            text = text[:-1] + "+00:00"
+        try:
+            parsed = _dt.datetime.fromisoformat(text)
+        except ValueError:
+            return None
+    else:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=_dt.timezone.utc)
+    return parsed.astimezone(_dt.timezone.utc)
+
+
+def _corpus_timestamp(
+    records: list[dict], paths: Iterable[str]
+) -> str | None:
+    """Latest provenance timestamp across the corpus, as an ISO-8601 string.
+
+    This is deliberately derived from the records rather than the clock so
+    that regenerating an unchanged corpus is a no-op and staleness can be
+    checked by diffing. Returns None when no record carries a parseable
+    timestamp -- callers must not substitute the current time.
+    """
+    split = [tuple(p.split(".")) for p in paths]
+    latest: _dt.datetime | None = None
+    for record in records:
+        for parts in split:
+            for value in _iter_path_values(record, parts):
+                parsed = _parse_timestamp(value)
+                if parsed is not None and (latest is None or parsed > latest):
+                    latest = parsed
+    if latest is None:
+        return None
+    return latest.isoformat(timespec="seconds")
 
 
 def _walk_yamls(yaml_dir: Path, pattern: str) -> Iterable[dict]:
@@ -147,11 +213,17 @@ def generate_dashboard(
 ) -> DashboardStats:
     """Read config, score, render PNG + HTML to output_dir.
 
+    Output is a pure function of the corpus: the dashboard carries the
+    latest provenance timestamp found in the records, not the time of the
+    run, so regenerating an unchanged corpus produces no diff.
+
     Config YAML schema:
 
         repo_name: <string>            # appears in dashboard title
         yaml_dir: <path or glob root>  # absolute or relative to config
         pattern: "*.yaml"              # rglob pattern (default: *.yaml)
+        timestamp_paths:               # optional; where to read provenance
+          - curation_history.timestamp # (default) list segments are searched
         slots:
           - path: ingredients          # dotted path in YAML
             threshold: 0.95            # coverage required for PASS
@@ -173,12 +245,14 @@ def generate_dashboard(
     pattern = cfg.get("pattern", "*.yaml")
     slots = cfg.get("slots") or []
 
+    timestamp_paths = cfg.get("timestamp_paths") or DEFAULT_TIMESTAMP_PATHS
+
     records = list(_walk_yamls(yaml_dir, pattern))
     scores = _score(records, slots)
     stats = DashboardStats(
         repo_name=repo_name,
         record_count=len(records),
-        timestamp=_dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds"),
+        timestamp=_corpus_timestamp(records, timestamp_paths),
         scores=scores,
     )
 
@@ -209,5 +283,6 @@ def cli() -> int:
     print(f"{stats.repo_name}: {stats.record_count} records, "
           f"{len(stats.scores)} slots, "
           f"{stats.fail_count} FAIL, "
-          f"overall {stats.overall_coverage:.1%}")
+          f"overall {stats.overall_coverage:.1%}, "
+          f"corpus as of {stats.timestamp or 'unknown'}")
     return 1 if stats.fail_count else 0

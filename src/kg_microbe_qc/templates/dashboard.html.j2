@@ -35,7 +35,11 @@
 <body>
 
 <h1>{{ stats.repo_name }} — QC Dashboard</h1>
-<div class="meta">Generated {{ stats.timestamp }}</div>
+{% if stats.timestamp %}
+<div class="meta">Corpus as of {{ stats.timestamp }}</div>
+{% else %}
+<div class="meta">Corpus date unknown — no record carries a curation timestamp</div>
+{% endif %}
 
 <div class="stat-grid">
   <div class="stat">
