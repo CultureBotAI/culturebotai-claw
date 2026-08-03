@@ -46,6 +46,9 @@ class DashboardStats:
     record_count: int
     timestamp: str | None
     scores: list[SlotScore]
+    #: Records contributing a parseable timestamp. Shown alongside the date
+    #: so a corpus whose date rests on a handful of records says so.
+    timestamp_sources: int = 0
 
     @property
     def overall_coverage(self) -> float:
@@ -122,26 +125,46 @@ def _parse_timestamp(value: Any) -> _dt.datetime | None:
 
 
 def _corpus_timestamp(
-    records: list[dict], paths: Iterable[str]
-) -> str | None:
-    """Latest provenance timestamp across the corpus, as an ISO-8601 string.
+    records: list[dict], paths: Iterable[str] | str
+) -> tuple[str | None, int]:
+    """Latest provenance timestamp in the corpus, and how many records had one.
 
-    This is deliberately derived from the records rather than the clock so
-    that regenerating an unchanged corpus is a no-op and staleness can be
-    checked by diffing. Returns None when no record carries a parseable
-    timestamp -- callers must not substitute the current time.
+    Derived from the records rather than the clock so that regenerating an
+    unchanged corpus is a no-op and staleness can be checked by diffing.
+    Returns (None, 0) when no record carries a parseable timestamp -- callers
+    must not substitute the current time.
+
+    This is the newest *recorded curation event*, which is a lower bound on
+    the age of the corpus, not the age itself: a record edited without
+    appending to its history does not move it, and deleting the
+    newest-curated record moves it backwards. Hence the second element --
+    a date resting on 2 of 311 records deserves to be labelled as such.
+
+    Deliberately unclamped against the present. A typo'd year does poison
+    the value stickily, but rejecting "future" timestamps would mean reading
+    the clock, and output that depends on when it ran is the whole defect
+    being fixed here. An absurd date is at least loudly visible on the page.
     """
+    if isinstance(paths, str):  # a YAML scalar iterates per-character
+        paths = [paths]
     split = [tuple(p.split(".")) for p in paths]
     latest: _dt.datetime | None = None
+    sourced = 0
     for record in records:
+        found = False
         for parts in split:
             for value in _iter_path_values(record, parts):
                 parsed = _parse_timestamp(value)
-                if parsed is not None and (latest is None or parsed > latest):
+                if parsed is None:
+                    continue
+                found = True
+                if latest is None or parsed > latest:
                     latest = parsed
+        if found:
+            sourced += 1
     if latest is None:
-        return None
-    return latest.isoformat(timespec="seconds")
+        return None, 0
+    return latest.isoformat(timespec="seconds"), sourced
 
 
 def _walk_yamls(yaml_dir: Path, pattern: str) -> Iterable[dict]:
@@ -201,7 +224,11 @@ def _render_chart(scores: list[SlotScore]) -> bytes:
     ax.grid(axis="x", alpha=0.3)
     fig.tight_layout()
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=110)
+    # Drop the "Matplotlib version X.Y.Z" tEXt chunk. The Mechs' workflows
+    # pip-install matplotlib unpinned, so leaving it in means a
+    # regenerate-and-diff staleness check trips on a matplotlib upgrade
+    # rather than on a corpus change.
+    fig.savefig(buf, format="png", dpi=110, metadata={"Software": None})
     plt.close(fig)
     return buf.getvalue()
 
@@ -249,11 +276,13 @@ def generate_dashboard(
 
     records = list(_walk_yamls(yaml_dir, pattern))
     scores = _score(records, slots)
+    timestamp, sources = _corpus_timestamp(records, timestamp_paths)
     stats = DashboardStats(
         repo_name=repo_name,
         record_count=len(records),
-        timestamp=_corpus_timestamp(records, timestamp_paths),
+        timestamp=timestamp,
         scores=scores,
+        timestamp_sources=sources,
     )
 
     chart_png = _render_chart(scores)
@@ -284,5 +313,6 @@ def cli() -> int:
           f"{len(stats.scores)} slots, "
           f"{stats.fail_count} FAIL, "
           f"overall {stats.overall_coverage:.1%}, "
-          f"corpus as of {stats.timestamp or 'unknown'}")
+          f"latest curation {stats.timestamp or 'unknown'} "
+          f"(from {stats.timestamp_sources}/{stats.record_count} records)")
     return 1 if stats.fail_count else 0
