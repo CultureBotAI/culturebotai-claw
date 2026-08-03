@@ -1,7 +1,7 @@
 ---
 name: boss
 description: Use ONLY when the user explicitly asks to orchestrate parallel external agents (Claude Code) in tmux sessions, or says you are the boss/orchestrator. For in-process subagents use the Agent tool with isolation=worktree instead. Manages multi-repo work across CultureMech, MIM, CommunityMech, and culturebotai-claw with lock coordination.
-argument-hint: [ "curate" | "enrich" | "sync" | "status" | "kill" | <QUESTION> ] [INFO]
+argument-hint: '[ "curate" | "enrich" | "sync" | "status" | "kill" | <QUESTION> ] [INFO]'
 category: orchestration
 requires_database: false
 requires_internet: false
