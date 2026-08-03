@@ -1,0 +1,10 @@
+# Files vendored byte-identical across the SPOKES only.
+#
+# The hub (CultureMech) deliberately has none of these: they are the machinery a
+# spoke uses to diff itself against the hub, and a hub copy would make the hub
+# check itself against itself — the self-referential pin that CultureMech
+# retired in TraitMech#182. So these cannot be audited against the hub the way
+# shared/idlabel/MANIFEST files are; claw's mirror is the reference instead.
+#
+# Same relative path in every spoke. One per line, '#' comments allowed.
+scripts/check_vendored_sync.sh
