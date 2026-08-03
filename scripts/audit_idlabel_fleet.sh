@@ -126,9 +126,74 @@ while IFS= read -r present; do
   fi
 done < <(git ls-files "$MIRROR_ROOT" 2>/dev/null | sort)
 
+# --- direction 4: spoke-only files agree with claw's spoke mirror ------------
+# Some vendored files exist in the spokes but NOT in the hub, so directions 1-3
+# cannot see them: check_vendored_sync.sh is what a spoke runs to diff itself
+# against the hub. The hub has no copy and must not get one — it would then check
+# itself against itself at a pinned ref, which is the self-referential pin
+# CultureMech retired (TraitMech#176, #182).
+#
+# So for these, claw's mirror is the reference by necessity rather than by
+# promotion; the hub has nothing to mirror. See shared/spoke/README.md — this is
+# narrower than claw becoming canonical and does not revive claw#21.
+#
+# Until this existed, check_vendored_sync.sh was byte-identical across three
+# spokes with nothing enforcing it (CommunityMech#278, TraitMech#209).
+SPOKE_ROOT="${SPOKE_ROOT:-shared/spoke}"
+SPOKE_MANIFEST="${SPOKE_MANIFEST:-${SPOKE_ROOT}/MANIFEST}"
+
+if [ ! -s "$SPOKE_MANIFEST" ]; then
+  echo "ERROR: spoke manifest '$SPOKE_MANIFEST' is missing or empty — refusing to audit nothing." >&2
+  exit 2
+fi
+mapfile -t SPOKE_FILES < <(grep -vE '^\s*(#|$)' "$SPOKE_MANIFEST")
+if [ "${#SPOKE_FILES[@]}" -eq 0 ]; then
+  echo "ERROR: spoke manifest '$SPOKE_MANIFEST' lists no files." >&2
+  exit 2
+fi
+
+for f in "${SPOKE_FILES[@]}"; do
+  ref_path="${SPOKE_ROOT}/${f}"
+  if [ ! -f "$ref_path" ]; then
+    echo "DRIFT: spoke mirror is missing ${ref_path}"; fail=1; continue
+  fi
+
+  # The hub's ABSENCE is the invariant here, so assert it rather than assume it.
+  # A hub copy would mean someone "fixed" the missing-canonical-copy problem the
+  # dangerous way, reintroducing a self-referential check.
+  if curl -fsSL -o /dev/null "$(raw "$HUB" "$f")" 2>/dev/null; then
+    echo "DRIFT: hub ${HUB} now has ${f} — spoke-only files must NOT exist in the hub;"
+    echo "       a hub copy makes the hub diff itself against itself (see ${SPOKE_ROOT}/README.md)"
+    fail=1
+  fi
+  checked=$((checked + 1))
+
+  for r in "${REPOS[@]}"; do
+    [ "$r" = "$HUB" ] && continue
+    if ! curl -fsSL "$(raw "$r" "$f")" -o "$tmp/r"; then
+      echo "DRIFT: ${r} is missing ${f} (spoke mirror has it)"; fail=1; continue
+    fi
+    cmp -s "$ref_path" "$tmp/r" || { echo "DRIFT: ${r}:${f} differs from ${ref_path}"; fail=1; }
+    checked=$((checked + 1))
+  done
+done
+
+# An unlisted file under the spoke mirror is audited by nothing and vendored
+# nowhere — same reasoning as direction 3.
+while IFS= read -r present; do
+  rel="${present#"${SPOKE_ROOT}/"}"
+  case "$rel" in MANIFEST|README.md) continue ;; esac
+  listed=0
+  for f in "${SPOKE_FILES[@]}"; do [ "$f" = "$rel" ] && { listed=1; break; }; done
+  if [ "$listed" -eq 0 ]; then
+    echo "UNLISTED: ${present} is not in ${SPOKE_MANIFEST} — it is audited by nothing and vendored nowhere"
+    fail=1
+  fi
+done < <(git ls-files "$SPOKE_ROOT" 2>/dev/null | sort)
+
 echo
 if [ "$fail" -eq 0 ]; then
-  echo "OK: ${checked} comparisons agree — ${#REPOS[@]} Mech repos and claw's mirror all match ${HUB}@${REF}"
+  echo "OK: ${checked} comparisons agree — ${#REPOS[@]} Mech repos and claw's mirrors all match ${HUB}@${REF} (hub-vendored) or ${SPOKE_ROOT} (spoke-only)"
 else
   echo "Fleet drift detected."
   echo "Fix: sync the lagging copy from ${HUB}@${REF}, then bump that repo's"
