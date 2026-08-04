@@ -22,6 +22,7 @@ import dataclasses
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 import urllib.parse
@@ -698,10 +699,67 @@ _SOURCES: dict[str, Callable[[], Iterable[Candidate]]] = {
 
 # ---------- driver ----------
 
+def sync_mim_curated(files_written: int) -> int:
+    """Write the newly-created per-record files back into MIM's data/curated/.
+
+    This importer creates YAMLs under data/ingredients/{mapped,unmapped}/ and
+    nothing else. But MIM's `just export-individual` projects data/curated/ OVER
+    that tree, so without this step the very next export silently reverts every
+    record an import just created — the mechanism that lost 55 curation events in
+    MediaIngredientMech#148, and the defect MediaIngredientMech#171 fixed for its
+    role applier. Reproduced during the microbedecoder onboarding: after --apply,
+    MIM's qc-roundtrip gate failed until `just sync-curated` was run by hand.
+
+    Same two steps, in the same order, as MIM's `just sync-curated`: aggregate the
+    per-record tree into data/curated/, then re-export. The re-export is not
+    redundant — the collection does not carry `discussions`, so the exporter
+    re-attaches it at the end of a record, and without the second step the tree is
+    content-correct but byte-different from what MIM's gate expects.
+
+    Returns a process exit code (0 on success).
+    """
+    if not files_written:
+        return 0
+    mim_root = MIM_INGREDIENTS.parent.parent
+    scripts = mim_root / "scripts"
+    steps = (
+        ("aggregate per-record files into data/curated/", [
+            sys.executable, str(scripts / "aggregate_records.py"),
+            "--ingredients-dir", str(MIM_INGREDIENTS),
+            "--output-dir", str(mim_root / "data" / "curated"),
+        ]),
+        ("re-export data/curated/ to a fixed point", [
+            sys.executable, str(scripts / "export_individual_records.py"),
+            "--input-dir", str(mim_root / "data" / "curated"),
+            "--output-dir", str(MIM_INGREDIENTS),
+        ]),
+    )
+    for description, cmd in steps:
+        print(f"  syncing MIM: {description}")
+        sys.stdout.flush()
+        proc = subprocess.run(cmd, cwd=mim_root)
+        if proc.returncode != 0:
+            print(
+                f"ERROR: failed to {description} (exit {proc.returncode}).\n"
+                "MIM's data/ingredients/ and data/curated/ are now out of sync; the\n"
+                "next `just export-individual` there would revert the records this\n"
+                "import just created. Run `just sync-curated` in MIM before committing.",
+                file=sys.stderr,
+            )
+            return proc.returncode
+    return 0
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--source", required=True, choices=list(_SOURCES))
     ap.add_argument("--apply", action="store_true")
+    ap.add_argument(
+        "--no-sync", action="store_true",
+        help="Do NOT write the new records back into MIM's data/curated/. Leaves the "
+             "two surfaces out of sync, so MIM's next `just export-individual` reverts "
+             "this import and its qc-roundtrip gate fails. For debugging only.",
+    )
     ap.add_argument("--no-pubchem", action="store_true",
                     help="Skip PubChem fallback (faster, less coverage).")
     ap.add_argument("--accept-medium", action="store_true",
@@ -853,6 +911,19 @@ def main() -> None:
             out.append(f"| {r['name']} | `{r['primary']}` | {r['method']} | {r['confidence']} |\n")
     summary_md.write_text("".join(out))
     print(f"\n[5/5] Summary: {summary_md}")
+
+    if args.apply:
+        created = counts.get("mapped_created", 0) + counts.get("unmapped_created", 0)
+        if created and args.no_sync:
+            print(
+                f"\nWARNING: --no-sync given and {created} record(s) were written.\n"
+                "MIM's data/curated/ is now stale; its next `just export-individual`\n"
+                "will revert them. Run `just sync-curated` in MIM before committing."
+            )
+        elif created:
+            rc = sync_mim_curated(created)
+            if rc != 0:
+                raise SystemExit(rc)
 
 
 if __name__ == "__main__":
