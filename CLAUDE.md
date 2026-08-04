@@ -51,6 +51,21 @@ task_id = create_curation_task(
 # Downstream Claude reads and processes it
 ```
 
+## Prompts
+
+Hand-over prompts live in `prompts/`. They are **prompts, not slash commands** — feed them to
+a native command, or paste them to another agent or an independent reviewer. No frontmatter,
+no wrapper, on purpose.
+
+- **`prompts/backlog-loop-goal.md`** — review and prioritise the open issues across the
+  fleet, then take the chosen one all the way: branch, work, PR, adversarial review, issues
+  from that review, merge on approval, delete the branch. Feed it to the native `/goal`.
+
+⚠️ **Do not wrap this as a custom command.** It used to live at `.claude/commands/goal.md`,
+which registered a custom `/goal` and therefore SHADOWED the native one instead of feeding
+it. If such a wrapper reappears, delete it rather than repointing it.
+(`.claude/commands/curate.md` is fine — it has no native equivalent.)
+
 ## Development Commands
 
 ### Setup
