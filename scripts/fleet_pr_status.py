@@ -2,14 +2,16 @@
 """Report every open PR across claw and the Mech repos, in one fixed format.
 
     python scripts/fleet_pr_status.py [--json] [--include-drafts/--no-drafts]
-                                      [--org ORG] [--limit N]
+                                      [--org ORG] [--repo-limit N] [--pr-limit N]
 
 Why a script rather than "just run `gh pr list`": the answer to "what is open?"
 has to be reproducible and complete, and the ad-hoc version is neither. Three
 traps this closes, each of which has produced a wrong answer in this fleet:
 
-  * `gh repo list` and `gh pr list` BOTH truncate silently at `--limit`
+  * `gh repo list` and `gh pr list` BOTH truncate silently at their limit
     (`gh pr list` defaults to 30). A short answer looks like a complete one.
+    The two are capped separately, because they fail differently: repo-listing
+    truncation drops WHOLE REPOS, PR-listing truncation undercounts within one.
   * Repos discovered from the local filesystem miss any repo not cloned --
     ProteinTraitsMech was invisible to local sweeps for weeks -- and include
     stale clones that are many commits behind the remote.
@@ -68,13 +70,13 @@ def _gh(args: list[str], timeout: int = 60) -> str:
     return proc.stdout
 
 
-def discover_repos(org: str, limit: int) -> tuple[list[str], int]:
+def discover_repos(org: str, repo_limit: int) -> tuple[list[str], int]:
     """Fleet repo names from the ORG, plus the org's total repo count.
 
     Returns the total so the caller can tell a complete listing from one that
-    hit `--limit`; `gh repo list` gives no other signal that it truncated.
+    hit the limit; `gh repo list` gives no other signal that it truncated.
     """
-    raw = _gh(["repo", "list", org, "--limit", str(limit), "--json", "name"])
+    raw = _gh(["repo", "list", org, "--limit", str(repo_limit), "--json", "name"])
     names = [r["name"] for r in json.loads(raw)]
     return sorted(n for n in names if FLEET_PATTERN.search(n)), len(names)
 
@@ -86,10 +88,10 @@ def order_repos(found: list[str]) -> tuple[list[str], list[str]]:
     return known + extra, extra
 
 
-def open_prs(org: str, repo: str, limit: int) -> list[dict]:
+def open_prs(org: str, repo: str, pr_limit: int) -> list[dict]:
     raw = _gh([
         "pr", "list", "--repo", f"{org}/{repo}", "--state", "open",
-        "--limit", str(limit), "--json", PR_FIELDS,
+        "--limit", str(pr_limit), "--json", PR_FIELDS,
     ])
     prs = json.loads(raw)
     # Newest first: the fleet reads its backlog that way, and a stable sort
@@ -97,28 +99,38 @@ def open_prs(org: str, repo: str, limit: int) -> list[dict]:
     return sorted(prs, key=lambda p: -p["number"])
 
 
-def collect(org: str, limit: int) -> dict:
-    repos, org_total = discover_repos(org, limit)
+def collect(org: str, repo_limit: int, pr_limit: int) -> dict:
+    """Two limits, tracked separately.
+
+    They bound unrelated quantities -- how many repos an org has, and how many
+    PRs one repo has open -- and they fail differently: a repo-listing
+    truncation silently drops whole repos from the report, while a PR-listing
+    truncation undercounts within one. Sharing a number meant the warning
+    could not say which knob to turn.
+    """
+    repos, org_total = discover_repos(org, repo_limit)
     ordered, unexpected = order_repos(repos)
     result: dict = {
         "org": org,
         "repos_queried": ordered,
         "unexpected_repos": unexpected,
         "org_repo_count": org_total,
-        "limit": limit,
-        "truncation_risk": org_total >= limit,
+        "repo_limit": repo_limit,
+        "pr_limit": pr_limit,
+        "repo_listing_truncated": org_total >= repo_limit,
+        "pr_listing_truncated": [],
         "prs": {},
         "errors": {},
     }
     for repo in ordered:
         try:
-            prs = open_prs(org, repo, limit)
+            prs = open_prs(org, repo, pr_limit)
         except (GhError, subprocess.TimeoutExpired, json.JSONDecodeError) as exc:
             result["errors"][repo] = str(exc)[:200]
             continue
         result["prs"][repo] = prs
-        if len(prs) >= limit:
-            result["truncation_risk"] = True
+        if len(prs) >= pr_limit:
+            result["pr_listing_truncated"].append(repo)
     return result
 
 
@@ -191,10 +203,17 @@ def render(data: dict, include_drafts: bool) -> str:
             "  NEW repos not in the known fleet list: "
             + ", ".join(data["unexpected_repos"])
         )
-    if data["truncation_risk"]:
+    if data["repo_listing_truncated"]:
         lines.append(
-            f"  WARNING: a listing reached --limit ({data['limit']}); "
-            "counts may be truncated. Re-run with a higher --limit."
+            f"  WARNING: repo discovery reached --repo-limit "
+            f"({data['repo_limit']}); ENTIRE REPOS may be missing from this "
+            "report. Re-run with a higher --repo-limit."
+        )
+    if data["pr_listing_truncated"]:
+        lines.append(
+            f"  WARNING: PR listing reached --pr-limit ({data['pr_limit']}) in "
+            + ", ".join(data["pr_listing_truncated"])
+            + "; those counts are truncated. Re-run with a higher --pr-limit."
         )
     for repo, err in data["errors"].items():
         lines.append(f"  ERROR {repo}: NOT QUERIED — {err}")
@@ -209,8 +228,12 @@ def render(data: dict, include_drafts: bool) -> str:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="fleet_pr_status")
     ap.add_argument("--org", default=DEFAULT_ORG)
-    ap.add_argument("--limit", type=int, default=200,
-                    help="per-listing cap; both gh listings truncate silently")
+    ap.add_argument("--repo-limit", type=int, default=300,
+                    help="cap on org repo discovery; gh truncates silently "
+                         "(default 300, org had 38 at time of writing)")
+    ap.add_argument("--pr-limit", type=int, default=200,
+                    help="cap on open PRs listed per repo; gh defaults to 30 "
+                         "and truncates silently")
     ap.add_argument("--json", action="store_true", dest="as_json")
     ap.add_argument("--include-drafts", action="store_true", default=True)
     ap.add_argument("--no-drafts", action="store_false", dest="include_drafts")
@@ -220,7 +243,7 @@ def main(argv: list[str] | None = None) -> int:
         print("gh not found on PATH", file=sys.stderr)
         return 2
     try:
-        data = collect(args.org, args.limit)
+        data = collect(args.org, args.repo_limit, args.pr_limit)
     except GhError as exc:
         print(f"discovery failed: {exc}", file=sys.stderr)
         return 2

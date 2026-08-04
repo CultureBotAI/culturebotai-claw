@@ -42,8 +42,10 @@ def _data(**kw) -> dict:
         "repos_queried": ["culturebotai-claw", "TraitMech"],
         "unexpected_repos": [],
         "org_repo_count": 38,
-        "limit": 200,
-        "truncation_risk": False,
+        "repo_limit": 300,
+        "pr_limit": 200,
+        "repo_listing_truncated": False,
+        "pr_listing_truncated": [],
         "prs": {"culturebotai-claw": [_pr(1)], "TraitMech": []},
         "errors": {},
     }
@@ -120,9 +122,29 @@ def test_an_unqueryable_repo_is_named_and_the_total_marked_a_lower_bound():
     assert "TraitMech=0" not in out
 
 
-def test_hitting_the_limit_is_warned_about_not_swallowed():
-    out = render(_data(truncation_risk=True, limit=30), include_drafts=True)
-    assert "WARNING" in out and "--limit (30)" in out
+def test_repo_discovery_truncation_warns_that_whole_repos_may_be_missing():
+    """The two limits fail differently and the warning must say which knob to
+    turn: repo truncation drops ENTIRE REPOS, which is the worse failure."""
+    out = render(_data(repo_listing_truncated=True, repo_limit=5),
+                 include_drafts=True)
+    assert "WARNING" in out
+    assert "--repo-limit (5)" in out
+    assert "ENTIRE REPOS" in out
+    assert "--pr-limit" not in out
+
+
+def test_pr_listing_truncation_names_the_affected_repos():
+    out = render(_data(pr_listing_truncated=["CultureMech", "TraitMech"],
+                       pr_limit=30), include_drafts=True)
+    assert "--pr-limit (30)" in out
+    assert "CultureMech, TraitMech" in out
+    assert "--repo-limit" not in out
+
+
+def test_the_two_truncation_warnings_are_independent():
+    both = render(_data(repo_listing_truncated=True,
+                        pr_listing_truncated=["TraitMech"]), include_drafts=True)
+    assert "--repo-limit" in both and "--pr-limit" in both
 
 
 def test_clean_run_makes_no_warning_noise():
@@ -198,3 +220,78 @@ def test_a_short_title_is_left_alone():
 def test_titles_are_flattened_so_a_newline_cannot_break_the_table():
     from fleet_pr_status import _title
     assert _title("Fix\nthe   thing") == "Fix the thing"
+
+
+# --------------------------------------------------------------------------
+# collect() — the detection logic, not just its rendering
+#
+# These exist because a mutation that stopped RECORDING pr truncation passed
+# every test above: render() was covered against hand-built data, while the
+# code that builds that data was not exercised at all. Stubbing `_gh` closes
+# the gap without touching the network.
+# --------------------------------------------------------------------------
+
+import json as _json  # noqa: E402
+
+import fleet_pr_status as fps  # noqa: E402
+
+
+def _fake_gh(repos: list[str], prs_by_repo: dict[str, int]):
+    def _gh(args, timeout=60):
+        if args[0] == "repo":
+            return _json.dumps([{"name": n} for n in repos])
+        repo = args[args.index("--repo") + 1].split("/")[1]
+        n = prs_by_repo.get(repo, 0)
+        return _json.dumps([
+            {"number": i, "title": f"t{i}", "isDraft": False,
+             "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN",
+             "additions": 1, "deletions": 0, "changedFiles": 1}
+            for i in range(1, n + 1)
+        ])
+    return _gh
+
+
+def test_collect_records_pr_truncation_per_repo(monkeypatch):
+    monkeypatch.setattr(
+        fps, "_gh",
+        _fake_gh(["TraitMech", "CultureMech"], {"TraitMech": 3, "CultureMech": 1}),
+    )
+    data = fps.collect("Org", repo_limit=50, pr_limit=3)
+    assert data["pr_listing_truncated"] == ["TraitMech"]
+    assert data["repo_listing_truncated"] is False
+
+
+def test_collect_records_repo_truncation_when_discovery_fills_the_limit(monkeypatch):
+    monkeypatch.setattr(fps, "_gh", _fake_gh(["TraitMech", "CultureMech"], {}))
+    data = fps.collect("Org", repo_limit=2, pr_limit=50)
+    assert data["repo_listing_truncated"] is True
+
+
+def test_collect_records_nothing_truncated_on_a_roomy_run(monkeypatch):
+    monkeypatch.setattr(fps, "_gh", _fake_gh(["TraitMech"], {"TraitMech": 2}))
+    data = fps.collect("Org", repo_limit=50, pr_limit=50)
+    assert data["repo_listing_truncated"] is False
+    assert data["pr_listing_truncated"] == []
+    assert len(data["prs"]["TraitMech"]) == 2
+
+
+def test_collect_captures_a_failing_repo_instead_of_dropping_it(monkeypatch):
+    def _gh(args, timeout=60):
+        if args[0] == "repo":
+            return _json.dumps([{"name": "TraitMech"}, {"name": "CultureMech"}])
+        if "CultureMech" in args[args.index("--repo") + 1]:
+            raise fps.GhError("HTTP 502")
+        return _json.dumps([])
+    monkeypatch.setattr(fps, "_gh", _gh)
+    data = fps.collect("Org", repo_limit=50, pr_limit=50)
+    assert "CultureMech" in data["errors"]
+    assert "CultureMech" not in data["prs"]
+    assert "TraitMech" in data["prs"]
+
+
+def test_collect_filters_non_fleet_repos_out_of_discovery(monkeypatch):
+    monkeypatch.setattr(
+        fps, "_gh", _fake_gh(["TraitMech", "PFASCommunityAgents", "kg-microbe"], {}),
+    )
+    data = fps.collect("Org", repo_limit=50, pr_limit=50)
+    assert data["repos_queried"] == ["TraitMech"]

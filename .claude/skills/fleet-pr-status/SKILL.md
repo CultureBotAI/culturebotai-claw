@@ -24,8 +24,21 @@ Use this before a merge round, when picking up work, or any time someone asks
 uv run python scripts/fleet_pr_status.py            # the standard report
 uv run python scripts/fleet_pr_status.py --json     # machine-readable
 uv run python scripts/fleet_pr_status.py --no-drafts
-uv run python scripts/fleet_pr_status.py --limit 500
+uv run python scripts/fleet_pr_status.py --repo-limit 500   # org grew
+uv run python scripts/fleet_pr_status.py --pr-limit 500     # a repo has >200 open
 ```
+
+**Two limits, not one**, because they bound unrelated things and fail
+differently:
+
+- `--repo-limit` (default 300) caps org discovery. Truncating here drops
+  **entire repos** from the report. Proven: `--repo-limit 5` against a 38-repo
+  org silently loses CommunityMech and proteintraitsmech.
+- `--pr-limit` (default 200) caps open PRs listed per repo. Truncating here
+  undercounts *within* a repo that is still present.
+
+Each warns separately and names the flag to raise, so the message tells you
+which knob to turn rather than leaving you to guess.
 
 Exit codes: `0` report produced, `1` at least one repo could not be queried,
 `2` bad usage or `gh` missing. **A non-zero exit means the report is
