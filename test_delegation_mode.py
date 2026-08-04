@@ -7,6 +7,7 @@ MediaIngredientMech code when OAK is unavailable.
 """
 
 import os
+import tempfile
 import sys
 import logging
 from pathlib import Path
@@ -185,8 +186,12 @@ def test_lock_manager_integration():
         logger.info("✓ LockManager available")
 
         # Test status manager
+        # Hermetic: a repo-relative status_dir writes into the tracked
+        # status/ tree, and my_id "orchestration_claude" collides with a
+        # committed file -- running the suite used to null out its
+        # last_completed_operation record. See claw#44.
         status_mgr = StatusManager(config={
-            "status_dir": os.getenv("OPENCLAW_WORKSPACE", ".") + "/status",
+            "status_dir": tempfile.mkdtemp(prefix="openclaw-status-"),
             "my_id": "test_delegation",
         })
 

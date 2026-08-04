@@ -7,6 +7,7 @@ between multiple Claude instances.
 """
 
 import os
+import tempfile
 import sys
 import time
 import logging
@@ -237,8 +238,12 @@ def test_status_manager():
     try:
         from lock_manager import StatusManager
 
+        # Hermetic: a repo-relative status_dir writes into the tracked
+        # status/ tree, and my_id "orchestration_claude" collides with a
+        # committed file -- running the suite used to null out its
+        # last_completed_operation record. See claw#44.
         status_mgr = StatusManager(config={
-            "status_dir": os.getenv("OPENCLAW_WORKSPACE", ".") + "/status",
+            "status_dir": tempfile.mkdtemp(prefix="openclaw-status-"),
             "my_id": "orchestration_claude",
         })
 

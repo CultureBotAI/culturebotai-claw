@@ -76,10 +76,14 @@ and why.
 
 ```bash
 for r in $(<discovered repos>); do
-  gh pr list --repo CultureBotAI/$r --state open \
+  gh pr list --repo CultureBotAI/$r --state open --limit 200 \
     --json number,title,isDraft,author,createdAt,updatedAt,headRefName,baseRefName,additions,deletions,changedFiles,labels
 done
 ```
+
+`--limit` is not optional here. `gh pr list` defaults to **30** and truncates
+silently — the same trap flagged above for `gh repo list`, and the one this very
+step exists to prevent.
 
 Print the raw inventory **before** reviewing anything, so the reader can see the
 denominator. A report on 5 PRs when 6 are open is worse than no report.
@@ -89,10 +93,23 @@ denominator. A report on 5 PRs when 6 are open is worse than no report.
 This is the step that justifies doing all repos at once. Look for:
 
 - **Same file, two PRs.** Especially vendored files that must stay byte-identical
-  across repos (`scripts/audit_idlabel_fleet.sh` and its MANIFEST are the
-  canonical example). Two independently-correct PRs can both be wrong together.
-- **Revert pairs.** A PR that undoes something recently merged. Check whether the
-  author knows. TraitMech#213 sat blocking because it silently reverted #216.
+  across repos. The vendored set is whatever `shared/idlabel/MANIFEST` and
+  `shared/spoke/MANIFEST` list — read them, do not recite a remembered list.
+  `scripts/audit_idlabel_fleet.sh` is the *enforcer*, lives only in claw, and is
+  itself vendored nowhere. Two independently-correct PRs can both be wrong
+  together.
+- **Revert pairs.** A PR that undoes something recently merged. **Read the
+  three-dot diff** (`git diff origin/main...HEAD`, or the Files tab, which shows
+  three-dot). A two-dot `git diff origin/main HEAD` also lists files where the
+  branch is merely *behind* `main`, which looks identical to a revert and is not
+  one. Only a file the branch actually **modified** can revert anything; confirm
+  with `gh api repos/<owner>/<repo>/pulls/<n>/files`, and simulate the result
+  with `git merge-tree --write-tree` before claiming it.
+
+  This trap has already produced one false blocking verdict in this fleet
+  (TraitMech#219, closed as not-planned after the branch turned out to be behind
+  on `.github/workflows/claude-code-review.yml`, not reverting it). Treat a
+  suspected revert as a hypothesis until the three-dot diff shows the file.
 - **Fleet-wide fixes with a missing repo.** If four Mechs got a fix and the fifth
   did not, that is a finding, not an omission to be polite about.
 - **Dependency order.** Which PRs must merge before which. State the order
@@ -116,7 +133,11 @@ finding.
 regressions", check it. Claims in PR bodies are hypotheses.
 
 **c. Whether the tests would fail if the code were wrong.** Do not accept a green
-run as evidence. Revert the substantive change and confirm the suite goes red.
+run as evidence. Revert the substantive change and confirm the suite goes red —
+**in a throwaway `git worktree`, never in a live checkout.** Other agents are
+working in this fleet concurrently; mutating a shared tree to test a hypothesis
+breaks them, and it contradicts the read-only rule below. Create the worktree,
+mutate, run, and remove it.
 A test that passes on the bug it was written for is the single most common defect
 in this fleet's history. One real example: a determinism test compared two
 generated files that both embedded a whole-second timestamp — against the very
@@ -223,6 +244,14 @@ even if the answer turns out to be "won't fix".
   `gh api -X PATCH repos/<owner>/<repo>/pulls/<n> --input <json>`.
 - `proteintraitsmech` is lowercase on GitHub while its local directory is
   `ProteinTraitsMech`.
+- **macOS hides case bugs.** APFS is case-insensitive by default, so a glob for
+  `*/SKILL.md` also matches `skill.md` locally and finds nothing on Linux CI.
+  ProteinTraitsMech names 9 of its 12 skills `skill.md` and 3 `SKILL.md`, so any
+  fleet sweep that globs one casing under-reports on CI and over-reports on a
+  Mac. Match both casings, and state which files were actually examined.
+- **A file on disk is not a file in the repo.** Check `git ls-files` before
+  reporting a defect in a sibling repo; an untracked local artifact is not
+  something that repo is shipping.
 - CommunityMech's working tree is nested: `CommunityMech/CommunityMech`.
 - `uv run pytest` can resolve a `pytest` from `PATH` under a different
   interpreter. Use `uv run --extra dev python -m pytest` and compare the
