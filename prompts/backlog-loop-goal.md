@@ -1,19 +1,21 @@
 # Backlog loop — pick the right next thing, then finish it properly
 
-**A prompt, not a slash command.** Paste it to a session, to another agent, or to an
-independent reviewer — it is self-contained and drags no wrapper with it.
+**A prompt, not a slash command.** Feed it to the native `/goal`, or paste it to another
+agent or an independent reviewer — it is self-contained and drags no wrapper with it.
 
-It lives under `prompts/` to match the other five repos in the fleet, every one of which
-keeps its backlog-loop prompt there with no frontmatter. It moved here from
-`.claude/commands/goal.md`, where the frontmatter registered it as a custom `/goal`.
+This file used to live at `.claude/commands/goal.md`, where its frontmatter registered a
+CUSTOM `/goal` — colliding with the built-in command of the same name instead of feeding it.
+**If such a wrapper reappears pointing here, delete it rather than repointing it.**
 
-Note for anyone re-litigating that move: there is **no built-in `/goal`** in Claude Code, so
-nothing was being shadowed. Verified against the installed CLI (v0.2.41) — the registered
-built-in commands are `allowed-tools, bug, clear, compact, config, cost, exit, help, login,
-logout, mcp, terminal-setup, theme`, and `name:"goal"` appears zero times. A command wrapper
-here would be the only way to get a `/goal`, not a thing competing with one. The reason to
-keep this as a plain prompt is portability and fleet consistency — a `.claude/commands/`
-wrapper would be a defensible choice too, and `.claude/commands/curate.md` remains one.
+`/goal` is a documented built-in (Claude Code v2.1.139+): it sets a completion condition and
+keeps working across turns until a small fast model judges the condition met. That is exactly
+the loop this prompt describes, which is why the two belong together as
+`/goal <condition>` + this document, not as a command that replaces it.
+See https://code.claude.com/docs/en/goal.
+
+It also sits under `prompts/` to match the other five repos in the fleet, every one of which
+keeps its backlog-loop prompt there with no frontmatter. `.claude/commands/curate.md` stays a
+command because nothing built-in is called `/curate`.
 
 Run the full cycle on **one** unit of work: understand what is open, rank it,
 get agreement on what to do, do it, review it adversarially, and land it.
