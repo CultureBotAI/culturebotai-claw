@@ -23,10 +23,11 @@ def _discover_skill_files() -> list[Path]:
     """Every skill file, whatever its casing, listed exactly once.
 
     Globbing `*/SKILL.md` under-reports on Linux CI when a skill is named
-    `skill.md` -- ProteinTraitsMech names 9 of its 12 that way, so the fleet
-    convention is genuinely mixed. Globbing both patterns instead over-reports
-    on macOS, where a case-insensitive filesystem matches each file twice and
-    `resolve()` does not canonicalise the spelling, so the pair does not dedupe.
+    `skill.md`; ProteinTraitsMech carried such a split until it normalised to
+    all-uppercase, and nothing enforces the convention across the fleet.
+    Globbing both patterns instead over-reports on macOS, where a
+    case-insensitive filesystem matches each file twice and `resolve()` does not
+    canonicalise the spelling, so the pair does not dedupe.
 
     Reading real directory entries sidesteps both: each file appears once,
     under its true on-disk name, on either filesystem.
