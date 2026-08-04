@@ -1,8 +1,11 @@
----
-description: Review and prioritise open issues across the fleet, then take the chosen one all the way — branch, PR, adversarial review, issues from that review, merge on approval, delete branch. Pauses for human input at every decision that is the human's to make.
----
+# Backlog loop — pick the right next thing, then finish it properly
 
-# /goal — pick the right next thing, then finish it properly
+**A prompt, not a slash command.** Feed it to the native `/goal`, or paste it to another
+agent or an independent reviewer — it is self-contained and drags no wrapper with it.
+
+This file used to live at `.claude/commands/goal.md`, which registered a CUSTOM `/goal` and
+therefore SHADOWED the native command instead of feeding it. If such a wrapper reappears
+pointing here, delete it rather than repointing it.
 
 Run the full cycle on **one** unit of work: understand what is open, rank it,
 get agreement on what to do, do it, review it adversarially, and land it.
