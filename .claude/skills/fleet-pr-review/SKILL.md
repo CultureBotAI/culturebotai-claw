@@ -246,12 +246,17 @@ even if the answer turns out to be "won't fix".
   `ProteinTraitsMech`.
 - **macOS hides case bugs.** APFS is case-insensitive by default, so a glob for
   `*/SKILL.md` also matches `skill.md` locally and finds nothing on Linux CI.
-  ProteinTraitsMech names 9 of its 12 skills `skill.md` and 3 `SKILL.md`, so any
-  fleet sweep that globs one casing under-reports on CI and over-reports on a
-  Mac. Match both casings, and state which files were actually examined.
-- **A file on disk is not a file in the repo.** Check `git ls-files` before
-  reporting a defect in a sibling repo; an untracked local artifact is not
-  something that repo is shipping.
+  ProteinTraitsMech carried a mixed `skill.md`/`SKILL.md` split until it
+  normalised to all-uppercase in early August 2026 — so any fleet sweep that
+  globs one casing can under-report on CI and over-report on a Mac. Match both
+  casings, and state which files were actually examined.
+- **A file on disk is not a file in the repo, and a local clone is not the
+  repo.** Check `git ls-files` before reporting a defect in a sibling repo — an
+  untracked local artifact is not something that repo is shipping. Then check
+  `git rev-list --count HEAD..origin/main`: reporting from a stale checkout is
+  the same error one level up, and has already produced a wrong answer here
+  about a task that a sibling repo had finished 25 commits ago. Prefer
+  `git ls-tree -r origin/main` or the API over the working tree.
 - CommunityMech's working tree is nested: `CommunityMech/CommunityMech`.
 - `uv run pytest` can resolve a `pytest` from `PATH` under a different
   interpreter. Use `uv run --extra dev python -m pytest` and compare the

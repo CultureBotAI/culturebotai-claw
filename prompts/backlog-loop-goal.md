@@ -256,8 +256,13 @@ sentence and move on.
 - macOS APFS is case-insensitive, so a glob for `*/SKILL.md` also matches
   `skill.md` locally and misses it on Linux CI. Match on real directory entries
   when a sweep must agree across both.
-- A file on disk is not a file in the repo. Check `git ls-files` before
-  reporting a defect in a sibling repo.
+- A file on disk is not a file in the repo, and **a local clone is not the
+  repo**. Check `git ls-files` before reporting a defect in a sibling repo, then
+  check `git rev-list --count HEAD..origin/main` before reporting on its state
+  at all. A stale checkout has already produced a confidently wrong answer here
+  — a task reported as untouched had been finished upstream 25 commits earlier.
+  For any question about a sibling repo, read `git ls-tree -r origin/main` or
+  the API, not the working tree.
 - `uv run pytest` may resolve a `pytest` from `PATH` under a different
   interpreter — use `uv run --extra dev python -m pytest`. Note that
   `pytest tests/` can collect fewer tests than CI's bare `pytest`.
