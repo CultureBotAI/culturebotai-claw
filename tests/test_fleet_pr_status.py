@@ -295,3 +295,141 @@ def test_collect_filters_non_fleet_repos_out_of_discovery(monkeypatch):
     )
     data = fps.collect("Org", repo_limit=50, pr_limit=50)
     assert data["repos_queried"] == ["TraitMech"]
+
+
+# --------------------------------------------------------------------------
+# the datestamped TSV snapshot
+# --------------------------------------------------------------------------
+
+import csv as _csv  # noqa: E402
+
+from fleet_pr_status import (  # noqa: E402
+    TSV_COLUMNS,
+    snapshot_is_complete,
+    tsv_path,
+    tsv_rows,
+    write_tsv,
+)
+
+SNAP = "2026-08-04T06:43:15+00:00"
+
+
+def _read(path):
+    with open(path) as f:
+        return list(_csv.DictReader(f, delimiter="\t"))
+
+
+def test_tsv_is_datestamped_from_the_snapshot_not_the_clock(tmp_path):
+    """The filename must come from the passed timestamp, so a caller can
+    reproduce a snapshot's name without waiting for the right day."""
+    p = write_tsv(_data(), tmp_path, SNAP)
+    assert p.name == "fleet_pr_status_2026-08-04.tsv"
+
+
+def test_an_incomplete_snapshot_is_marked_partial_in_the_FILENAME(tmp_path):
+    """The console warning does not survive; a month later the file is all
+    anyone has, so incompleteness has to travel with it."""
+    for bad in ({"errors": {"TraitMech": "502"}},
+                {"repo_listing_truncated": True},
+                {"pr_listing_truncated": ["CultureMech"]}):
+        p = write_tsv(_data(**bad), tmp_path, SNAP)
+        assert p.name.endswith(".partial.tsv"), bad
+    assert write_tsv(_data(), tmp_path, SNAP).name == "fleet_pr_status_2026-08-04.tsv"
+
+
+def test_snapshot_is_complete_reflects_all_three_failure_modes():
+    assert snapshot_is_complete(_data()) is True
+    assert snapshot_is_complete(_data(errors={"x": "y"})) is False
+    assert snapshot_is_complete(_data(repo_listing_truncated=True)) is False
+    assert snapshot_is_complete(_data(pr_listing_truncated=["x"])) is False
+
+
+def test_tsv_keeps_drafts_even_when_the_table_hides_them(tmp_path):
+    """The table is a view; the TSV is the record. Dropping rows from a data
+    export is the silent-omission failure this script exists to avoid."""
+    data = _data(prs={"culturebotai-claw": [_pr(1, isDraft=True), _pr(2)],
+                      "TraitMech": []})
+    rows = _read(write_tsv(data, tmp_path, SNAP))
+    assert len(rows) == 2
+    assert sorted(r["is_draft"] for r in rows) == ["false", "true"]
+    # meanwhile the rendered table, with drafts off, shows only one
+    assert "fleet: 1" in render(data, include_drafts=False)
+
+
+def test_tsv_header_matches_the_declared_columns_exactly(tmp_path):
+    p = write_tsv(_data(), tmp_path, SNAP)
+    with open(p) as f:
+        header = f.readline().rstrip("\n").split("\t")
+    assert header == list(TSV_COLUMNS)
+
+
+def test_every_row_carries_the_snapshot_timestamp(tmp_path):
+    rows = _read(write_tsv(_data(), tmp_path, SNAP))
+    assert rows and all(r["snapshot_utc"] == SNAP for r in rows)
+
+
+def test_titles_are_flattened_so_a_tab_or_newline_cannot_break_the_tsv(tmp_path):
+    data = _data(prs={"culturebotai-claw": [_pr(1, title="a\tb\nc   d")],
+                      "TraitMech": []})
+    rows = _read(write_tsv(data, tmp_path, SNAP))
+    assert rows[0]["title"] == "a b c d"
+    assert len(rows) == 1
+
+
+def test_a_failed_repo_contributes_no_rows_but_the_file_is_marked(tmp_path):
+    data = _data(prs={"culturebotai-claw": [_pr(1)]},
+                 errors={"TraitMech": "HTTP 502"})
+    p = write_tsv(data, tmp_path, SNAP)
+    assert p.name.endswith(".partial.tsv")
+    assert len(_read(p)) == 1
+
+
+def test_rerunning_the_same_date_overwrites_rather_than_appending(tmp_path):
+    write_tsv(_data(), tmp_path, SNAP)
+    p = write_tsv(_data(), tmp_path, SNAP)
+    assert len(_read(p)) == 1
+
+
+def test_tsv_rows_are_ordered_by_the_fixed_repo_order(tmp_path):
+    data = _data(repos_queried=["culturebotai-claw", "TraitMech"],
+                 prs={"culturebotai-claw": [_pr(5)], "TraitMech": [_pr(9)]})
+    rows = tsv_rows(data, SNAP)
+    assert [r["repo"] for r in rows] == ["culturebotai-claw", "TraitMech"]
+
+
+def test_tsv_path_is_pure_and_does_not_touch_disk(tmp_path):
+    p = tsv_path(tmp_path, SNAP, complete=True)
+    assert not p.exists()
+    assert p.parent == tmp_path
+
+
+def test_a_quoted_title_survives_a_NAIVE_tab_split(tmp_path):
+    """TSV's whole appeal is that `cut -f5` works. Under csv's default quoting
+    a title containing a double quote is wrapped and its quotes doubled --
+    correct to a csv reader, mangled to every naive consumer."""
+    title = 'Answer to "what is open?"'
+    data = _data(prs={"culturebotai-claw": [_pr(1, title=title)], "TraitMech": []})
+    p = write_tsv(data, tmp_path, SNAP)
+    raw = p.read_text().splitlines()[1]
+    assert raw.split("\t")[4] == title
+    assert len(raw.split("\t")) == len(TSV_COLUMNS)
+
+
+def test_a_tab_in_any_field_cannot_shift_the_columns(tmp_path):
+    """Not just titles: a branch name or author with a tab would silently
+    add a column and misalign every field after it."""
+    data = _data(prs={"culturebotai-claw": [
+        _pr(1, title="a\tb", headRefName="feat\tx")], "TraitMech": []})
+    p = write_tsv(data, tmp_path, SNAP)
+    raw = p.read_text().splitlines()[1]
+    assert len(raw.split("\t")) == len(TSV_COLUMNS)
+    assert raw.split("\t")[4] == "a b"
+    assert raw.split("\t")[12] == "feat x"
+
+
+def test_the_file_contains_no_quoting_at_all(tmp_path):
+    data = _data(prs={"culturebotai-claw": [_pr(1, title='has "quotes" in it')],
+                      "TraitMech": []})
+    body = write_tsv(data, tmp_path, SNAP).read_text().splitlines()[1]
+    assert not body.startswith('"')
+    assert '""' not in body
