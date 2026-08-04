@@ -70,8 +70,9 @@ Because the ad-hoc version has produced wrong answers here, and every one was a
 **denominator** problem — a count that looked complete and was not:
 
 - **Both `gh` listings truncate silently.** `gh pr list` and `gh issue list`
-  default to **30**; `gh repo list` caps at `--limit` with no signal. The script
-  passes an explicit limit and warns when a listing reaches it.
+  default to **30**; `gh repo list` caps at its limit with no signal. The
+  script passes explicit limits and warns when either is reached, naming which
+  one so you know whether whole repos or only PRs were lost.
 - **A failed repo query vanishes from a hand-rolled loop.** `for r in …; do gh
   pr list …; done` prints nothing for a repo that 502s, which reads identically
   to "nothing open". The script names it, and marks the total a lower bound.
@@ -120,7 +121,24 @@ A repo that does not end in `mech` needs the pattern widened. Note that
 ## Tests
 
 `tests/test_fleet_pr_status.py` covers the failure paths rather than the happy
-one, because a clean run is not where this can mislead you. Mutation-checked:
-silently dropping a failed repo, rendering UNKNOWN as a conflict, suppressing
-the truncation warning, hiding drafts without saying so, omitting zero-PR repos
-from coverage, and absorbing a new Mech unflagged each fail at least one test.
+one, because a clean run is not where this can mislead you. Every guard is
+mutation-checked — each of these fails at least one test when removed:
+
+| mutation | |
+|---|---|
+| silently drop a failed repo | render + `collect` |
+| render UNKNOWN as CONFLICTS | render |
+| suppress either truncation warning | render |
+| stop *detecting* truncation in `collect` | `collect` |
+| hide drafts without saying so | render |
+| omit zero-PR repos from coverage | render |
+| absorb a new Mech unflagged | render |
+| cut a title with no marker | render |
+
+The `collect` rows exist because of a hole the split exposed: mutating
+`collect()` to stop recording PR truncation passed every test, since `render()`
+was covered against hand-built data while the code that *builds* it was not
+exercised at all. That is precisely the guard-that-verifies-nothing this script
+exists to catch, found inside the script's own tests. `collect()` is now tested
+by stubbing `_gh`, so discovery, listing, both truncation detections, error
+capture and fleet filtering run offline.
