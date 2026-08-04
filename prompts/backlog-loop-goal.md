@@ -4,14 +4,20 @@
 agent or an independent reviewer — it is self-contained and drags no wrapper with it.
 
 This file used to live at `.claude/commands/goal.md`, where its frontmatter registered a
-CUSTOM `/goal` — colliding with the built-in command of the same name instead of feeding it.
-**If such a wrapper reappears pointing here, delete it rather than repointing it.**
+CUSTOM `/goal` under the same name as the built-in. **If such a wrapper reappears pointing
+here, delete it rather than repointing it** — a project-local `/goal` that is not the built-in
+loop is a trap whichever one ends up winning.
 
-`/goal` is a documented built-in (Claude Code v2.1.139+): it sets a completion condition and
-keeps working across turns until a small fast model judges the condition met. That is exactly
-the loop this prompt describes, which is why the two belong together as
-`/goal <condition>` + this document, not as a command that replaces it.
+`/goal` is a documented built-in command (Claude Code v2.1.139+): it sets a completion
+condition and keeps working across turns until a small fast model judges the condition met.
+That is exactly the loop this prompt describes, which is why the two belong together as
+`/goal <condition>` + this document, rather than a command that replaces it.
 See https://code.claude.com/docs/en/goal.
+
+What that collision actually does is **unspecified**, and worth not guessing about. The docs
+say a project skill overrides a *bundled* skill of the same name (`/code-review`, `/debug`,
+`/loop`), but `/goal` is a *built-in command*, a category the override rule does not mention.
+So do not assume the custom one shadows it, or that it loses — neither is documented.
 
 It also sits under `prompts/` to match the other five repos in the fleet, every one of which
 keeps its backlog-loop prompt there with no frontmatter. `.claude/commands/curate.md` stays a
