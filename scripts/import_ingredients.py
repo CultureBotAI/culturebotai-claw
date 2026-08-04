@@ -720,8 +720,23 @@ def sync_mim_curated(files_written: int) -> int:
     """
     if not files_written:
         return 0
+    # Derived from MIM_INGREDIENTS, which MIM_INGREDIENTS_DIR can point anywhere.
+    # Check it before handing it to subprocess as cwd: a non-existent cwd raises
+    # FileNotFoundError, which would escape as a traceback and skip the diagnosis
+    # below -- the one place the operator most needs to be told the two surfaces
+    # are out of sync. A root that exists but lacks the scripts is caught by the
+    # non-zero exit check instead.
     mim_root = MIM_INGREDIENTS.parent.parent
     scripts = mim_root / "scripts"
+    if not mim_root.is_dir():
+        print(
+            f"ERROR: derived MIM root does not exist: {mim_root}\n"
+            "MIM_INGREDIENTS_DIR must point at <mim-checkout>/data/ingredients.\n"
+            "The records were written but data/curated/ was NOT synced; the next\n"
+            "`just export-individual` in MIM would revert them.",
+            file=sys.stderr,
+        )
+        return 1
     steps = (
         ("aggregate per-record files into data/curated/", [
             sys.executable, str(scripts / "aggregate_records.py"),
