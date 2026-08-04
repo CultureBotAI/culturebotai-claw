@@ -21,9 +21,11 @@ Use this before a merge round, when picking up work, or any time someone asks
 ## Run it
 
 ```bash
-uv run python scripts/fleet_pr_status.py            # the standard report
+uv run python scripts/fleet_pr_status.py            # table + datestamped TSV
 uv run python scripts/fleet_pr_status.py --json     # machine-readable
 uv run python scripts/fleet_pr_status.py --no-drafts
+uv run python scripts/fleet_pr_status.py --no-tsv   # table only
+uv run python scripts/fleet_pr_status.py --tsv-dir DIR
 uv run python scripts/fleet_pr_status.py --repo-limit 500   # org grew
 uv run python scripts/fleet_pr_status.py --pr-limit 500     # a repo has >200 open
 ```
@@ -43,6 +45,35 @@ which knob to turn rather than leaving you to guess.
 Exit codes: `0` report produced, `1` at least one repo could not be queried,
 `2` bad usage or `gh` missing. **A non-zero exit means the report is
 incomplete** — do not quote its total as if it were the answer.
+
+## The datestamped TSV
+
+Every run also writes a snapshot to `workspace/reports/` (gitignored):
+
+```
+workspace/reports/fleet_pr_status_2026-08-04.tsv
+```
+
+15 fixed columns — `snapshot_utc, repo, number, url, title, state, mergeable,
+is_draft, author, additions, deletions, changed_files, head_ref, created_at,
+updated_at` — so snapshots from different days diff and concatenate cleanly.
+Append new columns at the end rather than inserting.
+
+Three properties worth knowing:
+
+- **The TSV keeps drafts even when `--no-drafts` hides them from the table.**
+  The table is a view; the TSV is the record. `is_draft` lets any consumer
+  filter for itself, and a data export that silently omits rows is the exact
+  failure this script exists to avoid.
+- **An incomplete snapshot is named `.partial.tsv`.** If a repo could not be
+  queried, or either listing truncated, the fact travels *in the filename* —
+  the console warning does not survive, and a month later the file is all
+  anyone has.
+- **Re-running on the same date overwrites.** The file means "the state on that
+  date", not an append log. `snapshot_utc` carries the full timestamp, so the
+  last run of a day is identifiable.
+
+`--no-tsv` prints the table only; `--tsv-dir` puts it elsewhere.
 
 ## Report the output as-is
 

@@ -27,11 +27,14 @@ could not be queried, 2 bad usage or `gh` unavailable.
 from __future__ import annotations
 
 import argparse
+import csv
+import datetime as _dt
 import json
 import re
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 #: A repo is in the fleet if it is claw or ends in "mech" (any casing --
 #: `proteintraitsmech` is lowercase on GitHub while its directory is not).
@@ -52,8 +55,16 @@ PREFERRED_ORDER = (
 )
 
 PR_FIELDS = (
-    "number,title,isDraft,author,createdAt,updatedAt,headRefName,"
+    "number,title,isDraft,author,createdAt,updatedAt,headRefName,url,"
     "mergeable,mergeStateStatus,additions,deletions,changedFiles"
+)
+
+#: TSV columns. Fixed and ordered, so snapshots from different days diff and
+#: concatenate cleanly; append new columns at the end rather than inserting.
+TSV_COLUMNS = (
+    "snapshot_utc", "repo", "number", "url", "title", "state", "mergeable",
+    "is_draft", "author", "additions", "deletions", "changed_files",
+    "head_ref", "created_at", "updated_at",
 )
 
 
@@ -158,6 +169,77 @@ def _title(text: str, width: int = TITLE_WIDTH) -> str:
     return text if len(text) <= width else text[: width - 1] + "…"
 
 
+DEFAULT_TSV_DIR = Path(__file__).resolve().parents[1] / "workspace" / "reports"
+
+
+def snapshot_is_complete(data: dict) -> bool:
+    """True when every fleet repo was queried and nothing hit a limit."""
+    return not (
+        data["errors"]
+        or data["repo_listing_truncated"]
+        or data["pr_listing_truncated"]
+    )
+
+
+def tsv_rows(data: dict, snapshot_utc: str) -> list[dict]:
+    """One row per open PR, drafts included.
+
+    Deliberately NOT filtered by --no-drafts: the table is a view, the TSV is
+    the record. A snapshot that silently omits rows is the thing this whole
+    script exists to avoid, and `is_draft` lets any consumer filter for itself.
+    """
+    rows = []
+    for repo in data["repos_queried"]:
+        for pr in data["prs"].get(repo, []):
+            rows.append({
+                "snapshot_utc": snapshot_utc,
+                "repo": repo,
+                "number": pr["number"],
+                "url": pr.get("url", ""),
+                "title": " ".join((pr.get("title") or "").split()),
+                "state": _mergeable(pr),
+                "mergeable": pr.get("mergeable") or "UNKNOWN",
+                "is_draft": "true" if pr.get("isDraft") else "false",
+                "author": (pr.get("author") or {}).get("login", ""),
+                "additions": pr.get("additions", 0),
+                "deletions": pr.get("deletions", 0),
+                "changed_files": pr.get("changedFiles", 0),
+                "head_ref": pr.get("headRefName", ""),
+                "created_at": pr.get("createdAt", ""),
+                "updated_at": pr.get("updatedAt", ""),
+            })
+    return rows
+
+
+def tsv_path(out_dir: Path, snapshot_utc: str, complete: bool) -> Path:
+    """Datestamped, and marked `.partial` when coverage was incomplete.
+
+    The filename carries that fact because the console warning does not
+    survive: a month later the file is all anyone has, and a partial snapshot
+    that looks whole is worse than no snapshot. Re-running on the same date
+    overwrites -- the file means "the state on that date", not an append log.
+    """
+    stem = f"fleet_pr_status_{snapshot_utc[:10]}"
+    if not complete:
+        stem += ".partial"
+    return out_dir / f"{stem}.tsv"
+
+
+def write_tsv(data: dict, out_dir: Path, snapshot_utc: str) -> Path:
+    complete = snapshot_is_complete(data)
+    path = tsv_path(out_dir, snapshot_utc, complete)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rows = tsv_rows(data, snapshot_utc)
+    with path.open("w", newline="") as f:
+        w = csv.DictWriter(
+            f, fieldnames=list(TSV_COLUMNS), delimiter="\t",
+            lineterminator="\n", extrasaction="raise",
+        )
+        w.writeheader()
+        w.writerows(rows)
+    return path
+
+
 def render(data: dict, include_drafts: bool) -> str:
     lines: list[str] = []
     total = 0
@@ -235,6 +317,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="cap on open PRs listed per repo; gh defaults to 30 "
                          "and truncates silently")
     ap.add_argument("--json", action="store_true", dest="as_json")
+    ap.add_argument("--tsv-dir", type=Path, default=DEFAULT_TSV_DIR,
+                    help=f"where the datestamped TSV lands (default {DEFAULT_TSV_DIR})")
+    ap.add_argument("--no-tsv", action="store_true",
+                    help="print the table only; write no snapshot file")
     ap.add_argument("--include-drafts", action="store_true", default=True)
     ap.add_argument("--no-drafts", action="store_false", dest="include_drafts")
     args = ap.parse_args(argv)
@@ -248,10 +334,21 @@ def main(argv: list[str] | None = None) -> int:
         print(f"discovery failed: {exc}", file=sys.stderr)
         return 2
 
+    snapshot_utc = _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds")
+
     if args.as_json:
-        print(json.dumps(data, indent=2, sort_keys=True))
+        print(json.dumps({**data, "snapshot_utc": snapshot_utc},
+                         indent=2, sort_keys=True))
     else:
         print(render(data, args.include_drafts))
+
+    if not args.no_tsv:
+        path = write_tsv(data, args.tsv_dir, snapshot_utc)
+        n = len(tsv_rows(data, snapshot_utc))
+        marker = "" if snapshot_is_complete(data) else "  [PARTIAL — see warnings above]"
+        print(f"\nSnapshot: {path}  ({n} rows, drafts included){marker}",
+              file=sys.stderr if args.as_json else sys.stdout)
+
     return 1 if data["errors"] else 0
 
 
