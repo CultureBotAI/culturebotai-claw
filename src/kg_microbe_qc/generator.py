@@ -224,10 +224,15 @@ def _render_chart(scores: list[SlotScore]) -> bytes:
     ax.grid(axis="x", alpha=0.3)
     fig.tight_layout()
     buf = io.BytesIO()
-    # Drop the "Matplotlib version X.Y.Z" tEXt chunk. The Mechs' workflows
-    # pip-install matplotlib unpinned, so leaving it in means a
-    # regenerate-and-diff staleness check trips on a matplotlib upgrade
-    # rather than on a corpus change.
+    # Drop the "Matplotlib version X.Y.Z" tEXt chunk, which would otherwise
+    # make the PNG differ on a matplotlib upgrade alone.
+    #
+    # Necessary but NOT sufficient: the rendered pixels also change between
+    # versions. Same corpus, same code, TraitMech config, no tEXt chunk in
+    # either -- 3.9.4 gives sha256 bf73262a…/30088 bytes, 3.11.1 gives
+    # d024ab77…/30945. So a regenerate-and-diff staleness check must scope
+    # itself to index.html, or the workflows must pin matplotlib (they
+    # pip-install it unpinned today). Tracked in claw#47.
     fig.savefig(buf, format="png", dpi=110, metadata={"Software": None})
     plt.close(fig)
     return buf.getvalue()
