@@ -195,8 +195,13 @@ For each approved PR, in dependency order:
    from before the base moved proves nothing. For anything non-trivial, merge
    the new base into the branch in a scratch worktree and run the suite.
 2. Merge, then delete the branch **remote and local**.
-3. Cross-repo closing keywords do **not** work on GitHub. Close the upstream
-   issue by hand, with a comment saying what landed and what did not.
+3. Cross-repo closing keywords **do** work when written as
+   `Closes <owner>/<repo>#<n>` — claw#42 merged at `00:12:12Z` and closed
+   TraitMech#193 at `00:12:13Z`. Do not close such an issue by hand first;
+   check whether it already closed. Still comment on it either way, saying what
+   landed, what was deliberately left, and what a downstream repo now has to do
+   — a closing keyword fires silently and tells the other repo's readers
+   nothing.
 
 ## Stage 10 — Report
 
