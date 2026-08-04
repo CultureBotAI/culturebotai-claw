@@ -223,10 +223,12 @@ sentence and move on.
 
 ## Traps this fleet has actually hit
 
-- `gh issue create` does not accept `--json`; it fails and can look like it
-  worked. `gh pr edit --body` can fail on a Projects-classic GraphQL error and
-  still exit 0 — verify the edit landed, or use
-  `gh api -X PATCH repos/<owner>/<repo>/pulls/<n>`.
+- `gh issue create` does not accept `--json`; it fails, and a `||` fallback can
+  make it look like it worked. `gh pr edit --body` has been seen to print a
+  Projects-classic GraphQL error and leave the body **unchanged** — it is not
+  reliably reproducible, so verify the edit landed rather than trusting either
+  the exit code or the absence of output. `gh api -X PATCH
+  repos/<owner>/<repo>/pulls/<n> --input <json>` avoids the path entirely.
 - macOS APFS is case-insensitive, so a glob for `*/SKILL.md` also matches
   `skill.md` locally and misses it on Linux CI. Match on real directory entries
   when a sweep must agree across both.
