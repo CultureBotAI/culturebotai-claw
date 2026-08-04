@@ -20,6 +20,7 @@ import argparse
 import csv
 import dataclasses
 import json
+import os
 import re
 import sys
 import time
@@ -37,9 +38,17 @@ import yaml
 WORKSPACE = Path(
     "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/workspace"
 )
+# Overridable so an import can target a git worktree instead of the primary
+# checkout. Without this the hardcoded path writes into whatever branch the main
+# MediaIngredientMech checkout happens to have out — which, when the onboarding
+# work lives on a worktree branch, is the wrong one and is invisible until the
+# records show up in someone else's diff.
 MIM_INGREDIENTS = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
-    "MediaIngredientMech/data/ingredients"
+    os.environ.get(
+        "MIM_INGREDIENTS_DIR",
+        "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
+        "MediaIngredientMech/data/ingredients",
+    )
 )
 MAPPED_DIR = MIM_INGREDIENTS / "mapped"
 UNMAPPED_DIR = MIM_INGREDIENTS / "unmapped"
@@ -435,6 +444,64 @@ def src_kgm_unmapped() -> Iterable[Candidate]:
             )
 
 
+# Source columns whose labels are chemicals/ingredients. The file's own
+# `category` tag is NOT usable for this: only 73 of 5,224 rows are tagged
+# biolink:ChemicalEntity, while ~1,023 chemicals sit in rows tagged
+# biolink:PhenotypicQuality because they came from metabolite-utilization and
+# antibiotic assays. Classify by provenance column, not by the category guess.
+_MICRODECODER_INGREDIENT_COLUMNS = (
+    "BacDive_Metabolite_utilization",
+    "BacDive_Metabolite_production",
+    "BacDive_Antibiotic_sensitivity",
+    "BacDive_Antibiotic_resistance",
+    "bergey:substrates",
+    "bergey:major_end_products",
+    "bergey:minor_end_products",
+    "literature:substrates",
+)
+
+# Labels that survive the column filter but are not ingredients: bare numbers,
+# units, and assay non-answers.
+_MICRODECODER_NOISE = {
+    "not reported", "not determined", "n/a", "na", "none", "unknown",
+    "%", "%(w/v)", "+", "-", "+/-", "positive", "negative",
+}
+
+
+def src_microbedecoder() -> Iterable[Candidate]:
+    """kg-microbe microbedecoder labels that its transform could not map.
+
+    Distinct from `kgm-unmapped`, which reads docs/metatraits/unmapped_compounds.tsv
+    (122 compound rows). This is the broader microbedecoder dump: 5,224 rows of
+    which only the ingredient-bearing columns above are in MIM's scope — the rest
+    are phenotype measurements, isolation-category context and metabolic
+    pathways, which belong to TraitMech, not here.
+    """
+    src = KGM_ROOT / "data/transformed/microbedecoder/unmapped_labels.tsv"
+    if not src.exists():
+        return
+    with src.open() as f:
+        for r in csv.DictReader(f, delimiter="\t"):
+            columns = r.get("source_columns") or ""
+            if not any(c in columns for c in _MICRODECODER_INGREDIENT_COLUMNS):
+                continue
+            label = (r.get("label") or "").strip()
+            if not label or label.lower() in _MICRODECODER_NOISE:
+                continue
+            # Bare numerics and measurement fragments ("1", "3.5", "0.5%").
+            if label.replace(".", "", 1).replace("%", "").strip().isdigit():
+                continue
+            parts = label.split()
+            name = " ".join(
+                p[0].upper() + p[1:] if len(p) > 1 else p.upper() for p in parts
+            )
+            yield Candidate(
+                name=name, cas="",
+                source_id=r.get("placeholder_curie", ""),
+                raw=r,
+            )
+
+
 def src_culturebotht() -> Iterable[Candidate]:
     compounds_csv = CULTUREBOT_ROOT / "data/raw/google_sheets/compounds_to_cas.csv"
     media_json = CULTUREBOT_ROOT / "data/consolidated/consolidated_media.json"
@@ -620,6 +687,7 @@ def src_communitymech_unmapped() -> Iterable[Candidate]:
 
 _SOURCES: dict[str, Callable[[], Iterable[Candidate]]] = {
     "kgm-unmapped": src_kgm_unmapped,
+    "microbedecoder": src_microbedecoder,
     "kgm-metatraits": src_kgm_metatraits,
     "culturebotht": src_culturebotht,
     "mim-queue": src_mim_queue,
