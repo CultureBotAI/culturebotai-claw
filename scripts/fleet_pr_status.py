@@ -135,6 +135,17 @@ def _mergeable(pr: dict) -> str:
     )
 
 
+TITLE_WIDTH = 58
+
+
+def _title(text: str, width: int = TITLE_WIDTH) -> str:
+    """Truncate visibly. A cut title with no marker reads as a whole one --
+    the same looks-complete-but-is-not failure this report exists to avoid,
+    at the level of a single cell."""
+    text = " ".join(text.split())
+    return text if len(text) <= width else text[: width - 1] + "…"
+
+
 def render(data: dict, include_drafts: bool) -> str:
     lines: list[str] = []
     total = 0
@@ -159,7 +170,7 @@ def render(data: dict, include_drafts: bool) -> str:
             draft = "draft " if pr.get("isDraft") else ""
             lines.append(
                 f"{repo:<21} {'#' + str(pr['number']):>5}  "
-                f"{draft + _mergeable(pr):<9} {size:>13}  {pr['title'][:58]}"
+                f"{draft + _mergeable(pr):<9} {size:>13}  {_title(pr['title'])}"
             )
     else:
         lines.append("  (none)")

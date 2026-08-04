@@ -174,3 +174,27 @@ def test_total_matches_the_rows_rendered():
     out = render(data, include_drafts=True)
     assert "fleet: 3" in out
     assert len([ln for ln in out.splitlines() if ln.startswith(("culturebotai-claw ", "TraitMech "))]) == 3
+
+
+# --------------------------------------------------------------------------
+# truncation is visible at the cell level too
+# --------------------------------------------------------------------------
+
+def test_a_truncated_title_is_marked_not_silently_cut():
+    """A cut title with no marker reads as a complete one -- the same
+    looks-complete-but-is-not failure this report exists to avoid."""
+    from fleet_pr_status import TITLE_WIDTH, _title
+    long = "x" * (TITLE_WIDTH + 40)
+    out = _title(long)
+    assert len(out) == TITLE_WIDTH
+    assert out.endswith("…")
+
+
+def test_a_short_title_is_left_alone():
+    from fleet_pr_status import _title
+    assert _title("Fix the thing") == "Fix the thing"
+
+
+def test_titles_are_flattened_so_a_newline_cannot_break_the_table():
+    from fleet_pr_status import _title
+    assert _title("Fix\nthe   thing") == "Fix the thing"
