@@ -181,6 +181,18 @@ def snapshot_is_complete(data: dict) -> bool:
     )
 
 
+def _cell(value: object) -> object:
+    """Flatten any string so a cell can never contain a tab or newline.
+
+    This is what lets the file be written unquoted, and TSV's whole appeal is
+    that `cut -f5` and `awk -F'\\t'` work. Under csv's default quoting a title
+    containing a double quote gets wrapped and its quotes doubled -- correct to
+    a csv reader, visibly mangled to every naive consumer. Guaranteeing no
+    delimiters in the data removes the need to quote at all.
+    """
+    return " ".join(value.split()) if isinstance(value, str) else value
+
+
 def tsv_rows(data: dict, snapshot_utc: str) -> list[dict]:
     """One row per open PR, drafts included.
 
@@ -191,12 +203,12 @@ def tsv_rows(data: dict, snapshot_utc: str) -> list[dict]:
     rows = []
     for repo in data["repos_queried"]:
         for pr in data["prs"].get(repo, []):
-            rows.append({
+            rows.append({k: _cell(v) for k, v in {
                 "snapshot_utc": snapshot_utc,
                 "repo": repo,
                 "number": pr["number"],
                 "url": pr.get("url", ""),
-                "title": " ".join((pr.get("title") or "").split()),
+                "title": pr.get("title") or "",
                 "state": _mergeable(pr),
                 "mergeable": pr.get("mergeable") or "UNKNOWN",
                 "is_draft": "true" if pr.get("isDraft") else "false",
@@ -207,7 +219,7 @@ def tsv_rows(data: dict, snapshot_utc: str) -> list[dict]:
                 "head_ref": pr.get("headRefName", ""),
                 "created_at": pr.get("createdAt", ""),
                 "updated_at": pr.get("updatedAt", ""),
-            })
+            }.items()})
     return rows
 
 
@@ -234,6 +246,7 @@ def write_tsv(data: dict, out_dir: Path, snapshot_utc: str) -> Path:
         w = csv.DictWriter(
             f, fieldnames=list(TSV_COLUMNS), delimiter="\t",
             lineterminator="\n", extrasaction="raise",
+            quoting=csv.QUOTE_NONE, quotechar=None,
         )
         w.writeheader()
         w.writerows(rows)

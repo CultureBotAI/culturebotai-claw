@@ -401,3 +401,35 @@ def test_tsv_path_is_pure_and_does_not_touch_disk(tmp_path):
     p = tsv_path(tmp_path, SNAP, complete=True)
     assert not p.exists()
     assert p.parent == tmp_path
+
+
+def test_a_quoted_title_survives_a_NAIVE_tab_split(tmp_path):
+    """TSV's whole appeal is that `cut -f5` works. Under csv's default quoting
+    a title containing a double quote is wrapped and its quotes doubled --
+    correct to a csv reader, mangled to every naive consumer."""
+    title = 'Answer to "what is open?"'
+    data = _data(prs={"culturebotai-claw": [_pr(1, title=title)], "TraitMech": []})
+    p = write_tsv(data, tmp_path, SNAP)
+    raw = p.read_text().splitlines()[1]
+    assert raw.split("\t")[4] == title
+    assert len(raw.split("\t")) == len(TSV_COLUMNS)
+
+
+def test_a_tab_in_any_field_cannot_shift_the_columns(tmp_path):
+    """Not just titles: a branch name or author with a tab would silently
+    add a column and misalign every field after it."""
+    data = _data(prs={"culturebotai-claw": [
+        _pr(1, title="a\tb", headRefName="feat\tx")], "TraitMech": []})
+    p = write_tsv(data, tmp_path, SNAP)
+    raw = p.read_text().splitlines()[1]
+    assert len(raw.split("\t")) == len(TSV_COLUMNS)
+    assert raw.split("\t")[4] == "a b"
+    assert raw.split("\t")[12] == "feat x"
+
+
+def test_the_file_contains_no_quoting_at_all(tmp_path):
+    data = _data(prs={"culturebotai-claw": [_pr(1, title='has "quotes" in it')],
+                      "TraitMech": []})
+    body = write_tsv(data, tmp_path, SNAP).read_text().splitlines()[1]
+    assert not body.startswith('"')
+    assert '""' not in body

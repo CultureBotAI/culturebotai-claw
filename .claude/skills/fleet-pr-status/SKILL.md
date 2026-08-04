@@ -59,7 +59,13 @@ is_draft, author, additions, deletions, changed_files, head_ref, created_at,
 updated_at` — so snapshots from different days diff and concatenate cleanly.
 Append new columns at the end rather than inserting.
 
-Three properties worth knowing:
+It is written **unquoted**: every field is whitespace-flattened first, so no
+cell can contain a tab or newline and `cut -f5` / `awk -F'\t'` work directly.
+That is the point of choosing TSV over CSV, and csv's default quoting would
+have wrapped any title containing a double quote and doubled its quotes —
+correct to a `csv` reader, mangled to every naive consumer.
+
+Three further properties worth knowing:
 
 - **The TSV keeps drafts even when `--no-drafts` hides them from the table.**
   The table is a view; the TSV is the record. `is_draft` lets any consumer
