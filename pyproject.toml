@@ -31,6 +31,12 @@ dependencies = [
     # pair and every schema check dies with "AttributeError: JSON" — which reads
     # like a data problem and is not one.
     "linkml>=1.10",
+    # kg_microbe_qc imports both at module scope, so `import kg_microbe_qc`
+    # fails outright without them. They were previously satisfied only by
+    # whatever the calling Mech's venv happened to provide, which left claw's
+    # own copy of the module unimportable from a clean `uv sync`.
+    "matplotlib>=3.8",
+    "jinja2>=3.1",
 ]
 
 [project.scripts]

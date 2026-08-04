@@ -35,7 +35,17 @@
 <body>
 
 <h1>{{ stats.repo_name }} — QC Dashboard</h1>
-<div class="meta">Generated {{ stats.timestamp }}</div>
+{# "Latest curation", not "generated" or "corpus as of": this is the newest
+   recorded curation event, a lower bound on corpus age. The source count is
+   shown because a date resting on 2 of 311 records means something very
+   different from one resting on 477 of 477. #}
+{% if stats.timestamp %}
+<div class="meta">Latest curation {{ stats.timestamp }}
+  (from {{ "{:,}".format(stats.timestamp_sources) }} of
+  {{ "{:,}".format(stats.record_count) }} records)</div>
+{% else %}
+<div class="meta">Latest curation unknown — no record carries a curation timestamp</div>
+{% endif %}
 
 <div class="stat-grid">
   <div class="stat">
