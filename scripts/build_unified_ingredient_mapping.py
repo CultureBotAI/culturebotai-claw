@@ -121,15 +121,36 @@ def load_mim_index(mim_root: Path) -> tuple[dict, dict, dict]:
                 if norm_syn and norm_syn not in name_index:
                     name_index[norm_syn] = record
 
-        # Index by CHEBI (primary)
-        if record['chebi_id']:
-            chebi_index[record['chebi_id']] = record
+        # Index by CHEBI (primary) and by any ontology ID (CHEBI, FOODON, ENVO).
+        #
+        # A live record always beats a tombstone. MIM's merge pattern gives the
+        # REJECTED loser the WINNER's identifier — that is deliberate, so
+        # downstream lookups on the loser still resolve — which means every merge
+        # puts two records on one id. These indexes used to be last-writer-wins,
+        # so whichever sorted later took the id, and for 18 CHEBI ids that was the
+        # tombstone. `Glucose` (2,120 CultureMech occurrences) was published as
+        # REJECTED because `Glucose_2.yaml` (the merged-away lowercase `glucose`)
+        # sorts after it. The identifier was right and the status was wrong, which
+        # is the worst shape for a consumer that filters on status.
+        #
+        # `name_index` above is already first-writer-wins and was unaffected.
+        def _prefer(index: Dict[str, dict], key: str) -> None:
+            prior = index.get(key)
+            if prior is None:
+                index[key] = record
+                return
+            prior_dead = prior.get('mapping_status') == 'REJECTED'
+            this_dead = record.get('mapping_status') == 'REJECTED'
+            if prior_dead and not this_dead:
+                index[key] = record
 
-        # Index by any ontology ID (CHEBI, FOODON, ENVO — for cross-lookup)
+        if record['chebi_id']:
+            _prefer(chebi_index, record['chebi_id'])
+
         if ontology_id:
-            ontology_index[ontology_id] = record
+            _prefer(ontology_index, ontology_id)
         if identifier:
-            ontology_index[identifier] = record
+            _prefer(ontology_index, identifier)
 
         count += 1
 
