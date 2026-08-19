@@ -20,7 +20,9 @@ ENVO when populated) becomes one SSSOM row with:
   mapping_date      YAML modification date (ISO, UTC)
   confidence        0.99 EXACT_MATCH / 0.9 CONSIDER_SPECIFIC / 0.8 SYMMETRIC
   comment           short human-readable rationale
-  other             pipe-separated alternate labels (kg-microbe side, etc.)
+  other             pipe-separated alternate labels (kg-microbe side, etc.),
+                    plus `CAS:<rn>` on symmetric rows — kg-microbe turns these
+                    into synonyms on the ontology entity, and from there KGX
 
 Inputs (all read-only):
   MIM/data/ingredients/mapped/*.yaml
@@ -105,6 +107,10 @@ POLLUTION_SYNONYM_THRESHOLD = 500
 # Additional defensive cap on the `other` column to keep SSSOM rows parseable
 # by downstream tools (pandas default csv field limit is 128 KiB).
 MAX_OTHER_ENTRIES = 50
+# Predicates for which kg-microbe merges `other` into the ontology entity's
+# synonyms (`consolidate_chemical_mappings.py`). Asymmetric rows keep the
+# ontology's own label instead, so anything added to their `other` is dropped.
+SYMMETRIC_PREDICATES = {"skos:exactMatch", "skos:closeMatch"}
 
 JUST_MANUAL = "semapv:ManualMappingCuration"
 JUST_LEXICAL = "semapv:LexicalMatching"
@@ -360,6 +366,25 @@ def _mapping_date(path: Path, history: list[dict]) -> str:
         return datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
 
 
+def _cas_token(data: dict) -> str:
+    """`CAS:<rn>` for the substance a lab would actually order, or "".
+
+    Prefers `supplied_form[].cas_rn` over `chemical_properties.cas_rn`: the
+    latter describes the substance the record *denotes*, the former the
+    material that is physically ordered and delivered, and where MIM records
+    both it is because they differ (MIM #398).
+
+    Prefixed rather than bare — `9004-32-4` alone is indistinguishable from a
+    catalogue code or a concentration in a synonym search.
+    """
+    for sf in data.get("supplied_form") or []:
+        rn = (sf or {}).get("cas_rn")
+        if rn and str(rn).strip():
+            return f"CAS:{str(rn).strip()}"
+    rn = (data.get("chemical_properties") or {}).get("cas_rn")
+    return f"CAS:{str(rn).strip()}" if rn and str(rn).strip() else ""
+
+
 def _pipe(labels: list[str], drop: set[str], max_entries: int | None = None) -> str:
     out: list[str] = []
     seen: set[str] = set()
@@ -544,6 +569,25 @@ def _row_from_yaml(
     ]
     other = _pipe(candidate_alts, drop=drop, max_entries=MAX_OTHER_ENTRIES)
 
+    # The CAS-RN travels in `other` so it lands in KGX as a synonym: the KG
+    # node optimises for how it *reads*, while the number you actually order
+    # by stays findable (MIM #398/#403). Symmetric rows only — kg-microbe
+    # merges `other` into the ontology entity for exactMatch/closeMatch and
+    # ignores it otherwise, so a CAS on an asymmetric row would both vanish
+    # and, if it didn't, wrongly imply the broader parent is purchasable
+    # under the child's number.
+    #
+    # Appended AFTER the cap on purpose. `_pipe` truncates by breaking at
+    # MAX_OTHER_ENTRIES, so a CAS placed in `candidate_alts` would be the
+    # first thing dropped on crowded rows — and the crowded rows are the
+    # MnSO4 hydrate family, i.e. exactly the ones a lab orders by number.
+    # One ~15-char token cannot threaten the 128 KiB field limit the cap
+    # defends against.
+    cas_token = _cas_token(data)
+    if cas_token and predicate in SYMMETRIC_PREDICATES:
+        if cas_token.lower() not in {p.strip().lower() for p in other.split("|")}:
+            other = f"{other}|{cas_token}" if other else cas_token
+
     # Per-row object_source — SSSOM supports per-row override when the
     # mapping_set mixes ontologies.
     prefix = next(p for p in SUPPORTED_OBJECT_PREFIXES if obj_id.startswith(p))
@@ -598,7 +642,9 @@ def _row_from_yaml(
                 "confidence": "0.99",
                 "comment": (f"Registry/identity row preserving "
                             f"{primary_id} alongside parent {obj_id}."),
-                "other": "",
+                # These minted registry nodes carry no ontology synonyms of
+                # their own, so the CAS is the only orderable handle they get.
+                "other": cas_token,
                 "validation_method": "",
             })
 
@@ -641,7 +687,9 @@ def _row_from_yaml(
                 "comment": (f"Registry/identity row (Rule B1) for "
                             f"narrowMatch subject; kg-microbe primary id "
                             f"{kgm_curie} alongside parent {obj_id}."),
-                "other": "",
+                # The parent row is asymmetric, so this registry row is the
+                # only place the subject's CAS can reach a KG synonym.
+                "other": cas_token,
                 "validation_method": "",
             })
     return rows
