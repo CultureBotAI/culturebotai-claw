@@ -2,6 +2,17 @@
 
 Stdlib-only HTTP (urllib) so it runs under the same `python3.13` + PYTHONPATH
 invocation as kg_microbe_qc. Ported from DisMech's knowledge_gap_scan.py.
+
+Config keys read here beyond the record plumbing (see __main__ for the rest):
+
+  require_topic_in_sentence   default true. The gap-signal SENTENCE itself must
+                              mention a topic term (name or synonym); the query
+                              only anchors the PAPER, which is how all ten of
+                              TraitMech's scanned gaps came out misfiled (#69).
+                              Set false to restore recall-first behaviour --
+                              relevant for Mechs whose record names are coined
+                              multi-word labels no abstract contains verbatim
+                              (#79).
 """
 from __future__ import annotations
 
@@ -55,12 +66,32 @@ _ALL_GAP_TERMS = tuple(t for terms in GAP_SIGNAL_GROUPS.values() for t in terms)
 # whose only content is "gaps remain" cannot be curated even when it mentions
 # the topic; TraitMech got two of these filed verbatim under two different
 # traits (#69, TraitMech#411).
+#
+# Anchored at BOTH ends, with only filler permitted around the assertion (#77):
+# a sentence is contentless only when it consists of essentially nothing but
+# the assertion. An unanchored pattern killed "This review identifies
+# challenges and knowledge gaps in biofilm dispersal under flow, specifically
+# the role of c-di-GMP", and an end-only anchor killed "Despite decades of
+# work on the role of c-di-GMP in biofilm dispersal, major knowledge gaps
+# remain" -- both specific, curatable gaps whose content sits outside the
+# matched phrase.
+_FILLER = (
+    r"(?:however|nevertheless|nonetheless|still|overall|finally|to\s+date|"
+    r"in\s+(?:conclusion|summary))?[,\s]*"
+)
 CONTENTLESS_PATTERNS = (
-    re.compile(r"identif\w*\s+(?:ongoing\s+)?challenges\s+and\s+(?:critical\s+)?knowledge\s+gaps", re.I),
-    re.compile(r"knowledge\s+gaps?\s+(?:remain|persist|exist)s?\s*[.!?]?$", re.I),
-    re.compile(r"^\s*(?:however|nevertheless|nonetheless)?[,\s]*(?:many|several|numerous|important|critical)?\s*"
-               r"(?:knowledge\s+gaps?|unanswered\s+questions?|open\s+questions?)\s+"
-               r"(?:remain|persist|exist)s?\s*[.!?]?\s*$", re.I),
+    re.compile(
+        rf"^\s*{_FILLER}(?:it|this\s+(?:review|study|paper|work|article))?\s*"
+        rf"identif\w*\s+(?:ongoing\s+)?challenges\s+and\s+(?:critical\s+)?knowledge\s+gaps"
+        rf"(?:\s+for\s+future\s+research)?\s*[.!?]?\s*$",
+        re.I,
+    ),
+    re.compile(
+        rf"^\s*{_FILLER}(?:many|several|numerous|important|critical|major|significant)?\s*"
+        rf"(?:knowledge\s+gaps?|research\s+gaps?|unanswered\s+questions?|open\s+questions?)\s+"
+        rf"(?:remain|persist|exist)s?\s*[.!?]?\s*$",
+        re.I,
+    ),
 )
 
 _WS_RE = re.compile(r"\s+")
@@ -85,16 +116,36 @@ def signal_categories(sentence: str) -> list[str]:
 
 
 def _topic_variants(topic_terms) -> tuple[str, ...]:
-    """Casefolded topic terms, with slug underscores also tried as spaces."""
+    """Casefolded topic terms plus separator spellings.
+
+    Slug underscores are tried as spaces, and hyphen<->space both ways (#78):
+    `gut-associated` must match "Gut associated microbial communities" and the
+    reverse, because separator variance is the commonest difference between a
+    record label and the prose that discusses it.
+    """
     out: list[str] = []
+    seen: set[str] = set()
     for term in topic_terms or ():
         t = _norm(term).casefold()
         if not t:
             continue
-        out.append(t)
-        if "_" in t:
-            out.append(t.replace("_", " "))
+        variants = {t, t.replace("_", " ")}
+        variants |= {v.replace("-", " ") for v in variants}
+        variants |= {v.replace(" ", "-") for v in variants}
+        for v in sorted(variants):
+            if v not in seen:
+                seen.add(v)
+                out.append(v)
     return tuple(out)
+
+
+def _term_pattern(term: str) -> re.Pattern:
+    # NOT plain \b...\b: outside a non-word edge character, \b demands an
+    # adjacent word character that prose never supplies, so `Fe3+` or
+    # `(-)-anisomycin` could never match any sentence (#75). Lookarounds demand
+    # a boundary only where the term's own edge is a word character, which
+    # still keeps `aerobic` from matching inside "anaerobic" (#71).
+    return re.compile(rf"(?<!\w){re.escape(term)}(?!\w)")
 
 
 def sentence_mentions_topic(sentence: str, topic_terms) -> bool:
@@ -102,9 +153,7 @@ def sentence_mentions_topic(sentence: str, topic_terms) -> bool:
     # inside "anaerobic". A spurious pass would silently reproduce the exact
     # misfiling this gate exists to stop.
     low = _norm(sentence).casefold()
-    return any(
-        re.search(rf"\b{re.escape(t)}\b", low) for t in _topic_variants(topic_terms)
-    )
+    return any(_term_pattern(t).search(low) for t in _topic_variants(topic_terms))
 
 
 def is_contentless(sentence: str) -> bool:
@@ -245,14 +294,15 @@ def prompt_key(discussion: dict[str, Any]) -> str:
 
     The same sentence filed under two records is a strong signal at least one
     filing is wrong (TraitMech got two such pairs in ten discussions), so runs
-    keep the first filing and drop the rest. Keyed on the sentence rather than
-    discussion_id, which mixes in record_id and so can never collide. The
-    sentence is read from evidence[0].snippet, where build_discussion() puts it
-    verbatim -- parsing it back out of the prompt string would break on a
-    record name containing ": " (#73).
+    keep the best-scored filing and drop the rest (#76). Keyed on the sentence
+    rather than discussion_id, which mixes in record_id and so can never
+    collide. The sentence is read from evidence[0].snippet, where
+    build_discussion() puts it verbatim -- it always emits at least one
+    evidence entry, and parsing the sentence back out of the prompt string
+    would break on a record name containing ": " (#73).
     """
     evidence = discussion.get("evidence") or []
-    sentence = evidence[0].get("snippet", "") if evidence else discussion.get("prompt", "")
+    sentence = evidence[0].get("snippet", "") if evidence else ""
     return _norm(sentence).casefold()
 
 

@@ -4,6 +4,12 @@ Dry-run (default) emits a triage packet; --apply appends proposed
 Discussion(kind=KNOWLEDGE_GAP) records to the matched YAMLs (guarded:
 deterministic id for idempotency, min-score gate, --limit, and only EOF-append
 when a record has no existing `discussions:` key).
+
+Precision gates (#69): the signal sentence must mention a topic term
+(`require_topic_in_sentence: false` in the config disables -- see scan.py's
+docstring), contentless boilerplate is rejected, and a sentence filed under
+two records in one run keeps only the best-scored filing. Dedup state is
+per-run: across runs with --offset windows, #72 still applies.
 """
 from __future__ import annotations
 
@@ -72,6 +78,18 @@ def render_markdown(packet: dict) -> str:
         for ev in d["evidence"]:
             lines.append(f"    - {ev['reference']} — {ev['snippet']}")
         lines.append("")
+    # The losers, not just their count: a curator reading only the Markdown
+    # (or the workflow's head-of-file step summary) must be able to see which
+    # record lost a sentence to which, or the dedup is invisible judgement.
+    dropped = [r for r in packet["results"]
+               if str(r.get("write_status", "")).startswith("cross_record_duplicate")]
+    if dropped:
+        lines.append("## Dropped cross-record duplicates")
+        for r in dropped:
+            kept = r["write_status"].removeprefix("cross_record_duplicate_of:")
+            lines.append(f"- `{r['record_id']}` (score {r['score']}) lost to `{kept}`: "
+                         f"{r.get('duplicate_sentence', '')}")
+        lines.append("")
     return "\n".join(lines)
 
 
@@ -120,11 +138,11 @@ def main() -> int:
     if args.limit:
         records = records[: args.limit]
 
-    results, proposed, applied = [], 0, 0
-    # Cross-record dedup (#69): the same promoted sentence under two records
-    # means at least one filing is wrong. First filing wins; later ones are
-    # reported, never written.
-    seen_prompts: dict[str, str] = {}
+    # Phase 1: scan everything. Dedup needs the full candidate set before any
+    # verdicts, because the BEST-scored filing of a shared sentence must win
+    # (#76) -- deciding while streaming kept whichever record the glob reached
+    # first, and --offset rotation changed the winner between runs.
+    scanned = []
     for path, doc in records:
         rid = _record_id(doc, cfg, path)
         scan = scan_record(doc, cfg, args.page_size, args.max_signals, args.timeout)
@@ -133,16 +151,34 @@ def main() -> int:
         d = build_discussion(rid, scan)
         if not d:
             continue
+        scanned.append((path, rid, scan, d))
+
+    # Cross-record dedup (#69): the same promoted sentence under two records
+    # means at least one filing is wrong. Highest score wins; ties break on
+    # record id, so the outcome is deterministic regardless of scan order.
+    winner: dict[str, str] = {}
+    best: dict[str, tuple[int, str]] = {}
+    for _path, rid, scan, d in scanned:
         key = prompt_key(d)
-        if key in seen_prompts:
+        rank = (scan["score"], )
+        cur = best.get(key)
+        if cur is None or rank > (cur[0],) or (rank == (cur[0],) and rid < cur[1]):
+            best[key] = (scan["score"], rid)
+            winner[key] = rid
+
+    results, proposed, applied, duplicates = [], 0, 0, 0
+    for path, rid, scan, d in scanned:
+        key = prompt_key(d)
+        if rid != winner[key]:
+            duplicates += 1
             results.append({"name": scan["name"], "record_id": rid,
                             "file": str(path), "score": scan["score"],
-                            "write_status": f"cross_record_duplicate_of:{seen_prompts[key]}",
+                            "write_status": f"cross_record_duplicate_of:{winner[key]}",
+                            "duplicate_sentence": d["evidence"][0]["snippet"],
                             "discussion": None})
-            print(f"  [dup] {scan['name']}: same gap sentence already filed under "
-                  f"{seen_prompts[key]} -- dropped", file=sys.stderr)
+            print(f"  [dup] {scan['name']}: same gap sentence filed under "
+                  f"{winner[key]} (higher score) -- dropped", file=sys.stderr)
             continue
-        seen_prompts[key] = rid
         proposed += 1
         write_status = "dry-run"
         if args.apply:
@@ -155,10 +191,6 @@ def main() -> int:
         print(f"  [{scan['score']}] {scan['name']} -> {d['discussion_id']} ({write_status})",
               file=sys.stderr)
 
-    duplicates = sum(
-        1 for r in results
-        if str(r.get("write_status", "")).startswith("cross_record_duplicate")
-    )
     packet = {"repo_name": cfg.get("repo_name", ""), "engine": args.engine,
               "records_scanned": len(records), "min_score": min_score,
               "proposed": proposed, "applied": applied,
