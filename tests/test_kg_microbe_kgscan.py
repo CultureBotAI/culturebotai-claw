@@ -63,6 +63,17 @@ def test_slug_underscores_match_spaced_prose():
     )
 
 
+def test_topic_match_respects_word_boundaries():
+    """#71: `aerobic` inside "anaerobic" must not pass the gate -- a spurious
+    pass silently reproduces the misfiling the gate exists to stop."""
+    assert not sentence_mentions_topic(
+        "Anaerobic digestion of sludge remains poorly understood.", ["aerobic"]
+    )
+    assert sentence_mentions_topic(
+        "Aerobic growth at depth remains poorly understood.", ["aerobic"]
+    )
+
+
 def test_gate_can_be_disabled_and_without_topic_terms_is_inert():
     text = "The mechanisms of coral growth anomalies remain poorly understood."
     assert len(extract_gap_signals(text, topic_terms=TOPIC, require_topic=False)) == 1

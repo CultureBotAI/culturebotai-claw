@@ -98,8 +98,13 @@ def _topic_variants(topic_terms) -> tuple[str, ...]:
 
 
 def sentence_mentions_topic(sentence: str, topic_terms) -> bool:
+    # Word-boundary, not substring (#71): `aerobic` must not pass the gate
+    # inside "anaerobic". A spurious pass would silently reproduce the exact
+    # misfiling this gate exists to stop.
     low = _norm(sentence).casefold()
-    return any(t in low for t in _topic_variants(topic_terms))
+    return any(
+        re.search(rf"\b{re.escape(t)}\b", low) for t in _topic_variants(topic_terms)
+    )
 
 
 def is_contentless(sentence: str) -> bool:
@@ -241,10 +246,13 @@ def prompt_key(discussion: dict[str, Any]) -> str:
     The same sentence filed under two records is a strong signal at least one
     filing is wrong (TraitMech got two such pairs in ten discussions), so runs
     keep the first filing and drop the rest. Keyed on the sentence rather than
-    discussion_id, which mixes in record_id and so can never collide.
+    discussion_id, which mixes in record_id and so can never collide. The
+    sentence is read from evidence[0].snippet, where build_discussion() puts it
+    verbatim -- parsing it back out of the prompt string would break on a
+    record name containing ": " (#73).
     """
-    prompt = discussion.get("prompt", "")
-    sentence = prompt.split(": ", 1)[1] if ": " in prompt else prompt
+    evidence = discussion.get("evidence") or []
+    sentence = evidence[0].get("snippet", "") if evidence else discussion.get("prompt", "")
     return _norm(sentence).casefold()
 
 
