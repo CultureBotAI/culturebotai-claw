@@ -107,6 +107,11 @@ POLLUTION_SYNONYM_THRESHOLD = 500
 # Additional defensive cap on the `other` column to keep SSSOM rows parseable
 # by downstream tools (pandas default csv field limit is 128 KiB).
 MAX_OTHER_ENTRIES = 50
+# `mapping_quality` values that denote an exact identity. SYNONYM_MATCH belongs
+# here: MIM's schema glosses it "Matches known synonym in ontology", which says
+# how the term was located, not that the identity is approximate — CLOSE_MATCH
+# is the value reserved for "semantically close but not exact".
+EXACT_QUALITIES = {"EXACT_MATCH", "SYNONYM_MATCH"}
 # Predicates for which kg-microbe merges `other` into the ontology entity's
 # synonyms (`consolidate_chemical_mappings.py`). Asymmetric rows keep the
 # ontology's own label instead, so anything added to their `other` is dropped.
@@ -469,11 +474,21 @@ def _row_from_yaml(
         if quality in {"EXACT_MATCH", "LEXICAL_MATCH", ""}
         else JUST_MANUAL
     )
-    confidence = "0.99" if quality == "EXACT_MATCH" else "0.9"
-    # Non-EXACT_MATCH quality (e.g. CLOSE_MATCH used by FOODON peptones)
-    # earns a closeMatch predicate by default so downstream consumers
-    # don't treat them as identity mappings.
-    if quality and quality != "EXACT_MATCH":
+    confidence = "0.99" if quality in EXACT_QUALITIES else "0.9"
+    # Non-exact quality (e.g. CLOSE_MATCH used by FOODON peptones) earns a
+    # closeMatch predicate by default so downstream consumers don't treat them
+    # as identity mappings.
+    #
+    # SYNONYM_MATCH is NOT one of those. MIM's schema defines it as "Matches
+    # known synonym in ontology" — a statement about how the match was FOUND,
+    # not about whether the identity holds — while CLOSE_MATCH is the value
+    # that means "Semantically close but not exact". Treating them alike
+    # demoted 227 published exactMatch rows to closeMatch on rebuild, among
+    # them `nitrous oxide` -> CHEBI:17045 `dinitrogen oxide`, `Escin` ->
+    # CHEBI:2500 `Aescin` and `Disodium oxalate` -> CHEBI:132764 `sodium
+    # oxalate`: same substance, reached through the ontology's own synonym
+    # list. See MediaIngredientMech#409.
+    if quality and quality not in EXACT_QUALITIES:
         predicate = "skos:closeMatch"
     # NARROW_MATCH (typically minted kgmicrobe.ingredient:* primaries)
     # asserts the MIM term is narrower than the parent ontology term.
