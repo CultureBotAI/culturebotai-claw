@@ -15,7 +15,7 @@ from pathlib import Path
 
 import yaml
 
-from .scan import build_discussion, scan_record
+from .scan import build_discussion, prompt_key, scan_record
 
 
 def _load_records(config_dir: Path, record_glob: str):
@@ -59,7 +59,8 @@ def render_markdown(packet: dict) -> str:
              f"- engine: {packet['engine']}",
              f"- records scanned: {packet['records_scanned']}",
              f"- gaps proposed (score >= {packet['min_score']}): {packet['proposed']}",
-             f"- applied: {packet['applied']}", ""]
+             f"- applied: {packet['applied']}",
+             f"- cross-record duplicates dropped: {packet.get('duplicates_dropped', 0)}", ""]
     for item in packet["results"]:
         if not item.get("discussion"):
             continue
@@ -120,6 +121,10 @@ def main() -> int:
         records = records[: args.limit]
 
     results, proposed, applied = [], 0, 0
+    # Cross-record dedup (#69): the same promoted sentence under two records
+    # means at least one filing is wrong. First filing wins; later ones are
+    # reported, never written.
+    seen_prompts: dict[str, str] = {}
     for path, doc in records:
         rid = _record_id(doc, cfg, path)
         scan = scan_record(doc, cfg, args.page_size, args.max_signals, args.timeout)
@@ -128,6 +133,16 @@ def main() -> int:
         d = build_discussion(rid, scan)
         if not d:
             continue
+        key = prompt_key(d)
+        if key in seen_prompts:
+            results.append({"name": scan["name"], "record_id": rid,
+                            "file": str(path), "score": scan["score"],
+                            "write_status": f"cross_record_duplicate_of:{seen_prompts[key]}",
+                            "discussion": None})
+            print(f"  [dup] {scan['name']}: same gap sentence already filed under "
+                  f"{seen_prompts[key]} -- dropped", file=sys.stderr)
+            continue
+        seen_prompts[key] = rid
         proposed += 1
         write_status = "dry-run"
         if args.apply:
@@ -140,9 +155,14 @@ def main() -> int:
         print(f"  [{scan['score']}] {scan['name']} -> {d['discussion_id']} ({write_status})",
               file=sys.stderr)
 
+    duplicates = sum(
+        1 for r in results
+        if str(r.get("write_status", "")).startswith("cross_record_duplicate")
+    )
     packet = {"repo_name": cfg.get("repo_name", ""), "engine": args.engine,
               "records_scanned": len(records), "min_score": min_score,
-              "proposed": proposed, "applied": applied, "results": results}
+              "proposed": proposed, "applied": applied,
+              "duplicates_dropped": duplicates, "results": results}
 
     out_json = args.output_json or (config_dir.parent / "reports" / "knowledge_gap_scan.json")
     out_md = args.output_md or (config_dir.parent / "reports" / "knowledge_gap_scan.md")

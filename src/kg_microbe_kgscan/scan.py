@@ -51,6 +51,18 @@ SIGNAL_WEIGHTS = {
 }
 _ALL_GAP_TERMS = tuple(t for terms in GAP_SIGNAL_GROUPS.values() for t in terms)
 
+# Review-boilerplate assertions that a gap EXISTS without naming one. A sentence
+# whose only content is "gaps remain" cannot be curated even when it mentions
+# the topic; TraitMech got two of these filed verbatim under two different
+# traits (#69, TraitMech#411).
+CONTENTLESS_PATTERNS = (
+    re.compile(r"identif\w*\s+(?:ongoing\s+)?challenges\s+and\s+(?:critical\s+)?knowledge\s+gaps", re.I),
+    re.compile(r"knowledge\s+gaps?\s+(?:remain|persist|exist)s?\s*[.!?]?$", re.I),
+    re.compile(r"^\s*(?:however|nevertheless|nonetheless)?[,\s]*(?:many|several|numerous|important|critical)?\s*"
+               r"(?:knowledge\s+gaps?|unanswered\s+questions?|open\s+questions?)\s+"
+               r"(?:remain|persist|exist)s?\s*[.!?]?\s*$", re.I),
+)
+
 _WS_RE = re.compile(r"\s+")
 _SENT_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z(])")
 
@@ -72,12 +84,50 @@ def signal_categories(sentence: str) -> list[str]:
             if any(t in low for t in terms)]
 
 
-def extract_gap_signals(text: str, max_signals: int = 8) -> list[dict[str, Any]]:
+def _topic_variants(topic_terms) -> tuple[str, ...]:
+    """Casefolded topic terms, with slug underscores also tried as spaces."""
+    out: list[str] = []
+    for term in topic_terms or ():
+        t = _norm(term).casefold()
+        if not t:
+            continue
+        out.append(t)
+        if "_" in t:
+            out.append(t.replace("_", " "))
+    return tuple(out)
+
+
+def sentence_mentions_topic(sentence: str, topic_terms) -> bool:
+    low = _norm(sentence).casefold()
+    return any(t in low for t in _topic_variants(topic_terms))
+
+
+def is_contentless(sentence: str) -> bool:
+    """A gap assertion that names no gap -- review boilerplate, uncuratable."""
+    return any(p.search(sentence) for p in CONTENTLESS_PATTERNS)
+
+
+def extract_gap_signals(text: str, max_signals: int = 8, topic_terms=(),
+                        require_topic: bool = True) -> list[dict[str, Any]]:
+    """Gap-shaped sentences, anchored to the topic.
+
+    The query already anchors the PAPER to the topic; this anchors the SENTENCE.
+    Without it, a topically adjacent paper's hedged sentence about something
+    else entirely gets promoted into a Discussion filed under the wrong record
+    -- which is how all ten of TraitMech's scanned gaps came out misfiled
+    (#69, TraitMech#411). Precision beats recall here: an unfiled gap costs
+    nothing, a misfiled one renders as curated content with citations.
+    """
+    gate = require_topic and bool(topic_terms)
     out: list[dict[str, Any]] = []
     seen: set[str] = set()
     for sentence in split_sentences(text):
         cats = signal_categories(sentence)
         if not cats:
+            continue
+        if gate and not sentence_mentions_topic(sentence, topic_terms):
+            continue
+        if is_contentless(sentence):
             continue
         key = _norm(sentence).casefold()
         if key in seen:
@@ -162,12 +212,14 @@ def scan_record(record: dict[str, Any], cfg: dict, page_size: int, max_signals: 
         results = europepmc_search(query, page_size=page_size, timeout=timeout)
     except Exception as e:  # network/HTTP — report, skip record
         return {"name": name, "error": str(e), "matches": [], "score": 0}
+    require_topic = bool(cfg.get("require_topic_in_sentence", True))
     matches = []
     for r in results:
         # Europe PMC abstractText carries structured-abstract HTML (<h4>…</h4>);
         # strip tags so snippets/sentences are clean prose.
         abstract = re.sub(r"<[^>]+>", " ", r.get("abstractText") or "")
-        sigs = extract_gap_signals(abstract, max_signals=max_signals)
+        sigs = extract_gap_signals(abstract, max_signals=max_signals,
+                                   topic_terms=topic_terms, require_topic=require_topic)
         if not sigs:
             continue
         ref = _pub_ref(r)
@@ -181,6 +233,19 @@ def scan_record(record: dict[str, Any], cfg: dict, page_size: int, max_signals: 
     total = sum(m["score"] for m in matches)
     return {"name": name, "topic_terms": topic_terms, "query": query,
             "matches": matches, "score": total}
+
+
+def prompt_key(discussion: dict[str, Any]) -> str:
+    """Identity of the promoted gap sentence, for cross-record dedup.
+
+    The same sentence filed under two records is a strong signal at least one
+    filing is wrong (TraitMech got two such pairs in ten discussions), so runs
+    keep the first filing and drop the rest. Keyed on the sentence rather than
+    discussion_id, which mixes in record_id and so can never collide.
+    """
+    prompt = discussion.get("prompt", "")
+    sentence = prompt.split(": ", 1)[1] if ": " in prompt else prompt
+    return _norm(sentence).casefold()
 
 
 def _discussion_id(record_id: str, top_sentence: str) -> str:
