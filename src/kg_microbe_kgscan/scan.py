@@ -2,6 +2,17 @@
 
 Stdlib-only HTTP (urllib) so it runs under the same `python3.13` + PYTHONPATH
 invocation as kg_microbe_qc. Ported from DisMech's knowledge_gap_scan.py.
+
+Config keys read here beyond the record plumbing (see __main__ for the rest):
+
+  require_topic_in_sentence   default true. The gap-signal SENTENCE itself must
+                              mention a topic term (name or synonym); the query
+                              only anchors the PAPER, which is how all ten of
+                              TraitMech's scanned gaps came out misfiled (#69).
+                              Set false to restore recall-first behaviour --
+                              relevant for Mechs whose record names are coined
+                              multi-word labels no abstract contains verbatim
+                              (#79).
 """
 from __future__ import annotations
 
@@ -51,6 +62,38 @@ SIGNAL_WEIGHTS = {
 }
 _ALL_GAP_TERMS = tuple(t for terms in GAP_SIGNAL_GROUPS.values() for t in terms)
 
+# Review-boilerplate assertions that a gap EXISTS without naming one. A sentence
+# whose only content is "gaps remain" cannot be curated even when it mentions
+# the topic; TraitMech got two of these filed verbatim under two different
+# traits (#69, TraitMech#411).
+#
+# Anchored at BOTH ends, with only filler permitted around the assertion (#77):
+# a sentence is contentless only when it consists of essentially nothing but
+# the assertion. An unanchored pattern killed "This review identifies
+# challenges and knowledge gaps in biofilm dispersal under flow, specifically
+# the role of c-di-GMP", and an end-only anchor killed "Despite decades of
+# work on the role of c-di-GMP in biofilm dispersal, major knowledge gaps
+# remain" -- both specific, curatable gaps whose content sits outside the
+# matched phrase.
+_FILLER = (
+    r"(?:however|nevertheless|nonetheless|still|overall|finally|to\s+date|"
+    r"in\s+(?:conclusion|summary))?[,\s]*"
+)
+CONTENTLESS_PATTERNS = (
+    re.compile(
+        rf"^\s*{_FILLER}(?:it|this\s+(?:review|study|paper|work|article))?\s*"
+        rf"identif\w*\s+(?:ongoing\s+)?challenges\s+and\s+(?:critical\s+)?knowledge\s+gaps"
+        rf"(?:\s+for\s+future\s+research)?\s*[.!?]?\s*$",
+        re.I,
+    ),
+    re.compile(
+        rf"^\s*{_FILLER}(?:many|several|numerous|important|critical|major|significant)?\s*"
+        rf"(?:knowledge\s+gaps?|research\s+gaps?|unanswered\s+questions?|open\s+questions?)\s+"
+        rf"(?:remain|persist|exist)s?\s*[.!?]?\s*$",
+        re.I,
+    ),
+)
+
 _WS_RE = re.compile(r"\s+")
 _SENT_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z(])")
 
@@ -72,12 +115,73 @@ def signal_categories(sentence: str) -> list[str]:
             if any(t in low for t in terms)]
 
 
-def extract_gap_signals(text: str, max_signals: int = 8) -> list[dict[str, Any]]:
+def _topic_variants(topic_terms) -> tuple[str, ...]:
+    """Casefolded topic terms plus separator spellings.
+
+    Slug underscores are tried as spaces, and hyphen<->space both ways (#78):
+    `gut-associated` must match "Gut associated microbial communities" and the
+    reverse, because separator variance is the commonest difference between a
+    record label and the prose that discusses it.
+    """
+    out: list[str] = []
+    seen: set[str] = set()
+    for term in topic_terms or ():
+        t = _norm(term).casefold()
+        if not t:
+            continue
+        variants = {t, t.replace("_", " ")}
+        variants |= {v.replace("-", " ") for v in variants}
+        variants |= {v.replace(" ", "-") for v in variants}
+        for v in sorted(variants):
+            if v not in seen:
+                seen.add(v)
+                out.append(v)
+    return tuple(out)
+
+
+def _term_pattern(term: str) -> re.Pattern:
+    # NOT plain \b...\b: outside a non-word edge character, \b demands an
+    # adjacent word character that prose never supplies, so `Fe3+` or
+    # `(-)-anisomycin` could never match any sentence (#75). Lookarounds demand
+    # a boundary only where the term's own edge is a word character, which
+    # still keeps `aerobic` from matching inside "anaerobic" (#71).
+    return re.compile(rf"(?<!\w){re.escape(term)}(?!\w)")
+
+
+def sentence_mentions_topic(sentence: str, topic_terms) -> bool:
+    # Word-boundary, not substring (#71): `aerobic` must not pass the gate
+    # inside "anaerobic". A spurious pass would silently reproduce the exact
+    # misfiling this gate exists to stop.
+    low = _norm(sentence).casefold()
+    return any(_term_pattern(t).search(low) for t in _topic_variants(topic_terms))
+
+
+def is_contentless(sentence: str) -> bool:
+    """A gap assertion that names no gap -- review boilerplate, uncuratable."""
+    return any(p.search(sentence) for p in CONTENTLESS_PATTERNS)
+
+
+def extract_gap_signals(text: str, max_signals: int = 8, topic_terms=(),
+                        require_topic: bool = True) -> list[dict[str, Any]]:
+    """Gap-shaped sentences, anchored to the topic.
+
+    The query already anchors the PAPER to the topic; this anchors the SENTENCE.
+    Without it, a topically adjacent paper's hedged sentence about something
+    else entirely gets promoted into a Discussion filed under the wrong record
+    -- which is how all ten of TraitMech's scanned gaps came out misfiled
+    (#69, TraitMech#411). Precision beats recall here: an unfiled gap costs
+    nothing, a misfiled one renders as curated content with citations.
+    """
+    gate = require_topic and bool(topic_terms)
     out: list[dict[str, Any]] = []
     seen: set[str] = set()
     for sentence in split_sentences(text):
         cats = signal_categories(sentence)
         if not cats:
+            continue
+        if gate and not sentence_mentions_topic(sentence, topic_terms):
+            continue
+        if is_contentless(sentence):
             continue
         key = _norm(sentence).casefold()
         if key in seen:
@@ -162,12 +266,14 @@ def scan_record(record: dict[str, Any], cfg: dict, page_size: int, max_signals: 
         results = europepmc_search(query, page_size=page_size, timeout=timeout)
     except Exception as e:  # network/HTTP — report, skip record
         return {"name": name, "error": str(e), "matches": [], "score": 0}
+    require_topic = bool(cfg.get("require_topic_in_sentence", True))
     matches = []
     for r in results:
         # Europe PMC abstractText carries structured-abstract HTML (<h4>…</h4>);
         # strip tags so snippets/sentences are clean prose.
         abstract = re.sub(r"<[^>]+>", " ", r.get("abstractText") or "")
-        sigs = extract_gap_signals(abstract, max_signals=max_signals)
+        sigs = extract_gap_signals(abstract, max_signals=max_signals,
+                                   topic_terms=topic_terms, require_topic=require_topic)
         if not sigs:
             continue
         ref = _pub_ref(r)
@@ -181,6 +287,23 @@ def scan_record(record: dict[str, Any], cfg: dict, page_size: int, max_signals: 
     total = sum(m["score"] for m in matches)
     return {"name": name, "topic_terms": topic_terms, "query": query,
             "matches": matches, "score": total}
+
+
+def prompt_key(discussion: dict[str, Any]) -> str:
+    """Identity of the promoted gap sentence, for cross-record dedup.
+
+    The same sentence filed under two records is a strong signal at least one
+    filing is wrong (TraitMech got two such pairs in ten discussions), so runs
+    keep the best-scored filing and drop the rest (#76). Keyed on the sentence
+    rather than discussion_id, which mixes in record_id and so can never
+    collide. The sentence is read from evidence[0].snippet, where
+    build_discussion() puts it verbatim -- it always emits at least one
+    evidence entry, and parsing the sentence back out of the prompt string
+    would break on a record name containing ": " (#73).
+    """
+    evidence = discussion.get("evidence") or []
+    sentence = evidence[0].get("snippet", "") if evidence else ""
+    return _norm(sentence).casefold()
 
 
 def _discussion_id(record_id: str, top_sentence: str) -> str:

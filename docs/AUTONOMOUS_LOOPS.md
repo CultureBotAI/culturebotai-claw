@@ -386,8 +386,11 @@ Two things stand out. `edison_batch.json` is the closest thing in the fleet to a
 machine-consumable task payload — it already carries per-field queries — and
 CultureMech's `researched_media.json` (53 entries) is the fleet's **only
 re-billing guard**. TraitMech's `reports/knowledge_gap_scan.json` is the only
-committed knowledge-gap scan output anywhere, and is the right template for what
-an autonomous scan should commit.
+committed knowledge-gap scan output anywhere, and its *shape* is the right
+template for what an autonomous scan should commit — but its *content* is the
+ten misfiled gaps that motivated the #69 precision gates (all ten are rejected
+by the current scanner), and it predates the `duplicates_dropped` field, so
+regenerate rather than imitate it.
 
 **CommunityMech has no ranked work queue at all** — its `reports/` is 37 files of
 per-community author-request email drafts, and despite the `ground-taxa-gtdb`
