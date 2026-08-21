@@ -40,7 +40,7 @@ results = plugin.search(
 
 ### MediaIngredientMech OntologyClient
 
-Located at: `/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech/src/mediaingredientmech/utils/ontology_client.py`
+Located at: `$MEDIAINGREDIENTMECH_ROOT/src/mediaingredientmech/utils/ontology_client.py`
 
 ```python
 from mediaingredientmech.utils.ontology_client import OntologyClient, OntologyCandidate

@@ -13,10 +13,9 @@ Deduplication Strategies:
 
 import logging
 import re
-from pathlib import Path
-from typing import Dict, List, Optional, Any, Tuple, Set
-from dataclasses import dataclass
 from collections import defaultdict
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -254,9 +253,6 @@ class IngredientDeduplicator:
 
         # Merge synonyms
         syns_a = self.get_synonyms(ingredient_a)
-        syns_b = self.get_synonyms(ingredient_b)
-        all_synonyms = syns_a | syns_b
-
         if 'synonyms' not in merged:
             merged['synonyms'] = []
 

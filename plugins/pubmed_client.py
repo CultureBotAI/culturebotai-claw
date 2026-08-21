@@ -14,14 +14,14 @@ NCBI E-utilities Documentation:
 https://www.ncbi.nlm.nih.gov/books/NBK25501/
 """
 
+import json
 import logging
 import time
 from dataclasses import dataclass
-from typing import Optional, Dict, List
-from urllib.parse import quote
-import requests
 from pathlib import Path
-import json
+from typing import Dict, List, Optional
+
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -216,7 +216,6 @@ class PubMedClient:
             title = self._extract_xml_field(xml, "ArticleTitle")
 
             # Extract abstract
-            abstract_parts = []
             # Look for AbstractText tags
             import re
             abstract_matches = re.findall(r'<AbstractText[^>]*>(.*?)</AbstractText>', xml, re.DOTALL)

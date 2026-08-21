@@ -74,7 +74,12 @@ install_hooks_for_repo() {
         fi
 
         # Copy and customize hook
-        sed "s/{{REPO_NAME}}/$repo_name/g" "$template_file" > "$target_file"
+        local escaped_root=${ORCHESTRATION_ROOT//&/\\&}
+        escaped_root=${escaped_root//|/\\|}
+        sed \
+            -e "s|{{REPO_NAME}}|$repo_name|g" \
+            -e "s|{{ORCHESTRATION_ROOT}}|$escaped_root|g" \
+            "$template_file" > "$target_file"
         chmod +x "$target_file"
 
         echo -e "${GREEN}  ✓ Installed $hook${NC}"

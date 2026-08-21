@@ -476,7 +476,7 @@ class LockManager:
   "coordination": {
     "enabled": true,
     "my_id": "culturemech_claude",  // Unique per repo
-    "orchestration_root": "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw",
+    "orchestration_root": "/absolute/path/to/culturebotai-claw",
     "check_locks_before": [
       "file_edit",
       "git_commit",
@@ -498,7 +498,7 @@ class LockManager:
 #!/bin/bash
 # Check lock before editing files
 
-ORCHESTRATION="/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw"
+ORCHESTRATION="${OPENCLAW_ORCHESTRATION_ROOT:?Set OPENCLAW_ORCHESTRATION_ROOT}"
 LOCK_FILE="$ORCHESTRATION/locks/culturemech.lock"
 
 if [ -f "$LOCK_FILE" ]; then

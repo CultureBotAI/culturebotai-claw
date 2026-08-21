@@ -11,11 +11,11 @@ Exit codes:
   2 - Error
 """
 
-import sys
 import os
-import yaml
+import sys
 from pathlib import Path
-from datetime import datetime, timezone
+
+from plugins.lock_manager import LockManager
 
 
 def check_lock(resource_name: str, operation: str = "operation") -> int:
@@ -43,82 +43,34 @@ def check_lock(resource_name: str, operation: str = "operation") -> int:
         workspace = str(Path(orchestration_root) / "workspace")
 
     locks_dir = Path(workspace) / "locks"
-    lock_file = locks_dir / f"{resource_name}.lock"
-
-    # Check global lock first
-    global_lock = locks_dir / "global.lock"
-    if global_lock.exists():
-        try:
-            with open(global_lock, 'r') as f:
-                lock_data = yaml.safe_load(f)
-
-            # Check if expired
-            expires_at = datetime.fromisoformat(lock_data['expires_at'])
-            if datetime.now(timezone.utc) <= expires_at:
-                print(f"⚠️  GLOBAL LOCK ACTIVE")
-                print(f"   Locked by: {lock_data['locked_by']}")
-                print(f"   Operation: {lock_data['operation']}")
-                print(f"   Since: {lock_data['locked_at']}")
-                print(f"   Expires: {lock_data['expires_at']}")
-                print()
-                print(f"Cannot {operation} while global lock is active.")
-                print("This usually means a cross-repo pipeline is running.")
-                print()
-                print("Options:")
-                print("  1. Wait for operation to complete")
-                print("  2. Ask orchestration Claude to cancel operation")
-                print("  3. If stuck, remove lock file (EMERGENCY ONLY)")
-                return 1
-        except Exception as e:
-            print(f"⚠️  Error reading global lock: {e}", file=sys.stderr)
-
-    # Check resource-specific lock
-    if not lock_file.exists():
-        # No lock, proceed
-        return 0
-
     try:
-        with open(lock_file, 'r') as f:
-            lock_data = yaml.safe_load(f)
+        manager = LockManager({"locks_dir": str(locks_dir), "my_id": "hook-checker"})
+        global_lock = manager.check_lock("global")
+        if global_lock is not None:
+            _print_lock("GLOBAL", global_lock, operation)
+            return 1
 
-        # Check if expired
-        expires_at = datetime.fromisoformat(lock_data['expires_at'])
-        if datetime.now(timezone.utc) > expires_at:
-            # Expired, remove it
-            lock_file.unlink()
-            print(f"ℹ️  Removed expired lock on {resource_name}")
+        lock_data = manager.check_lock(resource_name)
+        if lock_data is None:
             return 0
 
-        # Lock is active
-        print(f"⚠️  {resource_name.upper()} IS LOCKED")
-        print(f"   Locked by: {lock_data['locked_by']}")
-        print(f"   Operation: {lock_data['operation']}")
-        print(f"   Since: {lock_data['locked_at']}")
-        print(f"   Reason: {lock_data.get('reason', 'N/A')}")
-        print(f"   Expires: {lock_data['expires_at']}")
-        print()
-        print(f"Cannot {operation} while {resource_name} is locked.")
-        print()
-        print("What this means:")
-        if lock_data['locked_by'] == 'orchestration_claude':
-            print("  - The orchestration pipeline is working on this repo")
-            print("  - Wait for the pipeline to complete")
-            print("  - Check orchestration status with: openclaw-cli pipeline status")
-        else:
-            print(f"  - Another Claude instance ({lock_data['locked_by']}) is working")
-            print("  - Wait for that operation to complete")
-        print()
-        print("Options:")
-        print("  1. Wait for the lock to expire")
-        print("  2. Check status: openclaw-cli pipeline status")
-        print("  3. Ask the locking Claude to complete/cancel")
-        print(f"  4. Emergency unlock: rm {lock_file} (USE WITH CAUTION)")
-
+        _print_lock(resource_name.upper(), lock_data, operation)
         return 1
-
-    except Exception as e:
+    except (OSError, ValueError) as e:
         print(f"❌ Error checking lock: {e}", file=sys.stderr)
         return 2
+
+
+def _print_lock(resource: str, lock_data: dict, operation: str) -> None:
+    """Print lock state without assuming a malformed lock has every field."""
+    print(f"⚠️  {resource} IS LOCKED")
+    print(f"   Locked by: {lock_data.get('locked_by', 'unknown')}")
+    print(f"   Operation: {lock_data.get('operation', 'unknown')}")
+    print(f"   Since: {lock_data.get('locked_at', 'unknown')}")
+    print(f"   Reason: {lock_data.get('reason', 'N/A')}")
+    print(f"   Expires: {lock_data.get('expires_at', 'unknown')}")
+    print()
+    print(f"Cannot {operation} while the coordination lock is active or unreadable.")
 
 
 def main():

@@ -1,293 +1,139 @@
-# KG-Microbe OpenClaw Orchestration
+# CultureBotAI CLAW
 
-AI agent orchestration layer for coordinating development across three interconnected microbial knowledge base repositories:
+CultureBotAI CLAW coordinates validation, curation, and shared tooling across
+the CultureMech, MediaIngredientMech (MIM), and CommunityMech repositories.
+It contains repository-aware plugins, file-based coordination, curation
+pipelines, shared Mech utilities, and fleet CI workflows.
 
-- **CultureMech**: 10,657 culture media recipes from 10 international sources
-- **MIM**: LLM-assisted curation system for 1,131 ingredients with ontology mappings
-- **CommunityMech**: Microbial community modeling (35+ communities) with ecological interactions
+## Current support status
 
-## Overview
+| Surface | Status |
+|---|---|
+| Repository configuration and identity checks | Supported; missing or wrong roots fail closed |
+| File-based repository locks | Supported; atomic, lease-owned, and expiration-aware |
+| Agent and pipeline discovery | Supported |
+| Agent and pipeline execution through `openclaw-cli` | Not implemented; non-dry runs fail explicitly |
+| Environment-curation dry run and reports | Supported |
+| Environment-curation apply mode | Disabled until a validated atomic writer exists |
+| Shared history, QC, discussions, and knowledge-gap tools | Packaged and supported |
+| Historical scripts and phase reports | Retained for provenance; not part of the supported API |
 
-This orchestration layer uses [OpenClaw](https://pypi.org/project/openclaw/) to coordinate AI coding agents for:
+## Requirements
 
-- **Data pipeline automation** (ingredient curation, validation, cross-repo data flows)
-- **Code development** (refactoring, documentation, testing)
-- **Build coordination** (multi-repo releases, synchronized versioning)
-- **Development workflows** (schema sync, dependency updates, integration testing)
-
-## Installation
-
-### Prerequisites
-
-- Python 3.10+
-- uv package manager
-- `just` task runner installed
+- Python 3.11 or newer
+- [uv](https://docs.astral.sh/uv/)
 - Git
-- Anthropic API key
+- `just` for repository recipes
+- An Anthropic API key only for workflows that invoke an LLM
 
-### Setup
+## Setup
 
-1. **Clone or navigate to this directory:**
-   ```bash
-   cd /Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw
-   ```
-
-2. **Install dependencies:**
-   ```bash
-   uv sync
-   ```
-
-3. **Configure environment:**
-   Edit `.env` and add your Anthropic API key:
-   ```bash
-   ANTHROPIC_API_KEY=sk-ant-...
-   ```
-
-   The repository paths are pre-configured, but verify they're correct:
-   ```bash
-   openclaw-cli config show
-   ```
-
-4. **Validate configuration:**
-   ```bash
-   openclaw-cli config validate
-   ```
-
-5. **Check system status:**
-   ```bash
-   openclaw-cli status
-   ```
-
-## Available Agents
-
-### Code Development Agents
-- **DocumentationAgent** (Haiku) - Generate schema docs, update READMEs, create API documentation
-- **RefactoringAgent** (Sonnet) - Code refactoring, pattern detection [Coming in Week 2]
-- **TestAgent** (Sonnet) - Generate tests, run pytest, analyze coverage [Coming in Week 2]
-
-### Data Pipeline Agents
-- **ValidationAgent** (Haiku) - Schema and ontology validation
-- **IngredientCurationAgent** (Sonnet) - LLM-assisted ontology mapping [Coming in Week 2]
-- **ETLCoordinatorAgent** (Sonnet) - Cross-repo data flows [Coming in Week 2]
-- **NetworkRepairAgent** (Opus) - Network integrity auditing [Coming in Week 2]
-
-### Build & Deployment Agents
-- **BuildCoordinatorAgent** (Haiku) - Multi-repo builds, justfile execution [Coming in Week 3]
-- **ExportAgent** (Haiku) - Browser exports, KGX files [Coming in Week 3]
-- **ReleaseAgent** (Sonnet) - Version management, coordinated releases [Coming in Week 3]
-
-### Development Workflow Agents
-- **SchemaSyncAgent** (Haiku) - Schema change propagation [Coming in Week 3]
-- **DependencyAgent** (Haiku) - Dependency updates, security checks [Coming in Week 3]
-- **CrossRepoValidatorAgent** (Sonnet) - Integration testing [Coming in Week 3]
-
-## Quick Start
-
-### List Available Agents
 ```bash
-openclaw-cli agent list
+git clone https://github.com/CultureBotAI/culturebotai-claw.git
+cd culturebotai-claw
+cp .env.example .env
+# Edit the repository roots in .env.
+uv sync --extra dev
+uv run openclaw-cli config validate
+uv run openclaw-cli status
 ```
 
-### Run Validation Agent (Dry Run)
+Repository roots are security boundaries. Configuration validation requires
+each path to be the exact Git worktree root with the expected GitHub `origin`.
+Unset variables never fall back to the current directory.
+
+## CLI
+
+The orchestration CLI currently supports discovery, configuration checks, and
+validated dry runs:
+
 ```bash
-openclaw-cli agent run validation_agent --dry-run
+uv run openclaw-cli agent list
+uv run openclaw-cli agent run validation_agent --dry-run
+uv run openclaw-cli pipeline list
+uv run openclaw-cli pipeline run ingredient_curation --dry-run
+uv run openclaw-cli plugin list
+uv run openclaw-cli plugin test lock_manager
 ```
 
-### List Available Plugins
+Agent and pipeline execution without `--dry-run` intentionally exits nonzero
+until the OpenClaw execution integration is implemented.
+
+## Shared Mech tools
+
+`src/` is installed as part of this project. These equivalent module and
+console-script forms are available:
+
 ```bash
-openclaw-cli plugin list
+uv run kg-microbe-history --help
+uv run kg-microbe-kgscan --help
+uv run kg-microbe-qc --help
+uv run kg-microbe-discussions --help
+
+uv run python -m kg_microbe_history --help
+uv run python -m kg_microbe_kgscan --help
+uv run python -m kg_microbe_qc --help
+uv run python -m kg_microbe_discussions --help
 ```
 
-### Test a Plugin
-```bash
-openclaw-cli plugin test just_runner
-```
+The shared schemas and vendored fleet checks live under `shared/`.
 
-## Plugins
+## Safety model
 
-The orchestration system includes custom plugins that wrap existing tools:
+Cross-repository code must:
 
-### JustRunnerPlugin
-Executes justfile recipes across all three repositories.
+1. Resolve targets through `RepositorySettings`.
+2. Verify the exact worktree and expected `origin` identity.
+3. Acquire the target repository lock with the context-manager API.
+4. Default to dry-run and require an explicit apply action.
+5. Refuse unallowlisted recipes or operations.
+6. Validate staged output before replacing source data.
+7. Surface partial failures and preserve recoverable artifacts.
 
-**Example usage:**
+Example lock usage:
+
 ```python
-from plugins.just_runner import JustRunnerPlugin
+from plugins.lock_manager import LockManager
 
-plugin = JustRunnerPlugin()
-result = plugin.execute_recipe("culturemech", "validate-all")
+with LockManager().lock("mediaingredientmech", "publish_sssom"):
+    # Perform the already-approved operation.
+    ...
 ```
 
-### LinkMLValidatorPlugin
-Validates YAML data against LinkML schemas.
+The repository-path, recipe-allowlist, and lock guarantees are enforced in
+code. Approval, backup, and transaction behavior remains the responsibility of
+each writer until it adopts a shared write transaction.
 
-**Example usage:**
-```python
-from plugins.linkml_validator import LinkMLValidatorPlugin
+## Development checks
 
-plugin = LinkMLValidatorPlugin()
-result = plugin.validate_repository("mediaingredientmech")
-```
+These are the pull-request gates:
 
-### GitIntegrationPlugin
-Safe git operations (branching, committing, status).
-
-**Example usage:**
-```python
-from plugins.git_integration import GitIntegrationPlugin
-
-plugin = GitIntegrationPlugin()
-result = plugin.create_branch("communitymech", "feature/network-repair")
-```
-
-### OAKQueryPlugin
-Ontology Access Kit integration [Coming in Week 2]
-
-## Directory Structure
-
-```
-culturebotai-claw/
-├── openclaw_config.yaml          # Main OpenClaw configuration
-├── .env                          # Environment variables
-├── pyproject.toml                # Dependencies
-├── README.md                     # This file
-│
-├── agents/                       # Agent definitions (YAML)
-│   ├── code_development/         # RefactoringAgent, DocumentationAgent, TestAgent
-│   ├── data_pipeline/            # ETLCoordinator, IngredientCuration, Validation
-│   ├── build_deployment/         # BuildCoordinator, Export, Release
-│   └── dev_workflow/             # SchemaSync, Dependency, CrossRepoValidator
-│
-├── pipelines/                    # Multi-agent pipelines
-│   ├── ingredient_curation_pipeline.py  [Coming in Week 2]
-│   ├── release_pipeline.py              [Coming in Week 3]
-│   └── validation_pipeline.py           [Coming in Week 1]
-│
-├── plugins/                      # Custom OpenClaw plugins
-│   ├── just_runner.py            # Execute justfile recipes
-│   ├── linkml_validator.py       # LinkML validation
-│   ├── git_integration.py        # Git operations
-│   └── oak_query.py              # Ontology queries [Coming in Week 2]
-│
-├── workspace/                    # Agent workspaces (gitignored)
-│   ├── shared_memory/            # Inter-agent communication
-│   ├── validation_agent/         # ValidationAgent workspace
-│   ├── documentation_agent/      # DocumentationAgent workspace
-│   └── logs/                     # Execution logs
-│
-└── cli/
-    └── main.py                   # Click CLI
-```
-
-## CLI Commands
-
-### Agent Management
 ```bash
-# List all agents
-openclaw-cli agent list
-
-# Run a specific agent
-openclaw-cli agent run <agent_name> [--dry-run]
+uvx ruff@0.16.3 check cli plugins pipelines src tests
+uv run --extra dev mypy \
+  cli/main.py plugins/repository_settings.py plugins/lock_manager.py \
+  src/kg_microbe_history src/kg_microbe_kgscan
+uv run --extra dev python -m pytest -q \
+  --cov=src --cov-report=term-missing --cov-fail-under=70
 ```
 
-### Pipeline Management
-```bash
-# List all pipelines
-openclaw-cli pipeline list
+Pytest intentionally collects only `tests/`. Root- and `scripts/`-level
+`test_*.py` files are legacy executable diagnostics and are not CI tests.
 
-# Run a specific pipeline
-openclaw-cli pipeline run <pipeline_name> [--dry-run]
+## Repository map
+
+```text
+agents/       declarative agent definitions
+cli/          openclaw-cli discovery and validation interface
+pipelines/    orchestration workflows
+plugins/      repository, lock, validation, ontology, and curation adapters
+src/          packaged shared Mech utilities
+shared/       shared schemas and vendored fleet validators
+scripts/      maintenance, migration, and curation commands
+tests/        maintained assertion-based test suite
+docs/         current guides, proposals, reviews, and historical archive
+workspace/    gitignored runtime locks, tasks, reports, and caches
 ```
 
-### Plugin Management
-```bash
-# List all plugins
-openclaw-cli plugin list
-
-# Test a specific plugin
-openclaw-cli plugin test <plugin_name>
-```
-
-### Configuration
-```bash
-# Show current configuration
-openclaw-cli config show
-
-# Validate configuration
-openclaw-cli config validate
-```
-
-### System Status
-```bash
-# Show overall system status
-openclaw-cli status
-```
-
-## Development Roadmap
-
-### ✅ Week 1: Foundation (Current)
-- [x] Create orchestration directory structure
-- [x] Install OpenClaw and dependencies
-- [x] Create main configuration files
-- [x] Build ValidationAgent
-- [x] Build DocumentationAgent
-- [x] Create JustRunner, LinkML, and Git plugins
-- [x] Create CLI interface
-- [ ] Test agents on CommunityMech
-
-### Week 2-3: Core Agents
-- [ ] Implement ETLCoordinatorAgent
-- [ ] Implement IngredientCurationAgent (wrap existing LLM code)
-- [ ] Implement NetworkRepairAgent (wrap llm_repair.py)
-- [ ] Create ingredient curation pipeline
-- [ ] Create OAKQueryPlugin
-
-### Week 4: Build & Development
-- [ ] Implement BuildCoordinatorAgent
-- [ ] Implement ReleaseAgent
-- [ ] Implement SchemaSyncAgent
-- [ ] Create multi-repo build pipeline
-
-### Week 5: Advanced Features
-- [ ] Add RefactoringAgent and TestAgent
-- [ ] Implement file watching and event triggers
-- [ ] Add monitoring and metrics
-
-### Week 6: Production Hardening
-- [ ] Comprehensive testing
-- [ ] Complete documentation
-- [ ] Safety mechanisms
-- [ ] Team training
-
-## Safety Features
-
-The orchestration system includes multiple safety mechanisms:
-
-1. **Read-only default**: All agents default to read-only mode
-2. **Git branches**: All modifications happen in dedicated branches
-3. **Approval workflows**: Critical operations require approval
-4. **Automatic backups**: All write operations create timestamped backups
-5. **Audit logging**: Every agent action is logged
-6. **Cost tracking**: LLM API costs are monitored
-
-## Cost Estimates
-
-Estimated monthly costs (with proper caching):
-- Ingredient Curation: ~$90/month (Sonnet, daily)
-- Network Repair: ~$21/month (Opus, weekly)
-- Code Refactoring: ~$5-20/month (Sonnet, as needed)
-- Documentation: ~$1.20/month (Haiku, daily)
-- Validation: ~$7.20/month (Haiku, hourly)
-- **Total: $125-150/month**
-
-## Support
-
-For issues or questions:
-- Check the main plan document in `.claude/` directory
-- Review agent configuration in `agents/`
-- Check logs in `workspace/logs/`
-- Verify configuration with `openclaw-cli config validate`
-
-## License
-
-This orchestration layer is part of the KG-Microbe project.
+See the [documentation index](docs/README.md) for longer guides and archived
+project history.

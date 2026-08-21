@@ -5,11 +5,14 @@ This plugin enables OpenClaw agents to execute justfile recipes across
 the three KG-Microbe repositories.
 """
 
-import os
-import subprocess
-from pathlib import Path
-from typing import Dict, List, Optional, Any
 import logging
+import subprocess
+from typing import Any, Dict, List, Optional
+
+from plugins.repository_settings import (
+    RepositoryConfigurationError,
+    RepositorySettings,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -25,16 +28,16 @@ class JustRunnerPlugin:
             config: Plugin configuration
         """
         self.config = config or {}
-        self.allowed_recipes = self.config.get("allowed_recipes", [])
-        self.repo_paths = self._load_repo_paths()
-
-    def _load_repo_paths(self) -> Dict[str, Path]:
-        """Load repository paths from environment variables."""
-        return {
-            "culturemech": Path(os.getenv("CULTUREMECH_ROOT", "")),
-            "mediaingredientmech": Path(os.getenv("MEDIAINGREDIENTMECH_ROOT", "")),
-            "communitymech": Path(os.getenv("COMMUNITYMECH_ROOT", "")),
-        }
+        configured_recipes = self.config.get("allowed_recipes", [])
+        if not isinstance(configured_recipes, (list, tuple, set)) or not all(
+            isinstance(recipe, str) and recipe for recipe in configured_recipes
+        ):
+            raise ValueError("allowed_recipes must be a collection of recipe names")
+        self.allowed_recipes = frozenset(configured_recipes)
+        self.repository_settings = RepositorySettings.from_environment(self.config)
+        # Retain this public attribute for compatibility, but expose only paths
+        # which have passed configuration and Git identity validation.
+        self.repo_paths = self.repository_settings.paths
 
     def execute_recipe(
         self,
@@ -55,27 +58,25 @@ class JustRunnerPlugin:
         Returns:
             Dictionary with execution results
         """
-        # Validate repository
-        if repo not in self.repo_paths:
+        try:
+            repo_path = self.repository_settings.get_target(repo).path
+        except RepositoryConfigurationError as exc:
             return {
                 "success": False,
-                "error": f"Unknown repository: {repo}",
+                "error": str(exc),
                 "repo": repo,
                 "recipe": recipe,
             }
 
-        repo_path = self.repo_paths[repo]
-        if not repo_path.exists():
+        # An absent allowlist deliberately permits nothing. Every executable
+        # recipe must be explicitly authorized by the calling agent config.
+        if recipe not in self.allowed_recipes:
             return {
                 "success": False,
-                "error": f"Repository path does not exist: {repo_path}",
+                "error": f"Recipe '{recipe}' is not allowed",
                 "repo": repo,
                 "recipe": recipe,
             }
-
-        # Validate recipe is allowed (if allowlist is configured)
-        if self.allowed_recipes and recipe not in self.allowed_recipes:
-            logger.warning(f"Recipe '{recipe}' not in allowed list, proceeding anyway")
 
         # Check if justfile exists
         justfile_path = repo_path / "justfile"
@@ -148,13 +149,13 @@ class JustRunnerPlugin:
         Returns:
             Dictionary with list of recipes and their descriptions
         """
-        if repo not in self.repo_paths:
+        try:
+            repo_path = self.repository_settings.get_target(repo).path
+        except RepositoryConfigurationError as exc:
             return {
                 "success": False,
-                "error": f"Unknown repository: {repo}",
+                "error": str(exc),
             }
-
-        repo_path = self.repo_paths[repo]
         cmd = ["just", "-d", str(repo_path), "--list"]
 
         try:
@@ -198,7 +199,7 @@ class JustRunnerPlugin:
             Dictionary with results from all repositories
         """
         if repos is None:
-            repos = list(self.repo_paths.keys())
+            repos = list(self.repository_settings.names)
 
         results = {}
         for repo in repos:

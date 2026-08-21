@@ -174,7 +174,7 @@ Text: "CultureBotAI-CLAW" with subtitle "Multi-Agent Orchestration for KG-Microb
 ```bash
 # After creating the GitHub repo at github.com/YOUR_USERNAME/culturebotai-claw
 
-cd /Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw
+cd /absolute/path/to/culturebotai-claw
 
 # Add remote (replace YOUR_USERNAME)
 git remote add origin https://github.com/YOUR_USERNAME/culturebotai-claw.git

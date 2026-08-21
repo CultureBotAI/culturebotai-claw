@@ -6,25 +6,47 @@ CultureMech, MediaIngredientMech, and CommunityMech repositories.
 """
 
 import os
-import sys
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
+
 import click
+from dotenv import load_dotenv
 from rich.console import Console
 from rich.table import Table
-from rich import print as rprint
-from dotenv import load_dotenv
 
-# Add parent directory to path to import plugins
-sys.path.insert(0, str(Path(__file__).parent.parent))
+from plugins.repository_settings import (
+    RepositoryConfigurationError,
+    RepositorySettings,
+)
 
 # Load environment variables
 load_dotenv()
 
 console = Console()
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _project_version() -> str:
+    try:
+        return version("kg-microbe-orchestration")
+    except PackageNotFoundError:
+        return "unknown"
+
+
+def _agent_file(agent_name: str) -> Path | None:
+    matches = list((PROJECT_ROOT / "agents").rglob(f"{agent_name}.yaml"))
+    return matches[0] if len(matches) == 1 else None
+
+
+def _pipeline_file(pipeline_name: str) -> Path | None:
+    candidates = {pipeline_name, f"{pipeline_name}_pipeline"}
+    matches = [PROJECT_ROOT / "pipelines" / f"{name}.py" for name in candidates]
+    existing = [path for path in matches if path.exists()]
+    return existing[0] if len(existing) == 1 else None
 
 
 @click.group()
-@click.version_option(version="1.0.0")
+@click.version_option(version=_project_version())
 def cli():
     """
     KG-Microbe OpenClaw Orchestration CLI
@@ -73,20 +95,26 @@ def list_agents():
     console.print(f"\nTotal agents: {len(agent_files)}")
 
 
-@agent.command()
+@agent.command("run")
 @click.argument("agent_name")
 @click.option("--dry-run", is_flag=True, help="Simulate execution without making changes")
-def run(agent_name: str, dry_run: bool):
+def run_agent(agent_name: str, dry_run: bool):
     """
     Run a specific agent.
 
     Example: openclaw-cli agent run validation_agent --dry-run
     """
-    if dry_run:
-        console.print(f"[yellow]DRY RUN: Would execute {agent_name}[/yellow]")
-    else:
-        console.print(f"[red]Not implemented yet: Agent execution requires OpenClaw SDK integration[/red]")
-        console.print(f"Agent: {agent_name}")
+    agent_file = _agent_file(agent_name)
+    if agent_file is None:
+        raise click.ClickException(f"Unknown or ambiguous agent: {agent_name}")
+    if not dry_run:
+        raise click.ClickException(
+            "Agent execution is not implemented; use --dry-run to validate the request"
+        )
+    console.print(
+        f"[yellow]DRY RUN: validated {agent_name} "
+        f"({agent_file.relative_to(PROJECT_ROOT)})[/yellow]"
+    )
 
 
 @cli.group()
@@ -117,20 +145,26 @@ def list_pipelines():
     console.print(table)
 
 
-@pipeline.command()
+@pipeline.command("run")
 @click.argument("pipeline_name")
 @click.option("--dry-run", is_flag=True, help="Simulate execution")
-def run(pipeline_name: str, dry_run: bool):
+def run_pipeline(pipeline_name: str, dry_run: bool):
     """
     Run a specific pipeline.
 
     Example: openclaw-cli pipeline run ingredient_curation --dry-run
     """
-    if dry_run:
-        console.print(f"[yellow]DRY RUN: Would execute {pipeline_name} pipeline[/yellow]")
-    else:
-        console.print(f"[red]Not implemented yet: Pipeline execution requires OpenClaw SDK integration[/red]")
-        console.print(f"Pipeline: {pipeline_name}")
+    pipeline_file = _pipeline_file(pipeline_name)
+    if pipeline_file is None:
+        raise click.ClickException(f"Unknown or ambiguous pipeline: {pipeline_name}")
+    if not dry_run:
+        raise click.ClickException(
+            "Pipeline execution is not implemented; use --dry-run to validate the request"
+        )
+    console.print(
+        f"[yellow]DRY RUN: validated {pipeline_name} "
+        f"({pipeline_file.relative_to(PROJECT_ROOT)})[/yellow]"
+    )
 
 
 @cli.group()
@@ -178,8 +212,7 @@ def test(plugin_name: str):
     plugin_file = plugins_dir / f"{plugin_name}.py"
 
     if not plugin_file.exists():
-        console.print(f"[red]Plugin not found: {plugin_name}[/red]")
-        return
+        raise click.ClickException(f"Plugin not found: {plugin_name}")
 
     # Try to import and instantiate the plugin
     try:
@@ -191,20 +224,24 @@ def test(plugin_name: str):
 
             if hasattr(module, "register_plugin"):
                 plugin_info = module.register_plugin()
-                console.print(f"[green]✓ Plugin registered successfully[/green]")
+                console.print("[green]✓ Plugin registered successfully[/green]")
                 console.print(f"  Name: {plugin_info['name']}")
                 console.print(f"  Version: {plugin_info['version']}")
                 console.print(f"  Description: {plugin_info['description']}")
 
                 # Try to instantiate
                 plugin_class = plugin_info["class"]
-                plugin_instance = plugin_class()
-                console.print(f"[green]✓ Plugin instantiated successfully[/green]")
+                plugin_class()
+                console.print("[green]✓ Plugin instantiated successfully[/green]")
             else:
-                console.print(f"[red]Plugin missing register_plugin() function[/red]")
+                raise click.ClickException("Plugin missing register_plugin() function")
+        else:
+            raise click.ClickException(f"Unable to load plugin module: {plugin_name}")
 
     except Exception as e:
-        console.print(f"[red]Error loading plugin: {e}[/red]")
+        if isinstance(e, click.ClickException):
+            raise
+        raise click.ClickException(f"Error loading plugin: {e}") from e
 
 
 @cli.group()
@@ -222,7 +259,7 @@ def show():
 
     # Environment variables
     settings = {
-        "ANTHROPIC_API_KEY": os.getenv("ANTHROPIC_API_KEY", "[not set]")[:20] + "..." if os.getenv("ANTHROPIC_API_KEY") else "[not set]",
+        "ANTHROPIC_API_KEY": "configured" if os.getenv("ANTHROPIC_API_KEY") else "not set",
         "OPENCLAW_MODE": os.getenv("OPENCLAW_MODE", "local"),
         "OPENCLAW_LOG_LEVEL": os.getenv("OPENCLAW_LOG_LEVEL", "INFO"),
         "CULTUREMECH_ROOT": os.getenv("CULTUREMECH_ROOT", "[not set]"),
@@ -237,32 +274,30 @@ def show():
 
 
 @config.command()
-def validate():
+@click.option(
+    "--config-file",
+    type=click.Path(path_type=Path, dir_okay=False),
+    default=PROJECT_ROOT / "openclaw_config.yaml",
+    show_default=True,
+)
+def validate(config_file: Path):
     """Validate configuration."""
     issues = []
 
-    # Check API key
-    if not os.getenv("ANTHROPIC_API_KEY"):
-        issues.append("ANTHROPIC_API_KEY is not set")
-
-    # Check repository paths
-    repos = {
-        "CultureMech": os.getenv("CULTUREMECH_ROOT"),
-        "MediaIngredientMech": os.getenv("MEDIAINGREDIENTMECH_ROOT"),
-        "CommunityMech": os.getenv("COMMUNITYMECH_ROOT"),
-    }
-
-    for repo_name, repo_path in repos.items():
-        if not repo_path:
-            issues.append(f"{repo_name} path not set")
-        elif not Path(repo_path).exists():
-            issues.append(f"{repo_name} path does not exist: {repo_path}")
+    try:
+        settings = RepositorySettings.from_file(config_file)
+    except RepositoryConfigurationError as exc:
+        issues.append(str(exc))
+    else:
+        issues.extend(settings.errors.values())
 
     if issues:
         console.print("[red]Configuration issues found:[/red]")
         for issue in issues:
             console.print(f"  [yellow]- {issue}[/yellow]")
-        sys.exit(1)
+        raise click.ClickException(
+            f"Configuration validation failed with {len(issues)} issue(s)"
+        )
     else:
         console.print("[green]✓ Configuration is valid[/green]")
 
@@ -276,26 +311,33 @@ def status():
 
     # Check OpenClaw installation
     try:
-        import openclaw
-        openclaw_status = f"✓ Installed (v{openclaw.__version__})"
-    except ImportError:
+        openclaw_status = f"✓ Installed (v{version('openclaw')})"
+    except PackageNotFoundError:
         openclaw_status = "✗ Not installed"
 
     config_table.add_row("OpenClaw", openclaw_status)
 
-    # Check repositories
-    repos = {
-        "CultureMech": os.getenv("CULTUREMECH_ROOT"),
-        "MediaIngredientMech": os.getenv("MEDIAINGREDIENTMECH_ROOT"),
-        "CommunityMech": os.getenv("COMMUNITYMECH_ROOT"),
+    repository_names = {
+        "culturemech": "CultureMech",
+        "mediaingredientmech": "MediaIngredientMech",
+        "communitymech": "CommunityMech",
     }
+    try:
+        settings = RepositorySettings.from_file(PROJECT_ROOT / "openclaw_config.yaml")
+    except RepositoryConfigurationError as exc:
+        settings = None
+        repository_error = str(exc)
+    else:
+        repository_error = ""
 
-    for repo_name, repo_path in repos.items():
-        if repo_path and Path(repo_path).exists():
-            status = "✓ Found"
+    for key, display_name in repository_names.items():
+        if settings is None:
+            repository_status = f"✗ {repository_error}"
+        elif key in settings.errors:
+            repository_status = f"✗ {settings.errors[key]}"
         else:
-            status = "✗ Not found"
-        config_table.add_row(repo_name, status)
+            repository_status = "✓ Verified"
+        config_table.add_row(display_name, repository_status)
 
     console.print(config_table)
 

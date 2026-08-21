@@ -11,12 +11,14 @@ Sync Logic:
 """
 
 import logging
-import os
-import yaml
-from pathlib import Path
-from typing import Dict, List, Optional, Any, Tuple
-from datetime import datetime
 from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import yaml
+
+from plugins.repository_settings import RepositorySettings
 
 logger = logging.getLogger(__name__)
 
@@ -46,11 +48,24 @@ class IngredientRepoSynchronizer:
         """
         self.config = config or {}
 
-        # Get repository roots from environment
-        self.culturemech_root = Path(os.getenv('CULTUREMECH_ROOT',
-                                                self.config.get('culturemech_root', '.')))
-        self.mim_root = Path(os.getenv('MEDIAINGREDIENTMECH_ROOT',
-                                       self.config.get('mediaingredientmech_root', '.')))
+        repository_config = self.config
+        if "repositories" not in repository_config:
+            repository_config = {
+                "repositories": {
+                    name: {"path": value}
+                    for name, value in (
+                        ("culturemech", self.config.get("culturemech_root")),
+                        (
+                            "mediaingredientmech",
+                            self.config.get("mediaingredientmech_root"),
+                        ),
+                    )
+                    if value is not None
+                }
+            }
+        self.repository_settings = RepositorySettings.from_environment(repository_config)
+        self.culturemech_root = self.repository_settings.get_target("culturemech").path
+        self.mim_root = self.repository_settings.get_target("mediaingredientmech").path
 
         logger.info(f"IngredientRepoSynchronizer initialized: "
                    f"CultureMech={self.culturemech_root}, MIM={self.mim_root}")

@@ -4,11 +4,15 @@ LinkML Validator Plugin for OpenClaw
 This plugin enables OpenClaw agents to validate YAML data against LinkML schemas.
 """
 
-import os
+import logging
 import subprocess
 from pathlib import Path
-from typing import Dict, List, Optional, Any
-import logging
+from typing import Any, Dict, Optional
+
+from plugins.repository_settings import (
+    RepositoryConfigurationError,
+    RepositorySettings,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -26,15 +30,8 @@ class LinkMLValidatorPlugin:
         self.config = config or {}
         self.strict_mode = self.config.get("strict_mode", True)
         self.validate_imports = self.config.get("validate_imports", True)
-        self.repo_paths = self._load_repo_paths()
-
-    def _load_repo_paths(self) -> Dict[str, Path]:
-        """Load repository paths from environment variables."""
-        return {
-            "culturemech": Path(os.getenv("CULTUREMECH_ROOT", "")),
-            "mediaingredientmech": Path(os.getenv("MEDIAINGREDIENTMECH_ROOT", "")),
-            "communitymech": Path(os.getenv("COMMUNITYMECH_ROOT", "")),
-        }
+        self.repository_settings = RepositorySettings.from_environment(self.config)
+        self.repo_paths = self.repository_settings.paths
 
     def validate_data(
         self,
@@ -120,13 +117,13 @@ class LinkMLValidatorPlugin:
         Returns:
             Dictionary with validation results for all files
         """
-        if repo not in self.repo_paths:
+        try:
+            repo_path = self.repository_settings.get_target(repo).path
+        except RepositoryConfigurationError as exc:
             return {
                 "valid": False,
-                "error": f"Unknown repository: {repo}",
+                "error": str(exc),
             }
-
-        repo_path = self.repo_paths[repo]
 
         # Find schema file
         schema_path = repo_path / "src" / "schema" / f"{repo}.yaml"
@@ -152,7 +149,7 @@ class LinkMLValidatorPlugin:
 
         data_files = list(data_dir.glob(data_pattern))
 
-        results = {
+        results: Dict[str, Any] = {
             "repo": repo,
             "schema": str(schema_path),
             "total_files": len(data_files),

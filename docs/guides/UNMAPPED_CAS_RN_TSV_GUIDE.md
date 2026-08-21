@@ -413,11 +413,11 @@ Ingredients with ChEBI IDs are easier to curate manually (authoritative source f
 If MediaIngredientMech is updated:
 
 ```bash
-cd ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw
+cd /absolute/path/to/culturebotai-claw
 
 # Regenerate TSV
-python scripts/export_unmapped_cas_rn_tsv.py \
-    --mim ~/Documents/.../MediaIngredientMech \
+uv run python scripts/export_unmapped_cas_rn_tsv.py \
+    --mim "$MEDIAINGREDIENTMECH_ROOT" \
     --output workspace/unmapped_cas_rn_ingredients.tsv
 
 # Copy to project root

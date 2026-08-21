@@ -7,7 +7,7 @@
 #
 
 # Configuration
-ORCHESTRATION_ROOT="/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe-orchestration"
+ORCHESTRATION_ROOT="{{ORCHESTRATION_ROOT}}"  # Replaced during installation
 REPO_NAME="{{REPO_NAME}}"  # Will be replaced during installation
 STATUS_DIR="$ORCHESTRATION_ROOT/status"
 CLAUDE_ID="${REPO_NAME}_claude"

@@ -12,8 +12,7 @@ Adapts the LLMCurator pattern from ingredient curation for environment-specific 
 import json
 import logging
 import os
-from dataclasses import dataclass
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 from plugins.environment_curator import EnvironmentSuggestion, EnvironmentTerm, Evidence
 

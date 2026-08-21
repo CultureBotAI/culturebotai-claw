@@ -17,14 +17,21 @@ Workflow (8 steps):
 This replaces separate tooling in both repositories with a unified workflow.
 """
 
+import logging
 import os
 import sys
-import logging
-import yaml
-import subprocess
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
+
+import yaml
+
+from plugins.ingredient_deduplicator import IngredientDeduplicator
+from plugins.ingredient_repo_synchronizer import IngredientRepoSynchronizer
+from plugins.lock_manager import LockManager
+from plugins.repository_settings import RepositorySettings
+
+logger = logging.getLogger(__name__)
 
 # Add MediaIngredientMech to path for LLM curator
 mediaingredient_root = os.getenv("MEDIAINGREDIENTMECH_ROOT")
@@ -33,21 +40,13 @@ if mediaingredient_root:
     if str(src_path) not in sys.path:
         sys.path.insert(0, str(src_path))
 
-# Import plugins
-from plugins.lock_manager import LockManager
-from plugins.ingredient_deduplicator import IngredientDeduplicator
-from plugins.ingredient_repo_synchronizer import IngredientRepoSynchronizer
-
-# Try to import LLM curator and OAK
+# Try to import the optional downstream LLM curator.
 try:
     from mediaingredientmech.utils.llm_curator import LLMCurator
-    from mediaingredientmech.utils.ontology_client import OntologyClient
     LLM_CURATOR_AVAILABLE = True
 except ImportError as e:
     logger.warning(f"LLM curator not available: {e}")
     LLM_CURATOR_AVAILABLE = False
-
-logger = logging.getLogger(__name__)
 
 
 class UnifiedIngredientMappingPipeline:
@@ -62,8 +61,15 @@ class UnifiedIngredientMappingPipeline:
         """
         self.config = config or {}
 
+        # Validate repository identities before creating local artifacts.
+        self.repository_settings = RepositorySettings.from_environment(self.config)
+        self.culturemech_root = self.repository_settings.get_target("culturemech").path
+        self.mim_root = self.repository_settings.get_target(
+            "mediaingredientmech"
+        ).path
+
         # Load workspace paths
-        self.workspace = Path(os.getenv("OPENCLAW_WORKSPACE", "."))
+        self.workspace = Path(os.getenv("OPENCLAW_WORKSPACE", "workspace"))
         self.canonical_dir = self.workspace / "canonical_ingredients"
         self.canonical_dir.mkdir(parents=True, exist_ok=True)
 
@@ -75,14 +81,10 @@ class UnifiedIngredientMappingPipeline:
         self.default_threshold = self.config.get("auto_accept_threshold", 0.90)
         self.max_cost_per_run = self.config.get("max_cost_per_run", 5.00)
 
-        # Repository roots
-        self.culturemech_root = Path(os.getenv('CULTUREMECH_ROOT', '.'))
-        self.mim_root = Path(os.getenv('MEDIAINGREDIENTMECH_ROOT', '.'))
-
         # Initialize plugins
         self.lock_manager = LockManager()
         self.deduplicator = IngredientDeduplicator()
-        self.synchronizer = IngredientRepoSynchronizer()
+        self.synchronizer = IngredientRepoSynchronizer(self.config)
 
         # Initialize LLM curator if available
         self.llm_curator = None
@@ -119,7 +121,7 @@ class UnifiedIngredientMappingPipeline:
         batch_size = batch_size or self.default_batch_size
         auto_accept_threshold = auto_accept_threshold or self.default_threshold
 
-        logger.info(f"=== Starting Unified Ingredient Mapping Pipeline ===")
+        logger.info("=== Starting Unified Ingredient Mapping Pipeline ===")
         logger.info(f"Config: batch_size={batch_size}, threshold={auto_accept_threshold}, "
                    f"dry_run={dry_run}, min_occurrences={min_occurrences}")
 
@@ -227,7 +229,7 @@ class UnifiedIngredientMappingPipeline:
         with open(report_file, 'w') as f:
             yaml.dump(report, f, default_flow_style=False)
 
-        logger.info(f"\n=== Pipeline Complete ===")
+        logger.info("\n=== Pipeline Complete ===")
         logger.info(f"Duration: {duration:.1f}s")
         logger.info(f"Auto-accepted: {report['summary']['auto_accepted']}")
         logger.info(f"Manual review: {report['summary']['manual_review']}")
