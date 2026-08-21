@@ -23,10 +23,15 @@ So the hub's absence is an invariant, not a gap — and
 See `MANIFEST`. Adding a file means putting the canonical bytes here at the same
 relative path a spoke uses, and listing it.
 
-`.github/workflows/vendored-sync.yaml` is **not** here yet. The four spokes'
-copies share byte-identical logic but differ in comments that name each repo's
-local gate, so they are not yet vendorable. Normalising them is the remaining
-half of TraitMech#209; the mechanism to hold them exists once that is done.
+`.github/workflows/vendored-sync.yaml` is **not** here yet. Three of the four
+spokes (MediaIngredientMech, CommunityMech, TraitMech) carry it as a standalone
+file with byte-identical logic that differs only in comments naming each
+repo's local gate, so they are not yet vendorable — normalising them is the
+remaining half of TraitMech#209; the mechanism to hold them exists once that
+is done. proteintraitsmech's equivalent gate is not a standalone file at all —
+it is a job embedded inside a differently-named, differently-structured
+workflow (`history-and-vendored.yaml`) — so it is not yet even comparable the
+same way, let alone vendorable.
 
 ## Direction
 
