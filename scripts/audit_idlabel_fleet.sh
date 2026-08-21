@@ -32,7 +32,7 @@ REPOS=(CultureMech MediaIngredientMech CommunityMech TraitMech proteintraitsmech
 # repos, 1 SPOKE_FILES entry, --max-time 10 each: (5+2)x5 + 5 + 5 = 45 calls,
 # ~450s worst case against .github/workflows/id-label-canon.yaml's
 # timeout-minutes: 10 (600s). Re-check this math before growing REPOS,
-# FILES/MANIFEST, or MAPPED further.
+# FILES/MANIFEST, MAPPED, or SPOKE_MANIFEST further.
 
 # claw's mirror lives here, and its MANIFEST is the single list of vendored
 # files. Read it rather than restating it: a hardcoded copy would be a second
