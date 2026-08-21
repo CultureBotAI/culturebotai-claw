@@ -169,10 +169,21 @@ for f in "${SPOKE_FILES[@]}"; do
 
   # The hub's ABSENCE is the invariant here, so assert it rather than assume it.
   # A hub copy would mean someone "fixed" the missing-canonical-copy problem the
-  # dangerous way, reintroducing a self-referential check.
-  if curl -fsSL --max-time 10 -o /dev/null "$(raw "$HUB" "$f")" 2>/dev/null; then
+  # dangerous way, reintroducing a self-referential check. Read the actual HTTP
+  # status via -w rather than trusting curl -f's exit code: raw.githubusercontent.com
+  # can respond to a genuinely-missing file in a way that curl maps to exit 56
+  # (CURLE_RECV_ERROR) rather than the textbook 22 (CURLE_HTTP_RETURNED_ERROR) for
+  # a 404 — confirmed live against this exact URL — so branching on the exit code
+  # would either misreport a confirmed-absent file as an unverifiable error, or
+  # (worse, if the assumed code is wrong the other way) silently accept a network
+  # failure as "confirmed absent" without ever checking the invariant.
+  http_code="$(curl -sS --max-time 10 -o /dev/null -w '%{http_code}' "$(raw "$HUB" "$f")" 2>/dev/null || true)"
+  if [ "$http_code" = "200" ]; then
     echo "DRIFT: hub ${HUB} now has ${f} — spoke-only files must NOT exist in the hub;"
     echo "       a hub copy makes the hub diff itself against itself (see ${SPOKE_ROOT}/README.md)"
+    fail=1
+  elif [ "$http_code" != "404" ]; then
+    echo "ERROR: could not verify hub ${HUB} lacks ${f} (HTTP ${http_code:-no response}, not a clean 404)"
     fail=1
   fi
   checked=$((checked + 1))
