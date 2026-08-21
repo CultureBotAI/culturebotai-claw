@@ -2,7 +2,8 @@
 
 This directory is a **CI-verified mirror** of the id↔label validator and its
 chemical-formula plausibility helper, which are vendored byte-identical into the
-four Mech repos (CultureMech / MediaIngredientMech / CommunityMech / TraitMech).
+five Mech repos (CultureMech / MediaIngredientMech / CommunityMech / TraitMech /
+proteintraitsmech).
 
 **The machine-canonical fetch-hub is the public `CultureBotAI/CultureMech`, not
 this repo.** culturebotai-claw is private, so the Mechs' CI (they are public)
@@ -67,7 +68,7 @@ touching this directory or the script.
 
 It asserts both directions against `CultureBotAI/CultureMech@main`:
 
-1. all four Mech repos carry byte-identical copies of the five validator files
+1. all five Mech repos carry byte-identical copies of the five validator files
    plus `mech_shared.yaml` (path-mapped to `src/<pkg>/schema/`), and
 2. this mirror carries byte-identical copies of the five validator files.
 

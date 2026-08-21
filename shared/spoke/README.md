@@ -1,7 +1,8 @@
 # Spoke-only vendored files
 
 Canonical copies of files that are byte-identical across the **spokes**
-(MediaIngredientMech, CommunityMech, TraitMech) but do **not** exist in the hub.
+(MediaIngredientMech, CommunityMech, TraitMech, proteintraitsmech) but do
+**not** exist in the hub.
 
 ## Why these cannot live in `shared/idlabel/`
 
@@ -22,7 +23,7 @@ So the hub's absence is an invariant, not a gap — and
 See `MANIFEST`. Adding a file means putting the canonical bytes here at the same
 relative path a spoke uses, and listing it.
 
-`.github/workflows/vendored-sync.yaml` is **not** here yet. The three spokes'
+`.github/workflows/vendored-sync.yaml` is **not** here yet. The four spokes'
 copies share byte-identical logic but differ in comments that name each repo's
 local gate, so they are not yet vendorable. Normalising them is the remaining
 half of TraitMech#209; the mechanism to hold them exists once that is done.
