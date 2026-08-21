@@ -47,6 +47,7 @@ fi
 # Same bytes, per-repo path src/<lowercased-repo>/<suffix>.
 MAPPED=(
   schema/mech_shared.yaml
+  schema/history.yaml
 )
 # Note the mirror carries the manifest set only — not mech_shared.yaml, which is
 # a schema module rather than part of the id-label validator set.
@@ -59,7 +60,7 @@ fail=0
 checked=0
 
 fetch_hub() { # path -> $tmp/hub
-  if ! curl -fsSL "$(raw "$HUB" "$1")" -o "$tmp/hub"; then
+  if ! curl -fsSL --max-time 10 "$(raw "$HUB" "$1")" -o "$tmp/hub"; then
     echo "ERROR: hub ${HUB}@${REF} is missing $1"
     return 1
   fi
@@ -73,7 +74,7 @@ for f in "${FILES[@]}"; do
   fetch_hub "$f" || { fail=1; continue; }
   for r in "${REPOS[@]}"; do
     [ "$r" = "$HUB" ] && continue
-    if ! curl -fsSL "$(raw "$r" "$f")" -o "$tmp/r"; then
+    if ! curl -fsSL --max-time 10 "$(raw "$r" "$f")" -o "$tmp/r"; then
       echo "DRIFT: ${r} is missing ${f} (hub has it)"; fail=1; continue
     fi
     cmp -s "$tmp/hub" "$tmp/r" || { echo "DRIFT: ${r}:${f} differs from hub"; fail=1; }
@@ -87,7 +88,7 @@ for suf in "${MAPPED[@]}"; do
   for r in "${REPOS[@]}"; do
     [ "$r" = "$HUB" ] && continue
     rf="src/$(lc "$r")/${suf}"
-    if ! curl -fsSL "$(raw "$r" "$rf")" -o "$tmp/r"; then
+    if ! curl -fsSL --max-time 10 "$(raw "$r" "$rf")" -o "$tmp/r"; then
       echo "DRIFT: ${r} is missing ${rf} (hub has it)"; fail=1; continue
     fi
     cmp -s "$tmp/hub" "$tmp/r" || { echo "DRIFT: ${r}:${rf} differs from hub"; fail=1; }
@@ -161,7 +162,7 @@ for f in "${SPOKE_FILES[@]}"; do
   # The hub's ABSENCE is the invariant here, so assert it rather than assume it.
   # A hub copy would mean someone "fixed" the missing-canonical-copy problem the
   # dangerous way, reintroducing a self-referential check.
-  if curl -fsSL -o /dev/null "$(raw "$HUB" "$f")" 2>/dev/null; then
+  if curl -fsSL --max-time 10 -o /dev/null "$(raw "$HUB" "$f")" 2>/dev/null; then
     echo "DRIFT: hub ${HUB} now has ${f} — spoke-only files must NOT exist in the hub;"
     echo "       a hub copy makes the hub diff itself against itself (see ${SPOKE_ROOT}/README.md)"
     fail=1
@@ -170,7 +171,7 @@ for f in "${SPOKE_FILES[@]}"; do
 
   for r in "${REPOS[@]}"; do
     [ "$r" = "$HUB" ] && continue
-    if ! curl -fsSL "$(raw "$r" "$f")" -o "$tmp/r"; then
+    if ! curl -fsSL --max-time 10 "$(raw "$r" "$f")" -o "$tmp/r"; then
       echo "DRIFT: ${r} is missing ${f} (spoke mirror has it)"; fail=1; continue
     fi
     cmp -s "$ref_path" "$tmp/r" || { echo "DRIFT: ${r}:${f} differs from ${ref_path}"; fail=1; }
