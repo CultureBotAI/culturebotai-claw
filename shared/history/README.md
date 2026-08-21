@@ -9,8 +9,8 @@ issue.**
 
 | Piece | Path | Consumed how |
 |---|---|---|
-| LinkML schema (canonical) | `shared/history/history.yaml` | vendored byte-identical into each adopting Mech |
-| Scaffolder + validator | `src/kg_microbe_history/` | `PYTHONPATH=<claw>/src python -m kg_microbe_history` |
+| LinkML schema (canonical) | `shared/history/history.yaml` | packaged with the CLI and vendored byte-identical into each adopting Mech |
+| Scaffolder + validator | `src/kg_microbe_history/` | installed as `kg-microbe-history` |
 
 This mirrors `kg_microbe_kgscan`: one implementation here, thin per-repo justfile
 recipes in the Mechs.
@@ -22,13 +22,11 @@ The schema is **vendored** into each Mech; the scaffolder is **not**.
 claw is private and the Mechs are public, so a Mech's CI cannot check claw out
 without a token. Validation must therefore work from a local schema copy — and it
 does: `linkml-validate --schema <vendored> --target-class HistoryRecord <files>`
-needs nothing else. Scaffolding is a dev-time action where a claw checkout is a
-fair assumption, so `just new-history` resolves the library through `CLAW_SRC`
-and **fails loudly** when it is missing rather than skipping.
+needs nothing else. The installed CLI carries the canonical schema as package
+data, so its default validation path also works outside a claw checkout.
 
-That fail-loud choice is deliberate. A skip-when-missing variant of exactly this
-pattern is what let TraitMech's `vendored-sync` job pass while checking nothing
-(TraitMech#182).
+Spoke CI may still validate its vendored schema directly without access to this
+private repository.
 
 ## Adoption status
 

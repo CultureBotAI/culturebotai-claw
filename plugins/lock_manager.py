@@ -22,6 +22,17 @@ import yaml
 logger = logging.getLogger(__name__)
 
 
+def _workspace_root() -> Path:
+    """Resolve workspace settings without writing inside an installed package."""
+
+    workspace = Path(os.getenv("OPENCLAW_WORKSPACE", "workspace")).expanduser()
+    if not workspace.is_absolute():
+        orchestration_root = os.getenv("OPENCLAW_ORCHESTRATION_ROOT")
+        base = Path(orchestration_root).expanduser() if orchestration_root else Path.cwd()
+        workspace = base / workspace
+    return workspace.resolve()
+
+
 class LockManager:
     """Distributed lock manager for multi-Claude coordination."""
 
@@ -35,8 +46,8 @@ class LockManager:
             config: Configuration with locks_dir, my_id, default_timeout
         """
         self.config = config or {}
-        workspace = os.getenv("OPENCLAW_WORKSPACE", "workspace")
-        self.locks_dir = Path(self.config.get("locks_dir", str(Path(workspace) / "locks")))
+        workspace = _workspace_root()
+        self.locks_dir = Path(self.config.get("locks_dir", str(workspace / "locks")))
         self.locks_dir.mkdir(parents=True, exist_ok=True)
 
         self.my_id = self.config.get("my_id", "orchestration_claude")
@@ -414,8 +425,8 @@ class StatusManager:
             config: Configuration with status_dir, my_id
         """
         self.config = config or {}
-        workspace = os.getenv("OPENCLAW_WORKSPACE", "workspace")
-        self.status_dir = Path(self.config.get("status_dir", str(Path(workspace) / "status")))
+        workspace = _workspace_root()
+        self.status_dir = Path(self.config.get("status_dir", str(workspace / "status")))
         self.status_dir.mkdir(parents=True, exist_ok=True)
 
         self.my_id = self.config.get("my_id", "orchestration_claude")

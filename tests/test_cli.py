@@ -6,6 +6,27 @@ from git import Repo
 from cli.main import cli
 
 
+def _write_verified_config(tmp_path, monkeypatch, extra_lines=()):
+    repositories = {
+        "culturemech": ("CULTUREMECH_ROOT", "CultureBotAI/CultureMech"),
+        "mediaingredientmech": (
+            "MEDIAINGREDIENTMECH_ROOT",
+            "CultureBotAI/MediaIngredientMech",
+        ),
+        "communitymech": ("COMMUNITYMECH_ROOT", "CultureBotAI/CommunityMech"),
+    }
+    lines = [*extra_lines, "repositories:"]
+    for name, (environment_variable, identity) in repositories.items():
+        path = tmp_path / name
+        repo = Repo.init(path, mkdir=True)
+        repo.create_remote("origin", f"https://github.com/{identity}.git")
+        monkeypatch.setenv(environment_variable, str(path))
+        lines.extend((f"  {name}:", f"    path: ${{{environment_variable}}}"))
+    config_path = tmp_path / "openclaw.yaml"
+    config_path.write_text("\n".join(lines), encoding="utf-8")
+    return config_path
+
+
 def test_missing_plugin_is_nonzero():
     result = CliRunner().invoke(cli, ["plugin", "test", "does-not-exist"])
 
@@ -108,6 +129,61 @@ def test_config_validate_does_not_require_optional_api_key(tmp_path, monkeypatch
 
     assert result.exit_code == 0
 
+
+def test_config_validate_rejects_unknown_top_level_key(tmp_path, monkeypatch):
+    config_path = _write_verified_config(
+        tmp_path, monkeypatch, extra_lines=("plugnis: {}",)
+    )
+
+    result = CliRunner().invoke(
+        cli, ["config", "validate", "--config-file", str(config_path)]
+    )
+
+    assert result.exit_code != 0
+    assert "Unknown top-level configuration keys: plugnis" in result.output
+
+
+def test_config_validate_rejects_invalid_safety_types(tmp_path, monkeypatch):
+    config_path = _write_verified_config(
+        tmp_path,
+        monkeypatch,
+        extra_lines=("safety:", "  create_backups: yes-please"),
+    )
+
+    result = CliRunner().invoke(
+        cli, ["config", "validate", "--config-file", str(config_path)]
+    )
+
+    assert result.exit_code != 0
+    assert "safety.create_backups" in result.output
+
+
+def test_config_validate_rejects_null_known_section(tmp_path, monkeypatch):
+    config_path = _write_verified_config(
+        tmp_path, monkeypatch, extra_lines=("plugins:",)
+    )
+
+    result = CliRunner().invoke(
+        cli, ["config", "validate", "--config-file", str(config_path)]
+    )
+
+    assert result.exit_code != 0
+    assert "'plugins' must be a mapping" in result.output
+
+
+def test_config_validate_rejects_invalid_pipeline_scalar(tmp_path, monkeypatch):
+    config_path = _write_verified_config(
+        tmp_path,
+        monkeypatch,
+        extra_lines=("pipelines:", "  unified:", "    batch_size: many"),
+    )
+
+    result = CliRunner().invoke(
+        cli, ["config", "validate", "--config-file", str(config_path)]
+    )
+
+    assert result.exit_code != 0
+    assert "pipelines.unified.batch_size" in result.output
 
 
 def test_cli_version_comes_from_project_metadata():

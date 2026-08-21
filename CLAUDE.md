@@ -31,6 +31,7 @@ Experimental or disabled:
 
 - `openclaw-cli agent run` and `pipeline run` execution without `--dry-run`.
 - Environment-curation apply mode; it raises until an atomic validated writer exists.
+- Unified ingredient-mapping apply mode; it raises until all YAML writes are transactional.
 - Legacy root diagnostics, one-off migration scripts, and archived phase workflows.
 
 Never describe an experimental path as implemented merely because a YAML agent

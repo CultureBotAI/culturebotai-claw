@@ -41,6 +41,167 @@ DEFAULT_REPOSITORIES: Mapping[str, RepositoryDefinition] = {
     ),
 }
 
+KNOWN_CONFIGURATION_SECTIONS = {
+    "openclaw",
+    "repositories",
+    "agents",
+    "plugins",
+    "pipelines",
+    "safety",
+    "monitoring",
+    "performance",
+}
+
+
+def _is_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def configuration_structure_errors(config: Mapping[str, Any]) -> list[str]:
+    """Return structural errors for the configuration surfaces consumed here."""
+
+    errors: list[str] = []
+    unknown = set(config) - KNOWN_CONFIGURATION_SECTIONS
+    if unknown:
+        names = ", ".join(sorted(str(key) for key in unknown))
+        errors.append(f"Unknown top-level configuration keys: {names}")
+
+    for section in KNOWN_CONFIGURATION_SECTIONS:
+        value = config.get(section)
+        if section in config and not isinstance(value, Mapping):
+            errors.append(f"'{section}' must be a mapping")
+
+    def expect(section: str, key: str, expected: type, description: str) -> None:
+        section_value = config.get(section)
+        if not isinstance(section_value, Mapping) or key not in section_value:
+            return
+        value = section_value[key]
+        if expected is float:
+            valid = _is_number(value)
+        elif expected is int:
+            valid = isinstance(value, int) and not isinstance(value, bool)
+        else:
+            valid = isinstance(value, expected)
+        if not valid:
+            errors.append(f"'{section}.{key}' must be {description}")
+
+    def expect_string_list(section: str, key: str) -> None:
+        section_value = config.get(section)
+        if not isinstance(section_value, Mapping) or key not in section_value:
+            return
+        value = section_value[key]
+        if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+            errors.append(f"'{section}.{key}' must be a list of strings")
+
+    for key in ("version", "mode", "log_level", "workspace"):
+        expect("openclaw", key, str, "a string")
+    expect_string_list("agents", "discovery_paths")
+    expect("agents", "defaults", dict, "a mapping")
+    expect_string_list("plugins", "enabled")
+    expect_string_list("plugins", "paths")
+    expect_string_list("safety", "require_approval_for")
+    expect("safety", "create_backups", bool, "a boolean")
+    expect("safety", "backup_directory", str, "a string")
+    expect("safety", "allowed_operations", dict, "a mapping")
+    expect("monitoring", "enable_logging", bool, "a boolean")
+    expect("monitoring", "log_directory", str, "a string")
+    expect("monitoring", "metrics_enabled", bool, "a boolean")
+    expect("monitoring", "cost_tracking", bool, "a boolean")
+    expect("monitoring", "max_cost_per_run", float, "a number")
+    expect("performance", "parallel_agents", int, "an integer")
+    expect("performance", "cache_enabled", bool, "a boolean")
+    expect("performance", "cache_ttl", float, "a number")
+
+    pipelines = config.get("pipelines")
+    if isinstance(pipelines, Mapping):
+        for name, pipeline in pipelines.items():
+            if not isinstance(pipeline, Mapping):
+                errors.append(f"'pipelines.{name}' must be a mapping")
+                continue
+            pipeline_types = {
+                "description": (str, "a string"),
+                "batch_size": (int, "an integer"),
+                "auto_accept_threshold": (float, "a number"),
+                "max_cost_per_run": (float, "a number"),
+                "dry_run_default": (bool, "a boolean"),
+                "canonical_storage": (str, "a string"),
+                "sync_mode": (str, "a string"),
+                "min_synonym_overlap": (float, "a number"),
+            }
+            for key, (expected, description) in pipeline_types.items():
+                if key not in pipeline:
+                    continue
+                value = pipeline[key]
+                if expected is float:
+                    valid = _is_number(value)
+                elif expected is int:
+                    valid = isinstance(value, int) and not isinstance(value, bool)
+                else:
+                    valid = isinstance(value, expected)
+                if not valid:
+                    errors.append(f"'pipelines.{name}.{key}' must be {description}")
+            for key in ("quality_gates", "deduplication_strategies"):
+                value = pipeline.get(key)
+                if value is not None and (
+                    not isinstance(value, list)
+                    or not all(isinstance(item, str) for item in value)
+                ):
+                    errors.append(f"'pipelines.{name}.{key}' must be a list of strings")
+
+    agents = config.get("agents")
+    if isinstance(agents, Mapping) and isinstance(agents.get("defaults"), Mapping):
+        defaults = agents["defaults"]
+        default_types = {
+            "temperature": float,
+            "max_tokens": int,
+            "timeout": int,
+            "retry_on_failure": bool,
+            "max_retries": int,
+        }
+        for key, expected in default_types.items():
+            if key not in defaults:
+                continue
+            value = defaults[key]
+            if expected is float:
+                valid = _is_number(value)
+            elif expected is int:
+                valid = isinstance(value, int) and not isinstance(value, bool)
+            else:
+                valid = isinstance(value, expected)
+            if not valid:
+                errors.append(f"'agents.defaults.{key}' has the wrong type")
+
+    safety = config.get("safety")
+    if isinstance(safety, Mapping):
+        operations = safety.get("allowed_operations")
+        if isinstance(operations, Mapping):
+            for name, allowed in operations.items():
+                if not isinstance(allowed, bool):
+                    errors.append(
+                        f"'safety.allowed_operations.{name}' must be a boolean"
+                    )
+
+    return errors
+
+
+def load_configuration(config_path: Path) -> Mapping[str, Any]:
+    """Load a YAML configuration and reject unsupported structure."""
+
+    try:
+        loaded = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError) as exc:
+        raise RepositoryConfigurationError(
+            f"Unable to load configuration {config_path}: {exc}"
+        ) from exc
+    if not isinstance(loaded, Mapping):
+        raise RepositoryConfigurationError(
+            f"Configuration {config_path} must contain a YAML mapping"
+        )
+    errors = configuration_structure_errors(loaded)
+    if errors:
+        raise RepositoryConfigurationError("; ".join(errors))
+    return loaded
+
 
 def _repository_identity(remote_url: str) -> Optional[str]:
     """Return a GitHub ``owner/repository`` from common remote URL forms."""
@@ -218,16 +379,7 @@ class RepositorySettings:
     ) -> "RepositorySettings":
         """Load and validate the repository section of an OpenClaw YAML file."""
 
-        try:
-            loaded = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-        except (OSError, yaml.YAMLError) as exc:
-            raise RepositoryConfigurationError(
-                f"Unable to load configuration {config_path}: {exc}"
-            ) from exc
-        if not isinstance(loaded, Mapping):
-            raise RepositoryConfigurationError(
-                f"Configuration {config_path} must contain a YAML mapping"
-            )
+        loaded = load_configuration(config_path)
         return cls.from_environment(loaded, environ=environ)
 
     @staticmethod

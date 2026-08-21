@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from plugins.lock_manager import LockManager
+from plugins.lock_manager import LockManager, StatusManager
 
 
 def _contend_for_lock(
@@ -229,3 +229,16 @@ def test_hook_checker_blocks_on_corrupt_lock(tmp_path: Path) -> None:
 
     assert result.returncode == 1
     assert "active or unreadable" in result.stdout
+
+
+def test_relative_workspace_uses_configured_orchestration_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("OPENCLAW_ORCHESTRATION_ROOT", str(tmp_path))
+    monkeypatch.setenv("OPENCLAW_WORKSPACE", "runtime")
+
+    lock_manager = LockManager()
+    status_manager = StatusManager()
+
+    assert lock_manager.locks_dir == tmp_path / "runtime" / "locks"
+    assert status_manager.status_dir == tmp_path / "runtime" / "status"

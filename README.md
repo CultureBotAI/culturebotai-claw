@@ -15,6 +15,7 @@ pipelines, shared Mech utilities, and fleet CI workflows.
 | Agent and pipeline execution through `openclaw-cli` | Not implemented; non-dry runs fail explicitly |
 | Environment-curation dry run and reports | Supported |
 | Environment-curation apply mode | Disabled until a validated atomic writer exists |
+| Unified ingredient-mapping apply mode | Disabled until canonical and downstream writes are transactional |
 | Shared history, QC, discussions, and knowledge-gap tools | Packaged and supported |
 | Historical scripts and phase reports | Retained for provenance; not part of the supported API |
 
@@ -37,6 +38,10 @@ uv sync --extra dev
 uv run openclaw-cli config validate
 uv run openclaw-cli status
 ```
+
+The external OpenClaw runtime is not a package dependency while agent and
+pipeline execution is disabled. Add a compatible runtime only when implementing
+that integration.
 
 Repository roots are security boundaries. Configuration validation requires
 each path to be the exact Git worktree root with the expected GitHub `origin`.

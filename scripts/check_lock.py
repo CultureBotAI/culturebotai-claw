@@ -32,17 +32,17 @@ def check_lock(resource_name: str, operation: str = "operation") -> int:
         2 if error
     """
     # Find workspace directory (same logic as lock_manager.py)
-    workspace = os.getenv("OPENCLAW_WORKSPACE")
-    if not workspace:
-        # Try to find orchestration root and use its workspace
-        orchestration_root = os.getenv("OPENCLAW_ORCHESTRATION_ROOT")
-        if not orchestration_root:
-            # Try to find it relative to this script
-            script_dir = Path(__file__).parent
-            orchestration_root = script_dir.parent
-        workspace = str(Path(orchestration_root) / "workspace")
+    orchestration_root = Path(
+        os.getenv(
+            "OPENCLAW_ORCHESTRATION_ROOT",
+            str(Path(__file__).resolve().parent.parent),
+        )
+    )
+    workspace = Path(os.getenv("OPENCLAW_WORKSPACE", "workspace")).expanduser()
+    if not workspace.is_absolute():
+        workspace = orchestration_root / workspace
 
-    locks_dir = Path(workspace) / "locks"
+    locks_dir = workspace.resolve() / "locks"
     try:
         manager = LockManager({"locks_dir": str(locks_dir), "my_id": "hook-checker"})
         global_lock = manager.check_lock("global")

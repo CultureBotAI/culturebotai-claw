@@ -14,7 +14,6 @@ dependencies = [
     "anthropic>=0.85.0",
     "click>=8.3.1",
     "gitpython>=3.1.46",
-    "openclaw==2026.3.12",
     "pyyaml>=6.0.3",
     "rich>=14.3.3",
     "watchdog>=6.0.0",
@@ -52,14 +51,19 @@ dev = [
     "mypy>=1.0.0",
 ]
 
+[tool.setuptools]
+include-package-data = false
+
 [tool.setuptools.packages.find]
 where = [".", "src"]
-include = ["cli*", "plugins*", "pipelines*", "kg_microbe_*"]
-exclude = ["tests*", "scripts*", "shared*"]
+include = ["cli*", "plugins*", "pipelines*", "kg_microbe_*", "shared*"]
+exclude = ["tests*", "scripts*", "shared.idlabel*"]
+namespaces = false
 
 [tool.setuptools.package-data]
 kg_microbe_qc = ["templates/*.j2"]
 kg_microbe_discussions = ["templates/*.html"]
+"shared.history" = ["history.yaml"]
 
 [tool.uv]
 package = true

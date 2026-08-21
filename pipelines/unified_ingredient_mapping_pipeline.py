@@ -49,6 +49,10 @@ except ImportError as e:
     LLM_CURATOR_AVAILABLE = False
 
 
+class ApplyModeUnavailableError(RuntimeError):
+    """Raised while unified writes lack a validated transaction boundary."""
+
+
 class UnifiedIngredientMappingPipeline:
     """Orchestrate unified ingredient mapping across repositories."""
 
@@ -118,6 +122,14 @@ class UnifiedIngredientMappingPipeline:
         Returns:
             Pipeline execution summary
         """
+        self._revalidate_repository_targets()
+        if not dry_run:
+            raise ApplyModeUnavailableError(
+                "Unified ingredient mapping apply mode is unavailable: canonical and "
+                "downstream YAML writes are not yet atomic and transactional. Run with "
+                "dry_run=True."
+            )
+
         batch_size = batch_size or self.default_batch_size
         auto_accept_threshold = auto_accept_threshold or self.default_threshold
 
@@ -237,6 +249,16 @@ class UnifiedIngredientMappingPipeline:
         logger.info(f"Report saved: {report_file}")
 
         return report
+
+    def _revalidate_repository_targets(self) -> None:
+        """Recheck exact worktrees and origins immediately before every run."""
+
+        self.culturemech_root = self.repository_settings.get_target("culturemech").path
+        self.mim_root = self.repository_settings.get_target(
+            "mediaingredientmech"
+        ).path
+        self.synchronizer.repository_settings.get_target("culturemech")
+        self.synchronizer.repository_settings.get_target("mediaingredientmech")
 
     def _step1_acquire_locks(self, report: Dict) -> bool:
         """Acquire locks on both repositories."""
