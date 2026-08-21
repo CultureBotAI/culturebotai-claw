@@ -25,7 +25,7 @@ set -euo pipefail
 ORG="${ORG:-CultureBotAI}"
 HUB="${HUB:-CultureMech}"
 REF="${REF:-main}"
-REPOS=(CultureMech MediaIngredientMech CommunityMech TraitMech)
+REPOS=(CultureMech MediaIngredientMech CommunityMech TraitMech proteintraitsmech)
 
 # claw's mirror lives here, and its MANIFEST is the single list of vendored
 # files. Read it rather than restating it: a hardcoded copy would be a second
