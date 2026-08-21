@@ -6,7 +6,8 @@ from CultureMech and MediaIngredientMech.
 """
 
 import pytest
-from plugins.ingredient_deduplicator import IngredientDeduplicator, ConflictRecord
+
+from plugins.ingredient_deduplicator import IngredientDeduplicator
 
 
 @pytest.fixture

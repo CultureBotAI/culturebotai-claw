@@ -429,7 +429,8 @@ live in its current form.** Evidence:
 
 - `plugins/lock_manager.py` has not been modified since the **initial commit**
   (`662c4be`, 2026-03-22). Same single-commit history for `scripts/check_lock.py`,
-  `run_pilot_test*.py`, `test_coordination.py`, and `MULTI_CLAUDE_COORDINATION.md`.
+  `run_pilot_test*.py`, `test_coordination.py`, and
+  `docs/guides/MULTI_CLAUDE_COORDINATION.md`.
 - `workspace/locks/` and `locks/` are **both empty**.
 - The newest file in `workspace/tasks/` is dated **2026-03-22** — the original
   pilot, over four months stale.

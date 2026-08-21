@@ -4,11 +4,15 @@ Git Integration Plugin for OpenClaw
 This plugin enables OpenClaw agents to perform safe git operations.
 """
 
-import os
-from pathlib import Path
-from typing import Dict, List, Optional, Any
 import logging
-from git import Repo, GitCommandError
+from typing import Any, Dict, List, Optional
+
+from git import GitCommandError, Repo
+
+from plugins.repository_settings import (
+    RepositoryConfigurationError,
+    RepositorySettings,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -26,15 +30,8 @@ class GitIntegrationPlugin:
         self.config = config or {}
         self.auto_commit = self.config.get("auto_commit", False)
         self.branch_prefix = self.config.get("branch_prefix", "agent/")
-        self.repo_paths = self._load_repo_paths()
-
-    def _load_repo_paths(self) -> Dict[str, Path]:
-        """Load repository paths from environment variables."""
-        return {
-            "culturemech": Path(os.getenv("CULTUREMECH_ROOT", "")),
-            "mediaingredientmech": Path(os.getenv("MEDIAINGREDIENTMECH_ROOT", "")),
-            "communitymech": Path(os.getenv("COMMUNITYMECH_ROOT", "")),
-        }
+        self.repository_settings = RepositorySettings.from_environment(self.config)
+        self.repo_paths = self.repository_settings.paths
 
     def _get_repo(self, repo_name: str) -> Optional[Repo]:
         """
@@ -46,20 +43,19 @@ class GitIntegrationPlugin:
         Returns:
             Repo object or None if not found
         """
-        if repo_name not in self.repo_paths:
-            logger.error(f"Unknown repository: {repo_name}")
-            return None
-
-        repo_path = self.repo_paths[repo_name]
-        if not repo_path.exists():
-            logger.error(f"Repository path does not exist: {repo_path}")
-            return None
-
         try:
-            return Repo(repo_path)
-        except Exception as e:
-            logger.error(f"Failed to open git repository at {repo_path}: {e}")
+            return self.repository_settings.open_repository(repo_name)
+        except RepositoryConfigurationError as e:
+            logger.error(str(e))
             return None
+
+    def _repository_error(self, repo_name: str) -> str:
+        """Return the specific fail-closed error for a repository target."""
+        try:
+            self.repository_settings.get_target(repo_name)
+        except RepositoryConfigurationError as exc:
+            return str(exc)
+        return "Failed to open repository"
 
     def create_branch(
         self,
@@ -80,7 +76,7 @@ class GitIntegrationPlugin:
         """
         repo = self._get_repo(repo_name)
         if repo is None:
-            return {"success": False, "error": "Failed to open repository"}
+            return {"success": False, "error": self._repository_error(repo_name)}
 
         # Add prefix if not already present
         if not branch_name.startswith(self.branch_prefix):
@@ -125,7 +121,7 @@ class GitIntegrationPlugin:
         """
         repo = self._get_repo(repo_name)
         if repo is None:
-            return {"success": False, "error": "Failed to open repository"}
+            return {"success": False, "error": self._repository_error(repo_name)}
 
         try:
             return {
@@ -164,7 +160,7 @@ class GitIntegrationPlugin:
         """
         repo = self._get_repo(repo_name)
         if repo is None:
-            return {"success": False, "error": "Failed to open repository"}
+            return {"success": False, "error": self._repository_error(repo_name)}
 
         try:
             # Add files
@@ -210,7 +206,7 @@ class GitIntegrationPlugin:
         """
         repo = self._get_repo(repo_name)
         if repo is None:
-            return {"success": False, "error": "Failed to open repository"}
+            return {"success": False, "error": self._repository_error(repo_name)}
 
         try:
             commits = []
@@ -255,7 +251,7 @@ class GitIntegrationPlugin:
         """
         repo = self._get_repo(repo_name)
         if repo is None:
-            return {"success": False, "error": "Failed to open repository"}
+            return {"success": False, "error": self._repository_error(repo_name)}
 
         try:
             if commit1 and commit2:

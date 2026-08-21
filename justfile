@@ -1,5 +1,12 @@
 # Justfile for CultureBotAI-CLAW workflows
 
+# Portable repository roots. Environment variables take precedence; sibling
+# checkouts are the local-development defaults.
+culturemech_root := env_var_or_default("CULTUREMECH_ROOT", "../CultureMech")
+mim_root := env_var_or_default("MEDIAINGREDIENTMECH_ROOT", "../MediaIngredientMech")
+communitymech_root := env_var_or_default("COMMUNITYMECH_ROOT", "../CommunityMech")
+kg_microbe_root := env_var_or_default("KG_MICROBE_ROOT", "../kg-microbe")
+
 # Default recipe - show available commands
 default:
     @just --list
@@ -11,23 +18,23 @@ default:
 # Extract FEBA ingredients without CAS-RN coverage
 feba-extract-uncovered:
     @echo "Extracting FEBA ingredients without CAS-RN..."
-    python scripts/extract_feba_uncovered_ingredients.py \
-        --culturemech ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech \
-        --mim ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech \
+    uv run python scripts/extract_feba_uncovered_ingredients.py \
+        --culturemech "{{culturemech_root}}" \
+        --mim "{{mim_root}}" \
         --output-list workspace/feba_uncovered_ingredients.txt \
         --output-report workspace/feba_uncovered_report.yaml
 
 # Map FEBA notation variants to CAS-RN
 feba-map-variants:
     @echo "Mapping FEBA notation variants..."
-    python scripts/map_feba_notation_variants.py \
+    uv run python scripts/map_feba_notation_variants.py \
         --ingredients workspace/feba_uncovered_ingredients.txt \
         --output workspace/feba_notation_mapping_results.yaml
 
 # Classify FEBA ingredients by mappability
 feba-classify:
     @echo "Classifying FEBA ingredients by mappability..."
-    python scripts/classify_feba_mappability.py \
+    uv run python scripts/classify_feba_mappability.py \
         --uncovered-report workspace/feba_uncovered_report.yaml \
         --mapping-results workspace/feba_notation_mapping_results.yaml \
         --output workspace/feba_mappability_classification.yaml
@@ -35,7 +42,7 @@ feba-classify:
 # Resolve FEBA resolvable ingredients (HIGH priority)
 feba-resolve-high:
     @echo "Resolving HIGH priority resolvable ingredients..."
-    python scripts/resolve_feba_resolvable.py \
+    uv run python scripts/resolve_feba_resolvable.py \
         --classification workspace/feba_mappability_classification.yaml \
         --output workspace/feba_resolvable_resolution_results.yaml \
         --priority HIGH
@@ -43,7 +50,7 @@ feba-resolve-high:
 # Resolve FEBA resolvable ingredients (MEDIUM priority)
 feba-resolve-medium:
     @echo "Resolving MEDIUM priority resolvable ingredients..."
-    python scripts/resolve_feba_resolvable.py \
+    uv run python scripts/resolve_feba_resolvable.py \
         --classification workspace/feba_mappability_classification.yaml \
         --output workspace/feba_resolvable_resolution_medium.yaml \
         --priority MEDIUM
@@ -51,7 +58,7 @@ feba-resolve-medium:
 # Resolve FEBA resolvable ingredients (ALL priorities)
 feba-resolve-all:
     @echo "Resolving ALL resolvable ingredients..."
-    python scripts/resolve_feba_resolvable.py \
+    uv run python scripts/resolve_feba_resolvable.py \
         --classification workspace/feba_mappability_classification.yaml \
         --output workspace/feba_resolvable_resolution_all.yaml \
         --priority ALL
@@ -59,7 +66,7 @@ feba-resolve-all:
 # Generate TSV export of FEBA uncovered ingredients
 feba-generate-tsv:
     @echo "Generating FEBA uncovered ingredients TSV..."
-    python scripts/generate_feba_uncovered_tsv.py \
+    uv run python scripts/generate_feba_uncovered_tsv.py \
         --uncovered-report workspace/feba_uncovered_report.yaml \
         --classification-report workspace/feba_mappability_classification.yaml \
         --output FEBA_UNCOVERED_INGREDIENTS.tsv
@@ -87,8 +94,8 @@ feba-analyze: feba-extract-uncovered feba-map-variants feba-classify feba-resolv
 # Export unmapped CAS-RN ingredients to TSV
 cas-export-unmapped:
     @echo "Exporting unmapped CAS-RN ingredients..."
-    python scripts/export_unmapped_cas_rn_tsv.py \
-        --mim ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech \
+    uv run python scripts/export_unmapped_cas_rn_tsv.py \
+        --mim "{{mim_root}}" \
         --output workspace/unmapped_cas_rn_ingredients.tsv
     @cp workspace/unmapped_cas_rn_ingredients.tsv UNMAPPED_CAS_RN_INGREDIENTS.tsv
     @echo "✅ TSV generated: UNMAPPED_CAS_RN_INGREDIENTS.tsv"
@@ -100,80 +107,80 @@ cas-export-unmapped:
 # Analyze FEBA ontology coverage
 feba-analyze-ontology:
     @echo "Analyzing FEBA ontology coverage..."
-    python scripts/analyze_feba_ontology_coverage.py \
-        --culturemech ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech \
+    uv run python scripts/analyze_feba_ontology_coverage.py \
+        --culturemech "{{culturemech_root}}" \
         --output-report workspace/feba_ontology_coverage_report.yaml \
         --output-unmapped workspace/feba_ontology_unmapped_ingredients.txt
 
 # Enrich FEBA ontology mappings using CAS-RN (test mode with 10 ingredients)
 feba-enrich-ontology-test:
     @echo "Testing ChEBI enrichment (10 ingredients)..."
-    python scripts/enrich_feba_ontology_from_cas.py \
+    uv run python scripts/enrich_feba_ontology_from_cas.py \
         --ontology-report workspace/feba_ontology_coverage_report.yaml \
         --cas-mapping-results workspace/feba_notation_mapping_results.yaml \
         --cas-resolvable-results workspace/feba_resolvable_resolution_results.yaml \
-        --culturemech ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech \
+        --culturemech "{{culturemech_root}}" \
         --output workspace/feba_chebi_enrichment_results.yaml \
         --max-queries 10
 
 # Enrich FEBA ontology mappings using CAS-RN (full run)
 feba-enrich-ontology:
     @echo "Enriching FEBA ontology mappings via ChEBI API..."
-    python scripts/enrich_feba_ontology_from_cas.py \
+    uv run python scripts/enrich_feba_ontology_from_cas.py \
         --ontology-report workspace/feba_ontology_coverage_report.yaml \
         --cas-mapping-results workspace/feba_notation_mapping_results.yaml \
         --cas-resolvable-results workspace/feba_resolvable_resolution_results.yaml \
-        --culturemech ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech \
+        --culturemech "{{culturemech_root}}" \
         --output workspace/feba_chebi_enrichment_results.yaml
     @echo "✅ Enrichment complete. Check workspace/feba_chebi_enrichment_results.yaml"
 
 # Apply ChEBI enrichments to CultureMech media files (dry-run)
 feba-apply-enrichments-dry:
     @echo "Testing enrichment application (dry-run)..."
-    python scripts/apply_ontology_enrichments.py \
-        --culturemech ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech \
+    uv run python scripts/apply_ontology_enrichments.py \
+        --culturemech "{{culturemech_root}}" \
         --enrichment-file workspace/feba_chebi_enrichment_results.yaml \
         --dry-run
 
 # Apply ChEBI enrichments to CultureMech media files
 feba-apply-enrichments:
     @echo "Applying ChEBI enrichments to CultureMech media files..."
-    python scripts/apply_ontology_enrichments.py \
-        --culturemech ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech \
+    uv run python scripts/apply_ontology_enrichments.py \
+        --culturemech "{{culturemech_root}}" \
         --enrichment-file workspace/feba_chebi_enrichment_results.yaml
     @echo "✅ Enrichments applied to CultureMech media files"
 
 # Update MediaIngredientMech with ChEBI enrichments (dry-run)
 feba-update-mim-dry:
     @echo "Testing MediaIngredientMech update (dry-run)..."
-    python scripts/update_mim_with_enrichments.py \
-        --mim ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech \
+    uv run python scripts/update_mim_with_enrichments.py \
+        --mim "{{mim_root}}" \
         --enrichment-file workspace/feba_chebi_enrichment_results.yaml \
         --dry-run
 
 # Update MediaIngredientMech with ChEBI enrichments
 feba-update-mim:
     @echo "Updating MediaIngredientMech with ChEBI enrichments..."
-    python scripts/update_mim_with_enrichments.py \
-        --mim ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech \
+    uv run python scripts/update_mim_with_enrichments.py \
+        --mim "{{mim_root}}" \
         --enrichment-file workspace/feba_chebi_enrichment_results.yaml
     @echo "✅ MediaIngredientMech updated"
 
 # Create MIM ingredient files for enriched ingredients (dry-run)
 feba-create-mim-ingredients-dry:
     @echo "Testing MIM ingredient file creation (dry-run)..."
-    python scripts/create_mim_ingredients_from_enrichments.py \
-        --mim ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech \
-        --culturemech ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech \
+    uv run python scripts/create_mim_ingredients_from_enrichments.py \
+        --mim "{{mim_root}}" \
+        --culturemech "{{culturemech_root}}" \
         --enrichment-file workspace/feba_chebi_enrichment_results.yaml \
         --dry-run
 
 # Create MIM ingredient files for enriched ingredients
 feba-create-mim-ingredients:
     @echo "Creating MIM ingredient files for enriched ingredients..."
-    python scripts/create_mim_ingredients_from_enrichments.py \
-        --mim ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech \
-        --culturemech ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech \
+    uv run python scripts/create_mim_ingredients_from_enrichments.py \
+        --mim "{{mim_root}}" \
+        --culturemech "{{culturemech_root}}" \
         --enrichment-file workspace/feba_chebi_enrichment_results.yaml
     @echo "✅ MIM ingredient files created"
 
@@ -189,8 +196,8 @@ feba-create-mim-ingredients:
 build-unified-mapping:
     @echo "Building unified ingredient mapping..."
     uv run python scripts/build_unified_ingredient_mapping.py \
-        --culturemech ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech \
-        --mim ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech \
+        --culturemech "{{culturemech_root}}" \
+        --mim "{{mim_root}}" \
         --output workspace/unified_ingredient_mapping.tsv
     @echo "✅ Unified mapping: workspace/unified_ingredient_mapping.tsv"
 
@@ -202,7 +209,7 @@ build-unified-mapping:
 sync-mim-to-culturemech-dry:
     @echo "Syncing MIM CHEBI → CultureMech (dry-run)..."
     uv run python scripts/sync_mim_to_culturemech.py \
-        --culturemech ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech \
+        --culturemech "{{culturemech_root}}" \
         --mapping workspace/unified_ingredient_mapping.tsv \
         --dry-run
 
@@ -210,7 +217,7 @@ sync-mim-to-culturemech-dry:
 sync-mim-to-culturemech:
     @echo "Syncing MIM CHEBI → CultureMech..."
     uv run python scripts/sync_mim_to_culturemech.py \
-        --culturemech ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech \
+        --culturemech "{{culturemech_root}}" \
         --mapping workspace/unified_ingredient_mapping.tsv
     @echo "✅ MIM CHEBI IDs synced to CultureMech ingredient term.id fields"
 
@@ -221,33 +228,33 @@ sync-mim-to-culturemech:
 # Match CultureMech media to KG-Microbe nodes (dry-run)
 match-culturemech-dry:
     @echo "Testing CultureMech → KG-Microbe matching (dry-run)..."
-    python scripts/match_culturemech_to_kg.py \
-        --culturemech ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech \
-        --kg-microbe ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe \
+    uv run python scripts/match_culturemech_to_kg.py \
+        --culturemech "{{culturemech_root}}" \
+        --kg-microbe "{{kg_microbe_root}}" \
         --dry-run
 
 # Match CultureMech media to KG-Microbe nodes (populate kg_microbe_match field)
 match-culturemech:
     @echo "Matching CultureMech media to KG-Microbe nodes..."
-    python scripts/match_culturemech_to_kg.py \
-        --culturemech ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech \
-        --kg-microbe ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe
+    uv run python scripts/match_culturemech_to_kg.py \
+        --culturemech "{{culturemech_root}}" \
+        --kg-microbe "{{kg_microbe_root}}"
     @echo "✅ CultureMech kg_microbe_match fields populated"
 
 # Match MIM ingredients to KG-Microbe nodes (dry-run)
 match-mim-dry:
     @echo "Testing MIM → KG-Microbe matching (dry-run)..."
-    python scripts/match_mim_to_kg.py \
-        --mim ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech \
-        --kg-microbe ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe \
+    uv run python scripts/match_mim_to_kg.py \
+        --mim "{{mim_root}}" \
+        --kg-microbe "{{kg_microbe_root}}" \
         --dry-run
 
 # Match MIM ingredients to KG-Microbe nodes (populate kg_microbe_node_id field)
 match-mim:
     @echo "Matching MIM ingredients to KG-Microbe nodes..."
-    python scripts/match_mim_to_kg.py \
-        --mim ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech \
-        --kg-microbe ~/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe
+    uv run python scripts/match_mim_to_kg.py \
+        --mim "{{mim_root}}" \
+        --kg-microbe "{{kg_microbe_root}}"
     @echo "✅ MIM kg_microbe_node_id fields populated"
 
 # Run both KG-Microbe matching workflows (dry-run)
@@ -269,9 +276,9 @@ match-all: match-culturemech match-mim
 # on rebuild. The prune is idempotent and no-ops when the cache is absent.
 build-sssom:
     @echo "Pruning stale residual-P2.5 decisions before build..."
-    python scripts/prune_residual_for_chebi_fixes.py
+    uv run python scripts/prune_residual_for_chebi_fixes.py
     @echo "Building MIM→ingredient-ontology SSSOM..."
-    python scripts/build_mim_ingredient_sssom.py \
+    uv run python scripts/build_mim_ingredient_sssom.py \
         --output workspace/reports/mim_ingredient_mappings.sssom.tsv
     @echo "Working copy: workspace/reports/mim_ingredient_mappings.sssom.tsv"
 
@@ -287,7 +294,7 @@ validate-sssom:
 # Stage 3: Review synonyms in the working-copy SSSOM via OAK + EBI OLS
 review-sssom:
     @echo "Reviewing SSSOM synonyms against ingredient ontologies (OAK + OLS)..."
-    python scripts/review_sssom_synonyms.py \
+    uv run python scripts/review_sssom_synonyms.py \
         --input workspace/reports/mim_ingredient_mappings.sssom.tsv \
         --tsv-out workspace/reports/sssom_synonym_review.tsv \
         --md-out workspace/reports/sssom_synonym_review.md
@@ -298,7 +305,7 @@ review-sssom:
 # final merge; agent dispatch is Claude-side.
 review-sssom-team-shard:
     @echo "Sharding SSSOM for agent-team review..."
-    python scripts/shard_sssom_for_review.py \
+    uv run python scripts/shard_sssom_for_review.py \
         --input workspace/reports/mim_ingredient_mappings.sssom.tsv \
         --n 4
     @echo ""
@@ -313,17 +320,17 @@ review-sssom-team-shard:
 # none|UNVERIFIED|{date}.
 review-sssom-team-merge:
     @echo "Merging per-shard agent reviews into the SSSOM..."
-    python scripts/merge_sssom_shard_reviews.py
+    uv run python scripts/merge_sssom_shard_reviews.py
 
 # Stage 4: Promote the working copy to MediaIngredientMech/mappings/ (dry-run)
 publish-sssom-dry:
     @echo "Previewing SSSOM promotion (dry-run)..."
-    python scripts/publish_sssom.py --dry-run
+    uv run python scripts/publish_sssom.py --dry-run
 
 # Stage 4: Promote the working copy to MediaIngredientMech/mappings/
 publish-sssom:
     @echo "Promoting SSSOM to MediaIngredientMech/mappings/ ..."
-    python scripts/publish_sssom.py --apply
+    uv run python scripts/publish_sssom.py --apply
 
 # Full lifecycle: build → validate → review (stops before promote)
 sssom-release: build-sssom validate-sssom review-sssom
@@ -344,36 +351,36 @@ sssom-release: build-sssom validate-sssom review-sssom
 # KGM_ONLY/UNMAPPED_PENDING_CURATION). Feeds every other recipe below.
 audit-kgm-mim:
     @echo "Running MIM ↔ kg-microbe reconciliation audit..."
-    /opt/homebrew/bin/python3.13 scripts/audit_kgm_mim_reconciliation.py
+    uv run python scripts/audit_kgm_mim_reconciliation.py
 
 # Emit MIM YAML patch proposals for ingredients using deprecated CHEBIs.
 fix-deprecated-chebi:
-    /opt/homebrew/bin/python3.13 scripts/fix_deprecated_chebi.py
+    uv run python scripts/fix_deprecated_chebi.py
 
 # Emit MIM YAML patch proposals for ingredients whose SSSOM object_label
 # drifted from CHEBI's canonical label (or whose CHEBI was removed).
 fix-label-drift:
-    /opt/homebrew/bin/python3.13 scripts/fix_label_drift.py
+    uv run python scripts/fix_label_drift.py
 
 # OLS round-trip every DISAGREE row in the audit; dedup against the
 # 72-row TRUE_BUG run. Classifies each as MIM_WRONG / MIM_OK / AMBIGUOUS.
 roundtrip-disagree:
-    /opt/homebrew/bin/python3.13 scripts/round_trip_true_bugs.py --source audit
+    uv run python scripts/round_trip_true_bugs.py --source audit
 
 # Build old MediaIngredientMech:000xxx → current MIM:<slug> migration map
 # from KGM_ONLY rows in the audit.
 generate-migration-map:
-    /opt/homebrew/bin/python3.13 scripts/generate_mim_migration_map.py
+    uv run python scripts/generate_mim_migration_map.py
 
 # Generate kg-microbe xref patches (consumes the migration map). Output
 # is the input for a future kg-microbe PR.
 generate-kgm-xref-patches:
-    /opt/homebrew/bin/python3.13 scripts/generate_kgm_xref_patches.py
+    uv run python scripts/generate_kgm_xref_patches.py
 
 # Propose candidate CHEBI IDs for the 430 UNMAPPED_PENDING_CURATION
 # entries via OLS search. Slow (API-bound); results are cached.
 propose-chebi-unmapped:
-    /opt/homebrew/bin/python3.13 scripts/propose_chebi_for_unmapped.py
+    uv run python scripts/propose_chebi_for_unmapped.py
 
 # Full reconciliation pipeline, in dependency order.
 reconcile-all: audit-kgm-mim fix-deprecated-chebi fix-label-drift roundtrip-disagree generate-migration-map generate-kgm-xref-patches
@@ -382,36 +389,36 @@ reconcile-all: audit-kgm-mim fix-deprecated-chebi fix-label-drift roundtrip-disa
 # that kg-microbe's CHEBI-only unified_chemical_mappings.tsv.gz can't
 # absorb). Writes a working copy to workspace/reports/.
 build-complex-ingredients:
-    /opt/homebrew/bin/python3.13 scripts/build_complex_ingredients_tsv.py
+    uv run python scripts/build_complex_ingredients_tsv.py
 
 # Build AND promote complex_ingredients.tsv{,.gz} to
 # MediaIngredientMech/mappings/ — the canonical location consumed by
 # kg-microbe on its next unified-mappings rebuild.
 publish-complex-ingredients:
-    /opt/homebrew/bin/python3.13 scripts/build_complex_ingredients_tsv.py --publish
+    uv run python scripts/build_complex_ingredients_tsv.py --publish
 
 # Generate the canonical mapping-case taxonomy reference. See
 # .claude/skills/mapping-taxonomy/SKILL.md for what this documents.
 mapping-taxonomy:
-    /opt/homebrew/bin/python3.13 scripts/generate_mapping_taxonomy_report.py
+    uv run python scripts/generate_mapping_taxonomy_report.py
 
 # Diff MIM's published SSSOM against kg-microbe's consolidated SSSOM on
 # the chemical-mappings-mim-priority branch. See
 # .claude/skills/kg-microbe-review/SKILL.md for the full methodology.
 kg-microbe-review:
-    /opt/homebrew/bin/python3.13 scripts/generate_kg_microbe_review.py
+    uv run python scripts/generate_kg_microbe_review.py
 
 # Inventory all "unmapped / pending-curation" ingredient surfaces across
 # the four repos (MIM, kg-microbe, CultureMech, CommunityMech). See
 # .claude/skills/unmapped-inventory/SKILL.md for the sync model.
 inventory-unmapped:
-    /opt/homebrew/bin/python3.13 scripts/inventory_unmapped_ingredients.py
+    uv run python scripts/inventory_unmapped_ingredients.py
 
 # Snapshot kg-microbe dependency files into workspace/kgm_snapshot/.
 # Captures current local kg-microbe state (no git pull). See
 # .claude/skills/kg-microbe-sync/SKILL.md.
 sync-kgm:
-    /opt/homebrew/bin/python3.13 scripts/sync_kgm_dependencies.py
+    uv run python scripts/sync_kgm_dependencies.py
 
 # Mapping-schema validators moved into kg-microbe at
 # mappings/validate_mapping_schema.py (lives next to the data it
@@ -423,63 +430,63 @@ sync-kgm:
 # evidence claims. Polite (3 req/s; 10 req/s with NCBI_API_KEY env var).
 # See .claude/skills/evidence-reference-validation/SKILL.md.
 fetch-pubmed *args:
-    /opt/homebrew/bin/python3.13 scripts/fetch_pubmed_abstracts.py {{args}}
+    uv run python scripts/fetch_pubmed_abstracts.py {{args}}
 
 # Verify every literature snippet in MIM evidence claims appears
 # verbatim in its cited PubMed abstract. Anti-hallucination gate.
 # Exits 2 on SNIPPET_NOT_IN_ABSTRACT (CI blocking).
 validate-evidence *args:
-    /opt/homebrew/bin/python3.13 scripts/validate_evidence_references.py {{args}}
+    uv run python scripts/validate_evidence_references.py {{args}}
 
 # Propose PMID + snippet candidates via PubMed search for MIM ingredient
 # evidence claims (Phase 4). Outputs to workspace/reports/evidence_proposals/.
 # Curators review, paste into MIM YAMLs, then validate-evidence confirms.
 # See .claude/skills/evidence-curation/SKILL.md.
 propose-evidence *args:
-    /opt/homebrew/bin/python3.13 scripts/propose_evidence.py {{args}}
+    uv run python scripts/propose_evidence.py {{args}}
 
 # Backfill chemical_properties.molecular_formula/smiles/inchi for every
 # CHEBI-mapped MIM ingredient using the local CHEBI sqlite. Default
 # dry-run; pass --apply to write YAMLs.
 backfill-chemistry *args:
-    /opt/homebrew/bin/python3.13 scripts/backfill_chebi_chemistry.py {{args}}
+    uv run python scripts/backfill_chebi_chemistry.py {{args}}
 
 # Same for cas:* primaries via PubChem REST (CAS → CID → properties).
 # Cached to workspace/cache/pubchem_cas_chemistry.json.
 backfill-cas-chemistry *args:
-    /opt/homebrew/bin/python3.13 scripts/backfill_cas_chemistry.py {{args}}
+    uv run python scripts/backfill_cas_chemistry.py {{args}}
 
 # Apply propose-evidence drafts: parse workspace/reports/evidence_proposals/
 # and append validated literature evidence (Phase 1 substring check) to
 # the target MIM YAMLs. Default dry-run; pass --apply to write YAMLs.
 apply-evidence *args:
-    /opt/homebrew/bin/python3.13 scripts/apply_evidence_proposals.py {{args}}
+    uv run python scripts/apply_evidence_proposals.py {{args}}
 
 # Generate the curator-review report covering UNDEFINED_MIXTURE
 # classifications + unset records, with heuristic suggestions and an
 # `action` column for batch overrides. Read-only.
 review-classifications:
-    /opt/homebrew/bin/python3.13 scripts/review_ingredient_classifications.py
+    uv run python scripts/review_ingredient_classifications.py
 
 # Cascading multi-ontology resolver for heuristic-complex MIM
 # ingredients (yeast extract, peptone, soil, manure, milk, etc.).
 # FOODON → ENVO → CHEBI → NCIT via OLS, with token-subset re-scoring.
 # See .claude/skills/complex-ingredient-resolver/SKILL.md.
 foodon-pass *args:
-    /opt/homebrew/bin/python3.13 -u scripts/foodon_pass.py {{args}}
+    uv run python -u scripts/foodon_pass.py {{args}}
 
 # Detect MIM mappings where the ontology term is more general than the
 # named ingredient (e.g. "Vermont Soil" → ENVO:soil). Read-only review.
 # See .claude/skills/specificity-loss-review/SKILL.md.
 detect-specificity-loss:
-    /opt/homebrew/bin/python3.13 scripts/detect_specificity_loss.py
+    uv run python scripts/detect_specificity_loss.py
 
 # Mint a kgmicrobe.ingredient:* custom term to preserve specificity.
 # See .claude/skills/specificity-loss-review/SKILL.md.
 #   just mint-kgm-ingredient --slug Vermont_Soil
 #   just mint-kgm-ingredient --from-tsv workspace/reports/specificity_loss_review.tsv
 mint-kgm-ingredient *args:
-    /opt/homebrew/bin/python3.13 scripts/mint_kgm_ingredient.py {{args}}
+    uv run python scripts/mint_kgm_ingredient.py {{args}}
 
 # Import a new ingredient/compound source into MIM. See
 # .claude/skills/ingredient-mapping/SKILL.md for the full source→resolver→emit
@@ -490,7 +497,7 @@ mint-kgm-ingredient *args:
 #   just import-ingredients --source kgm-unmapped --apply
 #   just import-ingredients --source mim-queue --apply --accept-medium
 import-ingredients *ARGS:
-    /opt/homebrew/bin/python3.13 scripts/import_ingredients.py {{ARGS}}
+    uv run python scripts/import_ingredients.py {{ARGS}}
 
 # =============================================================================
 # Utility Commands

@@ -16,17 +16,12 @@ Config keys read here beyond the record plumbing (see __main__ for the rest):
 """
 from __future__ import annotations
 
-import argparse
 import hashlib
 import json
 import re
-import sys
 import urllib.parse
 import urllib.request
-from pathlib import Path
 from typing import Any
-
-import yaml
 
 EUROPE_PMC_SEARCH_URL = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
 
@@ -245,13 +240,15 @@ def _record_topic(record: dict[str, Any], name_fields, synonym_field) -> tuple[s
         elif isinstance(s, dict):
             for k in ("synonym_text", "value", "name", "label"):
                 if isinstance(s.get(k), str):
-                    terms.append(s[k]); break
+                    terms.append(s[k])
+                    break
     # Dedup, drop very short/ambiguous terms, cap to avoid an enormous query.
     seen, clean = set(), []
     for t in terms:
         t = _norm(t)
         if len(t) >= 4 and t.casefold() not in seen:
-            seen.add(t.casefold()); clean.append(t)
+            seen.add(t.casefold())
+            clean.append(t)
     return name, clean[:6]
 
 
@@ -267,7 +264,7 @@ def scan_record(record: dict[str, Any], cfg: dict, page_size: int, max_signals: 
     except Exception as e:  # network/HTTP — report, skip record
         return {"name": name, "error": str(e), "matches": [], "score": 0}
     require_topic = bool(cfg.get("require_topic_in_sentence", True))
-    matches = []
+    matches: list[dict[str, Any]] = []
     for r in results:
         # Europe PMC abstractText carries structured-abstract HTML (<h4>…</h4>);
         # strip tags so snippets/sentences are clean prose.

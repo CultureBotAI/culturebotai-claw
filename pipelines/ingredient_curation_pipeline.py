@@ -14,12 +14,12 @@ Note: Gracefully handles OAK unavailability by delegating to existing
 MediaIngredientMech code (just curate command).
 """
 
-import os
 import logging
+import os
 import subprocess
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 import yaml
 
@@ -59,7 +59,7 @@ class IngredientCurationPipeline:
         self.config = config or {}
 
         # Load workspace paths
-        self.workspace = Path(os.getenv("OPENCLAW_WORKSPACE", "."))
+        self.workspace = Path(os.getenv("OPENCLAW_WORKSPACE", "workspace"))
         self.reports_dir = self.workspace / "reports" / "ingredient_curation"
         self.reports_dir.mkdir(parents=True, exist_ok=True)
 

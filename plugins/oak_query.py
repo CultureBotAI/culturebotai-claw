@@ -5,14 +5,14 @@ This plugin wraps MediaIngredientMech's OntologyClient with caching to reduce
 duplicate API calls and improve performance for ontology searches.
 """
 
+import hashlib
+import json
+import logging
 import os
 import time
-import json
-import hashlib
 from pathlib import Path
-from typing import Dict, List, Optional, Any
-import logging
 from threading import Lock
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,9 @@ class OAKQueryPlugin:
         """
         self.config = config or {}
         self.cache_ttl = self.config.get("cache_ttl", 86400)  # 24 hours default
-        workspace = self.config.get("cache_dir", os.getenv("OPENCLAW_WORKSPACE", "."))
+        workspace = self.config.get(
+            "cache_dir", os.getenv("OPENCLAW_WORKSPACE", "workspace")
+        )
         self.cache_dir = Path(workspace) / ".cache" / "oak_queries"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 

@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import subprocess
 import sys
+from importlib.resources import files
 from pathlib import Path
 
 import yaml
@@ -26,7 +27,14 @@ from .scaffold import (
     write_record,
 )
 
-DEFAULT_SCHEMA_REL = "shared/history/history.yaml"
+
+def _default_schema_path() -> str:
+    """Find the packaged schema, retaining source-only spoke compatibility."""
+
+    try:
+        return str(files("shared.history").joinpath("history.yaml"))
+    except ModuleNotFoundError:
+        return str(Path(__file__).resolve().parents[2] / "shared/history/history.yaml")
 
 
 def _add_new_args(ap: argparse.ArgumentParser) -> None:
@@ -307,7 +315,7 @@ def main(argv: list[str] | None = None) -> int:
 
     ap_val = sub.add_parser("validate", help="validate a record or directory")
     ap_val.add_argument("target", help="record path or directory (e.g. history/)")
-    ap_val.add_argument("--schema", default=DEFAULT_SCHEMA_REL)
+    ap_val.add_argument("--schema", default=_default_schema_path())
     ap_val.add_argument(
         "--structural-only",
         action="store_true",

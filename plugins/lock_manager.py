@@ -5,20 +5,38 @@ Prevents conflicts between Orchestration Claude and downstream Claudes
 by implementing a distributed file-based lock system.
 """
 
-import os
-import time
-import yaml
+import fcntl
 import logging
-from pathlib import Path
-from datetime import datetime, timedelta
-from typing import Optional, Dict, Any, List
+import os
+import re
+import time
+import uuid
 from contextlib import contextmanager
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from threading import RLock
+from typing import Any, Dict, List, Optional
+
+import yaml
 
 logger = logging.getLogger(__name__)
 
 
+def _workspace_root() -> Path:
+    """Resolve workspace settings without writing inside an installed package."""
+
+    workspace = Path(os.getenv("OPENCLAW_WORKSPACE", "workspace")).expanduser()
+    if not workspace.is_absolute():
+        orchestration_root = os.getenv("OPENCLAW_ORCHESTRATION_ROOT")
+        base = Path(orchestration_root).expanduser() if orchestration_root else Path.cwd()
+        workspace = base / workspace
+    return workspace.resolve()
+
+
 class LockManager:
     """Distributed lock manager for multi-Claude coordination."""
+
+    _RESOURCE_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         """
@@ -28,12 +46,15 @@ class LockManager:
             config: Configuration with locks_dir, my_id, default_timeout
         """
         self.config = config or {}
-        self.locks_dir = Path(self.config.get("locks_dir",
-                                               os.getenv("OPENCLAW_WORKSPACE", ".") + "/locks"))
+        workspace = _workspace_root()
+        self.locks_dir = Path(self.config.get("locks_dir", str(workspace / "locks")))
         self.locks_dir.mkdir(parents=True, exist_ok=True)
 
         self.my_id = self.config.get("my_id", "orchestration_claude")
         self.default_timeout = self.config.get("default_timeout", 3600)  # 1 hour
+        self.poll_interval = float(self.config.get("poll_interval", 0.1))
+        self._leases: Dict[str, str] = {}
+        self._leases_guard = RLock()
 
         logger.info(f"LockManager initialized: locks_dir={self.locks_dir}, my_id={self.my_id}")
 
@@ -58,57 +79,63 @@ class LockManager:
         Returns:
             True if lock acquired, False otherwise
         """
-        timeout = timeout or self.default_timeout
-        lock_file = self.locks_dir / f"{resource}.lock"
-        start_time = time.time()
+        resource = self._validate_resource(resource)
+        timeout = self.default_timeout if timeout is None else timeout
+        if timeout <= 0:
+            raise ValueError("timeout must be greater than zero")
+        if max_wait < 0:
+            raise ValueError("max_wait cannot be negative")
+
+        lock_file = self._lock_file(resource)
+        start_time = time.monotonic()
+        lease_token = uuid.uuid4().hex
 
         logger.info(f"Attempting to acquire lock: {resource} for operation: {operation}")
 
         while True:
-            # Check existing lock
-            existing_lock = self._read_lock(lock_file)
-            if existing_lock:
-                # Check if expired
-                expires_at = datetime.fromisoformat(existing_lock['expires_at'])
-                if datetime.utcnow() > expires_at:
-                    # Expired, remove it
-                    logger.info(f"Lock {resource} expired, removing")
-                    lock_file.unlink()
-                else:
-                    # Still valid
-                    logger.debug(f"Lock {resource} held by {existing_lock['locked_by']}")
-
-                    if not wait:
-                        logger.warning(f"Failed to acquire lock {resource}: already locked")
-                        return False
-
-                    # Wait and retry
-                    elapsed = time.time() - start_time
-                    if elapsed > max_wait:
-                        logger.error(f"Timeout waiting for lock {resource} after {elapsed:.1f}s")
-                        return False
-
-                    logger.debug(f"Waiting for lock {resource} ({elapsed:.1f}s elapsed)")
-                    time.sleep(5)
-                    continue
-
-            # Create lock
+            now = self._utc_now()
             lock_data = {
                 'locked_by': self.my_id,
-                'locked_at': datetime.utcnow().isoformat(),
+                'lease_token': lease_token,
+                'locked_at': now.isoformat(),
                 'operation': operation,
                 'pid': os.getpid(),
-                'expires_at': (datetime.utcnow() + timedelta(seconds=timeout)).isoformat(),
+                'expires_at': (now + timedelta(seconds=timeout)).isoformat(),
                 'reason': operation,
             }
 
             try:
-                with open(lock_file, 'w') as f:
-                    yaml.dump(lock_data, f, default_flow_style=False)
-
+                self._create_lock_atomic(lock_file, lock_data)
+                with self._leases_guard:
+                    self._leases[resource] = lease_token
                 logger.info(f"✓ Lock acquired: {resource} (expires in {timeout}s)")
                 return True
+            except FileExistsError:
+                existing_lock = self._read_lock(lock_file)
+                if existing_lock and self._is_expired(existing_lock):
+                    if self._reclaim_expired_lock(resource):
+                        logger.info(f"Reclaimed expired lock: {resource}")
+                    continue
 
+                if existing_lock:
+                    logger.debug(
+                        f"Lock {resource} held by {existing_lock.get('locked_by', 'unknown')}"
+                    )
+                else:
+                    logger.warning(
+                        f"Lock {resource} exists but cannot be read; refusing to replace it"
+                    )
+
+                elapsed = time.monotonic() - start_time
+                if not wait:
+                    logger.warning(f"Failed to acquire lock {resource}: already locked")
+                    return False
+                if elapsed >= max_wait:
+                    logger.error(f"Timeout waiting for lock {resource} after {elapsed:.1f}s")
+                    return False
+
+                logger.debug(f"Waiting for lock {resource} ({elapsed:.1f}s elapsed)")
+                time.sleep(min(self.poll_interval, max_wait - elapsed))
             except Exception as e:
                 logger.error(f"Failed to write lock file {lock_file}: {e}")
                 return False
@@ -123,25 +150,13 @@ class LockManager:
         Returns:
             True if lock released, False if lock didn't exist or not owned by us
         """
-        lock_file = self.locks_dir / f"{resource}.lock"
-
-        if not lock_file.exists():
-            logger.warning(f"Tried to release non-existent lock: {resource}")
+        resource = self._validate_resource(resource)
+        with self._leases_guard:
+            lease_token = self._leases.get(resource)
+        if not lease_token:
+            logger.error(f"Cannot release lock {resource}: no lease is owned by this manager")
             return False
-
-        # Check if we own the lock
-        lock_data = self._read_lock(lock_file)
-        if lock_data and lock_data.get('locked_by') != self.my_id:
-            logger.error(f"Cannot release lock {resource}: owned by {lock_data['locked_by']}")
-            return False
-
-        try:
-            lock_file.unlink()
-            logger.info(f"✓ Lock released: {resource}")
-            return True
-        except Exception as e:
-            logger.error(f"Failed to release lock {resource}: {e}")
-            return False
+        return self._release_owned_lock(resource, lease_token)
 
     def check_lock(self, resource: str) -> Optional[Dict[str, Any]]:
         """
@@ -153,22 +168,27 @@ class LockManager:
         Returns:
             Lock data if locked, None if available
         """
-        lock_file = self.locks_dir / f"{resource}.lock"
-        if not lock_file.exists():
-            return None
-
+        resource = self._validate_resource(resource)
+        lock_file = self._lock_file(resource)
         lock_data = self._read_lock(lock_file)
         if not lock_data:
+            if lock_file.exists():
+                # A malformed or partially written lock must still block work.
+                return {
+                    "locked_by": "unknown",
+                    "invalid": True,
+                    "reason": "lock file could not be read",
+                }
             return None
+        if not self._is_expired(lock_data):
+            return lock_data
 
-        # Check expiration
-        expires_at = datetime.fromisoformat(lock_data['expires_at'])
-        if datetime.utcnow() > expires_at:
-            logger.info(f"Lock {resource} expired, removing")
-            lock_file.unlink()
-            return None
-
-        return lock_data
+        self._reclaim_expired_lock(resource)
+        # A contender may have acquired the resource immediately after reclamation.
+        current_lock = self._read_lock(lock_file)
+        if current_lock and not self._is_expired(current_lock):
+            return current_lock
+        return None
 
     def check_any_locks(self, resources: List[str]) -> Dict[str, Optional[Dict[str, Any]]]:
         """
@@ -257,19 +277,138 @@ class LockManager:
         if not acquired:
             raise RuntimeError(f"Failed to acquire lock on {resource}")
 
+        resource = self._validate_resource(resource)
+        with self._leases_guard:
+            lease_token = self._leases[resource]
+
         try:
             yield
         finally:
-            self.release_lock(resource)
+            if not self._release_owned_lock(resource, lease_token):
+                logger.warning(
+                    f"Context manager did not release {resource}: its lease is no longer owned"
+                )
+
+    @staticmethod
+    def _utc_now() -> datetime:
+        """Return an aware UTC timestamp."""
+        return datetime.now(timezone.utc)
+
+    @classmethod
+    def _validate_resource(cls, resource: str) -> str:
+        """Validate a resource before using it as part of a lock filename."""
+        if not isinstance(resource, str) or not cls._RESOURCE_PATTERN.fullmatch(resource):
+            raise ValueError(
+                "resource must be 1-128 characters and contain only letters, "
+                "numbers, '.', '_', or '-'"
+            )
+        if resource in {".", ".."}:
+            raise ValueError("resource cannot be '.' or '..'")
+        return resource
+
+    def _lock_file(self, resource: str) -> Path:
+        return self.locks_dir / f"{resource}.lock"
+
+    def _guard_file(self, resource: str) -> Path:
+        return self.locks_dir / f".{resource}.lock.guard"
+
+    @contextmanager
+    def _resource_guard(self, resource: str):
+        """Serialize ownership checks and stale reclamation for one resource."""
+        guard_file = self._guard_file(resource)
+        with open(guard_file, "a", encoding="utf-8") as guard:
+            fcntl.flock(guard.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(guard.fileno(), fcntl.LOCK_UN)
+
+    def _create_lock_atomic(self, lock_file: Path, lock_data: Dict[str, Any]) -> None:
+        """Create a complete lock file without replacing an existing lease."""
+        serialized = yaml.safe_dump(lock_data, default_flow_style=False).encode("utf-8")
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+        if hasattr(os, "O_CLOEXEC"):
+            flags |= os.O_CLOEXEC
+        descriptor = os.open(lock_file, flags, 0o600)
+        try:
+            with os.fdopen(descriptor, "wb") as lock:
+                descriptor = -1
+                lock.write(serialized)
+                lock.flush()
+                os.fsync(lock.fileno())
+        except Exception:
+            if descriptor >= 0:
+                os.close(descriptor)
+            # This process created the file and incomplete locks fail closed, so
+            # no other process can have legitimately replaced it here.
+            lock_file.unlink(missing_ok=True)
+            raise
+
+    def _release_owned_lock(self, resource: str, lease_token: str) -> bool:
+        """Release only when the on-disk lease still matches this acquisition."""
+        lock_file = self._lock_file(resource)
+        try:
+            with self._resource_guard(resource):
+                lock_data = self._read_lock(lock_file)
+                if not lock_data:
+                    logger.warning(f"Tried to release non-existent lock: {resource}")
+                    released = False
+                elif lock_data.get("lease_token") != lease_token:
+                    logger.error(
+                        f"Cannot release lock {resource}: lease is owned by another acquisition"
+                    )
+                    released = False
+                else:
+                    lock_file.unlink()
+                    logger.info(f"✓ Lock released: {resource}")
+                    released = True
+        except Exception as e:
+            logger.error(f"Failed to release lock {resource}: {e}")
+            return False
+
+        with self._leases_guard:
+            if self._leases.get(resource) == lease_token:
+                self._leases.pop(resource, None)
+        return released
+
+    def _reclaim_expired_lock(self, resource: str) -> bool:
+        """Remove an expired lock after rechecking it under a process mutex."""
+        lock_file = self._lock_file(resource)
+        try:
+            with self._resource_guard(resource):
+                current_lock = self._read_lock(lock_file)
+                if not current_lock or not self._is_expired(current_lock):
+                    return False
+                lock_file.unlink()
+                return True
+        except FileNotFoundError:
+            return False
+        except Exception as e:
+            logger.error(f"Failed to reclaim expired lock {resource}: {e}")
+            return False
+
+    def _is_expired(self, lock_data: Dict[str, Any]) -> bool:
+        """Check expiration, accepting legacy naive timestamps as UTC."""
+        try:
+            expires_at = datetime.fromisoformat(lock_data["expires_at"])
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+            return self._utc_now() > expires_at.astimezone(timezone.utc)
+        except (KeyError, TypeError, ValueError) as e:
+            logger.error(f"Invalid lock expiration; treating lock as active: {e}")
+            return False
 
     def _read_lock(self, lock_file: Path) -> Optional[Dict[str, Any]]:
         """Read lock file safely."""
-        if not lock_file.exists():
-            return None
-
         try:
-            with open(lock_file, 'r') as f:
-                return yaml.safe_load(f)
+            with open(lock_file, 'r', encoding="utf-8") as f:
+                lock_data = yaml.safe_load(f)
+            if not isinstance(lock_data, dict):
+                logger.error(f"Invalid lock file {lock_file}: expected a mapping")
+                return None
+            return lock_data
+        except FileNotFoundError:
+            return None
         except Exception as e:
             logger.error(f"Failed to read lock file {lock_file}: {e}")
             return None
@@ -286,8 +425,8 @@ class StatusManager:
             config: Configuration with status_dir, my_id
         """
         self.config = config or {}
-        self.status_dir = Path(self.config.get("status_dir",
-                                                os.getenv("OPENCLAW_WORKSPACE", ".") + "/status"))
+        workspace = _workspace_root()
+        self.status_dir = Path(self.config.get("status_dir", str(workspace / "status")))
         self.status_dir.mkdir(parents=True, exist_ok=True)
 
         self.my_id = self.config.get("my_id", "orchestration_claude")
@@ -313,11 +452,11 @@ class StatusManager:
         status_file = self.status_dir / f"{self.my_id}_status.yaml"
 
         status_data = {
-            'last_updated': datetime.utcnow().isoformat(),
+            'last_updated': datetime.now(timezone.utc).isoformat(),
             'status': status,
             'current_operation': current_operation,
             'last_completed_operation': last_completed,
-            'next_available_at': next_available_at or datetime.utcnow().isoformat(),
+            'next_available_at': next_available_at or datetime.now(timezone.utc).isoformat(),
         }
 
         try:

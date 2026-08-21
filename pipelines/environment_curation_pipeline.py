@@ -18,28 +18,33 @@ Workflow:
 6. Auto-accept or queue for review
 """
 
-import os
-import logging
 import json
+import logging
+import os
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
+
 import yaml
 
 # Import plugins
 from plugins.environment_curator import (
+    EnvironmentSignalExtractor,
     EnvironmentSuggestion,
     EnvironmentTerm,
     Evidence,
+    EvidenceQualityScorer,
     MediaPrioritizer,
-    EnvironmentSignalExtractor,
-    EvidenceQualityScorer
 )
-from plugins.pubmed_client import get_pubmed_client
-from plugins.oak_query import OAKQueryPlugin
 from plugins.environment_llm_curator import get_environment_llm_curator
+from plugins.oak_query import OAKQueryPlugin
+from plugins.pubmed_client import get_pubmed_client
 
 logger = logging.getLogger(__name__)
+
+
+class ApplyModeUnavailableError(RuntimeError):
+    """Raised when a caller requests writes before a safe writer exists."""
 
 
 class EnvironmentCurationPipeline:
@@ -59,7 +64,7 @@ class EnvironmentCurationPipeline:
         self.config = config or {}
 
         # Load workspace paths
-        self.workspace = Path(os.getenv("OPENCLAW_WORKSPACE", "."))
+        self.workspace = Path(os.getenv("OPENCLAW_WORKSPACE", "workspace"))
         self.reports_dir = self.workspace / "reports" / "environment_curation"
         self.review_dir = self.workspace / "review"
         self.reports_dir.mkdir(parents=True, exist_ok=True)
@@ -111,6 +116,12 @@ class EnvironmentCurationPipeline:
         Returns:
             Pipeline execution summary
         """
+        if not dry_run:
+            raise ApplyModeUnavailableError(
+                "Environment curation apply mode is unavailable: accepted curations "
+                "do not yet have a validated, atomic writer. Run with dry_run=True."
+            )
+
         batch_size = batch_size or self.default_batch_size
         auto_accept_threshold = auto_accept_threshold or self.default_threshold
 
@@ -129,7 +140,8 @@ class EnvironmentCurationPipeline:
             "manual_review": [],
             "rejected": [],
             "errors": [],
-            "metrics": {}
+            "metrics": {},
+            "status": "running",
         }
 
         try:
@@ -188,29 +200,32 @@ class EnvironmentCurationPipeline:
             # Calculate metrics
             results["metrics"] = self._calculate_metrics(results)
 
-            # Save results
-            if not dry_run:
-                self._save_accepted_curations(results["auto_accepted"])
-
+            # Dry runs may emit review/report artifacts, but never source-data writes.
             self._save_manual_review_queue(results["manual_review"])
-            self._generate_report(results)
 
             end_time = datetime.now()
             duration = (end_time - start_time).total_seconds()
+
+            results["end_time"] = end_time.isoformat()
+            results["duration_seconds"] = duration
+            results["status"] = "partial_failure" if results["errors"] else "success"
+            self._generate_report(results)
 
             logger.info(f"Pipeline complete in {duration:.1f}s: "
                        f"{len(results['auto_accepted'])} auto-accepted, "
                        f"{len(results['manual_review'])} for review, "
                        f"{len(results['rejected'])} rejected")
 
-            results["end_time"] = end_time.isoformat()
-            results["duration_seconds"] = duration
-
             return results
 
         except Exception as e:
             logger.error(f"Pipeline failed: {e}", exc_info=True)
             results["error"] = str(e)
+            results["status"] = "failed"
+            end_time = datetime.now()
+            results["end_time"] = end_time.isoformat()
+            results["duration_seconds"] = (end_time - start_time).total_seconds()
+            self._generate_report(results)
             return results
 
     def _prioritize_candidates(
@@ -435,14 +450,6 @@ class EnvironmentCurationPipeline:
         # Cross-consistency (Gate 4) - placeholder
         suggestion.cross_consistent = True
 
-    def _save_accepted_curations(self, accepted: List[EnvironmentSuggestion]):
-        """Save auto-accepted curations to media records."""
-        if not accepted:
-            return
-
-        # TODO: Implement actual saving to media YAML files
-        logger.info(f"Would save {len(accepted)} auto-accepted curations (not implemented)")
-
     def _save_manual_review_queue(self, review_queue: List[EnvironmentSuggestion]):
         """Save suggestions needing manual review."""
         if not review_queue:
@@ -518,12 +525,14 @@ class EnvironmentCurationPipeline:
             "total_media": results["total_media"],
             "batch_size": results["batch_size"],
             "tier": results["tier"],
+            "status": results["status"],
             "metrics": results["metrics"],
             "suggestions_count": len(results["suggestions"]),
             "auto_accepted_count": len(results["auto_accepted"]),
             "manual_review_count": len(results["manual_review"]),
             "rejected_count": len(results["rejected"]),
-            "errors_count": len(results["errors"])
+            "errors_count": len(results["errors"]),
+            "error": results.get("error"),
         }
 
         with open(report_file, 'w') as f:

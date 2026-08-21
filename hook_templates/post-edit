@@ -7,10 +7,16 @@
 #
 
 # Configuration
-ORCHESTRATION_ROOT="/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe-orchestration"
+ORCHESTRATION_ROOT="{{ORCHESTRATION_ROOT}}"  # Replaced during installation
 REPO_NAME="{{REPO_NAME}}"  # Will be replaced during installation
-STATUS_DIR="$ORCHESTRATION_ROOT/status"
+WORKSPACE="${OPENCLAW_WORKSPACE:-workspace}"
+if [[ "$WORKSPACE" != /* ]]; then
+    WORKSPACE="$ORCHESTRATION_ROOT/$WORKSPACE"
+fi
+STATUS_DIR="$WORKSPACE/status"
 CLAUDE_ID="${REPO_NAME}_claude"
+
+mkdir -p "$STATUS_DIR"
 
 # Update status to indicate activity
 cat > "$STATUS_DIR/${CLAUDE_ID}_status.yaml" <<EOF

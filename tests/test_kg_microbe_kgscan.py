@@ -239,7 +239,8 @@ def test_dedup_keeps_the_best_scored_filing_regardless_of_scan_order(tmp_path, m
     monkeypatch.setattr(scan_mod, "europepmc_search", fake_search)
     conf = tmp_path / "conf"
     data = tmp_path / "data"
-    conf.mkdir(); data.mkdir()
+    conf.mkdir()
+    data.mkdir()
     (data / "aaa_low.yaml").write_text(yaml.dump(
         {"identifier": "trait:aaa_low", "label": "commensalism", "synonyms": []}))
     (data / "zzz_high.yaml").write_text(yaml.dump(
@@ -275,7 +276,8 @@ def test_require_topic_in_sentence_false_in_the_config_restores_recall(tmp_path,
          "Prokaryotes of marine plastispheres remain poorly understood."}])
     conf = tmp_path / "conf"
     data = tmp_path / "data"
-    conf.mkdir(); data.mkdir()
+    conf.mkdir()
+    data.mkdir()
     (data / "commensalism.yaml").write_text(yaml.dump(
         {"identifier": "trait:commensalism", "label": "commensalism", "synonyms": []}))
     cfg = conf / "kgscan_config.yaml"

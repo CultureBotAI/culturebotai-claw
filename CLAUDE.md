@@ -1,302 +1,149 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file is the repository-specific operating guide for coding agents. The
+code and tests are authoritative if an older guide or archived report differs.
 
-## Project Overview
+## Purpose and boundaries
 
-CultureBotAI-CLAW is an AI agent orchestration system for coordinating development across three interconnected microbial knowledge base repositories:
+CultureBotAI CLAW coordinates work across three downstream repositories:
 
-- **CultureMech**: `/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech` - 10,657 culture media recipes
-- **MIM** (MediaIngredientMech): `/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech` - ingredients with ontology mappings (CHEBI / FOODON / NCIT / cas: / kgmicrobe.compound:)
-- **CommunityMech**: `/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CommunityMech/CommunityMech` - 35+ microbial communities
+- CultureMech (`CULTUREMECH_ROOT`)
+- MediaIngredientMech, canonically abbreviated MIM
+  (`MEDIAINGREDIENTMECH_ROOT`)
+- CommunityMech (`COMMUNITYMECH_ROOT`)
 
-> **Acronym convention**: Throughout this repo (CLAUDE.md, skills, README, scripts), `MIM` is the canonical acronym for MediaIngredientMech. Use the verbose `MediaIngredientMech` only in (a) filesystem paths, (b) repository URLs, (c) environment variable names like `MEDIAINGREDIENTMECH_ROOT`, and (d) the first introduction (here) where the acronym is defined.
+This repository owns orchestration, cross-repository safety primitives, shared
+Mech utilities, fleet checks, and curation support. Do not edit a downstream
+repository directly from an ad hoc path. Resolve and verify it through the
+orchestration layer.
 
-## Multi-Claude Coordination Architecture
+## Supported versus experimental surfaces
 
-**CRITICAL**: This repository uses a unique multi-Claude coordination system where multiple Claude Code sessions work concurrently across 4 repositories. Coordination happens through file-based communication, NOT API calls.
+Supported:
 
-### Coordination Roles
+- `RepositorySettings` fail-closed path and Git identity validation.
+- `LockManager` atomic, lease-owned file coordination.
+- Plugin and agent discovery and validated CLI dry runs.
+- Packaged history, QC dashboard, discussion-browser, and knowledge-gap tools.
+- The assertion-based suite under `tests/` and fleet workflows under `.github/`.
 
-- **Orchestration Claude** (this repository): Coordinates agents, creates tasks, manages locks, monitors progress
-- **Repository Claudes** (CultureMech/MediaIngredientMech/CommunityMech): Execute work within their repository boundaries
+Experimental or disabled:
 
-### Lock System
+- `openclaw-cli agent run` and `pipeline run` execution without `--dry-run`.
+- Environment-curation apply mode; it raises until an atomic validated writer exists.
+- Unified ingredient-mapping apply mode; it raises until all YAML writes are transactional.
+- Legacy root diagnostics, one-off migration scripts, and archived phase workflows.
 
-Before any operation that modifies downstream repositories:
+Never describe an experimental path as implemented merely because a YAML agent
+definition, configuration section, or placeholder method exists.
+
+## Setup and checks
+
+```bash
+cp .env.example .env       # first checkout only; edit repository roots
+uv sync --extra dev
+uv run openclaw-cli config validate
+
+uvx ruff@0.16.3 check cli plugins pipelines src tests
+uv run --extra dev mypy \
+  cli/main.py plugins/repository_settings.py plugins/lock_manager.py \
+  src/kg_microbe_history src/kg_microbe_kgscan
+uv run --extra dev python -m pytest -q \
+  --cov=src --cov-report=term-missing --cov-fail-under=70
+```
+
+Pytest collects only `tests/`. A root or `scripts/` file named `test_*.py` is a
+legacy executable diagnostic unless it is deliberately migrated into `tests/`
+with assertions.
+
+## Mandatory cross-repository mutation checklist
+
+Before any downstream write:
+
+1. Run `openclaw-cli config validate` and resolve the target through
+   `RepositorySettings`; never default a missing root to `.`.
+2. Confirm the target is the exact expected worktree and GitHub `origin`.
+3. Inspect branch, staged changes, unstaged changes, and untracked files.
+4. Obtain user approval when the operation changes downstream data, schemas,
+   Git state, or published artifacts.
+5. Acquire the repository lock with `LockManager.lock(...)`.
+6. Run the operation in dry-run mode first when available.
+7. Stage output, validate it, then replace destination files atomically.
+8. Report modified files, validation results, partial failures, and recovery path.
+
+Use the context manager so exceptions cannot skip release:
 
 ```python
 from plugins.lock_manager import LockManager
 
-lock_manager = LockManager()
-if lock_manager.acquire_lock("mediaingredientmech", "operation_name"):
-    # Perform operation
-    lock_manager.release_lock("mediaingredientmech")
+with LockManager().lock("culturemech", "operation_name"):
+    perform_approved_write()
 ```
 
-**Lock files**: `workspace/locks/*.lock` (auto-expire after 1 hour)
+Do not use manual acquire/release pairs in new code. Never force-release another
+lease as routine error recovery.
 
-### Task-Based Communication
+## Configuration rules
 
-Create tasks for downstream Claude sessions:
+- Start from `.env.example`; do not commit `.env` or credentials.
+- Repository paths must be explicit, absolute for automation, and free of
+  unresolved `${...}` expressions.
+- Repository-aware plugins must consume `RepositorySettings`, not call
+  `os.getenv` independently.
+- Command/recipe allowlists deny by default.
+- Runtime artifacts belong under `OPENCLAW_WORKSPACE` (default `./workspace`).
+- The path, identity, allowlist, and lock controls are enforced. Do not claim
+  that approval, backups, or transactional writes are centrally enforced for a
+  writer unless its code and tests demonstrate that behavior.
 
-```python
-task_id = create_curation_task(
-    workspace=Path("workspace"),
-    batch_size=20,
-    auto_accept_threshold=0.9,
-    dry_run=False
-)
-# Task file created in workspace/tasks/
-# Downstream Claude reads and processes it
+## Current architecture
+
+```text
+agents/       YAML agent definitions; declaration is not execution
+cli/          discovery, status, plugin checks, and configuration validation
+plugins/      validated repository adapters and coordination primitives
+pipelines/    curation/orchestration workflows with explicit support status
+src/          installed kg_microbe_* shared libraries and CLIs
+shared/       history schema, ID/label checks, and spoke sync manifests
+scripts/      maintenance and migration scripts; audit before treating as supported
+tests/        the only default pytest collection root
+docs/         current index, guides, proposals, reviews, and archive
+workspace/    gitignored runtime state
 ```
 
-## Prompts
-
-Hand-over prompts live in `prompts/`. They are **prompts, not slash commands** — feed them to
-a native command, or paste them to another agent or an independent reviewer. No frontmatter,
-no wrapper, on purpose.
-
-- **`prompts/backlog-loop-goal.md`** — review and prioritise the open issues across the
-  fleet, then take the chosen one all the way: branch, work, PR, adversarial review, issues
-  from that review, merge on approval, delete the branch. Feed it to the native `/goal`.
-
-**Do not wrap this as a custom command.** It used to live at `.claude/commands/goal.md`, which
-registered a custom `/goal` under the same name as the built-in. If such a wrapper reappears,
-delete it rather than repointing it — a project-local `/goal` that is not the built-in loop is
-a trap whichever one ends up winning. What the collision actually does is unspecified: the
-documented override rule covers *bundled* skills, and `/goal` is a *built-in command*, which
-that rule does not mention. See claw#60. (`.claude/commands/curate.md` is fine — nothing
-built-in is called `/curate`.)
-
-## Development Commands
-
-### Setup
+Key shared console scripts:
 
 ```bash
-# Install dependencies
-uv sync
-
-# Configure environment (edit .env first)
-openclaw-cli config validate
-
-# Check system status
-openclaw-cli status
+uv run kg-microbe-history --help
+uv run kg-microbe-kgscan --help
+uv run kg-microbe-qc --help
+uv run kg-microbe-discussions --help
 ```
 
-### CLI Usage
+## Change conventions
 
-```bash
-# List agents
-openclaw-cli agent list
+- Add regression tests under `tests/` for every repaired failure mode.
+- Return nonzero from CLI failures; printing an error is not sufficient.
+- Do not swallow partial failures into a successful report.
+- Use timezone-aware UTC timestamps.
+- Use atomic creation/replacement for locks and curated data.
+- Preserve unrelated user changes and generated artifacts.
+- Prefer `uv run python` over machine-specific interpreter paths.
+- Keep README user-facing; put agent-only constraints here; put detailed design
+  rationale in `docs/proposals/` or `docs/guides/`.
 
-# Run agent (dry-run recommended)
-openclaw-cli agent run validation_agent --dry-run
+## Prompts and review workflow
 
-# List/test plugins
-openclaw-cli plugin list
-openclaw-cli plugin test just_runner
-```
+- `prompts/backlog-loop-goal.md` is a hand-over prompt for the native `/goal`.
+  Do not recreate a project command named `/goal`.
+- `.claude/workflows/dynamic-review.js` is the version-controlled source for
+  `/dynamic-review`. It reports to the session by default and posts PR comments
+  only when explicitly requested.
+- `.claude/commands/curate.md` coordinates the curation stages and must stop for
+  confirmation before downstream mutations.
 
-### Testing
+## Documentation
 
-```bash
-# Test multi-Claude coordination
-./test_coordination.py
-
-# Test lock system
-./test_lock_coordination.sh
-
-# Run pilot test (orchestration test)
-./run_pilot_test_tasks.py --batch-size 5 --dry-run
-```
-
-## Architecture
-
-### Directory Structure
-
-```
-agents/                    # Agent definitions (YAML)
-├── code_development/      # RefactoringAgent, DocumentationAgent, TestAgent
-├── data_pipeline/         # ETLCoordinator, IngredientCuration, ValidationAgent
-├── build_deployment/      # BuildCoordinator, ExportAgent, ReleaseAgent
-└── dev_workflow/          # SchemaSyncAgent, DependencyAgent, CrossRepoValidator
-
-plugins/                   # Custom plugins wrapping existing tools
-├── just_runner.py         # Execute justfile recipes across repos
-├── linkml_validator.py    # LinkML schema validation
-├── oak_query.py          # Ontology Access Kit integration
-├── git_integration.py     # Safe git operations
-└── lock_manager.py       # Multi-Claude lock coordination
-
-pipelines/                 # Multi-agent workflows
-├── ingredient_curation_pipeline.py
-└── validation_pipeline.py
-
-workspace/                 # Runtime data (gitignored)
-├── locks/                # Lock files for coordination
-├── tasks/                # Task files for downstream Claudes
-├── results/              # Task results from downstream Claudes
-├── status/               # Status files for inter-Claude communication
-└── reports/              # Generated reports
-
-cli/                      # Click-based CLI
-└── main.py              # Entry point: openclaw-cli
-```
-
-### Agent Configuration
-
-Agents are defined in YAML (see `agents/*/*.yaml`):
-
-```yaml
-agent:
-  name: validation_agent
-  type: dev_workflow
-  model: claude-haiku-4-5
-
-workspace:
-  allowed_paths:
-    - "${CULTUREMECH_ROOT}/**/*.yaml"
-  read_only: true
-
-tools:
-  - name: linkml_validator
-    type: plugin
-    plugin: linkml_validator
-
-tasks:
-  validate_all:
-    workflow:
-      - step: validate_schemas
-      - step: validate_data
-      - step: generate_report
-```
-
-### Plugin System
-
-Plugins wrap existing tools and provide safe interfaces:
-
-- **JustRunnerPlugin**: Execute justfile recipes across repositories
-- **LinkMLValidatorPlugin**: Validate YAML against LinkML schemas
-- **GitIntegrationPlugin**: Safe git operations (branching, status, commits)
-- **OAKQueryPlugin**: Ontology term validation and search
-- **LockManager**: File-based distributed locking for multi-Claude coordination
-
-## Key Patterns
-
-### 1. Cross-Repository Operations
-
-Always use the orchestration layer for cross-repo operations. Never modify downstream repos directly:
-
-```python
-# ✅ CORRECT: Use plugin to execute command in downstream repo
-from plugins.just_runner import JustRunnerPlugin
-plugin = JustRunnerPlugin()
-result = plugin.execute_recipe("culturemech", "validate-all")
-
-# ❌ WRONG: Don't directly edit files in downstream repos
-# This repo should coordinate, not execute
-```
-
-### 2. Multi-Claude Workflow
-
-When orchestrating work for downstream Claudes:
-
-1. Acquire lock for target repository
-2. Create task file in `workspace/tasks/`
-3. Monitor status files in `workspace/status/`
-4. Read results from `workspace/results/`
-5. Release lock
-
-### 3. Safety Mechanisms
-
-All operations default to safe mode:
-
-- Read-only by default (`read_only: true` in agent configs)
-- Dry-run default (`OPENCLAW_DRY_RUN_DEFAULT=true`)
-- Approval required for destructive operations
-- Git branches for all modifications
-- Automatic backups in `workspace/.backups/`
-
-## Configuration
-
-### Environment Variables (.env)
-
-```bash
-ANTHROPIC_API_KEY=           # API key for programmatic LLM access
-CULTUREMECH_ROOT=            # Path to CultureMech repo
-MEDIAINGREDIENTMECH_ROOT=    # Path to MIM repo
-COMMUNITYMECH_ROOT=          # Path to CommunityMech repo
-OPENCLAW_WORKSPACE=          # Workspace directory (default: ./workspace)
-```
-
-### OpenClaw Configuration (openclaw_config.yaml)
-
-Defines repositories, agents, plugins, and safety settings. Key sections:
-
-- `repositories`: Paths and metadata for the 3 downstream repos
-- `agents.discovery_paths`: Where to find agent YAML files
-- `plugins.enabled`: Which plugins are active
-- `safety`: Approval requirements and allowed operations
-- `monitoring`: Logging, metrics, cost tracking
-
-## Important Notes
-
-1. **Never skip lock acquisition** for operations that modify downstream repositories
-2. **Always release locks** in finally blocks to prevent deadlocks
-3. **Check lock expiration**: Locks auto-expire after 1 hour (configurable)
-4. **Use task-based communication** for coordinating downstream Claude sessions
-5. **Respect repository boundaries**: Don't directly modify files in CultureMech/MediaIngredientMech/CommunityMech
-6. **Hook system**: All 3 downstream repos have Claude Code hooks installed (`scripts/install_hooks.sh`)
-
-## Common Development Workflows
-
-### Adding a New Agent
-
-1. Create YAML config in `agents/<type>/<name>_agent.yaml`
-2. Define model, workspace, tools, and tasks
-3. Test with `openclaw-cli agent run <name> --dry-run`
-
-### Adding a New Plugin
-
-1. Create plugin file in `plugins/<name>.py`
-2. Implement plugin interface (see existing plugins)
-3. Add to `openclaw_config.yaml` under `plugins.enabled`
-4. Test with `openclaw-cli plugin test <name>`
-
-### Testing Multi-Claude Coordination
-
-1. Start orchestration: `./run_pilot_test_tasks.py --dry-run`
-2. Open downstream repo in separate Claude Code session
-3. Have downstream Claude process tasks from `../culturebotai-claw/workspace/tasks/`
-4. Monitor results in `workspace/status/` and `workspace/results/`
-
-## Troubleshooting
-
-- **Lock conflicts**: Check `workspace/locks/` for stale locks. Use `scripts/check_lock.py <repo>`
-- **Task failures**: Check `workspace/logs/` for detailed execution logs
-- **Plugin errors**: Test individual plugins with `openclaw-cli plugin test <plugin_name>`
-- **Configuration issues**: Run `openclaw-cli config validate`
-
-## Code Review: `/dynamic-review`
-
-`.claude/workflows/dynamic-review.js` is a **dynamic workflow** (Claude Code's script-orchestrated
-multi-agent primitive) for repo-agnostic code review of a PR or branch diff. It scopes the diff and
-profiles the target repo **at runtime** (reads the repo's `CLAUDE.md` + `justfile` + LinkML schema,
-and an optional `.claude/review-profile.yaml`), runs that repo's **own** validators as a static gate,
-reviews across dynamically-chosen dimensions (Fable 5 agents), adversarially verifies each finding,
-then synthesizes a ranked report.
-
-- **Run it**: `/dynamic-review` (current branch vs `origin/main` in the cwd repo), or pass args, e.g.
-  `Run /dynamic-review on PR 90`, or `{repo, target:"PR:<n>"|"branch"|"diff:<a>..<b>"|"local", base, depth:"quick"|"standard"|"thorough", postComments}`.
-- **Default = report to session.** Inline GitHub PR comments are posted only when `postComments: true`
-  (uses the `gh api .../pulls/<n>/comments` + suggestion-block pattern).
-- The canonical copy lives at `~/.claude/workflows/dynamic-review.js` (so `/dynamic-review` works in
-  every repo); this committed copy is the version-controlled source of truth — keep the two in sync.
-
-## Documentation References
-
-- **Architecture**: `FINAL_ARCHITECTURE_COMPLETE.md` - Complete multi-Claude coordination design
-- **Coordination**: `MULTI_CLAUDE_COORDINATION.md` - Lock protocol and communication patterns
-- **Status**: `PROJECT_STATUS.md` - Current implementation status
-- **Setup**: `README.md` - Installation and quick start guide
+Start at [`docs/README.md`](docs/README.md). Historical completion, phase, and
+session reports live under `docs/archive/` and are never a source of current
+operating truth.
