@@ -26,6 +26,13 @@ ORG="${ORG:-CultureBotAI}"
 HUB="${HUB:-CultureMech}"
 REF="${REF:-main}"
 REPOS=(CultureMech MediaIngredientMech CommunityMech TraitMech proteintraitsmech)
+# Worst-case curl budget: (len(FILES)+len(MAPPED)) x (1 + non-hub repos) for
+# direction 1, + len(FILES) for direction 2, + (1 + non-hub repos) for
+# direction 4 (SPOKE_FILES has one entry). At 5 FILES, 2 MAPPED, 4 non-hub
+# repos, 1 SPOKE_FILES entry, --max-time 10 each: (5+2)x5 + 5 + 5 = 45 calls,
+# ~450s worst case against .github/workflows/id-label-canon.yaml's
+# timeout-minutes: 10 (600s). Re-check this math before growing REPOS,
+# FILES/MANIFEST, or MAPPED further.
 
 # claw's mirror lives here, and its MANIFEST is the single list of vendored
 # files. Read it rather than restating it: a hardcoded copy would be a second
@@ -49,8 +56,9 @@ MAPPED=(
   schema/mech_shared.yaml
   schema/history.yaml
 )
-# Note the mirror carries the manifest set only — not mech_shared.yaml, which is
-# a schema module rather than part of the id-label validator set.
+# Note the mirror carries the manifest set only — not mech_shared.yaml or
+# history.yaml, which are schema modules rather than part of the id-label
+# validator set.
 
 lc() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
 raw() { printf 'https://raw.githubusercontent.com/%s/%s/%s/%s' "$ORG" "$1" "$REF" "$2"; }
