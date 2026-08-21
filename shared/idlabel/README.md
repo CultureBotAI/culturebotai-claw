@@ -71,14 +71,15 @@ touching this directory or the script.
 It asserts both directions against `CultureBotAI/CultureMech@main`:
 
 1. all five Mech repos carry byte-identical copies of the five validator files
-   plus `mech_shared.yaml` (path-mapped to `src/<pkg>/schema/`), and
+   plus `mech_shared.yaml` and `history.yaml` (both path-mapped to
+   `src/<pkg>/schema/`), and
 2. this mirror carries byte-identical copies of the five validator files.
 
 It also reports any **tracked** file under `shared/idlabel/` that `MANIFEST` does
 not list, since such a file is audited by nothing and vendored nowhere while
 looking canonical.
 
-That is 29 comparisons (5 files × 4 non-hub Mechs + 1 mapped entry × 4 + 5
+That is 33 comparisons (5 files × 4 non-hub Mechs + 2 mapped entries × 4 + 5
 mirror-vs-hub). It supersedes two earlier checks that asserted the same
 invariant from two repos: this workflow's `matches-hub` job (mirror only) and
 CultureMech's `vendored-fleet-audit` (Mechs only).
