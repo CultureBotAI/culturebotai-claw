@@ -241,6 +241,28 @@ def test_regenerating_an_unchanged_corpus_produces_no_diff(tmp_path):
     assert (first / "coverage.png").read_bytes() == (second / "coverage.png").read_bytes()
 
 
+def test_dashboard_html_escapes_config_derived_text(tmp_path):
+    """#51: dashboard.html.j2's final suffix is .j2, not .html.
+
+    The previous select_autoescape(["html"]) therefore disabled escaping while
+    looking enabled to future maintainers.
+    """
+    corpus = tmp_path / "corpus"
+    _write_corpus(corpus, {"a": {"name": "A"}})
+    config = _write_config(
+        tmp_path,
+        corpus,
+        repo_name='<img src=x onerror="alert(1)">',
+        slots=[{"path": "<script>alert(2)</script>", "threshold": 0.9}],
+    )
+    generate_dashboard(config_path=config, output_dir=tmp_path / "out")
+    html = (tmp_path / "out" / "index.html").read_text()
+    assert "<img src=x" not in html
+    assert "<script>alert(2)</script>" not in html
+    assert "&lt;img src=x onerror=&#34;alert(1)&#34;&gt;" in html
+    assert "&lt;script&gt;alert(2)&lt;/script&gt;" in html
+
+
 def test_chart_png_does_not_embed_the_matplotlib_version(tmp_path):
     """The Mechs pip-install matplotlib unpinned. With the version stamped
     into the PNG, a regenerate-and-diff staleness check would trip on a

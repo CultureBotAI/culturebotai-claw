@@ -15,6 +15,9 @@ Exit codes: 0 ok, 1 nothing to do or a workflow was malformed, 2 bad usage.
 from __future__ import annotations
 
 import argparse
+import os
+import re
+import secrets
 import sys
 from pathlib import Path
 
@@ -80,11 +83,85 @@ def render_schedule(entries: list[dict]) -> list[str]:
     return lines
 
 
+def schedule_crons(text: str) -> list[str]:
+    """Return cron expressions from ``on.schedule`` without dumping the YAML."""
+    lines = text.splitlines()
+    on_idx = next((i for i, line in enumerate(lines) if line.rstrip() == "on:"), None)
+    if on_idx is None:
+        raise ValueError("no top-level `on:` block")
+    end = len(lines)
+    for i in range(on_idx + 1, len(lines)):
+        line = lines[i]
+        if line and not line[0].isspace() and not line.startswith("#"):
+            end = i
+            break
+    sched_idx = next(
+        (i for i in range(on_idx + 1, end) if lines[i].rstrip() == "  schedule:"), None
+    )
+    if sched_idx is None:
+        return []
+    found = []
+    cron_re = re.compile(r'^\s{4}-\s+cron:\s*(?:"([^"]*)"|\'([^\']*)\')')
+    for line in lines[sched_idx + 1 : end]:
+        if line.strip() and not line.startswith("    "):
+            break
+        match = cron_re.match(line)
+        if match:
+            found.append(match.group(1) if match.group(1) is not None else match.group(2))
+    return found
+
+
+def check_active_profile(config: dict) -> list[str]:
+    """Return ways workflows disagree with the profile named by ``active``."""
+    active = config.get("active")
+    if active not in config.get("profiles", {}):
+        return [f"active profile {active!r} does not exist"]
+    problems = []
+    wanted = config["profiles"][active].get("workflows") or {}
+    for stem, entries in sorted(wanted.items()):
+        expected = [entry["cron"] for entry in entries or []]
+        path = resolve_workflow(stem)
+        if path is None:
+            # A missing workflow cannot run, so it agrees with the kill-switch
+            # profile but cannot satisfy a profile that expects a schedule.
+            if expected:
+                problems.append(f"{stem}: workflow missing; expected {expected}")
+            continue
+        try:
+            actual = schedule_crons(path.read_text(encoding="utf-8"))
+        except ValueError as exc:
+            problems.append(f"{stem}: {exc}")
+            continue
+        if actual != expected:
+            problems.append(f"{stem}: active={active} expects {expected}, found {actual}")
+    return problems
+
+
+def write_active_profile(path: Path, profile: str) -> None:
+    """Update only the top-level ``active`` scalar, preserving surrounding prose."""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    matches = [i for i, line in enumerate(lines) if line.startswith("active:")]
+    if len(matches) != 1:
+        raise ValueError(f"expected exactly one top-level active key, found {len(matches)}")
+    idx = matches[0]
+    comment = ""
+    if "#" in lines[idx]:
+        comment = "  #" + lines[idx].split("#", 1)[1]
+    lines[idx] = f'active: "{profile}"{comment}'
+    rendered = "\n".join(lines) + "\n"
+    tmp = path.with_name(path.name + f".tmp-{secrets.token_hex(4)}")
+    try:
+        tmp.write_text(rendered, encoding="utf-8")
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
 def rewrite(text: str, entries: list[dict]) -> tuple[str, str]:
     """Return (new_text, what_changed). Raises ValueError if the shape is unexpected."""
     lines = text.splitlines()
 
-    on_idx = next((i for i, l in enumerate(lines) if l.rstrip() == "on:"), None)
+    on_idx = next((i for i, line in enumerate(lines) if line.rstrip() == "on:"), None)
     if on_idx is None:
         raise ValueError("no top-level `on:` block")
 
@@ -142,6 +219,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--config", default=str(DEFAULT_CONFIG))
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--list", action="store_true", dest="do_list")
+    ap.add_argument(
+        "--check-active",
+        action="store_true",
+        help="fail if managed workflow schedules do not match the active profile",
+    )
     args = ap.parse_args(argv)
 
     config = load_config(Path(args.config))
@@ -156,6 +238,15 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 1
+
+    if args.check_active:
+        active_problems = check_active_profile(config)
+        if active_problems:
+            for problem in active_problems:
+                print(f"error: {problem}", file=sys.stderr)
+            return 1
+        print(f"active profile '{config.get('active')}' matches managed workflows")
+        return 0
 
     if args.do_list or not args.profile:
         active = config.get("active")
@@ -177,7 +268,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     wanted = config["profiles"][args.profile].get("workflows") or {}
-    changed = missing = failed = 0
+    changed = missing = failed = blocking_missing = 0
 
     for stem, entries in sorted(wanted.items()):
         path = resolve_workflow(stem)
@@ -186,6 +277,8 @@ def main(argv: list[str] | None = None) -> int:
             # rather than passing silently — a typo'd stem looks identical.
             print(f"  skip  {stem}: no workflow file (not created yet?)")
             missing += 1
+            if entries:
+                blocking_missing += 1
             continue
         original = path.read_text(encoding="utf-8")
         try:
@@ -207,9 +300,24 @@ def main(argv: list[str] | None = None) -> int:
     print(
         f"\nprofile '{args.profile}': {changed} changed, {missing} absent, {failed} failed"
     )
-    if not args.dry_run and changed:
-        print("Remember to update `active:` in cron-profiles.yaml to match.")
-    return 1 if failed else 0
+    incomplete = failed or blocking_missing
+    if not args.dry_run and not incomplete:
+        expected_config = {**config, "active": args.profile}
+        post_apply_problems = check_active_profile(expected_config)
+        if post_apply_problems:
+            for problem in post_apply_problems:
+                print(f"error: post-apply verification failed: {problem}", file=sys.stderr)
+            print("active profile NOT updated because verification failed", file=sys.stderr)
+            return 1
+        try:
+            write_active_profile(Path(args.config), args.profile)
+        except (OSError, ValueError) as exc:
+            print(f"error: workflows changed but active profile was not updated: {exc}", file=sys.stderr)
+            return 1
+        print(f"active profile updated to '{args.profile}'")
+    elif not args.dry_run and incomplete:
+        print("active profile NOT updated because application was incomplete", file=sys.stderr)
+    return 1 if incomplete else 0
 
 
 if __name__ == "__main__":

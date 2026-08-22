@@ -18,6 +18,7 @@ import pytest
 import yaml
 
 SKILLS_DIR = Path(__file__).resolve().parents[1] / ".claude" / "skills"
+COMMANDS_DIR = Path(__file__).resolve().parents[1] / ".claude" / "commands"
 
 def _discover_skill_files() -> list[Path]:
     """Every skill file, whatever its casing, listed exactly once.
@@ -46,6 +47,7 @@ def _discover_skill_files() -> list[Path]:
 
 
 SKILL_FILES = _discover_skill_files()
+COMMAND_FILES = sorted(COMMANDS_DIR.glob("*.md")) if COMMANDS_DIR.is_dir() else []
 
 
 def _frontmatter_text(text: str, label: str = "<text>") -> str:
@@ -102,6 +104,11 @@ def test_there_are_skills_to_check():
     assert len(SKILL_FILES) >= 15, f"only found {len(SKILL_FILES)} skill files"
 
 
+def test_there_are_commands_to_check():
+    """Guard the guard: an empty commands directory must not pass silently."""
+    assert COMMAND_FILES, "found no .claude/commands/*.md files"
+
+
 # --------------------------------------------------------------------------
 # _frontmatter itself — the helper is the part that can pass on broken input
 # --------------------------------------------------------------------------
@@ -148,6 +155,26 @@ def test_skill_name_matches_its_directory(path: Path):
 @pytest.mark.parametrize("path", SKILL_FILES, ids=lambda p: p.parent.name)
 def test_skill_declares_a_usable_description(path: Path):
     """The description is what a model matches a request against."""
+    meta = yaml.safe_load(_frontmatter(path))
+    description = meta.get("description")
+    assert isinstance(description, str) and description.strip(), (
+        f"{path} has no usable description"
+    )
+
+
+@pytest.mark.parametrize("path", COMMAND_FILES, ids=lambda p: p.name)
+def test_command_frontmatter_has_no_duplicate_keys(path: Path):
+    yaml.load(_frontmatter(path), Loader=_StrictLoader)
+
+
+@pytest.mark.parametrize("path", COMMAND_FILES, ids=lambda p: p.name)
+def test_command_frontmatter_is_valid_yaml(path: Path):
+    meta = yaml.safe_load(_frontmatter(path))
+    assert isinstance(meta, dict), f"{path} frontmatter is not a mapping"
+
+
+@pytest.mark.parametrize("path", COMMAND_FILES, ids=lambda p: p.name)
+def test_command_declares_a_usable_description(path: Path):
     meta = yaml.safe_load(_frontmatter(path))
     description = meta.get("description")
     assert isinstance(description, str) and description.strip(), (
