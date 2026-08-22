@@ -6,9 +6,10 @@ five Mech repos (CultureMech / MediaIngredientMech / CommunityMech / TraitMech /
 proteintraitsmech).
 
 **The machine-canonical fetch-hub is the public `CultureBotAI/CultureMech`, not
-this repo.** culturebotai-claw is private, so the Mechs' CI (they are public)
-cannot fetch raw content from it. Each Mech's `scripts/check_vendored_sync.sh`
-therefore diffs against `CultureBotAI/CultureMech` at the commit pinned in its
+this repo.** That is an explicit governance choice; claw is also public, but is
+the fleet's passive discovery and orchestration mirror rather than a second
+authority. Each Mech's `scripts/check_vendored_sync.sh` therefore diffs against
+`CultureBotAI/CultureMech` at the commit pinned in its
 `scripts/.vendored_canon_ref`. The nightly `fleet-audit` job in this repo's
 `.github/workflows/id-label-canon.yaml` compares the hub, all spokes, and this
 mirror. It supersedes CultureMech's removed `vendored-fleet-audit.yml`.

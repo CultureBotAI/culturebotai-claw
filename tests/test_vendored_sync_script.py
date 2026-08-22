@@ -15,6 +15,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "shared" / "spoke" / "scripts" / "check_vendored_sync.sh"
 SAME_PATHS = (
     "tests/test_provider_triage_contract.py",
+    "tests/test_skill_frontmatter.py",
+    "tests/test_curation_timestamp_schema.py",
+    "prompts/backlog-loop-goal.md",
     "scripts/validate_id_label_correspondence.py",
     "scripts/chem_formula.py",
     "tests/test_id_label_empty_adapter.py",
@@ -25,6 +28,7 @@ MAPPED_PATHS = (
     ("src/fixture/schema/mech_shared.yaml", "src/culturemech/schema/mech_shared.yaml"),
     ("src/fixture/schema/history.yaml", "src/culturemech/schema/history.yaml"),
 )
+EXPECTED_FETCHES = 1 + len(SAME_PATHS) + len(MAPPED_PATHS)
 
 
 def _write(path: Path, content: str) -> None:
@@ -92,9 +96,9 @@ def test_all_fetches_are_bounded_and_never_retry_internally(tmp_path: Path) -> N
         ["bash", str(SCRIPT)], cwd=root, env=env, text=True, capture_output=True
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "OK: all 9 vendored files match" in result.stdout
+    assert f"OK: all {EXPECTED_FETCHES} vendored files match" in result.stdout
     calls = _calls(log)
-    assert len(calls) == 9
+    assert len(calls) == EXPECTED_FETCHES
     for args in calls:
         assert args[args.index("--max-time") + 1] == "10"
         assert not any(arg == "--retry" or arg.startswith("--retry-") for arg in args)
@@ -110,5 +114,5 @@ def test_curl_failure_is_reported_for_the_calling_workflow_to_retry(tmp_path: Pa
     assert "ERROR: could not fetch" in result.stdout
     assert "To resolve:" in result.stdout
     calls = _calls(log)
-    assert len(calls) == 9
+    assert len(calls) == EXPECTED_FETCHES
     assert all("--max-time" in args for args in calls)

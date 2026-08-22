@@ -24,6 +24,7 @@ from kg_microbe_kgscan.scan import (  # noqa: E402
     extract_gap_signals,
     is_contentless,
     prompt_key,
+    sentence_mentions_distinctive_tokens,
     sentence_mentions_topic,
 )
 
@@ -78,6 +79,52 @@ def test_gate_can_be_disabled_and_without_topic_terms_is_inert():
     text = "The mechanisms of coral growth anomalies remain poorly understood."
     assert len(extract_gap_signals(text, topic_terms=TOPIC, require_topic=False)) == 1
     assert len(extract_gap_signals(text, topic_terms=())) == 1
+
+
+def test_coined_community_name_can_match_two_distinctive_tokens():
+    topic = ["ANME-SRB Marine Methane Seep Consortium"]
+    sentence = (
+        "How methane turnover at marine seeps is stabilized remains poorly understood."
+    )
+    assert not sentence_mentions_topic(sentence, topic)
+    assert sentence_mentions_distinctive_tokens(sentence, topic, min_matches=2)
+    assert len(
+        extract_gap_signals(
+            sentence, topic_terms=topic, topic_token_min_matches=2
+        )
+    ) == 1
+
+
+def test_coined_name_token_gate_rejects_only_one_matching_token():
+    topic = ["ANME-SRB Marine Methane Seep Consortium"]
+    sentence = "Methane oxidation in digesters remains poorly understood."
+    assert not sentence_mentions_distinctive_tokens(sentence, topic, min_matches=2)
+    assert (
+        extract_gap_signals(
+            sentence, topic_terms=topic, topic_token_min_matches=2
+        )
+        == []
+    )
+
+
+def test_coined_name_mode_expands_the_search_query(monkeypatch):
+    seen = {}
+
+    def fake_search(query, **kwargs):
+        seen["query"] = query
+        return []
+
+    monkeypatch.setattr(scan_mod, "europepmc_search", fake_search)
+    scan_mod.scan_record(
+        {"id": "community:1", "name": "ANME-SRB Marine Methane Seep Consortium"},
+        {"name_fields": ["name"], "topic_token_min_matches": 2},
+        page_size=5,
+        max_signals=2,
+        timeout=1,
+    )
+    assert '"methane"' in seen["query"]
+    assert '"marine"' in seen["query"]
+    assert '"consortium"' not in seen["query"], "generic fleet terms stay excluded"
 
 
 # --- contentless boilerplate ---

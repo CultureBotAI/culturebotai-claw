@@ -13,6 +13,13 @@ Config keys read here beyond the record plumbing (see __main__ for the rest):
                               relevant for Mechs whose record names are coined
                               multi-word labels no abstract contains verbatim
                               (#79).
+  topic_token_min_matches     default 0. When positive, a sentence may also
+                              pass by containing at least this many distinctive
+                              content tokens from a coined record name. The
+                              same tokens expand the Europe PMC query. This is
+                              the precision/recall middle setting for
+                              CommunityMech (#79); phrase matching remains the
+                              default everywhere else.
 """
 from __future__ import annotations
 
@@ -91,6 +98,16 @@ CONTENTLESS_PATTERNS = (
 
 _WS_RE = re.compile(r"\s+")
 _SENT_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z(])")
+_TOPIC_TOKEN_RE = re.compile(r"[a-z][a-z0-9]+")
+_GENERIC_TOPIC_TOKENS = {
+    "community",
+    "consortium",
+    "culture",
+    "microbial",
+    "microbiome",
+    "microorganism",
+    "synthetic",
+}
 
 
 def _norm(s: str) -> str:
@@ -151,13 +168,41 @@ def sentence_mentions_topic(sentence: str, topic_terms) -> bool:
     return any(_term_pattern(t).search(low) for t in _topic_variants(topic_terms))
 
 
+def distinctive_topic_tokens(topic_terms, min_length: int = 5) -> tuple[str, ...]:
+    """Stable content tokens for coined labels that prose will not quote whole."""
+    tokens: set[str] = set()
+    for term in _topic_variants(topic_terms):
+        for token in _TOPIC_TOKEN_RE.findall(term):
+            if len(token) >= min_length and token not in _GENERIC_TOPIC_TOKENS:
+                tokens.add(token)
+    return tuple(sorted(tokens))
+
+
+def sentence_mentions_distinctive_tokens(
+    sentence: str, topic_terms, min_matches: int
+) -> bool:
+    if min_matches <= 0:
+        return False
+    low = _norm(sentence).casefold()
+    matches = sum(
+        bool(_term_pattern(token).search(low))
+        for token in distinctive_topic_tokens(topic_terms)
+    )
+    return matches >= min_matches
+
+
 def is_contentless(sentence: str) -> bool:
     """A gap assertion that names no gap -- review boilerplate, uncuratable."""
     return any(p.search(sentence) for p in CONTENTLESS_PATTERNS)
 
 
-def extract_gap_signals(text: str, max_signals: int = 8, topic_terms=(),
-                        require_topic: bool = True) -> list[dict[str, Any]]:
+def extract_gap_signals(
+    text: str,
+    max_signals: int = 8,
+    topic_terms=(),
+    require_topic: bool = True,
+    topic_token_min_matches: int = 0,
+) -> list[dict[str, Any]]:
     """Gap-shaped sentences, anchored to the topic.
 
     The query already anchors the PAPER to the topic; this anchors the SENTENCE.
@@ -174,8 +219,13 @@ def extract_gap_signals(text: str, max_signals: int = 8, topic_terms=(),
         cats = signal_categories(sentence)
         if not cats:
             continue
-        if gate and not sentence_mentions_topic(sentence, topic_terms):
-            continue
+        if gate:
+            phrase_match = sentence_mentions_topic(sentence, topic_terms)
+            token_match = sentence_mentions_distinctive_tokens(
+                sentence, topic_terms, topic_token_min_matches
+            )
+            if not phrase_match and not token_match:
+                continue
         if is_contentless(sentence):
             continue
         key = _norm(sentence).casefold()
@@ -258,7 +308,11 @@ def scan_record(record: dict[str, Any], cfg: dict, page_size: int, max_signals: 
     name, topic_terms = _record_topic(record, name_fields, cfg.get("synonym_field", "synonyms"))
     if not topic_terms:
         return None
-    query = build_query(topic_terms, cfg.get("topic_context_terms", []) or [])
+    topic_token_min_matches = int(cfg.get("topic_token_min_matches", 0))
+    query_terms = list(topic_terms)
+    if topic_token_min_matches > 0:
+        query_terms.extend(distinctive_topic_tokens(topic_terms))
+    query = build_query(query_terms, cfg.get("topic_context_terms", []) or [])
     try:
         results = europepmc_search(query, page_size=page_size, timeout=timeout)
     except Exception as e:  # network/HTTP — report, skip record
@@ -269,8 +323,13 @@ def scan_record(record: dict[str, Any], cfg: dict, page_size: int, max_signals: 
         # Europe PMC abstractText carries structured-abstract HTML (<h4>…</h4>);
         # strip tags so snippets/sentences are clean prose.
         abstract = re.sub(r"<[^>]+>", " ", r.get("abstractText") or "")
-        sigs = extract_gap_signals(abstract, max_signals=max_signals,
-                                   topic_terms=topic_terms, require_topic=require_topic)
+        sigs = extract_gap_signals(
+            abstract,
+            max_signals=max_signals,
+            topic_terms=topic_terms,
+            require_topic=require_topic,
+            topic_token_min_matches=topic_token_min_matches,
+        )
         if not sigs:
             continue
         ref = _pub_ref(r)
