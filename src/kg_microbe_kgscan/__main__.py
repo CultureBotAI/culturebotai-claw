@@ -8,8 +8,10 @@ when a record has no existing `discussions:` key).
 Precision gates (#69): the signal sentence must mention a topic term
 (`require_topic_in_sentence: false` in the config disables -- see scan.py's
 docstring), contentless boilerplate is rejected, and a sentence filed under
-two records in one run keeps only the best-scored filing. Dedup state is
-per-run: across runs with --offset windows, #72 still applies.
+two records in one run keeps only the best-scored filing. Existing Discussion
+evidence is indexed across the complete corpus before an offset window is
+selected, so rotating scheduled runs cannot file the same sentence under a
+second record (#72).
 """
 from __future__ import annotations
 
@@ -44,6 +46,36 @@ def _record_id(doc: dict, cfg: dict, path: Path) -> str:
     return path.stem
 
 
+def _existing_prompt_owners(records, cfg: dict, field: str) -> dict[str, tuple[str, ...]]:
+    """Index existing Discussion evidence snippets across the whole corpus.
+
+    The index is built before ``--offset``/``--limit`` are applied. Otherwise
+    rotating windows would only see their own slice and cross-run dedup would
+    remain ineffective (#72). Empty or malformed entries are ignored rather
+    than collapsed onto one empty key.
+    """
+    owners: dict[str, set[str]] = {}
+    for path, doc in records:
+        rid = _record_id(doc, cfg, path)
+        discussions = doc.get(field) or []
+        if not isinstance(discussions, list):
+            continue
+        for discussion in discussions:
+            if not isinstance(discussion, dict):
+                continue
+            evidence = discussion.get("evidence") or []
+            if not isinstance(evidence, list):
+                continue
+            # A scanner-built Discussion puts the promoted sentence first,
+            # but index every evidence snippet so older/manual records cannot
+            # hide a duplicate in a later citation.
+            for entry in evidence:
+                key = prompt_key({"evidence": [entry]})
+                if key:
+                    owners.setdefault(key, set()).add(rid)
+    return {key: tuple(sorted(rids)) for key, rids in owners.items()}
+
+
 def _append_discussion(path: Path, field: str, discussion: dict) -> str:
     """EOF-append a `discussions:` block. Returns 'written' | 'dedup' | 'has_block'."""
     text = path.read_text()
@@ -66,6 +98,7 @@ def render_markdown(packet: dict) -> str:
              f"- records scanned: {packet['records_scanned']}",
              f"- gaps proposed (score >= {packet['min_score']}): {packet['proposed']}",
              f"- applied: {packet['applied']}",
+             f"- existing filings skipped: {packet.get('existing_skipped', 0)}",
              f"- cross-record duplicates dropped: {packet.get('duplicates_dropped', 0)}", ""]
     for item in packet["results"]:
         if not item.get("discussion"):
@@ -127,7 +160,9 @@ def main() -> int:
     field = cfg.get("discussions_field", "discussions")
     min_score = args.min_score if args.min_score is not None else int(cfg.get("min_score", 5))
 
-    records = list(_load_records(config_dir, cfg["record_glob"]))
+    all_records = list(_load_records(config_dir, cfg["record_glob"]))
+    existing_owners = _existing_prompt_owners(all_records, cfg, field)
+    records = all_records
     total = len(records)
     if args.offset and total:
         # Rotate rather than slice-and-truncate: an offset past the end should
@@ -166,9 +201,26 @@ def main() -> int:
             best[key] = (scan["score"], rid)
             winner[key] = rid
 
-    results, proposed, applied, duplicates = [], 0, 0, 0
+    results, proposed, applied, duplicates, existing_skipped = [], 0, 0, 0, 0
     for path, rid, scan, d in scanned:
         key = prompt_key(d)
+        owners = existing_owners.get(key, ())
+        if owners:
+            owner = owners[0]
+            if rid in owners:
+                existing_skipped += 1
+                status = f"already_present_in:{rid}"
+            else:
+                duplicates += 1
+                status = f"cross_record_duplicate_of:{owner}"
+            results.append({"name": scan["name"], "record_id": rid,
+                            "file": str(path), "score": scan["score"],
+                            "write_status": status,
+                            "duplicate_sentence": d["evidence"][0]["snippet"],
+                            "discussion": None})
+            print(f"  [dup] {scan['name']}: gap sentence already filed under "
+                  f"{', '.join(owners)} -- dropped", file=sys.stderr)
+            continue
         if rid != winner[key]:
             duplicates += 1
             results.append({"name": scan["name"], "record_id": rid,
@@ -194,6 +246,7 @@ def main() -> int:
     packet = {"repo_name": cfg.get("repo_name", ""), "engine": args.engine,
               "records_scanned": len(records), "min_score": min_score,
               "proposed": proposed, "applied": applied,
+              "existing_skipped": existing_skipped,
               "duplicates_dropped": duplicates, "results": results}
 
     out_json = args.output_json or (config_dir.parent / "reports" / "knowledge_gap_scan.json")
