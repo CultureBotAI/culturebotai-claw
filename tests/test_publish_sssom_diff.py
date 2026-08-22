@@ -462,6 +462,9 @@ def test_main_apply_writes_a_pointer_and_counts_not_the_full_diff(tmp_path, monk
     archived = json.loads(diff_file.read_text())
     assert archived["added"] == [["MIM:New", "CHEBI:2"]]
     assert published.read_bytes() == working_copy.read_bytes()
+    assert list(tmp_path.rglob("*.tmp-*")) == [], (
+        "atomic writes (PUBLISHED and diff_archive) must not leave a stray tmp file behind"
+    )
 
 
 def test_main_refuses_to_promote_a_respelled_widening_flip(tmp_path, monkeypatch):
@@ -505,3 +508,50 @@ def test_main_proceeds_past_the_widening_gate_when_explicitly_overridden(tmp_pat
     )
 
     publish_sssom.main()  # must not raise SystemExit -- 1 widening flip, limit 1
+
+
+def test_main_apply_surfaces_a_partial_failure_after_published_is_already_committed(
+    tmp_path, monkeypatch
+):
+    """PUBLISHED.write is committed before the audit-log/diff-archive write.
+    If that second write fails (disk full, permission error), CLAUDE.md says
+    not to swallow the partial failure into apparent success -- main() must
+    exit nonzero with a message that surfaces the sha256 for manual recovery,
+    not silently print "Promoted" as if the audit trail exists."""
+    working_copy = tmp_path / "working.sssom.tsv"
+    published = tmp_path / "published.sssom.tsv"
+    _write_sssom_tsv(published, [("MIM:Old", "skos:exactMatch", "CHEBI:1")])
+    _write_sssom_tsv(working_copy, [
+        ("MIM:Old", "skos:exactMatch", "CHEBI:1"),
+        ("MIM:New", "skos:exactMatch", "CHEBI:2"),
+    ])
+    audit_log = tmp_path / "status" / "sssom_promotions.jsonl"
+
+    monkeypatch.setattr(publish_sssom, "WORKING_COPY", working_copy)
+    monkeypatch.setattr(publish_sssom, "PUBLISHED", published)
+    monkeypatch.setattr(publish_sssom, "AUDIT_LOG", audit_log)
+    monkeypatch.setattr(publish_sssom, "LOCKS_DIR", tmp_path / "locks")
+    monkeypatch.setattr(publish_sssom, "CLAW_ROOT", Path(__file__).resolve().parents[1])
+    monkeypatch.setattr(publish_sssom, "_validate", lambda path: [])
+    _patch_diff_report_default(monkeypatch, tmp_path)
+
+    real_write_diff_report = publish_sssom._write_diff_report
+    calls = {"n": 0}
+
+    def flaky(diff, path=None):
+        calls["n"] += 1
+        if calls["n"] == 1:  # the dry-run-style DIFF_REPORT call earlier in main()
+            return real_write_diff_report(diff, path or (tmp_path / "diff_report.json"))
+        raise OSError("simulated disk full")  # the diff_archive call in the apply block
+
+    monkeypatch.setattr(publish_sssom, "_write_diff_report", flaky)
+    monkeypatch.setattr(sys, "argv", ["publish_sssom.py", "--apply"])
+
+    with pytest.raises(SystemExit) as excinfo:
+        publish_sssom.main()
+
+    assert excinfo.value.code == 2
+    assert published.read_bytes() == working_copy.read_bytes(), (
+        "PUBLISHED is committed before the failing write -- it must still reflect the promotion"
+    )
+    assert not audit_log.exists(), "no audit-log entry should exist for a failed audit write"

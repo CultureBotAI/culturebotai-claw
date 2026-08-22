@@ -201,6 +201,19 @@ class SssomDiff:
     # widening flip past the gate. Kept as its own list rather than folded
     # into `flipped` because the tuple shapes differ (respelling has two
     # subjects, not one).
+    #
+    # Scope boundary, deliberately not closed further: this only pairs a
+    # removed row with an added row when the OBJECT is unchanged (see
+    # `added_by_spelling`'s key below). If a rebuild changes the subject's
+    # spelling AND retargets the object (e.g. a corrected CHEBI id) AND
+    # weakens the predicate, all in the same row, it reads as plain
+    # `removed`+`added` -- gated by --allow-drop, not --allow-widening-flips.
+    # Unlike a respelling (where `_spelling_key` gives an unambiguous
+    # correlation key), there is no analogous "this is probably the same
+    # record" signal once the object itself changes -- a different CHEBI id
+    # asserts a different concept, so treating it as a continuation of the
+    # same claim would be a guess, not a fact. See diff_rows() for how the
+    # cheaper, unambiguous case (object unchanged) is still caught.
     respelled_widening: list[tuple[str, str, str, str, str]] = field(default_factory=list)
     # column -> how many surviving rows changed it. Reported, not gated: most of
     # this is legitimate rebuild output (`source`, `mapping_date`) and gating it
@@ -567,51 +580,78 @@ def main():
 
     try:
         PUBLISHED.parent.mkdir(parents=True, exist_ok=True)
-        PUBLISHED.write_bytes(WORKING_COPY.read_bytes())
+        # Atomic (temp file + rename), matching kg_microbe_history/scaffold.py
+        # ::write_record()'s convention: PUBLISHED is the canonical curated
+        # artifact CLAUDE.md's "atomic creation/replacement" rule names
+        # directly, so it gets the same treatment as diff_archive below, not
+        # a plain in-place write a crash or disk-full event could truncate.
+        tmp_published = PUBLISHED.with_name(PUBLISHED.name + f".tmp-{secrets.token_hex(4)}")
+        try:
+            tmp_published.write_bytes(WORKING_COPY.read_bytes())
+            os.replace(tmp_published, PUBLISHED)
+        finally:
+            tmp_published.unlink(missing_ok=True)
         published_hash = _sha256(PUBLISHED)
-        AUDIT_LOG.parent.mkdir(parents=True, exist_ok=True)
-        # Full lists (not just the counts printed to stdout) go to a per-promotion
-        # sibling file, not embedded in the JSONL line: a promotion that re-spells
-        # every subject in a first publish or a full rebuild would write ~2,900
-        # pairs as a single line, and nothing prunes or rotates AUDIT_LOG (#113).
-        # A promotion that re-spells subjects is still the only record of which
-        # old subjects stopped resolving, and the alias file is written from it --
-        # so the full diff is archived, just not inline.
-        #
-        # Named on BOTH the previous and new hash, not just the new one: the
-        # new hash alone collides on a revert-and-redo (MIM_ROOT rolled back
-        # and re-promoted) or any deterministic rebuild reproducing an old
-        # published state, silently overwriting an earlier promotion's
-        # archived diff out from under its own audit-log `diff_file` pointer.
-        # A (prev, new) pair can only repeat if the same transition happens
-        # twice, in which case the diff content is identical anyway.
-        diff_archive = (
-            AUDIT_LOG.parent
-            / f"sssom_diff_{(prev_hash[:12] or 'none')}_{published_hash[:12]}.json"
-        )
-        _write_diff_report(diff, diff_archive)
-        entry = {
-            "timestamp": datetime.now(tz=timezone.utc).isoformat(),
-            "working_copy": str(WORKING_COPY),
-            "published": str(PUBLISHED),
-            "rows": new_rows,
-            "prev_rows": prev_rows,
-            "sha256": published_hash,
-            "prev_sha256": prev_hash,
-            "validators": ["JsonSchema", "PrefixMapCompleteness", "StrictCurieFormat"],
-            "diff_file": str(diff_archive),
-            "diff_counts": {
-                "added": len(diff.added),
-                "removed": len(diff.removed),
-                "respelled": len(diff.respelled),
-                "flipped": len(diff.flipped),
-                "widening_flipped": len(diff.widening_flips),
-                "respelled_widening": len(diff.respelled_widening),
-                "total_widening": len(diff.all_widening),
-            },
-        }
-        with AUDIT_LOG.open("a") as f:
-            f.write(json.dumps(entry) + "\n")
+
+        try:
+            AUDIT_LOG.parent.mkdir(parents=True, exist_ok=True)
+            # Full lists (not just the counts printed to stdout) go to a per-promotion
+            # sibling file, not embedded in the JSONL line: a promotion that re-spells
+            # every subject in a first publish or a full rebuild would write ~2,900
+            # pairs as a single line, and nothing prunes or rotates AUDIT_LOG (#113).
+            # A promotion that re-spells subjects is still the only record of which
+            # old subjects stopped resolving, and the alias file is written from it --
+            # so the full diff is archived, just not inline.
+            #
+            # Named on BOTH the previous and new hash, not just the new one: the
+            # new hash alone collides on a revert-and-redo (MIM_ROOT rolled back
+            # and re-promoted) or any deterministic rebuild reproducing an old
+            # published state, silently overwriting an earlier promotion's
+            # archived diff out from under its own audit-log `diff_file` pointer.
+            # A (prev, new) pair can only repeat if the same transition happens
+            # twice, in which case the diff content is identical anyway.
+            diff_archive = (
+                AUDIT_LOG.parent
+                / f"sssom_diff_{(prev_hash[:12] or 'none')}_{published_hash[:12]}.json"
+            )
+            _write_diff_report(diff, diff_archive)
+            entry = {
+                "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+                "working_copy": str(WORKING_COPY),
+                "published": str(PUBLISHED),
+                "rows": new_rows,
+                "prev_rows": prev_rows,
+                "sha256": published_hash,
+                "prev_sha256": prev_hash,
+                "validators": ["JsonSchema", "PrefixMapCompleteness", "StrictCurieFormat"],
+                "diff_file": str(diff_archive),
+                "diff_counts": {
+                    "added": len(diff.added),
+                    "removed": len(diff.removed),
+                    "respelled": len(diff.respelled),
+                    "flipped": len(diff.flipped),
+                    "widening_flipped": len(diff.widening_flips),
+                    "respelled_widening": len(diff.respelled_widening),
+                    "total_widening": len(diff.all_widening),
+                },
+            }
+            with AUDIT_LOG.open("a") as f:
+                f.write(json.dumps(entry) + "\n")
+        except OSError as exc:
+            # PUBLISHED is already committed above -- this is a partial
+            # failure, not a clean abort, and CLAUDE.md says not to swallow
+            # that into an apparent success. Surface the sha256 so the
+            # promotion can still be reconstructed/recorded by hand.
+            print(
+                f"\nPromoted → {PUBLISHED} (sha256={published_hash[:12]}) but FAILED to "
+                f"write the audit record ({exc}). No audit-log entry or diff archive "
+                f"exists for this promotion -- record it manually "
+                f"(prev_sha256={prev_hash[:12] or 'absent'}) and investigate before the "
+                "next promotion runs.",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+
         print(f"\nPromoted → {PUBLISHED}")
         print(f"Audit entry appended to {AUDIT_LOG}")
         print(f"Full diff archived to {diff_archive}")
