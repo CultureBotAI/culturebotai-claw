@@ -71,7 +71,9 @@ AUDIT_LOG = CLAW_ROOT / "workspace" / "status" / "sssom_promotions.jsonl"
 # somewhere readable rather than only in the apply-path audit log. Overwritten
 # each run -- this is "what would the diff show right now", not history; a
 # promotion's permanent record is the diff_archive file the apply path writes
-# instead (named by the published hash, so it doesn't overwrite).
+# instead (named by the (previous_hash, published_hash) pair, not just the
+# new hash -- see the comment where diff_archive is built for why a
+# single-hash name would collide on a revert-and-redo).
 DIFF_REPORT = CLAW_ROOT / "workspace" / "reports" / "sssom_promotion_diff.json"
 LOCKS_DIR = CLAW_ROOT / "workspace" / "locks"
 ROW_COUNT_DROP_LIMIT = 5

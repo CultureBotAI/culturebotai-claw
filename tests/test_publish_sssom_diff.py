@@ -456,3 +456,26 @@ def test_main_apply_writes_a_pointer_and_counts_not_the_full_diff(tmp_path, monk
     archived = json.loads(diff_file.read_text())
     assert archived["added"] == [["MIM:New", "CHEBI:2"]]
     assert published.read_bytes() == working_copy.read_bytes()
+
+
+def test_main_refuses_to_promote_a_respelled_widening_flip(tmp_path, monkeypatch):
+    """The exact bug this PR fixes, exercised through the CLI: before the
+    fix, a row that was both re-spelled AND downgraded from skos:exactMatch
+    was invisible to `flipped` (the key changed) and `respelled` (no
+    predicate_id), so `main()`'s gate -- checking only `widening_flips` --
+    would not have fired here. This must go through `all_widening`, not
+    `widening_flips` alone, or this test would still pass on the bug."""
+    working_copy = tmp_path / "working.sssom.tsv"
+    published = tmp_path / "published.sssom.tsv"
+    _write_sssom_tsv(published, [("MIM:Foo", "skos:exactMatch", "CHEBI:1")])
+    _write_sssom_tsv(working_copy, [("MIM:foo", "skos:closeMatch", "CHEBI:1")])
+
+    monkeypatch.setattr(publish_sssom, "WORKING_COPY", working_copy)
+    monkeypatch.setattr(publish_sssom, "PUBLISHED", published)
+    _patch_diff_report_default(monkeypatch, tmp_path)
+    monkeypatch.setattr(sys, "argv", ["publish_sssom.py", "--dry-run"])
+
+    with pytest.raises(SystemExit) as excinfo:
+        publish_sssom.main()
+
+    assert excinfo.value.code == 2
