@@ -108,7 +108,14 @@ warn_unused_configs = true
 disable_error_code = ["import-untyped"]
 
 [tool.coverage.run]
-source = ["src"]
+source = [
+    "src",
+    "cli.main",
+    "plugins.repository_settings",
+    "plugins.lock_manager",
+    "plugins.git_integration",
+    "plugins.just_runner",
+]
 
 [tool.coverage.report]
 show_missing = true

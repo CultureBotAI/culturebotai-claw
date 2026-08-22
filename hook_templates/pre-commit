@@ -8,7 +8,7 @@
 #
 
 # Configuration
-ORCHESTRATION_ROOT="{{ORCHESTRATION_ROOT}}"  # Replaced during installation
+ORCHESTRATION_ROOT={{ORCHESTRATION_ROOT}}  # Replaced during installation
 REPO_NAME="{{REPO_NAME}}"  # Will be replaced during installation
 
 # Check lock
