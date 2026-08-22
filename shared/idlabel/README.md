@@ -2,14 +2,16 @@
 
 This directory is a **CI-verified mirror** of the id↔label validator and its
 chemical-formula plausibility helper, which are vendored byte-identical into the
-four Mech repos (CultureMech / MediaIngredientMech / CommunityMech / TraitMech).
+five Mech repos (CultureMech / MediaIngredientMech / CommunityMech / TraitMech /
+proteintraitsmech).
 
 **The machine-canonical fetch-hub is the public `CultureBotAI/CultureMech`, not
 this repo.** culturebotai-claw is private, so the Mechs' CI (they are public)
 cannot fetch raw content from it. Each Mech's `scripts/check_vendored_sync.sh`
 therefore diffs against `CultureBotAI/CultureMech` at the commit pinned in its
-`scripts/.vendored_canon_ref`; the nightly `vendored-fleet-audit.yml` in
-CultureMech compares all four copies.
+`scripts/.vendored_canon_ref`. The nightly `fleet-audit` job in this repo's
+`.github/workflows/id-label-canon.yaml` compares the hub, all spokes, and this
+mirror. It supersedes CultureMech's removed `vendored-fleet-audit.yml`.
 
 This mirror exists for two reasons: a documented, human-readable home for the
 shared set, and an isolated test-runner (`id-label-canon` CI runs the vendored
@@ -67,17 +69,20 @@ touching this directory or the script.
 
 It asserts both directions against `CultureBotAI/CultureMech@main`:
 
-1. all four Mech repos carry byte-identical copies of the five validator files
-   plus `mech_shared.yaml` (path-mapped to `src/<pkg>/schema/`), and
+1. all five Mech repos carry byte-identical copies of the five validator files
+   plus `mech_shared.yaml` and `history.yaml` (both path-mapped to
+   `src/<pkg>/schema/`), and
 2. this mirror carries byte-identical copies of the five validator files.
 
 It also reports any **tracked** file under `shared/idlabel/` that `MANIFEST` does
 not list, since such a file is audited by nothing and vendored nowhere while
 looking canonical.
 
-That is 23 comparisons. It supersedes two earlier checks that asserted the same
-invariant from two repos: this workflow's `matches-hub` job (mirror only) and
-CultureMech's `vendored-fleet-audit` (Mechs only).
+The executable audit prints its current comparison count. It supersedes two
+earlier checks that asserted the same invariant from two repos: this workflow's
+`matches-hub` job (mirror only) and CultureMech's removed
+`vendored-fleet-audit.yml` workflow (Mechs only). The arithmetic is not copied
+into this README, where adding a repository or mapped file would make it stale.
 
 **`MANIFEST` is the single list.** The audit reads it rather than restating it,
 and refuses to run against a missing or empty manifest instead of cheerfully

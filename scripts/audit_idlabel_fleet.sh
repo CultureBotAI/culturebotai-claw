@@ -25,7 +25,14 @@ set -euo pipefail
 ORG="${ORG:-CultureBotAI}"
 HUB="${HUB:-CultureMech}"
 REF="${REF:-main}"
-REPOS=(CultureMech MediaIngredientMech CommunityMech TraitMech)
+REPOS=(CultureMech MediaIngredientMech CommunityMech TraitMech proteintraitsmech)
+# Worst-case curl budget: (len(FILES)+len(MAPPED)) x (1 + non-hub repos) for
+# direction 1, + len(FILES) for direction 2, + (1 + non-hub repos) for
+# direction 4 (SPOKE_FILES has one entry). At 5 FILES, 2 MAPPED, 4 non-hub
+# repos, 1 SPOKE_FILES entry, --max-time 10 each: (5+2)x5 + 5 + 5 = 45 calls,
+# ~450s worst case against .github/workflows/id-label-canon.yaml's
+# timeout-minutes: 10 (600s). Re-check this math before growing REPOS,
+# FILES/MANIFEST, MAPPED, or SPOKE_MANIFEST further.
 
 # claw's mirror lives here, and its MANIFEST is the single list of vendored
 # files. Read it rather than restating it: a hardcoded copy would be a second
@@ -47,9 +54,11 @@ fi
 # Same bytes, per-repo path src/<lowercased-repo>/<suffix>.
 MAPPED=(
   schema/mech_shared.yaml
+  schema/history.yaml
 )
-# Note the mirror carries the manifest set only — not mech_shared.yaml, which is
-# a schema module rather than part of the id-label validator set.
+# Note the mirror carries the manifest set only — not mech_shared.yaml or
+# history.yaml, which are schema modules rather than part of the id-label
+# validator set.
 
 lc() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
 raw() { printf 'https://raw.githubusercontent.com/%s/%s/%s/%s' "$ORG" "$1" "$REF" "$2"; }
@@ -59,7 +68,7 @@ fail=0
 checked=0
 
 fetch_hub() { # path -> $tmp/hub
-  if ! curl -fsSL "$(raw "$HUB" "$1")" -o "$tmp/hub"; then
+  if ! curl -fsSL --max-time 10 "$(raw "$HUB" "$1")" -o "$tmp/hub"; then
     echo "ERROR: hub ${HUB}@${REF} is missing $1"
     return 1
   fi
@@ -73,7 +82,7 @@ for f in "${FILES[@]}"; do
   fetch_hub "$f" || { fail=1; continue; }
   for r in "${REPOS[@]}"; do
     [ "$r" = "$HUB" ] && continue
-    if ! curl -fsSL "$(raw "$r" "$f")" -o "$tmp/r"; then
+    if ! curl -fsSL --max-time 10 "$(raw "$r" "$f")" -o "$tmp/r"; then
       echo "DRIFT: ${r} is missing ${f} (hub has it)"; fail=1; continue
     fi
     cmp -s "$tmp/hub" "$tmp/r" || { echo "DRIFT: ${r}:${f} differs from hub"; fail=1; }
@@ -87,7 +96,7 @@ for suf in "${MAPPED[@]}"; do
   for r in "${REPOS[@]}"; do
     [ "$r" = "$HUB" ] && continue
     rf="src/$(lc "$r")/${suf}"
-    if ! curl -fsSL "$(raw "$r" "$rf")" -o "$tmp/r"; then
+    if ! curl -fsSL --max-time 10 "$(raw "$r" "$rf")" -o "$tmp/r"; then
       echo "DRIFT: ${r} is missing ${rf} (hub has it)"; fail=1; continue
     fi
     cmp -s "$tmp/hub" "$tmp/r" || { echo "DRIFT: ${r}:${rf} differs from hub"; fail=1; }
@@ -126,19 +135,11 @@ while IFS= read -r present; do
   fi
 done < <(git ls-files "$MIRROR_ROOT" 2>/dev/null | sort)
 
-# --- direction 4: spoke-only files agree with claw's spoke mirror ------------
-# Some vendored files exist in the spokes but NOT in the hub, so directions 1-3
-# cannot see them: check_vendored_sync.sh is what a spoke runs to diff itself
-# against the hub. The hub has no copy and must not get one — it would then check
-# itself against itself at a pinned ref, which is the self-referential pin
-# CultureMech retired (TraitMech#176, #182).
-#
-# So for these, claw's mirror is the reference by necessity rather than by
-# promotion; the hub has nothing to mirror. See shared/spoke/README.md — this is
-# narrower than claw becoming canonical and does not revive claw#21.
-#
-# Until this existed, check_vendored_sync.sh was byte-identical across three
-# spokes with nothing enforcing it (CommunityMech#278, TraitMech#209).
+# --- direction 4: fleet-governance files agree with the hub ------------------
+# CultureMech now governs check_vendored_sync.sh itself. Compare claw's passive
+# mirror and every non-hub Mech directly to that canonical copy. This is the
+# post-propagation gate for #90: companion PRs may be briefly staggered, but the
+# fleet audit cannot go green until every copy has landed.
 SPOKE_ROOT="${SPOKE_ROOT:-shared/spoke}"
 SPOKE_MANIFEST="${SPOKE_MANIFEST:-${SPOKE_ROOT}/MANIFEST}"
 
@@ -157,23 +158,18 @@ for f in "${SPOKE_FILES[@]}"; do
   if [ ! -f "$ref_path" ]; then
     echo "DRIFT: spoke mirror is missing ${ref_path}"; fail=1; continue
   fi
-
-  # The hub's ABSENCE is the invariant here, so assert it rather than assume it.
-  # A hub copy would mean someone "fixed" the missing-canonical-copy problem the
-  # dangerous way, reintroducing a self-referential check.
-  if curl -fsSL -o /dev/null "$(raw "$HUB" "$f")" 2>/dev/null; then
-    echo "DRIFT: hub ${HUB} now has ${f} — spoke-only files must NOT exist in the hub;"
-    echo "       a hub copy makes the hub diff itself against itself (see ${SPOKE_ROOT}/README.md)"
-    fail=1
-  fi
+  fetch_hub "$f" || { fail=1; continue; }
+  cmp -s "$tmp/hub" "$ref_path" || {
+    echo "DRIFT: ${ref_path} differs from hub"; fail=1;
+  }
   checked=$((checked + 1))
 
   for r in "${REPOS[@]}"; do
     [ "$r" = "$HUB" ] && continue
-    if ! curl -fsSL "$(raw "$r" "$f")" -o "$tmp/r"; then
-      echo "DRIFT: ${r} is missing ${f} (spoke mirror has it)"; fail=1; continue
+    if ! curl -fsSL --max-time 10 "$(raw "$r" "$f")" -o "$tmp/r"; then
+      echo "DRIFT: ${r} is missing ${f} (hub has it)"; fail=1; continue
     fi
-    cmp -s "$ref_path" "$tmp/r" || { echo "DRIFT: ${r}:${f} differs from ${ref_path}"; fail=1; }
+    cmp -s "$tmp/hub" "$tmp/r" || { echo "DRIFT: ${r}:${f} differs from hub"; fail=1; }
     checked=$((checked + 1))
   done
 done
@@ -193,7 +189,7 @@ done < <(git ls-files "$SPOKE_ROOT" 2>/dev/null | sort)
 
 echo
 if [ "$fail" -eq 0 ]; then
-  echo "OK: ${checked} comparisons agree — ${#REPOS[@]} Mech repos and claw's mirrors all match ${HUB}@${REF} (hub-vendored) or ${SPOKE_ROOT} (spoke-only)"
+  echo "OK: ${checked} comparisons agree — ${#REPOS[@]} Mech repos and claw's mirrors all match ${HUB}@${REF}"
 else
   echo "Fleet drift detected."
   echo "Fix: sync the lagging copy from ${HUB}@${REF}, then bump that repo's"
