@@ -36,6 +36,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import collections
 import csv
 import hashlib
 import importlib.util
@@ -56,6 +57,11 @@ MIM_ROOT = Path(
 WORKING_COPY = CLAW_ROOT / "workspace" / "reports" / "mim_ingredient_mappings.sssom.tsv"
 PUBLISHED = MIM_ROOT / "mappings" / "ingredient_mappings.sssom.tsv"
 AUDIT_LOG = CLAW_ROOT / "workspace" / "status" / "sssom_promotions.jsonl"
+# The full diff, written on every run including --dry-run. stdout shows only
+# EXAMPLES_SHOWN per category, and dry-run is the mode a curator uses to work
+# out *why* promotion was refused -- so the remaining entries have to land
+# somewhere readable rather than only in the apply-path audit log.
+DIFF_REPORT = CLAW_ROOT / "workspace" / "reports" / "sssom_promotion_diff.json"
 LOCKS_DIR = CLAW_ROOT / "workspace" / "locks"
 ROW_COUNT_DROP_LIMIT = 5
 
@@ -148,11 +154,19 @@ def _spelling_key(subject: str) -> str:
 class SssomDiff:
     """A `(subject_id, object_id)`-keyed comparison of two SSSOM row sets."""
 
-    unchanged: int = 0
+    # Rows whose (subject, object) key AND predicate both survived. NOT
+    # "identical row" -- see column_changes, which is the rest of the story.
+    same_key_and_predicate: int = 0
     added: list[tuple[str, str]] = field(default_factory=list)
     removed: list[tuple[str, str]] = field(default_factory=list)
     respelled: list[tuple[str, str, str]] = field(default_factory=list)
     flipped: list[tuple[str, str, str, str]] = field(default_factory=list)
+    # column -> how many surviving rows changed it. Reported, not gated: most of
+    # this is legitimate rebuild output (`source`, `mapping_date`) and gating it
+    # would make promotion impossible. But it must be visible -- keying on
+    # (subject, object, predicate) alone would let a rebuild rewrite every
+    # object_label and still report "unchanged".
+    column_changes: dict[str, int] = field(default_factory=dict)
     # Rows sharing a (subject_id, object_id) with an earlier row, and therefore
     # absent from this comparison. Non-zero means the diff does not account for
     # every row in the file and its numbers should not be trusted.
@@ -187,13 +201,22 @@ def diff_rows(prev: list[dict[str, str]], new: list[dict[str, str]]) -> SssomDif
     )
 
     shared = prev_by_key.keys() & new_by_key.keys()
+    column_changes: collections.Counter[str] = collections.Counter()
     for key in shared:
-        old_pred = prev_by_key[key].get("predicate_id", "")
-        new_pred = new_by_key[key].get("predicate_id", "")
+        old_row, new_row = prev_by_key[key], new_by_key[key]
+        old_pred = old_row.get("predicate_id", "")
+        new_pred = new_row.get("predicate_id", "")
         if old_pred != new_pred:
             diff.flipped.append((key[0], key[1], old_pred, new_pred))
         else:
-            diff.unchanged += 1
+            diff.same_key_and_predicate += 1
+        # Everything the key and the predicate do not cover.
+        for col in old_row.keys() | new_row.keys():
+            if col in ("subject_id", "object_id", "predicate_id"):
+                continue
+            if old_row.get(col) != new_row.get(col):
+                column_changes[col] += 1
+    diff.column_changes = dict(column_changes.most_common())
 
     only_prev = prev_by_key.keys() - new_by_key.keys()
     only_new = new_by_key.keys() - prev_by_key.keys()
@@ -224,11 +247,25 @@ def diff_rows(prev: list[dict[str, str]], new: list[dict[str, str]]) -> SssomDif
 
 def _print_diff(diff: SssomDiff) -> None:
     print("\nRow-set diff (keyed on subject_id + object_id):")
-    print(f"  unchanged          {diff.unchanged}")
-    print(f"  added              {len(diff.added)}")
-    print(f"  removed            {len(diff.removed)}")
-    print(f"  subject re-spelled {len(diff.respelled)}")
-    print(f"  predicate flipped  {len(diff.flipped)}")
+    print(f"  same key + predicate  {diff.same_key_and_predicate}")
+    print(f"  added                 {len(diff.added)}")
+    print(f"  removed               {len(diff.removed)}")
+    print(f"  subject re-spelled    {len(diff.respelled)}")
+    print(f"  predicate flipped     {len(diff.flipped)}")
+
+    if diff.column_changes:
+        print("\n  Other columns changed on surviving rows (reported, not gated):")
+        for col, n in diff.column_changes.items():
+            print(f"    {col:<24}{n}")
+        if "object_label" in diff.column_changes:
+            print(
+                f"    ^ object_label moved on {diff.column_changes['object_label']} row(s). "
+                "Rule B4 only checks\n"
+                "      ontology-prefix objects and is skipped without the kg-microbe "
+                "transforms, so\n"
+                "      registry-prefix labels reach publication unverified. Read them "
+                "before promoting."
+            )
 
     if diff.collapsed_prev or diff.collapsed_new:
         print(
@@ -269,6 +306,26 @@ def _print_diff(diff: SssomDiff) -> None:
         print("  consumer holding the old subject can still resolve it.")
 
 
+def _diff_payload(diff: SssomDiff) -> dict:
+    """The full diff, for the audit log and the dry-run report."""
+    return {
+        "same_key_and_predicate": diff.same_key_and_predicate,
+        "column_changes": diff.column_changes,
+        "collapsed_prev": diff.collapsed_prev,
+        "collapsed_new": diff.collapsed_new,
+        "added": [list(r) for r in diff.added],
+        "removed": [list(r) for r in diff.removed],
+        "respelled": [list(r) for r in diff.respelled],
+        "flipped": [list(r) for r in diff.flipped],
+    }
+
+
+def _write_diff_report(diff: SssomDiff, path: Path = DIFF_REPORT) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(_diff_payload(diff), indent=2) + "\n")
+    return path
+
+
 def _validate(path: Path) -> list[str]:
     try:
         proc = subprocess.run(
@@ -303,10 +360,14 @@ def main():
         print("Run `just build-sssom` first.", file=sys.stderr)
         sys.exit(2)
 
-    new_rows = _row_count(WORKING_COPY)
+    # Count rows the same way the diff does -- a line count and a csv parse
+    # disagree on any quoted field carrying an embedded newline, and `comment`
+    # is curator free text. One counter, so the banner and the guard can never
+    # describe different things.
+    prev_parsed = _read_rows(PUBLISHED)
+    new_parsed = _read_rows(WORKING_COPY)
+    new_rows, prev_rows = len(new_parsed), len(prev_parsed)
     new_hash = _sha256(WORKING_COPY)
-
-    prev_rows = _row_count(PUBLISHED)
     prev_hash = _sha256(PUBLISHED) if PUBLISHED.exists() else ""
 
     if prev_hash and prev_hash == new_hash:
@@ -317,8 +378,10 @@ def main():
     print(f"Published:    {PUBLISHED} ({prev_rows} rows, sha256={prev_hash[:12] or 'absent'})")
     print(f"Delta:        {new_rows - prev_rows:+d} rows")
 
-    diff = diff_rows(_read_rows(PUBLISHED), _read_rows(WORKING_COPY))
+    diff = diff_rows(prev_parsed, new_parsed)
     _print_diff(diff)
+    report = _write_diff_report(diff)
+    print(f"\n  Full diff (every entry, not just the {EXAMPLES_SHOWN} shown): {report}")
 
     if prev_rows and len(diff.removed) > args.allow_drop:
         print(
@@ -380,13 +443,7 @@ def main():
             # Full lists, not just the counts printed to stdout: a promotion that
             # re-spells subjects is the only record of which old subjects stopped
             # resolving, and the alias file is written from it.
-            "diff": {
-                "unchanged": diff.unchanged,
-                "added": [list(r) for r in diff.added],
-                "removed": [list(r) for r in diff.removed],
-                "respelled": [list(r) for r in diff.respelled],
-                "flipped": [list(r) for r in diff.flipped],
-            },
+            "diff": _diff_payload(diff),
         }
         with AUDIT_LOG.open("a") as f:
             f.write(json.dumps(entry) + "\n")

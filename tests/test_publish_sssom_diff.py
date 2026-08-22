@@ -7,6 +7,7 @@ truncation. These tests pin the distinction the count could not make.
 """
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -35,7 +36,7 @@ def test_identical_row_sets_produce_an_empty_diff():
     diff = diff_rows(rows, list(rows))
 
     assert diff.is_empty
-    assert diff.unchanged == 2
+    assert diff.same_key_and_predicate == 2
 
 
 def test_a_genuinely_removed_row_is_reported_as_removed():
@@ -128,7 +129,7 @@ def test_predicate_flip_on_a_shared_key_is_reported_and_not_counted_unchanged():
     assert diff.flipped == [
         ("MIM:Glucose", "CHEBI:17234", "skos:exactMatch", "skos:narrowMatch")
     ]
-    assert diff.unchanged == 0
+    assert diff.same_key_and_predicate == 0
     assert diff.removed == []
 
 
@@ -200,6 +201,54 @@ def test_respelling_choice_is_deterministic_across_orderings():
 
     assert forward.respelled == reversed_.respelled
     assert forward.added == reversed_.added
+
+
+def test_columns_outside_the_key_are_counted_not_ignored():
+    """#115: keying on (subject, object, predicate) alone would let a rebuild
+    rewrite every object_label and still report the rows as unchanged."""
+    prev = [{"subject_id": "MIM:Glucose", "object_id": "CHEBI:17234",
+             "predicate_id": "skos:exactMatch", "object_label": "D-glucose",
+             "confidence": "0.95"}]
+    new = [{"subject_id": "MIM:Glucose", "object_id": "CHEBI:17234",
+            "predicate_id": "skos:exactMatch", "object_label": "glucose",
+            "confidence": "0.99"}]
+
+    diff = diff_rows(prev, new)
+
+    assert diff.same_key_and_predicate == 1, "the key and predicate did survive"
+    assert diff.column_changes == {"object_label": 1, "confidence": 1}
+    assert diff.is_empty, "column drift is reported, not gated"
+
+
+def test_column_changes_is_empty_when_rows_are_identical():
+    rows = [{"subject_id": "MIM:Glucose", "object_id": "CHEBI:17234",
+             "predicate_id": "skos:exactMatch", "object_label": "D-glucose"}]
+
+    assert diff_rows(rows, [dict(r) for r in rows]).column_changes == {}
+
+
+def test_a_column_present_on_only_one_side_counts_as_changed():
+    """A dropped or added column is drift too -- `.keys() |` not `.keys() &`."""
+    prev = [{"subject_id": "MIM:X", "object_id": "CHEBI:1",
+             "predicate_id": "skos:exactMatch", "confidence": "0.9"}]
+    new = [{"subject_id": "MIM:X", "object_id": "CHEBI:1",
+            "predicate_id": "skos:exactMatch"}]
+
+    assert diff_rows(prev, new).column_changes == {"confidence": 1}
+
+
+def test_diff_report_is_written_with_every_entry(tmp_path):
+    """#116: stdout shows EXAMPLES_SHOWN per category; the rest must be readable
+    somewhere on a dry run, not only in the apply-path audit log."""
+    prev = [row(f"MIM:Gone{i}", f"CHEBI:{i}") for i in range(30)]
+    diff = diff_rows(prev, [])
+
+    out = publish_sssom._write_diff_report(diff, tmp_path / "d.json")
+    payload = json.loads(out.read_text())
+
+    assert len(payload["removed"]) == 30 > publish_sssom.EXAMPLES_SHOWN
+    assert payload["same_key_and_predicate"] == 0
+    assert "column_changes" in payload
 
 
 def test_read_rows_skips_the_yaml_preamble(tmp_path):
