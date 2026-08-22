@@ -9,10 +9,9 @@ proteintraitsmech).
 this repo.** culturebotai-claw is private, so the Mechs' CI (they are public)
 cannot fetch raw content from it. Each Mech's `scripts/check_vendored_sync.sh`
 therefore diffs against `CultureBotAI/CultureMech` at the commit pinned in its
-`scripts/.vendored_canon_ref`; a nightly `vendored-fleet-audit.yml` in
-CultureMech historically compared the Mech copies this way too (see below —
-this claw-side audit has since superseded it; CultureMech's `.github/workflows/`
-no longer has a workflow under that name as of this writing, tracked in #92).
+`scripts/.vendored_canon_ref`. The nightly `fleet-audit` job in this repo's
+`.github/workflows/id-label-canon.yaml` compares the hub, all spokes, and this
+mirror. It supersedes CultureMech's removed `vendored-fleet-audit.yml`.
 
 This mirror exists for two reasons: a documented, human-readable home for the
 shared set, and an isolated test-runner (`id-label-canon` CI runs the vendored
@@ -79,10 +78,11 @@ It also reports any **tracked** file under `shared/idlabel/` that `MANIFEST` doe
 not list, since such a file is audited by nothing and vendored nowhere while
 looking canonical.
 
-That is 33 comparisons (5 files × 4 non-hub Mechs + 2 mapped entries × 4 + 5
-mirror-vs-hub). It supersedes two earlier checks that asserted the same
-invariant from two repos: this workflow's `matches-hub` job (mirror only) and
-CultureMech's `vendored-fleet-audit` (Mechs only).
+The executable audit prints its current comparison count. It supersedes two
+earlier checks that asserted the same invariant from two repos: this workflow's
+`matches-hub` job (mirror only) and CultureMech's removed
+`vendored-fleet-audit.yml` workflow (Mechs only). The arithmetic is not copied
+into this README, where adding a repository or mapped file would make it stale.
 
 **`MANIFEST` is the single list.** The audit reads it rather than restating it,
 and refuses to run against a missing or empty manifest instead of cheerfully
