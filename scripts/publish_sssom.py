@@ -44,6 +44,7 @@ import csv
 import hashlib
 import importlib.util
 import json
+import os
 import re
 import subprocess
 import sys
@@ -413,8 +414,20 @@ def _diff_payload(diff: SssomDiff) -> dict:
 
 
 def _write_diff_report(diff: SssomDiff, path: Path = DIFF_REPORT) -> Path:
+    """Write atomically (temp file + rename), not in place.
+
+    This used to only back the scratch DIFF_REPORT (overwritten every run,
+    low stakes if truncated by an interrupted write). It also now backs
+    diff_archive -- a promotion's permanent audit record, referenced by the
+    audit log's `diff_file` pointer -- where a crash mid-write would leave a
+    truncated, undetectably-corrupt file with an audit-log entry pointing at
+    it (CLAUDE.md: "Use atomic creation/replacement for locks and curated
+    data").
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(_diff_payload(diff), indent=2) + "\n")
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(_diff_payload(diff), indent=2) + "\n")
+    os.replace(tmp, path)
     return path
 
 
@@ -446,11 +459,13 @@ def main():
                          "when intentionally consolidating records.")
     ap.add_argument("--allow-widening-flips", type=int, default=0,
                     help="Max number of rows the new file may flip FROM skos:exactMatch "
-                         "to a weaker predicate. Flips that tighten a mapping TO "
-                         "exactMatch do not count. Default: %(default)s -- this should "
-                         "always be a deliberate curation decision, not rebuild noise "
-                         "(MediaIngredientMech#409). Set explicitly (with justification) "
-                         "when intentionally relaxing a mapping.")
+                         "to a weaker predicate -- counting both a same-subject flip and "
+                         "a downgrade riding along with a subject re-spelling (the two "
+                         "otherwise-invisible ways this can happen). Flips that tighten a "
+                         "mapping TO exactMatch do not count. Default: %(default)s -- this "
+                         "should always be a deliberate curation decision, not rebuild "
+                         "noise (MediaIngredientMech#409). Set explicitly (with "
+                         "justification) when intentionally relaxing a mapping.")
     args = ap.parse_args()
     apply = args.apply and not args.dry_run
 

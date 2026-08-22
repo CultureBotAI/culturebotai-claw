@@ -437,6 +437,12 @@ def test_main_apply_writes_a_pointer_and_counts_not_the_full_diff(tmp_path, monk
     monkeypatch.setattr(publish_sssom, "PUBLISHED", published)
     monkeypatch.setattr(publish_sssom, "AUDIT_LOG", audit_log)
     monkeypatch.setattr(publish_sssom, "LOCKS_DIR", tmp_path / "locks")
+    # _load_lock_manager() resolves plugins/lock_manager.py via CLAW_ROOT --
+    # a real checkout root, not necessarily this test file's grandparent, but
+    # the two coincide in every environment this suite runs in (worktree or
+    # CI checkout), and CLAW_ROOT is hardcoded to the PR author's own machine
+    # path otherwise -- unpatched, this passes locally and fails on CI.
+    monkeypatch.setattr(publish_sssom, "CLAW_ROOT", Path(__file__).resolve().parents[1])
     monkeypatch.setattr(publish_sssom, "_validate", lambda path: [])
     _patch_diff_report_default(monkeypatch, tmp_path)
     monkeypatch.setattr(sys, "argv", ["publish_sssom.py", "--apply"])
