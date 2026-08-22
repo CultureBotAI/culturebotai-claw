@@ -593,27 +593,36 @@ def main():
             tmp_published.unlink(missing_ok=True)
         published_hash = _sha256(PUBLISHED)
 
+        # Full lists (not just the counts printed to stdout) go to a per-promotion
+        # sibling file, not embedded in the JSONL line: a promotion that re-spells
+        # every subject in a first publish or a full rebuild would write ~2,900
+        # pairs as a single line, and nothing prunes or rotates AUDIT_LOG (#113).
+        # A promotion that re-spells subjects is still the only record of which
+        # old subjects stopped resolving, and the alias file is written from it --
+        # so the full diff is archived, just not inline.
+        #
+        # Named on BOTH the previous and new hash, not just the new one: the
+        # new hash alone collides on a revert-and-redo (MIM_ROOT rolled back
+        # and re-promoted) or any deterministic rebuild reproducing an old
+        # published state, silently overwriting an earlier promotion's
+        # archived diff out from under its own audit-log `diff_file` pointer.
+        # A (prev, new) pair can only repeat if the same transition happens
+        # twice, in which case the diff content is identical anyway.
+        #
+        # Computed here, OUTSIDE the try block below (a pure path expression,
+        # no I/O) -- the except clause references diff_archive to check
+        # whether it survived a later failure, and needs it bound even if the
+        # very first statement in the try (AUDIT_LOG.parent.mkdir) is what
+        # raises. Assigning it only inside the try left it unbound on that
+        # path, so except OSError couldn't even catch its own reference to
+        # it: UnboundLocalError isn't an OSError, so it propagated past the
+        # handler this whole block exists to provide.
+        diff_archive = (
+            AUDIT_LOG.parent
+            / f"sssom_diff_{(prev_hash[:12] or 'none')}_{published_hash[:12]}.json"
+        )
         try:
             AUDIT_LOG.parent.mkdir(parents=True, exist_ok=True)
-            # Full lists (not just the counts printed to stdout) go to a per-promotion
-            # sibling file, not embedded in the JSONL line: a promotion that re-spells
-            # every subject in a first publish or a full rebuild would write ~2,900
-            # pairs as a single line, and nothing prunes or rotates AUDIT_LOG (#113).
-            # A promotion that re-spells subjects is still the only record of which
-            # old subjects stopped resolving, and the alias file is written from it --
-            # so the full diff is archived, just not inline.
-            #
-            # Named on BOTH the previous and new hash, not just the new one: the
-            # new hash alone collides on a revert-and-redo (MIM_ROOT rolled back
-            # and re-promoted) or any deterministic rebuild reproducing an old
-            # published state, silently overwriting an earlier promotion's
-            # archived diff out from under its own audit-log `diff_file` pointer.
-            # A (prev, new) pair can only repeat if the same transition happens
-            # twice, in which case the diff content is identical anyway.
-            diff_archive = (
-                AUDIT_LOG.parent
-                / f"sssom_diff_{(prev_hash[:12] or 'none')}_{published_hash[:12]}.json"
-            )
             _write_diff_report(diff, diff_archive)
             entry = {
                 "timestamp": datetime.now(tz=timezone.utc).isoformat(),

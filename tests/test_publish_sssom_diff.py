@@ -647,3 +647,45 @@ def test_diff_archive_filename_incorporates_prev_hash_not_just_published_hash(
     assert len(second_archives) == 1, "the second promotion must produce a NEW archive file"
     for archive in first_archives | second_archives:
         assert archive.exists(), "neither archive should have been overwritten by the other"
+
+
+def test_main_apply_surfaces_a_partial_failure_when_the_audit_dir_cannot_be_created(
+    tmp_path, monkeypatch, capsys
+):
+    """diff_archive is referenced inside `except OSError` to check whether it
+    survived. If it were only assigned after AUDIT_LOG.parent.mkdir() inside
+    the try block, an OSError from that very first statement (mkdir itself)
+    would leave diff_archive unbound -- UnboundLocalError isn't an OSError,
+    so it would escape the handler this whole block exists to provide,
+    masking the crafted recovery message with a bare traceback."""
+    working_copy = tmp_path / "working.sssom.tsv"
+    published = tmp_path / "published.sssom.tsv"
+    _write_sssom_tsv(published, [("MIM:Old", "skos:exactMatch", "CHEBI:1")])
+    _write_sssom_tsv(working_copy, [
+        ("MIM:Old", "skos:exactMatch", "CHEBI:1"),
+        ("MIM:New", "skos:exactMatch", "CHEBI:2"),
+    ])
+    # AUDIT_LOG.parent.mkdir(parents=True, exist_ok=True) fails when the
+    # parent path is already occupied by a plain file, not a directory.
+    occupied = tmp_path / "occupied"
+    occupied.write_text("not a directory")
+    audit_log = occupied / "sssom_promotions.jsonl"
+
+    monkeypatch.setattr(publish_sssom, "WORKING_COPY", working_copy)
+    monkeypatch.setattr(publish_sssom, "PUBLISHED", published)
+    monkeypatch.setattr(publish_sssom, "AUDIT_LOG", audit_log)
+    monkeypatch.setattr(publish_sssom, "LOCKS_DIR", tmp_path / "locks")
+    monkeypatch.setattr(publish_sssom, "CLAW_ROOT", Path(__file__).resolve().parents[1])
+    monkeypatch.setattr(publish_sssom, "_validate", lambda path: [])
+    _patch_diff_report_default(monkeypatch, tmp_path)
+    monkeypatch.setattr(sys, "argv", ["publish_sssom.py", "--apply"])
+
+    with pytest.raises(SystemExit) as excinfo:
+        publish_sssom.main()
+
+    assert excinfo.value.code == 2
+    stderr = capsys.readouterr().err
+    assert "FAILED to write the audit-log entry" in stderr, (
+        "the crafted recovery message must fire, not a bare UnboundLocalError traceback"
+    )
+    assert published.read_bytes() == working_copy.read_bytes()
