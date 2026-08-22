@@ -299,8 +299,10 @@ def prompt_key(discussion: dict[str, Any]) -> str:
     would break on a record name containing ": " (#73).
     """
     evidence = discussion.get("evidence") or []
-    sentence = evidence[0].get("snippet", "") if evidence else ""
-    return _norm(sentence).casefold()
+    if not isinstance(evidence, list) or not evidence or not isinstance(evidence[0], dict):
+        return ""
+    sentence = evidence[0].get("snippet", "")
+    return _norm(sentence).casefold() if isinstance(sentence, str) else ""
 
 
 def _discussion_id(record_id: str, top_sentence: str) -> str:

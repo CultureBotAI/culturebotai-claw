@@ -206,6 +206,132 @@ def test_main_drops_the_second_filing_of_the_same_sentence(tmp_path, monkeypatch
     assert any(s.startswith("cross_record_duplicate_of:trait:") for s in statuses)
 
 
+def test_existing_discussion_outside_offset_window_blocks_cross_run_duplicate(
+    tmp_path, monkeypatch
+):
+    """#72: dedup must index the complete corpus, not only this run's window.
+
+    The existing filing is deliberately outside ``--offset 1 --limit 1``.
+    A per-run index would therefore miss it and file the same sentence under
+    the second record on the next nightly window.
+    """
+    shared = (
+        "The role of commensalism in gut associated communities "
+        "remains poorly understood."
+    )
+    monkeypatch.setattr(scan_mod, "europepmc_search", lambda *a, **k: [
+        {"pmid": "123", "title": "A paper", "abstractText": shared}
+    ])
+    cfg = _write_corpus(tmp_path)
+    first = tmp_path / "data" / "commensalism.yaml"
+    doc = yaml.safe_load(first.read_text())
+    doc["discussions"] = [
+        {
+            "discussion_id": "kgscan-existing",
+            "prompt": f"Knowledge gap for commensalism: {shared}",
+            "evidence": [{"snippet": shared}],
+        }
+    ]
+    first.write_text(yaml.dump(doc, sort_keys=False))
+
+    out_json = tmp_path / "packet.json"
+    monkeypatch.setattr(sys, "argv", [
+        "prog", "--config", str(cfg), "--min-score", "1",
+        "--offset", "1", "--limit", "1",
+        "--output-json", str(out_json),
+        "--output-md", str(tmp_path / "packet.md"),
+    ])
+    assert kgscan_main.main() == 0
+    packet = json.loads(out_json.read_text())
+    assert packet["records_scanned"] == 1
+    assert packet["proposed"] == 0
+    assert packet["duplicates_dropped"] == 1
+    assert packet["results"][0]["write_status"] == (
+        "cross_record_duplicate_of:trait:commensalism"
+    )
+
+
+def test_existing_discussion_in_same_record_is_not_reproposed(tmp_path, monkeypatch):
+    """An idempotent later scan reports an existing filing, even in dry-run."""
+    sentence = "Commensalism remains poorly understood."
+    monkeypatch.setattr(scan_mod, "europepmc_search", lambda *a, **k: [
+        {"pmid": "123", "title": "A paper", "abstractText": sentence}
+    ])
+    cfg = _write_corpus(tmp_path)
+    first = tmp_path / "data" / "commensalism.yaml"
+    doc = yaml.safe_load(first.read_text())
+    doc["discussions"] = [
+        {
+            "discussion_id": "kgscan-existing",
+            "prompt": f"Knowledge gap for commensalism: {sentence}",
+            "evidence": [{"snippet": sentence}],
+        }
+    ]
+    first.write_text(yaml.dump(doc, sort_keys=False))
+
+    out_json = tmp_path / "packet.json"
+    monkeypatch.setattr(sys, "argv", [
+        "prog", "--config", str(cfg), "--min-score", "1", "--limit", "1",
+        "--output-json", str(out_json),
+        "--output-md", str(tmp_path / "packet.md"),
+    ])
+    assert kgscan_main.main() == 0
+    packet = json.loads(out_json.read_text())
+    assert packet["proposed"] == 0
+    assert packet["existing_skipped"] == 1
+    assert packet["duplicates_dropped"] == 0
+    assert packet["results"][0]["write_status"] == (
+        "already_present_in:trait:commensalism"
+    )
+
+
+def test_malformed_existing_discussions_do_not_crash_or_create_an_empty_key(tmp_path):
+    records = [
+        (
+            tmp_path / "one.yaml",
+            {
+                "identifier": "trait:one",
+                "discussions": [
+                    None,
+                    {},
+                    "bad",
+                    {"evidence": "not-a-list"},
+                    {"evidence": [None, "bad", {"snippet": 42}]},
+                ],
+            },
+        ),
+        (tmp_path / "two.yaml", {"identifier": "trait:two", "discussions": {"not": "a list"}}),
+    ]
+    assert kgscan_main._existing_prompt_owners(
+        records, {"id_field": "identifier"}, "discussions"
+    ) == {}
+
+
+def test_existing_index_reads_every_evidence_snippet(tmp_path):
+    records = [
+        (
+            tmp_path / "one.yaml",
+            {
+                "identifier": "trait:one",
+                "discussions": [
+                    {
+                        "evidence": [
+                            {"snippet": "First gap sentence."},
+                            {"snippet": "A later duplicate sentence."},
+                        ]
+                    }
+                ],
+            },
+        )
+    ]
+    assert kgscan_main._existing_prompt_owners(
+        records, {"id_field": "identifier"}, "discussions"
+    ) == {
+        "first gap sentence.": ("trait:one",),
+        "a later duplicate sentence.": ("trait:one",),
+    }
+
+
 def test_main_files_nothing_when_the_only_gap_sentence_is_off_topic(tmp_path, monkeypatch):
     """A topically adjacent paper whose hedged sentence is about something else
     entirely — the shape of all ten TraitMech misfilings — produces zero
