@@ -11,10 +11,10 @@
 # The applier rewrites ONLY the `on.schedule` block of each managed workflow.
 # Everything else — inputs, jobs, comments outside that block — is untouched.
 #
-# ACTIVE IS `off`, AND THAT IS DELIBERATE. No agent workflow exists yet. Shipping
-# the switch before the thing it switches off means the first agent lands into a
-# fleet that is already dialled down, rather than one where turning it off means
-# editing YAML under pressure.
+# `active` is written by the applier after every complete, non-dry-run change.
+# `--check-active` verifies it against the workflows. It starts at `off`
+# deliberately: no agent workflow exists yet, so the first one lands into a
+# fleet that is already dialled down.
 #
 # Conventions:
 #   * A profile MUST name every managed workflow. The applier enforces this, so a

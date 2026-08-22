@@ -19,10 +19,13 @@ CONFIG = REPO_ROOT / ".github" / "cron-profiles.yaml"
 AGENT_CONFIG = REPO_ROOT / ".github" / "agent-config.yaml"
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
+import apply_cron_profile as cron_profiles  # noqa: E402
 from apply_cron_profile import (  # noqa: E402
+    check_active_profile,
     check_profiles_complete,
     managed_workflows,
     rewrite,
+    schedule_crons,
 )
 
 
@@ -203,3 +206,77 @@ def test_comments_inside_the_schedule_block_are_replaced() -> None:
 def test_output_stays_valid_yaml_with_trailing_comment() -> None:
     for entries in ([], [{"cron": "0 3 * * *"}]):
         yaml.safe_load(rewrite(WF_TRAILING_COMMENT, entries)[0])
+
+
+def _profile_config(tmp_path: Path, active: str = "off") -> Path:
+    path = tmp_path / "cron-profiles.yaml"
+    path.write_text(yaml.safe_dump({
+        "active": active,
+        "profiles": {
+            "off": {"workflows": {"agent": []}},
+            "slow": {"workflows": {"agent": [{"cron": "0 3 * * 1"}]}},
+        },
+    }, sort_keys=False))
+    return path
+
+
+def test_apply_updates_active_and_check_detects_later_manual_drift(
+    tmp_path, monkeypatch
+) -> None:
+    workflows = tmp_path / "workflows"
+    workflows.mkdir()
+    workflow = workflows / "agent.yaml"
+    workflow.write_text(WF)
+    config_path = _profile_config(tmp_path)
+    monkeypatch.setattr(cron_profiles, "WORKFLOW_DIR", workflows)
+
+    assert cron_profiles.main(["slow", "--config", str(config_path)]) == 0
+    config = yaml.safe_load(config_path.read_text())
+    assert config["active"] == "slow"
+    assert schedule_crons(workflow.read_text()) == ["0 3 * * 1"]
+    assert check_active_profile(config) == []
+
+    workflow.write_text(rewrite(workflow.read_text(), [])[0])
+    assert check_active_profile(config) == [
+        "agent: active=slow expects ['0 3 * * 1'], found []"
+    ]
+
+
+def test_incomplete_nonempty_profile_does_not_change_active(tmp_path, monkeypatch) -> None:
+    config_path = _profile_config(tmp_path)
+    workflows = tmp_path / "workflows"
+    workflows.mkdir()
+    monkeypatch.setattr(cron_profiles, "WORKFLOW_DIR", workflows)
+
+    assert cron_profiles.main(["slow", "--config", str(config_path)]) == 1
+    assert yaml.safe_load(config_path.read_text())["active"] == "off"
+
+
+def test_missing_workflow_agrees_with_off_profile(tmp_path, monkeypatch) -> None:
+    config_path = _profile_config(tmp_path, active="slow")
+    workflows = tmp_path / "workflows"
+    workflows.mkdir()
+    monkeypatch.setattr(cron_profiles, "WORKFLOW_DIR", workflows)
+
+    assert cron_profiles.main(["off", "--config", str(config_path)]) == 0
+    config = yaml.safe_load(config_path.read_text())
+    assert config["active"] == "off"
+    assert check_active_profile(config) == []
+
+
+def test_active_is_not_updated_when_post_apply_verification_fails(
+    tmp_path, monkeypatch
+) -> None:
+    workflows = tmp_path / "workflows"
+    workflows.mkdir()
+    (workflows / "agent.yaml").write_text(WF)
+    config_path = _profile_config(tmp_path)
+    monkeypatch.setattr(cron_profiles, "WORKFLOW_DIR", workflows)
+    monkeypatch.setattr(
+        cron_profiles,
+        "rewrite",
+        lambda original, entries: (original, "claimed success without changing"),
+    )
+
+    assert cron_profiles.main(["slow", "--config", str(config_path)]) == 1
+    assert yaml.safe_load(config_path.read_text())["active"] == "off"

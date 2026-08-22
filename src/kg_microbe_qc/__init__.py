@@ -15,6 +15,12 @@ Usage:
 Or via CLI:
     python -m kg_microbe_qc --config conf/qc_config.yaml \
         --output dashboard
+
+Reproducibility contract:
+    ``index.html`` is the staleness artifact: regenerate it and compare bytes.
+    ``coverage.png`` is presentation output and is not byte-stable across
+    matplotlib releases, even after metadata is stripped. Fleet staleness
+    checks must therefore compare the HTML only (culturebotai-claw#47).
 """
 from kg_microbe_qc.generator import generate_dashboard
 

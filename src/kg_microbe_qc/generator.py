@@ -12,7 +12,7 @@ import matplotlib
 matplotlib.use("Agg")  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
 import yaml  # noqa: E402
-from jinja2 import Environment, FileSystemLoader, select_autoescape  # noqa: E402
+from jinja2 import Environment, FileSystemLoader  # noqa: E402
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 
@@ -295,7 +295,9 @@ def generate_dashboard(
 
     env = Environment(
         loader=FileSystemLoader(str(TEMPLATES_DIR)),
-        autoescape=select_autoescape(["html"]),
+        # Every template in this package renders HTML. Selecting on the final
+        # suffix silently disabled escaping for dashboard.html.j2 (#51).
+        autoescape=True,
         trim_blocks=True,
         lstrip_blocks=True,
     )

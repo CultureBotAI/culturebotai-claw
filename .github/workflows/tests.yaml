@@ -54,6 +54,9 @@ jobs:
           src/kg_microbe_history
           src/kg_microbe_kgscan
 
+      - name: Verify active cron profile
+        run: uv run python scripts/apply_cron_profile.py --check-active
+
       - name: Run tests
         # `python -m pytest`, NOT `uv run pytest`. The latter resolves a pytest
         # from PATH when one is present outside the project, which locally meant
