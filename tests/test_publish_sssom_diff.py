@@ -133,6 +133,111 @@ def test_predicate_flip_on_a_shared_key_is_reported_and_not_counted_unchanged():
     assert diff.removed == []
 
 
+@pytest.mark.parametrize(
+    "new_predicate",
+    ["skos:closeMatch", "skos:narrowMatch", "skos:broadMatch", "skos:relatedMatch"],
+)
+def test_a_flip_away_from_exact_match_is_a_widening_flip(new_predicate):
+    """#112: nothing gated on `flipped` before this -- a rebuild that flipped
+    every exactMatch to closeMatch printed a count and exited 0."""
+    diff = diff_rows(
+        [row("MIM:Glucose", "CHEBI:17234", "skos:exactMatch")],
+        [row("MIM:Glucose", "CHEBI:17234", new_predicate)],
+    )
+
+    assert diff.widening_flips == [
+        ("MIM:Glucose", "CHEBI:17234", "skos:exactMatch", new_predicate)
+    ]
+
+
+@pytest.mark.parametrize("old_predicate", ["skos:closeMatch", "skos:narrowMatch", "skos:relatedMatch"])
+def test_a_flip_tightened_to_exact_match_is_not_widening(old_predicate):
+    """The normal outcome of curation -- a provisional mapping proven exact --
+    must not trip the same gate as a rebuild regression."""
+    diff = diff_rows(
+        [row("MIM:Glucose", "CHEBI:17234", old_predicate)],
+        [row("MIM:Glucose", "CHEBI:17234", "skos:exactMatch")],
+    )
+
+    assert diff.flipped == [("MIM:Glucose", "CHEBI:17234", old_predicate, "skos:exactMatch")]
+    assert diff.widening_flips == []
+
+
+def test_a_lateral_flip_between_non_exact_predicates_is_not_widening():
+    """Scope is deliberately narrow: exact-vs-not, not a full precision
+    ordering across the weaker predicates."""
+    diff = diff_rows(
+        [row("MIM:Glucose", "CHEBI:17234", "skos:narrowMatch")],
+        [row("MIM:Glucose", "CHEBI:17234", "skos:broadMatch")],
+    )
+
+    assert diff.flipped == [
+        ("MIM:Glucose", "CHEBI:17234", "skos:narrowMatch", "skos:broadMatch")
+    ]
+    assert diff.widening_flips == []
+
+
+def test_widening_flipped_is_included_in_the_diff_payload(tmp_path):
+    diff = diff_rows(
+        [row("MIM:Glucose", "CHEBI:17234", "skos:exactMatch")],
+        [row("MIM:Glucose", "CHEBI:17234", "skos:closeMatch")],
+    )
+
+    out = publish_sssom._write_diff_report(diff, tmp_path / "d.json")
+    payload = json.loads(out.read_text())
+
+    assert payload["widening_flipped"] == [
+        ["MIM:Glucose", "CHEBI:17234", "skos:exactMatch", "skos:closeMatch"]
+    ]
+
+
+def test_a_respelled_row_with_a_predicate_downgrade_is_not_silently_absorbed():
+    """A respelling changes the (subject, object) key, so this pair is never
+    in `shared` and never reaches `flipped` -- before the fix, an exactMatch
+    -> closeMatch downgrade riding along with a respelling was completely
+    invisible in every diff artifact, and --allow-widening-flips 0 did not
+    refuse the promotion. Reproduces the case found reviewing this PR."""
+    diff = diff_rows(
+        [row("MIM:Foo", "CHEBI:1", "skos:exactMatch")],
+        [row("MIM:foo", "CHEBI:1", "skos:closeMatch")],
+    )
+
+    assert diff.flipped == [], "the key changed -- this must not show up as a flip"
+    assert diff.respelled == [("MIM:Foo", "MIM:foo", "CHEBI:1")]
+    assert diff.respelled_widening == [
+        ("MIM:Foo", "MIM:foo", "CHEBI:1", "skos:exactMatch", "skos:closeMatch")
+    ]
+    assert diff.all_widening == diff.respelled_widening
+
+
+def test_a_plain_respelling_with_no_predicate_change_has_no_widening():
+    diff = diff_rows(
+        [row("MIM:EDTA_Stock", "CHEBI:4735", "skos:exactMatch")],
+        [row("MIM:Edta_Stock", "CHEBI:4735", "skos:exactMatch")],
+    )
+
+    assert diff.respelled == [("MIM:EDTA_Stock", "MIM:Edta_Stock", "CHEBI:4735")]
+    assert diff.respelled_widening == []
+    assert diff.all_widening == []
+
+
+def test_all_widening_unions_flips_and_respelled_widening():
+    diff = diff_rows(
+        [
+            row("MIM:Glucose", "CHEBI:17234", "skos:exactMatch"),  # flips in place
+            row("MIM:Foo", "CHEBI:1", "skos:exactMatch"),          # respells + widens
+        ],
+        [
+            row("MIM:Glucose", "CHEBI:17234", "skos:closeMatch"),
+            row("MIM:foo", "CHEBI:1", "skos:closeMatch"),
+        ],
+    )
+
+    assert len(diff.widening_flips) == 1
+    assert len(diff.respelled_widening) == 1
+    assert len(diff.all_widening) == 2
+
+
 def test_churn_is_separated_rather_than_netted_out():
     """The shape the count guard could not see: rows out AND rows in."""
     prev = [
@@ -273,3 +378,314 @@ def test_read_rows_skips_the_yaml_preamble(tmp_path):
 
 def test_read_rows_on_a_missing_file_is_empty_not_an_error(tmp_path):
     assert publish_sssom._read_rows(tmp_path / "absent.tsv") == []
+
+
+def _write_sssom_tsv(path, rows):
+    """Minimal SSSOM TSV (header + rows) for main()-level tests.
+
+    rows: iterable of (subject_id, predicate_id, object_id).
+    """
+    lines = ["subject_id\tpredicate_id\tobject_id\n"]
+    lines += [f"{s}\t{p}\t{o}\n" for s, p, o in rows]
+    path.write_text("".join(lines))
+
+
+def _patch_diff_report_default(monkeypatch, tmp_path):
+    """_write_diff_report's `path` default is bound to the real DIFF_REPORT
+    at module-def time, so monkeypatching the DIFF_REPORT *name* alone does
+    not redirect it -- without patching the default itself, a main()-level
+    test would write into this repo's real workspace/ directory."""
+    monkeypatch.setattr(
+        publish_sssom._write_diff_report, "__defaults__",
+        (tmp_path / "diff_report.json",),
+    )
+
+
+def test_main_refuses_to_promote_a_widening_flip_by_default(tmp_path, monkeypatch):
+    """#112 end-to-end: the CLI gate must actually fire, not just the
+    diff-level classification tested above."""
+    working_copy = tmp_path / "working.sssom.tsv"
+    published = tmp_path / "published.sssom.tsv"
+    _write_sssom_tsv(published, [("MIM:Glucose", "skos:exactMatch", "CHEBI:17234")])
+    _write_sssom_tsv(working_copy, [("MIM:Glucose", "skos:closeMatch", "CHEBI:17234")])
+
+    monkeypatch.setattr(publish_sssom, "WORKING_COPY", working_copy)
+    monkeypatch.setattr(publish_sssom, "PUBLISHED", published)
+    _patch_diff_report_default(monkeypatch, tmp_path)
+    monkeypatch.setattr(sys, "argv", ["publish_sssom.py", "--dry-run"])
+
+    with pytest.raises(SystemExit) as excinfo:
+        publish_sssom.main()
+
+    assert excinfo.value.code == 2
+
+
+def test_main_apply_writes_a_pointer_and_counts_not_the_full_diff(tmp_path, monkeypatch):
+    """#113 end-to-end: the JSONL audit line must not embed the full diff,
+    and the sibling archive file it points to must actually exist and hold
+    the full diff."""
+    working_copy = tmp_path / "working.sssom.tsv"
+    published = tmp_path / "published.sssom.tsv"
+    _write_sssom_tsv(published, [("MIM:Old", "skos:exactMatch", "CHEBI:1")])
+    _write_sssom_tsv(working_copy, [
+        ("MIM:Old", "skos:exactMatch", "CHEBI:1"),
+        ("MIM:New", "skos:exactMatch", "CHEBI:2"),
+    ])
+    audit_log = tmp_path / "status" / "sssom_promotions.jsonl"
+
+    monkeypatch.setattr(publish_sssom, "WORKING_COPY", working_copy)
+    monkeypatch.setattr(publish_sssom, "PUBLISHED", published)
+    monkeypatch.setattr(publish_sssom, "AUDIT_LOG", audit_log)
+    monkeypatch.setattr(publish_sssom, "LOCKS_DIR", tmp_path / "locks")
+    # _load_lock_manager() resolves plugins/lock_manager.py via CLAW_ROOT --
+    # a real checkout root, not necessarily this test file's grandparent, but
+    # the two coincide in every environment this suite runs in (worktree or
+    # CI checkout), and CLAW_ROOT is hardcoded to the PR author's own machine
+    # path otherwise -- unpatched, this passes locally and fails on CI.
+    monkeypatch.setattr(publish_sssom, "CLAW_ROOT", Path(__file__).resolve().parents[1])
+    monkeypatch.setattr(publish_sssom, "_validate", lambda path: [])
+    _patch_diff_report_default(monkeypatch, tmp_path)
+    monkeypatch.setattr(sys, "argv", ["publish_sssom.py", "--apply"])
+
+    publish_sssom.main()
+
+    lines = audit_log.read_text().splitlines()
+    assert len(lines) == 1
+    entry = json.loads(lines[0])
+    assert "diff" not in entry, "the full diff must not be embedded inline (#113)"
+    assert entry["diff_counts"] == {
+        "added": 1, "removed": 0, "respelled": 0, "flipped": 0,
+        "widening_flipped": 0, "respelled_widening": 0, "total_widening": 0,
+    }
+    diff_file = Path(entry["diff_file"])
+    assert diff_file.exists(), "diff_file must point at a file that actually exists"
+    archived = json.loads(diff_file.read_text())
+    assert archived["added"] == [["MIM:New", "CHEBI:2"]]
+    assert published.read_bytes() == working_copy.read_bytes()
+    assert list(tmp_path.rglob("*.tmp-*")) == [], (
+        "atomic writes (PUBLISHED and diff_archive) must not leave a stray tmp file behind"
+    )
+
+
+def test_main_refuses_to_promote_a_respelled_widening_flip(tmp_path, monkeypatch):
+    """The exact bug this PR fixes, exercised through the CLI: before the
+    fix, a row that was both re-spelled AND downgraded from skos:exactMatch
+    was invisible to `flipped` (the key changed) and `respelled` (no
+    predicate_id), so `main()`'s gate -- checking only `widening_flips` --
+    would not have fired here. This must go through `all_widening`, not
+    `widening_flips` alone, or this test would still pass on the bug."""
+    working_copy = tmp_path / "working.sssom.tsv"
+    published = tmp_path / "published.sssom.tsv"
+    _write_sssom_tsv(published, [("MIM:Foo", "skos:exactMatch", "CHEBI:1")])
+    _write_sssom_tsv(working_copy, [("MIM:foo", "skos:closeMatch", "CHEBI:1")])
+
+    monkeypatch.setattr(publish_sssom, "WORKING_COPY", working_copy)
+    monkeypatch.setattr(publish_sssom, "PUBLISHED", published)
+    _patch_diff_report_default(monkeypatch, tmp_path)
+    monkeypatch.setattr(sys, "argv", ["publish_sssom.py", "--dry-run"])
+
+    with pytest.raises(SystemExit) as excinfo:
+        publish_sssom.main()
+
+    assert excinfo.value.code == 2
+
+
+def test_main_proceeds_past_the_widening_gate_when_explicitly_overridden(tmp_path, monkeypatch):
+    """The gate's only purpose is to be overridable with justification -- a
+    boundary regression (e.g. `>=` instead of `>`, or the flag silently not
+    being read) would otherwise go undetected by the refusal-path tests
+    alone, since those never exercise a nonzero --allow-widening-flips."""
+    working_copy = tmp_path / "working.sssom.tsv"
+    published = tmp_path / "published.sssom.tsv"
+    _write_sssom_tsv(published, [("MIM:Glucose", "skos:exactMatch", "CHEBI:17234")])
+    _write_sssom_tsv(working_copy, [("MIM:Glucose", "skos:closeMatch", "CHEBI:17234")])
+
+    monkeypatch.setattr(publish_sssom, "WORKING_COPY", working_copy)
+    monkeypatch.setattr(publish_sssom, "PUBLISHED", published)
+    # Without this, main() reaches the real sssom CLI (this test's minimal
+    # 3-column TSV has no curie_map preamble, so `sssom validate` genuinely
+    # fails) -- _validate()'s hardcoded marker list doesn't happen to match
+    # that failure's wording, so it silently returns no errors and the test
+    # passes for the wrong reason. Mocking it, like every sibling main()-level
+    # test does, keeps this test isolated to the widening-gate override logic
+    # and avoids depending on an external binary's exact error wording.
+    monkeypatch.setattr(publish_sssom, "_validate", lambda path: [])
+    _patch_diff_report_default(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        sys, "argv", ["publish_sssom.py", "--dry-run", "--allow-widening-flips", "1"]
+    )
+
+    publish_sssom.main()  # must not raise SystemExit -- 1 widening flip, limit 1
+
+
+def test_main_apply_surfaces_a_partial_failure_after_published_is_already_committed(
+    tmp_path, monkeypatch
+):
+    """PUBLISHED.write is committed before the audit-log/diff-archive write.
+    If that second write fails (disk full, permission error), CLAUDE.md says
+    not to swallow the partial failure into apparent success -- main() must
+    exit nonzero with a message that surfaces the sha256 for manual recovery,
+    not silently print "Promoted" as if the audit trail exists."""
+    working_copy = tmp_path / "working.sssom.tsv"
+    published = tmp_path / "published.sssom.tsv"
+    _write_sssom_tsv(published, [("MIM:Old", "skos:exactMatch", "CHEBI:1")])
+    _write_sssom_tsv(working_copy, [
+        ("MIM:Old", "skos:exactMatch", "CHEBI:1"),
+        ("MIM:New", "skos:exactMatch", "CHEBI:2"),
+    ])
+    audit_log = tmp_path / "status" / "sssom_promotions.jsonl"
+
+    monkeypatch.setattr(publish_sssom, "WORKING_COPY", working_copy)
+    monkeypatch.setattr(publish_sssom, "PUBLISHED", published)
+    monkeypatch.setattr(publish_sssom, "AUDIT_LOG", audit_log)
+    monkeypatch.setattr(publish_sssom, "LOCKS_DIR", tmp_path / "locks")
+    monkeypatch.setattr(publish_sssom, "CLAW_ROOT", Path(__file__).resolve().parents[1])
+    monkeypatch.setattr(publish_sssom, "_validate", lambda path: [])
+    _patch_diff_report_default(monkeypatch, tmp_path)
+
+    real_write_diff_report = publish_sssom._write_diff_report
+    calls = {"n": 0}
+
+    def flaky(diff, path=None):
+        calls["n"] += 1
+        if calls["n"] == 1:  # the dry-run-style DIFF_REPORT call earlier in main()
+            return real_write_diff_report(diff, path or (tmp_path / "diff_report.json"))
+        raise OSError("simulated disk full")  # the diff_archive call in the apply block
+
+    monkeypatch.setattr(publish_sssom, "_write_diff_report", flaky)
+    monkeypatch.setattr(sys, "argv", ["publish_sssom.py", "--apply"])
+
+    with pytest.raises(SystemExit) as excinfo:
+        publish_sssom.main()
+
+    assert excinfo.value.code == 2
+    assert published.read_bytes() == working_copy.read_bytes(), (
+        "PUBLISHED is committed before the failing write -- it must still reflect the promotion"
+    )
+    assert not audit_log.exists(), "no audit-log entry should exist for a failed audit write"
+
+
+def test_main_apply_partial_failure_message_reflects_a_surviving_diff_archive(
+    tmp_path, monkeypatch, capsys
+):
+    """diff_archive is written (and renamed into place) BEFORE the AUDIT_LOG
+    append -- if that later append is what fails, the archive genuinely
+    exists on disk with the full diff. The recovery message must say so,
+    not unconditionally claim nothing was written (the bug the sibling test
+    above doesn't cover, since there the archive write itself is what fails)."""
+    working_copy = tmp_path / "working.sssom.tsv"
+    published = tmp_path / "published.sssom.tsv"
+    _write_sssom_tsv(published, [("MIM:Old", "skos:exactMatch", "CHEBI:1")])
+    _write_sssom_tsv(working_copy, [
+        ("MIM:Old", "skos:exactMatch", "CHEBI:1"),
+        ("MIM:New", "skos:exactMatch", "CHEBI:2"),
+    ])
+    # AUDIT_LOG pointed at a directory, not a file: diff_archive (a sibling
+    # under the same parent) writes fine, but AUDIT_LOG.open("a") raises
+    # IsADirectoryError (an OSError subclass) -- a failure strictly after
+    # the archive write succeeds.
+    audit_log_as_dir = tmp_path / "status_is_actually_a_dir"
+    audit_log_as_dir.mkdir()
+
+    monkeypatch.setattr(publish_sssom, "WORKING_COPY", working_copy)
+    monkeypatch.setattr(publish_sssom, "PUBLISHED", published)
+    monkeypatch.setattr(publish_sssom, "AUDIT_LOG", audit_log_as_dir)
+    monkeypatch.setattr(publish_sssom, "LOCKS_DIR", tmp_path / "locks")
+    monkeypatch.setattr(publish_sssom, "CLAW_ROOT", Path(__file__).resolve().parents[1])
+    monkeypatch.setattr(publish_sssom, "_validate", lambda path: [])
+    _patch_diff_report_default(monkeypatch, tmp_path)
+    monkeypatch.setattr(sys, "argv", ["publish_sssom.py", "--apply"])
+
+    with pytest.raises(SystemExit) as excinfo:
+        publish_sssom.main()
+
+    assert excinfo.value.code == 2
+    archives = list(tmp_path.glob("sssom_diff_*.json"))
+    assert len(archives) == 1, "the archive write itself must have succeeded"
+    stderr = capsys.readouterr().err
+    assert str(archives[0]) in stderr, "the message must point at the archive that DOES exist"
+    assert "no diff archive" not in stderr.lower()
+
+
+def test_diff_archive_filename_incorporates_prev_hash_not_just_published_hash(
+    tmp_path, monkeypatch
+):
+    """A separate commit re-keyed diff_archive from sssom_diff_{published_hash}
+    to sssom_diff_{prev_hash}_{published_hash}, specifically because a
+    revert-and-redo could otherwise silently overwrite an earlier promotion's
+    permanent diff record. Pin it directly: two promotions that land on the
+    SAME published content from two DIFFERENT prior states must produce two
+    distinct, surviving archive files -- and the first promotion (PUBLISHED
+    absent) must use the 'none' sentinel for prev_hash."""
+    working_copy = tmp_path / "working.sssom.tsv"
+    published = tmp_path / "published.sssom.tsv"
+    audit_log = tmp_path / "status" / "sssom_promotions.jsonl"
+    _write_sssom_tsv(working_copy, [("MIM:Target", "skos:exactMatch", "CHEBI:99")])
+
+    monkeypatch.setattr(publish_sssom, "WORKING_COPY", working_copy)
+    monkeypatch.setattr(publish_sssom, "PUBLISHED", published)
+    monkeypatch.setattr(publish_sssom, "AUDIT_LOG", audit_log)
+    monkeypatch.setattr(publish_sssom, "LOCKS_DIR", tmp_path / "locks")
+    monkeypatch.setattr(publish_sssom, "CLAW_ROOT", Path(__file__).resolve().parents[1])
+    monkeypatch.setattr(publish_sssom, "_validate", lambda path: [])
+    _patch_diff_report_default(monkeypatch, tmp_path)
+    monkeypatch.setattr(sys, "argv", ["publish_sssom.py", "--apply"])
+
+    assert not published.exists()  # first publish -- exercises the 'none' sentinel
+    publish_sssom.main()
+    first_archives = set(audit_log.parent.glob("sssom_diff_*.json"))
+    assert len(first_archives) == 1
+    assert "sssom_diff_none_" in next(iter(first_archives)).name
+
+    # Simulate a revert to a DIFFERENT prior state, then a "redo" back to the
+    # exact same target content main() just published -- same published_hash
+    # as before, different prev_hash.
+    _write_sssom_tsv(published, [("MIM:Different", "skos:exactMatch", "CHEBI:1")])
+    publish_sssom.main()
+    second_archives = set(audit_log.parent.glob("sssom_diff_*.json")) - first_archives
+
+    assert len(second_archives) == 1, "the second promotion must produce a NEW archive file"
+    for archive in first_archives | second_archives:
+        assert archive.exists(), "neither archive should have been overwritten by the other"
+
+
+def test_main_apply_surfaces_a_partial_failure_when_the_audit_dir_cannot_be_created(
+    tmp_path, monkeypatch, capsys
+):
+    """diff_archive is referenced inside `except OSError` to check whether it
+    survived. If it were only assigned after AUDIT_LOG.parent.mkdir() inside
+    the try block, an OSError from that very first statement (mkdir itself)
+    would leave diff_archive unbound -- UnboundLocalError isn't an OSError,
+    so it would escape the handler this whole block exists to provide,
+    masking the crafted recovery message with a bare traceback."""
+    working_copy = tmp_path / "working.sssom.tsv"
+    published = tmp_path / "published.sssom.tsv"
+    _write_sssom_tsv(published, [("MIM:Old", "skos:exactMatch", "CHEBI:1")])
+    _write_sssom_tsv(working_copy, [
+        ("MIM:Old", "skos:exactMatch", "CHEBI:1"),
+        ("MIM:New", "skos:exactMatch", "CHEBI:2"),
+    ])
+    # AUDIT_LOG.parent.mkdir(parents=True, exist_ok=True) fails when the
+    # parent path is already occupied by a plain file, not a directory.
+    occupied = tmp_path / "occupied"
+    occupied.write_text("not a directory")
+    audit_log = occupied / "sssom_promotions.jsonl"
+
+    monkeypatch.setattr(publish_sssom, "WORKING_COPY", working_copy)
+    monkeypatch.setattr(publish_sssom, "PUBLISHED", published)
+    monkeypatch.setattr(publish_sssom, "AUDIT_LOG", audit_log)
+    monkeypatch.setattr(publish_sssom, "LOCKS_DIR", tmp_path / "locks")
+    monkeypatch.setattr(publish_sssom, "CLAW_ROOT", Path(__file__).resolve().parents[1])
+    monkeypatch.setattr(publish_sssom, "_validate", lambda path: [])
+    _patch_diff_report_default(monkeypatch, tmp_path)
+    monkeypatch.setattr(sys, "argv", ["publish_sssom.py", "--apply"])
+
+    with pytest.raises(SystemExit) as excinfo:
+        publish_sssom.main()
+
+    assert excinfo.value.code == 2
+    stderr = capsys.readouterr().err
+    assert "FAILED to write the audit-log entry" in stderr, (
+        "the crafted recovery message must fire, not a bare UnboundLocalError traceback"
+    )
+    assert published.read_bytes() == working_copy.read_bytes()

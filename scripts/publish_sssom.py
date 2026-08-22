@@ -13,8 +13,12 @@ Safety:
   (see CLAUDE.md "Lock System") before touching the MIM repo.
 - Diffs the working copy against the published file as row *sets* keyed on
   `(subject_id, object_id)`, and refuses to promote if more than 5 rows would
-  be genuinely removed (guards against truncation).
-- Appends an audit entry to workspace/status/sssom_promotions.jsonl.
+  be genuinely removed (guards against truncation), or if any row would flip
+  from `skos:exactMatch` to a weaker predicate -- whether as a same-subject
+  flip or riding along with a subject re-spelling (guards against a rebuild
+  quietly downgrading identity claims -- MediaIngredientMech#409).
+- Appends an audit entry (pointer + counts, not the full diff -- see below)
+  to workspace/status/sssom_promotions.jsonl.
 
 Why a set diff and not a row count (MediaIngredientMech#416):
     A count is blind to churn. On 2026-08-21 the working copy had 2,885 rows
@@ -41,7 +45,9 @@ import csv
 import hashlib
 import importlib.util
 import json
+import os
 import re
+import secrets
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -56,19 +62,29 @@ MIM_ROOT = Path(
 )
 WORKING_COPY = CLAW_ROOT / "workspace" / "reports" / "mim_ingredient_mappings.sssom.tsv"
 PUBLISHED = MIM_ROOT / "mappings" / "ingredient_mappings.sssom.tsv"
+# One line per promotion: timestamp, hashes, row counts, and a diff_counts
+# summary. Deliberately does NOT embed the full added/removed/respelled/
+# flipped lists -- see diff_archive at the apply site (#113: an embedded
+# diff has no size bound, and a first publish or a full re-spelling rebuild
+# would write ~2,900 pairs as a single JSONL line).
 AUDIT_LOG = CLAW_ROOT / "workspace" / "status" / "sssom_promotions.jsonl"
 # The full diff, written on every run including --dry-run. stdout shows only
 # EXAMPLES_SHOWN per category, and dry-run is the mode a curator uses to work
 # out *why* promotion was refused -- so the remaining entries have to land
-# somewhere readable rather than only in the apply-path audit log.
+# somewhere readable rather than only in the apply-path audit log. Overwritten
+# each run -- this is "what would the diff show right now", not history; a
+# promotion's permanent record is the diff_archive file the apply path writes
+# instead (named by the (previous_hash, published_hash) pair, not just the
+# new hash -- see the comment where diff_archive is built for why a
+# single-hash name would collide on a revert-and-redo).
 DIFF_REPORT = CLAW_ROOT / "workspace" / "reports" / "sssom_promotion_diff.json"
 LOCKS_DIR = CLAW_ROOT / "workspace" / "locks"
 ROW_COUNT_DROP_LIMIT = 5
 
 SSSOM_BIN = "sssom"
 
-# How many examples of each diff category to print. The full lists go into the
-# audit log; stdout stays readable.
+# How many examples of each diff category to print. The full lists go into
+# DIFF_REPORT / diff_archive; stdout stays readable.
 EXAMPLES_SHOWN = 8
 
 
@@ -150,6 +166,21 @@ def _spelling_key(subject: str) -> str:
     return f"{prefix.casefold()}:{escaped.casefold()}"
 
 
+# Predicates that assert row identity outright. Flipping *away* from one of
+# these to anything else discards information a downstream consumer may be
+# relying on (MediaIngredientMech#409: a 249-row exactMatch -> closeMatch
+# rebuild regression that no guard caught). Flipping the other way -- a
+# provisional predicate tightened to exactMatch -- is the normal outcome of
+# curation and is deliberately not gated.
+#
+# Scope is intentionally narrow: this only classifies exact-vs-not, not a
+# full precision ordering across closeMatch/narrowMatch/broadMatch/
+# relatedMatch (which SSSOM does not itself define a total order for). A
+# lateral flip among those weaker predicates is reported (it is still in
+# `flipped`) but not gated.
+_EXACT_PREDICATES = frozenset({"skos:exactMatch"})
+
+
 @dataclass
 class SssomDiff:
     """A `(subject_id, object_id)`-keyed comparison of two SSSOM row sets."""
@@ -161,6 +192,29 @@ class SssomDiff:
     removed: list[tuple[str, str]] = field(default_factory=list)
     respelled: list[tuple[str, str, str]] = field(default_factory=list)
     flipped: list[tuple[str, str, str, str]] = field(default_factory=list)
+    # Respelling pairs (old_subject, new_subject, object, old_predicate,
+    # new_predicate) whose predicate ALSO weakened from exactMatch. A
+    # respelling changes the (subject, object) key itself, so a predicate
+    # downgrade riding along with it would otherwise vanish from both
+    # `flipped` (which only sees unchanged keys) and `respelled` (which
+    # doesn't carry predicate_id) -- a respelling would silently launder a
+    # widening flip past the gate. Kept as its own list rather than folded
+    # into `flipped` because the tuple shapes differ (respelling has two
+    # subjects, not one).
+    #
+    # Scope boundary, deliberately not closed further: this only pairs a
+    # removed row with an added row when the OBJECT is unchanged (see
+    # `added_by_spelling`'s key below). If a rebuild changes the subject's
+    # spelling AND retargets the object (e.g. a corrected CHEBI id) AND
+    # weakens the predicate, all in the same row, it reads as plain
+    # `removed`+`added` -- gated by --allow-drop, not --allow-widening-flips.
+    # Unlike a respelling (where `_spelling_key` gives an unambiguous
+    # correlation key), there is no analogous "this is probably the same
+    # record" signal once the object itself changes -- a different CHEBI id
+    # asserts a different concept, so treating it as a continuation of the
+    # same claim would be a guess, not a fact. See diff_rows() for how the
+    # cheaper, unambiguous case (object unchanged) is still caught.
+    respelled_widening: list[tuple[str, str, str, str, str]] = field(default_factory=list)
     # column -> how many surviving rows changed it. Reported, not gated: most of
     # this is legitimate rebuild output (`source`, `mapping_date`) and gating it
     # would make promotion impossible. But it must be visible -- keying on
@@ -176,6 +230,32 @@ class SssomDiff:
     @property
     def is_empty(self) -> bool:
         return not (self.added or self.removed or self.respelled or self.flipped)
+
+    @property
+    def widening_flips(self) -> list[tuple[str, str, str, str]]:
+        """The subset of `flipped` that leaves an exact-identity predicate.
+
+        Part of what `--allow-widening-flips` gates on -- see `all_widening`,
+        which also covers the same loss riding along with a respelling.
+        `flipped` itself stays ungated -- most predicate churn is legitimate
+        (a provisional mapping tightened to exactMatch), and gating on the raw
+        count would block that.
+        """
+        return [
+            f for f in self.flipped
+            if f[2] in _EXACT_PREDICATES and f[3] not in _EXACT_PREDICATES
+        ]
+
+    @property
+    def all_widening(self) -> list[tuple]:
+        """Every row that lost skos:exactMatch, respelled or not.
+
+        This -- not `widening_flips` alone -- is what `--allow-widening-flips`
+        gates on. `widening_flips` and `respelled_widening` have different
+        tuple shapes (4 fields vs 5: a respelling carries two subjects), so
+        they stay separate lists; this just unions them for gating/reporting.
+        """
+        return [*self.widening_flips, *self.respelled_widening]
 
 
 def diff_rows(prev: list[dict[str, str]], new: list[dict[str, str]]) -> SssomDiff:
@@ -235,6 +315,13 @@ def diff_rows(prev: list[dict[str, str]], new: list[dict[str, str]]) -> SssomDif
         if candidates:
             new_subject, _ = candidates.pop()
             diff.respelled.append((subject, new_subject, obj))
+            # A respelling changes the (subject, object) key, so this pair
+            # never appears in `shared` above -- a predicate downgrade riding
+            # along with the respelling would otherwise be invisible.
+            old_pred = prev_by_key[(subject, obj)].get("predicate_id", "")
+            new_pred = new_by_key[(new_subject, obj)].get("predicate_id", "")
+            if old_pred in _EXACT_PREDICATES and new_pred not in _EXACT_PREDICATES:
+                diff.respelled_widening.append((subject, new_subject, obj, old_pred, new_pred))
         else:
             diff.removed.append((subject, obj))
 
@@ -252,6 +339,20 @@ def _print_diff(diff: SssomDiff) -> None:
     print(f"  removed               {len(diff.removed)}")
     print(f"  subject re-spelled    {len(diff.respelled)}")
     print(f"  predicate flipped     {len(diff.flipped)}")
+    if diff.widening_flips:
+        print(
+            f"    of which widening (exactMatch -> weaker): {len(diff.widening_flips)}"
+        )
+    if diff.respelled_widening:
+        print(
+            f"  subject re-spelled AND widening (exactMatch -> weaker): "
+            f"{len(diff.respelled_widening)}"
+        )
+    if diff.all_widening:
+        print(
+            f"  total widening (gated): {len(diff.all_widening)}  "
+            "<- see --allow-widening-flips"
+        )
 
     if diff.column_changes:
         print("\n  Other columns changed on surviving rows (reported, not gated):")
@@ -295,6 +396,11 @@ def _print_diff(diff: SssomDiff) -> None:
         diff.flipped,
         lambda r: f"{r[0]} -> {r[1]}: {r[2]} => {r[3]}",
     )
+    show(
+        "subject re-spelled AND predicate widened",
+        diff.respelled_widening,
+        lambda r: f"{r[0]} => {r[1]} -> {r[2]}: {r[3]} => {r[4]}",
+    )
 
     if diff.respelled:
         print(
@@ -317,12 +423,35 @@ def _diff_payload(diff: SssomDiff) -> dict:
         "removed": [list(r) for r in diff.removed],
         "respelled": [list(r) for r in diff.respelled],
         "flipped": [list(r) for r in diff.flipped],
+        "widening_flipped": [list(r) for r in diff.widening_flips],
+        "respelled_widening": [list(r) for r in diff.respelled_widening],
     }
 
 
 def _write_diff_report(diff: SssomDiff, path: Path = DIFF_REPORT) -> Path:
+    """Write atomically (temp file + rename), not in place.
+
+    This used to only back the scratch DIFF_REPORT (overwritten every run,
+    low stakes if truncated by an interrupted write). It also now backs
+    diff_archive -- a promotion's permanent audit record, referenced by the
+    audit log's `diff_file` pointer -- where a crash mid-write would leave a
+    truncated, undetectably-corrupt file with an audit-log entry pointing at
+    it (CLAUDE.md: "Use atomic creation/replacement for locks and curated
+    data").
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(_diff_payload(diff), indent=2) + "\n")
+    # Randomized suffix + try/finally cleanup, matching
+    # kg_microbe_history/scaffold.py::write_record()'s existing convention --
+    # a fixed ".tmp" name collides when two invocations overlap (this runs
+    # unconditionally on every --dry-run too, which never takes the
+    # mediaingredientmech lock, so two concurrent dry-runs racing on the
+    # shared DIFF_REPORT path is a real scenario, not a hypothetical one).
+    tmp = path.with_name(path.name + f".tmp-{secrets.token_hex(4)}")
+    try:
+        tmp.write_text(json.dumps(_diff_payload(diff), indent=2) + "\n")
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
     return path
 
 
@@ -352,6 +481,15 @@ def main():
                          "published file. Subject re-spellings do not count against it. "
                          "Default: %(default)s. Set explicitly (with justification) "
                          "when intentionally consolidating records.")
+    ap.add_argument("--allow-widening-flips", type=int, default=0,
+                    help="Max number of rows the new file may flip FROM skos:exactMatch "
+                         "to a weaker predicate -- counting both a same-subject flip and "
+                         "a downgrade riding along with a subject re-spelling (the two "
+                         "otherwise-invisible ways this can happen). Flips that tighten a "
+                         "mapping TO exactMatch do not count. Default: %(default)s -- this "
+                         "should always be a deliberate curation decision, not rebuild "
+                         "noise (MediaIngredientMech#409). Set explicitly (with "
+                         "justification) when intentionally relaxing a mapping.")
     args = ap.parse_args()
     apply = args.apply and not args.dry_run
 
@@ -401,6 +539,20 @@ def main():
         )
         sys.exit(2)
 
+    if len(diff.all_widening) > args.allow_widening_flips:
+        print(
+            f"\nRefusing to promote: {len(diff.all_widening)} row(s) would flip from "
+            f"skos:exactMatch to a weaker predicate (limit: {args.allow_widening_flips})"
+            f", {len(diff.respelled_widening)} of them riding along with a respelling.",
+            file=sys.stderr,
+        )
+        print(
+            "Adjudicate the flips listed above, or override with "
+            "--allow-widening-flips <N>.",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+
     print("\nRe-validating working copy before promotion...")
     errors = _validate(WORKING_COPY)
     if errors:
@@ -428,27 +580,101 @@ def main():
 
     try:
         PUBLISHED.parent.mkdir(parents=True, exist_ok=True)
-        PUBLISHED.write_bytes(WORKING_COPY.read_bytes())
+        # Atomic (temp file + rename), matching kg_microbe_history/scaffold.py
+        # ::write_record()'s convention: PUBLISHED is the canonical curated
+        # artifact CLAUDE.md's "atomic creation/replacement" rule names
+        # directly, so it gets the same treatment as diff_archive below, not
+        # a plain in-place write a crash or disk-full event could truncate.
+        tmp_published = PUBLISHED.with_name(PUBLISHED.name + f".tmp-{secrets.token_hex(4)}")
+        try:
+            tmp_published.write_bytes(WORKING_COPY.read_bytes())
+            os.replace(tmp_published, PUBLISHED)
+        finally:
+            tmp_published.unlink(missing_ok=True)
         published_hash = _sha256(PUBLISHED)
-        AUDIT_LOG.parent.mkdir(parents=True, exist_ok=True)
-        entry = {
-            "timestamp": datetime.now(tz=timezone.utc).isoformat(),
-            "working_copy": str(WORKING_COPY),
-            "published": str(PUBLISHED),
-            "rows": new_rows,
-            "prev_rows": prev_rows,
-            "sha256": published_hash,
-            "prev_sha256": prev_hash,
-            "validators": ["JsonSchema", "PrefixMapCompleteness", "StrictCurieFormat"],
-            # Full lists, not just the counts printed to stdout: a promotion that
-            # re-spells subjects is the only record of which old subjects stopped
-            # resolving, and the alias file is written from it.
-            "diff": _diff_payload(diff),
-        }
-        with AUDIT_LOG.open("a") as f:
-            f.write(json.dumps(entry) + "\n")
+
+        # Full lists (not just the counts printed to stdout) go to a per-promotion
+        # sibling file, not embedded in the JSONL line: a promotion that re-spells
+        # every subject in a first publish or a full rebuild would write ~2,900
+        # pairs as a single line, and nothing prunes or rotates AUDIT_LOG (#113).
+        # A promotion that re-spells subjects is still the only record of which
+        # old subjects stopped resolving, and the alias file is written from it --
+        # so the full diff is archived, just not inline.
+        #
+        # Named on BOTH the previous and new hash, not just the new one: the
+        # new hash alone collides on a revert-and-redo (MIM_ROOT rolled back
+        # and re-promoted) or any deterministic rebuild reproducing an old
+        # published state, silently overwriting an earlier promotion's
+        # archived diff out from under its own audit-log `diff_file` pointer.
+        # A (prev, new) pair can only repeat if the same transition happens
+        # twice, in which case the diff content is identical anyway.
+        #
+        # Computed here, OUTSIDE the try block below (a pure path expression,
+        # no I/O) -- the except clause references diff_archive to check
+        # whether it survived a later failure, and needs it bound even if the
+        # very first statement in the try (AUDIT_LOG.parent.mkdir) is what
+        # raises. Assigning it only inside the try left it unbound on that
+        # path, so except OSError couldn't even catch its own reference to
+        # it: UnboundLocalError isn't an OSError, so it propagated past the
+        # handler this whole block exists to provide.
+        diff_archive = (
+            AUDIT_LOG.parent
+            / f"sssom_diff_{(prev_hash[:12] or 'none')}_{published_hash[:12]}.json"
+        )
+        try:
+            AUDIT_LOG.parent.mkdir(parents=True, exist_ok=True)
+            _write_diff_report(diff, diff_archive)
+            entry = {
+                "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+                "working_copy": str(WORKING_COPY),
+                "published": str(PUBLISHED),
+                "rows": new_rows,
+                "prev_rows": prev_rows,
+                "sha256": published_hash,
+                "prev_sha256": prev_hash,
+                "validators": ["JsonSchema", "PrefixMapCompleteness", "StrictCurieFormat"],
+                "diff_file": str(diff_archive),
+                "diff_counts": {
+                    "added": len(diff.added),
+                    "removed": len(diff.removed),
+                    "respelled": len(diff.respelled),
+                    "flipped": len(diff.flipped),
+                    "widening_flipped": len(diff.widening_flips),
+                    "respelled_widening": len(diff.respelled_widening),
+                    "total_widening": len(diff.all_widening),
+                },
+            }
+            with AUDIT_LOG.open("a") as f:
+                f.write(json.dumps(entry) + "\n")
+        except OSError as exc:
+            # PUBLISHED is already committed above -- this is a partial
+            # failure, not a clean abort, and CLAUDE.md says not to swallow
+            # that into an apparent success. Surface the sha256 so the
+            # promotion can still be reconstructed/recorded by hand.
+            #
+            # diff_archive is written (and renamed into place) before the
+            # AUDIT_LOG append -- if THAT later write is what failed, the
+            # archive genuinely exists on disk with the full diff, and
+            # claiming otherwise would send a curator's manual recovery down
+            # the wrong path (assuming nothing to point the hand-written
+            # audit line at, instead of just pointing it at the file that's
+            # already there under the right (prev_hash, published_hash) name).
+            archive_note = (
+                f"diff_file={diff_archive} was written" if diff_archive.exists()
+                else "no diff archive was written either"
+            )
+            print(
+                f"\nPromoted → {PUBLISHED} (sha256={published_hash[:12]}) but FAILED to "
+                f"write the audit-log entry ({exc}). {archive_note} -- record the "
+                f"promotion manually (prev_sha256={prev_hash[:12] or 'absent'}) and "
+                "investigate before the next promotion runs.",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+
         print(f"\nPromoted → {PUBLISHED}")
         print(f"Audit entry appended to {AUDIT_LOG}")
+        print(f"Full diff archived to {diff_archive}")
     finally:
         locker.release_lock("mediaingredientmech")
 
