@@ -133,6 +133,64 @@ def test_predicate_flip_on_a_shared_key_is_reported_and_not_counted_unchanged():
     assert diff.removed == []
 
 
+@pytest.mark.parametrize(
+    "new_predicate",
+    ["skos:closeMatch", "skos:narrowMatch", "skos:broadMatch", "skos:relatedMatch"],
+)
+def test_a_flip_away_from_exact_match_is_a_widening_flip(new_predicate):
+    """#112: nothing gated on `flipped` before this -- a rebuild that flipped
+    every exactMatch to closeMatch printed a count and exited 0."""
+    diff = diff_rows(
+        [row("MIM:Glucose", "CHEBI:17234", "skos:exactMatch")],
+        [row("MIM:Glucose", "CHEBI:17234", new_predicate)],
+    )
+
+    assert diff.widening_flips == [
+        ("MIM:Glucose", "CHEBI:17234", "skos:exactMatch", new_predicate)
+    ]
+
+
+@pytest.mark.parametrize("old_predicate", ["skos:closeMatch", "skos:narrowMatch", "skos:relatedMatch"])
+def test_a_flip_tightened_to_exact_match_is_not_widening(old_predicate):
+    """The normal outcome of curation -- a provisional mapping proven exact --
+    must not trip the same gate as a rebuild regression."""
+    diff = diff_rows(
+        [row("MIM:Glucose", "CHEBI:17234", old_predicate)],
+        [row("MIM:Glucose", "CHEBI:17234", "skos:exactMatch")],
+    )
+
+    assert diff.flipped == [("MIM:Glucose", "CHEBI:17234", old_predicate, "skos:exactMatch")]
+    assert diff.widening_flips == []
+
+
+def test_a_lateral_flip_between_non_exact_predicates_is_not_widening():
+    """Scope is deliberately narrow: exact-vs-not, not a full precision
+    ordering across the weaker predicates."""
+    diff = diff_rows(
+        [row("MIM:Glucose", "CHEBI:17234", "skos:narrowMatch")],
+        [row("MIM:Glucose", "CHEBI:17234", "skos:broadMatch")],
+    )
+
+    assert diff.flipped == [
+        ("MIM:Glucose", "CHEBI:17234", "skos:narrowMatch", "skos:broadMatch")
+    ]
+    assert diff.widening_flips == []
+
+
+def test_widening_flipped_is_included_in_the_diff_payload(tmp_path):
+    diff = diff_rows(
+        [row("MIM:Glucose", "CHEBI:17234", "skos:exactMatch")],
+        [row("MIM:Glucose", "CHEBI:17234", "skos:closeMatch")],
+    )
+
+    out = publish_sssom._write_diff_report(diff, tmp_path / "d.json")
+    payload = json.loads(out.read_text())
+
+    assert payload["widening_flipped"] == [
+        ["MIM:Glucose", "CHEBI:17234", "skos:exactMatch", "skos:closeMatch"]
+    ]
+
+
 def test_churn_is_separated_rather_than_netted_out():
     """The shape the count guard could not see: rows out AND rows in."""
     prev = [
