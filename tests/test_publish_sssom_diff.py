@@ -169,6 +169,39 @@ def test_spelling_key_tolerates_a_subject_without_a_prefix():
     assert _spelling_key("bare_subject") == "bare_subject"
 
 
+def test_duplicate_subject_object_pairs_are_counted_not_swallowed():
+    """Keying on (subject, object) drops repeats -- the diff must admit it."""
+    prev = [
+        row("MIM:Glucose", "CHEBI:17234", "skos:exactMatch"),
+        row("MIM:Glucose", "CHEBI:17234", "skos:closeMatch"),
+    ]
+    new = [row("MIM:Glucose", "CHEBI:17234", "skos:exactMatch")]
+
+    diff = diff_rows(prev, new)
+
+    assert diff.collapsed_prev == 1
+    assert diff.collapsed_new == 0
+
+
+def test_no_duplicates_reports_no_collapse():
+    diff = diff_rows([row("MIM:Glucose", "CHEBI:17234")], [row("MIM:Glucose", "CHEBI:17234")])
+
+    assert diff.collapsed_prev == 0
+    assert diff.collapsed_new == 0
+
+
+def test_respelling_choice_is_deterministic_across_orderings():
+    """Two added rows can share a spelling key; the pairing must not vary."""
+    prev = [row("MIM:FOO_BAR", "CHEBI:1")]
+    variants = [row("MIM:Foo_Bar", "CHEBI:1"), row("MIM:foo_bar", "CHEBI:1")]
+
+    forward = diff_rows(prev, list(variants))
+    reversed_ = diff_rows(prev, list(reversed(variants)))
+
+    assert forward.respelled == reversed_.respelled
+    assert forward.added == reversed_.added
+
+
 def test_read_rows_skips_the_yaml_preamble(tmp_path):
     path = tmp_path / "m.sssom.tsv"
     path.write_text(

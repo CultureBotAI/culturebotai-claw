@@ -153,6 +153,11 @@ class SssomDiff:
     removed: list[tuple[str, str]] = field(default_factory=list)
     respelled: list[tuple[str, str, str]] = field(default_factory=list)
     flipped: list[tuple[str, str, str, str]] = field(default_factory=list)
+    # Rows sharing a (subject_id, object_id) with an earlier row, and therefore
+    # absent from this comparison. Non-zero means the diff does not account for
+    # every row in the file and its numbers should not be trusted.
+    collapsed_prev: int = 0
+    collapsed_new: int = 0
 
     @property
     def is_empty(self) -> bool:
@@ -172,7 +177,14 @@ def diff_rows(prev: list[dict[str, str]], new: list[dict[str, str]]) -> SssomDif
     prev_by_key = {(r["subject_id"], r["object_id"]): r for r in prev}
     new_by_key = {(r["subject_id"], r["object_id"]): r for r in new}
 
-    diff = SssomDiff()
+    # Keying on (subject, object) silently drops any row that repeats the pair.
+    # Neither artifact has one today, but "today's data has none" is not the
+    # same as "this cannot happen", and an undetected collapse would make every
+    # number below quietly wrong. Count them and say so.
+    diff = SssomDiff(
+        collapsed_prev=len(prev) - len(prev_by_key),
+        collapsed_new=len(new) - len(new_by_key),
+    )
 
     shared = prev_by_key.keys() & new_by_key.keys()
     for key in shared:
@@ -186,12 +198,13 @@ def diff_rows(prev: list[dict[str, str]], new: list[dict[str, str]]) -> SssomDif
     only_prev = prev_by_key.keys() - new_by_key.keys()
     only_new = new_by_key.keys() - prev_by_key.keys()
 
-    # Index the added rows by (spelling-insensitive subject, object) so a
-    # removed row can find its re-spelled counterpart. A key can legitimately
-    # cover several rows only if the file has duplicates, which the SSSOM
-    # validators already reject; pop() keeps the pairing one-to-one regardless.
+    # Index the added rows by (spelling-insensitive subject, object) so a removed
+    # row can find its re-spelled counterpart. Two added rows can share a key
+    # (e.g. `MIM:Foo` and `MIM:foo` onto the same object), so pop() keeps the
+    # pairing one-to-one. Iterate sorted, not in set order, so which of them is
+    # reported as the re-spelling does not vary with PYTHONHASHSEED.
     added_by_spelling: dict[tuple[str, str], list[tuple[str, str]]] = {}
-    for subject, obj in only_new:
+    for subject, obj in sorted(only_new):
         added_by_spelling.setdefault((_spelling_key(subject), obj), []).append((subject, obj))
 
     for subject, obj in sorted(only_prev):
@@ -216,6 +229,13 @@ def _print_diff(diff: SssomDiff) -> None:
     print(f"  removed            {len(diff.removed)}")
     print(f"  subject re-spelled {len(diff.respelled)}")
     print(f"  predicate flipped  {len(diff.flipped)}")
+
+    if diff.collapsed_prev or diff.collapsed_new:
+        print(
+            f"\n  WARNING: {diff.collapsed_prev} published and {diff.collapsed_new} "
+            "working-copy row(s) repeat a (subject_id, object_id) pair and are not\n"
+            "  represented above. The counts in this diff are incomplete."
+        )
 
     def show(title: str, items: list, fmt) -> None:
         if not items:
