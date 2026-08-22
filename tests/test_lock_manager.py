@@ -13,7 +13,9 @@ from pathlib import Path
 import pytest
 import yaml
 
-from plugins.lock_manager import LockManager, StatusManager, _workspace_root
+import plugins.lock_manager as lock_manager_module
+from plugins.lock_manager import LockManager, StatusManager, resolve_workspace_root
+from scripts.check_lock import check_lock
 
 
 def _contend_for_lock(
@@ -296,4 +298,43 @@ def test_default_workspace_is_independent_of_current_directory(
     monkeypatch.delenv("OPENCLAW_WORKSPACE", raising=False)
     monkeypatch.chdir(tmp_path)
 
-    assert _workspace_root() == Path(__file__).parents[1] / "workspace"
+    assert resolve_workspace_root() == Path(__file__).parents[1] / "workspace"
+
+
+def test_manager_and_hook_checker_share_workspace_resolution(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    orchestration_root = tmp_path / "orchestration"
+    orchestration_root.mkdir()
+    (orchestration_root / "openclaw_config.yaml").touch()
+    monkeypatch.setattr(lock_manager_module, "PROJECT_ROOT", orchestration_root)
+    monkeypatch.delenv("OPENCLAW_ORCHESTRATION_ROOT", raising=False)
+    monkeypatch.delenv("OPENCLAW_WORKSPACE", raising=False)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+
+    manager = LockManager()
+    assert manager.acquire_lock("culturemech", "shared resolution")
+    assert check_lock("culturemech", "test shared resolution") == 1
+    assert manager.release_lock("culturemech")
+
+
+def test_relative_workspace_fails_closed_outside_checkout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    installed_root = tmp_path / "site-packages"
+    installed_root.mkdir()
+    monkeypatch.setattr(lock_manager_module, "PROJECT_ROOT", installed_root)
+    monkeypatch.delenv("OPENCLAW_ORCHESTRATION_ROOT", raising=False)
+    monkeypatch.delenv("OPENCLAW_WORKSPACE", raising=False)
+
+    with pytest.raises(ValueError, match="OPENCLAW_ORCHESTRATION_ROOT"):
+        resolve_workspace_root()
+
+    assert not (installed_root / "workspace").exists()
+
+    explicit_locks = tmp_path / "explicit-locks"
+    explicit_status = tmp_path / "explicit-status"
+    assert LockManager({"locks_dir": explicit_locks}).locks_dir == explicit_locks
+    assert StatusManager({"status_dir": explicit_status}).status_dir == explicit_status

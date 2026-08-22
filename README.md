@@ -123,6 +123,9 @@ uv run --extra dev python -m pytest -q \
   --cov=src --cov=cli.main --cov=plugins.repository_settings \
   --cov=plugins.lock_manager --cov=plugins/git_integration \
   --cov=plugins.just_runner --cov-report=term-missing --cov-fail-under=70
+uv run --extra dev coverage report \
+  --include=cli/main.py,plugins/repository_settings.py,plugins/lock_manager.py,plugins/git_integration.py,plugins/just_runner.py \
+  --fail-under=60
 ```
 
 Pytest intentionally collects only `tests/`. Root- and `scripts/`-level

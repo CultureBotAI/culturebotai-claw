@@ -71,6 +71,12 @@ jobs:
           --cov-report=term-missing
           --cov-fail-under=70
 
+      - name: Enforce safety-module coverage
+        run: >-
+          uv run --extra dev coverage report
+          --include=cli/main.py,plugins/repository_settings.py,plugins/lock_manager.py,plugins/git_integration.py,plugins/just_runner.py
+          --fail-under=60
+
   history-round-trip:
     # The history layer's own guarantee, exercised end to end rather than trusted:
     # a scaffolded record must validate, and an unfilled one must not.

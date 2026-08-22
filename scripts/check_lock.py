@@ -11,11 +11,9 @@ Exit codes:
   2 - Error
 """
 
-import os
 import sys
-from pathlib import Path
 
-from plugins.lock_manager import LockManager
+from plugins.lock_manager import LockManager, resolve_workspace_root
 
 
 def check_lock(resource_name: str, operation: str = "operation") -> int:
@@ -31,19 +29,8 @@ def check_lock(resource_name: str, operation: str = "operation") -> int:
         1 if locked (block)
         2 if error
     """
-    # Find workspace directory (same logic as lock_manager.py)
-    orchestration_root = Path(
-        os.getenv(
-            "OPENCLAW_ORCHESTRATION_ROOT",
-            str(Path(__file__).resolve().parent.parent),
-        )
-    )
-    workspace = Path(os.getenv("OPENCLAW_WORKSPACE", "workspace")).expanduser()
-    if not workspace.is_absolute():
-        workspace = orchestration_root / workspace
-
-    locks_dir = workspace.resolve() / "locks"
     try:
+        locks_dir = resolve_workspace_root() / "locks"
         manager = LockManager({"locks_dir": str(locks_dir), "my_id": "hook-checker"})
         global_lock = manager.check_lock("global")
         if global_lock is not None:

@@ -23,19 +23,24 @@ logger = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
-def _workspace_root() -> Path:
-    """Resolve workspace settings without writing inside an installed package."""
+def resolve_workspace_root() -> Path:
+    """Resolve the shared runtime workspace, failing closed outside a checkout."""
 
     workspace = Path(os.getenv("OPENCLAW_WORKSPACE", "workspace")).expanduser()
-    if not workspace.is_absolute():
-        orchestration_root = os.getenv("OPENCLAW_ORCHESTRATION_ROOT")
-        base = (
-            Path(orchestration_root).expanduser()
-            if orchestration_root
-            else PROJECT_ROOT
+    if workspace.is_absolute():
+        return workspace.resolve()
+
+    orchestration_root = os.getenv("OPENCLAW_ORCHESTRATION_ROOT")
+    if orchestration_root:
+        base = Path(orchestration_root).expanduser()
+    elif (PROJECT_ROOT / "openclaw_config.yaml").is_file():
+        base = PROJECT_ROOT
+    else:
+        raise ValueError(
+            "OPENCLAW_ORCHESTRATION_ROOT must be set when OPENCLAW_WORKSPACE "
+            "is relative and the orchestration checkout cannot be identified"
         )
-        workspace = base / workspace
-    return workspace.resolve()
+    return (base / workspace).resolve()
 
 
 class LockManager:
@@ -51,8 +56,12 @@ class LockManager:
             config: Configuration with locks_dir, my_id, default_timeout
         """
         self.config = config or {}
-        workspace = _workspace_root()
-        self.locks_dir = Path(self.config.get("locks_dir", str(workspace / "locks")))
+        configured_locks_dir = self.config.get("locks_dir")
+        self.locks_dir = (
+            Path(configured_locks_dir)
+            if configured_locks_dir is not None
+            else resolve_workspace_root() / "locks"
+        )
         self.locks_dir.mkdir(parents=True, exist_ok=True)
 
         self.my_id = self.config.get("my_id", "orchestration_claude")
@@ -434,8 +443,12 @@ class StatusManager:
             config: Configuration with status_dir, my_id
         """
         self.config = config or {}
-        workspace = _workspace_root()
-        self.status_dir = Path(self.config.get("status_dir", str(workspace / "status")))
+        configured_status_dir = self.config.get("status_dir")
+        self.status_dir = (
+            Path(configured_status_dir)
+            if configured_status_dir is not None
+            else resolve_workspace_root() / "status"
+        )
         self.status_dir.mkdir(parents=True, exist_ok=True)
 
         self.my_id = self.config.get("my_id", "orchestration_claude")
