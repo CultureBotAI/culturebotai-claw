@@ -81,7 +81,6 @@ TIMESTAMP = datetime.now(timezone.utc).isoformat()
 sys.path.insert(0, str(Path(__file__).parent))
 from apply_mim_chebi_fixes import _slug as slugify  # noqa: E402
 
-
 # ---------- candidate model ----------
 
 @dataclasses.dataclass
@@ -434,12 +433,11 @@ def src_kgm_unmapped() -> Iterable[Candidate]:
             label = (r.get("label_token") or "").strip()
             if not label:
                 continue
-            # Title-case (e.g. "aburamycin a" → "Aburamycin A")
-            parts = label.split()
-            name = " ".join(p[0].upper() + p[1:] if len(p) > 1 else p.upper()
-                            for p in parts)
             yield Candidate(
-                name=name, cas="",
+                # Source labels are chemical data, not display prose. Preserve
+                # stereodescriptors and locants verbatim (#62): title-casing
+                # turns myo-/cis- into ordinary words and can alter D-/L-.
+                name=label, cas="",
                 source_id=r.get("placeholder_id", ""),
                 raw=r,
             )
@@ -492,12 +490,11 @@ def src_microbedecoder() -> Iterable[Candidate]:
             # Bare numerics and measurement fragments ("1", "3.5", "0.5%").
             if label.replace(".", "", 1).replace("%", "").strip().isdigit():
                 continue
-            parts = label.split()
-            name = " ".join(
-                p[0].upper() + p[1:] if len(p) > 1 else p.upper() for p in parts
-            )
             yield Candidate(
-                name=name, cas="",
+                # Preserve the upstream chemical label verbatim. Per-token
+                # title-casing corrupts myo-, cis-, alpha-/beta-, D-/L-, and
+                # lower-case nouns such as "acid" (#62).
+                name=label, cas="",
                 source_id=r.get("placeholder_curie", ""),
                 raw=r,
             )
@@ -784,12 +781,12 @@ def main() -> None:
                     help="Stop after N candidates (for testing).")
     args = ap.parse_args()
 
-    print(f"[1/5] Indexing existing MIM")
+    print("[1/5] Indexing existing MIM")
     labels, by_cas, by_chebi, slugs = build_mim_index()
     print(f"      {len(labels)} labels, {len(by_cas)} CAS, {len(by_chebi)} primary IDs, "
           f"{len(slugs)} slugs")
 
-    print(f"[2/5] Loading caches")
+    print("[2/5] Loading caches")
     ols_cache = _load_json_cache(OLS_CAS_CACHE)
     pubchem_cache = _load_json_cache(PUBCHEM_CACHE)
     oak_index = _load_json_cache(OAK_CAS_INDEX)
@@ -901,7 +898,7 @@ def main() -> None:
     print(f"\n[4/5] Outcome ({'APPLY' if args.apply else 'DRY-RUN'}):")
     for k, v in counts.items():
         print(f"  {k}: {v}")
-    print(f"\n  Resolver methods:")
+    print("\n  Resolver methods:")
     for k, v in sorted(method_counts.items(), key=lambda x: -x[1]):
         print(f"    {k}: {v}")
 
