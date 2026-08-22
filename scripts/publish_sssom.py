@@ -14,7 +14,8 @@ Safety:
 - Diffs the working copy against the published file as row *sets* keyed on
   `(subject_id, object_id)`, and refuses to promote if more than 5 rows would
   be genuinely removed (guards against truncation), or if any row would flip
-  from `skos:exactMatch` to a weaker predicate (guards against a rebuild
+  from `skos:exactMatch` to a weaker predicate -- whether as a same-subject
+  flip or riding along with a subject re-spelling (guards against a rebuild
   quietly downgrading identity claims -- MediaIngredientMech#409).
 - Appends an audit entry (pointer + counts, not the full diff -- see below)
   to workspace/status/sssom_promotions.jsonl.
@@ -46,6 +47,7 @@ import importlib.util
 import json
 import os
 import re
+import secrets
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -425,9 +427,18 @@ def _write_diff_report(diff: SssomDiff, path: Path = DIFF_REPORT) -> Path:
     data").
     """
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(_diff_payload(diff), indent=2) + "\n")
-    os.replace(tmp, path)
+    # Randomized suffix + try/finally cleanup, matching
+    # kg_microbe_history/scaffold.py::write_record()'s existing convention --
+    # a fixed ".tmp" name collides when two invocations overlap (this runs
+    # unconditionally on every --dry-run too, which never takes the
+    # mediaingredientmech lock, so two concurrent dry-runs racing on the
+    # shared DIFF_REPORT path is a real scenario, not a hypothetical one).
+    tmp = path.with_name(path.name + f".tmp-{secrets.token_hex(4)}")
+    try:
+        tmp.write_text(json.dumps(_diff_payload(diff), indent=2) + "\n")
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
     return path
 
 

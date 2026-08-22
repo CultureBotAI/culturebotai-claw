@@ -485,3 +485,23 @@ def test_main_refuses_to_promote_a_respelled_widening_flip(tmp_path, monkeypatch
         publish_sssom.main()
 
     assert excinfo.value.code == 2
+
+
+def test_main_proceeds_past_the_widening_gate_when_explicitly_overridden(tmp_path, monkeypatch):
+    """The gate's only purpose is to be overridable with justification -- a
+    boundary regression (e.g. `>=` instead of `>`, or the flag silently not
+    being read) would otherwise go undetected by the refusal-path tests
+    alone, since those never exercise a nonzero --allow-widening-flips."""
+    working_copy = tmp_path / "working.sssom.tsv"
+    published = tmp_path / "published.sssom.tsv"
+    _write_sssom_tsv(published, [("MIM:Glucose", "skos:exactMatch", "CHEBI:17234")])
+    _write_sssom_tsv(working_copy, [("MIM:Glucose", "skos:closeMatch", "CHEBI:17234")])
+
+    monkeypatch.setattr(publish_sssom, "WORKING_COPY", working_copy)
+    monkeypatch.setattr(publish_sssom, "PUBLISHED", published)
+    _patch_diff_report_default(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        sys, "argv", ["publish_sssom.py", "--dry-run", "--allow-widening-flips", "1"]
+    )
+
+    publish_sssom.main()  # must not raise SystemExit -- 1 widening flip, limit 1
