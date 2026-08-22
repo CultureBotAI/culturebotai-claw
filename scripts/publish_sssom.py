@@ -187,6 +187,16 @@ class SssomDiff:
     removed: list[tuple[str, str]] = field(default_factory=list)
     respelled: list[tuple[str, str, str]] = field(default_factory=list)
     flipped: list[tuple[str, str, str, str]] = field(default_factory=list)
+    # Respelling pairs (old_subject, new_subject, object, old_predicate,
+    # new_predicate) whose predicate ALSO weakened from exactMatch. A
+    # respelling changes the (subject, object) key itself, so a predicate
+    # downgrade riding along with it would otherwise vanish from both
+    # `flipped` (which only sees unchanged keys) and `respelled` (which
+    # doesn't carry predicate_id) -- a respelling would silently launder a
+    # widening flip past the gate. Kept as its own list rather than folded
+    # into `flipped` because the tuple shapes differ (respelling has two
+    # subjects, not one).
+    respelled_widening: list[tuple[str, str, str, str, str]] = field(default_factory=list)
     # column -> how many surviving rows changed it. Reported, not gated: most of
     # this is legitimate rebuild output (`source`, `mapping_date`) and gating it
     # would make promotion impossible. But it must be visible -- keying on
@@ -207,7 +217,8 @@ class SssomDiff:
     def widening_flips(self) -> list[tuple[str, str, str, str]]:
         """The subset of `flipped` that leaves an exact-identity predicate.
 
-        This is what `--allow-widening-flips` gates on (MediaIngredientMech#409).
+        Part of what `--allow-widening-flips` gates on -- see `all_widening`,
+        which also covers the same loss riding along with a respelling.
         `flipped` itself stays ungated -- most predicate churn is legitimate
         (a provisional mapping tightened to exactMatch), and gating on the raw
         count would block that.
@@ -216,6 +227,17 @@ class SssomDiff:
             f for f in self.flipped
             if f[2] in _EXACT_PREDICATES and f[3] not in _EXACT_PREDICATES
         ]
+
+    @property
+    def all_widening(self) -> list[tuple]:
+        """Every row that lost skos:exactMatch, respelled or not.
+
+        This -- not `widening_flips` alone -- is what `--allow-widening-flips`
+        gates on. `widening_flips` and `respelled_widening` have different
+        tuple shapes (4 fields vs 5: a respelling carries two subjects), so
+        they stay separate lists; this just unions them for gating/reporting.
+        """
+        return [*self.widening_flips, *self.respelled_widening]
 
 
 def diff_rows(prev: list[dict[str, str]], new: list[dict[str, str]]) -> SssomDiff:
@@ -275,6 +297,13 @@ def diff_rows(prev: list[dict[str, str]], new: list[dict[str, str]]) -> SssomDif
         if candidates:
             new_subject, _ = candidates.pop()
             diff.respelled.append((subject, new_subject, obj))
+            # A respelling changes the (subject, object) key, so this pair
+            # never appears in `shared` above -- a predicate downgrade riding
+            # along with the respelling would otherwise be invisible.
+            old_pred = prev_by_key[(subject, obj)].get("predicate_id", "")
+            new_pred = new_by_key[(new_subject, obj)].get("predicate_id", "")
+            if old_pred in _EXACT_PREDICATES and new_pred not in _EXACT_PREDICATES:
+                diff.respelled_widening.append((subject, new_subject, obj, old_pred, new_pred))
         else:
             diff.removed.append((subject, obj))
 
@@ -294,8 +323,17 @@ def _print_diff(diff: SssomDiff) -> None:
     print(f"  predicate flipped     {len(diff.flipped)}")
     if diff.widening_flips:
         print(
-            f"    of which widening (exactMatch -> weaker): "
-            f"{len(diff.widening_flips)}  <- gated, see --allow-widening-flips"
+            f"    of which widening (exactMatch -> weaker): {len(diff.widening_flips)}"
+        )
+    if diff.respelled_widening:
+        print(
+            f"  subject re-spelled AND widening (exactMatch -> weaker): "
+            f"{len(diff.respelled_widening)}"
+        )
+    if diff.all_widening:
+        print(
+            f"  total widening (gated): {len(diff.all_widening)}  "
+            "<- see --allow-widening-flips"
         )
 
     if diff.column_changes:
@@ -340,6 +378,11 @@ def _print_diff(diff: SssomDiff) -> None:
         diff.flipped,
         lambda r: f"{r[0]} -> {r[1]}: {r[2]} => {r[3]}",
     )
+    show(
+        "subject re-spelled AND predicate widened",
+        diff.respelled_widening,
+        lambda r: f"{r[0]} => {r[1]} -> {r[2]}: {r[3]} => {r[4]}",
+    )
 
     if diff.respelled:
         print(
@@ -363,6 +406,7 @@ def _diff_payload(diff: SssomDiff) -> dict:
         "respelled": [list(r) for r in diff.respelled],
         "flipped": [list(r) for r in diff.flipped],
         "widening_flipped": [list(r) for r in diff.widening_flips],
+        "respelled_widening": [list(r) for r in diff.respelled_widening],
     }
 
 
@@ -454,10 +498,11 @@ def main():
         )
         sys.exit(2)
 
-    if len(diff.widening_flips) > args.allow_widening_flips:
+    if len(diff.all_widening) > args.allow_widening_flips:
         print(
-            f"\nRefusing to promote: {len(diff.widening_flips)} row(s) would flip from "
-            f"skos:exactMatch to a weaker predicate (limit: {args.allow_widening_flips}).",
+            f"\nRefusing to promote: {len(diff.all_widening)} row(s) would flip from "
+            f"skos:exactMatch to a weaker predicate (limit: {args.allow_widening_flips})"
+            f", {len(diff.respelled_widening)} of them riding along with a respelling.",
             file=sys.stderr,
         )
         print(
@@ -504,7 +549,18 @@ def main():
         # A promotion that re-spells subjects is still the only record of which
         # old subjects stopped resolving, and the alias file is written from it --
         # so the full diff is archived, just not inline.
-        diff_archive = CLAW_ROOT / "workspace" / "status" / f"sssom_diff_{published_hash[:12]}.json"
+        #
+        # Named on BOTH the previous and new hash, not just the new one: the
+        # new hash alone collides on a revert-and-redo (MIM_ROOT rolled back
+        # and re-promoted) or any deterministic rebuild reproducing an old
+        # published state, silently overwriting an earlier promotion's
+        # archived diff out from under its own audit-log `diff_file` pointer.
+        # A (prev, new) pair can only repeat if the same transition happens
+        # twice, in which case the diff content is identical anyway.
+        diff_archive = (
+            AUDIT_LOG.parent
+            / f"sssom_diff_{(prev_hash[:12] or 'none')}_{published_hash[:12]}.json"
+        )
         _write_diff_report(diff, diff_archive)
         entry = {
             "timestamp": datetime.now(tz=timezone.utc).isoformat(),
@@ -522,6 +578,8 @@ def main():
                 "respelled": len(diff.respelled),
                 "flipped": len(diff.flipped),
                 "widening_flipped": len(diff.widening_flips),
+                "respelled_widening": len(diff.respelled_widening),
+                "total_widening": len(diff.all_widening),
             },
         }
         with AUDIT_LOG.open("a") as f:

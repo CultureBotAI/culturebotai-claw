@@ -191,6 +191,53 @@ def test_widening_flipped_is_included_in_the_diff_payload(tmp_path):
     ]
 
 
+def test_a_respelled_row_with_a_predicate_downgrade_is_not_silently_absorbed():
+    """A respelling changes the (subject, object) key, so this pair is never
+    in `shared` and never reaches `flipped` -- before the fix, an exactMatch
+    -> closeMatch downgrade riding along with a respelling was completely
+    invisible in every diff artifact, and --allow-widening-flips 0 did not
+    refuse the promotion. Reproduces the case found reviewing this PR."""
+    diff = diff_rows(
+        [row("MIM:Foo", "CHEBI:1", "skos:exactMatch")],
+        [row("MIM:foo", "CHEBI:1", "skos:closeMatch")],
+    )
+
+    assert diff.flipped == [], "the key changed -- this must not show up as a flip"
+    assert diff.respelled == [("MIM:Foo", "MIM:foo", "CHEBI:1")]
+    assert diff.respelled_widening == [
+        ("MIM:Foo", "MIM:foo", "CHEBI:1", "skos:exactMatch", "skos:closeMatch")
+    ]
+    assert diff.all_widening == diff.respelled_widening
+
+
+def test_a_plain_respelling_with_no_predicate_change_has_no_widening():
+    diff = diff_rows(
+        [row("MIM:EDTA_Stock", "CHEBI:4735", "skos:exactMatch")],
+        [row("MIM:Edta_Stock", "CHEBI:4735", "skos:exactMatch")],
+    )
+
+    assert diff.respelled == [("MIM:EDTA_Stock", "MIM:Edta_Stock", "CHEBI:4735")]
+    assert diff.respelled_widening == []
+    assert diff.all_widening == []
+
+
+def test_all_widening_unions_flips_and_respelled_widening():
+    diff = diff_rows(
+        [
+            row("MIM:Glucose", "CHEBI:17234", "skos:exactMatch"),  # flips in place
+            row("MIM:Foo", "CHEBI:1", "skos:exactMatch"),          # respells + widens
+        ],
+        [
+            row("MIM:Glucose", "CHEBI:17234", "skos:closeMatch"),
+            row("MIM:foo", "CHEBI:1", "skos:closeMatch"),
+        ],
+    )
+
+    assert len(diff.widening_flips) == 1
+    assert len(diff.respelled_widening) == 1
+    assert len(diff.all_widening) == 2
+
+
 def test_churn_is_separated_rather_than_netted_out():
     """The shape the count guard could not see: rows out AND rows in."""
     prev = [
@@ -331,3 +378,81 @@ def test_read_rows_skips_the_yaml_preamble(tmp_path):
 
 def test_read_rows_on_a_missing_file_is_empty_not_an_error(tmp_path):
     assert publish_sssom._read_rows(tmp_path / "absent.tsv") == []
+
+
+def _write_sssom_tsv(path, rows):
+    """Minimal SSSOM TSV (header + rows) for main()-level tests.
+
+    rows: iterable of (subject_id, predicate_id, object_id).
+    """
+    lines = ["subject_id\tpredicate_id\tobject_id\n"]
+    lines += [f"{s}\t{p}\t{o}\n" for s, p, o in rows]
+    path.write_text("".join(lines))
+
+
+def _patch_diff_report_default(monkeypatch, tmp_path):
+    """_write_diff_report's `path` default is bound to the real DIFF_REPORT
+    at module-def time, so monkeypatching the DIFF_REPORT *name* alone does
+    not redirect it -- without patching the default itself, a main()-level
+    test would write into this repo's real workspace/ directory."""
+    monkeypatch.setattr(
+        publish_sssom._write_diff_report, "__defaults__",
+        (tmp_path / "diff_report.json",),
+    )
+
+
+def test_main_refuses_to_promote_a_widening_flip_by_default(tmp_path, monkeypatch):
+    """#112 end-to-end: the CLI gate must actually fire, not just the
+    diff-level classification tested above."""
+    working_copy = tmp_path / "working.sssom.tsv"
+    published = tmp_path / "published.sssom.tsv"
+    _write_sssom_tsv(published, [("MIM:Glucose", "skos:exactMatch", "CHEBI:17234")])
+    _write_sssom_tsv(working_copy, [("MIM:Glucose", "skos:closeMatch", "CHEBI:17234")])
+
+    monkeypatch.setattr(publish_sssom, "WORKING_COPY", working_copy)
+    monkeypatch.setattr(publish_sssom, "PUBLISHED", published)
+    _patch_diff_report_default(monkeypatch, tmp_path)
+    monkeypatch.setattr(sys, "argv", ["publish_sssom.py", "--dry-run"])
+
+    with pytest.raises(SystemExit) as excinfo:
+        publish_sssom.main()
+
+    assert excinfo.value.code == 2
+
+
+def test_main_apply_writes_a_pointer_and_counts_not_the_full_diff(tmp_path, monkeypatch):
+    """#113 end-to-end: the JSONL audit line must not embed the full diff,
+    and the sibling archive file it points to must actually exist and hold
+    the full diff."""
+    working_copy = tmp_path / "working.sssom.tsv"
+    published = tmp_path / "published.sssom.tsv"
+    _write_sssom_tsv(published, [("MIM:Old", "skos:exactMatch", "CHEBI:1")])
+    _write_sssom_tsv(working_copy, [
+        ("MIM:Old", "skos:exactMatch", "CHEBI:1"),
+        ("MIM:New", "skos:exactMatch", "CHEBI:2"),
+    ])
+    audit_log = tmp_path / "status" / "sssom_promotions.jsonl"
+
+    monkeypatch.setattr(publish_sssom, "WORKING_COPY", working_copy)
+    monkeypatch.setattr(publish_sssom, "PUBLISHED", published)
+    monkeypatch.setattr(publish_sssom, "AUDIT_LOG", audit_log)
+    monkeypatch.setattr(publish_sssom, "LOCKS_DIR", tmp_path / "locks")
+    monkeypatch.setattr(publish_sssom, "_validate", lambda path: [])
+    _patch_diff_report_default(monkeypatch, tmp_path)
+    monkeypatch.setattr(sys, "argv", ["publish_sssom.py", "--apply"])
+
+    publish_sssom.main()
+
+    lines = audit_log.read_text().splitlines()
+    assert len(lines) == 1
+    entry = json.loads(lines[0])
+    assert "diff" not in entry, "the full diff must not be embedded inline (#113)"
+    assert entry["diff_counts"] == {
+        "added": 1, "removed": 0, "respelled": 0, "flipped": 0,
+        "widening_flipped": 0, "respelled_widening": 0, "total_widening": 0,
+    }
+    diff_file = Path(entry["diff_file"])
+    assert diff_file.exists(), "diff_file must point at a file that actually exists"
+    archived = json.loads(diff_file.read_text())
+    assert archived["added"] == [["MIM:New", "CHEBI:2"]]
+    assert published.read_bytes() == working_copy.read_bytes()
