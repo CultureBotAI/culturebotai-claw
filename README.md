@@ -117,9 +117,15 @@ These are the pull-request gates:
 uvx ruff@0.16.3 check cli plugins pipelines src tests
 uv run --extra dev mypy \
   cli/main.py plugins/repository_settings.py plugins/lock_manager.py \
+  plugins/git_integration.py plugins/just_runner.py \
   src/kg_microbe_history src/kg_microbe_kgscan
 uv run --extra dev python -m pytest -q \
-  --cov=src --cov-report=term-missing --cov-fail-under=70
+  --cov=src --cov=cli.main --cov=plugins.repository_settings \
+  --cov=plugins.lock_manager --cov=plugins/git_integration \
+  --cov=plugins.just_runner --cov-report=term-missing --cov-fail-under=70
+uv run --extra dev coverage report \
+  --include=cli/main.py,plugins/repository_settings.py,plugins/lock_manager.py,plugins/git_integration.py,plugins/just_runner.py \
+  --fail-under=60
 ```
 
 Pytest intentionally collects only `tests/`. Root- and `scripts/`-level

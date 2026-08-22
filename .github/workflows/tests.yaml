@@ -49,6 +49,8 @@ jobs:
           cli/main.py
           plugins/repository_settings.py
           plugins/lock_manager.py
+          plugins/git_integration.py
+          plugins/just_runner.py
           src/kg_microbe_history
           src/kg_microbe_kgscan
 
@@ -61,8 +63,19 @@ jobs:
         run: >-
           uv run --extra dev python -m pytest -q
           --cov=src
+          --cov=cli.main
+          --cov=plugins.repository_settings
+          --cov=plugins.lock_manager
+          --cov=plugins.git_integration
+          --cov=plugins.just_runner
           --cov-report=term-missing
           --cov-fail-under=70
+
+      - name: Enforce safety-module coverage
+        run: >-
+          uv run --extra dev coverage report
+          --include=cli/main.py,plugins/repository_settings.py,plugins/lock_manager.py,plugins/git_integration.py,plugins/just_runner.py
+          --fail-under=60
 
   history-round-trip:
     # The history layer's own guarantee, exercised end to end rather than trusted:

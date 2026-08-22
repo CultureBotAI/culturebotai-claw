@@ -74,7 +74,10 @@ install_hooks_for_repo() {
         fi
 
         # Copy and customize hook
-        local escaped_root=${ORCHESTRATION_ROOT//&/\\&}
+        local shell_root
+        printf -v shell_root '%q' "$ORCHESTRATION_ROOT"
+        local escaped_root=${shell_root//\\/\\\\}
+        escaped_root=${escaped_root//&/\\&}
         escaped_root=${escaped_root//|/\\|}
         sed \
             -e "s|{{REPO_NAME}}|$repo_name|g" \

@@ -13,7 +13,9 @@ from pathlib import Path
 import pytest
 import yaml
 
-from plugins.lock_manager import LockManager, StatusManager
+import plugins.lock_manager as lock_manager_module
+from plugins.lock_manager import LockManager, StatusManager, resolve_workspace_root
+from scripts.check_lock import check_lock
 
 
 def _contend_for_lock(
@@ -125,6 +127,51 @@ def test_only_one_process_reclaims_an_expired_lock(tmp_path: Path) -> None:
     )
 
     _run_contenders(locks_dir)
+
+
+@pytest.mark.parametrize(
+    ("wait", "max_wait"),
+    [(False, 300), (True, 0)],
+)
+def test_failed_expired_lock_reclaim_respects_wait_bounds(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    wait: bool,
+    max_wait: int,
+) -> None:
+    locks_dir = tmp_path / "locks"
+    locks_dir.mkdir()
+    expired = datetime.now(timezone.utc) - timedelta(minutes=1)
+    (locks_dir / "culturemech.lock").write_text(
+        yaml.safe_dump(
+            {
+                "locked_by": "dead-process",
+                "lease_token": "expired-lease",
+                "locked_at": (expired - timedelta(minutes=1)).isoformat(),
+                "expires_at": expired.isoformat(),
+                "operation": "abandoned work",
+                "pid": 999999,
+            }
+        ),
+        encoding="utf-8",
+    )
+    manager = LockManager({"locks_dir": locks_dir})
+    reclaim_attempts = 0
+
+    def fail_reclaim(resource: str) -> bool:
+        nonlocal reclaim_attempts
+        reclaim_attempts += 1
+        return False
+
+    monkeypatch.setattr(manager, "_reclaim_expired_lock", fail_reclaim)
+
+    assert not manager.acquire_lock(
+        "culturemech",
+        "bounded reclaim",
+        wait=wait,
+        max_wait=max_wait,
+    )
+    assert reclaim_attempts == 1
 
 
 def test_release_requires_the_exact_local_lease(tmp_path: Path) -> None:
@@ -242,3 +289,52 @@ def test_relative_workspace_uses_configured_orchestration_root(
 
     assert lock_manager.locks_dir == tmp_path / "runtime" / "locks"
     assert status_manager.status_dir == tmp_path / "runtime" / "status"
+
+
+def test_default_workspace_is_independent_of_current_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("OPENCLAW_ORCHESTRATION_ROOT", raising=False)
+    monkeypatch.delenv("OPENCLAW_WORKSPACE", raising=False)
+    monkeypatch.chdir(tmp_path)
+
+    assert resolve_workspace_root() == Path(__file__).parents[1] / "workspace"
+
+
+def test_manager_and_hook_checker_share_workspace_resolution(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    orchestration_root = tmp_path / "orchestration"
+    orchestration_root.mkdir()
+    (orchestration_root / "openclaw_config.yaml").touch()
+    monkeypatch.setattr(lock_manager_module, "PROJECT_ROOT", orchestration_root)
+    monkeypatch.delenv("OPENCLAW_ORCHESTRATION_ROOT", raising=False)
+    monkeypatch.delenv("OPENCLAW_WORKSPACE", raising=False)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+
+    manager = LockManager()
+    assert manager.acquire_lock("culturemech", "shared resolution")
+    assert check_lock("culturemech", "test shared resolution") == 1
+    assert manager.release_lock("culturemech")
+
+
+def test_relative_workspace_fails_closed_outside_checkout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    installed_root = tmp_path / "site-packages"
+    installed_root.mkdir()
+    monkeypatch.setattr(lock_manager_module, "PROJECT_ROOT", installed_root)
+    monkeypatch.delenv("OPENCLAW_ORCHESTRATION_ROOT", raising=False)
+    monkeypatch.delenv("OPENCLAW_WORKSPACE", raising=False)
+
+    with pytest.raises(ValueError, match="OPENCLAW_ORCHESTRATION_ROOT"):
+        resolve_workspace_root()
+
+    assert not (installed_root / "workspace").exists()
+
+    explicit_locks = tmp_path / "explicit-locks"
+    explicit_status = tmp_path / "explicit-status"
+    assert LockManager({"locks_dir": explicit_locks}).locks_dir == explicit_locks
+    assert StatusManager({"status_dir": explicit_status}).status_dir == explicit_status

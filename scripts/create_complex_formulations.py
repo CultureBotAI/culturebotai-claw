@@ -63,7 +63,7 @@ FORMULATIONS = {
         'description': 'Complex media formulations and stock solutions that are multi-component mixtures',
         'note': 'These are not single ingredients but complete formulations. Individual components may be mapped in mapped_ingredients.yaml',
         'source': 'Research compiled from UTEX, CCAP, NCMA, SAG, and peer-reviewed literature',
-        'research_document': 'ALGAL_MEDIA_RESEARCH_SUMMARY.md'
+        'research_document': 'docs/archive/ALGAL_MEDIA_RESEARCH_SUMMARY.md'
     },
 
     'complete_media': [
@@ -680,7 +680,7 @@ def main():
     print(f"✓ Updated {unmapped_file}")
 
     print(f"\n✓ Complex formulations documented in: {formulations_file}")
-    print(f"✓ Research details available in: ALGAL_MEDIA_RESEARCH_SUMMARY.md")
+    print("✓ Research details available in: docs/archive/ALGAL_MEDIA_RESEARCH_SUMMARY.md")
 
 if __name__ == '__main__':
     main()

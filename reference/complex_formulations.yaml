@@ -6,7 +6,7 @@ metadata:
   note: These are not single ingredients but complete formulations. Individual components
     may be mapped in mapped_ingredients.yaml
   source: Research compiled from UTEX, CCAP, NCMA, SAG, and peer-reviewed literature
-  research_document: ALGAL_MEDIA_RESEARCH_SUMMARY.md
+  research_document: docs/archive/ALGAL_MEDIA_RESEARCH_SUMMARY.md
 complete_media:
 - name: BG-11 Medium
   category: complete_medium

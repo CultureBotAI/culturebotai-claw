@@ -4,18 +4,27 @@ The public reusable CLIs live under `src/` and are installed as console
 scripts. Files in this directory are repository-maintenance commands, not a
 stable Python API.
 
-## CI-supported scripts
+## Workflow-supported scripts
 
-These are invoked directly by GitHub workflows and are pull-request gates:
+Workflow support is narrower than a single "CI-supported" category:
 
-- `audit_idlabel_fleet.sh`
-- `validate_evidence_references.py`
-- `inventory_unmapped_ingredients.py`
-- `generate_kg_microbe_review.py`
-- `apply_cron_profile.py`
+- `audit_idlabel_fleet.sh` is executed for relevant pull requests, pushes to
+  `main`, nightly runs, and manual dispatches. It is a pull-request gate.
+- `validate_evidence_references.py` is executed by the scheduled,
+  manually-dispatched, and post-merge cross-repository workflow. Its failure
+  fails that workflow, but it is not a pull-request gate.
+- `inventory_unmapped_ingredients.py` is executed by the same cross-repository
+  workflow, but currently runs as advisory (`|| true`). Its findings do not
+  fail the workflow.
+- `generate_kg_microbe_review.py` is named in that workflow's push path filter
+  but is not executed by the workflow. Use the `just kg-microbe-review` recipe.
+- `apply_cron_profile.py` is not executed by a workflow. It is an operator tool
+  exposed through `just cron-profiles` and `just cron-profile`.
 
-Changes to them require focused tests under `tests/` and must preserve their
-documented command-line interface.
+Changes to these scripts require focused tests under `tests/` and must preserve
+their documented command-line interface. Do not describe a script as a
+pull-request gate unless a `pull_request` workflow executes it without an
+error-swallowing condition.
 
 ## Operator-supported scripts
 
