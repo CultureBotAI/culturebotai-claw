@@ -502,6 +502,14 @@ def test_main_proceeds_past_the_widening_gate_when_explicitly_overridden(tmp_pat
 
     monkeypatch.setattr(publish_sssom, "WORKING_COPY", working_copy)
     monkeypatch.setattr(publish_sssom, "PUBLISHED", published)
+    # Without this, main() reaches the real sssom CLI (this test's minimal
+    # 3-column TSV has no curie_map preamble, so `sssom validate` genuinely
+    # fails) -- _validate()'s hardcoded marker list doesn't happen to match
+    # that failure's wording, so it silently returns no errors and the test
+    # passes for the wrong reason. Mocking it, like every sibling main()-level
+    # test does, keeps this test isolated to the widening-gate override logic
+    # and avoids depending on an external binary's exact error wording.
+    monkeypatch.setattr(publish_sssom, "_validate", lambda path: [])
     _patch_diff_report_default(monkeypatch, tmp_path)
     monkeypatch.setattr(
         sys, "argv", ["publish_sssom.py", "--dry-run", "--allow-widening-flips", "1"]
@@ -555,3 +563,87 @@ def test_main_apply_surfaces_a_partial_failure_after_published_is_already_commit
         "PUBLISHED is committed before the failing write -- it must still reflect the promotion"
     )
     assert not audit_log.exists(), "no audit-log entry should exist for a failed audit write"
+
+
+def test_main_apply_partial_failure_message_reflects_a_surviving_diff_archive(
+    tmp_path, monkeypatch, capsys
+):
+    """diff_archive is written (and renamed into place) BEFORE the AUDIT_LOG
+    append -- if that later append is what fails, the archive genuinely
+    exists on disk with the full diff. The recovery message must say so,
+    not unconditionally claim nothing was written (the bug the sibling test
+    above doesn't cover, since there the archive write itself is what fails)."""
+    working_copy = tmp_path / "working.sssom.tsv"
+    published = tmp_path / "published.sssom.tsv"
+    _write_sssom_tsv(published, [("MIM:Old", "skos:exactMatch", "CHEBI:1")])
+    _write_sssom_tsv(working_copy, [
+        ("MIM:Old", "skos:exactMatch", "CHEBI:1"),
+        ("MIM:New", "skos:exactMatch", "CHEBI:2"),
+    ])
+    # AUDIT_LOG pointed at a directory, not a file: diff_archive (a sibling
+    # under the same parent) writes fine, but AUDIT_LOG.open("a") raises
+    # IsADirectoryError (an OSError subclass) -- a failure strictly after
+    # the archive write succeeds.
+    audit_log_as_dir = tmp_path / "status_is_actually_a_dir"
+    audit_log_as_dir.mkdir()
+
+    monkeypatch.setattr(publish_sssom, "WORKING_COPY", working_copy)
+    monkeypatch.setattr(publish_sssom, "PUBLISHED", published)
+    monkeypatch.setattr(publish_sssom, "AUDIT_LOG", audit_log_as_dir)
+    monkeypatch.setattr(publish_sssom, "LOCKS_DIR", tmp_path / "locks")
+    monkeypatch.setattr(publish_sssom, "CLAW_ROOT", Path(__file__).resolve().parents[1])
+    monkeypatch.setattr(publish_sssom, "_validate", lambda path: [])
+    _patch_diff_report_default(monkeypatch, tmp_path)
+    monkeypatch.setattr(sys, "argv", ["publish_sssom.py", "--apply"])
+
+    with pytest.raises(SystemExit) as excinfo:
+        publish_sssom.main()
+
+    assert excinfo.value.code == 2
+    archives = list(tmp_path.glob("sssom_diff_*.json"))
+    assert len(archives) == 1, "the archive write itself must have succeeded"
+    stderr = capsys.readouterr().err
+    assert str(archives[0]) in stderr, "the message must point at the archive that DOES exist"
+    assert "no diff archive" not in stderr.lower()
+
+
+def test_diff_archive_filename_incorporates_prev_hash_not_just_published_hash(
+    tmp_path, monkeypatch
+):
+    """A separate commit re-keyed diff_archive from sssom_diff_{published_hash}
+    to sssom_diff_{prev_hash}_{published_hash}, specifically because a
+    revert-and-redo could otherwise silently overwrite an earlier promotion's
+    permanent diff record. Pin it directly: two promotions that land on the
+    SAME published content from two DIFFERENT prior states must produce two
+    distinct, surviving archive files -- and the first promotion (PUBLISHED
+    absent) must use the 'none' sentinel for prev_hash."""
+    working_copy = tmp_path / "working.sssom.tsv"
+    published = tmp_path / "published.sssom.tsv"
+    audit_log = tmp_path / "status" / "sssom_promotions.jsonl"
+    _write_sssom_tsv(working_copy, [("MIM:Target", "skos:exactMatch", "CHEBI:99")])
+
+    monkeypatch.setattr(publish_sssom, "WORKING_COPY", working_copy)
+    monkeypatch.setattr(publish_sssom, "PUBLISHED", published)
+    monkeypatch.setattr(publish_sssom, "AUDIT_LOG", audit_log)
+    monkeypatch.setattr(publish_sssom, "LOCKS_DIR", tmp_path / "locks")
+    monkeypatch.setattr(publish_sssom, "CLAW_ROOT", Path(__file__).resolve().parents[1])
+    monkeypatch.setattr(publish_sssom, "_validate", lambda path: [])
+    _patch_diff_report_default(monkeypatch, tmp_path)
+    monkeypatch.setattr(sys, "argv", ["publish_sssom.py", "--apply"])
+
+    assert not published.exists()  # first publish -- exercises the 'none' sentinel
+    publish_sssom.main()
+    first_archives = set(audit_log.parent.glob("sssom_diff_*.json"))
+    assert len(first_archives) == 1
+    assert "sssom_diff_none_" in next(iter(first_archives)).name
+
+    # Simulate a revert to a DIFFERENT prior state, then a "redo" back to the
+    # exact same target content main() just published -- same published_hash
+    # as before, different prev_hash.
+    _write_sssom_tsv(published, [("MIM:Different", "skos:exactMatch", "CHEBI:1")])
+    publish_sssom.main()
+    second_archives = set(audit_log.parent.glob("sssom_diff_*.json")) - first_archives
+
+    assert len(second_archives) == 1, "the second promotion must produce a NEW archive file"
+    for archive in first_archives | second_archives:
+        assert archive.exists(), "neither archive should have been overwritten by the other"

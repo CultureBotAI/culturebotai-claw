@@ -642,12 +642,23 @@ def main():
             # failure, not a clean abort, and CLAUDE.md says not to swallow
             # that into an apparent success. Surface the sha256 so the
             # promotion can still be reconstructed/recorded by hand.
+            #
+            # diff_archive is written (and renamed into place) before the
+            # AUDIT_LOG append -- if THAT later write is what failed, the
+            # archive genuinely exists on disk with the full diff, and
+            # claiming otherwise would send a curator's manual recovery down
+            # the wrong path (assuming nothing to point the hand-written
+            # audit line at, instead of just pointing it at the file that's
+            # already there under the right (prev_hash, published_hash) name).
+            archive_note = (
+                f"diff_file={diff_archive} was written" if diff_archive.exists()
+                else "no diff archive was written either"
+            )
             print(
                 f"\nPromoted → {PUBLISHED} (sha256={published_hash[:12]}) but FAILED to "
-                f"write the audit record ({exc}). No audit-log entry or diff archive "
-                f"exists for this promotion -- record it manually "
-                f"(prev_sha256={prev_hash[:12] or 'absent'}) and investigate before the "
-                "next promotion runs.",
+                f"write the audit-log entry ({exc}). {archive_note} -- record the "
+                f"promotion manually (prev_sha256={prev_hash[:12] or 'absent'}) and "
+                "investigate before the next promotion runs.",
                 file=sys.stderr,
             )
             sys.exit(2)
