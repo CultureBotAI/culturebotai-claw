@@ -135,19 +135,11 @@ while IFS= read -r present; do
   fi
 done < <(git ls-files "$MIRROR_ROOT" 2>/dev/null | sort)
 
-# --- direction 4: spoke-only files agree with claw's spoke mirror ------------
-# Some vendored files exist in the spokes but NOT in the hub, so directions 1-3
-# cannot see them: check_vendored_sync.sh is what a spoke runs to diff itself
-# against the hub. The hub has no copy and must not get one — it would then check
-# itself against itself at a pinned ref, which is the self-referential pin
-# CultureMech retired (TraitMech#176, #182).
-#
-# So for these, claw's mirror is the reference by necessity rather than by
-# promotion; the hub has nothing to mirror. See shared/spoke/README.md — this is
-# narrower than claw becoming canonical and does not revive claw#21.
-#
-# Until this existed, check_vendored_sync.sh was byte-identical across three
-# spokes with nothing enforcing it (CommunityMech#278, TraitMech#209).
+# --- direction 4: fleet-governance files agree with the hub ------------------
+# CultureMech now governs check_vendored_sync.sh itself. Compare claw's passive
+# mirror and every non-hub Mech directly to that canonical copy. This is the
+# post-propagation gate for #90: companion PRs may be briefly staggered, but the
+# fleet audit cannot go green until every copy has landed.
 SPOKE_ROOT="${SPOKE_ROOT:-shared/spoke}"
 SPOKE_MANIFEST="${SPOKE_MANIFEST:-${SPOKE_ROOT}/MANIFEST}"
 
@@ -166,34 +158,18 @@ for f in "${SPOKE_FILES[@]}"; do
   if [ ! -f "$ref_path" ]; then
     echo "DRIFT: spoke mirror is missing ${ref_path}"; fail=1; continue
   fi
-
-  # The hub's ABSENCE is the invariant here, so assert it rather than assume it.
-  # A hub copy would mean someone "fixed" the missing-canonical-copy problem the
-  # dangerous way, reintroducing a self-referential check. Read the actual HTTP
-  # status via -w rather than trusting curl -f's exit code: raw.githubusercontent.com
-  # can respond to a genuinely-missing file in a way that curl maps to exit 56
-  # (CURLE_RECV_ERROR) rather than the textbook 22 (CURLE_HTTP_RETURNED_ERROR) for
-  # a 404 — confirmed live against this exact URL — so branching on the exit code
-  # would either misreport a confirmed-absent file as an unverifiable error, or
-  # (worse, if the assumed code is wrong the other way) silently accept a network
-  # failure as "confirmed absent" without ever checking the invariant.
-  http_code="$(curl -sS --max-time 10 -o /dev/null -w '%{http_code}' "$(raw "$HUB" "$f")" 2>/dev/null || true)"
-  if [ "$http_code" = "200" ]; then
-    echo "DRIFT: hub ${HUB} now has ${f} — spoke-only files must NOT exist in the hub;"
-    echo "       a hub copy makes the hub diff itself against itself (see ${SPOKE_ROOT}/README.md)"
-    fail=1
-  elif [ "$http_code" != "404" ]; then
-    echo "ERROR: could not verify hub ${HUB} lacks ${f} (HTTP ${http_code:-no response}, not a clean 404)"
-    fail=1
-  fi
+  fetch_hub "$f" || { fail=1; continue; }
+  cmp -s "$tmp/hub" "$ref_path" || {
+    echo "DRIFT: ${ref_path} differs from hub"; fail=1;
+  }
   checked=$((checked + 1))
 
   for r in "${REPOS[@]}"; do
     [ "$r" = "$HUB" ] && continue
     if ! curl -fsSL --max-time 10 "$(raw "$r" "$f")" -o "$tmp/r"; then
-      echo "DRIFT: ${r} is missing ${f} (spoke mirror has it)"; fail=1; continue
+      echo "DRIFT: ${r} is missing ${f} (hub has it)"; fail=1; continue
     fi
-    cmp -s "$ref_path" "$tmp/r" || { echo "DRIFT: ${r}:${f} differs from ${ref_path}"; fail=1; }
+    cmp -s "$tmp/hub" "$tmp/r" || { echo "DRIFT: ${r}:${f} differs from hub"; fail=1; }
     checked=$((checked + 1))
   done
 done
@@ -213,7 +189,7 @@ done < <(git ls-files "$SPOKE_ROOT" 2>/dev/null | sort)
 
 echo
 if [ "$fail" -eq 0 ]; then
-  echo "OK: ${checked} comparisons agree — ${#REPOS[@]} Mech repos and claw's mirrors all match ${HUB}@${REF} (hub-vendored) or ${SPOKE_ROOT} (spoke-only)"
+  echo "OK: ${checked} comparisons agree — ${#REPOS[@]} Mech repos and claw's mirrors all match ${HUB}@${REF}"
 else
   echo "Fleet drift detected."
   echo "Fix: sync the lagging copy from ${HUB}@${REF}, then bump that repo's"

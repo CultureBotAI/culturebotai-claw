@@ -1,8 +1,7 @@
-# Spoke-only vendored files
+# Fleet-governance file mirror
 
-Canonical copies of files that are byte-identical across the **spokes**
-(MediaIngredientMech, CommunityMech, TraitMech, proteintraitsmech) but do
-**not** exist in the hub.
+Passive claw mirror of fleet-governance files that are canonical in
+CultureMech and vendored byte-identical across all five Mechs.
 
 ## Why these cannot live in `shared/idlabel/`
 
@@ -10,18 +9,16 @@ Canonical copies of files that are byte-identical across the **spokes**
 audits every copy against `CultureMech@main`. That model requires the hub to
 hold the canonical bytes.
 
-These files break that assumption for a good reason. `check_vendored_sync.sh` is
-what a *spoke* runs to diff itself against the hub. The hub has no copy and must
-not get one: it would then check itself against itself at a pinned ref, which is
-the self-referential pin CultureMech deleted (TraitMech#182, TraitMech#176).
-
-So the hub's absence is an invariant, not a gap — and
-`audit_idlabel_fleet.sh` asserts it rather than assuming it.
+`check_vendored_sync.sh` originally existed only in the spokes. CultureMech now
+governs its own copy explicitly, including the provider behavior contract and
+repository-specific Edison selection, so the old hub-absence invariant is no
+longer true. `audit_idlabel_fleet.sh` compares this mirror and every Mech copy
+directly with CultureMech@main.
 
 ## What is here
 
-See `MANIFEST`. Adding a file means putting the canonical bytes here at the same
-relative path a spoke uses, and listing it.
+See `MANIFEST`. Adding a file means mirroring the canonical bytes here at the
+same relative path and listing it.
 
 `.github/workflows/vendored-sync.yaml` is **not** here yet. Three of the four
 spokes (MediaIngredientMech, CommunityMech, TraitMech) carry it as a standalone
@@ -35,7 +32,6 @@ same way, let alone vendorable.
 
 ## Direction
 
-claw is still a **mirror, not the canonical source** (claw#19, claw#22). For
-`shared/idlabel/` the source is CultureMech. For this directory there is no hub
-copy to mirror, so claw holds the reference by necessity — which is a narrower
-claim than claw being the fleet's canonical home, and does not revive claw#21.
+claw is still a **mirror, not the canonical source**. CultureMech is the source
+for both `shared/idlabel/` and this directory; the fleet audit enforces that
+relationship rather than relying on prose.

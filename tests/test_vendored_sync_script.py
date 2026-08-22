@@ -14,6 +14,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "shared" / "spoke" / "scripts" / "check_vendored_sync.sh"
 SAME_PATHS = (
+    "tests/test_provider_triage_contract.py",
     "scripts/validate_id_label_correspondence.py",
     "scripts/chem_formula.py",
     "tests/test_id_label_empty_adapter.py",
@@ -39,6 +40,9 @@ def _fixture(tmp_path: Path) -> tuple[Path, dict[str, str], Path]:
     for rel in SAME_PATHS:
         _write(root / rel, f"same:{rel}\n")
         _write(remote / rel, f"same:{rel}\n")
+    checker = SCRIPT.read_text()
+    _write(root / "scripts/check_vendored_sync.sh", checker)
+    _write(remote / "scripts/check_vendored_sync.sh", checker)
     for local, hub in MAPPED_PATHS:
         _write(root / local, f"mapped:{hub}\n")
         _write(remote / hub, f"mapped:{hub}\n")
@@ -73,6 +77,7 @@ shutil.copyfile(Path(os.environ["CANON_FIXTURES"]) / relative, output)
         "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
         "CANON_FIXTURES": str(remote),
         "CURL_LOG": str(log),
+        "GITHUB_REPOSITORY": "CultureBotAI/proteintraitsmech",
     }
     return root, env, log
 
@@ -87,9 +92,9 @@ def test_all_fetches_are_bounded_and_never_retry_internally(tmp_path: Path) -> N
         ["bash", str(SCRIPT)], cwd=root, env=env, text=True, capture_output=True
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "OK: all 7 vendored files match" in result.stdout
+    assert "OK: all 9 vendored files match" in result.stdout
     calls = _calls(log)
-    assert len(calls) == 7
+    assert len(calls) == 9
     for args in calls:
         assert args[args.index("--max-time") + 1] == "10"
         assert not any(arg == "--retry" or arg.startswith("--retry-") for arg in args)
@@ -105,5 +110,5 @@ def test_curl_failure_is_reported_for_the_calling_workflow_to_retry(tmp_path: Pa
     assert "ERROR: could not fetch" in result.stdout
     assert "To resolve:" in result.stdout
     calls = _calls(log)
-    assert len(calls) == 7
+    assert len(calls) == 9
     assert all("--max-time" in args for args in calls)
