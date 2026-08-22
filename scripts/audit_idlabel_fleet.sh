@@ -28,10 +28,10 @@ REF="${REF:-main}"
 REPOS=(CultureMech MediaIngredientMech CommunityMech TraitMech proteintraitsmech)
 # Worst-case curl budget: (len(FILES)+len(MAPPED)) x (1 + non-hub repos) for
 # direction 1, + len(FILES) for direction 2, + (1 + non-hub repos) for
-# direction 4 (SPOKE_FILES has one entry). At 5 FILES, 2 MAPPED, 4 non-hub
-# repos, 1 SPOKE_FILES entry, --max-time 10 each: (5+2)x5 + 5 + 5 = 45 calls,
-# ~450s worst case against .github/workflows/id-label-canon.yaml's
-# timeout-minutes: 10 (600s). Re-check this math before growing REPOS,
+# direction 4. At 5 FILES, 2 MAPPED, 4 non-hub repos, and 4 SPOKE_FILES,
+# --max-time 10 each: (5+2)x5 + 5 + 4x5 = 60 calls, ~600s worst case against
+# .github/workflows/id-label-canon.yaml's timeout-minutes: 15 (900s).
+# Re-check this math before growing REPOS,
 # FILES/MANIFEST, MAPPED, or SPOKE_MANIFEST further.
 
 # claw's mirror lives here, and its MANIFEST is the single list of vendored
@@ -93,6 +93,21 @@ done
 for suf in "${MAPPED[@]}"; do
   hubf="src/$(lc "$HUB")/${suf}"
   fetch_hub "$hubf" || { fail=1; continue; }
+
+  # history.yaml is also packaged by claw's local history CLI. It is an
+  # operational mirror, not another authority, so include it in the same audit.
+  if [ "$suf" = "schema/history.yaml" ]; then
+    claw_history="${CLAW_HISTORY:-shared/history/history.yaml}"
+    if [ ! -f "$claw_history" ]; then
+      echo "DRIFT: claw history mirror is missing ${claw_history}"; fail=1
+    else
+      cmp -s "$tmp/hub" "$claw_history" || {
+        echo "DRIFT: ${claw_history} differs from ${HUB}:${hubf}"; fail=1;
+      }
+      checked=$((checked + 1))
+    fi
+  fi
+
   for r in "${REPOS[@]}"; do
     [ "$r" = "$HUB" ] && continue
     rf="src/$(lc "$r")/${suf}"
@@ -163,6 +178,19 @@ for f in "${SPOKE_FILES[@]}"; do
     echo "DRIFT: ${ref_path} differs from hub"; fail=1;
   }
   checked=$((checked + 1))
+
+  # claw consumes two governance artifacts itself. Keep those operational
+  # copies byte-identical too; the timestamp test is Mech/schema-specific.
+  case "$f" in
+    tests/test_skill_frontmatter.py|prompts/backlog-loop-goal.md)
+      if [ ! -f "$f" ]; then
+        echo "DRIFT: claw operational copy is missing ${f}"; fail=1
+      else
+        cmp -s "$tmp/hub" "$f" || { echo "DRIFT: claw:${f} differs from hub"; fail=1; }
+        checked=$((checked + 1))
+      fi
+      ;;
+  esac
 
   for r in "${REPOS[@]}"; do
     [ "$r" = "$HUB" ] && continue

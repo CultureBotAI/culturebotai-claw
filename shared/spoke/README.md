@@ -9,16 +9,22 @@ CultureMech and vendored byte-identical across all five Mechs.
 audits every copy against `CultureMech@main`. That model requires the hub to
 hold the canonical bytes.
 
-`check_vendored_sync.sh` originally existed only in the spokes. CultureMech now
-governs its own copy explicitly, including the provider behavior contract and
-repository-specific Edison selection, so the old hub-absence invariant is no
-longer true. `audit_idlabel_fleet.sh` compares this mirror and every Mech copy
-directly with CultureMech@main.
+The mirrored set covers the vendored-sync checker, Claude skill/command
+frontmatter contract, deterministic curation-timestamp contract, and the
+standard fleet backlog-loop prompt. CultureMech governs each canonical copy;
+`audit_idlabel_fleet.sh` compares this mirror and every Mech copy directly with
+CultureMech@main.
 
 ## What is here
 
 See `MANIFEST`. Adding a file means mirroring the canonical bytes here at the
 same relative path and listing it.
+
+The claw repository is not a Mech and therefore does not carry the timestamp
+schema test operationally. Its own `tests/test_skill_frontmatter.py` and
+`prompts/backlog-loop-goal.md` are byte-identical operational copies. The fleet
+audit compares those two files to this passive mirror as well as comparing all
+five Mech repositories.
 
 `.github/workflows/vendored-sync.yaml` is **not** here yet. Three of the four
 spokes (MediaIngredientMech, CommunityMech, TraitMech) carry it as a standalone

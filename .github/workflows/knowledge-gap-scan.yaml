@@ -1,12 +1,12 @@
 name: Knowledge-gap scan
 
-# Weekly Europe PMC knowledge-gap scan across all four Mechs.
+# Weekly Europe PMC knowledge-gap scan across the four Discussion-bearing Mechs.
 #
-# This runs from claw, not from each Mech, for a hard reason: the scanner library
-# `kg_microbe_kgscan` lives in THIS repo, which is private, while the four Mechs are
-# public. A public Mech's CI cannot check out a private claw without a token, but
-# claw's own CI can freely check out the public Mechs. So the dependency direction
-# decides where the job lives.
+# The scanner library lives in claw, so one fleet workflow keeps scheduling and
+# scanner versions aligned. ProteinTraitsMech is intentionally excluded: its
+# 424k+ ontology-derived records have no Discussion slot, and a 300-record daily
+# window would take roughly four years to cover once. Its source/category-focused
+# research workflows are the supported mechanism instead. See docs/KGSCAN_SCOPE.md.
 #
 # Deliberately NO agent and NO write access. It runs the same deterministic
 # `just knowledge-gap-scan` a curator runs by hand, in dry-run, and publishes the

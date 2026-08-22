@@ -1,3 +1,6 @@
 # Fleet-governance files canonical in CultureMech and mirrored here.
 # Same relative path in every Mech. One per line, '#' comments allowed.
 scripts/check_vendored_sync.sh
+tests/test_skill_frontmatter.py
+tests/test_curation_timestamp_schema.py
+prompts/backlog-loop-goal.md

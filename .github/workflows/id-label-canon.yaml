@@ -2,8 +2,8 @@ name: id-label canonical
 
 # shared/idlabel/ is a CI-verified MIRROR of the id↔label validator set, kept here
 # as a documented reference + isolated test-runner. It is NOT the fetch source:
-# the four Mechs are public and claw is private, so their CI cannot fetch raw
-# content from claw. The machine-canonical fetch-hub is the (public)
+# the Mechs must not depend on claw as their fetch source. The
+# machine-canonical fetch-hub is the public
 # CultureBotAI/CultureMech — each Mech's scripts/check_vendored_sync.sh diffs
 # against CultureMech at its pinned commit.
 #
@@ -56,7 +56,7 @@ jobs:
     # (Mechs only), which between them checked the same invariant twice from
     # two repos.
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - name: Audit vendored id-label files across the fleet

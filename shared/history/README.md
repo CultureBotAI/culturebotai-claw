@@ -1,7 +1,8 @@
 # Shared curation-history layer
 
-Canonical home of the append-only provenance layer ported from
-monarch-initiative/dismech. Records answer the one question nothing else in the
+Packaged operational mirror of the append-only provenance layer ported from
+monarch-initiative/dismech. CultureMech is the machine-canonical schema hub.
+Records answer the one question nothing else in the
 fleet does: **which model, using which tool, changed what, why, and under which
 issue.**
 
@@ -9,7 +10,7 @@ issue.**
 
 | Piece | Path | Consumed how |
 |---|---|---|
-| LinkML schema (canonical) | `shared/history/history.yaml` | packaged with the CLI and vendored byte-identical into each adopting Mech |
+| LinkML schema (packaged mirror) | `shared/history/history.yaml` | packaged with the CLI and fleet-audited against CultureMech |
 | Scaffolder + validator | `src/kg_microbe_history/` | installed as `kg-microbe-history` |
 
 This mirrors `kg_microbe_kgscan`: one implementation here, thin per-repo justfile
@@ -19,29 +20,28 @@ recipes in the Mechs.
 
 The schema is **vendored** into each Mech; the scaffolder is **not**.
 
-claw is private and the Mechs are public, so a Mech's CI cannot check claw out
-without a token. Validation must therefore work from a local schema copy — and it
-does: `linkml-validate --schema <vendored> --target-class HistoryRecord <files>`
-needs nothing else. The installed CLI carries the canonical schema as package
-data, so its default validation path also works outside a claw checkout.
+Each Mech validates a local schema copy so its correctness gate is self-contained
+and pinned rather than dependent on another repository's current branch.
+`linkml-validate --schema <vendored> --target-class HistoryRecord <files>` needs
+nothing else. The installed CLI carries claw's audited mirror as package data,
+so its default validation path also works outside a claw checkout.
 
-Spoke CI may still validate its vendored schema directly without access to this
-private repository.
+Spoke CI validates its vendored schema directly without any claw checkout.
 
 ## Adoption status
 
 | Repo | Vendored schema | Recipes | Advisory CI |
 |---|:--:|:--:|:--:|
 | TraitMech | yes — `src/traitmech/schema/history.yaml` | yes | yes — `curation-history.yaml` |
-| CultureMech | not yet | not yet | not yet |
-| MIM | not yet | not yet | not yet |
-| CommunityMech | not yet | not yet | not yet |
+| CultureMech | yes | yes | yes — `curation-history.yaml` |
+| MIM | yes | yes | yes — `curation-history.yaml` |
+| CommunityMech | yes | yes | yes — `curation-history.yaml` |
+| ProteinTraitsMech | yes | yes | yes — `history-and-vendored.yaml` |
 
-TraitMech is the pilot. When a second repo adopts, add `history.yaml` to the
-vendored-fleet drift check (`audit_vendored_fleet.sh` + each spoke's
-`check_vendored_sync.sh`) so the copies cannot silently diverge — and note the
-`trigger_paths` gap tracked in MIM#160 / CommunityMech#280 / TraitMech#184 applies
-to any new vendored file too.
+CultureMech's copy is canonical. `scripts/check_vendored_sync.sh` includes the
+path-mapped schema in every Mech, while claw's single fleet audit compares all
+five copies and this packaged mirror against CultureMech. A Mech's pinned ref is
+the deliberate propagation boundary.
 
 ## Enforcement model
 
