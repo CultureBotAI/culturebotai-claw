@@ -148,3 +148,33 @@ def test_narrow_match_to_a_different_parent_stays_narrow(tmp_path):
     assert next(r for r in rows
                 if r["object_id"] == "CHEBI:17634")["predicate_id"] == "skos:narrowMatch"
     assert identity_row(rows, "kgmicrobe.ingredient:thing")["predicate_id"] == "skos:exactMatch"
+
+
+def test_identity_row_drops_a_stale_symmetric_comment(tmp_path, monkeypatch):
+    """A `SYMMETRIC:` rationale argues for a difference; an exactMatch row
+    asserting identity must not carry one. 51 rows did after the predicate
+    half of #438 landed."""
+    path = write_record(tmp_path, stem="Thing", identifier="CHEBI:17634",
+                        ontology_id="CHEBI:17634", quality="CLOSE_MATCH")
+    residual = {path.name: {"category": "SYMMETRIC",
+                            "rationale": "MIM is the more specific side"}}
+
+    rows = builder._row_from_yaml(path, residual, {}, {}, {})
+
+    row = identity_row(rows, "CHEBI:17634")
+    assert row["predicate_id"] == "skos:exactMatch"
+    assert "SYMMETRIC" not in (row["comment"] or "")
+
+
+def test_a_non_identity_row_keeps_its_symmetric_comment(tmp_path):
+    """The retirement is scoped to identity rows -- elsewhere the rationale
+    still explains a real predicate choice."""
+    path = write_record(tmp_path, stem="Thing", identifier="cas:1234-56-7",
+                        ontology_id="CHEBI:17634", quality="CLOSE_MATCH")
+    residual = {path.name: {"category": "SYMMETRIC",
+                            "rationale": "MIM is the more specific side"}}
+
+    rows = builder._row_from_yaml(path, residual, {}, {}, {})
+
+    parent = next(r for r in rows if r["object_id"] == "CHEBI:17634")
+    assert "SYMMETRIC" in (parent["comment"] or "")

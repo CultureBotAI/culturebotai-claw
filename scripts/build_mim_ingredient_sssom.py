@@ -572,6 +572,20 @@ def _row_from_yaml(
     # row's confidence is a separate question.
     if (data.get("identifier") or "").strip() == obj_id:
         predicate = "skos:exactMatch"
+        # ...and the residual-P2.5 rationale goes with it. Those comments argue
+        # for a specificity or symmetry *difference* — "MIM is the more
+        # specific side ('D-glucose' vs 'glucose')", "kg-microbe adds salt/
+        # hydrate qualifier ('hexahydrate')" — so leaving one on a row that now
+        # says exactMatch publishes a row contradicting its own comment. 51 did
+        # after the predicate half of MediaIngredientMech#438 landed.
+        #
+        # They were also wrong on their own terms: the triage compared MIM's
+        # term against a kg-microbe *source label* and then attached the verdict
+        # to the MIM→ontology row. `MIM:D-glucose → CHEBI:17634` has object
+        # label 'D-glucose'; the cited contrast is with plain 'glucose'
+        # (CHEBI:17234), a different term. Retiring them loses nothing true.
+        if comment.startswith("SYMMETRIC:"):
+            comment = ""
 
     # Prefer the ontology's canonical rdfs:label for object_label (SSSOM
     # best practice). Fall back to MIM's stored ontology_label if the
