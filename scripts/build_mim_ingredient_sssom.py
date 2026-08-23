@@ -550,6 +550,29 @@ def _row_from_yaml(
             justification = JUST_MANUAL if cat == "CONSIDER_SPECIFIC" else JUST_LEXICAL
             comment = f"{cat}: {dec.get('rationale', '')}"
 
+    # Identity row: when the object IS the record's own `identifier`, this row
+    # asserts "MIM:X is X" and nothing above may weaken it. Last, so it also
+    # overrides the residual-P2.5 category.
+    #
+    # The dual-emission block below already hard-codes exactMatch for the
+    # registry row it synthesises — but that block only fires when the
+    # identifier DIFFERS from the ontology_id. When they are equal there is no
+    # second row: this parent row is the identity row, and it was taking the
+    # quality-derived predicate instead. That published 448 rows saying a
+    # record is merely `closeMatch` to itself, with the same mapping_quality
+    # yielding both predicates (EXACT_MATCH split 1597/38, CAS_RN_LOOKUP 1/39)
+    # while all 142 NARROW_MATCH identity rows were correctly exactMatch.
+    # See MediaIngredientMech#438 and its Rule D.
+    #
+    # mapping_quality grades the *ontology grounding*. Identity with one's own
+    # primary identifier is not graded; it is definitional.
+    #
+    # Predicate only. `confidence` is deliberately left alone: raising it would
+    # move 45 further rows that are not what #438 is about, and the identity
+    # row's confidence is a separate question.
+    if (data.get("identifier") or "").strip() == obj_id:
+        predicate = "skos:exactMatch"
+
     # Prefer the ontology's canonical rdfs:label for object_label (SSSOM
     # best practice). Fall back to MIM's stored ontology_label if the
     # label loader didn't resolve. When we replace, keep MIM's stored
@@ -922,13 +945,35 @@ def main():
             loaded = _load_existing_validation_method(src)
             per_source.append((src, len(loaded)))
             prior_stamps.update(loaded)  # later source overrides earlier
+        # Fall back to (subject, object) when the predicate has changed since
+        # the stamp was written. The stamps record verdicts about the *object*
+        # -- `OAK+OLS:chebi|SYNONYM_ENRICH|...`, `none|UNKNOWN_TERM|...` -- so
+        # a predicate correction does not invalidate them, and this loader
+        # exists precisely so a rebuild does not wipe review state. Correcting
+        # 448 identity rows to exactMatch (MediaIngredientMech#438) would
+        # otherwise have silently dropped 389 stamps as collateral.
+        #
+        # Counted separately and reported: a carry-over across a predicate
+        # change is a weaker claim than an exact-key replay, and a reviewer
+        # who endorsed the old predicate should be able to see how many.
+        by_subject_object: dict[tuple[str, str], str] = {}
+        for (subj, _pred, obj), stamp in prior_stamps.items():
+            by_subject_object.setdefault((subj, obj), stamp)
         replayed = 0
+        carried = 0
         for r in final:
-            key = (r["subject_id"], r["predicate_id"], r["object_id"])
-            stamp = prior_stamps.get(key)
-            if stamp and not (r.get("validation_method") or "").strip():
-                r["validation_method"] = stamp
+            if (r.get("validation_method") or "").strip():
+                continue
+            stamp = prior_stamps.get(
+                (r["subject_id"], r["predicate_id"], r["object_id"]))
+            if stamp:
                 replayed += 1
+            else:
+                stamp = by_subject_object.get((r["subject_id"], r["object_id"]))
+                if stamp:
+                    carried += 1
+            if stamp:
+                r["validation_method"] = stamp
         if prior_stamps:
             srcs = ", ".join(f"{p.name}={n}" for p, n in per_source if n)
             print(
@@ -936,6 +981,12 @@ def main():
                 f"(prior sources: {srcs}; {len(prior_stamps)} unique)",
                 file=sys.stderr,
             )
+            if carried:
+                print(
+                    f"  ...plus {carried} carried across a predicate change "
+                    f"(matched on subject+object, not subject+predicate+object)",
+                    file=sys.stderr,
+                )
 
     version = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
     _write_sssom(final, args.output, version=version)
