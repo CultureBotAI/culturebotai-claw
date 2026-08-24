@@ -3,6 +3,27 @@
 This file is the repository-specific operating guide for coding agents. The
 code and tests are authoritative if an older guide or archived report differs.
 
+## Fact-based answers only
+
+Never state a comparison, count, status, or historical claim without having
+verified it in the current conversation via a tool call (`gh`, `git`, `grep`,
+`Read`, etc.). "I recall," "this is typically the case," or a prior summary
+are not verification — code, issue/PR state, and downstream Mech repos change
+between turns and across concurrent sessions.
+
+- Prefer a live check over memory: `gh api`/`gh pr view`/`gh issue view` over
+  a remembered issue list; `git log`/`git blame` over a recalled commit; a
+  fresh `Read` over trusting an earlier read of the same file.
+- A downstream Mech's local checkout can lag its `origin/main` significantly
+  (observed directly in this repo's own sessions) — verify against `gh api`
+  or a fresh `git fetch`, not the working tree on disk, before asserting what
+  a Mech currently contains.
+- If a claim can't be verified this session, say so ("I did not check X" /
+  "I don't know") instead of presenting a plausible guess as fact.
+- Re-verify rather than repeat: restating an earlier claim in this same
+  conversation without re-checking it is exactly the failure mode this rule
+  exists to prevent.
+
 ## Purpose and boundaries
 
 CultureBotAI CLAW coordinates work across three downstream repositories:
