@@ -26,12 +26,28 @@ between turns and across concurrent sessions.
 
 ## Purpose and boundaries
 
-CultureBotAI CLAW coordinates work across three downstream repositories:
+CultureBotAI CLAW coordinates work across five downstream Mech repositories.
+`src/kg_microbe_fleet/fleet.yaml` is the canonical list; do not re-declare it
+in code. Read it through `kg_microbe_fleet.load_fleet_manifest()`. It lives
+inside the package rather than in `conf/` so installed commands retain the
+manifest when no source checkout is present:
 
 - CultureMech (`CULTUREMECH_ROOT`)
 - MediaIngredientMech, canonically abbreviated MIM
   (`MEDIAINGREDIENTMECH_ROOT`)
 - CommunityMech (`COMMUNITYMECH_ROOT`)
+- TraitMech (`TRAITMECH_ROOT`)
+- ProteinTraitsMech (`PROTEINTRAITSMECH_ROOT`) — note the GitHub slug is
+  lowercase `proteintraitsmech`
+
+You do not need every Mech cloned. `openclaw-cli config validate` reports an
+unset root as "not configured locally" rather than a failure; pass
+`--require-all-repositories` where the whole fleet is expected. An unconfigured
+repository remains unusable — every access path still fails closed.
+
+Each Mech declares its capabilities in the manifest as `enabled`, `disabled`,
+or `not_applicable`; the latter two require a recorded reason. Consult the
+declaration rather than assuming a capability applies fleet-wide.
 
 This repository owns orchestration, cross-repository safety primitives, shared
 Mech utilities, fleet checks, and curation support. Do not edit a downstream
@@ -69,7 +85,7 @@ uvx ruff@0.16.3 check cli plugins pipelines src tests
 uv run --extra dev mypy \
   cli/main.py plugins/repository_settings.py plugins/lock_manager.py \
   plugins/git_integration.py plugins/just_runner.py \
-  src/kg_microbe_history src/kg_microbe_kgscan
+  src/kg_microbe_history src/kg_microbe_kgscan src/kg_microbe_fleet
 uv run --extra dev python -m pytest -q \
   --cov=src --cov=cli.main --cov=plugins.repository_settings \
   --cov=plugins.lock_manager --cov=plugins.git_integration \
@@ -126,7 +142,7 @@ lease as routine error recovery.
 ## Current architecture
 
 ```text
-agents/       YAML agent definitions; declaration is not execution
+src/kg_microbe_agents/definitions/  packaged YAML agent definitions; declaration is not execution
 cli/          discovery, status, plugin checks, and configuration validation
 plugins/      validated repository adapters and coordination primitives
 pipelines/    curation/orchestration workflows with explicit support status

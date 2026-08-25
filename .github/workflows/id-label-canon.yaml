@@ -1,19 +1,21 @@
 name: id-label canonical
 
-# shared/idlabel/ is a CI-verified MIRROR of the id↔label validator set, kept here
-# as a documented reference + isolated test-runner. It is NOT the fetch source:
-# the Mechs must not depend on claw as their fetch source. The
-# machine-canonical fetch-hub is the public
-# CultureBotAI/CultureMech — each Mech's scripts/check_vendored_sync.sh diffs
-# against CultureMech at its pinned commit.
+# This is a supported consumer of claw's canonical fleet manifest. The audit
+# scope must come from that manifest, so all and only Mechs declaring the
+# id_label_validation capability participate. Domain-specific package paths and
+# the temporary vendored-hub role are scientific/rollout inputs; neither is a
+# second definition of fleet membership.
 #
-# To keep this mirror honest (so "canonical copy" is enforced, not decorative)
-# this workflow does two things:
-#   1. `matches-hub` — assert shared/idlabel/* is byte-identical to
-#      CultureMech@main; a silent divergence between the two "canonical" homes
-#      fails here. This is the reconciliation of the two source-of-truth schemes.
-#   2. `test` — run the vendored tests against this copy, so a broken canonical
-#      copy fails here once rather than four times over in the spokes.
+# Phase 0 preserves CultureMech as the compatibility comparison target while
+# claw becomes the shared control plane. Phase 1 of the standardization plan
+# migrates artifact authority and immutable pins to claw in a coordinated fleet
+# rollout. The temporary comparison direction is not a policy that consumers
+# must avoid claw.
+#
+# This workflow:
+#   1. audits the complete manifest-declared consumer set and claw's checked-in
+#      compatibility copy against the current comparison target; and
+#   2. runs the shared validator contract against claw's copy.
 
 on:
   # The path-filtered triggers below all key on THIS repo changing, but the hub
@@ -30,6 +32,9 @@ on:
       - "shared/idlabel/**"
       - "shared/spoke/**"
       - "scripts/audit_idlabel_fleet.sh"
+      - "src/kg_microbe_fleet/**"
+      - "pyproject.toml"
+      - "uv.lock"
       - ".github/workflows/id-label-canon.yaml"
   push:
     branches: [main]
@@ -37,6 +42,9 @@ on:
       - "shared/idlabel/**"
       - "shared/spoke/**"
       - "scripts/audit_idlabel_fleet.sh"
+      - "src/kg_microbe_fleet/**"
+      - "pyproject.toml"
+      - "uv.lock"
       - ".github/workflows/id-label-canon.yaml"
   workflow_dispatch:
 
@@ -44,11 +52,9 @@ permissions:
   contents: read
 
 jobs:
-  # Reconciliation guard: this mirror must equal the machine-canonical fetch-hub
-  # (public CultureBotAI/CultureMech@main). Without this, claw/shared/idlabel and
-  # CultureMech are two "sources of truth" that can silently diverge — the same
-  # blind spot the drift check closes for the spokes, one level up. Fast and
-  # dependency-free (curl + cmp), so it blocks before the heavier test job.
+  # Transitional reconciliation guard. Phase 0 validates the entire
+  # manifest-declared consumer set against the existing CultureMech comparison
+  # target; Phase 1 reverses artifact authority after coordinated pin updates.
   fleet-audit:
     # One enforcer for both directions: every Mech agrees with the hub, AND
     # claw's mirror agrees with the hub. Replaces this workflow's old
@@ -59,6 +65,10 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
       - name: Audit vendored id-label files across the fleet
         run: bash scripts/audit_idlabel_fleet.sh
 

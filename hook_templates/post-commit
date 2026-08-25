@@ -1,4 +1,5 @@
 #!/bin/bash
+# Managed by kg-microbe coordination hook installer.
 #
 # Claude Code Post-Commit Hook
 # Updates status file after successful commit
@@ -6,34 +7,74 @@
 # This hook is called after Claude successfully creates a commit.
 #
 
+set -euo pipefail
+
 # Configuration
 ORCHESTRATION_ROOT={{ORCHESTRATION_ROOT}}  # Replaced during installation
-REPO_NAME="{{REPO_NAME}}"  # Will be replaced during installation
-WORKSPACE="${OPENCLAW_WORKSPACE:-workspace}"
-if [[ "$WORKSPACE" != /* ]]; then
-    WORKSPACE="$ORCHESTRATION_ROOT/$WORKSPACE"
-fi
+REPO_NAME={{REPO_NAME}}  # Replaced during installation
+WORKSPACE={{WORKSPACE_ROOT}}  # Replaced during installation
+PROJECT_ROOT={{PROJECT_ROOT}}  # Replaced during installation
+HOOKS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HOOK_INPUT_FILTER="$HOOKS_DIR/hook-input.py"
 STATUS_DIR="$WORKSPACE/status"
 CLAUDE_ID="${REPO_NAME}_claude"
+export CLAUDE_PROJECT_DIR="$PROJECT_ROOT"
 
+# PostToolUse is registered for Bash so older Claude Code clients can load the
+# settings. Only a successful git commit invocation should update commit state.
+if [ -L "$HOOK_INPUT_FILTER" ] || [ ! -f "$HOOK_INPUT_FILTER" ]; then
+    exit 0
+fi
+if ! command -v python3 >/dev/null 2>&1; then
+    exit 0
+fi
+if ! python3 "$HOOK_INPUT_FILTER" commit PostToolUse; then
+    exit 0
+fi
+
+if [ -L "$WORKSPACE" ] || [ -L "$STATUS_DIR" ]; then
+    echo "Status workspace and directory must not be symlinks" >&2
+    exit 1
+fi
 mkdir -p "$STATUS_DIR"
+STATUS_FILE="$STATUS_DIR/${CLAUDE_ID}_status.yaml"
+TEMPORARY_FILE="$(mktemp "$STATUS_DIR/.${CLAUDE_ID}.XXXXXX")"
+trap 'rm -f "$TEMPORARY_FILE"' EXIT
+TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 # Get commit message (first line)
 COMMIT_MSG=$(git log -1 --pretty=%s 2>/dev/null || echo "unknown")
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "Cannot serialize commit message: python3 is required" >&2
+    exit 1
+fi
+if ! COMMIT_MSG_YAML="$(
+    printf '%s' "$COMMIT_MSG" | python3 -c \
+        'import json, sys; print(json.dumps(sys.stdin.read()))'
+)"; then
+    echo "Cannot serialize commit message with python3" >&2
+    exit 1
+fi
 
-# Update status
-cat > "$STATUS_DIR/${CLAUDE_ID}_status.yaml" <<EOF
-last_updated: '$(date -u +%Y-%m-%dT%H:%M:%SZ)'
+# JSON strings are valid YAML scalars. Serializing through the standard library
+# escapes carriage returns and every other control character Git permits.
+cat > "$TEMPORARY_FILE" <<EOF
+last_updated: '$TIMESTAMP'
 status: idle
 current_operation: null
 last_completed_operation:
   type: commit
-  timestamp: '$(date -u +%Y-%m-%dT%H:%M:%SZ)'
+  timestamp: '$TIMESTAMP'
   result: success
   details:
-    commit_message: '$COMMIT_MSG'
-next_available_at: '$(date -u +%Y-%m-%dT%H:%M:%SZ)'
+    commit_message: $COMMIT_MSG_YAML
+next_available_at: '$TIMESTAMP'
 EOF
+if [ -d "$STATUS_FILE" ]; then
+    echo "Status file destination must not be a directory: $STATUS_FILE" >&2
+    exit 1
+fi
+mv "$TEMPORARY_FILE" "$STATUS_FILE"
+trap - EXIT
 
-# Always succeed
 exit 0

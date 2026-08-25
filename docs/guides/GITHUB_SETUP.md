@@ -7,7 +7,7 @@ culturebotai-claw
 
 ## Description (Short - 350 char limit)
 ```
-CultureBotAI-CLAW: Claude LLM Agent Workflow orchestration system for KG-Microbe repositories. Multi-agent coordination for automated ingredient curation, build management, and schema synchronization across CultureMech, MediaIngredientMech, and CommunityMech.
+CultureBotAI-CLAW: Claude LLM Agent Workflow orchestration for the manifest-defined KG-Microbe Mech fleet. Multi-agent coordination for automated curation, build management, schema synchronization, and cross-repository workflows.
 ```
 
 ## About Section
@@ -36,7 +36,7 @@ Add this badge section at the top of README.md:
 ```markdown
 # CultureBotAI-CLAW
 
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Powered by Claude](https://img.shields.io/badge/Powered%20by-Claude%204.6-5A67D8.svg)](https://www.anthropic.com/claude)
@@ -105,7 +105,7 @@ Thank you for your interest in contributing!
 
 ## Adding New Agents
 
-See `agents/` directory for examples. Each agent needs:
+See `src/kg_microbe_agents/definitions/` for examples. Each agent needs:
 - YAML configuration file
 - Clear task definitions
 - Safety mechanisms (dry-run, backups)

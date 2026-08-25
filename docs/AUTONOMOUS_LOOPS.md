@@ -420,39 +420,28 @@ queue in CommunityMech.
 
 ---
 
-## 4. The existing claw coordination design cannot be the substrate
+## 4. Local coordination is live, but it is not the autonomous-loop substrate
 
-This repo's `CLAUDE.md` documents a file-based multi-Claude protocol:
-`LockManager`, `workspace/locks/`, `workspace/tasks/`, `workspace/status/`,
-`workspace/results/`. **It is not live, and more importantly it cannot be made
-live in its current form.** Evidence:
+This repo's `CLAUDE.md` documents a file-based multi-Claude protocol built from
+`LockManager`, `workspace/locks/`, project hooks, and advisory status records.
+That protocol is now a supported **same-machine** coordination boundary.
+`install_hooks.sh` resolves applicable targets from the fleet manifest and
+safely merges handlers into each target's project-level
+`.claude/settings.json`. Edit and Bash pre-hooks fail closed on active or
+unreadable leases; post-hooks record advisory completion status. Existing
+settings and user hooks are preserved, repeat installation is idempotent, and
+malformed or unsafe project/local settings stop installation. Restrictive
+`disableAllHooks` and `allowManagedHooksOnly` values also fail installation.
+Higher-scope user or managed policy is not visible to the project installer, so
+operators must restart active sessions and confirm activation with `/hooks`.
 
-- `plugins/lock_manager.py` has not been modified since the **initial commit**
-  (`662c4be`, 2026-03-22). Same single-commit history for `scripts/check_lock.py`,
-  `run_pilot_test*.py`, `test_coordination.py`, and
-  `docs/guides/MULTI_CLAUDE_COORDINATION.md`.
-- `workspace/locks/` and `locks/` are **both empty**.
-- The newest file in `workspace/tasks/` is dated **2026-03-22** — the original
-  pilot, over four months stale.
-- Decisively: **`workspace/` is gitignored** (`.gitignore:13`). State that is not
-  committed cannot coordinate across machines, cannot be read by CI, and cannot be
-  seen by another session. A lock nobody else can observe is not a lock.
-
-**The enforcement path is severed**, which is the part that matters most:
-
-- `CultureMech/.claude/hooks/pre-edit:15` and `pre-commit:15` genuinely do call
-  `$ORCHESTRATION_ROOT/scripts/check_lock.py` and would block on a held lock.
-- But **no repo registers them.** `settings.local.json` in CultureMech, MIM,
-  CommunityMech and claw contains only a `permissions` key — no `hooks` key
-  anywhere in the fleet, and there is no non-local `settings.json`.
-- `.git/hooks/` in CultureMech, MIM and CommunityMech contains only `*.sample`.
-- `scripts/install_hooks.sh` copies the hook scripts into `.claude/hooks/` but
-  never writes to `settings.json` or `.git/hooks`; its closing advice is "Test
-  hooks: Run check_lock.py manually". TraitMech was never wired at all — no
-  `.claude/hooks/` directory, and the installer hardcodes only the other three.
-
-So the locking system is not merely unused: the hooks that would enforce it have
-never been connected to anything that runs.
+The boundary is deliberately narrower than an autonomous fleet loop.
+`workspace/` is gitignored local runtime state. A process on another machine or
+in CI cannot observe its leases or status, and an advisory task/status file is
+not a durable queue. Local workers also need isolated branches and worktrees;
+a repository lease is held only for a short shared metadata transition and is
+released before the worker edits or commits. The supported details live in
+`docs/guides/MULTI_CLAUDE_COORDINATION.md`.
 
 **One correction worth recording**, because it changes the migration plan: the
 library is not entirely dead. `scripts/publish_sssom.py` is a **live consumer** —
@@ -466,16 +455,17 @@ retirement needs a migration path for `publish_sssom.py` specifically.
 Unrelated but easy to confuse: `.claude/scheduled_tasks.lock` files exist in MIM
 and claw. Those are Claude Code's own stale session locks, not part of this system.
 
-Meanwhile the coordination problem is real and currently unsolved. During a single
-session on 2026-07-30 I watched ~38 concurrent Claude processes move branches and
-HEADs under me across three Mech repos, push commits, and file issues, with no
-mutual visibility. Two of my own research agents' edits were absorbed by other
-sessions' commits; one repo changed branch three times in twenty minutes.
+The broader coordination problem remains real. During a single session on
+2026-07-30 I watched about 38 concurrent Claude processes move branches and
+HEADs across three Mech repos, push commits, and file issues with no mutual
+visibility. Two research agents' edits were absorbed by other sessions'
+commits; one repo changed branch three times in twenty minutes. Local hooks
+cannot arbitrate processes that do not share their workspace.
 
-**Recommendation: retire the file-based protocol rather than extend it**, and move
-coordination to GitHub objects, where DisMech has it. Update `CLAUDE.md`
-accordingly — right now it documents a system that does not run, which is worse
-than documenting nothing.
+**Recommendation:** retain the file-based protocol for same-machine, bounded
+coordination and use GitHub objects as the authority for autonomous,
+cross-machine, and CI work. GitHub issues, assignees, branches, PRs, checks, and
+workflow concurrency provide the durable state that the autonomous loop needs.
 
 ---
 

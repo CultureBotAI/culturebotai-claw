@@ -10,12 +10,23 @@ model:
   temperature: 0.1
   max_tokens: 4096
 
+repository_scope:
+  source: fleet_manifest
+  capability: build_coordination
+
+# The CLI currently supports validated dry-runs only. Fleet-wide execution is
+# intentionally disabled until each Mech supplies a validated native-command
+# profile; missing profiles must never fall back to guessed `just` recipes.
+execution:
+  status: disabled
+  reason: "Per-Mech build command profiles are not yet part of the fleet contract"
+
 workspace:
   base_dir: ${OPENCLAW_WORKSPACE}
   allowed_paths:
-    - ${CULTUREMECH_ROOT}
-    - ${MEDIAINGREDIENTMECH_ROOT}
-    - ${COMMUNITYMECH_ROOT}
+    source: repository_scope
+    patterns:
+      - "**"
   create_backups: false  # Build artifacts don't need backup
   backup_dir: ${OPENCLAW_WORKSPACE}/.backups/builds
 
@@ -54,24 +65,20 @@ monitoring:
 tasks:
   # Task 1: Validate all repositories before build
   validate_all_repos:
-    description: "Run validation across all three repositories"
+    description: "Run validation across every repository in scope"
     parameters:
       - name: quick
         type: bool
         default: false
         description: "Quick validation (schema only) vs full validation"
     workflow:
-      - step: validate_culturemech
-        action: "Run 'just validate-all' in CultureMech"
-      - step: validate_mediaingredient
-        action: "Run 'just validate-all' in MediaIngredientMech"
-      - step: validate_communitymech
-        action: "Run 'just validate-all' in CommunityMech"
+      - step: validate_repositories
+        action: "Validate that every repository has an approved native-command profile"
+        repositories:
+          source: repository_scope
       - step: aggregate_results
         output:
-          - culturemech_status
-          - mediaingredient_status
-          - communitymech_status
+          - repository_statuses
           - overall_status
 
   # Task 2: Build all repositories in correct order
@@ -87,21 +94,10 @@ tasks:
     workflow:
       - step: check_git_status
         action: "Ensure working directories are clean"
-      - step: build_mediaingredient
-        action: "Build MediaIngredientMech (no dependencies)"
-        commands:
-          - "just gen-python"
-          - "just validate-all"
-      - step: build_culturemech
-        action: "Build CultureMech (depends on MediaIngredientMech)"
-        commands:
-          - "just enrich-with-hierarchy"
-          - "just validate-all"
-      - step: build_communitymech
-        action: "Build CommunityMech (depends on both)"
-        commands:
-          - "just link-media"
-          - "just validate-all"
+      - step: build_repositories
+        action: "Refuse execution until validated native build profiles are available"
+        repositories:
+          source: repository_scope
       - step: run_tests
         action: "Run test suites if not skipped"
         condition: "not skip_tests"
@@ -115,31 +111,10 @@ tasks:
   fresh_build:
     description: "Bootstrap build sequence for cold start"
     workflow:
-      - step: phase1_culturemech_initial
-        action: "CultureMech initial build (no MediaIngredientMech)"
-        commands:
-          - "just fetch-raw-data"
-          - "just import-all"
-          - "just extract-ingredients"
-          - "just aggregate-mapped-ingredients"
-      - step: phase2_mediaingredient_initial
-        action: "MediaIngredientMech import"
-        commands:
-          - "just import-data"
-          - "just validate-all"
-      - step: phase3_culturemech_enrichment
-        action: "CultureMech enrichment (with MediaIngredientMech)"
-        commands:
-          - "just enrich-with-hierarchy"
-          - "just assign-ingredient-roles"
-          - "just merge-recipes"
-          - "just validate-all"
-      - step: phase4_communitymech
-        action: "CommunityMech final build"
-        commands:
-          - "just validate-all"
-          - "just link-media"
-          - "just gen-all"
+      - step: bootstrap_repositories
+        action: "Refuse execution until validated cold-start profiles are available"
+        repositories:
+          source: repository_scope
 
   # Task 4: Generate build artifacts
   generate_artifacts:
@@ -149,20 +124,10 @@ tasks:
         type: list
         default: ["browser", "kgx", "umap"]
     workflow:
-      - step: culturemech_exports
-        action: "Generate CultureMech artifacts"
-        commands:
-          - "just kgx-export"
-          - "just gen-browser-data"
-      - step: mediaingredient_exports
-        action: "Generate MediaIngredientMech artifacts"
-        commands:
-          - "just export-individual"
-          - "just export-browser"
-      - step: communitymech_exports
-        action: "Generate CommunityMech artifacts"
-        commands:
-          - "just gen-all"
+      - step: generate_repository_artifacts
+        action: "Refuse execution until validated artifact profiles are available"
+        repositories:
+          source: repository_scope
 
   # Task 5: Check build status across repos
   check_build_status:
@@ -197,20 +162,15 @@ tasks:
         action: "Run only necessary build steps"
 
 integration:
-  justfile_paths:
-    culturemech: ${CULTUREMECH_ROOT}/project.justfile
-    mediaingredientmech: ${MEDIAINGREDIENTMECH_ROOT}/justfile
-    communitymech: ${COMMUNITYMECH_ROOT}/justfile
-
-  build_order:
-    phase1: ["mediaingredientmech"]
-    phase2: ["culturemech"]
-    phase3: ["communitymech"]
-
-  critical_commands:
-    - "validate-all"
-    - "gen-python"
-    - "enrich-with-hierarchy"
+  native_command_profiles:
+    status: deferred
+    missing_profile_policy: fail_closed
+    required_fields:
+      - validation_commands
+      - build_commands
+      - fresh_build_commands
+      - artifact_commands
+      - dependency_order
 
 reporting:
   format: yaml

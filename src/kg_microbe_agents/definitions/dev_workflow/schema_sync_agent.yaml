@@ -10,12 +10,16 @@ model:
   temperature: 0.1
   max_tokens: 4096
 
+repository_scope:
+  source: fleet_manifest
+  capability: schema_sync
+
 workspace:
   base_dir: ${OPENCLAW_WORKSPACE}
   allowed_paths:
-    - ${CULTUREMECH_ROOT}
-    - ${MEDIAINGREDIENTMECH_ROOT}
-    - ${COMMUNITYMECH_ROOT}
+    source: repository_scope
+    patterns:
+      - "**"
   create_backups: true
   backup_dir: ${OPENCLAW_WORKSPACE}/.backups/schemas
 
@@ -59,7 +63,7 @@ tasks:
     parameters:
       - name: repo
         type: string
-        choices: ["culturemech", "mediaingredientmech", "communitymech"]
+        choices_from: repository_scope
         required: true
       - name: since_commit
         type: string
@@ -124,10 +128,7 @@ tasks:
     workflow:
       - step: detect_dependencies
         action: "Identify downstream repos"
-        dependencies:
-          culturemech: ["communitymech"]
-          mediaingredientmech: ["culturemech", "communitymech"]
-          communitymech: []
+        dependencies_from: integration.domain_specific_dependency_graph
       - step: notify_downstream
         action: "Create GitHub issues or notifications"
       - step: auto_update_if_safe
@@ -216,7 +217,8 @@ tasks:
     parameters:
       - name: repos
         type: list
-        default: ["culturemech", "mediaingredientmech", "communitymech"]
+        default:
+          source: repository_scope
       - name: auto_regenerate
         type: bool
         default: false
@@ -248,16 +250,16 @@ tasks:
 
 integration:
   schema_paths:
-    culturemech: "src/culturemech/schema/culturemech.yaml"
-    mediaingredientmech: "src/mediaingredientmech/schema/mediaingredientmech.yaml"
-    communitymech: "src/communitymech/schema/communitymech.yaml"
+    source: repository_scope
+    field: schema_paths
 
-  datamodel_paths:
-    culturemech: "src/culturemech/datamodel.py"
-    mediaingredientmech: "src/mediaingredientmech/datamodel.py"
-    communitymech: "src/communitymech/datamodel.py"
+  datamodel_generation:
+    status: adapter_required
+    reason: "The Mechs do not share one verified generated-datamodel path"
 
-  dependency_graph:
+  # This graph describes a scientific schema relationship, not fleet
+  # membership. Repositories absent from it still remain in repository_scope.
+  domain_specific_dependency_graph:
     # Arrows show schema dependency direction
     mediaingredientmech: []
     culturemech: ["mediaingredientmech"]

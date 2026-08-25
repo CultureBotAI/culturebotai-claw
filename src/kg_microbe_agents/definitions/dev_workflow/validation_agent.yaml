@@ -10,15 +10,17 @@ model:
   temperature: 0.1
   max_tokens: 4096
 
+repository_scope:
+  source: fleet_manifest
+  capability: strict_validation
+
 workspace:
   base_dir: ${OPENCLAW_WORKSPACE}/validation_agent
   allowed_paths:
-    - "${CULTUREMECH_ROOT}/**/*.yaml"
-    - "${MEDIAINGREDIENTMECH_ROOT}/**/*.yaml"
-    - "${COMMUNITYMECH_ROOT}/**/*.yaml"
-    - "${CULTUREMECH_ROOT}/src/schema/*.yaml"
-    - "${MEDIAINGREDIENTMECH_ROOT}/src/schema/*.yaml"
-    - "${COMMUNITYMECH_ROOT}/src/schema/*.yaml"
+    source: repository_scope
+    patterns:
+      - "**/*.yaml"
+      - "src/**/schema/*.yaml"
   read_only: true
 
 tools:
@@ -57,16 +59,12 @@ tasks:
       - step: validate_schemas
         action: validate_all_schemas
         repositories:
-          - culturemech
-          - mediaingredientmech
-          - communitymech
+          source: repository_scope
 
       - step: validate_data
         action: validate_data_files
         repositories:
-          - culturemech
-          - mediaingredientmech
-          - communitymech
+          source: repository_scope
 
       - step: generate_report
         action: create_validation_report
@@ -75,7 +73,7 @@ tasks:
   validate_schema:
     description: "Validate LinkML schemas"
     parameters:
-      - repo: {type: string, required: true, enum: [culturemech, mediaingredientmech, communitymech]}
+      - repo: {type: string, required: true, choices_from: repository_scope}
       - schema_path: {type: path, required: false}
     workflow:
       - step: run_linkml_validation
@@ -98,9 +96,9 @@ tasks:
     description: "Check cross-repository data consistency"
     workflow:
       - step: extract_ingredient_ids
-        description: "Get all ingredient IDs from CultureMech"
+        description: "Get all ingredient IDs from the configured recipe source"
       - step: check_mapping_coverage
-        description: "Verify ingredients are mapped in MediaIngredientMech"
+        description: "Verify ingredients against the configured ingredient ontology"
       - step: generate_consistency_report
 
 output:

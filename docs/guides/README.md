@@ -2,7 +2,9 @@
 
 This directory contains longer-lived domain and cross-repository guidance:
 
-- `MULTI_CLAUDE_ARCHITECTURE.md` and `MULTI_CLAUDE_COORDINATION.md`
+- `MULTI_CLAUDE_COORDINATION.md` — the supported local coordination contract
+- `MULTI_CLAUDE_ARCHITECTURE.md` — a retired proposal retained only as a
+  redirect to the supported contract
 - `VALIDATION_STRATEGY.md`
 - `ENVO_TERM_SOURCING_GUIDE.md` and `SOIL_ONTOLOGY_GUIDE.md`
 - `UNMAPPED_CAS_RN_TSV_GUIDE.md`
@@ -10,4 +12,5 @@ This directory contains longer-lived domain and cross-repository guidance:
 - `OAKLIB_COMPATIBILITY_ISSUE.md`
 
 When a guide conflicts with the root `README.md`, `CLAUDE.md`, tests, or
-current code, the current code and its tests are authoritative.
+current code, the current code and its tests are authoritative. Files under
+`docs/archive/` and guides explicitly labelled retired are historical only.

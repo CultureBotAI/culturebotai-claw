@@ -1,6 +1,6 @@
 name: Knowledge-gap scan
 
-# Weekly Europe PMC knowledge-gap scan across the four Discussion-bearing Mechs.
+# Daily Europe PMC knowledge-gap scan across the Discussion-bearing Mechs.
 #
 # The scanner library lives in claw, so one fleet workflow keeps scheduling and
 # scanner versions aligned. ProteinTraitsMech is intentionally excluded: its
@@ -19,8 +19,9 @@ on:
     # cross-repo-validation (07:27) without overlapping either.
     #
     # DAILY, but each run scans a bounded WINDOW rather than the whole corpus —
-    # see the matrix below. A full scan is not viable: measured throughput is
-    # ~2.8 s/record, so CultureMech's 4,287 records would take ~3h20m and MIM's
+    # see each Mech's manifest capability setting. A full scan is not viable:
+    # measured throughput is ~2.8 s/record, so CultureMech's 4,287 records
+    # would take ~3h20m and MIM's
     # 1,879 ~1h28m, both of which the 45-minute timeout would kill mid-run.
     - cron: "0 7 * * *"
   workflow_dispatch:
@@ -49,36 +50,33 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Checkout claw
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Build capability-scoped scan matrix
+        id: matrix
+        run: |
+          set -euo pipefail
+          matrix="$(uv run python -m kg_microbe_fleet matrix --capability knowledge_gap_scan --setting window)"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
   scan:
+    needs: prepare
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
-      fail-fast: false   # one Mech's failure must not hide the other three
-      matrix:
-        include:
-          - mech: CultureMech
-            repository: CultureBotAI/CultureMech
-            checkout_path: CultureMech
-            workdir: CultureMech
-            window: 300   # of ~4,287 records — full coverage every ~15 runs
-          - mech: MediaIngredientMech
-            repository: CultureBotAI/MediaIngredientMech
-            checkout_path: MediaIngredientMech
-            workdir: MediaIngredientMech
-            window: 300   # of ~1,879 records — full coverage every ~7 runs
-          - mech: CommunityMech
-            repository: CultureBotAI/CommunityMech
-            checkout_path: CommunityMech
-            # NOT nested. The extra CommunityMech/ level exists only in the
-            # developer's local clone layout; the repo root holds justfile, conf
-            # and kb directly.
-            workdir: CommunityMech
-            window: 305   # the whole corpus fits inside one run
-          - mech: TraitMech
-            repository: CultureBotAI/TraitMech
-            checkout_path: TraitMech
-            workdir: TraitMech
-            window: 300   # of ~477 records — full coverage every 2 runs
+      fail-fast: false   # one Mech's failure must not hide the other legs
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
 
     steps:
       - name: Checkout claw (hosts kg_microbe_kgscan)

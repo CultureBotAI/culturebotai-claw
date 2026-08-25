@@ -11,21 +11,72 @@
 # Both directions are now asserted in one place, so there is one thing to read
 # when drift is reported and one thing to fix when the file set changes.
 #
-# TOPOLOGY IS UNCHANGED. CultureMech is still the hub and claw's shared/idlabel/
-# is still a passive mirror of it (claw#19, restated in claw#22). Moving the
-# *audit* into claw does not make claw canonical — it compares everything against
-# CultureMech@main exactly as before. Do not read this as reviving claw#21, which
-# framed claw as the fleet's enforcer while leaving CultureMech's audit running;
-# that was reverted as redundant. The difference here is that the old audit is
-# actually retired, which is what claw#21's commit message incorrectly claimed.
+# Phase 0 intentionally keeps the current CultureMech comparison direction so
+# the fleet-manifest migration does not also change artifact bytes or pins. This
+# is a transitional compatibility role, not the target ownership model: Phase 1
+# moves the shared artifact authority to claw with coordinated consumer updates.
+# Fleet membership already comes only from claw's packaged manifest; package
+# paths and the temporary hub role are domain/rollout inputs, not parallel
+# repository lists.
 #
-# Dependency-free: bash + curl + cmp.
+# Dependencies: uv/Python for the packaged fleet-manifest CLI, then bash + curl
+# + cmp for the audit itself. Network comparison behaviour is unchanged.
 set -euo pipefail
 
-ORG="${ORG:-CultureBotAI}"
-HUB="${HUB:-CultureMech}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ORCHESTRATION_ROOT="$(dirname "$SCRIPT_DIR")"
 REF="${REF:-main}"
-REPOS=(CultureMech MediaIngredientMech CommunityMech TraitMech proteintraitsmech)
+
+# Every default below is repository-relative. Anchor once so direct invocation
+# from another working directory audits this checkout, not the caller's cwd.
+cd "$ORCHESTRATION_ROOT"
+
+if ! FLEET_ROWS="$(
+  uv run --project "$ORCHESTRATION_ROOT" python -m kg_microbe_fleet \
+    scope --capability id_label_validation --require-vendored-hub
+)"; then
+  echo "ERROR: unable to load the atomic id-label audit scope from the fleet manifest." >&2
+  exit 2
+fi
+if [ -z "$FLEET_ROWS" ]; then
+  echo "ERROR: fleet manifest returned an empty audit scope." >&2
+  exit 2
+fi
+
+REPOS=()
+PACKAGE_PATHS=()
+HUB_KEY=""
+HUB=""
+HUB_PACKAGE=""
+while IFS=$'\t' read -r repo_key display_name github_identity root_variable package_path vendored_role; do
+  if [ -z "$repo_key" ] || [ -z "$display_name" ] || [ -z "$github_identity" ] || [ -z "$root_variable" ] || [ -z "$package_path" ] || [ -z "$vendored_role" ]; then
+    echo "ERROR: malformed fleet CLI row; refusing a partial fleet audit." >&2
+    exit 2
+  fi
+  REPOS+=("$github_identity")
+  PACKAGE_PATHS+=("$package_path")
+  case "$vendored_role" in
+    hub)
+      if [ -n "$HUB_KEY" ]; then
+        echo "ERROR: fleet audit scope contains multiple vendored hubs." >&2
+        exit 2
+      fi
+      HUB_KEY="$repo_key"
+      HUB="$github_identity"
+      HUB_PACKAGE="$package_path"
+      ;;
+    spoke) ;;
+    *)
+      echo "ERROR: unknown vendored role '$vendored_role' for '$repo_key'." >&2
+      exit 2
+      ;;
+  esac
+done <<< "$FLEET_ROWS"
+
+if [ "${#REPOS[@]}" -eq 0 ] || [ -z "$HUB" ] || [ -z "$HUB_PACKAGE" ]; then
+  echo "ERROR: vendored hub is not an id-label validation target." >&2
+  exit 2
+fi
 # Worst-case curl budget: (len(FILES)+len(MAPPED)) x (1 + non-hub repos) for
 # direction 1, + len(FILES) for direction 2, + (1 + non-hub repos) for
 # direction 4. At 5 FILES, 2 MAPPED, 4 non-hub repos, and 4 SPOKE_FILES,
@@ -45,13 +96,18 @@ if [ ! -s "$MANIFEST" ]; then
   echo "ERROR: manifest '$MANIFEST' is missing or empty — refusing to audit nothing." >&2
   exit 2
 fi
-# Same relative path in every Mech repo.
-mapfile -t FILES < <(grep -vE '^\s*(#|$)' "$MANIFEST")
+# Same relative path in every Mech repo. Use a Bash-3-compatible read loop so
+# the local audit behaves the same on macOS and Linux runners.
+FILES=()
+while IFS= read -r manifest_line; do
+  [[ "$manifest_line" =~ ^[[:space:]]*(#|$) ]] && continue
+  FILES+=("$manifest_line")
+done < "$MANIFEST"
 if [ "${#FILES[@]}" -eq 0 ]; then
   echo "ERROR: manifest '$MANIFEST' lists no files." >&2
   exit 2
 fi
-# Same bytes, per-repo path src/<lowercased-repo>/<suffix>.
+# Same bytes, under each repository's manifest-declared package path.
 MAPPED=(
   schema/mech_shared.yaml
   schema/history.yaml
@@ -60,8 +116,7 @@ MAPPED=(
 # history.yaml, which are schema modules rather than part of the id-label
 # validator set.
 
-lc() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
-raw() { printf 'https://raw.githubusercontent.com/%s/%s/%s/%s' "$ORG" "$1" "$REF" "$2"; }
+raw() { printf 'https://raw.githubusercontent.com/%s/%s/%s' "$1" "$REF" "$2"; }
 
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 fail=0
@@ -74,7 +129,7 @@ fetch_hub() { # path -> $tmp/hub
   fi
 }
 
-echo "Auditing against hub ${ORG}/${HUB}@${REF}"
+echo "Auditing against hub ${HUB}@${REF}"
 echo
 
 # --- direction 1: every Mech agrees with the hub -----------------------------
@@ -91,7 +146,7 @@ for f in "${FILES[@]}"; do
 done
 
 for suf in "${MAPPED[@]}"; do
-  hubf="src/$(lc "$HUB")/${suf}"
+  hubf="${HUB_PACKAGE}/${suf}"
   fetch_hub "$hubf" || { fail=1; continue; }
 
   # history.yaml is also packaged by claw's local history CLI. It is an
@@ -108,9 +163,10 @@ for suf in "${MAPPED[@]}"; do
     fi
   fi
 
-  for r in "${REPOS[@]}"; do
+  for index in "${!REPOS[@]}"; do
+    r="${REPOS[$index]}"
     [ "$r" = "$HUB" ] && continue
-    rf="src/$(lc "$r")/${suf}"
+    rf="${PACKAGE_PATHS[$index]}/${suf}"
     if ! curl -fsSL --max-time 10 "$(raw "$r" "$rf")" -o "$tmp/r"; then
       echo "DRIFT: ${r} is missing ${rf} (hub has it)"; fail=1; continue
     fi
@@ -162,7 +218,11 @@ if [ ! -s "$SPOKE_MANIFEST" ]; then
   echo "ERROR: spoke manifest '$SPOKE_MANIFEST' is missing or empty — refusing to audit nothing." >&2
   exit 2
 fi
-mapfile -t SPOKE_FILES < <(grep -vE '^\s*(#|$)' "$SPOKE_MANIFEST")
+SPOKE_FILES=()
+while IFS= read -r manifest_line; do
+  [[ "$manifest_line" =~ ^[[:space:]]*(#|$) ]] && continue
+  SPOKE_FILES+=("$manifest_line")
+done < "$SPOKE_MANIFEST"
 if [ "${#SPOKE_FILES[@]}" -eq 0 ]; then
   echo "ERROR: spoke manifest '$SPOKE_MANIFEST' lists no files." >&2
   exit 2

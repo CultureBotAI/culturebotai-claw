@@ -1,0 +1,43 @@
+#!/bin/bash
+# Managed by kg-microbe coordination hook installer.
+#
+# Claude Code Pre-Bash Hook
+# Checks the project lock before any shell command. Bash can mutate files
+# without using Edit/Write, so commit-only filtering is not a sufficient guard.
+#
+
+ORCHESTRATION_ROOT={{ORCHESTRATION_ROOT}}  # Replaced during installation
+REPO_NAME={{REPO_NAME}}  # Replaced during installation
+WORKSPACE_ROOT={{WORKSPACE_ROOT}}  # Replaced during installation
+PROJECT_ROOT={{PROJECT_ROOT}}  # Replaced during installation
+HOOKS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HOOK_INPUT_FILTER="$HOOKS_DIR/hook-input.py"
+export OPENCLAW_ORCHESTRATION_ROOT="$ORCHESTRATION_ROOT"
+export OPENCLAW_WORKSPACE="$WORKSPACE_ROOT"
+export CLAUDE_PROJECT_DIR="$PROJECT_ROOT"
+
+if [ -L "$HOOK_INPUT_FILTER" ] || [ ! -f "$HOOK_INPUT_FILTER" ]; then
+    echo "Bash hook input filter is missing or unsafe" >&2
+    exit 2
+fi
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "Cannot inspect Bash hook input: python3 is required" >&2
+    exit 2
+fi
+if ! python3 "$HOOK_INPUT_FILTER" bash PreToolUse; then
+    echo "Bash hook input is malformed or starts outside this project" >&2
+    exit 2
+fi
+
+uv run --offline --frozen --project "$ORCHESTRATION_ROOT" python \
+    "$ORCHESTRATION_ROOT/scripts/check_lock.py" "$REPO_NAME" "run shell commands"
+EXIT_CODE=$?
+
+if [ $EXIT_CODE -eq 0 ]; then
+    exit 0
+elif [ $EXIT_CODE -eq 1 ]; then
+    echo "✋ Shell command blocked by lock system" >&2
+else
+    echo "❌ Lock check failed; shell command blocked" >&2
+fi
+exit 2
