@@ -1,8 +1,8 @@
 """
 KG-Microbe OpenClaw CLI
 
-Command-line interface for orchestrating AI coding agents across
-CultureMech, MediaIngredientMech, and CommunityMech repositories.
+Command-line interface for orchestrating AI coding agents across the Mech
+fleet defined in ``conf/fleet.yaml``.
 """
 
 import os
@@ -52,10 +52,9 @@ def cli():
     """
     KG-Microbe OpenClaw Orchestration CLI
 
-    Coordinate AI coding agents across three microbial knowledge base repositories:
-    - CultureMech: 10,657 culture media recipes
-    - MediaIngredientMech: 1,131 ingredients with ontology mappings
-    - CommunityMech: 35+ microbial communities with ecological interactions
+    Coordinate AI coding agents across the Mech fleet defined in
+    conf/fleet.yaml. Run `openclaw-cli status` for the current fleet and
+    which repositories are configured here.
     """
     pass
 
@@ -366,8 +365,17 @@ def status():
             repository_status = f"✗ {repository_error}"
         elif key in settings.errors:
             repository_status = f"✗ {settings.errors[key]}"
-        else:
+        elif key in settings.paths:
             repository_status = "✓ Verified"
+        else:
+            # Assert presence in the validated set rather than inferring it
+            # from absence in the error map. The display list and the registry
+            # are now two separate manifest reads, so a key can appear here
+            # without ever having been resolved; reporting that as verified
+            # would be fail-open in the preflight command.
+            repository_status = (
+                f"✗ '{key}' is not in the resolved repository registry"
+            )
         config_table.add_row(display_name, repository_status)
 
     console.print(config_table)

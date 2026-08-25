@@ -164,26 +164,94 @@ def test_env_example_documents_every_manifest_root():
 def test_supported_components_do_not_hardcode_a_fleet_list(relative_path: str):
     """Reject a reintroduced literal enumerating Mech identities or roots.
 
-    Matching on two-or-more co-occurring names keeps single-repository
-    references (which are legitimate) from tripping the check.
+    Scans the whole non-comment body, not line by line. A per-line check is
+    vacuous against ruff-formatted code: the three-Mech literals this rule
+    exists to prevent put one repository per line, so nothing ever
+    co-occurred. Naming two or more distinct Mechs anywhere in a supported
+    module is the actual signal; naming one is legitimate.
     """
 
     text = (REPOSITORY_ROOT / relative_path).read_text(encoding="utf-8")
     manifest = load_fleet_manifest(MANIFEST_PATH)
 
-    for line in text.splitlines():
-        # The manifest's own loader call and comments are allowed to name Mechs.
-        stripped = line.strip()
-        if stripped.startswith("#"):
-            continue
-        named = [
-            mech.environment_variable
+    body = "\n".join(
+        line for line in text.splitlines() if not line.strip().startswith("#")
+    )
+    named = sorted(
+        {
+            mech.key
             for mech in manifest.mechs.values()
-            if mech.environment_variable in line
+            for token in (
+                mech.environment_variable,
+                mech.github,
+                mech.display_name,
+            )
+            if token in body
+        }
+    )
+
+    assert len(named) < 2, (
+        f"{relative_path} enumerates multiple Mechs ({', '.join(named)}); "
+        "derive them from the fleet manifest instead"
+    )
+
+
+def test_the_hardcoding_guard_would_have_caught_the_literals_it_replaced():
+    """The guard must fail against the pre-manifest code, or it proves nothing.
+
+    The first version of this check passed against `origin/main`'s three-Mech
+    literals, so it enforced nothing while `conf/fleet.yaml` advertised that it
+    did. This pins the guard to a known-bad input.
+    """
+
+    manifest = load_fleet_manifest(MANIFEST_PATH)
+    # A faithful reproduction of the shape that actually drifted: one
+    # repository per line, exactly as ruff formats it.
+    known_bad = "\n".join(
+        [
+            "repository_names = {",
+            '    "culturemech": "CultureMech",',
+            '    "mediaingredientmech": "MediaIngredientMech",',
+            '    "communitymech": "CommunityMech",',
+            "}",
         ]
-        assert len(named) < 2, (
-            f"{relative_path} enumerates multiple repository roots on one line "
-            f"({', '.join(named)}); derive them from the fleet manifest instead"
+    )
+
+    named = {
+        mech.key
+        for mech in manifest.mechs.values()
+        for token in (mech.environment_variable, mech.github, mech.display_name)
+        if token in known_bad
+    }
+
+    assert len(named) >= 2, (
+        "the guard does not detect a one-per-line three-Mech literal, which is "
+        "the exact form this rule exists to reject"
+    )
+
+
+def test_cli_commands_report_every_manifest_mech():
+    """Behavioural counterpart to the grep guard.
+
+    A module could satisfy the text scan while still displaying a truncated
+    fleet, so assert on what the commands actually print.
+    """
+
+    from click.testing import CliRunner
+
+    from cli.main import cli
+
+    manifest = load_fleet_manifest(MANIFEST_PATH)
+    runner = CliRunner()
+    status_output = runner.invoke(cli, ["status"]).output
+    show_output = runner.invoke(cli, ["config", "show"]).output
+
+    for mech in manifest.mechs.values():
+        assert mech.display_name in status_output, (
+            f"`status` omits {mech.key}"
+        )
+        assert mech.environment_variable in show_output, (
+            f"`config show` omits {mech.key}"
         )
 
 
@@ -281,3 +349,32 @@ def test_duplicate_environment_variable_is_rejected():
 def test_missing_manifest_file_is_rejected():
     with pytest.raises(FleetManifestError, match="Unable to load"):
         load_fleet_manifest(Path("/nonexistent/fleet.yaml"))
+
+
+def test_documented_and_ci_mypy_targets_agree():
+    """The type-check gate must be the same in CLAUDE.md and in CI.
+
+    These drifted while adding this package: CLAUDE.md gained
+    `src/kg_microbe_fleet` and the workflow did not, so the fail-closed loader
+    presented as the new source of truth was the one module CI never
+    type-checked.
+    """
+
+    import re
+
+    claude = (REPOSITORY_ROOT / "CLAUDE.md").read_text(encoding="utf-8")
+    workflow = (
+        REPOSITORY_ROOT / ".github" / "workflows" / "tests.yaml"
+    ).read_text(encoding="utf-8")
+
+    documented = re.search(r"uv run --extra dev mypy \\\n(.*?)\nuv run", claude, re.S)
+    ci = re.search(r"uv run --extra dev mypy\n(.*?)\n\n", workflow, re.S)
+    assert documented and ci, "could not locate both mypy invocations"
+
+    documented_targets = set(documented.group(1).replace("\\", "").split())
+    ci_targets = set(ci.group(1).split())
+
+    assert documented_targets == ci_targets, (
+        "CLAUDE.md and .github/workflows/tests.yaml disagree on mypy targets: "
+        f"{documented_targets ^ ci_targets}"
+    )

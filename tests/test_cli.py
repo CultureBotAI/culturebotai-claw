@@ -1,5 +1,7 @@
 """Exit-status and validation tests for the public Click CLI."""
 
+from pathlib import Path
+
 from click.testing import CliRunner
 from git import Repo
 
@@ -201,3 +203,138 @@ def test_config_show_never_prints_api_key(monkeypatch):
     assert result.exit_code == 0
     assert "sk-ant-secret-value" not in result.output
     assert "configured" in result.output
+
+
+def _config_with_only(tmp_path, monkeypatch, keys):
+    """Write a config naming only `keys`, with real verified worktrees."""
+    from kg_microbe_fleet import load_fleet_manifest
+
+    manifest = load_fleet_manifest()
+    lines = ["repositories:"]
+    for key in keys:
+        mech = manifest.get(key)
+        path = tmp_path / key
+        repo = Repo.init(path, mkdir=True)
+        repo.create_remote("origin", f"https://github.com/{mech.github}.git")
+        monkeypatch.setenv(mech.environment_variable, str(path))
+        lines.extend((f"  {key}:", f"    path: ${{{mech.environment_variable}}}"))
+    config_path = tmp_path / "openclaw.yaml"
+    config_path.write_text("\n".join(lines), encoding="utf-8")
+    return config_path
+
+
+def test_config_validate_reports_an_unconfigured_mech_without_failing(
+    tmp_path, monkeypatch
+):
+    """Not having every Mech cloned is not a configuration defect.
+
+    Before the fleet manifest, adding a repository to the registry made
+    `validate` fail for anyone without that clone, because every per-repository
+    error was folded into a hard failure.
+    """
+    from kg_microbe_fleet import load_fleet_manifest
+
+    for mech in load_fleet_manifest().mechs.values():
+        monkeypatch.delenv(mech.environment_variable, raising=False)
+    config_path = _config_with_only(tmp_path, monkeypatch, ["culturemech"])
+
+    result = CliRunner().invoke(
+        cli, ["config", "validate", "--config-file", str(config_path)]
+    )
+
+    assert result.exit_code == 0
+    assert "Not configured locally" in result.output
+    assert "Configuration is valid" in result.output
+
+
+def test_require_all_repositories_promotes_unconfigured_back_to_a_failure(
+    tmp_path, monkeypatch
+):
+    from kg_microbe_fleet import load_fleet_manifest
+
+    for mech in load_fleet_manifest().mechs.values():
+        monkeypatch.delenv(mech.environment_variable, raising=False)
+    config_path = _config_with_only(tmp_path, monkeypatch, ["culturemech"])
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "config",
+            "validate",
+            "--config-file",
+            str(config_path),
+            "--require-all-repositories",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "not configured" in result.output
+
+
+def test_config_validate_still_fails_on_a_genuinely_invalid_path(
+    tmp_path, monkeypatch
+):
+    """The softening must not extend to a configured-but-untrustworthy repo."""
+    from kg_microbe_fleet import load_fleet_manifest
+
+    for mech in load_fleet_manifest().mechs.values():
+        monkeypatch.delenv(mech.environment_variable, raising=False)
+    config_path = tmp_path / "openclaw.yaml"
+    config_path.write_text(
+        "repositories:\n  culturemech:\n    path: ${MISSING_ROOT}\n",
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(
+        cli, ["config", "validate", "--config-file", str(config_path)]
+    )
+
+    assert result.exit_code != 0
+    assert "unexpanded variable" in result.output
+
+
+def test_status_does_not_report_an_unresolved_repository_as_verified(
+    tmp_path, monkeypatch
+):
+    """`status` must assert membership in the validated set, not absence of an
+    error.
+
+    Its display list is a call-time manifest read while the registry is frozen
+    at import, so the two can diverge. A key present only in the display list
+    is in neither `errors` nor `paths`; inferring "verified" from absence of an
+    error then reports a repository that was never resolved, never opened, and
+    never identity-checked as good — fail-open in the preflight command.
+    """
+
+    from kg_microbe_fleet import load_fleet_manifest
+
+    shipped = (
+        Path(__file__).resolve().parents[1] / "conf" / "fleet.yaml"
+    ).read_text(encoding="utf-8")
+    # A repository the frozen DEFAULT_REPOSITORIES cannot know about.
+    diverged = tmp_path / "fleet.yaml"
+    diverged.write_text(
+        shipped
+        + "\n".join(
+            [
+                "  ghostmech:",
+                "    display_name: GhostMech",
+                "    github: CultureBotAI/GhostMech",
+                "    environment_variable: GHOSTMECH_ROOT",
+                "    vendored_role: spoke",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("KG_MICROBE_FLEET_MANIFEST", str(diverged))
+    for mech in load_fleet_manifest().mechs.values():
+        monkeypatch.delenv(mech.environment_variable, raising=False)
+
+    result = CliRunner().invoke(cli, ["status"])
+
+    assert "GhostMech" in result.output, "the diverged key should be displayed"
+    ghost_row = [line for line in result.output.splitlines() if "GhostMech" in line]
+    assert ghost_row and "✓ Verified" not in ghost_row[0], (
+        f"unresolved repository reported as verified: {ghost_row}"
+    )

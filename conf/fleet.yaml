@@ -5,8 +5,12 @@
 # `plugins/repository_settings.py` and `cli/main.py` knew three Mechs, the
 # cross-mech-sync skill knew four, and `scripts/fleet_pr_status.py` knew five.
 # Every fleet-facing component must derive its repository list from here rather
-# than re-declaring one; `tests/test_fleet_manifest.py` fails the build when a
-# supported component hard-codes a divergent list.
+# than re-declaring one. `tests/test_fleet_manifest.py` enforces that for the
+# components it names (currently `cli/main.py` and
+# `plugins/repository_settings.py`) and checks that `openclaw_config.yaml` and
+# `.env.example` match. It is not yet a repo-wide guarantee: several other
+# components still carry their own list, tracked in issue #131. Extend the
+# guard's parametrize list as each one is converted.
 #
 # Scope note: this manifest deliberately carries only fields that were verified
 # against the repositories when it was written — identity, environment variable,
