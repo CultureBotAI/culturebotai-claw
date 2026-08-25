@@ -6,19 +6,16 @@ from unittest.mock import patch
 import pytest
 from git import Repo
 
+from kg_microbe_fleet import load_fleet_manifest
 from plugins.git_integration import GitIntegrationPlugin
 from plugins.ingredient_repo_synchronizer import IngredientRepoSynchronizer
 from plugins.just_runner import JustRunnerPlugin
 from plugins.linkml_validator import LinkMLValidatorPlugin
 from plugins.repository_settings import (
+    DEFAULT_REPOSITORIES,
     RepositoryConfigurationError,
     RepositorySettings,
-)
-
-REPOSITORY_ENVIRONMENT_VARIABLES = (
-    "CULTUREMECH_ROOT",
-    "MEDIAINGREDIENTMECH_ROOT",
-    "COMMUNITYMECH_ROOT",
+    merged_repository_environment,
 )
 
 
@@ -30,8 +27,74 @@ def make_repository(path: Path, identity: str = "CultureBotAI/CultureMech") -> R
 
 
 def clear_repository_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    for variable in REPOSITORY_ENVIRONMENT_VARIABLES:
+    for variable in load_fleet_manifest().environment_variables().values():
         monkeypatch.delenv(variable, raising=False)
+
+
+def test_deprecated_default_repository_snapshot_remains_manifest_derived() -> None:
+    manifest = load_fleet_manifest()
+
+    assert tuple(DEFAULT_REPOSITORIES) == manifest.keys
+    assert {
+        key: definition.expected_repository
+        for key, definition in DEFAULT_REPOSITORIES.items()
+    } == {key: mech.github for key, mech in manifest.mechs.items()}
+
+
+def test_explicit_dotenv_rejects_duplicate_keys(tmp_path: Path) -> None:
+    dotenv = tmp_path / "duplicate.env"
+    dotenv.write_text(
+        "CULTUREMECH_ROOT=/first\nCULTUREMECH_ROOT=/second\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RepositoryConfigurationError, match="duplicate key"):
+        merged_repository_environment(dotenv, environ={})
+
+
+def test_dotenv_preserves_nested_missing_variable_for_strict_resolution(
+    tmp_path: Path,
+) -> None:
+    dotenv = tmp_path / "nested-missing.env"
+    dotenv.write_text(
+        "CULTUREMECH_ROOT=${MISSING_REPRO_VAR}/repo\n",
+        encoding="utf-8",
+    )
+
+    environment = merged_repository_environment(dotenv, environ={})
+    settings = RepositorySettings.from_environment(
+        {"repositories": {"culturemech": {"path": "${CULTUREMECH_ROOT}"}}},
+        environ=environment,
+    )
+
+    assert environment["CULTUREMECH_ROOT"] == "${MISSING_REPRO_VAR}/repo"
+    assert "culturemech" in settings.invalid
+    assert "culturemech" not in settings.paths
+    assert "unexpanded variable" in settings.errors["culturemech"]
+
+
+def test_nested_dotenv_expansion_uses_exported_value_at_every_level(
+    tmp_path: Path,
+) -> None:
+    repo = make_repository(tmp_path / "exported-repo")
+    dotenv = tmp_path / "nested.env"
+    dotenv.write_text(
+        "BASE_ROOT=/untrusted/dotenv/value\n"
+        "INTERMEDIATE_ROOT=${BASE_ROOT}\n"
+        "CULTUREMECH_ROOT=${INTERMEDIATE_ROOT}\n",
+        encoding="utf-8",
+    )
+
+    environment = merged_repository_environment(
+        dotenv,
+        environ={"BASE_ROOT": repo.working_tree_dir},
+    )
+    settings = RepositorySettings.from_environment(
+        {"repositories": {"culturemech": {"path": "${CULTUREMECH_ROOT}"}}},
+        environ=environment,
+    )
+
+    assert settings.paths["culturemech"] == Path(repo.working_tree_dir).resolve()
 
 
 def test_unset_path_never_falls_back_to_current_directory(
@@ -100,6 +163,91 @@ def test_repository_identity_requires_the_expected_host(
     assert "origin identity mismatch" in result["error"]
 
 
+@pytest.mark.parametrize(
+    "remote_url",
+    [
+        "file://github.com/CultureBotAI/CultureMech.git",
+        "ftp://github.com/CultureBotAI/CultureMech.git",
+        "https://github.com/attacker/CultureBotAI/CultureMech.git",
+        "https://github.com:8443/CultureBotAI/CultureMech.git",
+    ],
+)
+def test_repository_identity_rejects_spoofed_url_forms(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    remote_url: str,
+) -> None:
+    repo = make_repository(tmp_path / "spoofed-form")
+    repo.remote("origin").set_url(remote_url)
+    clear_repository_environment(monkeypatch)
+    monkeypatch.setenv("CULTUREMECH_ROOT", repo.working_tree_dir)
+
+    result = GitIntegrationPlugin().get_status("culturemech")
+
+    assert result["success"] is False
+    assert "unrecognizable URL" in result["error"]
+
+
+def test_repository_identity_rejects_a_foreign_push_url(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = make_repository(tmp_path / "push-spoofed")
+    repo.git.config(
+        "--add",
+        "remote.origin.pushurl",
+        "https://github.com/ExampleAttacker/not-culturemech.git",
+    )
+    clear_repository_environment(monkeypatch)
+    monkeypatch.setenv("CULTUREMECH_ROOT", repo.working_tree_dir)
+
+    result = GitIntegrationPlugin().get_status("culturemech")
+
+    assert result["success"] is False
+    assert "origin identity mismatch for push" in result["error"]
+
+
+def test_repository_identity_rejects_mixed_fetch_urls(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = make_repository(tmp_path / "mixed-fetch")
+    repo.git.config(
+        "--add",
+        "remote.origin.url",
+        "https://github.com/ExampleAttacker/not-culturemech.git",
+    )
+    clear_repository_environment(monkeypatch)
+    monkeypatch.setenv("CULTUREMECH_ROOT", repo.working_tree_dir)
+
+    result = GitIntegrationPlugin().get_status("culturemech")
+
+    assert result["success"] is False
+    assert "origin identity mismatch for fetch" in result["error"]
+
+
+def test_repository_identity_accepts_multiple_urls_only_when_all_match(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = make_repository(tmp_path / "matching-urls")
+    repo.git.config(
+        "--add",
+        "remote.origin.url",
+        "git@github.com:CultureBotAI/CultureMech.git",
+    )
+    repo.git.config(
+        "--add",
+        "remote.origin.pushurl",
+        "ssh://git@github.com/CultureBotAI/CultureMech.git",
+    )
+    clear_repository_environment(monkeypatch)
+    monkeypatch.setenv("CULTUREMECH_ROOT", repo.working_tree_dir)
+
+    settings = RepositorySettings.from_environment(
+        environ={"CULTUREMECH_ROOT": repo.working_tree_dir}
+    )
+
+    assert settings.paths["culturemech"] == Path(repo.working_tree_dir).resolve()
+
+
 def test_repository_identity_is_revalidated_before_operation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -127,6 +275,76 @@ def test_unexpanded_repository_variable_is_rejected() -> None:
     assert "unexpanded variable" in settings.errors["culturemech"]
     with pytest.raises(RepositoryConfigurationError, match="unexpanded variable"):
         settings.get_target("culturemech")
+
+
+def test_missing_own_root_plus_foreign_variable_is_a_fatal_defect() -> None:
+    settings = RepositorySettings.from_environment(
+        {
+            "repositories": {
+                "culturemech": {
+                    "path": "${CULTUREMECH_ROOT}/${MISSPELLED_SUFFIX}"
+                }
+            }
+        },
+        environ={},
+    )
+
+    assert "culturemech" in settings.invalid
+    assert "culturemech" not in settings.unconfigured
+    assert "unexpanded variable" in settings.errors["culturemech"]
+
+
+@pytest.mark.parametrize(
+    "environment",
+    [
+        {"CULTUREMECH_ROOT": "${CULTUREMECH_ROOT}"},
+        {
+            "CULTUREMECH_ROOT": "${OTHER_ROOT}",
+            "OTHER_ROOT": "${CULTUREMECH_ROOT}",
+        },
+    ],
+)
+def test_repository_variable_cycles_are_rejected(
+    environment: dict[str, str],
+) -> None:
+    settings = RepositorySettings.from_environment(
+        {"repositories": {"culturemech": {"path": "${CULTUREMECH_ROOT}"}}},
+        environ=environment,
+    )
+
+    assert "cyclic variable expansion" in settings.errors["culturemech"]
+    assert "culturemech" in settings.invalid
+
+
+def test_repository_variable_expansion_depth_is_bounded() -> None:
+    environment = {"CULTUREMECH_ROOT": "${EXPANSION_00}"}
+    environment.update(
+        {
+            f"EXPANSION_{index:02d}": f"${{EXPANSION_{index + 1:02d}}}"
+            for index in range(40)
+        }
+    )
+    environment["EXPANSION_40"] = "/would/eventually/resolve"
+
+    settings = RepositorySettings.from_environment(
+        {"repositories": {"culturemech": {"path": "${CULTUREMECH_ROOT}"}}},
+        environ=environment,
+    )
+
+    assert "exceeded 32" in settings.errors["culturemech"]
+    assert "culturemech" in settings.invalid
+
+
+def test_escaped_dollar_is_not_reexpanded(tmp_path: Path) -> None:
+    target = RepositorySettings._resolve_target(
+        name="culturemech",
+        raw_path=f"{tmp_path}/$$literal",
+        environment_variable="CULTUREMECH_ROOT",
+        expected_repository="CultureBotAI/CultureMech",
+        environ={"literal": "/unexpected/substitution"},
+    )
+
+    assert target.path == (tmp_path / "$literal").resolve()
 
 
 def test_a_foreign_unexpanded_variable_is_a_defect_not_an_absent_checkout() -> None:
@@ -280,4 +498,32 @@ def test_malformed_yaml_configuration_is_rejected(tmp_path: Path) -> None:
     config_path.write_text("repositories: [", encoding="utf-8")
 
     with pytest.raises(RepositoryConfigurationError, match="Unable to load"):
+        RepositorySettings.from_file(config_path, environ={})
+
+
+def test_duplicate_repository_path_key_is_rejected(tmp_path: Path) -> None:
+    config_path = tmp_path / "openclaw.yaml"
+    config_path.write_text(
+        "repositories:\n"
+        "  culturemech:\n"
+        "    path: ${CULTUREMECH_ROOT}\n"
+        "    path: /different/checkout\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RepositoryConfigurationError, match="duplicate key 'path'"):
+        RepositorySettings.from_file(config_path, environ={})
+
+
+def test_unknown_repository_configuration_key_is_rejected(tmp_path: Path) -> None:
+    config_path = tmp_path / "openclaw.yaml"
+    config_path.write_text(
+        "repositories:\n"
+        "  culturemech:\n"
+        "    path: ${CULTUREMECH_ROOT}\n"
+        "    pakage_manager: uv\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RepositoryConfigurationError, match="pakage_manager"):
         RepositorySettings.from_file(config_path, environ={})

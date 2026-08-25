@@ -1,11 +1,11 @@
 ---
 name: cross-mech-sync
-description: Propagate a change, fix, vendored file, or invariant across the four Mech repos (CultureMech / MIM / CommunityMech / TraitMech) safely and completely — establish ground truth from origin/main, pick the canonical version, sync the laggards via isolated git worktrees (never disturbing concurrent agents), verify, PR+merge, and keep NEXT_TASKS.md + the tracking issue in sync. Use for byte-identical vendored files, a data correction that spans source + derived artifacts + downstream repos, or any "this must land in more than one Mech" task. NOT for the data-pipeline sync (identifiers/CHEBI/KG matches) — that's cross-repo-sync.
+description: Propagate a change, fix, vendored file, or invariant across the manifest-defined Mech fleet safely and completely — query applicable repositories from kg_microbe_fleet, establish ground truth from origin/main, sync via isolated git worktrees, verify, PR+merge, and keep tracking artifacts aligned. NOT for the domain data-pipeline sync (identifiers/CHEBI/KG matches) — that's cross-repo-sync.
 category: integration
 requires_database: false
 requires_internet: true
 version: 1.0.0
-tags: [sync, cross-repo, cross-mech, vendored, byte-identical, worktree, pin, invariant, culturemech, mim, communitymech, traitmech]
+tags: [sync, cross-repo, cross-mech, fleet, vendored, byte-identical, worktree, pin, invariant]
 ---
 
 # Cross-Mech Sync Skill
@@ -27,19 +27,33 @@ a change must exist in more than one Mech, including:
 For the standard *data-pipeline* sync (unified mapping, CHEBI backfill, KG-node
 matches) use **`cross-repo-sync`** instead — that's a different job.
 
-## The repos
+## The repositories
 
-| Mech | Path (relative to `culturebotai-claw/`) | GitHub | default branch |
-|---|---|---|---|
-| CultureMech | `../CultureMech` | `CultureBotAI/CultureMech` | `main` |
-| MIM (MediaIngredientMech) | `../MediaIngredientMech` | `CultureBotAI/MediaIngredientMech` | `main` |
-| CommunityMech | `../CommunityMech/CommunityMech` (nested!) | `CultureBotAI/CommunityMech` | `main` |
-| TraitMech | `../TraitMech` | `CultureBotAI/TraitMech` | `main` |
-| kg-microbe (downstream, not a Mech) | `../kg-microbe` | `CultureBotAI/kg-microbe` | `master` |
+Never type a repository list into the procedure. Resolve the current identity,
+display name, and root environment variable from the packaged manifest:
 
-CLAUDE.md only documents the first three; **TraitMech is a real fourth Mech** —
-always include it in "all Mech" sweeps. kg-microbe is downstream: touch it only
-when the change genuinely flows there, and note its default branch is `master`.
+```bash
+uv run python -m kg_microbe_fleet list --format tsv
+# key<TAB>display_name<TAB>owner/repository<TAB>ROOT_ENVIRONMENT_VARIABLE
+```
+
+Use `--capability <name>` whenever the artifact is capability-scoped. An empty
+or unknown capability is an error, not permission to fall back to a remembered
+list. Repositories outside this output are downstream systems, not implicit
+fleet members, and require an explicit task-specific decision.
+
+```bash
+uv run python -m kg_microbe_fleet list --capability <CAPABILITY> --format tsv
+```
+
+`list` is for declarative inventory. Before reading from or writing to local
+checkout paths, use `targets --capability <CAPABILITY>` instead; it emits the
+same four identity fields plus an identity-validated absolute root (or an empty
+root for an unconfigured Mech) and fails before output on any Git mismatch.
+
+This workflow fetches immutable Git objects and opens, checks, and merges GitHub
+PRs, so `requires_internet: true` is intentional. A local inventory can be
+prepared offline, but it is not a completed cross-Mech sync.
 
 ## The five rules (learned the hard way)
 
@@ -55,7 +69,7 @@ when the change genuinely flows there, and note its default branch is `master`.
    branch is the one thing that can wreck another agent's session.
 
 3. **Pick the canonical version objectively.** For a byte-identical file, the
-   canonical is the **majority** (2-of-3) and/or the copy **already pinned**.
+   canonical is the majority of applicable consumers and/or the copy already pinned.
    Sync the laggards *to* it — don't average or re-derive.
 
 4. **Sync is incomplete until the derived artifacts are too.** A source fix that
@@ -69,79 +83,324 @@ when the change genuinely flows there, and note its default branch is `master`.
 
 ## Workflow
 
-### A. Establish ground truth
+### A. Prepare the validated scope
 
 ```bash
-# For each repo, hash the shared file(s) on origin/main and compare.
-for entry in "CultureMech:CultureBotAI/CultureMech" \
-             "MediaIngredientMech:CultureBotAI/MediaIngredientMech" \
-             "CommunityMech/CommunityMech:CultureBotAI/CommunityMech" \
-             "TraitMech:CultureBotAI/TraitMech"; do
-  repo="${entry%%:*}"; name=$(basename "$repo")
-  cd "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/$repo" || continue
-  git fetch origin -q
-  for f in <PATHS...>; do
-    h=$(git show "origin/main:$f" 2>/dev/null | shasum -a 256 | awk '{print $1}')
+CAPABILITY="${CAPABILITY:-}"
+TASK_SLUG="${TASK_SLUG:-}"
+TARGET_KEY="${TARGET_KEY:-}"
+set -euo pipefail
+test -n "$CAPABILITY" || { echo "CAPABILITY is required" >&2; exit 2; }
+case "$TASK_SLUG" in
+  ""|*[!a-z0-9-]*) echo "Invalid task slug: $TASK_SLUG" >&2; exit 2 ;;
+esac
+ORCHESTRATION_ROOT="$(git rev-parse --show-toplevel)"
+test -f "$ORCHESTRATION_ROOT/plugins/lock_manager.py"
+AUDIT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/cross-mech-audit.XXXXXX")"
+FLEET_TSV="$AUDIT_DIR/fleet.tsv"
+uv run python -m kg_microbe_fleet targets \
+  --capability "$CAPABILITY" > "$FLEET_TSV"
+test -s "$FLEET_TSV" || { echo "Capability scope is empty" >&2; exit 2; }
+
+# Declare the exact governed paths as an array; never eval a path string.
+PATHS=(<PATHS...>)
+
+```
+
+### B. Define a same-process, bounded metadata-lock runner
+
+Use this shell function only for short shared Git metadata transitions: adding
+or removing the registered worktree and deleting its local branch. The Python
+process that acquires the lock remains alive while its child command runs,
+checks the acquisition result, bounds the child below the lease lifetime,
+terminates the child before releasing, and releases its own token in `finally`.
+
+```bash
+run_with_repo_lock() {
+  resource=$1
+  task_limit=$2
+  shift 2
+  test "$#" -gt 0 || { echo "Missing locked command" >&2; return 2; }
+
+  OPENCLAW_ORCHESTRATION_ROOT="$ORCHESTRATION_ROOT" \
+    uv run --project "$ORCHESTRATION_ROOT" python - \
+      "$resource" "$task_limit" "$@" <<'PY'
+from __future__ import annotations
+
+import os
+import signal
+import subprocess
+import sys
+from pathlib import Path
+
+root = Path(os.environ["OPENCLAW_ORCHESTRATION_ROOT"]).resolve()
+sys.path.insert(0, str(root))
+
+from plugins.lock_manager import LockManager
+
+resource = sys.argv[1]
+task_limit = int(sys.argv[2])
+command = sys.argv[3:]
+if not command or not 60 <= task_limit <= 86_400:
+    raise SystemExit("invalid command or task limit")
+
+
+def stop_on_signal(signum: int, _frame: object) -> None:
+    raise SystemExit(128 + signum)
+
+
+for handled_signal in (signal.SIGHUP, signal.SIGINT, signal.SIGTERM):
+    signal.signal(handled_signal, stop_on_signal)
+
+manager = LockManager({"my_id": f"cross-mech-sync-{os.getpid()}"})
+acquired = manager.acquire_lock(
+    resource,
+    f"cross-mech-sync:{Path(command[0]).name}",
+    timeout=task_limit + 300,
+    wait=False,
+)
+if not acquired:
+    raise SystemExit(f"could not acquire repository lock: {resource}")
+
+exit_code = 1
+child: subprocess.Popen[bytes] | None = None
+try:
+    try:
+        child = subprocess.Popen(command)
+        exit_code = child.wait(timeout=task_limit)
+    except subprocess.TimeoutExpired:
+        print("locked command exceeded its approved duration", file=sys.stderr)
+        exit_code = 124
+finally:
+    if child is not None and child.poll() is None:
+        child.terminate()
+        try:
+            child.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            child.kill()
+            child.wait()
+    if not manager.release_lock(resource):
+        print("the owned repository lock could not be released", file=sys.stderr)
+        exit_code = 70
+
+raise SystemExit(exit_code)
+PY
+}
+```
+
+There is no renewal protocol. Choose an explicit task bound before execution;
+the lease is five minutes longer than the maximum child lifetime. Never acquire
+and release through separate Python invocations. Never run edits, validation,
+commit, or push under this lock: installed hooks treat any active repository
+lock as blocking and have no owner-token bypass. A unique branch/worktree—not a
+long lease—provides isolation for those operations.
+
+### C. Establish ground truth under short metadata locks
+
+Refresh each exact `origin/main` ref under the bounded metadata lock before
+reading it. The lock is released before hashing and no hook-bearing edit or
+commit runs beneath it.
+
+```bash
+while IFS=$'\t' read -r key name github root_variable repo_root; do
+  test -n "$repo_root" || { echo "UNCONFIGURED: $key ($root_variable)" >&2; exit 2; }
+  run_with_repo_lock "$key" 300 \
+    git -C "$repo_root" fetch origin \
+      refs/heads/main:refs/remotes/origin/main
+  for f in "${PATHS[@]}"; do
+    if ! git -C "$repo_root" cat-file -e "origin/main:$f"; then
+      echo "Missing Git object: $github origin/main:$f" >&2
+      exit 2
+    fi
+    if ! h="$(git -C "$repo_root" show "origin/main:$f" \
+      | shasum -a 256 | awk '{print $1}')"; then
+      echo "Could not hash: $github origin/main:$f" >&2
+      exit 2
+    fi
     echo "$name  ${h:0:16}  $f"
   done
-done
+done < "$FLEET_TSV"
 ```
 
 Group by hash → the majority is canonical; outliers are the sync targets. `diff`
-two copies to confirm the delta is benign (formatting/rename) before overwriting.
+two copies to confirm the delta is benign before overwriting. Because
+`set -o pipefail` is active and each object is checked with `cat-file`, a failed
+fleet query, locked fetch, or missing path aborts instead of hashing empty input.
 
-### B. Make the change in an isolated worktree (per laggard repo)
+### D. Make the change in an isolated worktree (per laggard repo)
 
 ```bash
-REPO=/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/<repo>
-WT=/tmp/sync-<slug>
-cd "$REPO" && git fetch origin -q
-git worktree remove --force "$WT" 2>/dev/null || true
-git worktree add -q "$WT" origin/main          # detached copy of main; live tree untouched
-cd "$WT" && git checkout -q -b <branch>
+# Resolve exactly one target from the already validated capability output.
+target_row="$(awk -F '\t' -v key="$TARGET_KEY" '$1 == key' "$FLEET_TSV")"
+test -n "$target_row" || { echo "Target is outside capability scope" >&2; exit 2; }
+IFS=$'\t' read -r TARGET_KEY TARGET_NAME TARGET_GITHUB TARGET_ROOT_VARIABLE \
+  REPO <<< "$target_row"
+test -n "$REPO" || { echo "Set $TARGET_ROOT_VARIABLE" >&2; exit 2; }
+case "$TARGET_GITHUB" in
+  */*) ;;
+  *) echo "Invalid owner/repository identity: $TARGET_GITHUB" >&2; exit 2 ;;
+esac
 
-# ... apply the change here: copy canonical bytes in, edit recipes, etc. ...
-# e.g. sync a file to the canonical copy from a sibling repo:
-#   (cd "$REPO_OF_CANONICAL" && git show origin/main:<path>) > "$WT/<path>"
+SYNC_DIR="$(mktemp -d "${TMPDIR:-/tmp}/cross-mech-${TARGET_KEY}.XXXXXX")"
+WT="$SYNC_DIR/worktree"
+OPERATION_SCRIPT="$SYNC_DIR/apply-reviewed-change.sh"
+PR_BODY_FILE="$SYNC_DIR/pr-body.md"
+SYNC_ID="${SYNC_DIR##*.}"
+BRANCH="feat/$TASK_SLUG-$SYNC_ID"
+git check-ref-format "refs/heads/$BRANCH"
+touch "$OPERATION_SCRIPT"
+chmod 700 "$OPERATION_SCRIPT"
+"${EDITOR:?Set EDITOR to write the reviewed operation}" "$OPERATION_SCRIPT"
+test -s "$OPERATION_SCRIPT" || { echo "Operation script is empty" >&2; exit 2; }
+touch "$PR_BODY_FILE"
+chmod 600 "$PR_BODY_FILE"
+"${EDITOR:?Set EDITOR to write the PR body}" "$PR_BODY_FILE"
+test -s "$PR_BODY_FILE" || { echo "PR body is empty" >&2; exit 2; }
 
-git add <paths> && git commit -m "<msg>
-
-Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
-git push -q -u origin <branch>
+# This short shared metadata transition is lock-owned. It completes and
+# releases before any worker edit or hook can run.
+run_with_repo_lock "$TARGET_KEY" 300 \
+  git -C "$REPO" fetch origin \
+    refs/heads/main:refs/remotes/origin/main
+run_with_repo_lock "$TARGET_KEY" 300 \
+  git -C "$REPO" worktree add -b "$BRANCH" "$WT" origin/main
+BASE_SHA="$(git -C "$WT" rev-parse HEAD)"
+test "$BASE_SHA" = "$(git -C "$REPO" rev-parse origin/main)"
 ```
 
-After pushing: `gh pr create -R <slug> --base main --head <branch> ...`, then
-merge (below), then **always** `cd "$REPO" && git worktree remove --force "$WT"`.
+The operation file must start with `set -euo pipefail`, take `WT` and `BRANCH`
+as positional arguments, apply only the reviewed change, validate, commit, and
+push the unique branch. It must not contain `eval`, interpolated user prose, a
+remembered repository path, or a worktree deletion. Execute it only after the
+metadata lease above has been released:
 
-### C. Verify before merge
+```bash
+bash "$OPERATION_SCRIPT" "$WT" "$BRANCH"
+```
+
+If the command fails, preserve the unique worktree and report its exact path for
+recovery. Do not remove it automatically. After a successful push, use the
+manifest's `owner/repository` identity—not its display name or basename:
+
+```bash
+gh pr create -R "$TARGET_GITHUB" --base main --head "$BRANCH" \
+  --title "<reviewed title>" --body-file "$PR_BODY_FILE"
+PR_NUMBER="$(gh pr view -R "$TARGET_GITHUB" "$BRANCH" \
+  --json number --jq .number)"
+case "$PR_NUMBER" in
+  ""|*[!0-9]*) echo "Could not resolve the created PR number" >&2; exit 2 ;;
+esac
+```
+
+### E. Verify before merge
 
 - Vendored-file pin: `just verify-validator-pin` → all files `OK`.
 - Tests: `uv run pytest <the synced tests> -q`.
-- CI: `gh pr view <n> -R <slug> --json mergeable,mergeStateStatus,statusCheckRollup`
+- CI: `gh pr view "$PR_NUMBER" -R "$TARGET_GITHUB" --json mergeable,mergeStateStatus,statusCheckRollup`
   → `MERGEABLE` / `CLEAN` and checks `SUCCESS`.
-- Scope: `gh pr view <n> -R <slug> --json files` — confirm no stray files.
+- Scope: `gh pr view "$PR_NUMBER" -R "$TARGET_GITHUB" --json files` — confirm no stray files.
 
-### D. Merge + clean up
+Immediately before merge, close the concurrent-update window as far as local
+automation can: refresh `origin/main`, verify it is an ancestor of the exact
+pushed head, require GitHub checks to pass, and re-check mergeability. If `main`
+advanced, rebase only this unique branch, rerun validation and CI, and repeat
+review as required.
 
 ```bash
-gh pr merge <n> -R <slug> --squash --delete-branch
-# verify: state MERGED, remote+local branch gone
-git ls-remote --heads origin <branch> | grep -c <branch>   # expect 0
+run_with_repo_lock "$TARGET_KEY" 300 \
+  git -C "$WT" fetch origin \
+    refs/heads/main:refs/remotes/origin/main
+
+if ! git -C "$WT" merge-base --is-ancestor origin/main HEAD; then
+  echo "origin/main advanced; rebase and rerun validation/CI" >&2
+  exit 2
+fi
+local_head="$(git -C "$WT" rev-parse HEAD)"
+remote_head="$(git -C "$REPO" ls-remote origin "refs/heads/$BRANCH" \
+  | awk 'NR == 1 {print $1}')"
+test -n "$remote_head"
+test "$local_head" = "$remote_head"
+gh pr checks -R "$TARGET_GITHUB" "$PR_NUMBER"
+pr_gate="$(gh pr view -R "$TARGET_GITHUB" "$PR_NUMBER" \
+  --json baseRefName,headRefName,headRefOid,headRepository,mergeable,mergeStateStatus \
+  --jq '[.baseRefName,.headRefName,.headRefOid,.headRepository.nameWithOwner,.mergeable,.mergeStateStatus] | @tsv')"
+IFS=$'\t' read -r pr_base pr_branch pr_head pr_head_repo pr_mergeable pr_merge_state \
+  <<< "$pr_gate"
+test "$pr_base" = "main"
+test "$pr_branch" = "$BRANCH"
+test "$pr_head" = "$local_head"
+test "$pr_head_repo" = "$TARGET_GITHUB"
+test "$pr_mergeable:$pr_merge_state" = "MERGEABLE:CLEAN"
 ```
 
-### E. Keep the bookkeeping in sync
+### F. Merge + clean up
 
-- Update **`NEXT_TASKS.md`** in each affected repo (mark done / move out; keep the
-  cross-Mech items consistent across the sibling files — they duplicate by hand
-  and drift). Edit it inside the same worktree so it lands in the same PR.
+```bash
+gh pr merge "$PR_NUMBER" -R "$TARGET_GITHUB" --squash --delete-branch \
+  --match-head-commit "$local_head"
+merged_gate="$(gh pr view -R "$TARGET_GITHUB" "$PR_NUMBER" \
+  --json state,baseRefName,headRefName,headRefOid,headRepository \
+  --jq '[.state,.baseRefName,.headRefName,.headRefOid,.headRepository.nameWithOwner] | @tsv')"
+IFS=$'\t' read -r merged_state merged_base merged_branch merged_head merged_head_repo \
+  <<< "$merged_gate"
+test "$merged_state" = "MERGED"
+test "$merged_base" = "main"
+test "$merged_branch" = "$BRANCH"
+test "$merged_head" = "$local_head"
+test "$merged_head_repo" = "$TARGET_GITHUB"
+# Verify the remote branch is absent. Status 2 means no matching ref; any other
+# result either found the branch or failed to query the remote.
+if git -C "$REPO" ls-remote --exit-code --heads origin "$BRANCH"; then
+  echo "Remote branch still exists: $BRANCH" >&2
+  exit 2
+else
+  remote_status=$?
+  test "$remote_status" -eq 2 || exit "$remote_status"
+fi
+
+# Refuse cleanup if validation or the operation left uncommitted state. The
+# unique mktemp path proves this is this run's worktree; removal is never forced.
+test -z "$(git -C "$WT" status --porcelain)"
+test "$(git -C "$WT" rev-parse HEAD)" = "$local_head"
+run_with_repo_lock "$TARGET_KEY" 300 \
+  git -C "$REPO" worktree remove "$WT"
+run_with_repo_lock "$TARGET_KEY" 300 \
+  git -C "$REPO" update-ref -d "refs/heads/$BRANCH" "$local_head"
+rm -- "$OPERATION_SCRIPT" "$PR_BODY_FILE"
+rmdir "$SYNC_DIR"
+```
+
+If cleanup refuses, stop and inspect. Never delete a registered or dirty
+worktree merely because its path resembles an older run. The exact-old-SHA
+`update-ref` deletes a reviewed unique local branch even after a squash merge,
+but refuses if that ref moved after review.
+
+### G. Keep declared bookkeeping in sync
+
+- Update only tracking artifacts explicitly declared by the governing manifest
+  or named in the task. Do not introduce or mutate a `NEXT_TASKS.md` merely
+  because another Mech happens to carry one.
 - Comment + close the tracking issue (often in `culturebotai-claw`); record any
   **decision** made (e.g. "TraitMech deferred — net-new adoption, not a sync").
 
+After every scoped target is complete, remove only the audit file and directory
+created by this run:
+
+```bash
+rm -- "$FLEET_TSV"
+rmdir "$AUDIT_DIR"
+```
+
 ## The vendored byte-identical invariant (reference)
 
-`scripts/validate_id_label_correspondence.py` + `tests/test_id_label_empty_adapter.py`
-+ `tests/test_id_label_unknown_prefix.py` are vendored byte-identical across
-CultureMech / MIM / CommunityMech and guarded by a pin **manifest**:
+The files governed by the ID/label capability are vendored byte-identically
+across every repository returned by:
+
+```bash
+uv run python -m kg_microbe_fleet list --capability id_label_validation --format tsv
+```
+
+They are guarded by a pin manifest:
 
 ```just
 VENDORED_IDLABEL_FILES := "scripts/validate_id_label_correspondence.py tests/test_id_label_empty_adapter.py tests/test_id_label_unknown_prefix.py"
@@ -150,16 +409,13 @@ verify-validator-pin:        # CI runs `sha256sum -c scripts/.validate_id_label_
 refresh-validator-pin:       # rebuilds the sidecar by hashing each VENDORED_IDLABEL_FILES entry
 ```
 
-- The `.sha256` sidecar is a multi-line manifest; all three repos carry an
+- The `.sha256` sidecar is a multi-line manifest; every applicable repo carries an
   **identical** sidecar (hash the sidecar itself to confirm: same → invariant holds).
 - **`conf/id_label_targets.yaml` is intentionally NOT pinned** — it is per-repo
   (different adapters / targets / exceptions). Only the *concept* of
   `ignored_prefixes` stays consistent, not the file.
 - To change a vendored file: edit it, run `just refresh-validator-pin` in **every**
   copy in one coordinated pass, commit the matching sidecar everywhere.
-- **TraitMech** is not yet in the trio (no validator). Adopting it is a net-new
-  task (vendor the files, author a TraitMech-specific conf for its trait-page
-  surfaces, add the recipes + CI), then add it to `VENDORED_IDLABEL_FILES`.
 
 ## Worked examples (this is what "done" looks like)
 

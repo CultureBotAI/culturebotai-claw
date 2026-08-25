@@ -27,8 +27,10 @@ between turns and across concurrent sessions.
 ## Purpose and boundaries
 
 CultureBotAI CLAW coordinates work across five downstream Mech repositories.
-`conf/fleet.yaml` is the canonical list; do not re-declare it in code. Read it
-through `kg_microbe_fleet.load_fleet_manifest()`:
+`src/kg_microbe_fleet/fleet.yaml` is the canonical list; do not re-declare it
+in code. Read it through `kg_microbe_fleet.load_fleet_manifest()`. It lives
+inside the package rather than in `conf/` so installed commands retain the
+manifest when no source checkout is present:
 
 - CultureMech (`CULTUREMECH_ROOT`)
 - MediaIngredientMech, canonically abbreviated MIM
@@ -140,7 +142,7 @@ lease as routine error recovery.
 ## Current architecture
 
 ```text
-agents/       YAML agent definitions; declaration is not execution
+src/kg_microbe_agents/definitions/  packaged YAML agent definitions; declaration is not execution
 cli/          discovery, status, plugin checks, and configuration validation
 plugins/      validated repository adapters and coordination primitives
 pipelines/    curation/orchestration workflows with explicit support status

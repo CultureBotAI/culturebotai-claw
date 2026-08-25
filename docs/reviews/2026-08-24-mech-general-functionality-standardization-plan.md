@@ -58,9 +58,10 @@ fixtures, injected environments, and dry-run command construction.
 
 ### 1. There is no single fleet definition
 
-Claw's core repository settings, `openclaw_config.yaml`, CLI status command, and
-several declarative agents list only CultureMech, MediaIngredientMech, and
-CommunityMech. The cross-Mech synchronization skill includes TraitMech but not
+Claw's core repository settings, packaged
+`kg_microbe_config/openclaw_config.yaml`, CLI status command, and several
+declarative agents list only CultureMech, MediaIngredientMech, and CommunityMech.
+The cross-Mech synchronization skill includes TraitMech but not
 ProteinTraitsMech. Fleet PR and vendored audits know all five.
 
 This is a systemic correctness problem. Every shared tool independently naming
@@ -247,13 +248,28 @@ must be one source of truth for each general contract.
 
 ### Phase 0 — Establish the fleet contract
 
+> **Implementation note (Phase 0, landed).** The manifest ships as
+> `src/kg_microbe_fleet/fleet.yaml`, not `conf/fleet.yaml` as written below.
+> Existing installed commands need the manifest in the wheel; a root `conf/`
+> file is absent after installation. Consumers load one manifest snapshot at
+> command time and inject it into repository settings. Only the location
+> changed; the contract is as specified. Package paths, primary schema paths,
+> and canonical record globs were verified against all five local Mech checkouts
+> on 2026-08-25 and are included in each profile. Repository settings, packaged
+> configuration and agents, CLI queries/status, fleet audits, general skills,
+> capability-scoped workflows, and coordination-hook installation now consume
+> this contract. Source-distribution-to-wheel smoke tests prove the manifest,
+> configuration, and agents work without the source checkout. All acceptance
+> tests are deterministic and provider-credit-free. Domain research focuses
+> remain Phase 2 profile data rather than fleet-identity metadata.
+
 1. Add `conf/fleet.yaml` with all five Mechs, their GitHub identities,
    environment variables, package/schema locations, record globs, and declared
    capabilities.
 2. Model capability status as `enabled`, `disabled`, or `not_applicable`, with a
    required reason for the latter two.
-3. Update `RepositorySettings`, `openclaw_config.yaml`, CLI status, agents,
-   fleet audits, and skills to consume the manifest.
+3. Update `RepositorySettings`, the packaged `openclaw_config.yaml`, CLI status,
+   agents, fleet audits, and skills to consume the manifest.
 4. Add a test that fails when code hard-codes a divergent fleet list.
 5. Update claw metadata and documentation to describe all five Mechs.
 

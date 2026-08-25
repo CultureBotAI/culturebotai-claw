@@ -2,7 +2,7 @@
 
 CultureBotAI CLAW coordinates validation, curation, and shared tooling across
 the five Mech repositories: CultureMech, MediaIngredientMech (MIM),
-CommunityMech, TraitMech, and ProteinTraitsMech. `conf/fleet.yaml` is the
+CommunityMech, TraitMech, and ProteinTraitsMech. `src/kg_microbe_fleet/fleet.yaml` is the
 canonical definition of that fleet. It contains repository-aware plugins,
 file-based coordination, curation pipelines, shared Mech utilities, and fleet
 CI workflows.
@@ -124,7 +124,7 @@ uvx ruff@0.16.3 check cli plugins pipelines src tests
 uv run --extra dev mypy \
   cli/main.py plugins/repository_settings.py plugins/lock_manager.py \
   plugins/git_integration.py plugins/just_runner.py \
-  src/kg_microbe_history src/kg_microbe_kgscan
+  src/kg_microbe_history src/kg_microbe_kgscan src/kg_microbe_fleet
 uv run --extra dev python -m pytest -q \
   --cov=src --cov=cli.main --cov=plugins.repository_settings \
   --cov=plugins.lock_manager --cov=plugins/git_integration \
@@ -140,7 +140,7 @@ Pytest intentionally collects only `tests/`. Root- and `scripts/`-level
 ## Repository map
 
 ```text
-agents/       declarative agent definitions
+src/kg_microbe_agents/definitions/  packaged declarative agent definitions
 cli/          openclaw-cli discovery and validation interface
 pipelines/    orchestration workflows
 plugins/      repository, lock, validation, ontology, and curation adapters

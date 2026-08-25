@@ -10,12 +10,16 @@ model:
   temperature: 0.1
   max_tokens: 4096
 
+repository_scope:
+  source: fleet_manifest
+  capability: release_management
+
 workspace:
   base_dir: ${OPENCLAW_WORKSPACE}
   allowed_paths:
-    - ${CULTUREMECH_ROOT}
-    - ${MEDIAINGREDIENTMECH_ROOT}
-    - ${COMMUNITYMECH_ROOT}
+    source: repository_scope
+    patterns:
+      - "**"
   create_backups: true
   backup_dir: ${OPENCLAW_WORKSPACE}/.backups/releases
 
@@ -74,9 +78,8 @@ tasks:
       - step: update_version_files
         action: "Update pyproject.toml in all repos"
         targets:
-          - "CultureMech/pyproject.toml"
-          - "MediaIngredientMech/pyproject.toml"
-          - "CommunityMech/pyproject.toml"
+          source: repository_scope
+          template: "{repository_root}/pyproject.toml"
       - step: generate_changelogs
         action: "Generate changelog entries from git log"
       - step: run_final_tests
@@ -89,17 +92,15 @@ tasks:
       - name: versions
         type: dict
         required: true
-        description: "Version map: {culturemech: v1.2.0, ...}"
+        description: "Version map keyed by manifest repository key"
       - name: dry_run
         type: bool
         default: true
     workflow:
-      - step: create_culturemech_tag
+      - step: create_repository_tags
         action: "git tag -a vX.Y.Z -m 'Release vX.Y.Z'"
-      - step: create_mediaingredient_tag
-        action: "git tag -a vX.Y.Z -m 'Release vX.Y.Z'"
-      - step: create_communitymech_tag
-        action: "git tag -a vX.Y.Z -m 'Release vX.Y.Z'"
+        repositories:
+          source: repository_scope
       - step: verify_tags
         action: "git tag -l | grep vX.Y.Z"
       - step: push_tags_if_approved
@@ -116,7 +117,8 @@ tasks:
         description: "Previous release tag to compare against"
       - name: repo
         type: string
-        choices: ["culturemech", "mediaingredientmech", "communitymech", "all"]
+        choices_from: repository_scope
+        allow_all: true
         default: "all"
     workflow:
       - step: get_commit_history
@@ -152,7 +154,8 @@ tasks:
         required: true
       - name: repos
         type: list
-        default: ["culturemech", "mediaingredientmech", "communitymech"]
+        default:
+          source: repository_scope
     workflow:
       - step: read_current_versions
         action: "Parse pyproject.toml for current versions"
@@ -187,7 +190,7 @@ tasks:
         action: "All version references match"
       - step: generate_readiness_report
         output:
-          - status: "ready" | "not_ready"
+          - status: {enum: [ready, not_ready]}
           - blockers: [list of issues]
           - recommendations: [suggested actions]
 
@@ -200,7 +203,8 @@ tasks:
         required: true
       - name: repos
         type: list
-        default: ["culturemech", "mediaingredientmech", "communitymech"]
+        default:
+          source: repository_scope
     workflow:
       - step: delete_tags
         action: "git tag -d TAG && git push origin :refs/tags/TAG"
@@ -233,10 +237,11 @@ tasks:
 
 integration:
   version_files:
-    - path: "pyproject.toml"
-      field: "tool.poetry.version"
-    - path: "src/{repo}/__init__.py"
-      pattern: '__version__ = "X.Y.Z"'
+    source: repository_scope
+    canonical:
+      path: "pyproject.toml"
+      field: "project.version"
+    additional_files_policy: adapter_required
 
   changelog_format: "markdown"
   changelog_location: "CHANGELOG.md"

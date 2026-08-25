@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pytest
 
+from kg_microbe_config import default_config_path
 from kg_microbe_fleet import (
     FleetManifestError,
     load_fleet_manifest,
@@ -19,7 +20,7 @@ from kg_microbe_fleet import (
 )
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-MANIFEST_PATH = REPOSITORY_ROOT / "conf" / "fleet.yaml"
+MANIFEST_PATH = REPOSITORY_ROOT / "src" / "kg_microbe_fleet" / "fleet.yaml"
 
 EXPECTED_MECHS = (
     "culturemech",
@@ -121,14 +122,15 @@ def test_exactly_one_vendored_hub_and_it_matches_the_declaration():
 
 
 def test_repository_registry_is_derived_from_the_manifest():
-    """`DEFAULT_REPOSITORIES` was the three-Mech literal that started the drift."""
+    """The old default registry was the three-Mech literal that started drift."""
 
-    from plugins.repository_settings import DEFAULT_REPOSITORIES
+    from plugins.repository_settings import repository_definitions
 
     manifest = load_fleet_manifest(MANIFEST_PATH)
+    definitions = repository_definitions(manifest)
 
-    assert set(DEFAULT_REPOSITORIES) == set(manifest.keys)
-    for key, definition in DEFAULT_REPOSITORIES.items():
+    assert set(definitions) == set(manifest.keys)
+    for key, definition in definitions.items():
         mech = manifest.get(key)
         assert definition.environment_variable == mech.environment_variable
         assert definition.expected_repository == mech.github
@@ -138,11 +140,15 @@ def test_openclaw_config_repositories_match_the_manifest():
     import yaml
 
     document = yaml.safe_load(
-        (REPOSITORY_ROOT / "openclaw_config.yaml").read_text(encoding="utf-8")
+        default_config_path().read_text(encoding="utf-8")
     )
     manifest = load_fleet_manifest(MANIFEST_PATH)
 
     assert set(document["repositories"]) == set(manifest.keys)
+    for key, mech in manifest.mechs.items():
+        assert document["repositories"][key]["path"] == (
+            "${" + mech.environment_variable + "}"
+        )
 
 
 def test_env_example_documents_every_manifest_root():
@@ -157,9 +163,53 @@ def test_env_example_documents_every_manifest_root():
     assert not missing, f".env.example is missing: {', '.join(missing)}"
 
 
+def _mechs_named_in(body: str, manifest) -> list[str]:
+    """The single detector shared by the guard and its meta-test.
+
+    Kept as one function on purpose: when the guard and the test that proves
+    the guard works are separate copies, weakening the guard leaves the proof
+    green — which is how the first version shipped enforcing nothing.
+
+    ``mech.key`` is included because both literals this rule removed were keyed
+    by the lowercase key, so a key-only re-declaration is the most likely
+    regression and the most likely thing to be missed.
+    """
+
+    return sorted(
+        {
+            mech.key
+            for mech in manifest.mechs.values()
+            for token in (
+                mech.key,
+                mech.environment_variable,
+                mech.github,
+                mech.display_name,
+            )
+            if token in body
+        }
+    )
+
+
+def _scannable_body(text: str) -> str:
+    return "\n".join(
+        line for line in text.splitlines() if not line.strip().startswith("#")
+    )
+
+
 @pytest.mark.parametrize(
     "relative_path",
-    ["cli/main.py", "plugins/repository_settings.py"],
+    [
+        "cli/main.py",
+        "plugins/repository_settings.py",
+        "scripts/fleet_pr_status.py",
+        "scripts/check_edison_keys.py",
+        "scripts/environment_coverage_dashboard.py",
+        "scripts/install_hooks.sh",
+        "scripts/audit_idlabel_fleet.sh",
+        "validate_setup.py",
+        ".github/workflows/knowledge-gap-scan.yaml",
+        ".claude/skills/fleet-pr-review/SKILL.md",
+    ],
 )
 def test_supported_components_do_not_hardcode_a_fleet_list(relative_path: str):
     """Reject a reintroduced literal enumerating Mech identities or roots.
@@ -174,21 +224,7 @@ def test_supported_components_do_not_hardcode_a_fleet_list(relative_path: str):
     text = (REPOSITORY_ROOT / relative_path).read_text(encoding="utf-8")
     manifest = load_fleet_manifest(MANIFEST_PATH)
 
-    body = "\n".join(
-        line for line in text.splitlines() if not line.strip().startswith("#")
-    )
-    named = sorted(
-        {
-            mech.key
-            for mech in manifest.mechs.values()
-            for token in (
-                mech.environment_variable,
-                mech.github,
-                mech.display_name,
-            )
-            if token in body
-        }
-    )
+    named = _mechs_named_in(_scannable_body(text), manifest)
 
     assert len(named) < 2, (
         f"{relative_path} enumerates multiple Mechs ({', '.join(named)}); "
@@ -200,7 +236,7 @@ def test_the_hardcoding_guard_would_have_caught_the_literals_it_replaced():
     """The guard must fail against the pre-manifest code, or it proves nothing.
 
     The first version of this check passed against `origin/main`'s three-Mech
-    literals, so it enforced nothing while `conf/fleet.yaml` advertised that it
+    literals, so it enforced nothing while `src/kg_microbe_fleet/fleet.yaml` advertised that it
     did. This pins the guard to a known-bad input.
     """
 
@@ -217,12 +253,7 @@ def test_the_hardcoding_guard_would_have_caught_the_literals_it_replaced():
         ]
     )
 
-    named = {
-        mech.key
-        for mech in manifest.mechs.values()
-        for token in (mech.environment_variable, mech.github, mech.display_name)
-        if token in known_bad
-    }
+    named = _mechs_named_in(known_bad, manifest)
 
     assert len(named) >= 2, (
         "the guard does not detect a one-per-line three-Mech literal, which is "
@@ -305,6 +336,20 @@ def test_malformed_github_identity_is_rejected():
         _parse(_minimal(**{"github: CultureBotAI/CultureMech": "github: CultureMech"}))
 
 
+@pytest.mark.parametrize("repository", [".", ".."])
+def test_github_identity_rejects_path_segments(repository: str):
+    with pytest.raises(FleetManifestError, match="owner/repository"):
+        _parse(
+            _minimal(
+                **{
+                    "github: CultureBotAI/CultureMech": (
+                        f"github: CultureBotAI/{repository}"
+                    )
+                }
+            )
+        )
+
+
 def test_unknown_vendored_role_is_rejected():
     with pytest.raises(FleetManifestError, match="vendored_role"):
         _parse(_minimal(**{"vendored_role: hub": "vendored_role: canonical"}))
@@ -351,8 +396,22 @@ def test_missing_manifest_file_is_rejected():
         load_fleet_manifest(Path("/nonexistent/fleet.yaml"))
 
 
+def test_duplicate_yaml_mapping_key_is_rejected(tmp_path: Path):
+    """A typo must not silently replace an earlier security boundary."""
+
+    manifest_path = tmp_path / "duplicate.yaml"
+    manifest_path.write_text(
+        _minimal(**{"github: CultureBotAI/CultureMech": "github: CultureBotAI/CultureMech\n"
+                    "    github: CultureBotAI/Impostor"}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(FleetManifestError, match="duplicate key 'github'"):
+        load_fleet_manifest(manifest_path)
+
+
 def test_documented_and_ci_mypy_targets_agree():
-    """The type-check gate must be the same in CLAUDE.md and in CI.
+    """The type-check gate must be the same in both docs and CI.
 
     These drifted while adding this package: CLAUDE.md gained
     `src/kg_microbe_fleet` and the workflow did not, so the fail-closed loader
@@ -363,18 +422,48 @@ def test_documented_and_ci_mypy_targets_agree():
     import re
 
     claude = (REPOSITORY_ROOT / "CLAUDE.md").read_text(encoding="utf-8")
+    readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
     workflow = (
         REPOSITORY_ROOT / ".github" / "workflows" / "tests.yaml"
     ).read_text(encoding="utf-8")
 
     documented = re.search(r"uv run --extra dev mypy \\\n(.*?)\nuv run", claude, re.S)
+    readme_documented = re.search(
+        r"uv run --extra dev mypy \\\n(.*?)\nuv run", readme, re.S
+    )
     ci = re.search(r"uv run --extra dev mypy\n(.*?)\n\n", workflow, re.S)
-    assert documented and ci, "could not locate both mypy invocations"
+    assert documented and readme_documented and ci, (
+        "could not locate all three mypy invocations"
+    )
 
     documented_targets = set(documented.group(1).replace("\\", "").split())
+    readme_targets = set(
+        readme_documented.group(1).replace("\\", "").split()
+    )
     ci_targets = set(ci.group(1).split())
 
-    assert documented_targets == ci_targets, (
-        "CLAUDE.md and .github/workflows/tests.yaml disagree on mypy targets: "
-        f"{documented_targets ^ ci_targets}"
+    assert documented_targets == readme_targets == ci_targets, (
+        "README.md, CLAUDE.md, and CI disagree on mypy targets: "
+        f"{(documented_targets ^ ci_targets) | (readme_targets ^ ci_targets)}"
+    )
+
+
+def test_manifest_ships_inside_the_package():
+    """The manifest must be packaged, not left at the repository root.
+
+    `plugins.repository_settings` builds its registry at import time, so a
+    manifest missing from the wheel makes the installed distribution
+    un-importable and the console script unable to start. An editable install
+    hides this, so assert the packaging declaration directly.
+    """
+
+    import tomllib
+
+    manifest_file = Path(__file__).resolve().parents[1] / "pyproject.toml"
+    pyproject = tomllib.loads(manifest_file.read_text(encoding="utf-8"))
+    package_data = pyproject["tool"]["setuptools"]["package-data"]
+
+    assert MANIFEST_PATH.is_file(), "the manifest must live inside the package"
+    assert MANIFEST_PATH.name in package_data.get("kg_microbe_fleet", []), (
+        "kg_microbe_fleet package-data must ship the manifest"
     )

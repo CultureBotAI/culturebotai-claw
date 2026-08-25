@@ -10,18 +10,18 @@ model:
   temperature: 0.1
   max_tokens: 8192
 
+repository_scope:
+  source: fleet_manifest
+  capability: documentation
+
 workspace:
   base_dir: ${OPENCLAW_WORKSPACE}/documentation_agent
   allowed_paths:
-    - "${CULTUREMECH_ROOT}/docs/**"
-    - "${CULTUREMECH_ROOT}/README.md"
-    - "${CULTUREMECH_ROOT}/src/schema/*.yaml"
-    - "${MEDIAINGREDIENTMECH_ROOT}/docs/**"
-    - "${MEDIAINGREDIENTMECH_ROOT}/README.md"
-    - "${MEDIAINGREDIENTMECH_ROOT}/src/schema/*.yaml"
-    - "${COMMUNITYMECH_ROOT}/docs/**"
-    - "${COMMUNITYMECH_ROOT}/README.md"
-    - "${COMMUNITYMECH_ROOT}/src/schema/*.yaml"
+    source: repository_scope
+    patterns:
+      - "docs/**"
+      - "README.md"
+      - "src/**/schema/*.yaml"
   read_only: false
   create_git_branches: true
 
@@ -67,7 +67,7 @@ tasks:
   generate_schema_docs:
     description: "Generate documentation from LinkML schemas"
     parameters:
-      - repo: {type: string, required: true, enum: [culturemech, mediaingredientmech, communitymech]}
+      - repo: {type: string, required: true, choices_from: repository_scope}
       - output_format: {type: string, default: markdown, enum: [markdown, rst, html]}
     workflow:
       - step: read_schema

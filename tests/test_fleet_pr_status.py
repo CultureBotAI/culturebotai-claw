@@ -18,12 +18,12 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from fleet_pr_status import (  # noqa: E402
-    FLEET_PATTERN,
-    PREFERRED_ORDER,
     _mergeable,
-    order_repos,
+    fleet_repository_identities,
     render,
 )
+
+from kg_microbe_fleet import load_fleet_manifest  # noqa: E402
 
 
 def _pr(number: int, **kw) -> dict:
@@ -40,11 +40,11 @@ def _data(**kw) -> dict:
     base = {
         "org": "CultureBotAI",
         "repos_queried": ["culturebotai-claw", "TraitMech"],
-        "unexpected_repos": [],
-        "org_repo_count": 38,
-        "repo_limit": 300,
+        "repository_identities": {
+            "culturebotai-claw": "CultureBotAI/culturebotai-claw",
+            "TraitMech": "CultureBotAI/TraitMech",
+        },
         "pr_limit": 200,
-        "repo_listing_truncated": False,
         "pr_listing_truncated": [],
         "prs": {"culturebotai-claw": [_pr(1)], "TraitMech": []},
         "errors": {},
@@ -57,38 +57,60 @@ def _data(**kw) -> dict:
 # fleet membership
 # --------------------------------------------------------------------------
 
-@pytest.mark.parametrize("name", [
-    "culturebotai-claw", "CultureMech", "MediaIngredientMech",
-    "CommunityMech", "TraitMech", "proteintraitsmech",
-])
-def test_every_known_fleet_repo_matches(name):
-    assert FLEET_PATTERN.search(name)
+def test_the_sweep_queries_exactly_the_manifest_fleet():
+    """Every Mech in the manifest is swept, and nothing else is."""
+
+    manifest = load_fleet_manifest()
+    identities = fleet_repository_identities(manifest)
+
+    for mech in manifest.mechs.values():
+        assert mech.github in identities, f"{mech.key} is not swept"
+    # claw itself plus exactly the manifest Mechs -- no more.
+    assert len(identities) == len(manifest.keys) + 1
 
 
-@pytest.mark.parametrize("name", [
-    "MicroGrowAgents", "PFASCommunityAgents", "kg-microbe", "CultureBotHT",
-    "MicroMediaParam", "bsdbng", "wizard-claw",
-])
-def test_non_fleet_repos_do_not_match(name):
-    """`claw` alone must not match -- only the exact repo name does."""
-    assert not FLEET_PATTERN.search(name)
+def test_an_org_repo_not_in_the_manifest_is_not_swept():
+    assert "CultureBotAI/HabitatMech" not in fleet_repository_identities()
 
 
-def test_a_new_mech_is_picked_up_and_flagged_rather_than_absorbed():
-    """A sixth Mech must appear in the report AND be called out, not silently
-    folded in as though it had always been there."""
-    ordered, extra = order_repos(list(PREFERRED_ORDER) + ["EnzymeMech"])
-    assert "EnzymeMech" in ordered
-    assert extra == ["EnzymeMech"]
-    out = render(_data(repos_queried=ordered, unexpected_repos=extra,
-                       prs={r: [] for r in ordered}), include_drafts=True)
-    assert "NEW repos not in the known fleet list: EnzymeMech" in out
+def test_adding_a_mech_to_the_manifest_adds_it_to_the_sweep():
+    """Membership is now declared, not discovered.
+
+    The previous implementation pattern-matched the GitHub org and flagged
+    repositories it had not seen before. Deriving the list from the manifest
+    means a Mech is swept as soon as it is declared -- but also that a
+    repository created in the org and never added to the manifest is invisible
+    here. That trade is deliberate: the manifest is the fleet's definition.
+    """
+
+    manifest = load_fleet_manifest()
+    before = fleet_repository_identities(manifest)
+
+    class _Extended:
+        mechs = {
+            **manifest.mechs,
+            "enzymemech": type(
+                "M", (), {"github": "CultureBotAI/EnzymeMech"}
+            )(),
+        }
+        keys = tuple(manifest.keys) + ("enzymemech",)
+
+    after = fleet_repository_identities(_Extended())
+
+    assert "CultureBotAI/EnzymeMech" not in before
+    assert "CultureBotAI/EnzymeMech" in after
 
 
-def test_repo_order_is_stable_regardless_of_discovery_order():
-    a, _ = order_repos(["TraitMech", "culturebotai-claw", "CultureMech"])
-    b, _ = order_repos(["CultureMech", "TraitMech", "culturebotai-claw"])
-    assert a == b == ["culturebotai-claw", "CultureMech", "TraitMech"]
+def test_repo_order_is_stable_and_follows_manifest_order():
+    manifest = load_fleet_manifest()
+
+    first = fleet_repository_identities(manifest)
+    second = fleet_repository_identities(manifest)
+
+    assert first == second
+    assert [identity for identity in first[1:]] == [
+        mech.github for mech in manifest.mechs.values()
+    ]
 
 
 # --------------------------------------------------------------------------
@@ -122,29 +144,12 @@ def test_an_unqueryable_repo_is_named_and_the_total_marked_a_lower_bound():
     assert "TraitMech=0" not in out
 
 
-def test_repo_discovery_truncation_warns_that_whole_repos_may_be_missing():
-    """The two limits fail differently and the warning must say which knob to
-    turn: repo truncation drops ENTIRE REPOS, which is the worse failure."""
-    out = render(_data(repo_listing_truncated=True, repo_limit=5),
-                 include_drafts=True)
-    assert "WARNING" in out
-    assert "--repo-limit (5)" in out
-    assert "ENTIRE REPOS" in out
-    assert "--pr-limit" not in out
-
-
 def test_pr_listing_truncation_names_the_affected_repos():
     out = render(_data(pr_listing_truncated=["CultureMech", "TraitMech"],
                        pr_limit=30), include_drafts=True)
     assert "--pr-limit (30)" in out
     assert "CultureMech, TraitMech" in out
     assert "--repo-limit" not in out
-
-
-def test_the_two_truncation_warnings_are_independent():
-    both = render(_data(repo_listing_truncated=True,
-                        pr_listing_truncated=["TraitMech"]), include_drafts=True)
-    assert "--repo-limit" in both and "--pr-limit" in both
 
 
 def test_clean_run_makes_no_warning_noise():
@@ -236,10 +241,8 @@ import json as _json  # noqa: E402
 import fleet_pr_status as fps  # noqa: E402
 
 
-def _fake_gh(repos: list[str], prs_by_repo: dict[str, int]):
+def _fake_gh(prs_by_repo: dict[str, int]):
     def _gh(args, timeout=60):
-        if args[0] == "repo":
-            return _json.dumps([{"name": n} for n in repos])
         repo = args[args.index("--repo") + 1].split("/")[1]
         n = prs_by_repo.get(repo, 0)
         return _json.dumps([
@@ -254,47 +257,29 @@ def _fake_gh(repos: list[str], prs_by_repo: dict[str, int]):
 def test_collect_records_pr_truncation_per_repo(monkeypatch):
     monkeypatch.setattr(
         fps, "_gh",
-        _fake_gh(["TraitMech", "CultureMech"], {"TraitMech": 3, "CultureMech": 1}),
+        _fake_gh({"TraitMech": 3, "CultureMech": 1}),
     )
-    data = fps.collect("Org", repo_limit=50, pr_limit=3)
+    data = fps.collect(pr_limit=3)
     assert data["pr_listing_truncated"] == ["TraitMech"]
-    assert data["repo_listing_truncated"] is False
-
-
-def test_collect_records_repo_truncation_when_discovery_fills_the_limit(monkeypatch):
-    monkeypatch.setattr(fps, "_gh", _fake_gh(["TraitMech", "CultureMech"], {}))
-    data = fps.collect("Org", repo_limit=2, pr_limit=50)
-    assert data["repo_listing_truncated"] is True
 
 
 def test_collect_records_nothing_truncated_on_a_roomy_run(monkeypatch):
-    monkeypatch.setattr(fps, "_gh", _fake_gh(["TraitMech"], {"TraitMech": 2}))
-    data = fps.collect("Org", repo_limit=50, pr_limit=50)
-    assert data["repo_listing_truncated"] is False
+    monkeypatch.setattr(fps, "_gh", _fake_gh({"TraitMech": 2}))
+    data = fps.collect(pr_limit=50)
     assert data["pr_listing_truncated"] == []
     assert len(data["prs"]["TraitMech"]) == 2
 
 
 def test_collect_captures_a_failing_repo_instead_of_dropping_it(monkeypatch):
     def _gh(args, timeout=60):
-        if args[0] == "repo":
-            return _json.dumps([{"name": "TraitMech"}, {"name": "CultureMech"}])
         if "CultureMech" in args[args.index("--repo") + 1]:
             raise fps.GhError("HTTP 502")
         return _json.dumps([])
     monkeypatch.setattr(fps, "_gh", _gh)
-    data = fps.collect("Org", repo_limit=50, pr_limit=50)
+    data = fps.collect(pr_limit=50)
     assert "CultureMech" in data["errors"]
     assert "CultureMech" not in data["prs"]
     assert "TraitMech" in data["prs"]
-
-
-def test_collect_filters_non_fleet_repos_out_of_discovery(monkeypatch):
-    monkeypatch.setattr(
-        fps, "_gh", _fake_gh(["TraitMech", "PFASCommunityAgents", "kg-microbe"], {}),
-    )
-    data = fps.collect("Org", repo_limit=50, pr_limit=50)
-    assert data["repos_queried"] == ["TraitMech"]
 
 
 # --------------------------------------------------------------------------
@@ -305,6 +290,7 @@ import csv as _csv  # noqa: E402
 
 from fleet_pr_status import (  # noqa: E402
     TSV_COLUMNS,
+    main,
     snapshot_is_complete,
     tsv_path,
     tsv_rows,
@@ -319,6 +305,23 @@ def _read(path):
         return list(_csv.DictReader(f, delimiter="\t"))
 
 
+def test_nonpositive_pr_limit_is_rejected_before_any_gh_call(capsys):
+    assert main(["--pr-limit", "0", "--no-tsv"]) == 2
+    assert "must be a positive integer" in capsys.readouterr().err
+
+
+def test_main_returns_nonzero_for_a_truncated_snapshot(monkeypatch, capsys):
+    monkeypatch.setattr(fps.shutil, "which", lambda command: "/usr/bin/gh")
+    monkeypatch.setattr(
+        fps,
+        "collect",
+        lambda pr_limit: _data(pr_listing_truncated=["TraitMech"]),
+    )
+
+    assert main(["--no-tsv"]) == 1
+    assert "WARNING" in capsys.readouterr().out
+
+
 def test_tsv_is_datestamped_from_the_snapshot_not_the_clock(tmp_path):
     """The filename must come from the passed timestamp, so a caller can
     reproduce a snapshot's name without waiting for the right day."""
@@ -330,17 +333,15 @@ def test_an_incomplete_snapshot_is_marked_partial_in_the_FILENAME(tmp_path):
     """The console warning does not survive; a month later the file is all
     anyone has, so incompleteness has to travel with it."""
     for bad in ({"errors": {"TraitMech": "502"}},
-                {"repo_listing_truncated": True},
                 {"pr_listing_truncated": ["CultureMech"]}):
         p = write_tsv(_data(**bad), tmp_path, SNAP)
         assert p.name.endswith(".partial.tsv"), bad
     assert write_tsv(_data(), tmp_path, SNAP).name == "fleet_pr_status_2026-08-04.tsv"
 
 
-def test_snapshot_is_complete_reflects_all_three_failure_modes():
+def test_snapshot_is_complete_reflects_both_failure_modes():
     assert snapshot_is_complete(_data()) is True
     assert snapshot_is_complete(_data(errors={"x": "y"})) is False
-    assert snapshot_is_complete(_data(repo_listing_truncated=True)) is False
     assert snapshot_is_complete(_data(pr_listing_truncated=["x"])) is False
 
 
@@ -376,6 +377,29 @@ def test_titles_are_flattened_so_a_tab_or_newline_cannot_break_the_tsv(tmp_path)
     assert len(rows) == 1
 
 
+@pytest.mark.parametrize(
+    ("title", "safe_title"),
+    [
+        ("=SUM(A1:A2)", "'=SUM(A1:A2)"),
+        ("  +cmd|' /C calc'!A0", "'+cmd|' /C calc'!A0"),
+        ("\t-2+3", "'-2+3"),
+        ("\n@SUM(1,2)", "'@SUM(1,2)"),
+    ],
+)
+def test_formula_titles_are_neutralized_after_tsv_flattening(
+    tmp_path, title, safe_title
+):
+    data = _data(
+        prs={"culturebotai-claw": [_pr(1, title=title)], "TraitMech": []}
+    )
+    path = write_tsv(data, tmp_path, SNAP)
+
+    assert _read(path)[0]["title"] == safe_title
+    raw_cells = path.read_text().splitlines()[1].split("\t")
+    assert raw_cells[4] == safe_title
+    assert len(raw_cells) == len(TSV_COLUMNS)
+
+
 def test_a_failed_repo_contributes_no_rows_but_the_file_is_marked(tmp_path):
     data = _data(prs={"culturebotai-claw": [_pr(1)]},
                  errors={"TraitMech": "HTTP 502"})
@@ -388,6 +412,87 @@ def test_rerunning_the_same_date_overwrites_rather_than_appending(tmp_path):
     write_tsv(_data(), tmp_path, SNAP)
     p = write_tsv(_data(), tmp_path, SNAP)
     assert len(_read(p)) == 1
+
+
+def test_rerun_removes_the_stale_opposite_completeness_marker(tmp_path):
+    complete = write_tsv(_data(), tmp_path, SNAP)
+    partial = write_tsv(
+        _data(errors={"TraitMech": "temporarily unavailable"}), tmp_path, SNAP
+    )
+    assert partial.exists()
+    assert not complete.exists()
+
+    complete = write_tsv(_data(), tmp_path, SNAP)
+    assert complete.exists()
+    assert not partial.exists()
+
+
+def test_snapshot_transition_is_serialized_under_one_persistent_lock(
+    tmp_path, monkeypatch
+):
+    """Replace and opposite-marker deletion must be one locked transition."""
+    complete = tsv_path(tmp_path, SNAP, complete=True)
+    partial = tsv_path(tmp_path, SNAP, complete=False)
+    partial.write_text("stale partial snapshot")
+    lock_path = fps._snapshot_lock_path(tmp_path, SNAP)
+    events = []
+    lock_held = False
+    real_flock = fps.fcntl.flock
+    real_replace = fps.os.replace
+    real_unlink = fps.Path.unlink
+
+    def tracking_flock(fd, operation):
+        nonlocal lock_held
+        if operation == fps.fcntl.LOCK_EX:
+            assert not lock_held
+            lock_held = True
+            events.append("lock")
+        elif operation == fps.fcntl.LOCK_UN:
+            assert lock_held
+            events.append("unlock")
+            lock_held = False
+        return real_flock(fd, operation)
+
+    def tracking_replace(source, destination):
+        assert lock_held
+        events.append("replace")
+        return real_replace(source, destination)
+
+    def tracking_unlink(path, *args, **kwargs):
+        assert path != lock_path, "the stable lock file must never be unlinked"
+        if path in {complete, partial}:
+            assert lock_held
+            events.append("delete-counterpart")
+        return real_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(fps.fcntl, "flock", tracking_flock)
+    monkeypatch.setattr(fps.os, "replace", tracking_replace)
+    monkeypatch.setattr(fps.Path, "unlink", tracking_unlink)
+
+    assert write_tsv(_data(), tmp_path, SNAP) == complete
+    assert events == ["lock", "replace", "delete-counterpart", "unlock"]
+    assert lock_path.exists()
+    assert lock_path.stat().st_mode & 0o777 == 0o600
+
+    # A partial writer for the same date must reuse the exact same lock path.
+    events.clear()
+    assert write_tsv(
+        _data(errors={"TraitMech": "temporarily unavailable"}), tmp_path, SNAP
+    ) == partial
+    assert events == ["lock", "replace", "delete-counterpart", "unlock"]
+    assert lock_path.exists()
+
+
+def test_snapshot_lock_rejects_a_symlink(tmp_path):
+    outside = tmp_path / "outside"
+    outside.write_text("do not follow", encoding="utf-8")
+    lock_path = fps._snapshot_lock_path(tmp_path, SNAP)
+    lock_path.symlink_to(outside)
+
+    with pytest.raises(OSError):
+        write_tsv(_data(), tmp_path, SNAP)
+
+    assert outside.read_text(encoding="utf-8") == "do not follow"
 
 
 def test_tsv_rows_are_ordered_by_the_fixed_repo_order(tmp_path):

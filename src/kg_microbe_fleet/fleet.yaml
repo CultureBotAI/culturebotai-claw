@@ -1,0 +1,313 @@
+# Canonical fleet manifest.
+#
+# This file is the single source of truth for which repositories constitute the
+# Mech fleet. Before it existed, at least three independent lists disagreed:
+# `plugins/repository_settings.py` and `cli/main.py` knew three Mechs, the
+# cross-mech-sync skill knew four, and `scripts/fleet_pr_status.py` knew five.
+# Every fleet-facing component must derive its repository list from here rather
+# than re-declaring one. The manifest, agent, workflow, script, and general-skill
+# contract tests enforce the supported consumer set and check that packaged
+# configuration and `.env.example` agree. Domain-specific pipelines may name
+# scientific inputs, but those names never redefine fleet membership.
+#
+# Package, schema, and record paths below were checked against each local Mech
+# checkout on 2026-08-25. They are repository-relative POSIX paths so consumers
+# never need to infer a sibling-checkout layout.
+
+version: 1
+
+# Canonical capability catalogue. Every Mech must declare every key exactly
+# once. The loader rejects omissions and unknown keys, so an absent declaration
+# can never silently mean "off". Status is one of enabled / disabled /
+# not_applicable; the latter two require a reason.
+capability_catalogue:
+  id_label_validation: {}
+  curation_history: {}
+  strict_validation: {}
+  schema_sync: {}
+  release_management: {}
+  build_coordination: {}
+  documentation: {}
+  testing: {}
+  refactoring: {}
+  coordination_hooks: {}
+  deep_research: {}
+  edison_key_discovery: {}
+  environment_coverage:
+    settings:
+      record_globs:
+        type: string_list
+        required_when_enabled: true
+  knowledge_gap_scan:
+    settings:
+      window:
+        type: integer
+        required_when_enabled: true
+        minimum: 1
+  vendored_sync: {}
+
+# Vendored shared-file governance roles.
+#
+#   hub    holds the canonical copy that spokes diff against
+#   spoke  vendors byte-identical copies and checks them against the hub
+#
+# Today CultureMech is the hub (`shared/spoke/scripts/check_vendored_sync.sh`
+# pins `CANON_REPO="CultureBotAI/CultureMech"`). Phase 1 of the standardization
+# plan proposes moving that authority to claw; this manifest records the
+# current state, not the intended end state.
+vendored_hub: culturemech
+
+mechs:
+  culturemech:
+    display_name: CultureMech
+    github: CultureBotAI/CultureMech
+    environment_variable: CULTUREMECH_ROOT
+    package_path: src/culturemech
+    schema_paths:
+      - src/culturemech/schema/culturemech.yaml
+    record_globs:
+      - data/merge_yaml/merged/*.yaml
+    vendored_role: hub
+    capabilities:
+      id_label_validation:
+        status: enabled
+      curation_history:
+        status: enabled
+      strict_validation:
+        status: enabled
+      schema_sync:
+        status: enabled
+      release_management:
+        status: enabled
+      build_coordination:
+        status: enabled
+      documentation:
+        status: enabled
+      testing:
+        status: enabled
+      refactoring:
+        status: enabled
+      coordination_hooks:
+        status: enabled
+      deep_research:
+        status: enabled
+      edison_key_discovery:
+        status: enabled
+      environment_coverage:
+        status: enabled
+        settings:
+          record_globs:
+            - data/merge_yaml/merged/*.yaml
+      knowledge_gap_scan:
+        status: enabled
+        settings:
+          window: 300
+      vendored_sync:
+        status: not_applicable
+        reason: >-
+          Canonical hub for the vendored shared files. A hub-side copy of
+          check_vendored_sync.sh would diff the hub against itself, which is
+          the self-referential-pin anti-pattern the spoke design replaced.
+
+  mediaingredientmech:
+    display_name: MediaIngredientMech
+    github: CultureBotAI/MediaIngredientMech
+    environment_variable: MEDIAINGREDIENTMECH_ROOT
+    package_path: src/mediaingredientmech
+    schema_paths:
+      - src/mediaingredientmech/schema/mediaingredientmech.yaml
+    record_globs:
+      - data/ingredients/**/*.yaml
+    vendored_role: spoke
+    capabilities:
+      id_label_validation:
+        status: enabled
+      curation_history:
+        status: enabled
+      strict_validation:
+        status: enabled
+      schema_sync:
+        status: enabled
+      release_management:
+        status: enabled
+      build_coordination:
+        status: enabled
+      documentation:
+        status: enabled
+      testing:
+        status: enabled
+      refactoring:
+        status: enabled
+      coordination_hooks:
+        status: enabled
+      deep_research:
+        status: enabled
+      edison_key_discovery:
+        status: enabled
+      environment_coverage:
+        status: enabled
+        settings:
+          record_globs:
+            - data/ingredients/**/*.yaml
+      knowledge_gap_scan:
+        status: enabled
+        settings:
+          window: 300
+      vendored_sync:
+        status: enabled
+
+  communitymech:
+    display_name: CommunityMech
+    github: CultureBotAI/CommunityMech
+    environment_variable: COMMUNITYMECH_ROOT
+    package_path: src/communitymech
+    schema_paths:
+      - src/communitymech/schema/communitymech.yaml
+    record_globs:
+      - kb/communities/*.yaml
+      - data/isolates/*.yaml
+    vendored_role: spoke
+    capabilities:
+      id_label_validation:
+        status: enabled
+      curation_history:
+        status: enabled
+      strict_validation:
+        status: enabled
+      schema_sync:
+        status: enabled
+      release_management:
+        status: enabled
+      build_coordination:
+        status: enabled
+      documentation:
+        status: enabled
+      testing:
+        status: enabled
+      refactoring:
+        status: enabled
+      coordination_hooks:
+        status: enabled
+      deep_research:
+        status: enabled
+      edison_key_discovery:
+        status: enabled
+      environment_coverage:
+        status: enabled
+        settings:
+          # Preserve the dashboard's original isolate-inventory scope. General
+          # CommunityMech consumers may also use kb/communities/*.yaml.
+          record_globs:
+            - data/isolates/*.yaml
+      knowledge_gap_scan:
+        status: enabled
+        settings:
+          window: 305
+      vendored_sync:
+        status: enabled
+
+  traitmech:
+    display_name: TraitMech
+    github: CultureBotAI/TraitMech
+    environment_variable: TRAITMECH_ROOT
+    package_path: src/traitmech
+    schema_paths:
+      - src/traitmech/schema/traitmech.yaml
+    record_globs:
+      - data/traits/**/*.yaml
+    vendored_role: spoke
+    capabilities:
+      id_label_validation:
+        status: enabled
+      curation_history:
+        status: enabled
+      strict_validation:
+        status: enabled
+      schema_sync:
+        status: enabled
+      release_management:
+        status: enabled
+      build_coordination:
+        status: enabled
+      documentation:
+        status: enabled
+      testing:
+        status: enabled
+      refactoring:
+        status: enabled
+      coordination_hooks:
+        status: enabled
+      deep_research:
+        status: enabled
+      edison_key_discovery:
+        status: enabled
+      environment_coverage:
+        status: not_applicable
+        reason: >-
+          Environment coverage currently compares culture media, ingredients,
+          and microbial communities; trait records are not an environment
+          inventory input.
+      knowledge_gap_scan:
+        status: enabled
+        settings:
+          window: 300
+      vendored_sync:
+        status: enabled
+
+  proteintraitsmech:
+    # The GitHub slug is lowercase while the display name is CamelCase. Code
+    # that reconstructs the identity from the display name gets a 404, so the
+    # `github` field below is authoritative.
+    display_name: ProteinTraitsMech
+    github: CultureBotAI/proteintraitsmech
+    environment_variable: PROTEINTRAITSMECH_ROOT
+    package_path: src/proteintraitsmech
+    schema_paths:
+      - src/proteintraitsmech/schema/proteintraitsmech.yaml
+    record_globs:
+      - data/traits/**/*.yaml
+    vendored_role: spoke
+    capabilities:
+      id_label_validation:
+        status: enabled
+      curation_history:
+        status: enabled
+      strict_validation:
+        status: enabled
+      schema_sync:
+        status: enabled
+      release_management:
+        status: enabled
+      build_coordination:
+        status: enabled
+      documentation:
+        status: enabled
+      testing:
+        status: enabled
+      refactoring:
+        status: enabled
+      coordination_hooks:
+        status: enabled
+      deep_research:
+        status: enabled
+      edison_key_discovery:
+        status: not_applicable
+        reason: >-
+          ProteinTraitsMech does not use an Edison research-provider key;
+          provider integration is configured through its own supported
+          credential surfaces.
+      environment_coverage:
+        status: not_applicable
+        reason: >-
+          Environment coverage currently compares culture media, ingredients,
+          and microbial communities; protein-trait records are not an
+          environment inventory input.
+      knowledge_gap_scan:
+        status: not_applicable
+        reason: >-
+          Record-level knowledge-gap scanning targets curated per-record
+          discussion text. This corpus is ontology-derived, so there is no
+          per-record gap surface to scan; the repository is correspondingly
+          absent from the knowledge-gap-scan workflow matrix.
+      vendored_sync:
+        status: enabled

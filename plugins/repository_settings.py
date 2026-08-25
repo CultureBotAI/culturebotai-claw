@@ -10,15 +10,23 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from io import StringIO
+from math import isfinite
 from pathlib import Path
 from string import Template
-from typing import Any, Mapping, Optional
+from types import MappingProxyType
+from typing import Any, Mapping, Optional, cast
 from urllib.parse import urlparse
 
 import yaml  # type: ignore[import-untyped]
+from dotenv import dotenv_values
+from dotenv.parser import parse_stream
 from git import GitCommandError, InvalidGitRepositoryError, NoSuchPathError, Repo
 
-from kg_microbe_fleet import load_fleet_manifest
+from kg_microbe_fleet import FleetManifest, UniqueKeySafeLoader, load_fleet_manifest
+
+_MAX_ENVIRONMENT_EXPANSIONS = 32
+_ESCAPED_DOLLAR_SENTINEL = "\ue000KG_MICROBE_ESCAPED_DOLLAR\ue001"
 
 
 class RepositoryConfigurationError(ValueError):
@@ -36,30 +44,109 @@ class RepositoryNotConfiguredError(RepositoryConfigurationError):
     """
 
 
+def merged_repository_environment(
+    dotenv_path: Optional[Path] = None,
+    environ: Optional[Mapping[str, str]] = None,
+) -> dict[str, str]:
+    """Return repository-root variables with exported values taking precedence.
+
+    Dotenv loading is always explicit: callers choose the exact file rather
+    than searching from their current directory. An explicitly selected path
+    must be a regular, non-symlink file. The process environment is never
+    mutated and unrelated values are never printed.
+    """
+
+    exported = dict(os.environ if environ is None else environ)
+    if dotenv_path is None:
+        return exported
+
+    path = dotenv_path.expanduser()
+    if path.is_symlink():
+        raise RepositoryConfigurationError(
+            f"dotenv file must be a regular, non-symlink file: {path}"
+        )
+    if not path.exists():
+        raise RepositoryConfigurationError(f"dotenv file does not exist: {path}")
+    if not path.is_file():
+        raise RepositoryConfigurationError(
+            f"dotenv path must be a regular file: {path}"
+        )
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise RepositoryConfigurationError(
+            f"unable to read dotenv file {path}: {exc}"
+        ) from exc
+    seen: set[str] = set()
+    for binding in parse_stream(StringIO(text)):
+        if binding.error:
+            raise RepositoryConfigurationError(
+                f"dotenv file is malformed at line {binding.original.line}: {path}"
+            )
+        if binding.key is None:
+            continue
+        if binding.key in seen:
+            raise RepositoryConfigurationError(
+                f"dotenv file has duplicate key {binding.key!r}: {path}"
+            )
+        seen.add(binding.key)
+
+    # Prevalidation above is necessary because python-dotenv otherwise logs a
+    # warning and returns a partial mapping for malformed input.
+    # Expansion belongs to the repository-path resolver below. Letting
+    # python-dotenv interpolate here silently turns an unknown variable into
+    # an empty string (for example ``${MISSING}/repo`` becomes ``/repo``),
+    # which can redirect an operation to an unintended checkout.
+    loaded = dotenv_values(stream=StringIO(text), verbose=False, interpolate=False)
+    merged = {
+        key: value
+        for key, value in loaded.items()
+        if isinstance(key, str) and isinstance(value, str)
+    }
+    merged.update(exported)
+    return merged
+
+
 @dataclass(frozen=True)
 class RepositoryDefinition:
     """Static identity and environment-variable mapping for a repository."""
 
     environment_variable: str
     expected_repository: str
+    display_name: str = ""
 
 
-def _definitions_from_manifest() -> "dict[str, RepositoryDefinition]":
+def repository_definitions(
+    manifest: Optional[FleetManifest] = None,
+) -> "dict[str, RepositoryDefinition]":
     """Derive the repository registry from the canonical fleet manifest.
 
     The registry used to be a literal here, which is how it drifted to three
     Mechs while other components knew four or five. Deriving it means adding a
-    repository to ``conf/fleet.yaml`` is sufficient.
+    repository to the manifest is sufficient.
+
+    ``display_name`` is carried for consumers that need presentation metadata.
+    The definitions are resolved when settings are built, never frozen at
+    import time, so a command can load one manifest and inject that same
+    snapshot into every consumer.
     """
 
-    manifest = load_fleet_manifest()
+    manifest = manifest or load_fleet_manifest()
     return {
-        key: RepositoryDefinition(mech.environment_variable, mech.github)
+        key: RepositoryDefinition(
+            mech.environment_variable, mech.github, mech.display_name
+        )
         for key, mech in manifest.mechs.items()
     }
 
 
-DEFAULT_REPOSITORIES: Mapping[str, RepositoryDefinition] = _definitions_from_manifest()
+# Backward-compatible read-only snapshot for callers that imported the symbol
+# before the fleet manifest was centralized. Supported commands deliberately
+# call ``repository_definitions(manifest)`` instead so one command uses one
+# injected manifest snapshot. New integrations should do the same.
+DEFAULT_REPOSITORIES: Mapping[str, RepositoryDefinition] = MappingProxyType(
+    repository_definitions()
+)
 
 KNOWN_CONFIGURATION_SECTIONS = {
     "openclaw",
@@ -74,7 +161,11 @@ KNOWN_CONFIGURATION_SECTIONS = {
 
 
 def _is_number(value: Any) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool)
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and (not isinstance(value, float) or isfinite(value))
+    )
 
 
 def configuration_structure_errors(config: Mapping[str, Any]) -> list[str]:
@@ -90,6 +181,63 @@ def configuration_structure_errors(config: Mapping[str, Any]) -> list[str]:
         value = config.get(section)
         if section in config and not isinstance(value, Mapping):
             errors.append(f"'{section}' must be a mapping")
+
+    section_keys = {
+        "openclaw": {"version", "mode", "log_level", "workspace"},
+        "agents": {"discovery_paths", "defaults"},
+        "plugins": {"enabled", "paths"},
+        "safety": {
+            "require_approval_for",
+            "create_backups",
+            "backup_directory",
+            "allowed_operations",
+        },
+        "monitoring": {
+            "enable_logging",
+            "log_directory",
+            "metrics_enabled",
+            "cost_tracking",
+            "max_cost_per_run",
+        },
+        "performance": {"parallel_agents", "cache_enabled", "cache_ttl"},
+    }
+    for section, allowed in section_keys.items():
+        section_value = config.get(section)
+        if not isinstance(section_value, Mapping):
+            continue
+        unknown_section_keys = set(section_value) - allowed
+        if unknown_section_keys:
+            names = ", ".join(sorted(str(key) for key in unknown_section_keys))
+            errors.append(f"'{section}' has unknown keys: {names}")
+
+    repositories = config.get("repositories")
+    if isinstance(repositories, Mapping):
+        allowed_repository_keys = {
+            "path",
+            "type",
+            "package_manager",
+            "task_runner",
+            "description",
+        }
+        for name, repository in repositories.items():
+            if isinstance(repository, str):
+                continue
+            if not isinstance(repository, Mapping):
+                errors.append(
+                    f"'repositories.{name}' must be a mapping or path string"
+                )
+                continue
+            unknown_repository_keys = set(repository) - allowed_repository_keys
+            if unknown_repository_keys:
+                unknown_names = ", ".join(
+                    sorted(str(key) for key in unknown_repository_keys)
+                )
+                errors.append(
+                    f"'repositories.{name}' has unknown keys: {unknown_names}"
+                )
+            for key, value in repository.items():
+                if key in allowed_repository_keys and not isinstance(value, str):
+                    errors.append(f"'repositories.{name}.{key}' must be a string")
 
     def expect(section: str, key: str, expected: type, description: str) -> None:
         section_value = config.get(section)
@@ -113,6 +261,28 @@ def configuration_structure_errors(config: Mapping[str, Any]) -> list[str]:
         if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
             errors.append(f"'{section}.{key}' must be a list of strings")
 
+    def expect_range(
+        mapping: Mapping[str, Any],
+        key: str,
+        label: str,
+        *,
+        minimum: float,
+        maximum: float | None = None,
+    ) -> None:
+        value = mapping.get(key)
+        if not _is_number(value):
+            return
+        numeric_value = cast("int | float", value)
+        if numeric_value < minimum or (
+            maximum is not None and numeric_value > maximum
+        ):
+            bounds = (
+                f"between {minimum:g} and {maximum:g}"
+                if maximum is not None
+                else f"at least {minimum:g}"
+            )
+            errors.append(f"'{label}.{key}' must be {bounds}")
+
     for key in ("version", "mode", "log_level", "workspace"):
         expect("openclaw", key, str, "a string")
     expect_string_list("agents", "discovery_paths")
@@ -131,6 +301,18 @@ def configuration_structure_errors(config: Mapping[str, Any]) -> list[str]:
     expect("performance", "parallel_agents", int, "an integer")
     expect("performance", "cache_enabled", bool, "a boolean")
     expect("performance", "cache_ttl", float, "a number")
+    monitoring = config.get("monitoring")
+    if isinstance(monitoring, Mapping):
+        expect_range(
+            monitoring,
+            "max_cost_per_run",
+            "monitoring",
+            minimum=0,
+        )
+    performance = config.get("performance")
+    if isinstance(performance, Mapping):
+        expect_range(performance, "parallel_agents", "performance", minimum=1)
+        expect_range(performance, "cache_ttl", "performance", minimum=0)
 
     pipelines = config.get("pipelines")
     if isinstance(pipelines, Mapping):
@@ -148,6 +330,18 @@ def configuration_structure_errors(config: Mapping[str, Any]) -> list[str]:
                 "sync_mode": (str, "a string"),
                 "min_synonym_overlap": (float, "a number"),
             }
+            allowed_pipeline_keys = set(pipeline_types) | {
+                "quality_gates",
+                "deduplication_strategies",
+            }
+            unknown_pipeline_keys = set(pipeline) - allowed_pipeline_keys
+            if unknown_pipeline_keys:
+                unknown_names = ", ".join(
+                    sorted(str(key) for key in unknown_pipeline_keys)
+                )
+                errors.append(
+                    f"'pipelines.{name}' has unknown keys: {unknown_names}"
+                )
             for key, (expected, description) in pipeline_types.items():
                 if key not in pipeline:
                     continue
@@ -160,6 +354,27 @@ def configuration_structure_errors(config: Mapping[str, Any]) -> list[str]:
                     valid = isinstance(value, expected)
                 if not valid:
                     errors.append(f"'pipelines.{name}.{key}' must be {description}")
+            expect_range(pipeline, "batch_size", f"pipelines.{name}", minimum=1)
+            expect_range(
+                pipeline,
+                "auto_accept_threshold",
+                f"pipelines.{name}",
+                minimum=0,
+                maximum=1,
+            )
+            expect_range(
+                pipeline,
+                "max_cost_per_run",
+                f"pipelines.{name}",
+                minimum=0,
+            )
+            expect_range(
+                pipeline,
+                "min_synonym_overlap",
+                f"pipelines.{name}",
+                minimum=0,
+                maximum=1,
+            )
             for key in ("quality_gates", "deduplication_strategies"):
                 value = pipeline.get(key)
                 if value is not None and (
@@ -178,6 +393,10 @@ def configuration_structure_errors(config: Mapping[str, Any]) -> list[str]:
             "retry_on_failure": bool,
             "max_retries": int,
         }
+        unknown_default_keys = set(defaults) - set(default_types)
+        if unknown_default_keys:
+            names = ", ".join(sorted(str(key) for key in unknown_default_keys))
+            errors.append(f"'agents.defaults' has unknown keys: {names}")
         for key, expected in default_types.items():
             if key not in defaults:
                 continue
@@ -190,6 +409,10 @@ def configuration_structure_errors(config: Mapping[str, Any]) -> list[str]:
                 valid = isinstance(value, expected)
             if not valid:
                 errors.append(f"'agents.defaults.{key}' has the wrong type")
+        expect_range(defaults, "temperature", "agents.defaults", minimum=0, maximum=2)
+        expect_range(defaults, "max_tokens", "agents.defaults", minimum=1)
+        expect_range(defaults, "timeout", "agents.defaults", minimum=1)
+        expect_range(defaults, "max_retries", "agents.defaults", minimum=0)
 
     safety = config.get("safety")
     if isinstance(safety, Mapping):
@@ -208,7 +431,10 @@ def load_configuration(config_path: Path) -> Mapping[str, Any]:
     """Load a YAML configuration and reject unsupported structure."""
 
     try:
-        loaded = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+        loaded = yaml.load(
+            config_path.read_text(encoding="utf-8"),
+            Loader=UniqueKeySafeLoader,
+        )
     except (OSError, yaml.YAMLError) as exc:
         raise RepositoryConfigurationError(
             f"Unable to load configuration {config_path}: {exc}"
@@ -237,6 +463,15 @@ def _repository_identity(remote_url: str) -> Optional[str]:
         host = host.rsplit("@", 1)[-1]
     elif "://" in value:
         parsed = urlparse(value)
+        if parsed.scheme.lower() not in {"https", "ssh"}:
+            return None
+        try:
+            port = parsed.port
+        except ValueError:
+            return None
+        expected_port = 443 if parsed.scheme.lower() == "https" else 22
+        if port not in {None, expected_port} or parsed.query or parsed.fragment:
+            return None
         host = parsed.hostname
         value = parsed.path
     else:
@@ -248,12 +483,12 @@ def _repository_identity(remote_url: str) -> Optional[str]:
         return None
 
     parts = [part for part in value.strip("/").split("/") if part]
-    if len(parts) < 2:
+    if len(parts) != 2:
         return None
     repository = parts[-1]
     if repository.lower().endswith(".git"):
         repository = repository[:-4]
-    return f"{parts[-2]}/{repository}"
+    return f"{parts[0]}/{repository}"
 
 
 @dataclass(frozen=True)
@@ -291,24 +526,34 @@ class RepositoryTarget:
             )
 
         try:
-            origin_urls = list(repo.remote("origin").urls)
+            fetch_urls = repo.git.remote("get-url", "--all", "origin").splitlines()
+            push_urls = repo.git.remote(
+                "get-url", "--push", "--all", "origin"
+            ).splitlines()
         except (ValueError, AttributeError, GitCommandError) as exc:
             raise RepositoryConfigurationError(
                 f"Repository '{self.name}' has no origin remote; expected "
                 f"{self.expected_repository}"
             ) from exc
 
-        identities = {
-            identity.lower()
-            for url in origin_urls
-            if (identity := _repository_identity(url)) is not None
-        }
-        if self.expected_repository.lower() not in identities:
-            actual = ", ".join(sorted(identities)) or "unrecognizable origin URL"
-            raise RepositoryConfigurationError(
-                f"Repository '{self.name}' origin identity mismatch: expected "
-                f"{self.expected_repository}, found {actual}"
-            )
+        expected = self.expected_repository.lower()
+        for purpose, urls in (("fetch", fetch_urls), ("push", push_urls)):
+            identities = [_repository_identity(url) for url in urls if url.strip()]
+            normalized = [identity.lower() for identity in identities if identity]
+            if (
+                not urls
+                or len(identities) != len(urls)
+                or len(normalized) != len(urls)
+                or any(identity != expected for identity in normalized)
+            ):
+                actual = ", ".join(sorted(set(normalized)))
+                if len(normalized) != len(urls):
+                    actual = f"{actual + ', ' if actual else ''}unrecognizable URL"
+                raise RepositoryConfigurationError(
+                    f"Repository '{self.name}' origin identity mismatch for {purpose}: "
+                    f"expected only {self.expected_repository}, found "
+                    f"{actual or 'no URL'}"
+                )
         return repo
 
 
@@ -337,22 +582,26 @@ class RepositorySettings:
         cls,
         config: Optional[Mapping[str, Any]] = None,
         environ: Optional[Mapping[str, str]] = None,
+        manifest: Optional[FleetManifest] = None,
     ) -> "RepositorySettings":
         """Build settings from repository config and environment variables.
 
         ``config["repositories"]`` may override a path. Paths may contain
         shell-style ``$VAR`` or ``${VAR}`` references; missing references are
-        rejected. Expected Git identities are fixed by
-        :data:`DEFAULT_REPOSITORIES`, rather than configurable by callers.
+        rejected. Expected Git identities are fixed by the canonical fleet
+        manifest, rather than configurable by callers. A caller may pass an
+        already-loaded manifest so every part of one command uses the exact
+        same fleet snapshot.
         """
 
         config = config or {}
         env = os.environ if environ is None else environ
+        definitions = repository_definitions(manifest)
         configured_repositories = config.get("repositories", {})
         if not isinstance(configured_repositories, Mapping):
             raise RepositoryConfigurationError("'repositories' must be a mapping")
 
-        unknown = set(configured_repositories) - set(DEFAULT_REPOSITORIES)
+        unknown = set(configured_repositories) - set(definitions)
         if unknown:
             names = ", ".join(sorted(str(name) for name in unknown))
             raise RepositoryConfigurationError(
@@ -363,7 +612,7 @@ class RepositorySettings:
         errors: dict[str, str] = {}
         unconfigured: list[str] = []
 
-        for name, definition in DEFAULT_REPOSITORIES.items():
+        for name, definition in definitions.items():
             override = configured_repositories.get(name, {})
             if isinstance(override, str):
                 raw_path: Any = override
@@ -399,18 +648,19 @@ class RepositorySettings:
             else:
                 targets[name] = target
 
-        return cls(targets, errors, tuple(DEFAULT_REPOSITORIES), tuple(unconfigured))
+        return cls(targets, errors, tuple(definitions), tuple(unconfigured))
 
     @classmethod
     def from_file(
         cls,
         config_path: Path,
         environ: Optional[Mapping[str, str]] = None,
+        manifest: Optional[FleetManifest] = None,
     ) -> "RepositorySettings":
         """Load and validate the repository section of an OpenClaw YAML file."""
 
         loaded = load_configuration(config_path)
-        return cls.from_environment(loaded, environ=environ)
+        return cls.from_environment(loaded, environ=environ, manifest=manifest)
 
     @staticmethod
     def _resolve_target(
@@ -430,24 +680,75 @@ class RepositorySettings:
                 f"Repository '{name}' expected_repository must be 'owner/repository'"
             )
 
-        try:
-            expanded = Template(raw_path.strip()).substitute(environ)
-        except (KeyError, ValueError) as exc:
-            # `path: ${THIS_REPO_ROOT}` with that variable unset means the
-            # repository is simply not set up on this machine — the same
-            # condition as an absent path, reached by a different route. Any
-            # OTHER unresolved variable is a genuine configuration defect (a
-            # typo, or a dependency on an undeclared variable) and stays fatal.
-            missing = exc.args[0] if isinstance(exc, KeyError) and exc.args else None
-            if missing == environment_variable:
-                raise RepositoryNotConfiguredError(
-                    f"Repository '{name}' path is not configured; set "
-                    f"{environment_variable}"
-                ) from exc
+        expanded = raw_path.strip()
+        if _ESCAPED_DOLLAR_SENTINEL in expanded or any(
+            _ESCAPED_DOLLAR_SENTINEL in value for value in environ.values()
+        ):
             raise RepositoryConfigurationError(
-                f"Repository '{name}' path contains an unexpanded variable: {raw_path}"
-            ) from exc
+                f"Repository '{name}' path contains a reserved expansion marker"
+            )
 
+        seen: set[str] = set()
+        for expansion_count in range(_MAX_ENVIRONMENT_EXPANSIONS + 1):
+            # Preserve Template's ``$$`` escape across recursive rounds. A
+            # replacement value may itself contain ``$$``, so protection is
+            # applied at every level and restored only after all identifiers
+            # have been resolved.
+            protected = expanded.replace("$$", _ESCAPED_DOLLAR_SENTINEL)
+            if protected in seen:
+                raise RepositoryConfigurationError(
+                    f"Repository '{name}' path has cyclic variable expansion: "
+                    f"{raw_path}"
+                )
+            seen.add(protected)
+
+            template = Template(protected)
+            try:
+                identifiers = template.get_identifiers()
+            except ValueError as exc:
+                raise RepositoryConfigurationError(
+                    f"Repository '{name}' path contains an invalid variable: "
+                    f"{raw_path}"
+                ) from exc
+
+            missing = [
+                identifier for identifier in identifiers if identifier not in environ
+            ]
+            if missing:
+                # `path: ${THIS_REPO_ROOT}` with that variable unset means the
+                # repository is simply not set up on this machine. Every
+                # other missing identifier—including one reached through a
+                # configured root—is a fatal configuration defect.
+                if (
+                    expanded == raw_path.strip()
+                    and identifiers == [environment_variable]
+                    and missing == [environment_variable]
+                ):
+                    raise RepositoryNotConfiguredError(
+                        f"Repository '{name}' path is not configured; set "
+                        f"{environment_variable}"
+                    )
+                raise RepositoryConfigurationError(
+                    f"Repository '{name}' path contains an unexpanded variable: "
+                    f"{raw_path}"
+                )
+
+            if not identifiers:
+                expanded = protected.replace(_ESCAPED_DOLLAR_SENTINEL, "$")
+                break
+            if expansion_count == _MAX_ENVIRONMENT_EXPANSIONS:
+                raise RepositoryConfigurationError(
+                    f"Repository '{name}' path exceeded "
+                    f"{_MAX_ENVIRONMENT_EXPANSIONS} variable-expansion levels: "
+                    f"{raw_path}"
+                )
+            try:
+                expanded = template.substitute(environ)
+            except (KeyError, ValueError) as exc:  # defensive mapping/template guard
+                raise RepositoryConfigurationError(
+                    f"Repository '{name}' path contains an unexpanded variable: "
+                    f"{raw_path}"
+                ) from exc
         path = Path(expanded).expanduser()
         if not path.is_absolute():
             raise RepositoryConfigurationError(

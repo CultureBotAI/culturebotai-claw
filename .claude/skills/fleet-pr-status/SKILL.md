@@ -1,6 +1,6 @@
 ---
 name: fleet-pr-status
-description: "Answer \"what PRs are open?\" across claw and the five Mech repos in one standard format. Runs scripts/fleet_pr_status.py, which discovers repos from the GitHub org, queries each with explicit limits, and always reports its own coverage — which repos were checked, which failed, whether any listing truncated. Read-only inventory: it does not review, edit, or merge anything."
+description: "Answer \"what PRs are open?\" across claw and the manifest-defined Mech fleet in one standard format. Runs scripts/fleet_pr_status.py, which queries the canonical fleet with an explicit PR limit and always reports its coverage — which repos were checked, which failed, and whether any PR listing truncated. Read-only inventory: it does not review, edit, or merge anything."
 category: cross-repo
 requires_database: false
 requires_internet: true
@@ -26,21 +26,13 @@ uv run python scripts/fleet_pr_status.py --json     # machine-readable
 uv run python scripts/fleet_pr_status.py --no-drafts
 uv run python scripts/fleet_pr_status.py --no-tsv   # table only
 uv run python scripts/fleet_pr_status.py --tsv-dir DIR
-uv run python scripts/fleet_pr_status.py --repo-limit 500   # org grew
 uv run python scripts/fleet_pr_status.py --pr-limit 500     # a repo has >200 open
 ```
 
-**Two limits, not one**, because they bound unrelated things and fail
-differently:
-
-- `--repo-limit` (default 300) caps org discovery. Truncating here drops
-  **entire repos** from the report. Proven: `--repo-limit 5` against a 38-repo
-  org silently loses CommunityMech and proteintraitsmech.
-- `--pr-limit` (default 200) caps open PRs listed per repo. Truncating here
-  undercounts *within* a repo that is still present.
-
-Each warns separately and names the flag to raise, so the message tells you
-which knob to turn rather than leaving you to guess.
+`--pr-limit` (default 200) caps open PRs listed per repository. Reaching it
+undercounts within that repository, so the report names the affected repository
+and the flag to raise. Repository membership itself has no discovery limit: it
+comes from the canonical fleet manifest.
 
 Exit codes: `0` report produced, `1` at least one repo could not be queried,
 `2` bad usage or `gh` missing. **A non-zero exit means the report is
@@ -72,7 +64,7 @@ Three further properties worth knowing:
   filter for itself, and a data export that silently omits rows is the exact
   failure this script exists to avoid.
 - **An incomplete snapshot is named `.partial.tsv`.** If a repo could not be
-  queried, or either listing truncated, the fact travels *in the filename* —
+  queried, or a PR listing truncated, the fact travels *in the filename* —
   the console warning does not survive, and a month later the file is all
   anyone has.
 - **Re-running on the same date overwrites.** The file means "the state on that
@@ -106,16 +98,14 @@ Coverage
 Because the ad-hoc version has produced wrong answers here, and every one was a
 **denominator** problem — a count that looked complete and was not:
 
-- **Both `gh` listings truncate silently.** `gh pr list` and `gh issue list`
-  default to **30**; `gh repo list` caps at its limit with no signal. The
-  script passes explicit limits and warns when either is reached, naming which
-  one so you know whether whole repos or only PRs were lost.
+- **`gh pr list` truncates silently.** It defaults to 30. The script passes an
+  explicit limit and names any repository that reaches it.
 - **A failed repo query vanishes from a hand-rolled loop.** `for r in …; do gh
   pr list …; done` prints nothing for a repo that 502s, which reads identically
   to "nothing open". The script names it, and marks the total a lower bound.
-- **Filesystem discovery misses repos.** ProteinTraitsMech was invisible to
-  local sweeps for weeks; a stale clone also misreports a repo's state entirely.
-  Discovery is from the org, and nothing here reads a working tree.
+- **Filesystem and suffix discovery disagree with governance.** A missing clone
+  used to hide a Mech, while suffix matching later absorbed HabitatMech without
+  a fleet decision. The script reads the canonical manifest and no working tree.
 - **A repo with zero open PRs must still appear.** Otherwise "checked, nothing
   there" is indistinguishable from "not checked".
 
@@ -145,15 +135,10 @@ because git said so.
 
 ## Adding a repo to the fleet
 
-Membership is the regex `(?i)mech$|^culturebotai-claw$` in
-`scripts/fleet_pr_status.py`. Anything matching is included automatically, so a
-sixth Mech needs no code change — it appears in the report and is **flagged** as
-a repo not in the known list, rather than being silently absorbed. Add it to
-`PREFERRED_ORDER` to fix its position in the table.
-
-A repo that does not end in `mech` needs the pattern widened. Note that
-`PFASCommunityAgents`, `MicroGrowAgents` and `kg-microbe` are deliberately
-**out** of scope.
+Add a Mech once to the canonical fleet manifest. The report uses its declared
+GitHub identity and manifest order automatically. A similarly named GitHub
+repository is not silently treated as a fleet member; candidate discovery is a
+separate governance audit.
 
 ## Tests
 
@@ -165,11 +150,11 @@ mutation-checked — each of these fails at least one test when removed:
 |---|---|
 | silently drop a failed repo | render + `collect` |
 | render UNKNOWN as CONFLICTS | render |
-| suppress either truncation warning | render |
+| suppress the PR truncation warning | render |
 | stop *detecting* truncation in `collect` | `collect` |
 | hide drafts without saying so | render |
 | omit zero-PR repos from coverage | render |
-| absorb a new Mech unflagged | render |
+| diverge from manifest membership | manifest-scope test |
 | cut a title with no marker | render |
 
 The `collect` rows exist because of a hole the split exposed: mutating
@@ -177,5 +162,5 @@ The `collect` rows exist because of a hole the split exposed: mutating
 was covered against hand-built data while the code that *builds* it was not
 exercised at all. That is precisely the guard-that-verifies-nothing this script
 exists to catch, found inside the script's own tests. `collect()` is now tested
-by stubbing `_gh`, so discovery, listing, both truncation detections, error
-capture and fleet filtering run offline.
+by stubbing `_gh`, so listing, truncation detection, error capture, and exact
+manifest scope run offline.

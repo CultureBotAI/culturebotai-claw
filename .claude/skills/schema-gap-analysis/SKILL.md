@@ -1,6 +1,6 @@
 ---
 name: schema-gap-analysis
-description: Cross-Mech reference + bootstrap template for the schema-gap-analysis methodology. The operational, copy-paste-runnable version lives in each Mech repo's own .claude/skills/schema-gap-analysis/ — use this version for the conceptual framework or to bootstrap a new Mech.
+description: Canonical fleet schema-gap methodology. Resolve applicable repositories, schemas, and record globs from kg_microbe_fleet, then combine the shared procedure with each Mech's domain root classes and validators.
 category: quality
 requires_database: false
 requires_internet: false
@@ -9,16 +9,14 @@ version: 2.1.0
 
 # Schema gap analysis (cross-Mech reference)
 
-> **Day-to-day use**: invoke this skill from inside the Mech repo you're auditing. Each Mech ships its own customized version with paths baked in (no substitution needed):
->
-> | Mech | Operational skill |
-> |---|---|
-> | CultureMech | `.claude/skills/schema-gap-analysis/SKILL.md` (companion to the deeper `audit-schema-gaps`) |
-> | MIM | `.claude/skills/schema-gap-analysis/SKILL.md` |
-> | CommunityMech | `.claude/skills/schema-gap-analysis/SKILL.md` |
-> | TraitMech | `.claude/skills/schema-gap-analysis/SKILL.md` |
->
-> **This file** is the cross-Mech reference — where the methodology lives once (so framework changes can be propagated by re-syncing the per-Mech copies) and where to bootstrap a new Mech.
+This is the canonical general procedure. A Mech-local adapter may add scientific
+root classes, validation extensions, or curation commands, but must not copy or
+redefine the fleet membership or the general method.
+
+This skill is diagnostic and analysis-only by default. It reads local schemas,
+records, and source code; it does not install packages, rewrite records, modify a
+schema, or invoke a network service. That is why `requires_internet: false` is
+accurate. Turn an accepted remediation plan into a separately authorized change.
 
 ## When to use
 
@@ -28,39 +26,41 @@ Run the per-Mech operational version when:
 - A new field is being added in code and you want to know whether the schema needs updating, the data needs migrating, or both.
 - Onboarding: "is this YAML valid?" needs a more rigorous answer than "the project's custom validator says yes."
 
-Each Mech ships its own custom validator (intentionally permissive to keep CI green during active curation). `linkml-validate` is the stricter ground truth this skill anchors on.
+Each Mech may ship domain validation extensions. `linkml-validate` is the shared
+structural ground truth this skill anchors on.
 
 ## Per-Mech configuration
 
-Use the row that matches the repo you're analysing. Substitute the placeholders into the commands below.
-
-| Mech | `SCHEMA` | Tree-root class (`-C`) | Canonical collection(s) | Per-record YAMLs | Custom validator (tolerant) | Curator/save module |
-|---|---|---|---|---|---|---|
-| **CultureMech** | `src/culturemech/schema/culturemech.yaml` | `MediaRecipe` | `data/merge_yaml/merged_2026/*.yaml` | `data/normalized_yaml/<cat>/*.yaml` | `src/culturemech/validation/validator.py` | `src/culturemech/render_media_pages.py` (read-only); curator edits are direct |
-| **MIM** | `src/mediaingredientmech/schema/mediaingredientmech.yaml` | `IngredientCollection` (curated/) / `IngredientRecord` (per-file) | `data/curated/mapped_ingredients.yaml`, `data/curated/unmapped_ingredients.yaml` | `data/ingredients/mapped/*.yaml`, `data/ingredients/unmapped/*.yaml` | `src/mediaingredientmech/validation/schema_validator.py` | `src/mediaingredientmech/curation/ingredient_curator.py` |
-| **CommunityMech** | `src/communitymech/schema/communitymech.yaml` | `MicrobialCommunity` | _(no top-level collection — per-record only)_ | `kb/communities/*.yaml`, `data/isolates/**/*.yaml` | _(check `src/communitymech/validation/`)_ | _(check `src/communitymech/curation/` or per-script writes)_ |
-| **TraitMech** | `src/traitmech/schema/traitmech.yaml` | `TraitRecord` | _(no top-level collection — per-record only)_ | `data/traits/<cat>/*.yaml` | _(none — schema is the only validator)_ | `scripts/seed_from_metpo.py`, `scripts/trait_causal_graph.py` |
-
-> **Note on tree-root vs collection class.** MIM has both — a `IngredientCollection` for the aggregate `mapped_ingredients.yaml` / `unmapped_ingredients.yaml` files **and** a per-record `IngredientRecord` for `data/ingredients/<status>/*.yaml`. Run validation against both shapes (see Procedure step 3). The other Mechs publish only the per-record shape.
-
-## Setup
-
-LinkML is normally installed in the Mech repo's `.venv/`, but two recurring bumps:
-
-**1. `pip` is sometimes missing from the venv.** Bootstrap it if needed:
+Resolve the applicable repositories and verified schema/corpus locations from
+the manifest rather than this skill:
 
 ```bash
-.venv/bin/python -m ensurepip
+uv run python -m kg_microbe_fleet list --capability schema_sync --format json
 ```
 
-**2. Version mismatch between `linkml` and `linkml-runtime`.** As of mid-2026 the typical Mech venv ships `linkml 1.9.3` and `linkml-runtime 1.10.0`; runtime 1.10 dropped `Format.JSON` which 1.9.x imports at module load → `linkml-validate` aborts on import with `AttributeError: type object 'Format' has no attribute 'JSON'`. Pin the runtime back to 1.9.x:
+For the selected Mech, use its `schema_paths` and `record_globs`. Determine the
+LinkML tree-root class from that schema and load any domain adapter declared by
+the Mech. Repositories with multiple record shapes must validate every declared
+glob against its corresponding root class; do not silently choose the first.
+
+## Offline preflight
+
+Use the validator already installed in the selected Mech's project environment.
+Do not bootstrap `pip`, change dependency versions, or let an environment runner
+resolve missing packages as part of an analysis. Those actions mutate the repo or
+environment and may require network access.
 
 ```bash
-.venv/bin/python -m pip install "linkml-runtime>=1.9,<1.10"
-.venv/bin/linkml-validate --help  # smoke test
+test -x .venv/bin/linkml-validate || {
+  echo "linkml-validate is not installed in this Mech environment" >&2
+  exit 2
+}
+.venv/bin/linkml-validate --help >/dev/null
 ```
 
-Upgrading `linkml` to a release that ships with 1.10-runtime is the permanent fix; pinning the runtime is the simplest interim path. Setup is one-time per venv.
+If this preflight fails, record the exact executable/import error as a blocker.
+Use the Mech's documented, lockfile-backed environment setup only in a separate
+authorized task; do not improvise a dependency pin during the gap analysis.
 
 ## The three-axis perspective
 
@@ -95,7 +95,7 @@ Signs:
 
 ## Procedure
 
-1. **Make linkml-validate runnable** (see Setup).
+1. **Run the offline validator preflight** above. Stop and report if it fails.
 
 2. **Validate canonical collection files**, if the Mech has any (MIM only, currently). For per-record-only Mechs, skip to step 3.
 
@@ -111,7 +111,8 @@ Signs:
 3. **Validate per-record YAMLs**. Per-Mech smoke-test pattern:
 
    ```bash
-   # Generic shape — substitute SCHEMA / RECORD_CLASS / RECORD_GLOB from the table above.
+   # Generic shape — use schema_paths and record_globs from the selected
+   # manifest profile; derive RECORD_CLASS from the referenced schema.
    SAMPLE=$(ls <RECORD_GLOB> | head -1)
    .venv/bin/linkml-validate -s $SCHEMA -C <RECORD_CLASS> "$SAMPLE"
    ```
@@ -165,17 +166,22 @@ Signs:
      src/ scripts/ --include='*.py'
 
    # Mech-specific: direct WRITES to canonical curated collection file(s)
-   # that skip the curator. Adjust the bracketed filename to match this
-   # Mech's canonical collection(s) — see the per-Mech table.
+   # that skip the curator. Adjust the bracketed filename to match the
+   # canonical collection declared by the selected Mech's local adapter.
    grep -rnE 'open\([^)]*(mapped|unmapped)_ingredients\.yaml[^)]*["\047][wa][bt]?["\047]' \
      scripts/ src/ --include='*.py'
    ```
 
    Even with these calibrated greps, the first one (naive `datetime.now()`) can occasionally surface a filename/display call site that doesn't end up in validated YAML (e.g. report-generator scripts writing `"generated_at"` into a top-level JSON report). Read the line before classifying as a process-axis bug.
 
-7. **Decide and apply fixes.** Usually a mix: rename/alias the canonical slot on the schema, broaden patterns, add missing slots, fix the handful of malformed records, and patch the offending generators (timezone, action label, key name) so the next regeneration is clean.
+7. **Write a remediation plan; do not apply it in this analysis.** Group each
+   proposed change by owner: schema, instance records, or generator/process.
+   Include affected paths, counts, validation commands, migration/rollback needs,
+   and any domain decision that requires review.
 
-8. **Re-run linkml-validate.** Exit code 0 with no errors is the target. Until then, document remaining divergences in a project memory file so they don't get rediscovered every session.
+8. **Define acceptance checks for the later implementation.** A separately
+   authorized fix should re-run `linkml-validate` over every declared corpus and
+   reach exit code 0 with no errors, or explicitly document reviewed exceptions.
 
 ## Common gap classes seen across Mechs
 
@@ -192,7 +198,10 @@ Signs:
 
 - **Don't patch the custom validator alone.** It's already permissive; the point of running `linkml-validate` is to find what the custom validator hides.
 - **Don't silently rename a slot in the schema without also updating the consuming code.** `_check_required`, `_validate_*` helpers, dataclass generators, and tests still reference the old name. `git grep` the slot name before renaming.
-- **Don't fix instance records with `sed`.** Round-trip through the Mech's curator/save module (see per-Mech table) so the canonical YAML formatting is preserved and collection-level metadata (`generation_date`, `total_count`, etc.) is correctly recomputed.
+- **Don't propose fixing instance records with `sed`.** The remediation plan
+  should name the Mech's curator/save module or local adapter so a later change
+  preserves canonical YAML formatting and recomputes collection metadata such
+  as `generation_date` and `total_count`.
 - **Don't add overlapping fields without aliasing.** If a new field partially overlaps with an existing one across two classes (e.g. `cas_rn` on `ChemicalProperties` and `MappingEvidence` in MIM), make sure both classes declare it explicitly or factor a common slot.
 
 ## Cross-Mech invariants worth checking once per pass
@@ -204,6 +213,9 @@ Signs:
 ## Pointers
 
 - **Reference end-to-end pass**: MIM's `notes/schema_gap_analysis_2026-05-16.md` documents the six gap classes the skill turned up on its first run, plus the PR that closed each. Good template for a write-up after running the skill on another Mech.
-- **Schema files** (one per Mech) — see the per-Mech table.
-- **Custom validators** (intentionally tolerant) — see the per-Mech table. The MIM one (`src/mediaingredientmech/validation/schema_validator.py`) is the most evolved example; refer to it when bootstrapping a Mech that doesn't have one yet.
+- **Schema files and record corpora** — read `schema_paths` and `record_globs`
+  from the selected manifest JSON object.
+- **Custom validators** (intentionally tolerant) — discover the selected Mech's
+  validator from its local adapter or repository code; do not infer its path
+  from another Mech's layout.
 - **Most common generator-drift sites**: any `scripts/aggregate_*`, `scripts/enrich_*`, `scripts/apply_*`, `scripts/auto_correct.py`, and any per-Mech curator module.

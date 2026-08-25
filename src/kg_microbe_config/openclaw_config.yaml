@@ -42,10 +42,7 @@ repositories:
 
 agents:
   discovery_paths:
-    - agents/code_development
-    - agents/data_pipeline
-    - agents/build_deployment
-    - agents/dev_workflow
+    - kg_microbe_agents/definitions
 
   defaults:
     temperature: 0.1

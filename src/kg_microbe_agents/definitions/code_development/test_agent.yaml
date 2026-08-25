@@ -10,12 +10,16 @@ model:
   temperature: 0.1
   max_tokens: 8192
 
+repository_scope:
+  source: fleet_manifest
+  capability: testing
+
 workspace:
   base_dir: ${OPENCLAW_WORKSPACE}
   allowed_paths:
-    - ${CULTUREMECH_ROOT}/tests
-    - ${MEDIAINGREDIENTMECH_ROOT}/tests
-    - ${COMMUNITYMECH_ROOT}/tests
+    source: repository_scope
+    patterns:
+      - "tests/**"
 
 safety:
   dry_run_default: false  # Running tests is non-destructive
@@ -27,9 +31,9 @@ tasks:
   run_all_tests:
     description: "Run pytest across all repositories"
     workflow:
-      - run_culturemech_tests
-      - run_mediaingredient_tests
-      - run_communitymech_tests
+      - step: run_repository_tests
+        repositories:
+          source: repository_scope
       - aggregate_results
 
   generate_tests:

@@ -2,16 +2,15 @@
 """Report every open PR across claw and the Mech repos, in one fixed format.
 
     python scripts/fleet_pr_status.py [--json] [--include-drafts/--no-drafts]
-                                      [--org ORG] [--repo-limit N] [--pr-limit N]
+                                      [--pr-limit N]
 
 Why a script rather than "just run `gh pr list`": the answer to "what is open?"
 has to be reproducible and complete, and the ad-hoc version is neither. Three
 traps this closes, each of which has produced a wrong answer in this fleet:
 
-  * `gh repo list` and `gh pr list` BOTH truncate silently at their limit
-    (`gh pr list` defaults to 30). A short answer looks like a complete one.
-    The two are capped separately, because they fail differently: repo-listing
-    truncation drops WHOLE REPOS, PR-listing truncation undercounts within one.
+  * `gh pr list` truncates silently at its limit (30 by default). A short answer
+    looks like a complete one, so this command records when the explicit limit
+    was reached.
   * Repos discovered from the local filesystem miss any repo not cloned --
     ProteinTraitsMech was invisible to local sweeps for weeks -- and include
     stale clones that are many commits behind the remote.
@@ -21,38 +20,31 @@ traps this closes, each of which has produced a wrong answer in this fleet:
 Every one of those is a denominator problem, so this prints the denominator:
 which repos were queried, which failed, and whether any limit was reached.
 
-Exit codes: 0 report produced (with or without open PRs), 1 one or more repos
-could not be queried, 2 bad usage or `gh` unavailable.
+Exit codes: 0 complete report produced (with or without open PRs), 1 one or
+more repositories could not be queried or a PR listing reached its limit, and
+2 bad usage or `gh` unavailable.
 """
 from __future__ import annotations
 
 import argparse
 import csv
 import datetime as _dt
+import fcntl
 import json
-import re
+import os
 import shutil
 import subprocess
 import sys
+import tempfile
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Iterator
 
-#: A repo is in the fleet if it is claw or ends in "mech" (any casing --
-#: `proteintraitsmech` is lowercase on GitHub while its directory is not).
-FLEET_PATTERN = re.compile(r"(?i)mech$|^culturebotai-claw$")
+from kg_microbe_fleet import FleetManifest, FleetManifestError, load_fleet_manifest
 
-DEFAULT_ORG = "CultureBotAI"
-
-#: Fixed display order, so two runs of the report diff cleanly. Repos found by
-#: discovery but absent here are appended alphabetically and flagged as new --
-#: a sixth Mech appearing is the thing this must not silently absorb.
-PREFERRED_ORDER = (
-    "culturebotai-claw",
-    "CultureMech",
-    "MediaIngredientMech",
-    "CommunityMech",
-    "TraitMech",
-    "proteintraitsmech",
-)
+#: The control plane is reported beside the Mechs but is not itself a Mech.
+#: Every Mech identity and its order come exclusively from the manifest.
+CONTROL_PLANE_REPOSITORY = "CultureBotAI/culturebotai-claw"
 
 PR_FIELDS = (
     "number,title,isDraft,author,createdAt,updatedAt,headRefName,url,"
@@ -81,27 +73,20 @@ def _gh(args: list[str], timeout: int = 60) -> str:
     return proc.stdout
 
 
-def discover_repos(org: str, repo_limit: int) -> tuple[list[str], int]:
-    """Fleet repo names from the ORG, plus the org's total repo count.
+def fleet_repository_identities(
+    manifest: FleetManifest | None = None,
+) -> tuple[str, ...]:
+    """Return claw plus the exact manifest-defined Mech fleet, in stable order."""
 
-    Returns the total so the caller can tell a complete listing from one that
-    hit the limit; `gh repo list` gives no other signal that it truncated.
-    """
-    raw = _gh(["repo", "list", org, "--limit", str(repo_limit), "--json", "name"])
-    names = [r["name"] for r in json.loads(raw)]
-    return sorted(n for n in names if FLEET_PATTERN.search(n)), len(names)
-
-
-def order_repos(found: list[str]) -> tuple[list[str], list[str]]:
-    """(ordered repos, ones not in PREFERRED_ORDER)."""
-    known = [r for r in PREFERRED_ORDER if r in found]
-    extra = sorted(r for r in found if r not in PREFERRED_ORDER)
-    return known + extra, extra
+    manifest = manifest or load_fleet_manifest()
+    return (CONTROL_PLANE_REPOSITORY,) + tuple(
+        mech.github for mech in manifest.mechs.values()
+    )
 
 
-def open_prs(org: str, repo: str, pr_limit: int) -> list[dict]:
+def open_prs(repository: str, pr_limit: int) -> list[dict]:
     raw = _gh([
-        "pr", "list", "--repo", f"{org}/{repo}", "--state", "open",
+        "pr", "list", "--repo", repository, "--state", "open",
         "--limit", str(pr_limit), "--json", PR_FIELDS,
     ])
     prs = json.loads(raw)
@@ -110,32 +95,24 @@ def open_prs(org: str, repo: str, pr_limit: int) -> list[dict]:
     return sorted(prs, key=lambda p: -p["number"])
 
 
-def collect(org: str, repo_limit: int, pr_limit: int) -> dict:
-    """Two limits, tracked separately.
+def collect(pr_limit: int, manifest: FleetManifest | None = None) -> dict:
+    """Query the exact manifest fleet and record every per-repo failure."""
 
-    They bound unrelated quantities -- how many repos an org has, and how many
-    PRs one repo has open -- and they fail differently: a repo-listing
-    truncation silently drops whole repos from the report, while a PR-listing
-    truncation undercounts within one. Sharing a number meant the warning
-    could not say which knob to turn.
-    """
-    repos, org_total = discover_repos(org, repo_limit)
-    ordered, unexpected = order_repos(repos)
+    identities = fleet_repository_identities(manifest)
+    repositories = [identity.rsplit("/", 1)[-1] for identity in identities]
+    owners = {identity.split("/", 1)[0] for identity in identities}
     result: dict = {
-        "org": org,
-        "repos_queried": ordered,
-        "unexpected_repos": unexpected,
-        "org_repo_count": org_total,
-        "repo_limit": repo_limit,
+        "org": next(iter(owners)) if len(owners) == 1 else "manifest-defined",
+        "repository_identities": dict(zip(repositories, identities)),
+        "repos_queried": repositories,
         "pr_limit": pr_limit,
-        "repo_listing_truncated": org_total >= repo_limit,
         "pr_listing_truncated": [],
         "prs": {},
         "errors": {},
     }
-    for repo in ordered:
+    for repo, identity in zip(repositories, identities):
         try:
-            prs = open_prs(org, repo, pr_limit)
+            prs = open_prs(identity, pr_limit)
         except (GhError, subprocess.TimeoutExpired, json.JSONDecodeError) as exc:
             result["errors"][repo] = str(exc)[:200]
             continue
@@ -174,23 +151,26 @@ DEFAULT_TSV_DIR = Path(__file__).resolve().parents[1] / "workspace" / "reports"
 
 def snapshot_is_complete(data: dict) -> bool:
     """True when every fleet repo was queried and nothing hit a limit."""
-    return not (
-        data["errors"]
-        or data["repo_listing_truncated"]
-        or data["pr_listing_truncated"]
-    )
+    return not (data["errors"] or data["pr_listing_truncated"])
 
 
 def _cell(value: object) -> object:
-    """Flatten any string so a cell can never contain a tab or newline.
+    """Flatten strings and keep spreadsheet software from executing them.
 
     This is what lets the file be written unquoted, and TSV's whole appeal is
     that `cut -f5` and `awk -F'\\t'` work. Under csv's default quoting a title
     containing a double quote gets wrapped and its quotes doubled -- correct to
     a csv reader, visibly mangled to every naive consumer. Guaranteeing no
-    delimiters in the data removes the need to quote at all.
+    delimiters in the data removes the need to quote at all. Spreadsheet apps
+    interpret cells beginning with ``=``, ``+``, ``-``, or ``@`` as formulas,
+    so prefix those strings with an apostrophe after whitespace is flattened.
     """
-    return " ".join(value.split()) if isinstance(value, str) else value
+    if not isinstance(value, str):
+        return value
+    flattened = " ".join(value.split())
+    if flattened.startswith(("=", "+", "-", "@")):
+        return "'" + flattened
+    return flattened
 
 
 def tsv_rows(data: dict, snapshot_utc: str) -> list[dict]:
@@ -237,19 +217,72 @@ def tsv_path(out_dir: Path, snapshot_utc: str, complete: bool) -> Path:
     return out_dir / f"{stem}.tsv"
 
 
+def _snapshot_lock_path(out_dir: Path, snapshot_utc: str) -> Path:
+    """One persistent lock inode shared by both completeness variants."""
+    return out_dir / f".fleet_pr_status_{snapshot_utc[:10]}.lock"
+
+
+@contextmanager
+def _snapshot_lock(out_dir: Path, snapshot_utc: str) -> Iterator[None]:
+    """Lock one date without following or replacing the stable lock inode."""
+
+    lock_path = _snapshot_lock_path(out_dir, snapshot_utc)
+    flags = os.O_CREAT | os.O_RDWR
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    descriptor = os.open(lock_path, flags, 0o600)
+    try:
+        fcntl.flock(descriptor, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(descriptor, fcntl.LOCK_UN)
+    finally:
+        os.close(descriptor)
+
+
 def write_tsv(data: dict, out_dir: Path, snapshot_utc: str) -> Path:
     complete = snapshot_is_complete(data)
     path = tsv_path(out_dir, snapshot_utc, complete)
+    counterpart = tsv_path(out_dir, snapshot_utc, not complete)
     path.parent.mkdir(parents=True, exist_ok=True)
     rows = tsv_rows(data, snapshot_utc)
-    with path.open("w", newline="") as f:
-        w = csv.DictWriter(
-            f, fieldnames=list(TSV_COLUMNS), delimiter="\t",
-            lineterminator="\n", extrasaction="raise",
-            quoting=csv.QUOTE_NONE, quotechar=None,
-        )
-        w.writeheader()
-        w.writerows(rows)
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            newline="",
+            delete=False,
+        ) as handle:
+            temporary = Path(handle.name)
+            writer = csv.DictWriter(
+                handle,
+                fieldnames=list(TSV_COLUMNS),
+                delimiter="\t",
+                lineterminator="\n",
+                extrasaction="raise",
+                quoting=csv.QUOTE_NONE,
+                quotechar=None,
+            )
+            writer.writeheader()
+            writer.writerows(rows)
+
+        # The selected path and deletion of its opposite marker are one state
+        # transition. Both complete and partial writers use this same stable
+        # lock file, which must never be unlinked: replacing a lock inode while
+        # another process waits on the old one would split the critical section.
+        with _snapshot_lock(out_dir, snapshot_utc):
+            os.replace(temporary, path)
+            temporary = None
+            counterpart.unlink(missing_ok=True)
+    except BaseException:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+        raise
     return path
 
 
@@ -293,17 +326,6 @@ def render(data: dict, include_drafts: bool) -> str:
 
     if hidden_drafts:
         lines.append(f"  {hidden_drafts} draft PR(s) hidden (--include-drafts to show)")
-    if data["unexpected_repos"]:
-        lines.append(
-            "  NEW repos not in the known fleet list: "
-            + ", ".join(data["unexpected_repos"])
-        )
-    if data["repo_listing_truncated"]:
-        lines.append(
-            f"  WARNING: repo discovery reached --repo-limit "
-            f"({data['repo_limit']}); ENTIRE REPOS may be missing from this "
-            "report. Re-run with a higher --repo-limit."
-        )
     if data["pr_listing_truncated"]:
         lines.append(
             f"  WARNING: PR listing reached --pr-limit ({data['pr_limit']}) in "
@@ -322,10 +344,6 @@ def render(data: dict, include_drafts: bool) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="fleet_pr_status")
-    ap.add_argument("--org", default=DEFAULT_ORG)
-    ap.add_argument("--repo-limit", type=int, default=300,
-                    help="cap on org repo discovery; gh truncates silently "
-                         "(default 300, org had 38 at time of writing)")
     ap.add_argument("--pr-limit", type=int, default=200,
                     help="cap on open PRs listed per repo; gh defaults to 30 "
                          "and truncates silently")
@@ -338,13 +356,17 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--no-drafts", action="store_false", dest="include_drafts")
     args = ap.parse_args(argv)
 
+    if args.pr_limit <= 0:
+        print("--pr-limit must be a positive integer", file=sys.stderr)
+        return 2
+
     if shutil.which("gh") is None:
         print("gh not found on PATH", file=sys.stderr)
         return 2
     try:
-        data = collect(args.org, args.repo_limit, args.pr_limit)
-    except GhError as exc:
-        print(f"discovery failed: {exc}", file=sys.stderr)
+        data = collect(args.pr_limit)
+    except FleetManifestError as exc:
+        print(f"fleet manifest failed validation: {exc}", file=sys.stderr)
         return 2
 
     snapshot_utc = _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds")
@@ -362,7 +384,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"\nSnapshot: {path}  ({n} rows, drafts included){marker}",
               file=sys.stderr if args.as_json else sys.stdout)
 
-    return 1 if data["errors"] else 0
+    # A truncated query is just as incomplete as a failed repository query.
+    # Keep the partial artifact for diagnosis, but never give automation a
+    # success status for a snapshot the script itself labels incomplete.
+    return 0 if snapshot_is_complete(data) else 1
 
 
 if __name__ == "__main__":

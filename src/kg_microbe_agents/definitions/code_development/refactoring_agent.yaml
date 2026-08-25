@@ -10,12 +10,16 @@ model:
   temperature: 0.1
   max_tokens: 8192
 
+repository_scope:
+  source: fleet_manifest
+  capability: refactoring
+
 workspace:
   base_dir: ${OPENCLAW_WORKSPACE}
   allowed_paths:
-    - ${CULTUREMECH_ROOT}/src
-    - ${MEDIAINGREDIENTMECH_ROOT}/src
-    - ${COMMUNITYMECH_ROOT}/src
+    source: repository_scope
+    patterns:
+      - "src/**"
   create_backups: true
   backup_dir: ${OPENCLAW_WORKSPACE}/.backups/refactoring
 

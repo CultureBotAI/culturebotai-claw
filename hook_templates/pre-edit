@@ -1,4 +1,5 @@
 #!/bin/bash
+# Managed by kg-microbe coordination hook installer.
 #
 # Claude Code Pre-Edit Hook
 # Checks if repo is locked before allowing file edits
@@ -9,10 +10,35 @@
 
 # Configuration
 ORCHESTRATION_ROOT={{ORCHESTRATION_ROOT}}  # Replaced during installation
-REPO_NAME="{{REPO_NAME}}"  # Will be replaced during installation
+REPO_NAME={{REPO_NAME}}  # Replaced during installation
+WORKSPACE_ROOT={{WORKSPACE_ROOT}}  # Replaced during installation
+PROJECT_ROOT={{PROJECT_ROOT}}  # Replaced during installation
+HOOKS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HOOK_INPUT_FILTER="$HOOKS_DIR/hook-input.py"
+# Relative OPENCLAW_WORKSPACE values must resolve from the trusted root baked
+# into this installed hook, never a stale or caller-controlled root.
+export OPENCLAW_ORCHESTRATION_ROOT="$ORCHESTRATION_ROOT"
+export OPENCLAW_WORKSPACE="$WORKSPACE_ROOT"
+export CLAUDE_PROJECT_DIR="$PROJECT_ROOT"
+
+# Reject malformed events and edits whose resolved target escapes this Claude
+# project. This prevents a session in one Mech from checking only its own lock
+# while editing an absolute/relative path in a sibling checkout.
+if [ -L "$HOOK_INPUT_FILTER" ] || [ ! -f "$HOOK_INPUT_FILTER" ]; then
+    echo "Edit hook input filter is missing or unsafe" >&2
+    exit 2
+fi
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "Cannot inspect edit hook input: python3 is required" >&2
+    exit 2
+fi
+if ! python3 "$HOOK_INPUT_FILTER" edit PreToolUse; then
+    echo "Edit hook input is malformed or targets outside this project" >&2
+    exit 2
+fi
 
 # Check lock
-uv run --project "$ORCHESTRATION_ROOT" python \
+uv run --offline --frozen --project "$ORCHESTRATION_ROOT" python \
     "$ORCHESTRATION_ROOT/scripts/check_lock.py" "$REPO_NAME" "edit files"
 EXIT_CODE=$?
 
@@ -24,8 +50,8 @@ elif [ $EXIT_CODE -eq 1 ]; then
     echo ""
     echo "✋ Edit blocked by lock system"
     echo ""
-    exit 1
+    exit 2
 else
     echo "❌ Lock check failed; edit blocked until coordination state is readable"
-    exit 1
+    exit 2
 fi

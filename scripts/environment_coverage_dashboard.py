@@ -2,8 +2,8 @@
 """
 Environment Coverage Dashboard
 
-Analyzes environmental coverage across CultureMech, MediaIngredientMech, and CommunityMech
-to identify well-covered and under-resourced environments.
+Analyzes environmental coverage across the exact repositories selected by the
+canonical fleet manifest to identify well-covered and under-resourced environments.
 
 Usage:
     python environment_coverage_dashboard.py [--format {table|json|html}] [--output FILE]
@@ -16,10 +16,24 @@ Requirements:
 
 import argparse
 import json
+import stat
 import sys
 from collections import defaultdict
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Set, Tuple
+from typing import Any, Dict
+
+from kg_microbe_fleet import (
+    FleetManifestError,
+    UniqueKeySafeLoader,
+    load_fleet_manifest,
+)
+from plugins.repository_settings import (
+    RepositoryConfigurationError,
+    RepositorySettings,
+    merged_repository_environment,
+)
 
 try:
     import yaml
@@ -28,21 +42,29 @@ except ImportError:
     sys.exit(1)
 
 
-class EnvironmentCoverageAnalyzer:
-    """Analyzes environment coverage across three repositories."""
+@dataclass(frozen=True)
+class CoverageSource:
+    """One trusted, manifest-selected source of environment records."""
 
-    def __init__(
-        self,
-        culturemech_root: Path,
-        mediaingredient_root: Path,
-        communitymech_root: Path
-    ):
-        self.culturemech_root = culturemech_root
-        self.mediaingredient_root = mediaingredient_root
-        self.communitymech_root = communitymech_root
+    key: str
+    display_name: str
+    root: Path
+    record_globs: tuple[str, ...]
+
+
+class CoverageInputError(ValueError):
+    """Raised when a selected record cannot be represented in the report."""
+
+
+class EnvironmentCoverageAnalyzer:
+    """Analyze environment-bearing records without repository-specific routing."""
+
+    def __init__(self, sources: Sequence[CoverageSource]):
+        self.sources = tuple(sources)
+        self.input_errors: list[str] = []
 
         # Environment tracking
-        self.environments: Dict[str, Dict] = defaultdict(lambda: {
+        self.environments: Dict[str, Dict[str, Any]] = defaultdict(lambda: {
             'envo_id': None,
             'label': None,
             'communities': [],
@@ -55,153 +77,200 @@ class EnvironmentCoverageAnalyzer:
 
     def analyze(self) -> Dict:
         """Run complete coverage analysis."""
-        print("Scanning CommunityMech...", file=sys.stderr)
-        self._scan_communities()
+        for source in self.sources:
+            print(f"Scanning {source.display_name}...", file=sys.stderr)
+            self._scan_source(source)
 
-        print("Scanning CultureMech...", file=sys.stderr)
-        self._scan_media()
-
-        print("Scanning MediaIngredientMech...", file=sys.stderr)
-        self._scan_ingredients()
+        if self.input_errors:
+            raise CoverageInputError(
+                "environment coverage inputs are incomplete: "
+                + "; ".join(self.input_errors)
+            )
 
         return self._generate_report()
 
-    def _scan_communities(self):
-        """Scan CommunityMech for environment terms."""
-        community_dir = self.communitymech_root / "data" / "isolates"
+    def _scan_source(self, source: CoverageSource) -> None:
+        """Scan exactly the manifest record globs for one validated checkout."""
 
-        if not community_dir.exists():
-            print(f"Warning: {community_dir} not found", file=sys.stderr)
+        try:
+            files = sorted(
+                {
+                    path
+                    for pattern in source.record_globs
+                    for path in source.root.glob(pattern)
+                }
+            )
+        except (OSError, ValueError) as exc:
+            self.input_errors.append(
+                f"{source.key}: cannot enumerate record_globs: {exc}"
+            )
             return
-
-        for yaml_file in community_dir.glob("*.yaml"):
-            try:
-                with open(yaml_file) as f:
-                    data = yaml.safe_load(f)
-
-                if not data:
-                    continue
-
-                # Extract environment_term
-                env_term = data.get('environment_term')
-                if env_term:
-                    envo_id = None
-                    envo_label = None
-
-                    # Handle both dict and list formats
-                    if isinstance(env_term, dict):
-                        term_data = env_term.get('term', {})
-                        envo_id = term_data.get('id')
-                        envo_label = term_data.get('label') or env_term.get('preferred_term')
-                    elif isinstance(env_term, list) and env_term:
-                        term_data = env_term[0].get('term', {})
-                        envo_id = term_data.get('id')
-                        envo_label = term_data.get('label') or env_term[0].get('preferred_term')
-
-                    if envo_id:
-                        env_key = envo_id
-                        self.environments[env_key]['envo_id'] = envo_id
-                        self.environments[env_key]['label'] = envo_label or envo_id
-                        self.environments[env_key]['communities'].append({
-                            'id': data.get('id'),
-                            'name': data.get('name'),
-                            'file': yaml_file.name
-                        })
-                        self.environments[env_key]['community_count'] += 1
-
-            except Exception as e:
-                print(f"Warning: Error reading {yaml_file}: {e}", file=sys.stderr)
-
-    def _scan_media(self):
-        """Scan CultureMech for source_environment fields."""
-        media_dir = self.culturemech_root / "data"
-
-        if not media_dir.exists():
-            print(f"Warning: {media_dir} not found", file=sys.stderr)
+        if not files:
+            self.input_errors.append(
+                f"{source.key}: record_globs matched no files: "
+                + ", ".join(source.record_globs)
+            )
             return
-
-        for yaml_file in media_dir.rglob("*.yaml"):
+        for yaml_file in files:
             try:
-                with open(yaml_file) as f:
-                    data = yaml.safe_load(f)
-
-                if not data:
-                    continue
-
-                # Extract source_environment
-                source_env = data.get('source_environment')
-                if source_env:
-                    # Handle list format
-                    if not isinstance(source_env, list):
-                        source_env = [source_env]
-
-                    for env_descriptor in source_env:
-                        if isinstance(env_descriptor, dict):
-                            term_data = env_descriptor.get('term', {})
-                            envo_id = term_data.get('id')
-                            envo_label = term_data.get('label') or env_descriptor.get('preferred_term')
-
-                            if envo_id:
-                                env_key = envo_id
-                                self.environments[env_key]['envo_id'] = envo_id
-                                self.environments[env_key]['label'] = envo_label or envo_id
-                                self.environments[env_key]['media'].append({
-                                    'id': data.get('id'),
-                                    'name': data.get('name'),
-                                    'file': yaml_file.name
-                                })
-                                self.environments[env_key]['media_count'] += 1
-
-            except Exception as e:
-                print(f"Warning: Error reading {yaml_file}: {e}", file=sys.stderr)
-
-    def _scan_ingredients(self):
-        """Scan MediaIngredientMech for environmental_context fields."""
-        ingredient_dir = self.mediaingredient_root / "data"
-
-        if not ingredient_dir.exists():
-            print(f"Warning: {ingredient_dir} not found", file=sys.stderr)
-            return
-
-        for yaml_file in ingredient_dir.rglob("*.yaml"):
+                path_stat = yaml_file.lstat()
+            except OSError as exc:
+                self.input_errors.append(
+                    f"{source.key}:{yaml_file}: cannot inspect matched path: {exc}"
+                )
+                continue
+            if stat.S_ISLNK(path_stat.st_mode):
+                self.input_errors.append(
+                    f"{source.key}:{yaml_file} is a symlink"
+                )
+                continue
+            if not stat.S_ISREG(path_stat.st_mode):
+                self.input_errors.append(
+                    f"{source.key}:{yaml_file} is not a regular file"
+                )
+                continue
             try:
-                with open(yaml_file) as f:
-                    data = yaml.safe_load(f)
-
-                if not data:
+                yaml_file.resolve(strict=True).relative_to(source.root)
+                data = yaml.load(
+                    yaml_file.read_text(encoding="utf-8"),
+                    Loader=UniqueKeySafeLoader,
+                )
+                if not isinstance(data, Mapping):
+                    self.input_errors.append(
+                        f"{source.key}:{yaml_file} root is not a mapping"
+                    )
                     continue
+                self._record_communities(data, yaml_file)
+                self._record_media(data, yaml_file)
+                self._record_ingredients(data, yaml_file)
+            except (OSError, ValueError, yaml.YAMLError) as exc:
+                self.input_errors.append(f"{source.key}:{yaml_file}: {exc}")
 
-                # Extract environmental_context
-                env_context = data.get('environmental_context')
-                if env_context:
-                    # Handle list format
-                    if not isinstance(env_context, list):
-                        env_context = [env_context]
+    def _descriptors(
+        self,
+        data: Mapping[str, Any],
+        field: str,
+        yaml_file: Path,
+    ) -> tuple[Mapping[str, Any], ...]:
+        if field not in data:
+            return ()
+        value = data[field]
+        if isinstance(value, Mapping):
+            return (value,)
+        if isinstance(value, list):
+            descriptors: list[Mapping[str, Any]] = []
+            for index, item in enumerate(value):
+                if isinstance(item, Mapping):
+                    descriptors.append(item)
+                else:
+                    self.input_errors.append(
+                        f"{yaml_file}:{field}[{index}] must be a mapping"
+                    )
+            return tuple(descriptors)
+        self.input_errors.append(
+            f"{yaml_file}:{field} must be a mapping or list of mappings"
+        )
+        return ()
 
-                    for context in env_context:
-                        if isinstance(context, dict):
-                            envo_id = context.get('environment_term')
-                            envo_label = context.get('environment_label')
-                            relevance = context.get('relevance')
+    def _term(
+        self,
+        descriptor: Mapping[str, Any],
+        field: str,
+        yaml_file: Path,
+    ) -> tuple[str | None, Any]:
+        # A descriptor may legitimately be curated but not yet ontology-grounded
+        # (for example, it can carry only preferred_term and notes). It cannot
+        # contribute an ENVO bucket, but it is not malformed. Once `term` is
+        # present, however, its shape and identifier must be valid.
+        if "term" not in descriptor:
+            return None, None
+        term = descriptor["term"]
+        if not isinstance(term, Mapping):
+            self.input_errors.append(f"{yaml_file}:{field}.term must be a mapping")
+            return None, None
+        envo_id = term.get("id")
+        if not isinstance(envo_id, str) or not envo_id.strip():
+            self.input_errors.append(
+                f"{yaml_file}:{field}.term.id must be a non-empty string"
+            )
+            return None, None
+        return envo_id.strip(), term.get("label") or descriptor.get("preferred_term")
 
-                            if envo_id:
-                                env_key = envo_id
-                                self.environments[env_key]['envo_id'] = envo_id
-                                self.environments[env_key]['label'] = envo_label or envo_id
-                                self.environments[env_key]['ingredients'].append({
-                                    'name': data.get('preferred_term'),
-                                    'ontology_id': data.get('ontology_id'),
-                                    'relevance': relevance,
-                                    'file': yaml_file.name
-                                })
-                                self.environments[env_key]['ingredient_count'] += 1
+    def _remember(self, envo_id: Any, label: Any) -> Dict[str, Any]:
+        key = str(envo_id)
+        environment = self.environments[key]
+        environment["envo_id"] = key
+        environment["label"] = str(label or key)
+        return environment
 
-            except Exception as e:
-                print(f"Warning: Error reading {yaml_file}: {e}", file=sys.stderr)
+    def _record_communities(
+        self, data: Mapping[str, Any], yaml_file: Path
+    ) -> None:
+        field = "environment_term"
+        for descriptor in self._descriptors(data, field, yaml_file):
+            envo_id, envo_label = self._term(descriptor, field, yaml_file)
+            if not envo_id:
+                continue
+            environment = self._remember(envo_id, envo_label)
+            environment["communities"].append(
+                {
+                    "id": data.get("id"),
+                    "name": data.get("name"),
+                    "file": yaml_file.name,
+                }
+            )
+            environment["community_count"] += 1
 
-    def _generate_report(self) -> Dict:
+    def _record_media(self, data: Mapping[str, Any], yaml_file: Path) -> None:
+        field = "source_environment"
+        for descriptor in self._descriptors(data, field, yaml_file):
+            envo_id, envo_label = self._term(descriptor, field, yaml_file)
+            if not envo_id:
+                continue
+            environment = self._remember(envo_id, envo_label)
+            environment["media"].append(
+                {
+                    "id": data.get("id"),
+                    "name": data.get("name"),
+                    "file": yaml_file.name,
+                }
+            )
+            environment["media_count"] += 1
+
+    def _record_ingredients(
+        self, data: Mapping[str, Any], yaml_file: Path
+    ) -> None:
+        field = "environmental_context"
+        for context in self._descriptors(data, field, yaml_file):
+            environment_term = context.get("environment_term")
+            if isinstance(environment_term, Mapping):
+                envo_id = environment_term.get("id")
+                envo_label = environment_term.get("label")
+            else:
+                envo_id = environment_term
+                envo_label = None
+            if not isinstance(envo_id, str) or not envo_id.strip():
+                self.input_errors.append(
+                    f"{yaml_file}:{field}.environment_term must contain a "
+                    "non-empty string identifier"
+                )
+                continue
+            environment = self._remember(
+                envo_id.strip(), context.get("environment_label") or envo_label
+            )
+            environment["ingredients"].append(
+                {
+                    "name": data.get("preferred_term"),
+                    "ontology_id": data.get("ontology_id"),
+                    "relevance": context.get("relevance"),
+                    "file": yaml_file.name,
+                }
+            )
+            environment["ingredient_count"] += 1
+
+    def _generate_report(self) -> Dict[str, Any]:
         """Generate coverage report."""
-        report = {
+        report: Dict[str, Any] = {
             'summary': {
                 'total_environments': len(self.environments),
                 'environments_with_communities': sum(1 for e in self.environments.values() if e['community_count'] > 0),
@@ -283,7 +352,7 @@ def format_table(report: Dict) -> str:
     output.append(f"  - With Ingredients: {summary['environments_with_ingredients']}")
     output.append(f"  - Fully Covered (all 3): {summary['fully_covered']}")
     output.append("")
-    output.append(f"Total Resources:")
+    output.append("Total Resources:")
     output.append(f"  - Communities: {summary['total_communities']}")
     output.append(f"  - Media: {summary['total_media']}")
     output.append(f"  - Ingredients: {summary['total_ingredients']}")
@@ -313,7 +382,7 @@ def format_table(report: Dict) -> str:
     output.append("COVERAGE GAPS")
     output.append("-" * 80)
 
-    gaps = {
+    gaps: Dict[str, list[Dict[str, Any]]] = {
         'communities_only': [],
         'media_only': [],
         'ingredients_only': [],
@@ -365,12 +434,12 @@ def format_json(report: Dict) -> str:
 def format_html(report: Dict) -> str:
     """Format report as HTML."""
     try:
-        from jinja2 import Template
+        from jinja2 import Environment
     except ImportError:
         print("Error: jinja2 not installed. Run: pip install jinja2", file=sys.stderr)
         sys.exit(1)
 
-    template = Template("""
+    template = Environment(autoescape=True).from_string("""
 <!DOCTYPE html>
 <html>
 <head>
@@ -459,27 +528,64 @@ def format_html(report: Dict) -> str:
     )
 
 
-def main():
+def _coverage_sources(dotenv_path: Path | None = None) -> tuple[CoverageSource, ...]:
+    """Resolve the complete manifest capability scope before reading records."""
+
+    manifest = load_fleet_manifest()
+    keys = manifest.with_capability("environment_coverage")
+    if not keys:
+        raise FleetManifestError(
+            "Capability 'environment_coverage' has no enabled Mechs"
+        )
+    environ = merged_repository_environment(dotenv_path)
+    settings = RepositorySettings.from_environment(manifest=manifest, environ=environ)
+
+    invalid = {key: settings.invalid[key] for key in keys if key in settings.invalid}
+    if invalid:
+        details = "; ".join(f"{key}: {message}" for key, message in invalid.items())
+        raise RepositoryConfigurationError(
+            f"configured environment coverage target is untrustworthy: {details}"
+        )
+
+    unconfigured = [key for key in keys if key in settings.unconfigured]
+    if unconfigured:
+        details = "; ".join(
+            f"{key}: {settings.errors[key]}" for key in unconfigured
+        )
+        raise RepositoryConfigurationError(
+            f"environment coverage target is not configured: {details}"
+        )
+
+    # Revalidate every target before scanning any of them. A checkout whose
+    # origin changed after settings construction must not yield a partial report.
+    sources: list[CoverageSource] = []
+    for key in keys:
+        mech = manifest.get(key)
+        capability = mech.capability("environment_coverage")
+        if capability is None:  # pragma: no cover - selected by this capability
+            raise FleetManifestError(f"{key} does not declare environment_coverage")
+        globs = capability.settings.get("record_globs")
+        if not isinstance(globs, tuple) or not globs:
+            raise FleetManifestError(
+                f"{key}.environment_coverage.record_globs is not a validated profile"
+            )
+        sources.append(
+            CoverageSource(
+                key=key,
+                display_name=mech.display_name,
+                root=settings.get_target(key).path,
+                record_globs=globs,
+            )
+        )
+    return tuple(sources)
+
+
+def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Analyze environmental coverage across CultureMech, MediaIngredientMech, and CommunityMech"
-    )
-    parser.add_argument(
-        '--culturemech-root',
-        type=Path,
-        default=Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech',
-        help='Path to CultureMech repository'
-    )
-    parser.add_argument(
-        '--mediaingredient-root',
-        type=Path,
-        default=Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech',
-        help='Path to MediaIngredientMech repository'
-    )
-    parser.add_argument(
-        '--communitymech-root',
-        type=Path,
-        default=Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CommunityMech/CommunityMech',
-        help='Path to CommunityMech repository'
+        description=(
+            "Analyze environmental coverage across the canonical manifest's "
+            "environment_coverage capability scope"
+        )
     )
     parser.add_argument(
         '--format',
@@ -492,26 +598,33 @@ def main():
         type=Path,
         help='Output file (default: stdout)'
     )
+    parser.add_argument(
+        '--dotenv',
+        type=Path,
+        help=(
+            'explicit dotenv file for checkout roots; exported values take '
+            'precedence (default: this source checkout\'s .env when present)'
+        ),
+    )
 
-    args = parser.parse_args()
-
-    # Validate paths
-    for name, path in [
-        ('CultureMech', args.culturemech_root),
-        ('MediaIngredientMech', args.mediaingredient_root),
-        ('CommunityMech', args.communitymech_root)
-    ]:
-        if not path.exists():
-            print(f"Error: {name} repository not found at {path}", file=sys.stderr)
-            sys.exit(1)
+    args = parser.parse_args(list(argv) if argv is not None else None)
 
     # Analyze
-    analyzer = EnvironmentCoverageAnalyzer(
-        args.culturemech_root,
-        args.mediaingredient_root,
-        args.communitymech_root
-    )
-    report = analyzer.analyze()
+    try:
+        dotenv_path = args.dotenv
+        if dotenv_path is None:
+            project_dotenv = Path(__file__).resolve().parents[1] / ".env"
+            if project_dotenv.exists() or project_dotenv.is_symlink():
+                dotenv_path = project_dotenv
+        analyzer = EnvironmentCoverageAnalyzer(_coverage_sources(dotenv_path))
+        report = analyzer.analyze()
+    except (
+        CoverageInputError,
+        FleetManifestError,
+        RepositoryConfigurationError,
+    ) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
 
     # Format
     if args.format == 'table':
@@ -528,7 +641,8 @@ def main():
         print(f"Report written to {args.output}", file=sys.stderr)
     else:
         print(output)
+    return 0
 
 
 if __name__ == '__main__':
-    main()
+    raise SystemExit(main())

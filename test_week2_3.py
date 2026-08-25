@@ -212,11 +212,11 @@ def test_file_structure():
 
     required_files = [
         "plugins/oak_query.py",
-        "agents/data_pipeline/ingredient_curation_agent.yaml",
-        "agents/data_pipeline/network_repair_agent.yaml",
-        "agents/data_pipeline/etl_coordinator_agent.yaml",
+        "src/kg_microbe_agents/definitions/data_pipeline/ingredient_curation_agent.yaml",
+        "src/kg_microbe_agents/definitions/data_pipeline/network_repair_agent.yaml",
+        "src/kg_microbe_agents/definitions/data_pipeline/etl_coordinator_agent.yaml",
         "pipelines/ingredient_curation_pipeline.py",
-        "openclaw_config.yaml",
+        "src/kg_microbe_config/openclaw_config.yaml",
     ]
 
     all_present = True

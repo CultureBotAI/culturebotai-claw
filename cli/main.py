@@ -2,7 +2,7 @@
 KG-Microbe OpenClaw CLI
 
 Command-line interface for orchestrating AI coding agents across the Mech
-fleet defined in ``conf/fleet.yaml``.
+fleet defined in ``src/kg_microbe_fleet/fleet.yaml``.
 """
 
 import os
@@ -10,21 +10,44 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 import click
-from dotenv import load_dotenv
 from rich.console import Console
 from rich.table import Table
 
+from kg_microbe_agents import (
+    AgentDefinitionError,
+    agents_root,
+    load_agent_definitions,
+    load_named_agent,
+)
+from kg_microbe_config import default_config_path
 from kg_microbe_fleet import load_fleet_manifest
 from plugins.repository_settings import (
     RepositoryConfigurationError,
     RepositorySettings,
+    merged_repository_environment,
 )
-
-# Load environment variables
-load_dotenv()
 
 console = Console()
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+AGENTS_ROOT = agents_root()
+DEFAULT_CONFIG_PATH = default_config_path()
+
+
+def _runtime_environment() -> dict[str, str]:
+    """Merge this source checkout's explicit dotenv with exported values.
+
+    Never search from the caller's current directory: an unrelated ``.env``
+    must not redirect repository operations. Installed commands have no source
+    dotenv and therefore use only their exported environment.
+    """
+
+    dotenv_path = PROJECT_ROOT / ".env"
+    selected_dotenv = None
+    if (PROJECT_ROOT / "pyproject.toml").is_file() and (
+        dotenv_path.exists() or dotenv_path.is_symlink()
+    ):
+        selected_dotenv = dotenv_path
+    return merged_repository_environment(selected_dotenv, environ=os.environ)
 
 
 def _project_version() -> str:
@@ -32,11 +55,6 @@ def _project_version() -> str:
         return version("kg-microbe-orchestration")
     except PackageNotFoundError:
         return "unknown"
-
-
-def _agent_file(agent_name: str) -> Path | None:
-    matches = list((PROJECT_ROOT / "agents").rglob(f"{agent_name}.yaml"))
-    return matches[0] if len(matches) == 1 else None
 
 
 def _pipeline_file(pipeline_name: str) -> Path | None:
@@ -53,7 +71,7 @@ def cli():
     KG-Microbe OpenClaw Orchestration CLI
 
     Coordinate AI coding agents across the Mech fleet defined in
-    conf/fleet.yaml. Run `openclaw-cli status` for the current fleet and
+    src/kg_microbe_fleet/fleet.yaml. Run `openclaw-cli status` for the current fleet and
     which repositories are configured here.
     """
     pass
@@ -68,31 +86,27 @@ def agent():
 @agent.command("list")
 def list_agents():
     """List all available agents."""
-    agents_dir = Path(__file__).parent.parent / "agents"
-
     table = Table(title="Available OpenClaw Agents")
     table.add_column("Agent", style="cyan")
     table.add_column("Type", style="magenta")
     table.add_column("Model", style="green")
     table.add_column("Description")
 
-    # Scan for agent YAML files
-    agent_files = [f for f in agents_dir.rglob("*.yaml")]
-
-    for agent_file in sorted(agent_files):
-        agent_type = agent_file.parent.name
-        agent_name = agent_file.stem
-
-        # Try to read basic info (in production, would parse YAML properly)
+    manifest = load_fleet_manifest()
+    try:
+        definitions = load_agent_definitions(manifest)
+    except AgentDefinitionError as exc:
+        raise click.ClickException(str(exc)) from exc
+    for definition in definitions:
         table.add_row(
-            agent_name,
-            agent_type,
-            "Haiku/Sonnet",  # Placeholder
-            f"Defined in {str(agent_file.relative_to(agents_dir))}"
+            definition.name,
+            definition.agent_type,
+            definition.model,
+            definition.description,
         )
 
     console.print(table)
-    console.print(f"\nTotal agents: {len(agent_files)}")
+    console.print(f"\nTotal agents: {len(definitions)}")
 
 
 @agent.command("run")
@@ -104,16 +118,19 @@ def run_agent(agent_name: str, dry_run: bool):
 
     Example: openclaw-cli agent run validation_agent --dry-run
     """
-    agent_file = _agent_file(agent_name)
-    if agent_file is None:
-        raise click.ClickException(f"Unknown or ambiguous agent: {agent_name}")
+    manifest = load_fleet_manifest()
+    try:
+        definition = load_named_agent(agent_name, manifest)
+    except AgentDefinitionError as exc:
+        raise click.ClickException(str(exc)) from exc
     if not dry_run:
         raise click.ClickException(
             "Agent execution is not implemented; use --dry-run to validate the request"
         )
     console.print(
         f"[yellow]DRY RUN: validated {agent_name} "
-        f"({agent_file.relative_to(PROJECT_ROOT)})[/yellow]"
+        f"({definition.path.relative_to(AGENTS_ROOT)}) across "
+        f"{len(definition.repository_keys)} manifest-scoped repositories[/yellow]"
     )
 
 
@@ -253,20 +270,23 @@ def config():
 @config.command()
 def show():
     """Show current configuration."""
+    manifest = load_fleet_manifest()
+    try:
+        environ = _runtime_environment()
+    except RepositoryConfigurationError as exc:
+        raise click.ClickException(str(exc)) from exc
     table = Table(title="OpenClaw Configuration")
     table.add_column("Setting", style="cyan")
     table.add_column("Value", style="green")
 
     # Environment variables
     settings = {
-        "ANTHROPIC_API_KEY": "configured" if os.getenv("ANTHROPIC_API_KEY") else "not set",
-        "OPENCLAW_MODE": os.getenv("OPENCLAW_MODE", "local"),
-        "OPENCLAW_LOG_LEVEL": os.getenv("OPENCLAW_LOG_LEVEL", "INFO"),
+        "ANTHROPIC_API_KEY": "configured" if environ.get("ANTHROPIC_API_KEY") else "not set",
+        "OPENCLAW_MODE": environ.get("OPENCLAW_MODE", "local"),
+        "OPENCLAW_LOG_LEVEL": environ.get("OPENCLAW_LOG_LEVEL", "INFO"),
     }
-    # Repository roots come from the fleet manifest so this display cannot fall
-    # behind the registry, which is what happened when it was a literal.
-    for mech in load_fleet_manifest().mechs.values():
-        settings[mech.environment_variable] = os.getenv(
+    for mech in manifest.mechs.values():
+        settings[mech.environment_variable] = environ.get(
             mech.environment_variable, "[not set]"
         )
 
@@ -280,7 +300,7 @@ def show():
 @click.option(
     "--config-file",
     type=click.Path(path_type=Path, dir_okay=False),
-    default=PROJECT_ROOT / "openclaw_config.yaml",
+    default=DEFAULT_CONFIG_PATH,
     show_default=True,
 )
 @click.option(
@@ -296,9 +316,14 @@ def validate(config_file: Path, require_all_repositories: bool):
     """Validate configuration."""
     issues = []
     absent: tuple[str, ...] = ()
+    manifest = load_fleet_manifest()
 
     try:
-        settings = RepositorySettings.from_file(config_file)
+        settings = RepositorySettings.from_file(
+            config_file,
+            environ=_runtime_environment(),
+            manifest=manifest,
+        )
     except RepositoryConfigurationError as exc:
         issues.append(str(exc))
     else:
@@ -339,21 +364,27 @@ def status():
     config_table.add_column("Component", style="cyan")
     config_table.add_column("Status", style="green")
 
-    # Check OpenClaw installation
+    config_table.add_row(
+        "Orchestration package", f"✓ Installed (v{_project_version()})"
+    )
+
+    # Load one immutable fleet snapshot and inject it into the repository
+    # resolver. A separately cached import-time registry used to let the status
+    # display and the paths being validated disagree.
+    manifest = load_fleet_manifest()
     try:
-        openclaw_status = f"✓ Installed (v{version('openclaw')})"
-    except PackageNotFoundError:
-        openclaw_status = "✗ Not installed"
-
-    config_table.add_row("OpenClaw", openclaw_status)
-
-    # Derived from the fleet manifest: this used to be a literal that silently
-    # omitted TraitMech and ProteinTraitsMech even after they joined the fleet.
+        environ = _runtime_environment()
+    except RepositoryConfigurationError as exc:
+        raise click.ClickException(str(exc)) from exc
     repository_names = {
-        key: mech.display_name for key, mech in load_fleet_manifest().mechs.items()
+        key: mech.display_name for key, mech in manifest.mechs.items()
     }
     try:
-        settings = RepositorySettings.from_file(PROJECT_ROOT / "openclaw_config.yaml")
+        settings = RepositorySettings.from_file(
+            DEFAULT_CONFIG_PATH,
+            environ=environ,
+            manifest=manifest,
+        )
     except RepositoryConfigurationError as exc:
         settings = None
         repository_error = str(exc)
@@ -368,20 +399,15 @@ def status():
         elif key in settings.paths:
             repository_status = "✓ Verified"
         else:
-            # Assert presence in the validated set rather than inferring it
-            # from absence in the error map. The display list and the registry
-            # are now two separate manifest reads, so a key can appear here
-            # without ever having been resolved; reporting that as verified
-            # would be fail-open in the preflight command.
-            repository_status = (
-                f"✗ '{key}' is not in the resolved repository registry"
-            )
+            # Defensive guard: both objects came from the same manifest, so an
+            # absent key is a settings contract failure, not a verified repo.
+            repository_status = f"✗ '{key}' is missing from repository settings"
         config_table.add_row(display_name, repository_status)
 
     console.print(config_table)
 
     # Count agents and plugins
-    agents_dir = Path(__file__).parent.parent / "agents"
+    agents_dir = AGENTS_ROOT
     plugins_dir = Path(__file__).parent.parent / "plugins"
 
     agent_count = len(list(agents_dir.rglob("*.yaml")))

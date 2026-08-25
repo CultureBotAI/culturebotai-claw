@@ -1,4 +1,5 @@
 #!/bin/bash
+# Managed by kg-microbe coordination hook installer.
 #
 # Claude Code Pre-Commit Hook
 # Checks if repo is locked before allowing commits
@@ -9,10 +10,42 @@
 
 # Configuration
 ORCHESTRATION_ROOT={{ORCHESTRATION_ROOT}}  # Replaced during installation
-REPO_NAME="{{REPO_NAME}}"  # Will be replaced during installation
+REPO_NAME={{REPO_NAME}}  # Replaced during installation
+WORKSPACE_ROOT={{WORKSPACE_ROOT}}  # Replaced during installation
+PROJECT_ROOT={{PROJECT_ROOT}}  # Replaced during installation
+HOOKS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HOOK_INPUT_FILTER="$HOOKS_DIR/hook-input.py"
+# Relative OPENCLAW_WORKSPACE values must resolve from the trusted root baked
+# into this installed hook, never a stale or caller-controlled root.
+export OPENCLAW_ORCHESTRATION_ROOT="$ORCHESTRATION_ROOT"
+export OPENCLAW_WORKSPACE="$WORKSPACE_ROOT"
+export CLAUDE_PROJECT_DIR="$PROJECT_ROOT"
+
+# Claude Code can only match the Bash tool at registration time on clients that
+# predate handler conditions. Inspect its JSON input here and do nothing for
+# every Bash command that is not an actual git commit invocation.
+if [ -L "$HOOK_INPUT_FILTER" ] || [ ! -f "$HOOK_INPUT_FILTER" ]; then
+    echo "Git commit hook input filter is missing or unsafe" >&2
+    exit 2
+fi
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "Cannot inspect git commit hook input: python3 is required" >&2
+    exit 2
+fi
+if python3 "$HOOK_INPUT_FILTER" commit PreToolUse; then
+    FILTER_EXIT=0
+else
+    FILTER_EXIT=$?
+fi
+if [ $FILTER_EXIT -eq 1 ]; then
+    exit 0
+elif [ $FILTER_EXIT -ne 0 ]; then
+    echo "Git commit hook input is malformed, ambiguous, or targets outside this project" >&2
+    exit 2
+fi
 
 # Check lock
-uv run --project "$ORCHESTRATION_ROOT" python \
+uv run --offline --frozen --project "$ORCHESTRATION_ROOT" python \
     "$ORCHESTRATION_ROOT/scripts/check_lock.py" "$REPO_NAME" "commit changes"
 EXIT_CODE=$?
 
@@ -24,8 +57,8 @@ elif [ $EXIT_CODE -eq 1 ]; then
     echo ""
     echo "✋ Commit blocked by lock system"
     echo ""
-    exit 1
+    exit 2
 else
     echo "❌ Lock check failed; commit blocked until coordination state is readable"
-    exit 1
+    exit 2
 fi

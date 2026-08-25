@@ -6,13 +6,32 @@ Run this script to verify that the orchestration layer is properly installed
 and configured.
 """
 
+from __future__ import annotations
+
+import importlib
 import os
 import sys
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as distribution_version
 from pathlib import Path
-from dotenv import load_dotenv
+from typing import Mapping
 
-# Load environment
-load_dotenv()
+from packaging.version import InvalidVersion, Version
+
+from kg_microbe_agents import (
+    AgentDefinitionError,
+    agents_root,
+    load_agent_definition,
+    load_agent_definitions,
+)
+from kg_microbe_config import default_config_path
+from kg_microbe_fleet import FleetManifest, FleetManifestError, load_fleet_manifest
+from plugins.repository_settings import (
+    RepositoryConfigurationError,
+    RepositorySettings,
+    merged_repository_environment,
+)
+
 
 def print_header(text):
     """Print a formatted header."""
@@ -29,45 +48,52 @@ def validate_installation():
     print_header("1. Package Installation")
 
     packages = [
-        ("openclaw", "2026.3.12"),
-        ("anthropic", "0.85.0"),
-        ("click", "8.0.0"),
-        ("rich", "13.0.0"),
-        ("gitpython", "3.1.0"),
-        ("yaml", None),  # PyYAML
-        ("watchdog", "3.0.0"),
-        ("dotenv", None),  # python-dotenv
+        ("cli.main", "kg-microbe-orchestration", "0.1.0", "orchestration"),
+        ("anthropic", "anthropic", "0.85.0", "anthropic"),
+        ("click", "click", "8.3.1", "click"),
+        ("rich", "rich", "14.3.3", "rich"),
+        ("git", "gitpython", "3.1.46", "GitPython"),
+        ("yaml", "PyYAML", "6.0.3", "PyYAML"),
+        ("watchdog", "watchdog", "6.0.0", "watchdog"),
+        ("dotenv", "python-dotenv", "1.2.2", "python-dotenv"),
     ]
 
     all_passed = True
-    for package, min_version in packages:
+    for module_name, distribution_name, min_version, label in packages:
         try:
-            if package == "yaml":
-                import yaml
-                print(f"  {check_mark(True)} PyYAML installed")
-            elif package == "dotenv":
-                import dotenv
-                print(f"  {check_mark(True)} python-dotenv installed")
-            else:
-                module = __import__(package)
-                version = getattr(module, "__version__", "unknown")
-                print(f"  {check_mark(True)} {package} v{version}")
-        except ImportError:
-            print(f"  {check_mark(False)} {package} NOT INSTALLED")
+            importlib.import_module(module_name)
+            installed = distribution_version(distribution_name)
+            meets_minimum = Version(installed) >= Version(min_version)
+            print(
+                f"  {check_mark(meets_minimum)} {label} v{installed} "
+                f"(required >= {min_version})"
+            )
+            all_passed = all_passed and meets_minimum
+        except (ImportError, PackageNotFoundError):
+            print(f"  {check_mark(False)} {label} NOT INSTALLED")
+            all_passed = False
+        except InvalidVersion as exc:
+            print(f"  {check_mark(False)} {label} has invalid version metadata: {exc}")
             all_passed = False
 
     return all_passed
 
-def validate_environment():
+def validate_environment(
+    manifest: FleetManifest | None = None,
+    environ: Mapping[str, str] | None = None,
+):
     """Validate environment variables."""
     print_header("2. Environment Configuration")
 
-    required_vars = [
-        "CULTUREMECH_ROOT",
-        "MEDIAINGREDIENTMECH_ROOT",
-        "COMMUNITYMECH_ROOT",
+    manifest = manifest or load_fleet_manifest()
+    env = os.environ if environ is None else environ
+
+    runtime_vars = [
         "OPENCLAW_MODE",
         "OPENCLAW_LOG_LEVEL",
+    ]
+    repository_vars = [
+        mech.environment_variable for mech in manifest.mechs.values()
     ]
 
     optional_vars = [
@@ -76,9 +102,18 @@ def validate_environment():
 
     all_passed = True
 
-    print("\n  Required Variables:")
-    for var in required_vars:
-        value = os.getenv(var)
+    print("\n  Fleet Repository Roots:")
+    for var in repository_vars:
+        value = env.get(var)
+        if value:
+            print(f"  {check_mark(True)} {var} = {value[:50]}...")
+        else:
+            print(f"  {check_mark(False)} {var} NOT SET")
+            all_passed = False
+
+    print("\n  Required Runtime Variables:")
+    for var in runtime_vars:
+        value = env.get(var)
         if value:
             print(f"  {check_mark(True)} {var} = {value[:50]}...")
         else:
@@ -87,7 +122,7 @@ def validate_environment():
 
     print("\n  Optional Variables:")
     for var in optional_vars:
-        value = os.getenv(var)
+        value = env.get(var)
         if value:
             if "KEY" in var or "SECRET" in var:
                 print(f"  {check_mark(True)} {var} = {'*' * 20}... (hidden)")
@@ -98,34 +133,38 @@ def validate_environment():
 
     return all_passed
 
-def validate_repositories():
-    """Validate repository paths exist."""
+def validate_repositories(
+    manifest: FleetManifest | None = None,
+    environ: Mapping[str, str] | None = None,
+):
+    """Validate every manifest repository's checkout and GitHub identity."""
     print_header("3. Repository Paths")
 
-    repos = {
-        "CultureMech": os.getenv("CULTUREMECH_ROOT"),
-        "MediaIngredientMech": os.getenv("MEDIAINGREDIENTMECH_ROOT"),
-        "CommunityMech": os.getenv("COMMUNITYMECH_ROOT"),
-    }
+    manifest = manifest or load_fleet_manifest()
+    settings = RepositorySettings.from_environment(
+        environ=environ,
+        manifest=manifest,
+    )
 
     all_passed = True
-    for repo_name, repo_path in repos.items():
-        if not repo_path:
-            print(f"  {check_mark(False)} {repo_name}: Path not set")
+    for key, mech in manifest.mechs.items():
+        if key in settings.unconfigured:
+            print(
+                f"  {check_mark(False)} {mech.display_name}: not configured; "
+                f"set {mech.environment_variable}"
+            )
+            all_passed = False
+            continue
+        if key in settings.invalid:
+            print(f"  {check_mark(False)} {mech.display_name}: {settings.invalid[key]}")
             all_passed = False
             continue
 
-        path = Path(repo_path)
-        if path.exists():
-            # Check for justfile
-            justfile = path / "justfile"
-            if justfile.exists():
-                print(f"  {check_mark(True)} {repo_name}: {repo_path} (justfile found)")
-            else:
-                print(f"  {check_mark(True)} {repo_name}: {repo_path} (no justfile)")
-        else:
-            print(f"  {check_mark(False)} {repo_name}: {repo_path} (NOT FOUND)")
-            all_passed = False
+        target = settings.get_target(key)
+        print(
+            f"  {check_mark(True)} {mech.display_name}: {target.path} "
+            f"(origin {mech.github})"
+        )
 
     return all_passed
 
@@ -136,11 +175,7 @@ def validate_structure():
     base_dir = Path(__file__).parent
 
     required_dirs = [
-        "agents",
-        "agents/code_development",
-        "agents/data_pipeline",
-        "agents/build_deployment",
-        "agents/dev_workflow",
+        "src/kg_microbe_agents/definitions",
         "plugins",
         "pipelines",
         "cli",
@@ -164,8 +199,7 @@ def validate_files():
     base_dir = Path(__file__).parent
 
     required_files = [
-        "openclaw_config.yaml",
-        ".env",
+        ".env.example",
         "pyproject.toml",
         "README.md",
         ".gitignore",
@@ -182,14 +216,31 @@ def validate_files():
             print(f"  {check_mark(exists)} {file_path} (NOT FOUND)")
             all_passed = False
 
+    config_path = default_config_path()
+    config_exists = config_path.is_file()
+    print(
+        f"  {check_mark(config_exists)} "
+        f"{config_path.relative_to(base_dir) if config_exists else config_path}"
+    )
+    all_passed = all_passed and config_exists
+
     return all_passed
 
+def agent_configuration_error(agent_file: Path) -> str | None:
+    """Return a concise defect for one agent YAML, or ``None`` when usable."""
+
+    try:
+        load_agent_definition(agent_file)
+    except AgentDefinitionError as exc:
+        return str(exc)
+    return None
+
+
 def validate_agents():
-    """Validate agent configurations."""
+    """Parse agent configurations and validate their minimum structure."""
     print_header("6. Agent Configurations")
 
-    base_dir = Path(__file__).parent
-    agents_dir = base_dir / "agents"
+    agents_dir = agents_root()
 
     agent_files = list(agents_dir.rglob("*.yaml"))
 
@@ -197,12 +248,24 @@ def validate_agents():
         print(f"  {check_mark(False)} No agent configurations found")
         return False
 
+    try:
+        definitions = load_agent_definitions()
+    except AgentDefinitionError as exc:
+        print(f"  {check_mark(False)} Packaged agent catalogue - {exc}")
+        return False
+
+    definitions_by_path = {definition.path: definition for definition in definitions}
+    all_passed = True
     for agent_file in sorted(agent_files):
         rel_path = agent_file.relative_to(agents_dir)
+        if agent_file not in definitions_by_path:
+            print(f"  {check_mark(False)} {rel_path} - missing from agent catalogue")
+            all_passed = False
+            continue
         print(f"  {check_mark(True)} {rel_path}")
 
     print(f"\n  Total agents: {len(agent_files)}")
-    return True
+    return all_passed
 
 def validate_plugins():
     """Validate plugin implementations."""
@@ -244,7 +307,7 @@ def validate_cli():
     print_header("8. CLI Availability")
 
     try:
-        from cli.main import cli
+        importlib.import_module("cli.main")
         print(f"  {check_mark(True)} CLI module importable")
 
         # Check if openclaw-cli command exists
@@ -261,7 +324,7 @@ def validate_cli():
             return True
         else:
             print(f"  {check_mark(False)} openclaw-cli command not in PATH")
-            print(f"    Try: uv pip install -e .")
+            print("    Try: uv pip install -e .")
             return False
     except Exception as e:
         print(f"  {check_mark(False)} CLI import error: {str(e)}")
@@ -269,14 +332,34 @@ def validate_cli():
 
 def main():
     """Run all validations."""
+    # Load only this checkout's explicit dotenv. Never search from the caller's
+    # current directory, where an unrelated file could redirect repository roots.
+    dotenv_path = Path(__file__).resolve().parent / ".env"
+    selected_dotenv = (
+        dotenv_path if dotenv_path.exists() or dotenv_path.is_symlink() else None
+    )
+    try:
+        environ = merged_repository_environment(
+            selected_dotenv,
+            environ=os.environ,
+        )
+    except RepositoryConfigurationError as exc:
+        print(f"\n  {check_mark(False)} Project environment is invalid: {exc}")
+        return 1
     print("\n" + "=" * 70)
     print("  KG-Microbe OpenClaw Orchestration - Setup Validation")
     print("=" * 70)
 
+    try:
+        manifest = load_fleet_manifest()
+    except FleetManifestError as exc:
+        print(f"\n  {check_mark(False)} Fleet manifest is invalid: {exc}")
+        return 1
+
     results = {
         "Installation": validate_installation(),
-        "Environment": validate_environment(),
-        "Repositories": validate_repositories(),
+        "Environment": validate_environment(manifest, environ),
+        "Repositories": validate_repositories(manifest, environ),
         "Structure": validate_structure(),
         "Files": validate_files(),
         "Agents": validate_agents(),
