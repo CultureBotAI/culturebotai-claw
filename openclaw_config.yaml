@@ -26,6 +26,20 @@ repositories:
     task_runner: just
     description: "Microbial community modeling with ecological interactions"
 
+  traitmech:
+    path: ${TRAITMECH_ROOT}
+    type: python
+    package_manager: uv
+    task_runner: just
+    description: "Knowledge base of microbial ecophysiological traits"
+
+  proteintraitsmech:
+    path: ${PROTEINTRAITSMECH_ROOT}
+    type: python
+    package_manager: uv
+    task_runner: just
+    description: "Ontology-derived protein-trait corpus"
+
 agents:
   discovery_paths:
     - agents/code_development

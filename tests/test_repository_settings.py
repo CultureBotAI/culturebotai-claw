@@ -129,6 +129,46 @@ def test_unexpanded_repository_variable_is_rejected() -> None:
         settings.get_target("culturemech")
 
 
+def test_a_foreign_unexpanded_variable_is_a_defect_not_an_absent_checkout() -> None:
+    """`${MISSING_ROOT}` is a typo or an undeclared dependency, so it must stay
+    fatal rather than be excused as "you have not cloned this repository"."""
+
+    settings = RepositorySettings.from_environment(
+        {"repositories": {"culturemech": {"path": "${MISSING_ROOT}"}}},
+        environ={},
+    )
+
+    assert "culturemech" not in settings.unconfigured
+    assert "culturemech" in settings.invalid
+
+
+def test_own_root_unset_reads_as_unconfigured_not_misconfigured() -> None:
+    """`path: ${CULTUREMECH_ROOT}` with that variable unset means the
+    repository is not set up here, which reaches the same state as an absent
+    path by a different route."""
+
+    settings = RepositorySettings.from_environment(
+        {"repositories": {"culturemech": {"path": "${CULTUREMECH_ROOT}"}}},
+        environ={},
+    )
+
+    assert "culturemech" in settings.unconfigured
+    assert "culturemech" not in settings.invalid
+    # Still reported, and still unusable: the distinction is for preflight
+    # reporting only and must not open an access path.
+    assert "not configured" in settings.errors["culturemech"]
+    with pytest.raises(RepositoryConfigurationError, match="not configured"):
+        settings.get_target("culturemech")
+
+
+def test_an_absent_path_is_unconfigured_and_still_fails_closed() -> None:
+    settings = RepositorySettings.from_environment({"repositories": {}}, environ={})
+
+    assert "culturemech" in settings.unconfigured
+    with pytest.raises(RepositoryConfigurationError):
+        settings.open_repository("culturemech")
+
+
 def test_relative_repository_path_is_rejected() -> None:
     settings = RepositorySettings.from_environment(
         {"repositories": {"culturemech": {"path": "../CultureMech"}}},

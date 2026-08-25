@@ -1,9 +1,15 @@
 # CultureBotAI CLAW
 
 CultureBotAI CLAW coordinates validation, curation, and shared tooling across
-the CultureMech, MediaIngredientMech (MIM), and CommunityMech repositories.
-It contains repository-aware plugins, file-based coordination, curation
-pipelines, shared Mech utilities, and fleet CI workflows.
+the five Mech repositories: CultureMech, MediaIngredientMech (MIM),
+CommunityMech, TraitMech, and ProteinTraitsMech. `conf/fleet.yaml` is the
+canonical definition of that fleet. It contains repository-aware plugins,
+file-based coordination, curation pipelines, shared Mech utilities, and fleet
+CI workflows.
+
+You do not need every repository cloned to work here — set only the roots you
+use, and `openclaw-cli config validate` will report the rest as "not
+configured locally" instead of failing.
 
 ## Current support status
 

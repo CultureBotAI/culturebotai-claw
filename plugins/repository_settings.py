@@ -18,9 +18,22 @@ from urllib.parse import urlparse
 import yaml  # type: ignore[import-untyped]
 from git import GitCommandError, InvalidGitRepositoryError, NoSuchPathError, Repo
 
+from kg_microbe_fleet import load_fleet_manifest
+
 
 class RepositoryConfigurationError(ValueError):
     """Raised when a configured repository cannot be trusted."""
+
+
+class RepositoryNotConfiguredError(RepositoryConfigurationError):
+    """Raised when a repository has no configured path at all.
+
+    Distinct from its parent because "you do not have this repository cloned"
+    and "this repository is configured but untrustworthy" warrant different
+    handling by a preflight command. It remains a
+    :class:`RepositoryConfigurationError` so every existing ``except`` clause,
+    and every fail-closed access path, is unchanged.
+    """
 
 
 @dataclass(frozen=True)
@@ -31,15 +44,22 @@ class RepositoryDefinition:
     expected_repository: str
 
 
-DEFAULT_REPOSITORIES: Mapping[str, RepositoryDefinition] = {
-    "culturemech": RepositoryDefinition("CULTUREMECH_ROOT", "CultureBotAI/CultureMech"),
-    "mediaingredientmech": RepositoryDefinition(
-        "MEDIAINGREDIENTMECH_ROOT", "CultureBotAI/MediaIngredientMech"
-    ),
-    "communitymech": RepositoryDefinition(
-        "COMMUNITYMECH_ROOT", "CultureBotAI/CommunityMech"
-    ),
-}
+def _definitions_from_manifest() -> "dict[str, RepositoryDefinition]":
+    """Derive the repository registry from the canonical fleet manifest.
+
+    The registry used to be a literal here, which is how it drifted to three
+    Mechs while other components knew four or five. Deriving it means adding a
+    repository to ``conf/fleet.yaml`` is sufficient.
+    """
+
+    manifest = load_fleet_manifest()
+    return {
+        key: RepositoryDefinition(mech.environment_variable, mech.github)
+        for key, mech in manifest.mechs.items()
+    }
+
+
+DEFAULT_REPOSITORIES: Mapping[str, RepositoryDefinition] = _definitions_from_manifest()
 
 KNOWN_CONFIGURATION_SECTIONS = {
     "openclaw",
@@ -305,10 +325,12 @@ class RepositorySettings:
         targets: Mapping[str, RepositoryTarget],
         errors: Mapping[str, str],
         repository_names: tuple[str, ...],
+        unconfigured: tuple[str, ...] = (),
     ) -> None:
         self._targets = dict(targets)
         self._errors = dict(errors)
         self._repository_names = repository_names
+        self._unconfigured = unconfigured
 
     @classmethod
     def from_environment(
@@ -339,6 +361,7 @@ class RepositorySettings:
 
         targets: dict[str, RepositoryTarget] = {}
         errors: dict[str, str] = {}
+        unconfigured: list[str] = []
 
         for name, definition in DEFAULT_REPOSITORIES.items():
             override = configured_repositories.get(name, {})
@@ -364,12 +387,19 @@ class RepositorySettings:
                 )
                 # Validate eagerly so configuration errors are available before use.
                 target.open()
+            except RepositoryNotConfiguredError as exc:
+                # Recorded in both places: `errors` keeps the historical
+                # contract that every non-usable repository is reported there,
+                # while `unconfigured` lets a preflight command tell "absent"
+                # apart from "present but untrustworthy".
+                errors[name] = str(exc)
+                unconfigured.append(name)
             except RepositoryConfigurationError as exc:
                 errors[name] = str(exc)
             else:
                 targets[name] = target
 
-        return cls(targets, errors, tuple(DEFAULT_REPOSITORIES))
+        return cls(targets, errors, tuple(DEFAULT_REPOSITORIES), tuple(unconfigured))
 
     @classmethod
     def from_file(
@@ -392,7 +422,7 @@ class RepositorySettings:
         environ: Mapping[str, str],
     ) -> RepositoryTarget:
         if not isinstance(raw_path, str) or not raw_path.strip():
-            raise RepositoryConfigurationError(
+            raise RepositoryNotConfiguredError(
                 f"Repository '{name}' path is not configured; set {environment_variable}"
             )
         if not isinstance(expected_repository, str) or "/" not in expected_repository:
@@ -403,6 +433,17 @@ class RepositorySettings:
         try:
             expanded = Template(raw_path.strip()).substitute(environ)
         except (KeyError, ValueError) as exc:
+            # `path: ${THIS_REPO_ROOT}` with that variable unset means the
+            # repository is simply not set up on this machine — the same
+            # condition as an absent path, reached by a different route. Any
+            # OTHER unresolved variable is a genuine configuration defect (a
+            # typo, or a dependency on an undeclared variable) and stays fatal.
+            missing = exc.args[0] if isinstance(exc, KeyError) and exc.args else None
+            if missing == environment_variable:
+                raise RepositoryNotConfiguredError(
+                    f"Repository '{name}' path is not configured; set "
+                    f"{environment_variable}"
+                ) from exc
             raise RepositoryConfigurationError(
                 f"Repository '{name}' path contains an unexpanded variable: {raw_path}"
             ) from exc
@@ -429,9 +470,40 @@ class RepositorySettings:
 
     @property
     def errors(self) -> dict[str, str]:
-        """Return a copy of per-repository configuration errors."""
+        """Return a copy of per-repository configuration errors.
+
+        Includes repositories that are merely unconfigured; see
+        :attr:`unconfigured` to separate those out.
+        """
 
         return dict(self._errors)
+
+    @property
+    def unconfigured(self) -> tuple[str, ...]:
+        """Return repositories whose only problem is having no configured path.
+
+        These are still unusable — :meth:`get_target` and
+        :meth:`open_repository` raise for them exactly as before. The
+        distinction exists so that not having every Mech cloned locally is not
+        reported as a configuration defect.
+        """
+
+        return self._unconfigured
+
+    @property
+    def invalid(self) -> dict[str, str]:
+        """Return configured-but-untrustworthy repositories.
+
+        This is :attr:`errors` minus :attr:`unconfigured`: the problems that
+        represent a genuine misconfiguration rather than an absent checkout.
+        """
+
+        skip = set(self._unconfigured)
+        return {
+            name: message
+            for name, message in self._errors.items()
+            if name not in skip
+        }
 
     def get_target(self, name: str) -> RepositoryTarget:
         """Return a trusted target, revalidating it at operation time."""

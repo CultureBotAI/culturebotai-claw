@@ -1,7 +1,7 @@
 [project]
 name = "kg-microbe-orchestration"
 version = "0.1.0"
-description = "OpenClaw orchestration layer for KG-Microbe repositories (CultureMech, MediaIngredientMech, CommunityMech)"
+description = "OpenClaw orchestration layer for the KG-Microbe Mech fleet (see conf/fleet.yaml)"
 readme = "README.md"
 # 3.11 floor so linkml 1.10.x can resolve. Under >=3.10 uv picks linkml 1.9.3
 # against linkml-runtime 1.10.0, an incompatible pair that fails every schema

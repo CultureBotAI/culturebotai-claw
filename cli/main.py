@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 from rich.console import Console
 from rich.table import Table
 
+from kg_microbe_fleet import load_fleet_manifest
 from plugins.repository_settings import (
     RepositoryConfigurationError,
     RepositorySettings,
@@ -262,10 +263,13 @@ def show():
         "ANTHROPIC_API_KEY": "configured" if os.getenv("ANTHROPIC_API_KEY") else "not set",
         "OPENCLAW_MODE": os.getenv("OPENCLAW_MODE", "local"),
         "OPENCLAW_LOG_LEVEL": os.getenv("OPENCLAW_LOG_LEVEL", "INFO"),
-        "CULTUREMECH_ROOT": os.getenv("CULTUREMECH_ROOT", "[not set]"),
-        "MEDIAINGREDIENTMECH_ROOT": os.getenv("MEDIAINGREDIENTMECH_ROOT", "[not set]"),
-        "COMMUNITYMECH_ROOT": os.getenv("COMMUNITYMECH_ROOT", "[not set]"),
     }
+    # Repository roots come from the fleet manifest so this display cannot fall
+    # behind the registry, which is what happened when it was a literal.
+    for mech in load_fleet_manifest().mechs.values():
+        settings[mech.environment_variable] = os.getenv(
+            mech.environment_variable, "[not set]"
+        )
 
     for key, value in settings.items():
         table.add_row(key, value)
@@ -280,16 +284,43 @@ def show():
     default=PROJECT_ROOT / "openclaw_config.yaml",
     show_default=True,
 )
-def validate(config_file: Path):
+@click.option(
+    "--require-all-repositories",
+    is_flag=True,
+    help=(
+        "Treat a repository that has no configured path as a failure. Off by "
+        "default so a checkout without every Mech cloned still validates; "
+        "enable it where the full fleet is genuinely expected."
+    ),
+)
+def validate(config_file: Path, require_all_repositories: bool):
     """Validate configuration."""
     issues = []
+    absent: tuple[str, ...] = ()
 
     try:
         settings = RepositorySettings.from_file(config_file)
     except RepositoryConfigurationError as exc:
         issues.append(str(exc))
     else:
-        issues.extend(settings.errors.values())
+        # A repository that is merely not cloned locally is not a defect in
+        # this configuration; one that is configured but untrustworthy is.
+        # Both remain unusable at operation time either way.
+        issues.extend(settings.invalid.values())
+        absent = settings.unconfigured
+        if require_all_repositories:
+            issues.extend(settings.errors[name] for name in absent)
+            absent = ()
+
+    if absent:
+        console.print(
+            f"[yellow]Not configured locally ({len(absent)}):[/yellow] "
+            + ", ".join(absent)
+        )
+        console.print(
+            "[yellow]  These are fleet members without a configured path here. "
+            "Operations against them will still fail closed.[/yellow]"
+        )
 
     if issues:
         console.print("[red]Configuration issues found:[/red]")
@@ -317,10 +348,10 @@ def status():
 
     config_table.add_row("OpenClaw", openclaw_status)
 
+    # Derived from the fleet manifest: this used to be a literal that silently
+    # omitted TraitMech and ProteinTraitsMech even after they joined the fleet.
     repository_names = {
-        "culturemech": "CultureMech",
-        "mediaingredientmech": "MediaIngredientMech",
-        "communitymech": "CommunityMech",
+        key: mech.display_name for key, mech in load_fleet_manifest().mechs.items()
     }
     try:
         settings = RepositorySettings.from_file(PROJECT_ROOT / "openclaw_config.yaml")
