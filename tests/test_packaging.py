@@ -11,6 +11,7 @@ PACKAGES = (
     "kg_microbe_history",
     "kg_microbe_kgscan",
     "kg_microbe_qc",
+    "kg_microbe_research",
 )
 
 
@@ -36,6 +37,7 @@ def test_shared_console_scripts_are_installed():
         "kg-microbe-history",
         "kg-microbe-kgscan",
         "kg-microbe-qc",
+        "kg-microbe-research",
     } <= scripts
 
 

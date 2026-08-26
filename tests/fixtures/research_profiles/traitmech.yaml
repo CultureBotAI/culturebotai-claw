@@ -1,0 +1,47 @@
+mech: TraitMech
+target: microbial traits, their scope, taxon evidence, and causal mechanisms
+default_focus: causal_mechanism
+evidence_policy: Curate causal nodes and edges only when the exact microbial trait claim has source-backed edge-level evidence.
+focuses:
+  causal_mechanism:
+    label: trait mechanism and evidence-backed causal graph
+    objective: Find genes, proteins, chemicals, processes, environmental drivers, and directional causal edges.
+    source_priorities:
+      - primary microbiology and physiology studies
+      - reviews for discovery followed by primary-paper verification
+      - UniProt, GO, Rhea, MetaCyc, KEGG, and NCBI for identifier checks
+    provider_adjustments: {openscientist: 4, falcon: 4, asta: 2, cyberian: 2, claude_code: 2}
+    stages:
+      discovery:
+        objective: Retrieve mechanistic studies and candidate entity/edge evidence.
+        capabilities: {academic_search: 5, scientific_literature: 5, citation_tracking: 3, snippets: 2}
+        speed_weight: 1
+      synthesis:
+        objective: Build a coherent, taxon-aware causal model and distinguish direct evidence from inference.
+        capabilities: {synthesis: 5, scientific_literature: 4, citation_tracking: 4, hypothesis_tracking: 2, code_interpretation: 1}
+        synthesis_weight: 2
+      verification:
+        objective: Validate each proposed edge, CURIE, and trait boundary independently.
+        capabilities: {citation_tracking: 5, scientific_literature: 4, academic_search: 3, structured_databases: 2, snippets: 2}
+        cost_weight: 1
+  definition_grounding:
+    label: trait definition, synonyms, boundaries, and ontology grounding
+    objective: Distinguish the trait from near neighbors and support definitions and mappings with authoritative sources.
+    source_priorities:
+      - source ontologies and authoritative database records
+      - primary assay or phenotype literature
+      - domain reviews used only to locate primary evidence
+    provider_adjustments: {claude_code: 4, asta: 2, consensus: 2, falcon: 2}
+    stages:
+      discovery:
+        objective: Search ontology pages, database definitions, and phenotype literature.
+        capabilities: {web_search: 4, structured_databases: 4, academic_search: 3, citation_tracking: 3}
+        speed_weight: 1
+      synthesis:
+        objective: Reconcile scope, assay dependence, synonyms, parents, and mapping relation.
+        capabilities: {synthesis: 5, citation_tracking: 4, scientific_literature: 3, structured_databases: 3}
+        synthesis_weight: 1
+      verification:
+        objective: Confirm identifiers and quoted definitions at their authoritative source.
+        capabilities: {citation_tracking: 5, structured_databases: 5, web_search: 2, snippets: 2}
+        cost_weight: 1

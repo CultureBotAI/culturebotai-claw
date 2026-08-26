@@ -40,7 +40,7 @@ fixtures, injected environments, and dry-run command construction.
 | Deep-research provider triage | Five separate provider scripts and five domain profiles | Missing | Centralize provider catalogue, ranking, policy, and execution |
 | Deep-research result storage | Markdown reports plus provider-specific metadata YAML | No shared result schema | Add schema-governed plans, runs, citations, artifacts, and results |
 | Entity research runners | One per Mech, with repeated provider/credential/command logic | Missing | Shared runner plus domain adapters |
-| Paid-call safety | Four runners are live-by-default; ProteinTraitsMech requires `--apply` | No fleet policy | Dry-run by default; explicit live and paid authorization |
+| Provider-use safety | Four runners are live-by-default; ProteinTraitsMech requires `--apply` | No fleet policy | Dry-run by default; explicit live and non-free usage authorization |
 | Source-fetch skill | Present in all five, with divergent variants | Missing | Canonical parameterized skill and fetch contract |
 | Open-issue review skill | Present in all five, with repo-name differences | Missing | Canonical skill driven by the fleet manifest |
 | Next-task/backlog skill | Present in four | Missing | Canonical skill with per-repo backlog paths |
@@ -119,9 +119,13 @@ CultureMech, TraitMech, MediaIngredientMech, and CommunityMech execute a provide
 unless the caller supplies `--dry-run`. ProteinTraitsMech defaults to dry-run
 and requires `--apply` for a possibly billed call.
 
-The central runner should adopt the safer behavior and additionally require an
-explicit paid-provider acknowledgement or budget ceiling. A credential being
-configured must remain distinct from a provider being functionally certified.
+The central runner should adopt the safer behavior and additionally require
+separate quota/billing authorization for every provider not explicitly marked
+free. Billing class is independent of the relative cost tier: live use of a
+metered or unknown-billing provider needs an explicit usage acknowledgement or
+a cost ceiling that admits its relative tier. `--no-paid` must exclude anything
+not explicitly free. A credential being configured must remain distinct from a
+provider having prior evidence of functional availability.
 
 ### 6. Shared skills are copied rather than parameterized
 
@@ -333,9 +337,61 @@ CommunityMech `ba596731b23b799f4baca96984ceb8f0d56874fe`, TraitMech
 
 ### Phase 2 — Build the shared deep-research subsystem
 
+> **Implementation note (Phase 2, provider subsystem landed).** `kg_microbe_research`
+> now owns the provider catalogue, focus-profile validation, deterministic
+> triage, and the execution policy; each Mech keeps its own
+> `conf/deep_research_provider.yaml`. Verified against `origin/main` in all five
+> repositories on 2026-08-25: every Mech carried its own
+> `scripts/deep_research_provider.py` (614-688 lines, five distinct hashes,
+> ~3,280 lines total). The two closest pairs differ only in comments, so the
+> divergence is copy drift rather than domain need — but it is not only
+> cosmetic: CultureMech and ProteinTraitsMech reject a non-numeric capability
+> weight, stage weight, or provider adjustment, MediaIngredientMech and
+> CommunityMech accept them and fail later inside scoring, and TraitMech has
+> dropped `credential_status` altogether. The shared loader takes the strictest
+> behaviour of each and is verified to accept all five committed profiles
+> unchanged, so adoption is not a data migration.
+>
+> This PR implements only the provider-catalogue, profile-validation,
+> deterministic-triage, and standalone policy-decision portions of Phase 2.
+> Configuration is not verified availability: a non-empty credential or a
+> `LocalProbe` PATH/module result can yield only `configured`. For an external
+> provider, only explicitly injected, previously obtained
+> `AvailabilityEvidence` can yield `available`. The catalogue-only `mock`
+> remains a `stub` until an executable mock implementation lands. The package
+> contains no provider health probe, provider call, or provider network path.
+> Values read from recognised credential environment variables are checked only
+> for non-emptiness and are never emitted or retained. Tests inject local
+> configuration with `environ` and `StaticProbe`, and functional evidence with
+> `StaticAvailability`, so they remain deterministic and provider-credit-free.
+> The installed CLI loads prior evidence through `--availability-evidence` and
+> the strict `load_availability(...)` boundary. Its versioned JSON requires a
+> status, reason, timezone-aware check and expiry, source, and a
+> configuration-context label per provider; the lifetime is capped at 24 hours
+> and expiry is rechecked on every lookup and immediately before authorization.
+> This is a trusted caller assertion, not a cryptographic attestation or proof
+> that the current credential matches the label, and credential values must
+> never be stored in it.
+>
+> Billing/quota authorization is independent of relative provider cost. Every
+> billing class not explicitly `free` — including `metered` and `unknown` — is
+> conservatively gated; `--no-paid` excludes all such providers. The
+> `kg-microbe-research authorize` CLI evaluates policy without making a call and
+> exits 0 only for live authorization, 3 for an allowed dry run, and 2 for a
+> policy refusal.
+>
+> Still outstanding are the provider command builder, executor, and executable
+> mock implementation from item 1; the LinkML research schema and
+> schema-compliant run record from items 2 and 3; the adapter protocol and five
+> runner conversions from items 6 and 7; and actual call-site enforcement of
+> items 4 and 5. Four existing runners therefore remain live-by-default, while
+> ProteinTraitsMech remains dry-run-first; none consumes the shared policy gate
+> yet. This PR supplies the partial contract those follow-ups must consume and
+> does not claim that Phase 2 or execution safety is complete.
+
 1. Create `kg_microbe_research` with:
    - provider definitions and aliases;
-   - capability, source-scope, cost, and latency vocabulary;
+   - capability, source-scope, relative cost, billing, and latency vocabulary;
    - credential/configured/available/blocked status separation;
    - focus-profile validation;
    - deterministic stage ranking and assignment;
@@ -354,10 +410,14 @@ CommunityMech `ba596731b23b799f4baca96984ceb8f0d56874fe`, TraitMech
 3. Store the rendered query, canonical provider, focus, target identity, config
    hash, timestamps, cost/budget, task identifier, status, citations, and output
    checksums in the schema-compliant record.
-4. Require dry-run by default. Live execution requires `--apply`; paid execution
-   additionally requires an explicit paid acknowledgement or budget ceiling.
+4. Require dry-run by default. Live execution requires `--apply`; every provider
+   not explicitly classified `free` additionally requires an explicit
+   quota/billing acknowledgement or a cost ceiling that admits its relative
+   cost tier.
 5. Connect execution to an immutable triage plan so a manually supplied
-   provider cannot bypass policy silently.
+   provider cannot bypass policy silently. A recorded override may explain an
+   ordinary triage/allowlist disagreement, but never waives `--no-paid`, usage
+   authorization, a cost ceiling, or provider status.
 6. Add a common adapter protocol for resolving a domain target, rendering prompt
    variables, and validating proposed changes.
 7. Convert each Mech runner into a thin adapter and retain its two custom focus
@@ -367,8 +427,8 @@ Acceptance criteria:
 
 - all provider and assignment tests pass without network calls;
 - all saved metadata validates against `research.yaml`;
-- no command spends credits without two explicit decisions: live execution and
-  paid-provider authorization;
+- no command can authorize quota/credit-consuming execution without two
+  explicit decisions: live execution and non-free-provider usage authorization;
 - each Mech can render a complete dry-run plan and result skeleton; and
 - provider behavior is governed centrally while domain focus remains local.
 
@@ -487,7 +547,7 @@ Acceptance criteria:
 2. **Make claw authoritative for shared schemas and vendored contracts**
 3. **Implement shared deep-research provider catalogue and triage engine**
 4. **Add schema-compliant ResearchPlan/ResearchRun/ResearchResult capture**
-5. **Require explicit apply and paid authorization for provider execution**
+5. **Require explicit apply and non-free usage authorization for provider execution**
 6. **Convert five entity research runners to shared core plus adapters**
 7. **Implement shared validated-write transaction and writer registry**
 8. **Centralize general Claude skills and generate Mech adapters**

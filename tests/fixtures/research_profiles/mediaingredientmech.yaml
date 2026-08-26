@@ -1,0 +1,47 @@
+mech: MediaIngredientMech
+target: culture-media ingredient identity, ontology mapping, formulation, and functional roles
+default_focus: identity_mapping
+evidence_policy: Treat recorded identity and properties as claims to test; never collapse salts, hydrates, mixtures, or commercial formulations without evidence.
+focuses:
+  identity_mapping:
+    label: exact ingredient identity and ontology mapping
+    objective: Confirm substance/formulation scope, synonyms, formula, salt or hydrate state, CAS-RN, and mapping relation.
+    source_priorities:
+      - ChEBI and other authoritative ontology/database records
+      - PubChem, NIST, EPA, supplier primary documentation, and pharmacopeias
+      - primary literature for named extracts, digests, and formulations
+    provider_adjustments: {claude_code: 4, perplexity: 3, asta: 2, falcon: 2, consensus: 1}
+    stages:
+      discovery:
+        objective: Search structured chemical resources, formulation documents, and scientific literature.
+        capabilities: {structured_databases: 5, web_search: 4, academic_search: 3, citation_tracking: 3}
+        speed_weight: 1
+      synthesis:
+        objective: Reconcile form-specific identifiers and choose exact, close, narrow, or no mapping.
+        capabilities: {synthesis: 5, structured_databases: 4, citation_tracking: 4, scientific_literature: 2}
+        synthesis_weight: 2
+      verification:
+        objective: Independently verify identity, CAS check digit/form assignment, mapping label, and provenance.
+        capabilities: {citation_tracking: 5, structured_databases: 5, web_search: 3, snippets: 2}
+        cost_weight: 1
+  functional_roles:
+    label: nutritional, physicochemical, and cellular-metabolic roles in media
+    objective: Find context-specific evidence for what the ingredient does in a culture medium and for which organism/process.
+    source_priorities:
+      - primary cultivation experiments and methods
+      - defined-medium design studies and metabolic literature
+      - ChEBI role axioms as context, not experimental proof
+    provider_adjustments: {falcon: 4, openscientist: 4, asta: 3, consensus: 2}
+    stages:
+      discovery:
+        objective: Retrieve studies that manipulate or explain the ingredient in culture.
+        capabilities: {academic_search: 5, scientific_literature: 5, citation_tracking: 3, snippets: 2}
+        speed_weight: 1
+      synthesis:
+        objective: Separate general chemical roles from medium-, taxon-, and concentration-specific roles.
+        capabilities: {synthesis: 5, scientific_literature: 4, citation_tracking: 4, hypothesis_tracking: 1}
+        synthesis_weight: 2
+      verification:
+        objective: Confirm each proposed role with explicit experimental or authoritative evidence.
+        capabilities: {citation_tracking: 5, scientific_literature: 4, academic_search: 3, snippets: 2}
+        cost_weight: 1

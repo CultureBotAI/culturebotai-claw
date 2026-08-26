@@ -130,6 +130,7 @@ uv run --extra dev mypy \
   cli/main.py plugins/repository_settings.py plugins/lock_manager.py \
   plugins/git_integration.py plugins/just_runner.py \
   src/kg_microbe_history src/kg_microbe_kgscan src/kg_microbe_fleet \
+  src/kg_microbe_research \
   src/kg_microbe_governance/__init__.py \
   src/kg_microbe_governance/__main__.py \
   src/kg_microbe_governance/fleet_audit.py \

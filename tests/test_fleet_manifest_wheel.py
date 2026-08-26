@@ -50,26 +50,24 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path) -> None
     source_archives = list(sdist_directory.glob("*.tar.gz"))
     assert len(source_archives) == 1
     with tarfile.open(source_archives[0], "r:gz") as source_archive:
-        source_names = {
-            name.split("/", 1)[1]
-            for name in source_archive.getnames()
-            if "/" in name
-        }
+        source_names = {name.split("/", 1)[1] for name in source_archive.getnames() if "/" in name}
     assert "src/kg_microbe_fleet/fleet.yaml" in source_names
     governance_document = json.loads(
-        (REPOSITORY_ROOT / "src/kg_microbe_governance/vendored_artifacts.json")
-        .read_text(encoding="utf-8")
+        (REPOSITORY_ROOT / "src/kg_microbe_governance/vendored_artifacts.json").read_text(
+            encoding="utf-8"
+        )
     )
     assert "src/kg_microbe_governance/vendored_artifacts.json" in source_names
     for artifact in governance_document["artifacts"]:
         assert artifact["source"] in source_names
     assert "src/kg_microbe_config/openclaw_config.yaml" in source_names
+    assert "src/kg_microbe_research/__init__.py" in source_names
+    assert "src/kg_microbe_research/__main__.py" in source_names
     assert not any(name.startswith("agents/") for name in source_names)
     assert not any(name.startswith("conf/") for name in source_names)
     assert not any(name.startswith("build/") for name in source_names)
     assert not any(
-        name == "shared" or name.startswith(("shared/", "src/shared/"))
-        for name in source_names
+        name == "shared" or name.startswith(("shared/", "src/shared/")) for name in source_names
     )
 
     # Build from the freshly generated source archive. An in-tree wheel build
@@ -104,10 +102,9 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path) -> None
         for artifact in governance_document["artifacts"]:
             assert artifact["source"].removeprefix("src/") in names
         assert "kg_microbe_config/openclaw_config.yaml" in names
-        assert (
-            "kg_microbe_agents/definitions/dev_workflow/validation_agent.yaml"
-            in names
-        )
+        assert "kg_microbe_research/__init__.py" in names
+        assert "kg_microbe_research/__main__.py" in names
+        assert "kg_microbe_agents/definitions/dev_workflow/validation_agent.yaml" in names
         assert "conf/fleet.yaml" not in names
         assert "openclaw_config.yaml" not in names
         assert not any(name.startswith("agents/") for name in names)
@@ -119,11 +116,9 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path) -> None
         )
         entry_points = wheel.read(entry_points_path).decode("utf-8")
         assert "kg-microbe-fleet = kg_microbe_fleet.__main__:main" in entry_points
-        assert (
-            "kg-microbe-governance = kg_microbe_governance.__main__:main"
-            in entry_points
-        )
+        assert "kg-microbe-governance = kg_microbe_governance.__main__:main" in entry_points
         assert "kg-microbe-history = kg_microbe_history.__main__:main" in entry_points
+        assert "kg-microbe-research = kg_microbe_research.__main__:main" in entry_points
         wheel.extractall(unpacked)
 
     smoke_environment = os.environ.copy()
@@ -135,6 +130,9 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path) -> None
     )
     smoke_environment.pop("KG_MICROBE_FLEET_MANIFEST", None)
     smoke_code = """
+from datetime import datetime, timedelta, timezone
+import json
+import os
 from pathlib import Path
 import sys
 
@@ -145,6 +143,8 @@ import kg_microbe_fleet
 import kg_microbe_governance
 import kg_microbe_governance.fleet_audit
 import kg_microbe_history
+import kg_microbe_research
+import kg_microbe_research.__main__
 import plugins
 from click.testing import CliRunner
 from cli.main import cli
@@ -153,6 +153,10 @@ from kg_microbe_fleet import default_manifest_path, load_fleet_manifest
 from kg_microbe_governance import load_governance_manifest
 from kg_microbe_governance.__main__ import main as governance_main
 from kg_microbe_history.__main__ import _default_schema_path, main as history_main
+from kg_microbe_research.__main__ import (
+    build_parser as build_research_parser,
+    main as research_main,
+)
 
 unpacked = Path(sys.argv[1]).resolve()
 runtime_modules = (
@@ -163,6 +167,8 @@ runtime_modules = (
     kg_microbe_governance,
     kg_microbe_governance.fleet_audit,
     kg_microbe_history,
+    kg_microbe_research,
+    kg_microbe_research.__main__,
     plugins,
 )
 for module in runtime_modules:
@@ -194,6 +200,48 @@ assert history_main([
     "--details", "validated from the unpacked wheel",
 ]) == 0
 assert history_main(["validate", str(history_root), "--structural-only"]) == 0
+assert build_research_parser().prog == "kg-microbe-research"
+research_profile = history_root.parent / "wheel-research-profile.json"
+research_profile.write_text(json.dumps({
+    "mech": "WheelMech",
+    "target": "offline wheel smoke",
+    "evidence_policy": "cite every material claim",
+    "default_focus": "primary",
+    "focuses": {"primary": {
+        "label": "Primary",
+        "objective": "Exercise installed triage and policy",
+        "source_priorities": [],
+        "provider_adjustments": {"asta": 1},
+        "stages": {"discovery": {
+            "objective": "Find evidence",
+            "capabilities": {"academic_search": 1},
+        }},
+    }},
+}), encoding="utf-8")
+checked_at = datetime.now(timezone.utc)
+research_evidence = history_root.parent / "wheel-availability.json"
+research_evidence.write_text(json.dumps({
+    "version": 1,
+    "providers": {"asta": {
+        "status": "available",
+        "reason": "offline installed-wheel fixture",
+        "checked_at": checked_at.isoformat(),
+        "expires_at": (checked_at + timedelta(hours=1)).isoformat(),
+        "source": "installed-wheel-smoke",
+        "context": "fake credential in isolated subprocess",
+    }},
+}), encoding="utf-8")
+os.environ["ASTA_API_KEY"] = "offline-wheel-fixture"
+research_args = [
+    "--profile", str(research_profile),
+    "--availability-evidence", str(research_evidence),
+    "--stage", "discovery", "--provider", "asta", "--json",
+]
+assert research_main(["triage", *research_args[:4], "--json"]) == 0
+assert research_main(["authorize", *research_args]) == 3
+assert research_main([
+    "authorize", *research_args[:-1], "--apply", "--acknowledge-usage", "--json",
+]) == 0
 assert callable(cli)
 runner = CliRunner()
 listed = runner.invoke(cli, ["agent", "list"])

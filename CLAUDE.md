@@ -62,6 +62,11 @@ Supported:
 - `LockManager` atomic, lease-owned file coordination.
 - Plugin and agent discovery and validated CLI dry runs.
 - Packaged history, QC dashboard, discussion-browser, and knowledge-gap tools.
+- `kg_microbe_research`: the shared provider catalogue, focus-profile
+  validation, deterministic triage, and the execution-policy gate. It makes no
+  provider health probe or provider call and performs no provider network
+  access. Values read from recognised credential environment variables are
+  checked only for non-emptiness and are never emitted or retained.
 - Packaged canonical vendored-artifact manifest and identity-validated,
   dry-run-first synchronization.
 - The assertion-based suite under `tests/` and fleet workflows under `.github/`.
@@ -71,6 +76,12 @@ Experimental or disabled:
 - `openclaw-cli agent run` and `pipeline run` execution without `--dry-run`.
 - Environment-curation apply mode; it raises until an atomic validated writer exists.
 - Unified ingredient-mapping apply mode; it raises until all YAML writes are transactional.
+- Provider command construction and *execution*, including an executable mock
+  provider. `kg_microbe_research` decides whether a call is permitted; it does
+  not make one. None of the five Mech runners consults this gate yet. Four
+  runners still execute live by default; ProteinTraitsMech is dry-run-first.
+- The shared research schema, schema-compliant run records, domain adapters,
+  and migrated Mech runners.
 - Legacy root diagnostics, one-off migration scripts, and archived phase workflows.
 
 Never describe an experimental path as implemented merely because a YAML agent
@@ -88,6 +99,7 @@ uv run --extra dev mypy \
   cli/main.py plugins/repository_settings.py plugins/lock_manager.py \
   plugins/git_integration.py plugins/just_runner.py \
   src/kg_microbe_history src/kg_microbe_kgscan src/kg_microbe_fleet \
+  src/kg_microbe_research \
   src/kg_microbe_governance/__init__.py \
   src/kg_microbe_governance/__main__.py \
   src/kg_microbe_governance/fleet_audit.py \
@@ -132,6 +144,54 @@ with LockManager().lock("culturemech", "operation_name"):
 Do not use manual acquire/release pairs in new code. Never force-release another
 lease as routine error recovery.
 
+## Research provider safety
+
+A live research call may consume a quota or incur a charge. It must satisfy
+three independent policy conditions:
+
+1. **Live execution.** `authorize(...)` returns a dry run unless `apply=True`.
+2. **Usage authorization.** Billing/quota classification is independent of the
+   relative cost tier used for ranking. Every provider not explicitly marked
+   `free` (including `metered` or `unknown`) additionally needs an explicit
+   acknowledgement or a cost ceiling that admits its relative cost tier.
+3. **Plan agreement.** The provider must be one the immutable plan returned by
+   `plan_stage(...)` would offer. An ordinary triage/allowlist disagreement can
+   proceed only with a recorded override reason.
+
+An override can explain a manual triage or allowlist choice; it never waives
+`--no-paid`, the usage-authorization gate, a cost ceiling, or provider status.
+
+A blocked, unavailable, or merely configured provider is refused whatever the
+caller passes. Configuration is not verified availability: a non-empty
+credential or discovered local CLI/package can yield only `configured`. For an
+external provider, only explicitly injected, previously obtained
+`AvailabilityEvidence` can yield `available`. The catalogue-only `mock` remains
+a `stub` until its executable implementation lands. `KNOWN_BLOCKED` records
+measured failures and outranks both configuration and injected evidence.
+
+The installed CLI accepts prior evidence only through
+`--availability-evidence PATH`. `load_availability(...)` strictly validates its
+versioned JSON: every entry records status, reason, timezone-aware check/expiry
+times, source, and a configuration-context label; expiry must be after the
+check, no more than 24 hours later, and still in the future. Expiry is rechecked
+on every lookup and immediately before an existing plan can authorize
+execution. This is an explicit trusted-caller boundary, not a cryptographic
+attestation or a check that the current secret matches the recorded context.
+Never put credential values in an evidence file. Programmatic callers and tests
+can inject non-expiring, ephemeral evidence with `StaticAvailability`.
+
+`--no-paid` excludes every provider whose billing class is not explicitly
+`free`, regardless of its relative cost tier. The
+`kg-microbe-research authorize` command evaluates policy only and never invokes
+a provider. It exits 0 only for live authorization, 3 for a permitted dry run,
+and 2 for a policy refusal.
+
+Never call a provider to test this code. The package contains no provider health
+probe or provider-call path, and every contract in `tests/` is offline and
+deterministic. Inject local configuration with `environ` and `StaticProbe`, and
+inject prior functional evidence separately with `StaticAvailability` or the
+strict cached-evidence loader.
+
 ## Configuration rules
 
 - Start from `.env.example`; do not commit `.env` or credentials.
@@ -162,6 +222,7 @@ workspace/    gitignored runtime state
 Key shared console scripts:
 
 ```bash
+uv run kg-microbe-research --help
 uv run kg-microbe-history --help
 uv run kg-microbe-governance --help
 uv run kg-microbe-kgscan --help

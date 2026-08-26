@@ -1,0 +1,47 @@
+mech: ProteinTraitsMech
+target: protein sequence, structure, function, chemistry, families, and causal mechanisms
+default_focus: mechanism
+evidence_policy: Curate trait definitions, examples, relations, and causal edges only with resolvable database provenance or explicit literature evidence.
+focuses:
+  mechanism:
+    label: sequence/structure/function mechanism and causal graph
+    objective: Find catalytic residues, cofactors, reaction chemistry, conformational steps, molecular functions, and evidence-backed causal edges.
+    source_priorities:
+      - primary biochemical and structural studies
+      - M-CSA, Rhea, UniProtKB/Swiss-Prot, PDB, PDBe, and AlphaFold DB
+      - InterPro, Pfam, CATH, SCOP, PROSITE, EC, GO, and ChEBI
+    provider_adjustments: {falcon: 4, openscientist: 4, asta: 3, claude_code: 3, cyberian: 2}
+    stages:
+      discovery:
+        objective: Retrieve primary mechanism studies and authoritative sequence/structure/function records.
+        capabilities: {academic_search: 5, scientific_literature: 5, structured_databases: 4, citation_tracking: 3, snippets: 2}
+        speed_weight: 1
+      synthesis:
+        objective: Connect residues, structural features, chemistry, and functional outcomes without overgeneralizing across families.
+        capabilities: {synthesis: 5, scientific_literature: 4, structured_databases: 3, citation_tracking: 4, code_interpretation: 2}
+        synthesis_weight: 2
+      verification:
+        objective: Confirm accessions, residue numbering, reaction participants, exemplar proteins, and every causal edge.
+        capabilities: {structured_databases: 5, citation_tracking: 5, scientific_literature: 4, academic_search: 2, snippets: 2}
+        cost_weight: 1
+  family_grounding:
+    label: family/domain/motif identity, hierarchy, and cross-resource equivalence
+    objective: Resolve whether records are equivalent, broader/narrower, co-membership, or externally mapped associations.
+    source_priorities:
+      - source-native InterPro, Pfam, CATH, SCOP, PROSITE, MEROPS, CAZy, and NCBIfam records
+      - official crosswalks such as interpro2go and ec2go
+      - primary family-characterization studies for disputed scope
+    provider_adjustments: {claude_code: 5, cyberian: 3, perplexity: 2, asta: 2}
+    stages:
+      discovery:
+        objective: Search source databases, hierarchy pages, mappings, and family literature.
+        capabilities: {structured_databases: 5, web_search: 4, academic_search: 3, citation_tracking: 3, code_interpretation: 2}
+        speed_weight: 1
+      synthesis:
+        objective: Distinguish identity from hierarchy, co-membership, overlap, and mapping-product assertions.
+        capabilities: {synthesis: 5, structured_databases: 5, citation_tracking: 4, code_interpretation: 2}
+        synthesis_weight: 2
+      verification:
+        objective: Resolve every CURIE and confirm relation provenance at the source resource.
+        capabilities: {structured_databases: 5, citation_tracking: 5, web_search: 3}
+        cost_weight: 1
