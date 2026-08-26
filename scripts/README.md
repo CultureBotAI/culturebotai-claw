@@ -8,8 +8,13 @@ stable Python API.
 
 Workflow support is narrower than a single "CI-supported" category:
 
-- `audit_idlabel_fleet.sh` is executed for relevant pull requests, pushes to
-  `main`, nightly runs, and manual dispatches. It is a pull-request gate.
+- `.github/workflows/governance-fleet-audit.yaml` invokes the installed
+  `kg-microbe-governance fleet-audit` command from trusted claw base/main
+  against the manifest-derived Mech main checkouts; downstream pins are
+  unanimous authenticated data, not executable audit code. It does not
+  delegate to a compatibility script in this directory.
+- `.github/workflows/id-label-canon.yaml` runs the three canonical packaged
+  behavioral suites directly under `src/kg_microbe_governance/artifacts/`.
 - `validate_evidence_references.py` is executed by the scheduled,
   manually-dispatched, and post-merge cross-repository workflow. Its failure
   fails that workflow, but it is not a pull-request gate.

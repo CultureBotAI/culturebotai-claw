@@ -1,49 +1,24 @@
-name: id-label canonical
+name: canonical ID-label contract
 
-# This is a supported consumer of claw's canonical fleet manifest. The audit
-# scope must come from that manifest, so all and only Mechs declaring the
-# id_label_validation capability participate. Domain-specific package paths and
-# the temporary vendored-hub role are scientific/rollout inputs; neither is a
-# second definition of fleet membership.
-#
-# Phase 1 is now explicitly in its bootstrap transition. Claw's complete
-# packaged manifest/payload is the new authority for downstream pins, while the
-# old CultureMech comparison remains active until all five PRs consume one
-# immutable claw merge commit. The final flip removes this compatibility job.
-#
-# This workflow:
-#   1. audits the complete manifest-declared consumer set and claw's checked-in
-#      compatibility copy against the current comparison target; and
-#   2. runs the shared validator contract against claw's copy.
+# Exercise the authoritative packaged validator and its three behavioral
+# contracts directly. The separate governance-fleet-audit workflow verifies
+# every deployed artifact and immutable pin across the five Mech mains.
 
 on:
-  # The path-filtered triggers below all key on THIS repo changing, but the hub
-  # is CultureMech: when CultureMech@main moves (the documented way a vendored
-  # file changes) nothing here changes, so nothing fires and the mirror goes
-  # stale unseen. The nightly run is what actually closes that window — it is
-  # curl + cmp, no Mech checkouts, so it is cheap to run unconditionally.
-  # Scheduled ahead of cross-repo-validation (27 7) so a stale mirror surfaces
-  # before the day's heavier cross-repo runs.
+  # Keep the canonical dependency/behavior canary independent of source changes.
+  # It follows the 06:41 governance fleet audit and precedes heavier fleet jobs.
   schedule:
-    - cron: "41 6 * * *"   # daily at 06:41 UTC
+    - cron: "51 6 * * *"
   pull_request:
     paths:
-      - "shared/idlabel/**"
-      - "shared/spoke/**"
       - "src/kg_microbe_governance/**"
-      - "scripts/audit_idlabel_fleet.sh"
-      - "src/kg_microbe_fleet/**"
       - "pyproject.toml"
       - "uv.lock"
       - ".github/workflows/id-label-canon.yaml"
   push:
     branches: [main]
     paths:
-      - "shared/idlabel/**"
-      - "shared/spoke/**"
       - "src/kg_microbe_governance/**"
-      - "scripts/audit_idlabel_fleet.sh"
-      - "src/kg_microbe_fleet/**"
       - "pyproject.toml"
       - "uv.lock"
       - ".github/workflows/id-label-canon.yaml"
@@ -53,37 +28,20 @@ permissions:
   contents: read
 
 jobs:
-  # Transitional reconciliation guard. Phase 0 validates the entire
-  # manifest-declared consumer set against the existing CultureMech comparison
-  # target; Phase 1 reverses artifact authority after coordinated pin updates.
-  fleet-audit:
-    # One enforcer for both directions: every Mech agrees with the hub, AND
-    # claw's mirror agrees with the hub. Replaces this workflow's old
-    # `matches-hub` job (mirror only) and CultureMech's vendored-fleet-audit
-    # (Mechs only), which between them checked the same invariant twice from
-    # two repos.
+  id-label-contract:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
-      - name: Audit vendored id-label files across the fleet
-        run: bash scripts/audit_idlabel_fleet.sh
-
-  test:
-    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-      - name: Install deps
+      - name: Install test dependencies
         run: python -m pip install --upgrade pip pytest oaklib
-      - name: Run canonical id-label tests
-        working-directory: shared/idlabel
-        # the vendored tests resolve the validator at ../scripts relative to
-        # themselves, so this dir is the "repo root" they expect.
-        run: python -m pytest tests/ -q
+      - name: Run canonical ID-label behavioral tests
+        working-directory: src/kg_microbe_governance/artifacts
+        run: |
+          python -m pytest -q \
+            tests/test_id_label_empty_adapter.py \
+            tests/test_id_label_unknown_prefix.py \
+            tests/test_id_label_plausibility.py

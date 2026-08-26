@@ -12,18 +12,18 @@ rest pin the specific defects from #29/#30/#31 so they cannot come back.
 from __future__ import annotations
 
 import shutil
-import subprocess
 import sys
+from importlib.resources import files
 from pathlib import Path
 
 import pytest
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SCHEMA = REPO_ROOT / "shared" / "history" / "history.yaml"
 sys.path.insert(0, str(REPO_ROOT / "src"))
+SCHEMA = files("kg_microbe_governance").joinpath("artifacts/schema/history.yaml")
 
-from kg_microbe_history.__main__ import main  # noqa: E402
+from kg_microbe_history.__main__ import _default_schema_path, main  # noqa: E402
 from kg_microbe_history.scaffold import (  # noqa: E402
     KIND_DIRS,
     _slug_token,
@@ -48,16 +48,15 @@ def _only_record(tmp_path: Path) -> Path:
 # --------------------------------------------------------------------------
 
 
+def test_default_schema_is_the_packaged_governance_artifact() -> None:
+    assert Path(_default_schema_path()).resolve() == Path(str(SCHEMA)).resolve()
+
+
 @pytest.mark.skipif(shutil.which("linkml-validate") is None, reason="linkml not installed")
 def test_scaffolded_record_validates_against_schema(tmp_path: Path) -> None:
     assert _new(tmp_path, "--kind", "record", "--slug", "demo", "--target-root", "data",
                 "--summary", "s", "--details", "real details") == 0
-    proc = subprocess.run(
-        ["linkml-validate", "--schema", str(SCHEMA), "--target-class", "HistoryRecord",
-         str(_only_record(tmp_path))],
-        capture_output=True, text=True,
-    )
-    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert main(["validate", str(tmp_path / "history")]) == 0
 
 
 def test_code_enums_match_schema() -> None:
@@ -179,6 +178,19 @@ def test_yml_extension_is_not_skipped(tmp_path: Path) -> None:
 
 def test_validate_missing_target_is_clean_error(tmp_path: Path) -> None:
     assert main(["validate", str(tmp_path / "nope"), "--structural-only"]) == 2
+
+
+def test_missing_schema_error_names_packaged_authority(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    history = tmp_path / "history"
+    history.mkdir()
+    missing = tmp_path / "missing-history.yaml"
+
+    assert main(["validate", str(history), "--schema", str(missing)]) == 2
+
+    error = capsys.readouterr().err
+    assert "kg_microbe_governance/artifacts/schema/history.yaml" in error
 
 
 def test_build_record_rejects_unknown_kind() -> None:

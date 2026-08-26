@@ -88,6 +88,22 @@ def test_cross_mech_sync_fails_closed_and_uses_owned_locks():
     assert "-R <slug>" not in text
 
 
+def test_cross_mech_sync_uses_claw_authoritative_governance_rail():
+    text = _skill("cross-mech-sync")
+
+    assert "src/kg_microbe_governance/vendored_artifacts.json" in text
+    assert "scripts/.vendored_canon_ref" in text
+    assert "kg-microbe-governance sync" in text
+    assert "kg-microbe-governance check" in text
+    assert "kg-microbe-governance fleet-audit" in text
+    assert "consumer majority is evidence of" in text
+    assert "never authority" in text
+    assert "just verify-validator-pin" not in text
+    assert "VENDORED_IDLABEL_FILES" not in text
+    assert ".validate_id_label_correspondence.sha256" not in text
+    assert "just refresh-validator-pin" not in text
+
+
 def test_schema_gap_analysis_queries_schema_profiles_from_manifest():
     text = _skill("schema-gap-analysis")
 

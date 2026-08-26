@@ -153,7 +153,6 @@ cli/          discovery, status, plugin checks, and configuration validation
 plugins/      validated repository adapters and coordination primitives
 pipelines/    curation/orchestration workflows with explicit support status
 src/          installed kg_microbe_* libraries, CLIs, and canonical governance payloads
-shared/       temporary legacy mirrors retained through the Phase 1 fleet rollout
 scripts/      maintenance and migration scripts; audit before treating as supported
 tests/        the only default pytest collection root
 docs/         current index, guides, proposals, reviews, and archive
@@ -184,7 +183,9 @@ uv run kg-microbe-discussions --help
 
 ## Prompts and review workflow
 
-- `prompts/backlog-loop-goal.md` is a hand-over prompt for the native `/goal`.
+- `src/kg_microbe_governance/artifacts/prompts/backlog-loop-goal.md` is the
+  canonical hand-over prompt for the native `/goal` and the source vendored to
+  each Mech.
   Do not recreate a project command named `/goal`.
 - `.claude/workflows/dynamic-review.js` is the version-controlled source for
   `/dynamic-review`. It reports to the session by default and posts PR comments

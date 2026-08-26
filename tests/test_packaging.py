@@ -79,7 +79,18 @@ events:
 
 
 def test_packaged_history_schema_is_canonical():
-    packaged = files("shared.history").joinpath("history.yaml").read_text(encoding="utf-8")
-    canonical_path = Path(__file__).parents[1] / "shared" / "history" / "history.yaml"
+    packaged = (
+        files("kg_microbe_governance")
+        .joinpath("artifacts/schema/history.yaml")
+        .read_text(encoding="utf-8")
+    )
+    canonical_path = (
+        Path(__file__).parents[1]
+        / "src"
+        / "kg_microbe_governance"
+        / "artifacts"
+        / "schema"
+        / "history.yaml"
+    )
 
     assert packaged == canonical_path.read_text(encoding="utf-8")

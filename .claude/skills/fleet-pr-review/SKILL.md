@@ -123,11 +123,13 @@ This avoids both unvalidated local state and edits to a shared checkout.
 This is the step that justifies doing all repos at once. Look for:
 
 - **Same file, two PRs.** Especially vendored files that must stay byte-identical
-  across repos. The vendored set is whatever `shared/idlabel/MANIFEST` and
-  `shared/spoke/MANIFEST` list — read them, do not recite a remembered list.
-  `scripts/audit_idlabel_fleet.sh` is the *enforcer*, lives only in claw, and is
-  itself vendored nowhere. Two independently-correct PRs can both be wrong
-  together.
+  across repos. The vendored set is declared only in
+  `src/kg_microbe_governance/vendored_artifacts.json`; read it together with the
+  capability scopes in `src/kg_microbe_fleet/fleet.yaml`, rather than reciting a
+  remembered list. The installed `kg-microbe-governance fleet-audit` command is
+  the enforcer used by `.github/workflows/governance-fleet-audit.yaml`. For a
+  rollout, audit the five exact `origin/main` commits against their common,
+  immutable claw pin. Two independently-correct PRs can both be wrong together.
 - **Revert pairs.** A PR that undoes something recently merged. **Read the
   three-dot diff** (`git diff origin/main...HEAD`, or the Files tab, which shows
   three-dot). A two-dot `git diff origin/main HEAD` also lists files where the

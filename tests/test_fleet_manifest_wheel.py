@@ -67,6 +67,10 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path) -> None
     assert not any(name.startswith("agents/") for name in source_names)
     assert not any(name.startswith("conf/") for name in source_names)
     assert not any(name.startswith("build/") for name in source_names)
+    assert not any(
+        name == "shared" or name.startswith(("shared/", "src/shared/"))
+        for name in source_names
+    )
 
     # Build from the freshly generated source archive. An in-tree wheel build
     # can copy an ignored, stale build/lib tree and silently resurrect deleted
@@ -109,6 +113,7 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path) -> None
         assert not any(name.startswith("agents/") for name in names)
         assert not any(name.startswith("conf/") for name in names)
         assert not any(name.startswith("build/") for name in names)
+        assert not any(name == "shared" or name.startswith("shared/") for name in names)
         entry_points_path = next(
             name for name in names if name.endswith(".dist-info/entry_points.txt")
         )
@@ -118,6 +123,7 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path) -> None
             "kg-microbe-governance = kg_microbe_governance.__main__:main"
             in entry_points
         )
+        assert "kg-microbe-history = kg_microbe_history.__main__:main" in entry_points
         wheel.extractall(unpacked)
 
     smoke_environment = os.environ.copy()
@@ -138,6 +144,7 @@ import kg_microbe_config
 import kg_microbe_fleet
 import kg_microbe_governance
 import kg_microbe_governance.fleet_audit
+import kg_microbe_history
 import plugins
 from click.testing import CliRunner
 from cli.main import cli
@@ -145,6 +152,7 @@ from kg_microbe_config import default_config_path
 from kg_microbe_fleet import default_manifest_path, load_fleet_manifest
 from kg_microbe_governance import load_governance_manifest
 from kg_microbe_governance.__main__ import main as governance_main
+from kg_microbe_history.__main__ import _default_schema_path, main as history_main
 
 unpacked = Path(sys.argv[1]).resolve()
 runtime_modules = (
@@ -154,6 +162,7 @@ runtime_modules = (
     kg_microbe_fleet,
     kg_microbe_governance,
     kg_microbe_governance.fleet_audit,
+    kg_microbe_history,
     plugins,
 )
 for module in runtime_modules:
@@ -173,6 +182,18 @@ assert default_config_path().is_relative_to(unpacked)
 governance = load_governance_manifest(fleet_manifest=manifest)
 assert len(governance.artifacts) == 14
 assert governance_main(["list", "--repository", "proteintraitsmech", "--json"]) == 0
+history_schema = Path(_default_schema_path()).resolve()
+assert history_schema.is_relative_to(unpacked)
+assert history_schema == (
+    unpacked / "kg_microbe_governance/artifacts/schema/history.yaml"
+)
+history_root = Path(sys.argv[2])
+assert history_main([
+    "new", "--history-root", str(history_root), "--kind", "record",
+    "--slug", "wheel-smoke", "--target-root", "data", "--summary", "smoke",
+    "--details", "validated from the unpacked wheel",
+]) == 0
+assert history_main(["validate", str(history_root), "--structural-only"]) == 0
 assert callable(cli)
 runner = CliRunner()
 listed = runner.invoke(cli, ["agent", "list"])
@@ -184,7 +205,13 @@ validated = runner.invoke(cli, ["config", "validate"])
 assert validated.exit_code == 0, validated.output
 """
     smoked = subprocess.run(
-        [sys.executable, "-c", smoke_code, str(unpacked)],
+        [
+            sys.executable,
+            "-c",
+            smoke_code,
+            str(unpacked),
+            str(tmp_path / "wheel-history"),
+        ],
         cwd=tmp_path,
         env=smoke_environment,
         capture_output=True,

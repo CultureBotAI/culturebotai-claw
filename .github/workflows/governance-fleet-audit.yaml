@@ -1,0 +1,173 @@
+name: authoritative governance fleet audit
+
+# Audit the public Mech mains with code from trusted claw base/main. Downstream
+# pins are treated only as data: all must agree and resolve inside trusted claw
+# history before any audit runs. Public Git/GitHub reads and deterministic local
+# checks never invoke a model, research provider, credentialed service, or paid API.
+
+on:
+  schedule:
+    - cron: "41 6 * * *"
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fleet-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out candidate workflow revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: control
+          persist-credentials: false
+
+      # Pull requests use their exact protected-base commit as the trusted audit
+      # runner, main pushes use their triggering commit, and schedules/manual
+      # runs use main even if workflow_dispatch selected another candidate ref.
+      # A downstream pin never selects executable audit or install code.
+      - name: Check out trusted claw revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'push' && github.sha || 'main' }}
+          path: fleet/trusted-claw
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
+        with:
+          enable-cache: true
+          working-directory: fleet/trusted-claw
+
+      - name: Install trusted governance package
+        run: uv sync --project fleet/trusted-claw --locked
+
+      - name: Export manifest-defined governance consumers
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p fleet
+          uv run --project fleet/trusted-claw python - > fleet/governance-consumers.tsv <<'PY'
+          from kg_microbe_governance import load_governance_manifest
+
+          manifest = load_governance_manifest()
+          for consumer in manifest.consumers.values():
+              print(
+                  "\t".join(
+                      (
+                          consumer.key,
+                          consumer.github,
+                          consumer.package_path,
+                          manifest.pin_path,
+                      )
+                  )
+              )
+          PY
+          test -s fleet/governance-consumers.tsv
+
+      - name: Check out manifest-defined Mech mains
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS=$'\t' read -r key github package_path pin_path; do
+            root="$GITHUB_WORKSPACE/fleet/$key"
+            git clone --filter=blob:none --no-checkout --depth 1 --branch main \
+              "https://github.com/$github.git" "$root"
+
+            sparse_paths=("$pin_path")
+            while IFS=$'\t' read -r _repository _artifact _source target _sha _mode; do
+              sparse_paths+=("$target")
+            done < <(
+              uv run --project fleet/trusted-claw kg-microbe-governance list \
+                --repository "$key"
+            )
+            test "${#sparse_paths[@]}" -gt 1
+            git -C "$root" sparse-checkout init --no-cone
+            git -C "$root" sparse-checkout set --no-cone "${sparse_paths[@]}"
+            git -C "$root" checkout --detach origin/main
+          done < fleet/governance-consumers.tsv
+
+      - name: Read and compare every committed fleet pin
+        id: fleet-pin
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from __future__ import annotations
+
+          import os
+          import re
+          import subprocess
+          from pathlib import Path
+
+          workspace = Path(os.environ["GITHUB_WORKSPACE"])
+          rows = (workspace / "fleet/governance-consumers.tsv").read_text(
+              encoding="utf-8"
+          ).splitlines()
+          pins: dict[str, str] = {}
+          for row in rows:
+              key, _github, _package_path, pin_path = row.split("\t")
+              root = workspace / "fleet" / key
+              content = subprocess.run(
+                  ["git", "-C", str(root), "show", f"HEAD:{pin_path}"],
+                  check=True,
+                  capture_output=True,
+              ).stdout
+              if re.fullmatch(rb"[0-9a-f]{40}\n?", content) is None:
+                  raise SystemExit(f"{key} has an invalid committed claw pin")
+              pins[key] = content.decode("ascii").strip()
+
+          unique = set(pins.values())
+          if len(unique) != 1:
+              raise SystemExit(f"fleet claw pins differ: {pins}")
+          ref = unique.pop()
+          with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as stream:
+              stream.write(f"ref={ref}\n")
+          PY
+
+      - name: Authenticate pin against trusted claw history
+        shell: bash
+        run: |
+          set -euo pipefail
+          ref="${{ steps.fleet-pin.outputs.ref }}"
+          git -C fleet/trusted-claw cat-file -e "${ref}^{commit}"
+          if ! git -C fleet/trusted-claw merge-base --is-ancestor "$ref" HEAD; then
+            echo "::error::Fleet pin is not reachable from trusted claw base/main" >&2
+            exit 2
+          fi
+
+      - name: Audit all governed artifacts at committed main tips
+        shell: bash
+        run: |
+          set -euo pipefail
+          audit_args=(
+            fleet-audit
+            --ref "${{ steps.fleet-pin.outputs.ref }}"
+          )
+          while IFS=$'\t' read -r key _github _package_path _pin_path; do
+            audit_args+=(
+              --target-root "$key=$GITHUB_WORKSPACE/fleet/$key"
+            )
+          done < fleet/governance-consumers.tsv
+          uv run --project fleet/trusted-claw kg-microbe-governance \
+            "${audit_args[@]}"
+
+      # The deployed-fleet audit above deliberately uses trusted base/main code.
+      # This separate lane proves that the proposed/current checkout itself has
+      # the authoritative layout and preserves the workflow's security contract.
+      - name: Validate candidate authority contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv sync --project control --locked --extra dev
+          uv run --project control --extra dev python -m pytest -q \
+            control/tests/test_fleet_manifest.py \
+            control/tests/test_kg_microbe_governance.py \
+            control/tests/test_id_label_workflow.py \
+            control/tests/test_authoritative_governance_layout.py

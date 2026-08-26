@@ -14,9 +14,11 @@ Other maintained references:
 
 - [`guides/VENDORED_GOVERNANCE.md`](guides/VENDORED_GOVERNANCE.md) — canonical
   shared-artifact manifest, synchronization, rollout, and rollback.
+- [`guides/CURATION_HISTORY.md`](guides/CURATION_HISTORY.md) — append-only
+  curation-history schema, CLI, vendoring, and enforcement model.
 - [`AUTONOMOUS_LOOPS.md`](AUTONOMOUS_LOOPS.md) — goal-loop workflow guidance.
-- [`shared/history/README.md`](../shared/history/README.md) — append-only history layer.
-- [`shared/idlabel/README.md`](../shared/idlabel/README.md) — vendored ID/label checks.
+- [`src/kg_microbe_governance/artifacts/`](../src/kg_microbe_governance/artifacts/) —
+  canonical ID/label implementation and behavioral contracts.
 
 Generated reports belong under the gitignored `workspace/reports/`, not in the
 documentation tree.
