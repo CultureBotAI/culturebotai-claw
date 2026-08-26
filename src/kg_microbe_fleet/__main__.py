@@ -121,7 +121,12 @@ def _matrix_command(args: argparse.Namespace, manifest: FleetManifest) -> None:
 
 def _show_command(args: argparse.Namespace, manifest: FleetManifest) -> None:
     if args.field == "vendored_hub":
-        print(manifest.vendored_hub)
+        legacy_hub = manifest.vendored_hub
+        if legacy_hub is None:
+            raise FleetManifestError(
+                "The fleet has no vendored Mech hub; claw is authoritative"
+            )
+        print(legacy_hub)
         return
     raise FleetManifestError(f"Unsupported manifest field: {args.field}")
 
@@ -141,14 +146,20 @@ def _scope_command(args: argparse.Namespace, manifest: FleetManifest) -> None:
         raise FleetManifestError(
             f"Capability '{args.capability}' has no enabled Mechs"
         )
-    if args.require_vendored_hub and not any(
-        mech.key == manifest.vendored_hub and mech.vendored_role == "hub"
-        for mech in mechs
-    ):
-        raise FleetManifestError(
-            f"vendored hub '{manifest.vendored_hub}' is not in capability "
-            f"scope '{args.capability}'"
-        )
+    if args.require_vendored_hub:
+        legacy_hub = manifest.vendored_hub
+        if legacy_hub is None:
+            raise FleetManifestError(
+                "The fleet has no vendored Mech hub; claw is authoritative"
+            )
+        if not any(
+            mech.key == legacy_hub and mech.vendored_role == "hub"
+            for mech in mechs
+        ):
+            raise FleetManifestError(
+                f"vendored hub '{legacy_hub}' is not in capability "
+                f"scope '{args.capability}'"
+            )
 
     for mech in mechs:
         print(

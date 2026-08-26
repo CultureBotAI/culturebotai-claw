@@ -1,8 +1,10 @@
-# Shared curation-history layer
+# Shared curation-history compatibility path
 
-Packaged operational mirror of the append-only provenance layer ported from
-monarch-initiative/dismech. CultureMech is the machine-canonical schema hub.
-Records answer the one question nothing else in the
+Compatibility copy of the append-only provenance layer ported from
+monarch-initiative/dismech. The canonical schema now ships at
+`src/kg_microbe_governance/artifacts/schema/history.yaml`; this path remains
+packaged for the Phase 1 rollout so existing CLI and workflow consumers do not
+change at the same moment as authority. Records answer the one question nothing else in the
 fleet does: **which model, using which tool, changed what, why, and under which
 issue.**
 
@@ -10,7 +12,8 @@ issue.**
 
 | Piece | Path | Consumed how |
 |---|---|---|
-| LinkML schema (packaged mirror) | `shared/history/history.yaml` | packaged with the CLI and fleet-audited against CultureMech |
+| Canonical LinkML schema | `src/kg_microbe_governance/artifacts/schema/history.yaml` | governed by the strict artifact manifest and packaged synchronizer |
+| Transitional compatibility copy | `shared/history/history.yaml` | current history CLI/workflow path until the final authority flip |
 | Scaffolder + validator | `src/kg_microbe_history/` | installed as `kg-microbe-history` |
 
 This mirrors `kg_microbe_kgscan`: one implementation here, thin per-repo justfile
@@ -38,10 +41,12 @@ Spoke CI validates its vendored schema directly without any claw checkout.
 | CommunityMech | yes | yes | yes — `curation-history.yaml` |
 | ProteinTraitsMech | yes | yes | yes — `history-and-vendored.yaml` |
 
-CultureMech's copy is canonical. `scripts/check_vendored_sync.sh` includes the
-path-mapped schema in every Mech, while claw's single fleet audit compares all
-five copies and this packaged mirror against CultureMech. A Mech's pinned ref is
-the deliberate propagation boundary.
+During the transition, the legacy audit still compares existing consumers to
+CultureMech while all five move to one immutable claw bootstrap revision. After
+the final flip, every Mech—including CultureMech—pins claw and the compatibility
+copy is retired. See
+[`docs/guides/VENDORED_GOVERNANCE.md`](../../docs/guides/VENDORED_GOVERNANCE.md)
+for the state machine, sync command, and rollback.
 
 ## Enforcement model
 

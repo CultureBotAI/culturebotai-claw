@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import yaml
 from git import Repo
 
 from kg_microbe_fleet import load_fleet_manifest
@@ -134,6 +135,42 @@ def test_scope_fails_before_output_when_required_hub_is_outside_scope(capsys):
     assert not captured.out
     assert "vendored hub" in captured.err
     assert "is not in capability scope" in captured.err
+
+
+def test_legacy_hub_queries_fail_explicitly_after_authority_flip(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    authoritative = yaml.safe_load(
+        load_fleet_manifest().source.read_text(encoding="utf-8")
+    )
+    authoritative["vendored_governance"]["state"] = "authoritative"
+    authoritative["vendored_governance"].pop("legacy_hub")
+    for mech in authoritative["mechs"].values():
+        mech["vendored_role"] = "consumer"
+        vendored_sync = mech["capabilities"]["vendored_sync"]
+        vendored_sync["status"] = "enabled"
+        vendored_sync.pop("reason", None)
+    path = tmp_path / "authoritative-fleet.yaml"
+    path.write_text(yaml.safe_dump(authoritative, sort_keys=False), encoding="utf-8")
+    monkeypatch.setenv("KG_MICROBE_FLEET_MANIFEST", str(path))
+
+    assert main(["show", "--field", "vendored_hub"]) == 2
+    captured = capsys.readouterr()
+    assert not captured.out
+    assert "claw is authoritative" in captured.err
+
+    assert (
+        main(
+            [
+                "scope",
+                "--capability",
+                "id_label_validation",
+                "--require-vendored-hub",
+            ]
+        )
+        == 2
+    )
+    assert "claw is authoritative" in capsys.readouterr().err
 
 
 def _repository(path: Path, github_identity: str) -> Path:

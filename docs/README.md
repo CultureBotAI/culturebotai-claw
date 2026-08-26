@@ -12,6 +12,8 @@ for provenance; they do not describe the supported interface.
 
 Other maintained references:
 
+- [`guides/VENDORED_GOVERNANCE.md`](guides/VENDORED_GOVERNANCE.md) — canonical
+  shared-artifact manifest, synchronization, rollout, and rollback.
 - [`AUTONOMOUS_LOOPS.md`](AUTONOMOUS_LOOPS.md) — goal-loop workflow guidance.
 - [`shared/history/README.md`](../shared/history/README.md) — append-only history layer.
 - [`shared/idlabel/README.md`](../shared/idlabel/README.md) — vendored ID/label checks.

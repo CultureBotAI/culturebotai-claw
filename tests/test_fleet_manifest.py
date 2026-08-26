@@ -37,6 +37,25 @@ def _parse(document_text: str, name: str = "fleet.yaml"):
     return parse_fleet_manifest(yaml.safe_load(document_text), Path(name))
 
 
+def _shipped_document():
+    import yaml
+
+    return yaml.safe_load(MANIFEST_PATH.read_text(encoding="utf-8"))
+
+
+def _authoritative_document():
+    document = _shipped_document()
+    governance = document["vendored_governance"]
+    governance["state"] = "authoritative"
+    governance.pop("legacy_hub")
+    for mech in document["mechs"].values():
+        mech["vendored_role"] = "consumer"
+        vendored_sync = mech["capabilities"]["vendored_sync"]
+        vendored_sync["status"] = "enabled"
+        vendored_sync.pop("reason", None)
+    return document
+
+
 def _minimal(*extra_lines: str, **overrides: str) -> str:
     """Build a one-Mech manifest, optionally appending already-indented lines.
 
@@ -48,7 +67,12 @@ def _minimal(*extra_lines: str, **overrides: str) -> str:
 
     lines = [
         "version: 1",
-        "vendored_hub: culturemech",
+        "vendored_governance:",
+        "  state: transition",
+        "  canonical_repository: CultureBotAI/culturebotai-claw",
+        "  manifest_path: src/kg_microbe_governance/vendored_artifacts.json",
+        "  pin_path: scripts/.vendored_canon_ref",
+        "  legacy_hub: culturemech",
         "mechs:",
         "  culturemech:",
         "    display_name: CultureMech",
@@ -107,13 +131,21 @@ def test_every_non_enabled_capability_states_a_reason():
                 )
 
 
-def test_exactly_one_vendored_hub_and_it_matches_the_declaration():
+def test_transition_has_one_legacy_hub_and_external_claw_authority():
     manifest = load_fleet_manifest(MANIFEST_PATH)
 
     hubs = [
         key for key, mech in manifest.mechs.items() if mech.vendored_role == "hub"
     ]
     assert hubs == [manifest.vendored_hub]
+    assert manifest.vendored_governance.state == "transition"
+    assert (
+        manifest.vendored_governance.canonical_repository
+        == "CultureBotAI/culturebotai-claw"
+    )
+    assert manifest.vendored_governance.manifest_path.endswith(
+        "vendored_artifacts.json"
+    )
 
 
 # --------------------------------------------------------------------------
@@ -356,13 +388,127 @@ def test_unknown_vendored_role_is_rejected():
 
 
 def test_vendored_hub_must_match_the_repository_declaring_the_hub_role():
-    with pytest.raises(FleetManifestError, match="vendored_hub"):
-        _parse(_minimal(**{"vendored_hub: culturemech": "vendored_hub: traitmech"}))
+    with pytest.raises(FleetManifestError, match="legacy_hub"):
+        _parse(_minimal(**{"legacy_hub: culturemech": "legacy_hub: traitmech"}))
 
 
 def test_manifest_without_a_hub_is_rejected():
-    with pytest.raises(FleetManifestError, match="exactly one vendored hub"):
+    with pytest.raises(FleetManifestError, match="exactly one legacy vendored hub"):
         _parse(_minimal(**{"vendored_role: hub": "vendored_role: spoke"}))
+
+
+def test_authoritative_governance_requires_every_mech_to_be_a_consumer():
+    document = _minimal(
+        **{
+            "state: transition": "state: authoritative",
+            "  legacy_hub: culturemech\n": "",
+        }
+    )
+    with pytest.raises(FleetManifestError, match="vendored_role 'consumer'"):
+        _parse(document)
+
+
+def test_authoritative_governance_has_no_mech_hub_or_circular_pin():
+    manifest = parse_fleet_manifest(_authoritative_document(), Path("fleet.yaml"))
+    assert manifest.vendored_hub is None
+    assert manifest.vendored_governance.state == "authoritative"
+    assert manifest.get("culturemech").vendored_role == "consumer"
+
+
+def test_authoritative_governance_rejects_null_legacy_hub():
+    document = _authoritative_document()
+    document["vendored_governance"]["legacy_hub"] = None
+
+    with pytest.raises(FleetManifestError, match="must omit legacy_hub"):
+        parse_fleet_manifest(document, Path("fleet.yaml"))
+
+
+@pytest.mark.parametrize("status", ["disabled", "not_applicable"])
+def test_authoritative_governance_requires_enabled_vendored_sync(status: str):
+    document = _authoritative_document()
+    capability = document["mechs"]["culturemech"]["capabilities"]["vendored_sync"]
+    capability["status"] = status
+    capability["reason"] = "intentionally invalid final-state fixture"
+
+    with pytest.raises(
+        FleetManifestError,
+        match="vendored_sync.status must be 'enabled' for an authoritative consumer",
+    ):
+        parse_fleet_manifest(document, Path("fleet.yaml"))
+
+
+@pytest.mark.parametrize("status", ["enabled", "disabled"])
+def test_transition_requires_hub_vendored_sync_not_applicable(status: str):
+    document = _shipped_document()
+    capability = document["mechs"]["culturemech"]["capabilities"]["vendored_sync"]
+    capability["status"] = status
+    if status == "disabled":
+        capability["reason"] = "intentionally invalid transition fixture"
+    else:
+        capability.pop("reason", None)
+
+    with pytest.raises(
+        FleetManifestError,
+        match=(
+            "vendored_sync.status must be 'not_applicable' for a transition "
+            "legacy hub"
+        ),
+    ):
+        parse_fleet_manifest(document, Path("fleet.yaml"))
+
+
+@pytest.mark.parametrize("status", ["disabled", "not_applicable"])
+def test_transition_requires_spoke_vendored_sync_enabled(status: str):
+    document = _shipped_document()
+    capability = document["mechs"]["traitmech"]["capabilities"]["vendored_sync"]
+    capability["status"] = status
+    capability["reason"] = "intentionally invalid transition fixture"
+
+    with pytest.raises(
+        FleetManifestError,
+        match="vendored_sync.status must be 'enabled' for a transition spoke",
+    ):
+        parse_fleet_manifest(document, Path("fleet.yaml"))
+
+
+def test_vendored_authority_cannot_be_a_mech_repository():
+    with pytest.raises(FleetManifestError, match="external to the Mech fleet"):
+        _parse(
+            _minimal(
+                **{
+                    "canonical_repository: CultureBotAI/culturebotai-claw": (
+                        "canonical_repository: CultureBotAI/CultureMech"
+                    )
+                }
+            )
+        )
+
+
+@pytest.mark.parametrize("repository", [".", ".."])
+def test_vendored_authority_rejects_path_segments(repository: str):
+    with pytest.raises(FleetManifestError, match="owner/repository"):
+        _parse(
+            _minimal(
+                **{
+                    "canonical_repository: CultureBotAI/culturebotai-claw": (
+                        f"canonical_repository: CultureBotAI/{repository}"
+                    )
+                }
+            )
+        )
+
+
+def test_transition_rejects_a_partial_consumer_role_flip():
+    with pytest.raises(FleetManifestError, match="atomic authority flip"):
+        _parse(
+            _minimal(
+                "  traitmech:",
+                "    display_name: TraitMech",
+                "    github: CultureBotAI/TraitMech",
+                "    environment_variable: TRAITMECH_ROOT",
+                "    vendored_role: consumer",
+            )
+        )
 
 
 def test_duplicate_github_identity_is_rejected():

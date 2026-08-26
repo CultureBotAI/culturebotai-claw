@@ -43,6 +43,7 @@ dependencies = [
 [project.scripts]
 openclaw-cli = "cli.main:cli"
 kg-microbe-fleet = "kg_microbe_fleet.__main__:main"
+kg-microbe-governance = "kg_microbe_governance.__main__:main"
 kg-microbe-history = "kg_microbe_history.__main__:main"
 kg-microbe-kgscan = "kg_microbe_kgscan.__main__:main"
 kg-microbe-qc = "kg_microbe_qc.generator:cli"
@@ -69,6 +70,13 @@ namespaces = false
 # The fleet manifest is imported at package-import time, so it must ship in
 # the wheel; `conf/` at the repository root would not be packaged.
 kg_microbe_fleet = ["fleet.yaml"]
+kg_microbe_governance = [
+    "vendored_artifacts.json",
+    "artifacts/**/*.py",
+    "artifacts/**/*.sh",
+    "artifacts/**/*.yaml",
+    "artifacts/**/*.md",
+]
 kg_microbe_config = ["openclaw_config.yaml"]
 kg_microbe_agents = ["definitions/**/*.yaml"]
 kg_microbe_qc = ["templates/*.j2"]
@@ -104,7 +112,20 @@ norecursedirs = ["shared/idlabel", ".venv", "workspace", "cache", "ATTIC"]
 [tool.ruff]
 target-version = "py311"
 line-length = 100
-extend-exclude = ["shared/idlabel", "docs/archive", "workspace", "cache", "ATTIC"]
+extend-exclude = [
+    "shared/idlabel",
+    "docs/archive",
+    "workspace",
+    "cache",
+    "ATTIC",
+    # These are canonical byte-for-byte Mech payloads. Their own behavioral
+    # suites govern them; changing bytes for claw-only style cleanup would
+    # create fleet drift. The new synchronizer/checker remains linted.
+    "src/kg_microbe_governance/artifacts/scripts/_edison_capture.py",
+    "src/kg_microbe_governance/artifacts/scripts/chem_formula.py",
+    "src/kg_microbe_governance/artifacts/scripts/validate_id_label_correspondence.py",
+    "src/kg_microbe_governance/artifacts/tests",
+]
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F", "I"]
@@ -126,7 +147,20 @@ source = [
     "plugins.git_integration",
     "plugins.just_runner",
 ]
+# Byte-identical legacy payloads are executed by each Mech's own behavioral
+# contract. Counting their packaged copies as untested claw implementation
+# would both double-count them and pressure claw to change canonical bytes.
+omit = [
+    "src/kg_microbe_governance/artifacts/scripts/_edison_capture.py",
+    "src/kg_microbe_governance/artifacts/scripts/chem_formula.py",
+    "src/kg_microbe_governance/artifacts/scripts/validate_id_label_correspondence.py",
+]
 
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
+omit = [
+    "src/kg_microbe_governance/artifacts/scripts/_edison_capture.py",
+    "src/kg_microbe_governance/artifacts/scripts/chem_formula.py",
+    "src/kg_microbe_governance/artifacts/scripts/validate_id_label_correspondence.py",
+]

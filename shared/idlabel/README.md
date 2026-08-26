@@ -1,96 +1,26 @@
-# id↔label validator — CI-verified mirror
+# ID/label validator compatibility mirror
 
-This directory is a **CI-verified mirror** of the id↔label validator and its
-chemical-formula plausibility helper, which are vendored byte-identical into the
-five Mech repos (CultureMech / MediaIngredientMech / CommunityMech / TraitMech /
-proteintraitsmech).
+This directory remains the isolated test layout for the pre-Phase-1 ID/label
+mirror. Its five payloads are byte-identical to their canonical copies under
+`src/kg_microbe_governance/artifacts/`, where they are part of the complete
+shared-artifact manifest.
 
-**The machine-canonical fetch-hub is the public `CultureBotAI/CultureMech`, not
-this repo.** That is an explicit governance choice; claw is also public, but is
-the fleet's passive discovery and orchestration mirror rather than a second
-authority. Each Mech's `scripts/check_vendored_sync.sh` therefore diffs against
-`CultureBotAI/CultureMech` at the commit pinned in its
-`scripts/.vendored_canon_ref`. The nightly `fleet-audit` job in this repo's
-`.github/workflows/id-label-canon.yaml` compares the hub, all spokes, and this
-mirror. It supersedes CultureMech's removed `vendored-fleet-audit.yml`.
+The layout mirrors a Mech's `scripts/` and `tests/` directories so the existing
+behavioral tests can resolve `../scripts/` unchanged. The scheduled
+`id-label-canon` workflow continues testing this compatibility copy during the
+coordinated migration.
 
-This mirror exists for two reasons: a documented, human-readable home for the
-shared set, and an isolated test-runner (`id-label-canon` CI runs the vendored
-tests here without a full Mech checkout). To stop it becoming a second,
-divergent "source of truth", the `matches-hub` job asserts it is byte-identical
-to `CultureMech@main` on every change — if the two diverge, claw CI fails.
+Do not originate changes here or add files to the old `MANIFEST`. Canonical
+changes start in `src/kg_microbe_governance/artifacts/`, update the digest in
+`vendored_artifacts.json`, pass the installed-wheel and offline synchronization
+tests, and are rolled to all five Mechs with an exact claw commit pin.
 
-## Files (canonical)
+Until the downstream rollout completes, the old fleet audit still compares
+this directory and legacy consumers to CultureMech. That temporary comparison
+does not make CultureMech the new-code authority: it prevents an unpinned gap
+between the bootstrap and final authority commits. Once every Mech pin is
+verified, the final flip removes this mirror and the legacy hub contract.
 
-| file | role |
-|---|---|
-| `scripts/validate_id_label_correspondence.py` | the validator (Engine B) |
-| `scripts/chem_formula.py` | element-multiset plausibility helper |
-| `tests/test_id_label_empty_adapter.py` | validator unit tests |
-| `tests/test_id_label_unknown_prefix.py` | validator unit tests |
-| `tests/test_id_label_plausibility.py` | plausibility-gate tests |
-
-The layout mirrors a Mech's own (`scripts/` + `tests/`) so the vendored tests
-resolve the validator at `../scripts/…` unchanged, and so `id-label-canon` CI
-here runs the exact tests the Mechs run.
-
-## How the content was chosen
-
-All four Mech copies were byte-identical when this canonical copy was seeded
-(the "merge from all Mechs" was trivial — they already agreed, having just been
-converged). Seeded from `CultureBotAI/CultureMech@main` at that point.
-
-## How a Mech consumes it
-
-Each Mech keeps a synced copy under its own `scripts/` + `tests/` (its CI runs
-the validator locally and has no claw checkout). `scripts/check_vendored_sync.sh`
-in each Mech fetches these files from `CultureBotAI/CultureMech` (the public
-fetch-hub) at the commit pinned in `scripts/.vendored_canon_ref` and
-byte-compares — a Mech that edits its copy fails CI, because the reference lives
-in another repo.
-
-## Changing a vendored file
-
-1. Land the change in the fetch-hub, **`CultureBotAI/CultureMech`**, on `main`.
-2. Sync this mirror (`shared/idlabel/*`) from `CultureMech@main` in claw so the
-   `matches-hub` CI job stays green.
-3. In each other Mech, sync the changed file(s) and bump
-   `scripts/.vendored_canon_ref` to the new CultureMech commit — the deliberate
-   propagation act. Use the `cross-mech-sync` skill.
-
-Nothing but that sync keeps the copies aligned; the retired per-Mech sha256 pin
-verified a copy against itself, not across repos, which is why the cross-repo
-reference (against CultureMech) exists.
-
-## How drift is caught
-
-One check, `scripts/audit_idlabel_fleet.sh`, run by the `fleet-audit` job in
-`.github/workflows/id-label-canon.yaml` nightly at 06:41 UTC and on any PR
-touching this directory or the script.
-
-It asserts both directions against `CultureBotAI/CultureMech@main`:
-
-1. all five Mech repos carry byte-identical copies of the five validator files
-   plus `mech_shared.yaml` and `history.yaml` (both path-mapped to
-   `src/<pkg>/schema/`), and
-2. this mirror carries byte-identical copies of the five validator files.
-
-It also reports any **tracked** file under `shared/idlabel/` that `MANIFEST` does
-not list, since such a file is audited by nothing and vendored nowhere while
-looking canonical.
-
-The executable audit prints its current comparison count. It supersedes two
-earlier checks that asserted the same invariant from two repos: this workflow's
-`matches-hub` job (mirror only) and CultureMech's removed
-`vendored-fleet-audit.yml` workflow (Mechs only). The arithmetic is not copied
-into this README, where adding a repository or mapped file would make it stale.
-
-**`MANIFEST` is the single list.** The audit reads it rather than restating it,
-and refuses to run against a missing or empty manifest instead of cheerfully
-reporting zero comparisons. Adding a vendored file means editing `MANIFEST` and
-nothing else.
-
-**Consolidating the audit did not move canonicity.** CultureMech is still the
-hub and this is still a passive mirror (claw#19, restated in claw#22). The audit
-runs here because one enforcer is easier to reason about than two; it still
-compares everything against CultureMech.
+See
+[`docs/guides/VENDORED_GOVERNANCE.md`](../../docs/guides/VENDORED_GOVERNANCE.md)
+for the manifest, dry-run/apply commands, rollout order, and rollback.

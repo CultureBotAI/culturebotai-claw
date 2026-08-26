@@ -1,7 +1,8 @@
-"""Installed-wheel smoke test for the canonical fleet manifest."""
+"""Installed-wheel smoke for canonical fleet and governance package data."""
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -13,8 +14,8 @@ from pathlib import Path
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_wheel_packages_the_single_canonical_manifest(tmp_path: Path) -> None:
-    """The installed CLI must start without a source checkout or override."""
+def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path) -> None:
+    """Installed CLIs must start without a source checkout or override."""
 
     uv = shutil.which("uv")
     assert uv is not None, "the project test runner requires uv"
@@ -55,6 +56,13 @@ def test_wheel_packages_the_single_canonical_manifest(tmp_path: Path) -> None:
             if "/" in name
         }
     assert "src/kg_microbe_fleet/fleet.yaml" in source_names
+    governance_document = json.loads(
+        (REPOSITORY_ROOT / "src/kg_microbe_governance/vendored_artifacts.json")
+        .read_text(encoding="utf-8")
+    )
+    assert "src/kg_microbe_governance/vendored_artifacts.json" in source_names
+    for artifact in governance_document["artifacts"]:
+        assert artifact["source"] in source_names
     assert "src/kg_microbe_config/openclaw_config.yaml" in source_names
     assert not any(name.startswith("agents/") for name in source_names)
     assert not any(name.startswith("conf/") for name in source_names)
@@ -88,6 +96,9 @@ def test_wheel_packages_the_single_canonical_manifest(tmp_path: Path) -> None:
     with zipfile.ZipFile(wheels[0]) as wheel:
         names = set(wheel.namelist())
         assert "kg_microbe_fleet/fleet.yaml" in names
+        assert "kg_microbe_governance/vendored_artifacts.json" in names
+        for artifact in governance_document["artifacts"]:
+            assert artifact["source"].removeprefix("src/") in names
         assert "kg_microbe_config/openclaw_config.yaml" in names
         assert (
             "kg_microbe_agents/definitions/dev_workflow/validation_agent.yaml"
@@ -103,6 +114,10 @@ def test_wheel_packages_the_single_canonical_manifest(tmp_path: Path) -> None:
         )
         entry_points = wheel.read(entry_points_path).decode("utf-8")
         assert "kg-microbe-fleet = kg_microbe_fleet.__main__:main" in entry_points
+        assert (
+            "kg-microbe-governance = kg_microbe_governance.__main__:main"
+            in entry_points
+        )
         wheel.extractall(unpacked)
 
     smoke_environment = os.environ.copy()
@@ -121,11 +136,15 @@ import cli as cli_package
 import kg_microbe_agents
 import kg_microbe_config
 import kg_microbe_fleet
+import kg_microbe_governance
+import kg_microbe_governance.fleet_audit
 import plugins
 from click.testing import CliRunner
 from cli.main import cli
 from kg_microbe_config import default_config_path
 from kg_microbe_fleet import default_manifest_path, load_fleet_manifest
+from kg_microbe_governance import load_governance_manifest
+from kg_microbe_governance.__main__ import main as governance_main
 
 unpacked = Path(sys.argv[1]).resolve()
 runtime_modules = (
@@ -133,6 +152,8 @@ runtime_modules = (
     kg_microbe_agents,
     kg_microbe_config,
     kg_microbe_fleet,
+    kg_microbe_governance,
+    kg_microbe_governance.fleet_audit,
     plugins,
 )
 for module in runtime_modules:
@@ -149,6 +170,9 @@ assert manifest.keys == (
 )
 assert default_manifest_path() == module_path.parent / "fleet.yaml"
 assert default_config_path().is_relative_to(unpacked)
+governance = load_governance_manifest(fleet_manifest=manifest)
+assert len(governance.artifacts) == 14
+assert governance_main(["list", "--repository", "proteintraitsmech", "--json"]) == 0
 assert callable(cli)
 runner = CliRunner()
 listed = runner.invoke(cli, ["agent", "list"])

@@ -11,10 +11,10 @@
 # Both directions are now asserted in one place, so there is one thing to read
 # when drift is reported and one thing to fix when the file set changes.
 #
-# Phase 0 intentionally keeps the current CultureMech comparison direction so
-# the fleet-manifest migration does not also change artifact bytes or pins. This
-# is a transitional compatibility role, not the target ownership model: Phase 1
-# moves the shared artifact authority to claw with coordinated consumer updates.
+# The Phase 1 bootstrap intentionally keeps the CultureMech comparison direction
+# active while the public immutable claw revision is rolled to all five Mechs.
+# New canonical bytes and mappings live in kg_microbe_governance; the final
+# authority flip replaces this compatibility audit only after every pin passes.
 # Fleet membership already comes only from claw's packaged manifest; package
 # paths and the temporary hub role are domain/rollout inputs, not parallel
 # repository lists.
@@ -79,8 +79,8 @@ if [ "${#REPOS[@]}" -eq 0 ] || [ -z "$HUB" ] || [ -z "$HUB_PACKAGE" ]; then
 fi
 # Worst-case curl budget: (len(FILES)+len(MAPPED)) x (1 + non-hub repos) for
 # direction 1, + len(FILES) for direction 2, + (1 + non-hub repos) for
-# direction 4. At 5 FILES, 2 MAPPED, 4 non-hub repos, and 4 SPOKE_FILES,
-# --max-time 10 each: (5+2)x5 + 5 + 4x5 = 60 calls, ~600s worst case against
+# direction 4. At 5 FILES, 2 MAPPED, 4 non-hub repos, and 3 SPOKE_FILES,
+# --max-time 10 each: (5+2)x5 + 5 + 3x5 = 55 calls, ~550s worst case against
 # .github/workflows/id-label-canon.yaml's timeout-minutes: 15 (900s).
 # Re-check this math before growing REPOS,
 # FILES/MANIFEST, MAPPED, or SPOKE_MANIFEST further.
@@ -206,11 +206,11 @@ while IFS= read -r present; do
   fi
 done < <(git ls-files "$MIRROR_ROOT" 2>/dev/null | sort)
 
-# --- direction 4: fleet-governance files agree with the hub ------------------
-# CultureMech now governs check_vendored_sync.sh itself. Compare claw's passive
-# mirror and every non-hub Mech directly to that canonical copy. This is the
-# post-propagation gate for #90: companion PRs may be briefly staggered, but the
-# fleet audit cannot go green until every copy has landed.
+# --- direction 4: legacy fleet-governance files agree with the hub -----------
+# During transition, compare claw's compatibility mirror and every non-hub Mech
+# directly to the old CultureMech copy. The checker launcher is intentionally
+# excluded because its claw-governed replacement has different bytes and must
+# roll incrementally; the new pin audit gates it before the authority flip.
 SPOKE_ROOT="${SPOKE_ROOT:-shared/spoke}"
 SPOKE_MANIFEST="${SPOKE_MANIFEST:-${SPOKE_ROOT}/MANIFEST}"
 

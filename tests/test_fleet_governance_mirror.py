@@ -1,4 +1,4 @@
-"""Structural contract for claw's passive fleet-governance mirror."""
+"""Structural contract for the bounded Phase 1 compatibility mirror."""
 
 import os
 import subprocess
