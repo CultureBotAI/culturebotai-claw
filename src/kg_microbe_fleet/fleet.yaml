@@ -48,17 +48,15 @@ capability_catalogue:
 
 # Vendored shared-file governance is deliberately modeled separately from
 # fleet membership: claw is the external authority and must never pin itself.
-# Phase 1 is a coordinated two-commit migration. In `transition`, the legacy
-# CultureMech hub remains available to consumers that have not yet moved while
-# the immutable claw bootstrap revision is rolled out. The final flip changes
-# this to `authoritative`, removes `legacy_hub`, and makes every Mech a
-# `consumer`; the loader rejects mixed authoritative state.
+# The coordinated Phase 1 migration is complete. `transition` remains a
+# validated compatibility state for older manifests, but the shipped state is
+# `authoritative`: there is no Mech hub, and every Mech is a pinned consumer of
+# claw. The loader rejects mixed authoritative state.
 vendored_governance:
-  state: transition
+  state: authoritative
   canonical_repository: CultureBotAI/culturebotai-claw
   manifest_path: src/kg_microbe_governance/vendored_artifacts.json
   pin_path: scripts/.vendored_canon_ref
-  legacy_hub: culturemech
 
 mechs:
   culturemech:
@@ -70,7 +68,7 @@ mechs:
       - src/culturemech/schema/culturemech.yaml
     record_globs:
       - data/merge_yaml/merged/*.yaml
-    vendored_role: hub
+    vendored_role: consumer
     capabilities:
       id_label_validation:
         status: enabled
@@ -106,11 +104,7 @@ mechs:
         settings:
           window: 300
       vendored_sync:
-        status: not_applicable
-        reason: >-
-          Temporary legacy hub during the Phase 1 transition. The coordinated
-          downstream rollout makes CultureMech a pinned claw consumer before
-          the final authoritative-state flip; claw itself never self-pins.
+        status: enabled
 
   mediaingredientmech:
     display_name: MediaIngredientMech
@@ -121,7 +115,7 @@ mechs:
       - src/mediaingredientmech/schema/mediaingredientmech.yaml
     record_globs:
       - data/ingredients/**/*.yaml
-    vendored_role: spoke
+    vendored_role: consumer
     capabilities:
       id_label_validation:
         status: enabled
@@ -169,7 +163,7 @@ mechs:
     record_globs:
       - kb/communities/*.yaml
       - data/isolates/*.yaml
-    vendored_role: spoke
+    vendored_role: consumer
     capabilities:
       id_label_validation:
         status: enabled
@@ -218,7 +212,7 @@ mechs:
       - src/traitmech/schema/traitmech.yaml
     record_globs:
       - data/traits/**/*.yaml
-    vendored_role: spoke
+    vendored_role: consumer
     capabilities:
       id_label_validation:
         status: enabled
@@ -269,7 +263,7 @@ mechs:
       - src/proteintraitsmech/schema/proteintraitsmech.yaml
     record_globs:
       - data/traits/**/*.yaml
-    vendored_role: spoke
+    vendored_role: consumer
     capabilities:
       id_label_validation:
         status: enabled

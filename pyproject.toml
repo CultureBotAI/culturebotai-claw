@@ -62,8 +62,8 @@ include-package-data = false
 
 [tool.setuptools.packages.find]
 where = [".", "src"]
-include = ["cli*", "plugins*", "pipelines*", "kg_microbe_*", "shared*"]
-exclude = ["tests*", "scripts*", "shared.idlabel*"]
+include = ["cli*", "plugins*", "pipelines*", "kg_microbe_*"]
+exclude = ["tests*", "scripts*"]
 namespaces = false
 
 [tool.setuptools.package-data]
@@ -81,7 +81,6 @@ kg_microbe_config = ["openclaw_config.yaml"]
 kg_microbe_agents = ["definitions/**/*.yaml"]
 kg_microbe_qc = ["templates/*.j2"]
 kg_microbe_discussions = ["templates/*.html"]
-"shared.history" = ["history.yaml"]
 
 [tool.uv]
 package = true
@@ -100,20 +99,12 @@ python_files = ["test_*.py"]
 filterwarnings = [
     "error::pytest.PytestReturnNotNoneWarning",
 ]
-# shared/idlabel/tests are the VENDORED fleet tests. They are already run by
-# `.github/workflows/id-label-canon.yaml`, which is green nightly and gives them
-# what they need: Python 3.13, a fresh oaklib, and `shared/idlabel` as the working
-# directory (they resolve the validator at ../scripts relative to themselves).
-# Running them from the repo root with a different environment can fail on an
-# unrelated oaklib/enum incompatibility, so exclude them here rather than
-# duplicate — and weaken — a check that already exists.
-norecursedirs = ["shared/idlabel", ".venv", "workspace", "cache", "ATTIC"]
+norecursedirs = [".venv", "workspace", "cache", "ATTIC"]
 
 [tool.ruff]
 target-version = "py311"
 line-length = 100
 extend-exclude = [
-    "shared/idlabel",
     "docs/archive",
     "workspace",
     "cache",

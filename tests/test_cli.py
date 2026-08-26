@@ -450,7 +450,7 @@ def test_manifest_override_is_shared_by_registry_status_and_config_show(
             "display_name": "GhostMech",
             "github": "CultureBotAI/GhostMech",
             "environment_variable": "GHOSTMECH_ROOT",
-            "vendored_role": "spoke",
+            "vendored_role": "consumer",
         }
     )
     document["mechs"]["ghostmech"] = ghost

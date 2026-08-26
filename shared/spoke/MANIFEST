@@ -1,7 +1,0 @@
-# Legacy Phase 1 comparison set formerly canonical in CultureMech.
-# Do not add files; the complete authority is vendored_artifacts.json.
-# The launcher is intentionally absent: its new claw-governed bytes differ
-# from the legacy hub copy and must be allowed to roll out incrementally.
-tests/test_skill_frontmatter.py
-tests/test_curation_timestamp_schema.py
-prompts/backlog-loop-goal.md

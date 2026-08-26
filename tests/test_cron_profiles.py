@@ -1,9 +1,9 @@
 """Tests for the agent cadence config and its applier.
 
 Config that nothing reads is worse than no config, because it invites trust —
-that is the lesson of claw#37, where shared/idlabel/MANIFEST looked like the
-source of truth and was referenced nowhere. These pin the properties that make
-cron-profiles.yaml real.
+that is the lesson of claw#37, where a retired compatibility manifest looked
+like the source of truth and was referenced nowhere. These pin the properties
+that make cron-profiles.yaml real.
 """
 
 from __future__ import annotations

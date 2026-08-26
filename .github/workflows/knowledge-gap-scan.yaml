@@ -15,8 +15,8 @@ name: Knowledge-gap scan
 
 on:
   schedule:
-    # 07:00 UTC = midnight US/Pacific. Sits between id-label-canon (06:41) and
-    # cross-repo-validation (07:27) without overlapping either.
+    # 07:00 UTC = midnight US/Pacific. Follows the governance/id-label canaries
+    # (06:41/06:51) and precedes cross-repo-validation (07:27).
     #
     # DAILY, but each run scans a bounded WINDOW rather than the whole corpus —
     # see each Mech's manifest capability setting. A full scan is not viable:

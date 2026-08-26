@@ -120,91 +120,79 @@ The largest consumer performs one manifest plus fourteen artifact fetches, so
 three worst-case attempts plus the existing two five-second retry delays remain
 within a five-minute workflow timeout (235 seconds before runner overhead).
 
-## Phase 1 coordinated rollout
+## Phase 1 rollout record
 
-Authority cannot be flipped in one commit because downstream repositories need
-an already-public immutable claw revision to pin. The fleet manifest therefore
-models two fail-closed states:
+Phase 1 completed through a two-commit claw migration because public downstream
+CI needed an already-merged immutable claw revision before claw could retire the
+old comparison layout. The reviewed bootstrap is pull request
+[`#133`](https://github.com/CultureBotAI/culturebotai-claw/pull/133), merge commit
+`a8f7c94d8d5ccfa0ed430e4d3c5d0dbf63af2416`.
 
-1. `transition`: claw publishes canonical bytes while CultureMech remains the
-   temporary legacy comparison hub for consumers not yet migrated.
-2. `authoritative`: all five Mechs are consumers of claw, no Mech hub exists,
-   and `legacy_hub` is forbidden.
+All five downstream migrations passed their repository CI and were merged:
 
-The rollout order is:
+| Mech | Pull request | Audited `origin/main` |
+|---|---:|---|
+| CultureMech | [#340](https://github.com/CultureBotAI/CultureMech/pull/340) | `0422968004b99c91ed356d6ee4e38b7e93f371d5` |
+| MediaIngredientMech | [#472](https://github.com/CultureBotAI/MediaIngredientMech/pull/472) | `82694054f5bbf74b5392bf8858c9962c2152a35a` |
+| CommunityMech | [#683](https://github.com/CultureBotAI/CommunityMech/pull/683) | `ba596731b23b799f4baca96984ceb8f0d56874fe` |
+| TraitMech | [#516](https://github.com/CultureBotAI/TraitMech/pull/516) | `3ee94eeec831d98d2a2cc1ebe2368fe3fa122f69` |
+| ProteinTraitsMech | [#564](https://github.com/CultureBotAI/proteintraitsmech/pull/564) | `a70ff8f5564b77a50963daafaacc2dde013eb1a2` |
 
-1. Merge and review the claw bootstrap commit.
-2. Record its full merge commit SHA.
-3. Create clean worktrees from each Mech's current `origin/main`.
-4. Run the synchronizer with that exact SHA for all five Mechs, including
-   CultureMech; update each workflow/contract so the complete manifest set and
-   pin are gating.
-5. Merge the five downstream PRs only after their offline and schema tests pass.
-6. Fetch each downstream `origin/main`, check out clean worktrees at those exact
-   remote-tracking commits, then run the claw fleet audit against the reviewed
-   bootstrap SHA. Require missing-file, byte-drift, safe mode, identity,
-   applicability, committed-HEAD, and pin checks to pass:
+An audited SHA can be newer than the rollout PR when unrelated work reached
+`main` afterward; the audit binds the current committed tip, not merely the
+rollout merge.
 
-   ```bash
-   uv run kg-microbe-governance fleet-audit \
-     --ref <full-bootstrap-claw-commit> \
-     --target-root culturemech=/path/to/CultureMech-worktree \
-     --target-root mediaingredientmech=/path/to/MediaIngredientMech-worktree \
-     --target-root communitymech=/path/to/CommunityMech-worktree \
-     --target-root traitmech=/path/to/TraitMech-worktree \
-     --target-root proteintraitsmech=/path/to/ProteinTraitsMech-worktree
-   ```
+Immediately before the authoritative flip, each detached audit worktree was
+clean, had `HEAD == refs/remotes/origin/main`, and contained the full bootstrap
+pin. One five-root audit then reported 14 matching artifacts for CultureMech,
+MediaIngredientMech, CommunityMech, and TraitMech; ProteinTraitsMech correctly
+reported its 13 applicable artifacts because Edison capture is not applicable.
 
-   The audit requires exactly the five manifest keys, distinct exact Git roots,
-   clean trees, `HEAD == refs/remotes/origin/main`, the same expected pin in all
-   five, and a successful pinned checker for every capability-scoped artifact.
-   It binds the bootstrap ref byte-for-byte to the installed claw manifest and
-   payloads, then reads every governed artifact and pin directly from each
-   repository's `HEAD` tree (including Git executable modes); ignored files and
-   `skip-worktree` flags therefore cannot substitute working-tree bytes.
-7. Before deleting compatibility mirrors, complete and review this executable
-   migration checklist:
-   - repoint the `kg_microbe_history` default/help path, `shared.history`
-     package-data declaration, history tests/workflow, and history docs;
-   - preserve an equivalent canonical ID-label behavioral job, then repoint its
-     working directory plus the Pytest/Ruff exclusions and
-     `scripts/audit_idlabel_fleet.sh`;
-   - replace the transitional mirror-byte test and
-     `tests/test_fleet_governance_mirror.py` contract;
-   - account for every file under `shared/history`, `shared/idlabel`, and
-     `shared/spoke`, plus the root operational copies of
-     `tests/test_skill_frontmatter.py` and `prompts/backlog-loop-goal.md`; and
-   - add a no-reference/no-reintroduction guard for all retired paths.
-8. Merge the final claw flip to `authoritative`, remove the compatibility
-   mirrors and CultureMech-hub audit, and reject their reintroduction.
+`.github/workflows/governance-fleet-audit.yaml` preserves that central check
+after the flip. It runs daily and on every claw pull request and main push,
+sparse-checks out the public Mech mains derived from the trusted claw manifest,
+and reads every pin from its committed tree. All pins must be identical and the
+commit must be reachable from the exact trusted claw base/main revision before
+the fleet audit runs. The job installs its governance package from that trusted
+revision first so it can derive the consumers and paths; the downstream pin
+supplies canonical data, never executable acceptance logic. On pull requests, a
+separate candidate-validation step checks the proposed authority layout and
+workflow contract while the deployed-fleet audit remains bound to the protected
+base revision.
 
-The legacy checker launcher is excluded from the compatibility mirror during
-this window. Its replacement intentionally has different bytes, so comparing
-it to the old CultureMech launcher would make every incremental rollout order
-fail. Existing consumers continue enforcing their old pin until migrated; the
-new five-Mech pin audit is the gate for the replacement before the final flip.
+The final claw state is `authoritative`: all five Mechs are consumers, no Mech
+hub exists, and `legacy_hub` is forbidden. The compatibility mirrors, duplicate
+root contracts, and CultureMech-hub audit were removed only after the fleet
+audit passed. Claw's maintained history CLI and ID-label behavioral workflow now
+consume the packaged canonical assets directly, and tests reject operational
+references that would reintroduce the retired layout.
 
-The downstream PRs include companion changes beyond generated bytes:
+The audit command remains the release gate for future canonical revisions:
 
-| Mech | Required rollout companion |
-|---|---|
-| CultureMech | Add the claw-consumer vendored gate and replace the legacy static checker contract. |
-| MediaIngredientMech | Update vendored workflow authority text while preserving exit-1 retry and exit-2 precondition semantics. |
-| CommunityMech | Update vendored workflow authority text while preserving exit-1 retry and exit-2 precondition semantics. |
-| TraitMech | Update vendored workflow authority text while preserving exit-1 retry and exit-2 precondition semantics. |
-| ProteinTraitsMech | Replace the old shell `FILES`/`MAPPED` parser contract and add retry semantics to its combined workflow. |
+```bash
+uv run kg-microbe-governance fleet-audit \
+  --ref <full-claw-commit> \
+  --target-root culturemech=/path/to/CultureMech-worktree \
+  --target-root mediaingredientmech=/path/to/MediaIngredientMech-worktree \
+  --target-root communitymech=/path/to/CommunityMech-worktree \
+  --target-root traitmech=/path/to/TraitMech-worktree \
+  --target-root proteintraitsmech=/path/to/ProteinTraitsMech-worktree
+```
 
-Do not update canonical payload wording while changing authority. The bootstrap
-uses the already-converged bytes so the migration is behavior-neutral. A later
-pinned release can evolve a shared contract through the same rollout rail.
-Consequently, some copied schema comments still name the old three/four-Mech or
-private-hub context; that is recorded compatibility debt, not current authority
-documentation, and changing it belongs in a later all-five pinned release.
+It requires exactly the five manifest keys, distinct exact Git roots, clean
+trees, `HEAD == refs/remotes/origin/main`, one expected pin, and successful
+checks for every applicable artifact. It reads bytes and executable modes from
+each repository's committed `HEAD`, so ignored files and `skip-worktree` flags
+cannot substitute working-tree state.
+
+Do not change canonical payload bytes as part of an authority-only migration.
+A later pinned release can evolve a shared contract through the same bootstrap,
+downstream rollout, exact-main audit, and final-state sequence. Some current
+payload comments retain historical fleet wording; changing those bytes requires
+that separate coordinated release.
 
 ## Rollback
 
-Before the final flip, a downstream PR can be reverted to its former
-CultureMech pin without changing claw. After the final flip, rollback means
-pinning all five Mechs to the previous reviewed claw commit; do not reinstate a
-Mech authority or use a mutable branch. The canonical bytes remain recoverable
-from every reviewed claw commit.
+Rollback means pinning all five Mechs to the previous reviewed claw commit; do
+not reinstate a Mech authority or use a mutable branch. The canonical bytes
+remain recoverable from every reviewed claw commit.

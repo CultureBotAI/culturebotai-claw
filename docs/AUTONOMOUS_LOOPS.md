@@ -530,9 +530,8 @@ fleet-identical artifacts. Every Mech, including CultureMech, consumes a full
 claw commit pin; applicability comes from the canonical fleet capabilities and
 one artifact manifest. Agent workflow templates should use that same rail (or a
 pinned reusable workflow in Phase 5) rather than being copied independently.
-See `docs/guides/VENDORED_GOVERNANCE.md` for the transitional rollout—during
-that bounded window the legacy CultureMech comparison remains active solely to
-avoid an unpinned gap.
+See `docs/guides/VENDORED_GOVERNANCE.md` for the completed coordinated rollout
+and the immutable pin/audit procedure.
 
 ### 5.6 Safety rails to adopt verbatim
 
@@ -639,8 +638,7 @@ across four repos is far harder than a rename.
   inside `reference/` subdirs and the stale prose references updated. Archived
   docs (`ATTIC/`, `docs/archive/`) deliberately left as historical record.
 - **`history/` provenance layer** (§2.9) — canonical LinkML schema at
-  `src/kg_microbe_governance/artifacts/schema/history.yaml` (with the old
-  `shared/history/history.yaml` compatibility path retained during rollout),
+  `src/kg_microbe_governance/artifacts/schema/history.yaml`,
   scaffolder at `src/kg_microbe_history/`,
   vendored schema + `just new-history` / `just validate-history` + advisory
   `curation-history.yaml` workflow in TraitMech as the pilot consumer.

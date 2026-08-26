@@ -45,14 +45,24 @@ def _shipped_document():
 
 def _authoritative_document():
     document = _shipped_document()
+    assert document["vendored_governance"]["state"] == "authoritative"
+    return document
+
+
+def _transition_document():
+    """Return a valid legacy-state fixture without weakening shipped state."""
+
+    document = _shipped_document()
     governance = document["vendored_governance"]
-    governance["state"] = "authoritative"
-    governance.pop("legacy_hub")
-    for mech in document["mechs"].values():
-        mech["vendored_role"] = "consumer"
+    governance["state"] = "transition"
+    governance["legacy_hub"] = "culturemech"
+    for key, mech in document["mechs"].items():
+        is_legacy_hub = key == "culturemech"
+        mech["vendored_role"] = "hub" if is_legacy_hub else "spoke"
         vendored_sync = mech["capabilities"]["vendored_sync"]
-        vendored_sync["status"] = "enabled"
-        vendored_sync.pop("reason", None)
+        if is_legacy_hub:
+            vendored_sync["status"] = "not_applicable"
+            vendored_sync["reason"] = "valid synthetic transition fixture"
     return document
 
 
@@ -131,20 +141,24 @@ def test_every_non_enabled_capability_states_a_reason():
                 )
 
 
-def test_transition_has_one_legacy_hub_and_external_claw_authority():
+def test_shipped_governance_is_authoritative_with_only_consumers():
     manifest = load_fleet_manifest(MANIFEST_PATH)
 
-    hubs = [
-        key for key, mech in manifest.mechs.items() if mech.vendored_role == "hub"
-    ]
-    assert hubs == [manifest.vendored_hub]
-    assert manifest.vendored_governance.state == "transition"
+    assert manifest.vendored_governance.state == "authoritative"
+    assert manifest.vendored_hub is None
     assert (
         manifest.vendored_governance.canonical_repository
         == "CultureBotAI/culturebotai-claw"
     )
     assert manifest.vendored_governance.manifest_path.endswith(
         "vendored_artifacts.json"
+    )
+    assert all(
+        mech.vendored_role == "consumer" for mech in manifest.mechs.values()
+    )
+    assert all(
+        mech.capability("vendored_sync").status == "enabled"
+        for mech in manifest.mechs.values()
     )
 
 
@@ -237,7 +251,6 @@ def _scannable_body(text: str) -> str:
         "scripts/check_edison_keys.py",
         "scripts/environment_coverage_dashboard.py",
         "scripts/install_hooks.sh",
-        "scripts/audit_idlabel_fleet.sh",
         "validate_setup.py",
         ".github/workflows/knowledge-gap-scan.yaml",
         ".claude/skills/fleet-pr-review/SKILL.md",
@@ -439,7 +452,7 @@ def test_authoritative_governance_requires_enabled_vendored_sync(status: str):
 
 @pytest.mark.parametrize("status", ["enabled", "disabled"])
 def test_transition_requires_hub_vendored_sync_not_applicable(status: str):
-    document = _shipped_document()
+    document = _transition_document()
     capability = document["mechs"]["culturemech"]["capabilities"]["vendored_sync"]
     capability["status"] = status
     if status == "disabled":
@@ -459,7 +472,7 @@ def test_transition_requires_hub_vendored_sync_not_applicable(status: str):
 
 @pytest.mark.parametrize("status", ["disabled", "not_applicable"])
 def test_transition_requires_spoke_vendored_sync_enabled(status: str):
-    document = _shipped_document()
+    document = _transition_document()
     capability = document["mechs"]["traitmech"]["capabilities"]["vendored_sync"]
     capability["status"] = status
     capability["reason"] = "intentionally invalid transition fixture"

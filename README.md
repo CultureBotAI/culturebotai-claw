@@ -90,9 +90,9 @@ uv run python -m kg_microbe_discussions --help
 ```
 
 Canonical shared schemas, behavioral contracts, and vendored fleet checks live
-under `src/kg_microbe_governance/`. The old `shared/` mirrors remain only for
-the bounded Phase 1 compatibility window. See
-[`docs/guides/VENDORED_GOVERNANCE.md`](docs/guides/VENDORED_GOVERNANCE.md).
+under `src/kg_microbe_governance/`. Claw is their authoritative source; every
+Mech consumes an immutable claw revision and no Mech acts as a shared-file hub.
+See [`docs/guides/VENDORED_GOVERNANCE.md`](docs/guides/VENDORED_GOVERNANCE.md).
 
 ## Safety model
 
@@ -154,7 +154,6 @@ cli/          openclaw-cli discovery and validation interface
 pipelines/    orchestration workflows
 plugins/      repository, lock, validation, ontology, and curation adapters
 src/          packaged shared Mech utilities and canonical governance payloads
-shared/       temporary pre-Phase-1 compatibility mirrors
 scripts/      maintenance, migration, and curation commands
 tests/        maintained assertion-based test suite
 docs/         current guides, proposals, reviews, and historical archive

@@ -4,6 +4,9 @@ Plan saved: 2026-08-24
 
 Repository inventory reviewed: 2026-08-22
 
+Implementation status updated: 2026-08-25. Phases 0 and 1 are complete; the
+current-state inventory below remains the baseline that motivated the program.
+
 Repositories: CultureMech, TraitMech, MediaIngredientMech, CommunityMech,
 ProteinTraitsMech, and culturebotai-claw
 
@@ -229,16 +232,14 @@ src/
   kg_microbe_kgscan/
   kg_microbe_discussions/
   kg_microbe_web/
-
-shared/
-  schema/
-    mech_shared.yaml
-    history.yaml
-    research.yaml
-  skills/
-  hooks/
-  workflows/
-  adapters/
+  kg_microbe_governance/
+    artifacts/
+      schema/
+        mech_shared.yaml
+        history.yaml
+      scripts/
+      tests/
+      prompts/
 ```
 
 The exact package boundaries can be adjusted during implementation, but there
@@ -281,20 +282,22 @@ Acceptance criteria:
 
 ### Phase 1 — Move shared-schema and vendored governance to claw
 
-> **Implementation note (Phase 1 bootstrap in progress).** Authority migration
-> uses two claw commits around a coordinated five-Mech rollout. The bootstrap
+> **Implementation note (Phase 1, completed 2026-08-25).** Authority migration
+> used two claw commits around a coordinated five-Mech rollout. The bootstrap
 > packages one strict artifact manifest, the converged canonical payloads, an
 > identity-validated dry-run/apply synchronizer, and a dependency-free pinned
-> checker while `fleet.yaml` is explicitly in `transition`. The synchronizer
+> checker while `fleet.yaml` was explicitly in `transition`. The synchronizer
 > proves that the requested claw SHA contains the installed manifest and bytes
-> before writing it as a pin. The five Mechs then pin the reviewed bootstrap
-> merge SHA. Only after the local five-worktree audit verifies exact committed
-> `origin/main` roots, binds that SHA to the installed manifest/payload bytes,
-> and compares every pin, file, and Git mode directly with each `HEAD` tree does
-> the final claw commit switch to `authoritative` and forbid a Mech hub. Before
-> retiring compatibility mirrors, the history package/default/tests/workflow and
-> ID-label behavioral job must be repointed to their canonical packaged assets.
-> This avoids circular/self pins and never calls a research provider.
+> before writing it as a pin. All five Mechs now pin bootstrap merge
+> `a8f7c94d8d5ccfa0ed430e4d3c5d0dbf63af2416` through CultureMech #340,
+> MediaIngredientMech #472, CommunityMech #683, TraitMech #516, and
+> ProteinTraitsMech #564. The local five-worktree audit verified exact committed
+> `origin/main` roots, bound that SHA to the installed manifest/payload bytes,
+> and compared every pin, file, and Git mode directly with each `HEAD` tree.
+> The final claw commit therefore switches to `authoritative`, forbids a Mech
+> hub, repoints the history package and ID-label behavioral job to canonical
+> packaged assets, and removes the compatibility mirrors. The migration avoided
+> circular/self pins and never called a research provider.
 
 1. Make claw canonical for `mech_shared.yaml`, `history.yaml`, shared validator
    code, shared behavioral tests, and the backlog-loop contract.
@@ -319,6 +322,14 @@ Acceptance criteria:
 - no circular or self-referential pin remains; and
 - the fleet audit checks committed missing files, byte drift, and Git modes,
   including when ignore or index flags hide working-tree state.
+
+All Phase 1 acceptance criteria passed. The recorded pre-flip audit used clean
+detached worktrees at CultureMech `0422968004b99c91ed356d6ee4e38b7e93f371d5`,
+MediaIngredientMech `82694054f5bbf74b5392bf8858c9962c2152a35a`,
+CommunityMech `ba596731b23b799f4baca96984ceb8f0d56874fe`, TraitMech
+`3ee94eeec831d98d2a2cc1ebe2368fe3fa122f69`, and ProteinTraitsMech
+`a70ff8f5564b77a50963daafaacc2dde013eb1a2`; it reported 14, 14, 14,
+14, and 13 applicable artifacts respectively.
 
 ### Phase 2 — Build the shared deep-research subsystem
 

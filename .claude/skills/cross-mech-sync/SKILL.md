@@ -16,8 +16,9 @@ A repeatable, **non-disruptive** procedure for landing the same change across th
 Mech repos and leaving every copy + tracking artifact consistent. Use it whenever
 a change must exist in more than one Mech, including:
 
-- A **shared vendored file** that must stay byte-identical (e.g. the id↔label
-  validator `scripts/validate_id_label_correspondence.py` and its two shared tests).
+- A **shared vendored file** that must stay byte-identical (for example, the
+  ID↔label validator, helpers, and behavioral tests declared by claw's canonical
+  governance manifest).
 - A **data correction that fans out** — a wrong value in a source repo that also
   lives in derived artifacts (HTML pages, UMAP, SSSOM) and downstream repos
   (e.g. the boric-acid `CHEBI:33134`→`CHEBI:33118` fix: CultureMech YAML → MIM
@@ -68,9 +69,12 @@ prepared offline, but it is not a completed cross-Mech sync.
    git worktree off `origin/main`** (see Workflow). Switching/​stashing their
    branch is the one thing that can wreck another agent's session.
 
-3. **Pick the canonical version objectively.** For a byte-identical file, the
-   canonical is the majority of applicable consumers and/or the copy already pinned.
-   Sync the laggards *to* it — don't average or re-derive.
+3. **Use the declared authority.** For a claw-governed artifact, canonical bytes
+   come only from `src/kg_microbe_governance/vendored_artifacts.json` at the full
+   commit in `scripts/.vendored_canon_ref`; consumer majority is evidence of
+   deployment state, never authority. For an unmanaged convention, establish
+   ground truth explicitly before choosing a version. Never average or re-derive
+   byte-governed content.
 
 4. **Sync is incomplete until the derived artifacts are too.** A source fix that
    leaves stale HTML/UMAP/SSSOM is a half-fix. After the source change, sweep
@@ -78,8 +82,11 @@ prepared offline, but it is not a completed cross-Mech sync.
    generated outputs. `grep -rl "<old value>"` across each repo, excluding the
    legitimate cases (e.g. a vendored ontology snapshot where the id is correct).
 
-5. **One coordinated change.** Pin/manifest edits must land in *every* copy in the
-   same pass. Leaving one repo unpinned recreates the drift you just fixed.
+5. **One coordinated release.** Change canonical payloads and checksums in a
+   reviewed claw bootstrap commit, roll that immutable commit pin through every
+   applicable Mech, audit the exact committed `origin/main` tips, and only then
+   complete any final claw state change. Never edit a consumer copy or invent a
+   per-repository pin outside that release rail.
 
 ## Workflow
 
@@ -222,10 +229,14 @@ while IFS=$'\t' read -r key name github root_variable repo_root; do
 done < "$FLEET_TSV"
 ```
 
-Group by hash → the majority is canonical; outliers are the sync targets. `diff`
-two copies to confirm the delta is benign before overwriting. Because
-`set -o pipefail` is active and each object is checked with `cat-file`, a failed
-fleet query, locked fetch, or missing path aborts instead of hashing empty input.
+Group by hash to identify deployed drift and its scope. For a governed path,
+resolve the expected source, digest, applicability, and target from
+`src/kg_microbe_governance/vendored_artifacts.json` at the reviewed claw pin;
+do not promote the majority consumer hash to canonical. For an unmanaged path,
+review the diffs and document the chosen ground truth before overwriting.
+Because `set -o pipefail` is active and each object is checked with `cat-file`,
+a failed fleet query, locked fetch, or missing path aborts instead of hashing
+empty input.
 
 ### D. Make the change in an isolated worktree (per laggard repo)
 
@@ -294,7 +305,11 @@ esac
 
 ### E. Verify before merge
 
-- Vendored-file pin: `just verify-validator-pin` → all files `OK`.
+- Governed artifacts, when in scope:
+  `bash scripts/check_vendored_sync.sh` → every applicable artifact and the
+  immutable claw pin are current. Also run the trusted claw command against the
+  exact worktree and pin when coordinating a canonical release:
+  `kg-microbe-governance check --repository <key> --target-root <worktree> --ref <full-sha>`.
 - Tests: `uv run pytest <the synced tests> -q`.
 - CI: `gh pr view "$PR_NUMBER" -R "$TARGET_GITHUB" --json mergeable,mergeStateStatus,statusCheckRollup`
   → `MERGEABLE` / `CLEAN` and checks `SUCCESS`.
@@ -393,37 +408,48 @@ rmdir "$AUDIT_DIR"
 
 ## The vendored byte-identical invariant (reference)
 
-The files governed by the ID/label capability are vendored byte-identically
-across every repository returned by:
+Claw is the sole authority. Read
+`src/kg_microbe_governance/vendored_artifacts.json` to determine the canonical
+source, expanded Mech target, applicability, digest, and executable-bit
+contract. Each Mech records one full claw commit in
+`scripts/.vendored_canon_ref`; no checksum sidecar or Mech-local manifest is an
+authority.
+
+Use the installed governance commands from the reviewed claw revision:
 
 ```bash
-uv run python -m kg_microbe_fleet list --capability id_label_validation --format tsv
+# Dry-run is the default; add --apply only after reviewing every WOULD_WRITE row.
+uv run kg-microbe-governance sync \
+  --repository <mech-key> \
+  --target-root <isolated-worktree> \
+  --ref <full-reviewed-claw-sha>
+
+uv run kg-microbe-governance check \
+  --repository <mech-key> \
+  --target-root <isolated-worktree> \
+  --ref <full-reviewed-claw-sha>
 ```
 
-They are guarded by a pin manifest:
+After all downstream PRs merge, refresh every local `origin/main` and run one
+`kg-microbe-governance fleet-audit` with exactly the five manifest keys and the
+common full SHA. The audit requires clean exact repository roots, committed
+main tips, identical pins, canonical bytes, and Git modes. See
+`docs/guides/VENDORED_GOVERNANCE.md` for the bootstrap, rollout, audit, and
+rollback sequence.
 
-```just
-VENDORED_IDLABEL_FILES := "scripts/validate_id_label_correspondence.py tests/test_id_label_empty_adapter.py tests/test_id_label_unknown_prefix.py"
-
-verify-validator-pin:        # CI runs `sha256sum -c scripts/.validate_id_label_correspondence.sha256`
-refresh-validator-pin:       # rebuilds the sidecar by hashing each VENDORED_IDLABEL_FILES entry
-```
-
-- The `.sha256` sidecar is a multi-line manifest; every applicable repo carries an
-  **identical** sidecar (hash the sidecar itself to confirm: same → invariant holds).
-- **`conf/id_label_targets.yaml` is intentionally NOT pinned** — it is per-repo
-  (different adapters / targets / exceptions). Only the *concept* of
-  `ignored_prefixes` stays consistent, not the file.
-- To change a vendored file: edit it, run `just refresh-validator-pin` in **every**
-  copy in one coordinated pass, commit the matching sidecar everywhere.
+Repo-specific configuration is governed only when the manifest says so. For
+example, `conf/id_label_targets.yaml` remains Mech-owned because it is absent
+from the canonical manifest; confirm that from the manifest rather than from
+memory.
 
 ## Worked examples (this is what "done" looks like)
 
-- **claw#6 — extend the pin to the shared tests.** Ground-truth showed `.py` in
-  sync but CommunityMech's two tests drifted (cosmetic). Synced them to the
-  CultureMech/MIM canonical, adopted the `VENDORED_IDLABEL_FILES` manifest, regen
-  sidecar → identical 3-line manifest across all three; CI enforces it. TraitMech
-  decision recorded as deferred. (CommunityMech PR #151.)
+- **Historical: claw#6 — extend the former ID/label checksum sidecar.** Before
+  claw became authoritative, ground-truth showed the validator in sync while
+  CommunityMech's tests drifted. The old rollout synchronized the copies and a
+  three-line sidecar. That mechanism is retired; the lesson that behavioral
+  contracts must travel with their implementation remains, but all new changes
+  use the claw manifest, full commit pin, synchronizer, and fleet audit above.
 - **Boric-acid `CHEBI:33134`→`CHEBI:33118`.** One wrong id (1H-phosphole, not boric
   acid) spanned 4 surfaces: CultureMech YAML (source) → MIM unified TSV →
   kg-microbe reviewed TSV + unified SSSOM (surgical row removal — the generator

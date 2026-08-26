@@ -98,36 +98,36 @@ def test_shipped_manifest_is_complete_aligned_and_checksum_valid() -> None:
     )
 
 
-def test_transitional_mirrors_match_their_new_canonical_payloads() -> None:
-    root = Path(__file__).resolve().parents[1]
-    mappings = {
-        "artifacts/schema/history.yaml": "shared/history/history.yaml",
-        "artifacts/scripts/validate_id_label_correspondence.py": (
-            "shared/idlabel/scripts/validate_id_label_correspondence.py"
+def test_downstream_targets_resolve_to_nested_canonical_payloads() -> None:
+    """Keep Mech target names without recreating root compatibility copies."""
+    artifacts = {
+        artifact["id"]: artifact
+        for artifact in _document()["artifacts"]
+    }
+    expected = {
+        "id_label_validator": (
+            "src/kg_microbe_governance/artifacts/scripts/validate_id_label_correspondence.py",
+            "scripts/validate_id_label_correspondence.py",
         ),
-        "artifacts/scripts/chem_formula.py": "shared/idlabel/scripts/chem_formula.py",
-        "artifacts/tests/test_id_label_empty_adapter.py": (
-            "shared/idlabel/tests/test_id_label_empty_adapter.py"
+        "chemical_formula_helper": (
+            "src/kg_microbe_governance/artifacts/scripts/chem_formula.py",
+            "scripts/chem_formula.py",
         ),
-        "artifacts/tests/test_id_label_unknown_prefix.py": (
-            "shared/idlabel/tests/test_id_label_unknown_prefix.py"
+        "skill_frontmatter_contract": (
+            "src/kg_microbe_governance/artifacts/tests/test_skill_frontmatter.py",
+            "tests/test_skill_frontmatter.py",
         ),
-        "artifacts/tests/test_id_label_plausibility.py": (
-            "shared/idlabel/tests/test_id_label_plausibility.py"
-        ),
-        "artifacts/tests/test_skill_frontmatter.py": (
-            "shared/spoke/tests/test_skill_frontmatter.py"
-        ),
-        "artifacts/tests/test_curation_timestamp_schema.py": (
-            "shared/spoke/tests/test_curation_timestamp_schema.py"
-        ),
-        "artifacts/prompts/backlog-loop-goal.md": (
-            "shared/spoke/prompts/backlog-loop-goal.md"
+        "backlog_loop_contract": (
+            "src/kg_microbe_governance/artifacts/prompts/backlog-loop-goal.md",
+            "prompts/backlog-loop-goal.md",
         ),
     }
-    package = files("kg_microbe_governance")
-    for canonical, legacy in mappings.items():
-        assert package.joinpath(canonical).read_bytes() == (root / legacy).read_bytes()
+
+    for artifact_id, (source, target) in expected.items():
+        artifact = artifacts[artifact_id]
+        assert artifact["source"] == source
+        assert artifact["target"] == target
+        assert _asset_bytes(source)
 
 
 def test_manifest_rejects_duplicate_json_keys() -> None:

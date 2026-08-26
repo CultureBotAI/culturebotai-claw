@@ -84,27 +84,18 @@ def test_knowledge_gap_matrix_is_capability_scoped_and_carries_windows(capsys):
     assert all(row["checkout_path"] == row["workdir"] for row in rows)
 
 
-def test_show_vendored_hub_emits_only_the_manifest_key(capsys):
+def test_show_vendored_hub_fails_explicitly_for_authoritative_fleet(capsys):
+    assert main(["show", "--field", "vendored_hub"]) == 2
+
+    captured = capsys.readouterr()
+    assert not captured.out
+    assert "claw is authoritative" in captured.err
+
+
+def test_scope_is_one_fixed_column_authoritative_capability_snapshot(capsys):
     manifest = load_fleet_manifest()
 
-    assert main(["show", "--field", "vendored_hub"]) == 0
-    assert capsys.readouterr().out.strip() == manifest.vendored_hub
-
-
-def test_scope_is_one_fixed_column_capability_snapshot_with_its_hub(capsys):
-    manifest = load_fleet_manifest()
-
-    assert (
-        main(
-            [
-                "scope",
-                "--capability",
-                "id_label_validation",
-                "--require-vendored-hub",
-            ]
-        )
-        == 0
-    )
+    assert main(["scope", "--capability", "id_label_validation"]) == 0
     rows = [line.split("\t") for line in capsys.readouterr().out.splitlines()]
 
     assert len(rows) == len(manifest.with_capability("id_label_validation"))
@@ -112,13 +103,11 @@ def test_scope_is_one_fixed_column_capability_snapshot_with_its_hub(capsys):
     assert [row[0] for row in rows] == list(
         manifest.with_capability("id_label_validation")
     )
-    hub_rows = [row for row in rows if row[5] == "hub"]
-    assert len(hub_rows) == 1
-    assert hub_rows[0][0] == manifest.vendored_hub
-    assert hub_rows[0][4] == manifest.get(manifest.vendored_hub).package_path
+    assert manifest.vendored_hub is None
+    assert {row[5] for row in rows} == {"consumer"}
 
 
-def test_scope_fails_before_output_when_required_hub_is_outside_scope(capsys):
+def test_scope_rejects_legacy_hub_requirement_after_authority_flip(capsys):
     assert (
         main(
             [
@@ -133,31 +122,30 @@ def test_scope_fails_before_output_when_required_hub_is_outside_scope(capsys):
 
     captured = capsys.readouterr()
     assert not captured.out
-    assert "vendored hub" in captured.err
-    assert "is not in capability scope" in captured.err
+    assert "claw is authoritative" in captured.err
 
 
-def test_legacy_hub_queries_fail_explicitly_after_authority_flip(
+def test_transition_override_still_supports_legacy_hub_queries(
     tmp_path: Path, monkeypatch, capsys
 ) -> None:
-    authoritative = yaml.safe_load(
+    transition = yaml.safe_load(
         load_fleet_manifest().source.read_text(encoding="utf-8")
     )
-    authoritative["vendored_governance"]["state"] = "authoritative"
-    authoritative["vendored_governance"].pop("legacy_hub")
-    for mech in authoritative["mechs"].values():
-        mech["vendored_role"] = "consumer"
+    transition["vendored_governance"]["state"] = "transition"
+    transition["vendored_governance"]["legacy_hub"] = "culturemech"
+    for key, mech in transition["mechs"].items():
+        is_legacy_hub = key == "culturemech"
+        mech["vendored_role"] = "hub" if is_legacy_hub else "spoke"
         vendored_sync = mech["capabilities"]["vendored_sync"]
-        vendored_sync["status"] = "enabled"
-        vendored_sync.pop("reason", None)
-    path = tmp_path / "authoritative-fleet.yaml"
-    path.write_text(yaml.safe_dump(authoritative, sort_keys=False), encoding="utf-8")
+        if is_legacy_hub:
+            vendored_sync["status"] = "not_applicable"
+            vendored_sync["reason"] = "valid synthetic transition fixture"
+    path = tmp_path / "transition-fleet.yaml"
+    path.write_text(yaml.safe_dump(transition, sort_keys=False), encoding="utf-8")
     monkeypatch.setenv("KG_MICROBE_FLEET_MANIFEST", str(path))
 
-    assert main(["show", "--field", "vendored_hub"]) == 2
-    captured = capsys.readouterr()
-    assert not captured.out
-    assert "claw is authoritative" in captured.err
+    assert main(["show", "--field", "vendored_hub"]) == 0
+    assert capsys.readouterr().out.strip() == "culturemech"
 
     assert (
         main(
@@ -168,9 +156,12 @@ def test_legacy_hub_queries_fail_explicitly_after_authority_flip(
                 "--require-vendored-hub",
             ]
         )
-        == 2
+        == 0
     )
-    assert "claw is authoritative" in capsys.readouterr().err
+    rows = [line.split("\t") for line in capsys.readouterr().out.splitlines()]
+    hub_rows = [row for row in rows if row[5] == "hub"]
+    assert len(hub_rows) == 1
+    assert hub_rows[0][0] == "culturemech"
 
 
 def _repository(path: Path, github_identity: str) -> Path:

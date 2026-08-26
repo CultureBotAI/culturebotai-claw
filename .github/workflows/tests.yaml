@@ -112,10 +112,10 @@ jobs:
             --summary "CI round-trip probe" \
             --details "Scaffolded by the tests workflow to prove the layer works end to end." \
             --history-root "$RUNNER_TEMP/history"
-          uv run python -m kg_microbe_history validate "$RUNNER_TEMP/history" \
-            --schema shared/history/history.yaml
-        env:
-          PYTHONPATH: src
+          # Deliberately omit --schema: this lane proves that the project CLI
+          # resolves the canonical schema from kg_microbe_governance package data.
+          # The from-sdist wheel test separately proves installed-package behavior.
+          uv run python -m kg_microbe_history validate "$RUNNER_TEMP/history"
 
       - name: An unfilled record is rejected by BOTH gates
         run: |
@@ -131,14 +131,14 @@ jobs:
             exit 1
           fi
 
-          # The spokes validate with plain linkml-validate against their vendored
-          # copy, so the schema must reject it without our CLI in the loop.
+          # The Mechs validate with plain linkml-validate against their governed
+          # copies, so the canonical schema must reject it without our CLI in the
+          # loop.
           record=$(find "$RUNNER_TEMP/placeholder" -name '*.yaml' | head -1)
-          if uv run linkml-validate --schema shared/history/history.yaml \
+          if uv run linkml-validate \
+               --schema src/kg_microbe_governance/artifacts/schema/history.yaml \
                --target-class HistoryRecord "$record"; then
             echo "::error::the schema accepted a TODO-placeholder record" >&2
             exit 1
           fi
           echo "Both gates rejected the placeholder, as intended."
-        env:
-          PYTHONPATH: src

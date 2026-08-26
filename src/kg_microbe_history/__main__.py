@@ -29,12 +29,11 @@ from .scaffold import (
 
 
 def _default_schema_path() -> str:
-    """Find the packaged schema, retaining source-only spoke compatibility."""
+    """Return the claw-authoritative schema packaged with governance."""
 
-    try:
-        return str(files("shared.history").joinpath("history.yaml"))
-    except ModuleNotFoundError:
-        return str(Path(__file__).resolve().parents[2] / "shared/history/history.yaml")
+    return str(
+        files("kg_microbe_governance").joinpath("artifacts/schema/history.yaml")
+    )
 
 
 def _add_new_args(ap: argparse.ArgumentParser) -> None:
@@ -228,7 +227,9 @@ def cmd_validate(args: argparse.Namespace) -> int:
     if not schema.is_file():
         print(
             f"error: history schema not found at '{schema}'. "
-            "Pass --schema to point at shared/history/history.yaml.",
+            "Pass --schema to a HistoryRecord schema or reinstall the package; "
+            "the default is the packaged "
+            "kg_microbe_governance/artifacts/schema/history.yaml.",
             file=sys.stderr,
         )
         return 2
