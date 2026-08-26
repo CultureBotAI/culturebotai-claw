@@ -333,6 +333,29 @@ CommunityMech `ba596731b23b799f4baca96984ceb8f0d56874fe`, TraitMech
 
 ### Phase 2 — Build the shared deep-research subsystem
 
+> **Implementation note (Phase 2, provider subsystem landed).** `kg_microbe_research`
+> now owns the provider catalogue, focus-profile validation, deterministic
+> triage, and the execution policy; each Mech keeps its own
+> `conf/deep_research_provider.yaml`. Verified against `origin/main` in all five
+> repositories on 2026-08-25: every Mech carried its own
+> `scripts/deep_research_provider.py` (614-688 lines, five distinct hashes,
+> ~3,280 lines total). The two closest pairs differ only in comments, so the
+> divergence is copy drift rather than domain need — but it is not only
+> cosmetic: CultureMech and ProteinTraitsMech reject a non-numeric capability
+> weight, stage weight, or provider adjustment, MediaIngredientMech and
+> CommunityMech accept them and fail later inside scoring, and TraitMech has
+> dropped `credential_status` altogether. The shared loader takes the strictest
+> behaviour of each and is verified to accept all five committed profiles
+> unchanged, so adoption is not a data migration.
+>
+> Items 1, 4, and 5 are implemented. Availability is injected through `environ`
+> and a `LocalProbe`, so no test depends on the developer's PATH and no test
+> touches the network. Items 2, 3, 6, and 7 — the LinkML research schema, the
+> schema-compliant run record, the adapter protocol, and converting the five
+> runners — are deliberately left to follow-up work; this lands the contract
+> they consume. Until then the five runners still execute live by default, so
+> the safety fix is available but not yet enforced at their call sites.
+
 1. Create `kg_microbe_research` with:
    - provider definitions and aliases;
    - capability, source-scope, cost, and latency vocabulary;

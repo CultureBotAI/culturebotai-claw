@@ -62,6 +62,9 @@ Supported:
 - `LockManager` atomic, lease-owned file coordination.
 - Plugin and agent discovery and validated CLI dry runs.
 - Packaged history, QC dashboard, discussion-browser, and knowledge-gap tools.
+- `kg_microbe_research`: the shared provider catalogue, focus-profile
+  validation, deterministic triage, and the execution-policy gate. It never
+  performs network access and never reads a credential value.
 - Packaged canonical vendored-artifact manifest and identity-validated,
   dry-run-first synchronization.
 - The assertion-based suite under `tests/` and fleet workflows under `.github/`.
@@ -71,6 +74,9 @@ Experimental or disabled:
 - `openclaw-cli agent run` and `pipeline run` execution without `--dry-run`.
 - Environment-curation apply mode; it raises until an atomic validated writer exists.
 - Unified ingredient-mapping apply mode; it raises until all YAML writes are transactional.
+- Provider *execution*. `kg_microbe_research` decides whether a call is
+  permitted; it does not make one. The five Mech runners still execute live by
+  default and do not yet consult this gate.
 - Legacy root diagnostics, one-off migration scripts, and archived phase workflows.
 
 Never describe an experimental path as implemented merely because a YAML agent
@@ -88,6 +94,7 @@ uv run --extra dev mypy \
   cli/main.py plugins/repository_settings.py plugins/lock_manager.py \
   plugins/git_integration.py plugins/just_runner.py \
   src/kg_microbe_history src/kg_microbe_kgscan src/kg_microbe_fleet \
+  src/kg_microbe_research \
   src/kg_microbe_governance/__init__.py \
   src/kg_microbe_governance/__main__.py \
   src/kg_microbe_governance/fleet_audit.py \
@@ -132,6 +139,24 @@ with LockManager().lock("culturemech", "operation_name"):
 Do not use manual acquire/release pairs in new code. Never force-release another
 lease as routine error recovery.
 
+## Research provider safety
+
+A live research call is billable. Three separate decisions are required and no
+default supplies any of them:
+
+1. **Live execution.** `authorize(...)` returns a dry run unless `apply=True`.
+2. **Paid authorization.** A provider in a paid cost tier additionally needs an
+   explicit acknowledgement or a cost ceiling that admits its tier.
+3. **Plan agreement.** The provider must be one the immutable `TriagePlan`
+   would offer, or the caller must record an override reason.
+
+A blocked or unconfigured provider is refused whatever the caller passes. A
+configured credential is not evidence that a provider works: `KNOWN_BLOCKED`
+records measured failures and outranks credential status.
+
+Never call a provider to test this code. Every contract in `tests/` is offline
+and deterministic; inject availability with `environ` and `StaticProbe`.
+
 ## Configuration rules
 
 - Start from `.env.example`; do not commit `.env` or credentials.
@@ -162,6 +187,7 @@ workspace/    gitignored runtime state
 Key shared console scripts:
 
 ```bash
+uv run kg-microbe-research --help
 uv run kg-microbe-history --help
 uv run kg-microbe-governance --help
 uv run kg-microbe-kgscan --help
