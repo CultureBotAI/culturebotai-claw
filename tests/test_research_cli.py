@@ -261,3 +261,14 @@ def test_an_unknown_focus_and_an_unknown_stage_fail_the_same_way(
     stage_error = capsys.readouterr().err
     assert focus_error.startswith("error:")
     assert stage_error.startswith("error:")
+
+
+def test_providers_json_paid_flag_agrees_with_the_one_predicate(capsys):
+    """#139: the CLI hardcoded {"high", "very_high"} instead of reading PAID_COSTS."""
+    from kg_microbe_research import is_paid
+
+    assert main(["providers", "--json"]) == 0
+    rows = json.loads(capsys.readouterr().out)["providers"]
+    assert rows, "no providers reported"
+    for row in rows:
+        assert row["paid"] is is_paid(row["provider"]), row["provider"]

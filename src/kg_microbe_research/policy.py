@@ -29,9 +29,9 @@ from typing import Any
 from .profile import ResearchProfile
 from .providers import (
     COST_VALUE,
-    PAID_COSTS,
     PROVIDERS,
     canonical_provider,
+    is_paid,
     normalize_allowlist,
     unknown_providers,
 )
@@ -138,9 +138,13 @@ class Decision:
 
 
 def requires_paid_authorization(provider: str) -> bool:
-    """Whether calling this provider needs an explicit paid decision."""
-    entry = PROVIDERS.get(canonical_provider(provider))
-    return entry is not None and entry.cost in PAID_COSTS
+    """Whether calling this provider needs an explicit paid decision.
+
+    The policy-facing spelling of `providers.is_paid`. It delegates rather than
+    repeating the predicate: this is the rule that decides whether money can be
+    spent, and it must have exactly one definition.
+    """
+    return is_paid(provider)
 
 
 def _ceiling_admits(cost: str, ceiling: str) -> bool:

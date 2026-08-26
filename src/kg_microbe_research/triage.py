@@ -14,12 +14,12 @@ from typing import Any
 from .profile import Focus, ProfileError, ResearchProfile, Stage
 from .providers import (
     COST_VALUE,
-    PAID_COSTS,
     PROVIDERS,
     SYNTHESIS_VALUE,
     TIME_VALUE,
     LocalProbe,
     Provider,
+    is_paid,
     normalize_allowlist,
     provider_status,
 )
@@ -44,7 +44,8 @@ class Ranked:
 
     @property
     def paid(self) -> bool:
-        return self.cost in PAID_COSTS
+        """Whether routing here can incur a charge. See `providers.is_paid`."""
+        return is_paid(self.provider)
 
     def as_dict(self) -> dict[str, Any]:
         return {

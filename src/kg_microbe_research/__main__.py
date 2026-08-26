@@ -19,6 +19,7 @@ from .policy import COST_TIERS, PolicyError, authorize, plan_stage
 from .profile import ProfileError, ResearchProfile, load_profile
 from .providers import (
     PROVIDERS,
+    is_paid,
     normalize_allowlist,
     provider_status,
     unknown_providers,
@@ -68,7 +69,7 @@ def _cmd_providers(args: argparse.Namespace) -> int:
                 "status": status,
                 "status_reason": reason,
                 "cost": provider.cost,
-                "paid": provider.cost in {"high", "very_high"},
+                "paid": is_paid(name),
                 "time": provider.time,
                 "synthesis": provider.synthesis,
                 "source_scope": provider.source_scope,

@@ -426,3 +426,46 @@ def test_plan_and_report_agree_on_an_aliased_allowlist(tmp_path):
     assert report["stages"][0]["recommended_available"]["provider"] == (
         plan.recommended.provider
     )
+
+
+# --------------------------------------------------------------------------
+# The paid rule has exactly one definition (#139)
+# --------------------------------------------------------------------------
+
+
+def test_is_paid_matches_the_cost_table_for_every_provider():
+    from kg_microbe_research import is_paid
+
+    for name, provider in PROVIDERS.items():
+        assert is_paid(name) is (provider.cost in PAID_COSTS), name
+
+
+def test_is_paid_resolves_aliases():
+    from kg_microbe_research import is_paid
+
+    assert is_paid("edison") is is_paid("falcon")
+
+
+def test_is_paid_is_false_for_an_unknown_provider():
+    from kg_microbe_research import is_paid
+
+    assert is_paid("nosuchprovider") is False
+
+
+def test_the_policy_spelling_of_the_paid_rule_agrees_with_the_catalogue():
+    """`requires_paid_authorization` had a byte-identical duplicate body."""
+    from kg_microbe_research import is_paid, requires_paid_authorization
+
+    for name in PROVIDERS:
+        assert requires_paid_authorization(name) is is_paid(name), name
+
+
+def test_every_reported_paid_flag_agrees_with_the_one_predicate(tmp_path):
+    """The ranking rows are a third consumer; they must not drift either."""
+    from kg_microbe_research import is_paid
+
+    profile = load_profile(write_profile(tmp_path))
+    rows = rank_stage(profile.focus(), "discovery", environ={}, probe=NO_LOCAL_TOOLING)
+    assert rows, "no rows to check"
+    for row in rows:
+        assert row.paid is is_paid(row.provider), row.provider
