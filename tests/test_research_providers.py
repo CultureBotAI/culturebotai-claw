@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+import kg_microbe_research.providers as provider_contract
 from kg_microbe_research import (
     ALL_CAPABILITIES,
     BILLING_CLASSES,
@@ -105,6 +106,29 @@ def test_every_provider_uses_a_known_cost_time_and_synthesis_vocabulary():
         assert provider.billing in BILLING_CLASSES, name
         assert provider.time in TIME_VALUE, name
         assert provider.synthesis in SYNTHESIS_VALUE, name
+
+
+@pytest.mark.parametrize(
+    ("mapping", "key", "replacement"),
+    (
+        ("COST_VALUE", "low", 99),
+        ("TIME_VALUE", "fast", 99),
+        ("SYNTHESIS_VALUE", "deep", 99),
+        ("ALIASES", "edison", "asta"),
+        ("KNOWN_BLOCKED", "falcon", "different offline policy"),
+        ("CREDENTIALS", "asta", ("DIFFERENT_KEY",)),
+    ),
+)
+def test_triage_contract_digest_covers_ranking_and_admission_inputs(
+    monkeypatch: pytest.MonkeyPatch,
+    mapping: str,
+    key: str,
+    replacement: object,
+) -> None:
+    original = provider_contract._triage_contract_sha256()
+    monkeypatch.setitem(getattr(provider_contract, mapping), key, replacement)
+
+    assert provider_contract._triage_contract_sha256() != original
 
 
 def test_provider_dataclass_key_matches_its_name():

@@ -1,0 +1,940 @@
+id: https://w3id.org/kg-microbe/research
+name: kg_microbe_research
+title: KG-Microbe Mech deep-research result schema
+description: >-
+  Provider-neutral, audit-only records for planning, executing, and reviewing
+  deep research across the five KG-Microbe Mechs. The record preserves the
+  exact policy decision, requested and actual provider, immutable input and
+  output checksums, citations, artifacts, findings, and proposed domain
+  changes. A ResearchResult is provenance and a curation workspace: it never
+  authorizes a provider call and never applies a ProposedChange. Application
+  requires a separate validated-write workflow owned by the target Mech.
+
+  The schema deliberately uses named attributes and finite enums instead of an
+  unrestricted metadata/Any escape hatch. Cross-record conditions that LinkML
+  cannot express portably (identifier references, path containment, checksum
+  verification, and mode/status cardinality) are enforced by the research
+  record validator.
+license: BSD-3-Clause
+
+prefixes:
+  linkml: https://w3id.org/linkml/
+  kg_microbe_research: https://w3id.org/kg-microbe/research/
+  xsd: http://www.w3.org/2001/XMLSchema#
+
+default_prefix: kg_microbe_research
+default_range: string
+
+imports:
+  - linkml:types
+
+types:
+  Sha256:
+    typeof: string
+    description: Lower-case hexadecimal SHA-256 digest of the exact referenced bytes.
+    pattern: '^[0-9a-f]{64}$'
+
+  RepositoryRelativePath:
+    typeof: string
+    description: >-
+      Non-empty repository-relative POSIX path. Runtime validation additionally
+      resolves the path and rejects traversal outside the repository.
+    pattern: '^(?!/)(?!.*(?:^|/)\.\.(?:/|$))[^\\\r\n]+$'
+
+  PositiveInteger:
+    typeof: integer
+    description: Integer greater than or equal to one.
+    minimum_value: 1
+
+  NonNegativeInteger:
+    typeof: integer
+    description: Integer greater than or equal to zero.
+    minimum_value: 0
+
+  NonNegativeNumber:
+    typeof: float
+    description: Finite numeric value greater than or equal to zero.
+    minimum_value: 0.0
+
+  FitPercentage:
+    typeof: integer
+    description: Whole-number provider fit score from zero through one hundred.
+    minimum_value: 0
+    maximum_value: 100
+
+  CurrencyCode:
+    typeof: string
+    description: ISO 4217 three-letter currency code for a provider-reported cost.
+    pattern: '^[A-Z]{3}$'
+
+enums:
+  MechEnum:
+    description: Exact fleet display name of the Mech that owns the research target.
+    permissible_values:
+      CultureMech:
+      TraitMech:
+      MediaIngredientMech:
+      CommunityMech:
+      ProteinTraitsMech:
+
+  ProviderEnum:
+    description: >-
+      Canonical provider keys from kg_microbe_research.providers.PROVIDERS.
+      Aliases such as edison and claude-code must be resolved before writing.
+    permissible_values:
+      asta:
+      falcon:
+      openscientist:
+      claude_code:
+      openai:
+      perplexity:
+      consensus:
+      cyberian:
+      cborg:
+      mock:
+      deeper_med:
+
+  ProviderStatusEnum:
+    description: Exact status vocabulary returned by provider_status().
+    permissible_values:
+      available:
+        description: Functional availability is supported by current evidence.
+      configured:
+        description: Configuration exists, but functional availability is unverified.
+      blocked:
+        description: The provider is known not to be routable in the current context.
+      unavailable:
+        description: Required configuration or a supported provider integration is absent.
+      stub:
+        description: Catalogue entry exists but no executable integration exists.
+
+  BillingClassEnum:
+    description: Exact billing vocabulary from the provider catalogue.
+    permissible_values:
+      free:
+      metered:
+      unknown:
+
+  RelativeCostEnum:
+    description: Exact relative-cost vocabulary from the provider catalogue.
+    permissible_values:
+      low:
+      medium:
+      high:
+      very_high:
+
+  ResearchAuthorityEnum:
+    description: Authority carried by a research plan.
+    permissible_values:
+      audit_only:
+        description: >-
+          The plan may describe or record work but grants no authority to call
+          a provider or apply a proposed change.
+
+  ResearchExecutionModeEnum:
+    description: Whether a run was policy-only or permitted to call a provider.
+    permissible_values:
+      DRY_RUN:
+        description: No provider may have been called.
+      LIVE:
+        description: A provider call was separately and explicitly authorized.
+
+  ResearchResultStatusEnum:
+    description: Terminal status of the complete saved research result.
+    permissible_values:
+      DRY_RUN:
+        description: Planning and policy evaluation completed without provider use.
+      COMPLETED:
+        description: All intended live stages completed with usable outputs.
+      PARTIAL:
+        description: At least one live stage completed, but the result is incomplete.
+      FAILED:
+        description: The result terminated without a usable research output.
+      UNUSABLE:
+        description: Output was produced but rejected as empty, off-topic, or unsafe to curate.
+
+  ResearchAssessmentStatusEnum:
+    description: Whether independently reviewable evidence assessment is present.
+    permissible_values:
+      NOT_ASSESSED:
+        description: Raw provider outputs and citations were captured without claim assessment.
+      PARTIALLY_ASSESSED:
+        description: Some, but not all intended evidence assessment was completed.
+      ASSESSED:
+        description: The captured output was assessed to the scope stated by the result.
+
+  ResearchRunStatusEnum:
+    description: Terminal status of one provider attempt.
+    permissible_values:
+      DRY_RUN:
+        description: Policy was evaluated but no provider was called.
+      COMPLETED:
+        description: The provider returned a usable output.
+      FAILED:
+        description: The provider attempt failed without a usable output.
+      UNUSABLE:
+        description: The provider returned output that was empty, off-topic, or unsafe to curate.
+
+  AssignmentKindEnum:
+    description: Why this provider appears in a stage assignment.
+    permissible_values:
+      RECOMMENDED:
+        description: Highest-ranked provider permitted by triage and policy filters.
+      FALLBACK:
+        description: Lower-ranked provider retained as an explicit fallback candidate.
+      OVERRIDE:
+        description: Provider explicitly selected outside the ordinary recommendation.
+
+  UsageAuthorizationMethodEnum:
+    description: How non-free provider use was or was not authorized.
+    permissible_values:
+      NOT_REQUIRED:
+        description: Provider is explicitly classified as free.
+      NOT_REQUESTED:
+        description: No usage authorization was requested, as in a dry run.
+      EXPLICIT_ACKNOWLEDGEMENT:
+        description: Possible quota or credit use was explicitly acknowledged.
+      COST_CEILING:
+        description: A supplied relative-cost ceiling admitted the provider.
+
+  EvidenceValidationStatusEnum:
+    description: Exact deep-research-client reference resolution vocabulary.
+    permissible_values:
+      VERIFIED:
+        description: The identifier resolved to a real record.
+      NOT_FOUND:
+        description: The identifier could not be resolved and may be confabulated.
+      UNVERIFIABLE:
+        description: No supported check was possible; nothing was learned either way.
+
+  EvidenceRelevanceEnum:
+    description: Exact deep-research-client topical-relevance vocabulary.
+    permissible_values:
+      ON_TOPIC:
+      UNCERTAIN:
+      OFF_TOPIC:
+      NOT_ASSESSED:
+
+  EvidenceSupportEnum:
+    description: >-
+      How evidence bears on a finding. Polarity is separate from reference
+      resolution, topical relevance, and evidentiary strength.
+    permissible_values:
+      SUPPORT:
+      REFUTE:
+      PARTIAL:
+      NO_EVIDENCE:
+      WRONG_STATEMENT:
+
+  EvidenceSourceEnum:
+    description: >-
+      Study or evidence context. The vocabulary is shared across culture,
+      microbial-trait, ingredient, community, and protein research rather than
+      inheriting disease-only categories from DisMech.
+    permissible_values:
+      PRIMARY_LITERATURE:
+      REVIEW:
+      DATABASE:
+      CULTURE_COLLECTION:
+      PROTOCOL:
+      DATASET:
+      ONTOLOGY:
+      HUMAN_CLINICAL:
+      MODEL_ORGANISM:
+      IN_VITRO:
+      COMPUTATIONAL:
+      OTHER:
+
+  ArtifactRoleEnum:
+    description: Purpose of a checksum-addressed file in this result bundle.
+    permissible_values:
+      TARGET_SNAPSHOT:
+      PROFILE:
+      PROVIDER_CATALOGUE:
+      PROMPT_TEMPLATE:
+      RENDERED_QUERY:
+      TRIAGE_PLAN:
+      PROVIDER_RESPONSE:
+      REPORT:
+      SOURCE_SNAPSHOT:
+      CITATIONS:
+      PROVIDER_ARTIFACT:
+      REFERENCE_VALIDATION:
+      EVIDENCE_ASSESSMENT:
+      PATCH:
+      DOMAIN_SCHEMA:
+      DOMAIN_VALIDATION:
+      RUN_LOG:
+      ERROR:
+
+  ChangeOperationEnum:
+    description: High-level operation proposed against a target Mech record.
+    permissible_values:
+      CREATE:
+      UPDATE:
+      DELETE:
+
+  ChangeValidationStatusEnum:
+    description: Captured, non-authoritative outcome reported by a domain validator.
+    permissible_values:
+      NOT_RUN:
+      RECORDED_PASS:
+      RECORDED_FAILURE:
+      ERROR:
+
+  EvidenceVerificationMethodEnum:
+    description: How a claim-to-source evidence assertion was checked.
+    permissible_values:
+      EXACT_TEXT_MATCH:
+        description: The validator can match the normalized snippet in a UTF-8 source snapshot.
+      MANUAL_SOURCE_REVIEW:
+        description: A named assessor reviewed a non-text or layout-dependent source location.
+      STRUCTURED_DATA_CHECK:
+        description: A named assessor checked a field, row, accession, sequence, or structure.
+      COMPUTATIONAL_CHECK:
+        description: A named assessor checked reproducible derived evidence.
+
+classes:
+  ResearchResult:
+    tree_root: true
+    description: >-
+      One immutable, schema-valid research bundle. Lists are optional at the
+      LinkML layer so dry-run and failed skeletons remain representable;
+      lifecycle-specific semantic validation requires the appropriate non-empty
+      runs and outputs.
+    attributes:
+      research_version:
+        description: Version of this research-result contract.
+        range: PositiveInteger
+        required: true
+      result_id:
+        description: Stable identifier for this saved result bundle.
+        required: true
+      generated_at:
+        description: Time the terminal result record was generated.
+        range: datetime
+        required: true
+      status:
+        description: Terminal lifecycle state of the complete result.
+        range: ResearchResultStatusEnum
+        required: true
+      assessment_status:
+        description: Raw-capture versus independently assessed state of this immutable result.
+        range: ResearchAssessmentStatusEnum
+        required: true
+      assessment_scope:
+        description: >-
+          Explicit boundary within which the evidence review claims completeness;
+          required for assessed results and absent from raw captures.
+      assessment_limitations:
+        description: >-
+          Material gaps that prevent the stated assessment scope from being complete;
+          required for PARTIALLY_ASSESSED results.
+        multivalued: true
+      assessment_of_result_id:
+        description: Earlier raw result whose captured material this result assesses.
+      assessment_of_path:
+        description: Repository-relative path of the checksum-bound earlier raw result.
+        range: RepositoryRelativePath
+      assessment_of_sha256:
+        description: SHA-256 digest of the exact earlier raw-result bytes.
+        range: Sha256
+      supersedes_result_id:
+        description: Earlier result replaced by this append-only correction.
+      supersedes_path:
+        description: Repository-relative path of the checksum-bound superseded result.
+        range: RepositoryRelativePath
+      supersedes_sha256:
+        description: SHA-256 digest of the exact superseded-result bytes.
+        range: Sha256
+      plan:
+        description: Immutable question, target, profile, catalogue, and triage plan.
+        range: ResearchPlan
+        inlined: true
+        required: true
+      runs:
+        description: Terminal dry-run evaluations and live provider attempts.
+        range: ResearchRun
+        multivalued: true
+        inlined_as_list: true
+      citations:
+        description: Citations extracted from runs and optionally independently checked.
+        range: ResearchCitation
+        multivalued: true
+        inlined_as_list: true
+      artifacts:
+        description: >-
+          Checksum-addressed external files or embedded immutable inputs used or
+          produced by the research.
+        range: ResearchArtifact
+        multivalued: true
+        inlined_as_list: true
+      evidence:
+        description: Per-claim, per-source evidence assertions made by named assessors.
+        range: ResearchEvidence
+        multivalued: true
+        inlined_as_list: true
+      findings:
+        description: Provider-neutral claims assessed from the research evidence.
+        range: ResearchFinding
+        multivalued: true
+        inlined_as_list: true
+      proposed_changes:
+        description: Non-applied changes justified by findings with captured validator provenance.
+        range: ProposedChange
+        multivalued: true
+        inlined_as_list: true
+      summary:
+        description: Concise terminal summary written for a curator.
+      warnings:
+        description: Non-fatal caveats that must accompany use of this result.
+        multivalued: true
+
+  ResearchPlan:
+    description: Immutable triage inputs and assignments for one research question.
+    attributes:
+      plan_id:
+        description: Stable identifier referenced by every ResearchRun.
+        required: true
+      created_at:
+        description: Time the immutable plan was created.
+        range: datetime
+        required: true
+      authority:
+        description: Audit-only authority carried by this plan.
+        range: ResearchAuthorityEnum
+        required: true
+      mech:
+        description: Exact fleet display name of the target Mech.
+        range: MechEnum
+        required: true
+      focus:
+        description: Canonical key of the Mech-owned focus profile entry.
+        required: true
+      focus_label:
+        description: Human-readable label from the selected focus.
+        required: true
+      evidence_policy:
+        description: Mech-owned evidence policy copied from the profile.
+        required: true
+      source_priorities:
+        description: Ordered source classes preferred by the selected focus.
+        multivalued: true
+      profile_path:
+        description: Repository-relative path to the exact profile used.
+        range: RepositoryRelativePath
+        required: true
+      profile_sha256:
+        description: Checksum of the exact profile bytes used to produce this plan.
+        range: Sha256
+        required: true
+      profile_artifact_id:
+        description: Embedded PROFILE artifact bound to profile_path and profile_sha256.
+        required: true
+      provider_catalogue_version:
+        description: Version of the canonical provider catalogue contract.
+        range: PositiveInteger
+        required: true
+      provider_catalogue_sha256:
+        description: >-
+          Checksum of the canonical provider catalogue representation evaluated
+          by triage; detects catalogue drift between planning and replay.
+        range: Sha256
+        required: true
+      triage_contract_version:
+        description: Version of the scoring, ordering, alias, and admission contract.
+        range: PositiveInteger
+        required: true
+      triage_contract_sha256:
+        description: Digest of the exact static triage contract used to produce assignments.
+        range: Sha256
+        required: true
+      no_paid:
+        description: Whether all non-free and unknown-billing providers were excluded.
+        range: boolean
+        required: true
+      provider_allowlist:
+        description: Canonical provider allowlist used by triage, when one was supplied.
+        range: ProviderEnum
+        multivalued: true
+      question:
+        description: Scientific question and checksum-bound target for this plan.
+        range: ResearchQuestion
+        inlined: true
+        required: true
+      provider_evaluations:
+        description: >-
+          Complete ranked provider/status snapshot for every stage, including
+          providers excluded from assignment by availability or policy.
+        range: ResearchProviderEvaluation
+        multivalued: true
+        minimum_cardinality: 1
+        inlined_as_list: true
+        required: true
+      stage_assignments:
+        description: Ordered primary, fallback, or override provider assignments.
+        range: ResearchStageAssignment
+        multivalued: true
+        minimum_cardinality: 1
+        inlined_as_list: true
+        required: true
+
+  ResearchQuestion:
+    description: >-
+      The human research question, caller-declared target metadata, and exact
+      target-byte snapshot it concerns.
+    attributes:
+      question_id:
+        description: Stable question identifier within the result bundle.
+        required: true
+      text:
+        description: Human-readable scientific research question.
+        required: true
+      target:
+        description: Checksum-bound Mech entity addressed by the question.
+        range: ResearchTarget
+        inlined: true
+        required: true
+
+  ResearchTarget:
+    description: >-
+      Caller-declared target metadata and the exact source-byte snapshot used for
+      research; Mech-specific identity derivation belongs to a domain adapter.
+    attributes:
+      target_id:
+        description: Caller-declared domain identifier or repository-local key.
+        required: true
+      target_label:
+        description: Caller-declared human-readable target label.
+        required: true
+      target_type:
+        description: >-
+          Caller-declared domain class, such as medium, trait, ingredient,
+          community, or protein.
+        required: true
+      target_path:
+        description: Repository-relative path to the target snapshot used for research.
+        range: RepositoryRelativePath
+        required: true
+      target_sha256:
+        description: Checksum of the exact target bytes used to render the query.
+        range: Sha256
+        required: true
+      target_artifact_id:
+        description: >-
+          Embedded TARGET_SNAPSHOT artifact bound to target_path and target_sha256.
+        required: true
+
+  ResearchProviderEvaluation:
+    description: One row of the complete deterministic triage and availability snapshot.
+    attributes:
+      stage:
+        description: Canonical stage key from the selected focus profile.
+        required: true
+      ordinal:
+        description: One-based rank among every catalogue provider for this stage.
+        range: PositiveInteger
+        required: true
+      provider:
+        description: Canonical provider evaluated at this rank.
+        range: ProviderEnum
+        required: true
+      provider_status:
+        description: Provider status observed when the plan was built.
+        range: ProviderStatusEnum
+        required: true
+      provider_status_reason:
+        description: Non-secret evidence supporting the observed provider status.
+        required: true
+      fit:
+        description: Normalized deterministic fit score from 0 to 100.
+        range: FitPercentage
+        required: true
+      relative_cost:
+        description: Versioned catalogue relative-cost tier.
+        range: RelativeCostEnum
+        required: true
+      billing:
+        description: Versioned catalogue billing class.
+        range: BillingClassEnum
+        required: true
+      usage_authorization_required:
+        description: True unless the provider is explicitly classified free.
+        range: boolean
+        required: true
+
+  ResearchStageAssignment:
+    description: One provider's deterministic placement in a plan stage.
+    attributes:
+      stage:
+        description: Canonical stage key from the selected focus profile.
+        required: true
+      ordinal:
+        description: One-based rank within the stage after policy filters.
+        range: PositiveInteger
+        required: true
+      objective:
+        description: Stage objective copied from the focus profile.
+        required: true
+      provider:
+        description: Canonical provider assigned to this stage and ordinal.
+        range: ProviderEnum
+        required: true
+      provider_status:
+        description: Provider availability state observed during triage.
+        range: ProviderStatusEnum
+        required: true
+      provider_status_reason:
+        description: Non-secret reason supporting provider_status at planning time.
+        required: true
+      fit:
+        description: Normalized deterministic fit score from 0 to 100.
+        range: FitPercentage
+        required: true
+      relative_cost:
+        description: Catalogue relative-cost tier for the assigned provider.
+        range: RelativeCostEnum
+        required: true
+      billing:
+        description: Catalogue billing class for the assigned provider.
+        range: BillingClassEnum
+        required: true
+      usage_authorization_required:
+        description: True unless the provider is explicitly classified free.
+        range: boolean
+        required: true
+      assignment_kind:
+        description: Whether this is a recommendation, fallback, or override.
+        range: AssignmentKindEnum
+        required: true
+      override_reason:
+        description: Required semantically when assignment_kind is OVERRIDE.
+
+  ResearchRun:
+    description: >-
+      Terminal record of one dry-run evaluation or one live provider attempt.
+      requested_provider records intent; provider records what actually ran and
+      remains absent when provider_called is false.
+    attributes:
+      run_id:
+        description: Stable identifier referenced by citations and artifacts.
+        required: true
+      plan_id:
+        description: ResearchPlan.plan_id that authorized this attempt.
+        required: true
+      stage:
+        description: Stage key corresponding to a ResearchStageAssignment.
+        required: true
+      attempt:
+        description: One-based attempt number within the stage.
+        range: PositiveInteger
+        required: true
+      requested_provider:
+        description: Canonical provider selected before any explicit substitution.
+        range: ProviderEnum
+        required: true
+      provider:
+        description: Canonical provider that actually received the query.
+        range: ProviderEnum
+      provider_substitution_reason:
+        description: >-
+          Explicit reason the actual provider differs from requested_provider;
+          silent fallback is forbidden by semantic validation.
+      provider_status:
+        description: Provider status re-evaluated at the policy boundary.
+        range: ProviderStatusEnum
+        required: true
+      provider_status_reason:
+        description: Non-secret evidence supporting provider_status at execution time.
+        required: true
+      mode:
+        description: Dry-run or live execution mode authorized for this attempt.
+        range: ResearchExecutionModeEnum
+        required: true
+      status:
+        range: ResearchRunStatusEnum
+        required: true
+      provider_called:
+        description: Whether external provider execution actually began.
+        range: boolean
+        required: true
+      live_authorized:
+        description: Whether the separate live-execution decision was granted.
+        range: boolean
+        required: true
+      relative_cost:
+        description: Catalogue relative-cost tier checked by execution policy.
+        range: RelativeCostEnum
+        required: true
+      billing:
+        description: Catalogue billing class checked by execution policy.
+        range: BillingClassEnum
+        required: true
+      usage_authorization_required:
+        range: boolean
+        required: true
+      usage_authorized:
+        description: Whether any required quota/billing decision was granted.
+        range: boolean
+        required: true
+      usage_authorization_method:
+        description: How the separate non-free usage gate was resolved.
+        range: UsageAuthorizationMethodEnum
+        required: true
+      max_cost:
+        description: Relative-cost ceiling supplied to policy, when used.
+        range: RelativeCostEnum
+      rendered_query:
+        description: Exact query text presented to the provider or shown by dry-run.
+        required: true
+      query_sha256:
+        description: Checksum of rendered_query encoded as UTF-8.
+        range: Sha256
+        required: true
+      created_at:
+        description: Time the run record was initialized.
+        range: datetime
+        required: true
+      policy_evaluated_at:
+        description: Time provider status, plan agreement, and usage gates were evaluated.
+        range: datetime
+        required: true
+      started_at:
+        description: Time live provider execution began, when it began.
+        range: datetime
+      completed_at:
+        description: Time this attempt reached its terminal status.
+        range: datetime
+      provider_task_id:
+        description: Provider-side durable job, task, or trajectory identifier.
+      requested_model:
+        description: Model requested before execution, when applicable.
+      actual_model:
+        description: Provider-reported model that actually produced the result.
+      reported_cost:
+        description: Numeric cost reported by the provider, without estimation.
+        range: NonNegativeNumber
+      cost_currency:
+        description: Currency for reported_cost; absent when no monetary cost was reported.
+        range: CurrencyCode
+      authorization_reasons:
+        description: Ordered, non-secret reasons emitted by the policy decision.
+        multivalued: true
+        minimum_cardinality: 1
+        required: true
+      error:
+        description: Sanitized terminal error detail; credentials and raw response bodies are forbidden.
+
+  ResearchCitation:
+    description: >-
+      One provider-reported bibliographic reference plus optional independent
+      identifier resolution. Claim-specific snippets, source context, and
+      polarity belong to ResearchEvidence rather than this shared citation.
+    attributes:
+      citation_id:
+        description: Stable identifier optionally referenced by ResearchEvidence.
+        required: true
+      run_id:
+        description: ResearchRun.run_id from which this citation originated.
+        required: true
+      raw_reference:
+        description: Provider-native reference preserved losslessly, even when malformed.
+        required: true
+      normalized_reference:
+        description: Independently resolved PMID, DOI, accession, CURIE, or HTTPS URL.
+      title:
+        description: Independently resolved title, when available.
+      url:
+        description: Resolved canonical URL for the cited source, when available.
+        range: uri
+      retrieved_at:
+        description: Time the bibliographic record was retrieved.
+        range: datetime
+      validation_status:
+        description: Optional because a raw provider citation may not yet have been checked.
+        range: EvidenceValidationStatusEnum
+      validation_artifact_id:
+        description: >-
+          REFERENCE_VALIDATION artifact preserving the resolver output whenever
+          validation_status is recorded.
+      validated_by:
+        description: Tool or named assessor that resolved the identifier.
+      validated_at:
+        description: Time identifier resolution was performed.
+        range: datetime
+
+  ResearchArtifact:
+    description: >-
+      Checksum-addressed external content or an embedded immutable input belonging
+      to the result bundle.
+    attributes:
+      artifact_id:
+        description: Stable identifier referenced elsewhere in this result.
+        required: true
+      run_id:
+        description: Originating ResearchRun.run_id, when the artifact belongs to one attempt.
+      role:
+        description: Declared purpose of this file within the result bundle.
+        range: ArtifactRoleEnum
+        required: true
+      path:
+        description: Repository-relative path to the committed or staged artifact, when external.
+        range: RepositoryRelativePath
+      content_base64:
+        description: >-
+          Canonical base64-encoded bytes for a bundle-level PROFILE or
+          TARGET_SNAPSHOT input; every other artifact role must use path.
+      media_type:
+        description: IANA media type, when known.
+        required: true
+      sha256:
+        description: Checksum of the exact artifact bytes.
+        range: Sha256
+        required: true
+      size_bytes:
+        description: Exact byte length of the artifact.
+        range: NonNegativeInteger
+        required: true
+      external_id:
+        description: Provider storage, job, trajectory, or source identifier for rehydration.
+      description:
+        description: Human-readable description without embedding artifact content.
+
+  ResearchEvidence:
+    description: >-
+      One auditable assertion about how one checksum-bound source bears on one
+      finding. Multiple assertions may link the same citation to different
+      findings with different snippets, locators, and polarity.
+    attributes:
+      evidence_id:
+        description: Stable identifier referenced by ResearchFinding.evidence_ids.
+        required: true
+      finding_id:
+        description: ResearchFinding whose claim this source assertion assesses.
+        required: true
+      run_id:
+        description: Completed ResearchRun that produced or motivated this assessment.
+        required: true
+      citation_id:
+        description: Bibliographic ResearchCitation, when the source has one.
+      source_artifact_id:
+        description: SOURCE_SNAPSHOT artifact containing the independently obtained source.
+        required: true
+      assessment_artifact_id:
+        description: >-
+          EVIDENCE_ASSESSMENT artifact preserving manual, structured-data, or
+          computational claim-assessment details; required except for exact text
+          matching and, when supplied for exact text, still validated.
+      evidence_source:
+        description: Study or evidence context; this is not the provider name.
+        range: EvidenceSourceEnum
+        required: true
+      relevance:
+        description: Topic overlap, kept separate from support polarity.
+        range: EvidenceRelevanceEnum
+        required: true
+      support_level:
+        description: Polarity of this source with respect to the linked finding.
+        range: EvidenceSupportEnum
+        required: true
+      verification_method:
+        description: Method used to check the assertion against the source snapshot.
+        range: EvidenceVerificationMethodEnum
+        required: true
+      snippet:
+        description: Exact source text; required for EXACT_TEXT_MATCH.
+      locator:
+        description: Page, section, figure, table, field, row, accession, or sequence range.
+      rationale:
+        description: Why this source earns the recorded polarity for this finding.
+        required: true
+      assessed_by:
+        description: Named person, agent, or deterministic tool responsible for the assessment.
+        required: true
+      assessed_at:
+        description: Time the claim-to-source assertion was assessed.
+        range: datetime
+        required: true
+
+  ResearchFinding:
+    description: A reviewable claim aggregated from explicit ResearchEvidence assertions.
+    attributes:
+      finding_id:
+        description: Stable identifier referenced by ProposedChange.finding_ids.
+        required: true
+      statement:
+        description: Provider-neutral scientific claim.
+        required: true
+      disposition:
+        description: Aggregate disposition after considering all linked evidence assertions.
+        range: EvidenceSupportEnum
+        required: true
+      evidence_ids:
+        description: References to ResearchEvidence.evidence_id values assessed for this claim.
+        multivalued: true
+        minimum_cardinality: 1
+        required: true
+      rationale:
+        description: Why the cited evidence earns this support polarity.
+        required: true
+      notes:
+        description: Caveats, disagreements, or follow-up needed before promotion.
+
+  ProposedChange:
+    description: >-
+      A non-applied, checksum-bound change proposal for a target Mech record.
+      Passing domain validation does not grant write authority.
+    attributes:
+      change_id:
+        description: Stable identifier for this proposed change.
+        required: true
+      target_path:
+        description: Repository-relative path the change would create, update, or delete.
+        range: RepositoryRelativePath
+        required: true
+      operation:
+        description: High-level create, update, or delete operation being proposed.
+        range: ChangeOperationEnum
+        required: true
+      field_path:
+        description: JSON Pointer or Mech-defined field path affected by the proposal.
+      summary:
+        description: Concise description of the proposed domain change.
+        required: true
+      rationale:
+        description: Evidence-based reason for proposing the change.
+        required: true
+      pre_change_artifact_id:
+        description: >-
+          TARGET_SNAPSHOT artifact for the existing target. It is absent only
+          for CREATE and is rechecked before any later write.
+      finding_ids:
+        description: ResearchFinding.finding_id values that justify the proposal.
+        multivalued: true
+        minimum_cardinality: 1
+        required: true
+      patch_artifact_id:
+        description: ResearchArtifact.artifact_id containing the exact proposed patch.
+        required: true
+      domain_validation_status:
+        description: Captured validator claim; it does not authorize or certify a write.
+        range: ChangeValidationStatusEnum
+        required: true
+      domain_schema_artifact_id:
+        description: DOMAIN_SCHEMA artifact containing the exact schema bytes used.
+        required: true
+      domain_schema_path:
+        description: Repository-relative path of the domain schema captured by that artifact.
+        range: RepositoryRelativePath
+        required: true
+      validation_artifact_id:
+        description: >-
+          ResearchArtifact.artifact_id containing validator output; required
+          semantically whenever domain validation was attempted.
+      validation_message:
+        description: Concise validator outcome or reason validation was not run.
+      validation_command:
+        description: Non-secret reproducible validator command, when validation was attempted.
+      validated_at:
+        description: Time the recorded validator outcome was produced.
+        range: datetime

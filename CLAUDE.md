@@ -63,10 +63,11 @@ Supported:
 - Plugin and agent discovery and validated CLI dry runs.
 - Packaged history, QC dashboard, discussion-browser, and knowledge-gap tools.
 - `kg_microbe_research`: the shared provider catalogue, focus-profile
-  validation, deterministic triage, and the execution-policy gate. It makes no
-  provider health probe or provider call and performs no provider network
-  access. Values read from recognised credential environment variables are
-  checked only for non-emptiness and are never emitted or retained.
+  validation, deterministic triage, execution-policy gate, packaged LinkML
+  result schema, strict result validator, and append-only dry-run scaffolder.
+  It makes no provider health probe or provider call and performs no provider
+  network access. Values read from recognised credential environment variables
+  are checked only for non-emptiness and are never emitted or retained.
 - Packaged canonical vendored-artifact manifest and identity-validated,
   dry-run-first synchronization.
 - The assertion-based suite under `tests/` and fleet workflows under `.github/`.
@@ -80,8 +81,8 @@ Experimental or disabled:
   provider. `kg_microbe_research` decides whether a call is permitted; it does
   not make one. None of the five Mech runners consults this gate yet. Four
   runners still execute live by default; ProteinTraitsMech is dry-run-first.
-- The shared research schema, schema-compliant run records, domain adapters,
-  and migrated Mech runners.
+- Provider executors, domain adapters, historical-result migrations, and the
+  five migrated Mech runners.
 - Legacy root diagnostics, one-off migration scripts, and archived phase workflows.
 
 Never describe an experimental path as implemented merely because a YAML agent
@@ -154,9 +155,10 @@ three independent policy conditions:
    relative cost tier used for ranking. Every provider not explicitly marked
    `free` (including `metered` or `unknown`) additionally needs an explicit
    acknowledgement or a cost ceiling that admits its relative cost tier.
-3. **Plan agreement.** The provider must be one the immutable plan returned by
-   `plan_stage(...)` would offer. An ordinary triage/allowlist disagreement can
-   proceed only with a recorded override reason.
+3. **Plan agreement.** The provider must be represented in the immutable plan
+   returned by `plan_stage(...)`. Explicitly naming any eligible fallback
+   instead of the recommendation, or making another triage/allowlist choice,
+   requires a recorded override reason.
 
 An override can explain a manual triage or allowlist choice; it never waives
 `--no-paid`, the usage-authorization gate, a cost ceiling, or provider status.
@@ -185,6 +187,20 @@ can inject non-expiring, ephemeral evidence with `StaticAvailability`.
 `kg-microbe-research authorize` command evaluates policy only and never invokes
 a provider. It exits 0 only for live authorization, 3 for a permitted dry run,
 and 2 for a policy refusal.
+
+`kg-microbe-research scaffold-result` saves a schema-valid `DRY_RUN` bundle with
+an evaluation row for every catalogue provider at every stage, policy-eligible
+assignments, and embedded checksum-bound profile and target input bytes.
+`validate-result` checks its closed LinkML shape, lifecycle, references, profile
+replay, paths, and artifact bytes. Raw `COMPLETED` capture uses `NOT_ASSESSED`;
+assessed claims require named per-claim `ResearchEvidence` against independent
+source snapshots. Assessment lineage is checksum-bound and preserves the raw
+plan, status, runs, citations, and artifacts. The POSIX public result writer is
+append-only and has no overwrite mode. Neither command calls a provider. A
+saved `ResearchPlan` has `authority: audit_only`; never deserialize it into
+execution authority.
+Rebuild and authorize a fresh in-memory triage plan immediately before any
+future provider call. See `docs/guides/DEEP_RESEARCH_RESULTS.md`.
 
 Never call a provider to test this code. The package contains no provider health
 probe or provider-call path, and every contract in `tests/` is offline and

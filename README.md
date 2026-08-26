@@ -23,6 +23,7 @@ configured locally" instead of failing.
 | Environment-curation apply mode | Disabled until a validated atomic writer exists |
 | Unified ingredient-mapping apply mode | Disabled until canonical and downstream writes are transactional |
 | Shared history, QC, discussions, and knowledge-gap tools | Packaged and supported |
+| Deep-research provider triage and schema-valid dry-run result capture | Packaged, offline, and supported; provider execution is not implemented |
 | Historical scripts and phase reports | Retained for provenance; not part of the supported API |
 
 ## Requirements
@@ -77,22 +78,30 @@ console-script forms are available:
 
 ```bash
 uv run kg-microbe-history --help
+uv run kg-microbe-research --help
 uv run kg-microbe-governance --help
 uv run kg-microbe-kgscan --help
 uv run kg-microbe-qc --help
 uv run kg-microbe-discussions --help
 
 uv run python -m kg_microbe_history --help
+uv run python -m kg_microbe_research --help
 uv run python -m kg_microbe_governance --help
 uv run python -m kg_microbe_kgscan --help
 uv run python -m kg_microbe_qc --help
 uv run python -m kg_microbe_discussions --help
 ```
 
-Canonical shared schemas, behavioral contracts, and vendored fleet checks live
-under `src/kg_microbe_governance/`. Claw is their authoritative source; every
-Mech consumes an immutable claw revision and no Mech acts as a shared-file hub.
+Canonical vendored-governance schemas, behavioral contracts, and fleet checks
+live under `src/kg_microbe_governance/`. Subsystem-owned packaged schemas remain
+beside their runtime; the deep-research authority is
+`src/kg_microbe_research/schema/research.yaml`. Claw is their authoritative
+source; every Mech consumes an immutable claw revision and no Mech acts as a
+shared-file hub.
 See [`docs/guides/VENDORED_GOVERNANCE.md`](docs/guides/VENDORED_GOVERNANCE.md).
+The deep-research result contract and provider-free scaffold/validation flow are
+documented in
+[`docs/guides/DEEP_RESEARCH_RESULTS.md`](docs/guides/DEEP_RESEARCH_RESULTS.md).
 
 ## Safety model
 
@@ -137,7 +146,7 @@ uv run --extra dev mypy \
   src/kg_microbe_governance/artifacts/scripts/check_vendored_sync.py
 uv run --extra dev python -m pytest -q \
   --cov=src --cov=cli.main --cov=plugins.repository_settings \
-  --cov=plugins.lock_manager --cov=plugins/git_integration \
+  --cov=plugins.lock_manager --cov=plugins.git_integration \
   --cov=plugins.just_runner --cov-report=term-missing --cov-fail-under=70
 uv run --extra dev coverage report \
   --include=cli/main.py,plugins/repository_settings.py,plugins/lock_manager.py,plugins/git_integration.py,plugins/just_runner.py \

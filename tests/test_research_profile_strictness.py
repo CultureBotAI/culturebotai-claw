@@ -218,7 +218,16 @@ def test_declared_text_fields_are_not_silently_string_coerced(location: str, val
     else:
         focus["stages"]["discovery"]["objective"] = value
 
-    with pytest.raises(ProfileError, match="must be a string"):
+    with pytest.raises(ProfileError, match="must be a(?: non-empty)? string"):
+        parse_profile(document)
+
+
+@pytest.mark.parametrize("value", (None, "", "   "))
+def test_stage_objective_is_required_and_nonblank(value: object) -> None:
+    document = valid_document()
+    document["focuses"]["primary"]["stages"]["discovery"]["objective"] = value
+
+    with pytest.raises(ProfileError, match="must be a non-empty string"):
         parse_profile(document)
 
 

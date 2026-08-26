@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
+import yaml
 
 from kg_microbe_research.__main__ import main
 
@@ -36,6 +37,31 @@ PROFILE = textwrap.dedent(
     """
 )
 
+RESULT_PROFILE = textwrap.dedent(
+    """\
+    mech: CultureMech
+    target: culturing media
+    evidence_policy: cite every material claim with an exact snippet
+    default_focus: primary
+    focuses:
+      primary:
+        label: growth evidence
+        objective: find and verify explicit organism-medium growth evidence
+        source_priorities:
+          - primary cultivation studies
+        provider_adjustments: {asta: 20}
+        stages:
+          discovery:
+            objective: find source-backed leads
+            capabilities: {academic_search: 4, scientific_literature: 4, snippets: 2}
+            speed_weight: 1
+          verification:
+            objective: independently verify identifiers and quoted evidence
+            capabilities: {citation_tracking: 5, scientific_literature: 3, snippets: 2}
+            cost_weight: 1
+    """
+)
+
 
 @pytest.fixture
 def profile_path(tmp_path: Path) -> Path:
@@ -46,7 +72,7 @@ def profile_path(tmp_path: Path) -> Path:
 
 @pytest.fixture(autouse=True)
 def _no_ambient_credentials(monkeypatch):
-    """The CLI reads the real environment; pin it so results are deterministic."""
+    """Pin ambient credentials and local tooling so CLI tests are deterministic."""
     for key in (
         "ASTA_API_KEY",
         "OPENAI_API_KEY",
@@ -60,6 +86,14 @@ def _no_ambient_credentials(monkeypatch):
         "ENABLE_MOCK_PROVIDER",
     ):
         monkeypatch.delenv(key, raising=False)
+    monkeypatch.setattr(
+        "kg_microbe_research.providers.SystemProbe.which",
+        lambda _self, _executable: False,
+    )
+    monkeypatch.setattr(
+        "kg_microbe_research.providers.SystemProbe.has_module",
+        lambda _self, _module: False,
+    )
 
 
 @pytest.fixture
@@ -94,6 +128,81 @@ def availability_path(tmp_path: Path) -> Path:
         encoding="utf-8",
     )
     return path
+
+
+def _write_asta_availability(path: Path, *, status: str) -> Path:
+    checked_at = datetime.now(timezone.utc)
+    path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "providers": {
+                    "asta": {
+                        "status": status,
+                        "reason": f"offline scaffold fixture: {status}",
+                        "checked_at": checked_at.isoformat(),
+                        "expires_at": (checked_at + timedelta(hours=1)).isoformat(),
+                        "source": "pytest-offline-scaffold",
+                        "context": "fake ASTA credential; no provider execution",
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
+@pytest.fixture
+def result_repository(tmp_path: Path) -> dict[str, Path | str]:
+    repository = tmp_path / "CultureMech"
+    profile = repository / "conf" / "deep_research_provider.yaml"
+    target = repository / "data" / "normalized_yaml" / "offline_medium.yaml"
+    profile.parent.mkdir(parents=True)
+    target.parent.mkdir(parents=True)
+    profile.write_text(RESULT_PROFILE, encoding="utf-8")
+    target.write_text(
+        "id: CultureMech:000001\nname: Offline medium\n",
+        encoding="utf-8",
+    )
+    availability = _write_asta_availability(
+        repository / "availability.json", status="available"
+    )
+    return {
+        "repository": repository,
+        "profile": "conf/deep_research_provider.yaml",
+        "target": "data/normalized_yaml/offline_medium.yaml",
+        "availability": availability,
+        "output": "research/runs/offline-result.yaml",
+    }
+
+
+def _scaffold_result_args(layout: dict[str, Path | str]) -> list[str]:
+    return [
+        "scaffold-result",
+        "--repository-root",
+        str(layout["repository"]),
+        "--profile",
+        str(layout["profile"]),
+        "--availability-evidence",
+        str(layout["availability"]),
+        "--target-path",
+        str(layout["target"]),
+        "--target-id",
+        "CultureMech:000001",
+        "--target-label",
+        "Offline medium",
+        "--target-type",
+        "growth medium",
+        "--question",
+        "Which organisms have explicit source-backed growth on this exact medium?",
+        "--question-id",
+        "question-offline-medium",
+        "--allow",
+        "asta",
+        "--output",
+        str(layout["output"]),
+    ]
 
 
 def test_providers_json_lists_the_whole_catalogue(capsys):
@@ -220,6 +329,8 @@ def test_authorize_refuses_a_live_paid_call_with_exit_code_two(
             "discovery",
             "--provider",
             "openai",
+            "--override-reason",
+            "exercise the usage gate for a non-primary provider",
             "--apply",
             "--json",
         ]
@@ -233,6 +344,38 @@ def test_authorize_refuses_a_live_paid_call_with_exit_code_two(
 def test_authorize_permits_the_same_call_once_the_charge_is_acknowledged(
     monkeypatch, availability_path, profile_path, capsys
 ):
+    monkeypatch.setenv("ASTA_API_KEY", "x")
+    monkeypatch.setenv("OPENAI_API_KEY", "x")
+    exit_code = main(
+        [
+            "authorize",
+            "--profile",
+            str(profile_path),
+            "--availability-evidence",
+            str(availability_path),
+            "--stage",
+            "discovery",
+            "--provider",
+            "openai",
+            "--override-reason",
+            "exercise an explicitly selected non-primary provider",
+            "--apply",
+            "--acknowledge-usage",
+            "--json",
+        ]
+    )
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["mode"] == "live"
+    assert payload["execution_authorized"] is True
+    assert payload["usage_authorization_required"] is True
+    assert any(reason.startswith("override:") for reason in payload["reasons"])
+
+
+def test_authorize_refuses_an_eligible_fallback_without_an_override_reason(
+    monkeypatch, availability_path, profile_path, capsys
+):
+    monkeypatch.setenv("ASTA_API_KEY", "x")
     monkeypatch.setenv("OPENAI_API_KEY", "x")
     exit_code = main(
         [
@@ -250,11 +393,11 @@ def test_authorize_permits_the_same_call_once_the_charge_is_acknowledged(
             "--json",
         ]
     )
-    assert exit_code == 0
+
+    assert exit_code == 2
     payload = json.loads(capsys.readouterr().out)
-    assert payload["mode"] == "live"
-    assert payload["execution_authorized"] is True
-    assert payload["usage_authorization_required"] is True
+    assert "eligible fallback" in payload["error"]
+    assert "override reason" in payload["error"]
 
 
 def test_authorize_refuses_a_blocked_provider(monkeypatch, availability_path, profile_path, capsys):
@@ -315,6 +458,90 @@ def test_malformed_availability_evidence_fails_closed(tmp_path, capsys):
     path.write_text("not json", encoding="utf-8")
     assert main(["providers", "--availability-evidence", str(path), "--json"]) == 1
     assert "not valid JSON" in capsys.readouterr().err
+
+
+def test_scaffold_and_validate_result_are_offline_append_only_and_secret_free(
+    monkeypatch, result_repository, capsys
+):
+    secret = "ASTA-SECRET-MUST-NOT-LEAK"
+    monkeypatch.setenv("ASTA_API_KEY", secret)
+
+    def provider_execution_is_forbidden(*args, **kwargs):
+        raise AssertionError(f"scaffold-result attempted provider execution: {args!r} {kwargs!r}")
+
+    monkeypatch.setattr("subprocess.run", provider_execution_is_forbidden)
+    args = _scaffold_result_args(result_repository)
+    repository = Path(result_repository["repository"])
+    output = repository / str(result_repository["output"])
+
+    assert main(args) == 0
+    scaffold_output = capsys.readouterr()
+    assert output.is_file()
+    original = output.read_bytes()
+    document = yaml.safe_load(original)
+    assert document["research_version"] == 1
+    assert document["status"] == "DRY_RUN"
+    assert [run["stage"] for run in document["runs"]] == ["discovery", "verification"]
+    assert all(run["mode"] == "DRY_RUN" for run in document["runs"])
+    assert all(run["status"] == "DRY_RUN" for run in document["runs"])
+    assert all(run["provider_called"] is False for run in document["runs"])
+    assert all(run["live_authorized"] is False for run in document["runs"])
+    assert all(run["requested_provider"] == "asta" for run in document["runs"])
+    assert all(
+        assignment["provider"] == "asta"
+        for assignment in document["plan"]["stage_assignments"]
+    )
+    assert secret not in original.decode("utf-8")
+    assert secret not in scaffold_output.out
+    assert secret not in scaffold_output.err
+
+    assert (
+        main(
+            [
+                "validate-result",
+                str(result_repository["output"]),
+                "--repository-root",
+                str(repository),
+                "--verify-snapshots",
+            ]
+        )
+        == 0
+    )
+    validated = capsys.readouterr()
+    assert "OK:" in validated.err
+    assert secret not in validated.out
+    assert secret not in validated.err
+
+    assert main(args) == 1
+    refused = capsys.readouterr()
+    assert "append-only" in refused.err
+    assert output.read_bytes() == original
+    assert secret not in refused.out
+    assert secret not in refused.err
+
+
+def test_scaffold_result_refuses_unavailable_evidence_without_output(
+    monkeypatch, result_repository, capsys
+):
+    secret = "ASTA-UNAVAILABLE-SECRET"
+    monkeypatch.setenv("ASTA_API_KEY", secret)
+    unavailable = _write_asta_availability(
+        Path(result_repository["repository"]) / "unavailable.json",
+        status="unavailable",
+    )
+    result_repository["availability"] = unavailable
+    result_repository["output"] = "research/runs/unavailable-result.yaml"
+
+    assert main(_scaffold_result_args(result_repository)) == 1
+    captured = capsys.readouterr()
+    output = Path(result_repository["repository"]) / str(result_repository["output"])
+    assert not output.exists()
+    assert captured.err.startswith("error:")
+    assert "no provider is available" in captured.err
+    assert "made no provider call" in captured.err
+    assert "Traceback" not in captured.err
+    assert secret not in captured.out
+    assert secret not in captured.err
 
 
 def test_an_unknown_max_cost_is_rejected_by_the_parser(profile_path):

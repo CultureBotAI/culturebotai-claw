@@ -15,6 +15,7 @@ that is accepted here is accepted identically for every Mech.
 
 from __future__ import annotations
 
+import hashlib
 import math
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -39,6 +40,11 @@ class ProfileError(ValueError):
 
 class _UniqueKeyLoader(yaml.SafeLoader):
     """Safe YAML loader that refuses duplicate keys at every mapping depth."""
+
+    # Do not inherit path resolvers installed process-wide by unrelated PyYAML
+    # consumers. A root resolver with a null tag otherwise makes ordinary
+    # profile mappings unconstructable and introduces test/import-order drift.
+    yaml_path_resolvers: dict[Any, Any] = {}
 
 
 def _construct_unique_mapping(
@@ -151,6 +157,7 @@ class ResearchProfile:
     default_focus: str
     focuses: Mapping[str, Focus]
     path: Path | None = field(default=None, compare=False)
+    source_sha256: str | None = field(default=None, compare=False)
 
     def focus(self, name: str | None = None) -> Focus:
         """Resolve a focus by name, defaulting to the profile's `default_focus`."""
@@ -213,8 +220,8 @@ def _parse_stage(focus_name: str, stage_name: str, stage: Any) -> Stage:
     }
     return Stage(
         name=stage_name,
-        objective=_optional_string(
-            stage.get("objective", ""), f"Stage {focus_name}.{stage_name}.objective"
+        objective=_nonempty_string(
+            stage.get("objective"), f"Stage {focus_name}.{stage_name}.objective"
         ),
         capabilities=capabilities,
         weights=weights,
@@ -285,7 +292,12 @@ def _parse_focus(focus_name: str, focus: Any) -> Focus:
     )
 
 
-def parse_profile(data: Any, *, path: Path | None = None) -> ResearchProfile:
+def parse_profile(
+    data: Any,
+    *,
+    path: Path | None = None,
+    source_sha256: str | None = None,
+) -> ResearchProfile:
     """Validate an already-loaded profile mapping."""
     if not isinstance(data, Mapping):
         where = f": {path}" if path else ""
@@ -314,18 +326,40 @@ def parse_profile(data: Any, *, path: Path | None = None) -> ResearchProfile:
         default_focus=default_focus,
         focuses=parsed_focuses,
         path=path,
+        source_sha256=source_sha256,
     )
 
 
 def load_profile(path: Path) -> ResearchProfile:
-    """Read and validate a Mech research profile from disk."""
+    """Read and validate a Mech research profile from one byte snapshot.
+
+    ``source_sha256`` is bound to the exact bytes parsed here. Research-result
+    records can therefore cite the profile that produced their plan without a
+    second read and its accompanying time-of-check/time-of-use gap.
+    """
     path = Path(path)
     try:
-        text = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeError) as exc:
+        source = path.read_bytes()
+    except OSError as exc:
         raise ProfileError(f"Cannot read research profile {path}: {exc}") from exc
+    return load_profile_bytes(source, path=path)
+
+
+def load_profile_bytes(source: bytes, *, path: Path | None = None) -> ResearchProfile:
+    """Parse and checksum one caller-supplied immutable profile byte snapshot."""
+
+    try:
+        text = source.decode("utf-8")
+    except UnicodeError as exc:
+        where = f" {path}" if path is not None else ""
+        raise ProfileError(f"Cannot read research profile{where}: {exc}") from exc
     try:
         data = yaml.load(text, Loader=_UniqueKeyLoader)
     except yaml.YAMLError as exc:
-        raise ProfileError(f"Research profile {path} is not valid YAML: {exc}") from exc
-    return parse_profile(data, path=path)
+        where = f" {path}" if path is not None else ""
+        raise ProfileError(f"Research profile{where} is not valid YAML: {exc}") from exc
+    return parse_profile(
+        data,
+        path=path,
+        source_sha256=hashlib.sha256(source).hexdigest(),
+    )

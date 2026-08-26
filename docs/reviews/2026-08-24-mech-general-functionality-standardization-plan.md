@@ -380,7 +380,7 @@ CommunityMech `ba596731b23b799f4baca96984ceb8f0d56874fe`, TraitMech
 > exits 0 only for live authorization, 3 for an allowed dry run, and 2 for a
 > policy refusal.
 >
-> Still outstanding are the provider command builder, executor, and executable
+> At that merge, still outstanding were the provider command builder, executor, and executable
 > mock implementation from item 1; the LinkML research schema and
 > schema-compliant run record from items 2 and 3; the adapter protocol and five
 > runner conversions from items 6 and 7; and actual call-site enforcement of
@@ -388,6 +388,31 @@ CommunityMech `ba596731b23b799f4baca96984ceb8f0d56874fe`, TraitMech
 > ProteinTraitsMech remains dry-run-first; none consumes the shared policy gate
 > yet. This PR supplies the partial contract those follow-ups must consume and
 > does not claim that Phase 2 or execution safety is complete.
+
+> **Implementation note (Phase 2, research-result contract implemented).** The
+> packaged `kg_microbe_research/schema/research.yaml` now governs an append-only,
+> terminal `ResearchResult` tree with questions, audit-only plans, complete
+> per-stage catalogue evaluations, ordered eligible assignments and fallbacks,
+> requested-versus-actual provider runs, lossless raw citations, per-claim
+> evidence assertions against independent source snapshots, embedded profile
+> and target inputs bound by checksums, path-backed output artifacts, assessed
+> findings, and unapplied proposed changes. Raw capture and named, timestamped
+> assessment are distinct. A closed LinkML validator is paired with strict YAML
+> and semantic checks for lifecycle consistency, reference closure, canonical
+> provider facts, versioned triage policy, non-free usage decisions, timestamp
+> ordering, query/config/target/artifact digests, checksum-bound append-only
+> lineage, safe repository-relative paths, and artifact byte integrity.
+> `scaffold-result` renders a complete provider-free `DRY_RUN` skeleton from any
+> of the five domain profiles; `validate-result` performs only local validation.
+> A saved plan always carries `authority: audit_only` and can never be
+> rehydrated into the private in-process policy authority. Profile and target
+> input bytes are embedded and replayed on every validation. The supported
+> POSIX writer uses collision-resistant IDs, descriptor-relative atomic
+> publication, and no overwrite mode. Provider/model/network calls remain
+> absent from the package and tests. Items 2 and 3 and the dry-run result portion
+> of the acceptance criteria are therefore implemented; provider executors,
+> adapter protocol, five runner conversions, and live call-site enforcement
+> remain outstanding.
 
 1. Create `kg_microbe_research` with:
    - provider definitions and aliases;
@@ -415,9 +440,10 @@ CommunityMech `ba596731b23b799f4baca96984ceb8f0d56874fe`, TraitMech
    quota/billing acknowledgement or a cost ceiling that admits its relative
    cost tier.
 5. Connect execution to an immutable triage plan so a manually supplied
-   provider cannot bypass policy silently. A recorded override may explain an
-   ordinary triage/allowlist disagreement, but never waives `--no-paid`, usage
-   authorization, a cost ceiling, or provider status.
+   provider cannot bypass policy silently. Explicitly naming an eligible
+   fallback instead of the recommendation, or making another triage/allowlist
+   choice, requires a recorded override reason; it never waives `--no-paid`,
+   usage authorization, a cost ceiling, or provider status.
 6. Add a common adapter protocol for resolving a domain target, rendering prompt
    variables, and validating proposed changes.
 7. Convert each Mech runner into a thin adapter and retain its two custom focus
