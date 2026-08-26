@@ -15,7 +15,8 @@ reconciliation scripts keep working:
 
     canonical_name  <- object_label
     formula         <- object_formula
-    synonyms        <- set of subject_label over rows sharing object_id
+    synonyms        <- set of subject_label over *exactMatch* rows sharing
+                       object_id
     xrefs           <- set of subject_id over rows sharing object_id
                        (this is where MIM:<id> cross-references now live)
     sources         <- pipe-joined `source` values
@@ -93,9 +94,19 @@ def load_kgm_entity_index(
         if not entry["formula"]:
             entry["formula"] = (row.get("object_formula") or "").strip()
 
-        # Subject labels are the surface forms kg-microbe resolves to this entity.
+        # Only identity rows can contribute synonyms.  The unified mapping also
+        # carries close/narrow/broad matches whose subject labels are useful for
+        # discovery, but are explicitly *not* names for the object.  Treating all
+        # of them as synonyms discarded the SSSOM predicate and let unrelated
+        # labels leak into MIM's published ``other`` column (MIM #464/#470).
         slabel = (row.get("subject_label") or "").strip()
-        if slabel and slabel != oid and not _CURIE_RE.match(slabel):
+        predicate = (row.get("predicate_id") or "").strip()
+        if (
+            predicate == "skos:exactMatch"
+            and slabel
+            and slabel != oid
+            and not _CURIE_RE.match(slabel)
+        ):
             entry["synonyms"].add(slabel)
 
         sid = (row.get("subject_id") or "").strip()
