@@ -15,7 +15,7 @@ from __future__ import annotations
 import importlib.util
 import os
 import shutil
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -378,6 +378,26 @@ def credential_status(
     if not keys:
         return "unavailable", f"no credential is defined for provider {provider!r}"
     return "unavailable", f"set {' or '.join(keys)}"
+
+
+def normalize_allowlist(
+    allow: Iterable[str] | None,
+) -> frozenset[str] | None:
+    """Canonicalize an allowlist so aliases resolve before any filtering.
+
+    Shared by triage and policy. When only `plan_stage` canonicalized, `triage
+    --allow claude-code` reported that nothing fit while `authorize --allow
+    claude-code` routed to claude_code — the CultureMech#290 failure class
+    (one filter, two implementations) in a new place.
+    """
+    if allow is None:
+        return None
+    return frozenset(canonical_provider(str(name)) for name in allow)
+
+
+def unknown_providers(names: Iterable[str]) -> list[str]:
+    """The canonical names in `names` that no catalogue entry defines."""
+    return sorted({str(name) for name in names} - set(PROVIDERS))
 
 
 def is_paid(provider: str) -> bool:

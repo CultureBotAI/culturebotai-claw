@@ -27,7 +27,14 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .profile import ResearchProfile
-from .providers import COST_VALUE, PAID_COSTS, PROVIDERS, canonical_provider
+from .providers import (
+    COST_VALUE,
+    PAID_COSTS,
+    PROVIDERS,
+    canonical_provider,
+    normalize_allowlist,
+    unknown_providers,
+)
 from .triage import LocalProbe, Ranked, rank_stage, recommendable
 
 # Ordered weakest-to-strongest, so a ceiling admits every tier at or below it.
@@ -82,11 +89,9 @@ def plan_stage(
 ) -> TriagePlan:
     """Rank a stage and freeze the result as the authority for execution."""
     resolved = profile.focus(focus)
-    allowlist = (
-        None if allow is None else frozenset(canonical_provider(str(n)) for n in allow)
-    )
+    allowlist = normalize_allowlist(allow)
     if allowlist is not None:
-        unknown = sorted(allowlist - set(PROVIDERS))
+        unknown = unknown_providers(allowlist)
         if unknown:
             raise PolicyError(
                 f"Unknown provider(s) in allowlist: {unknown}; choose from "

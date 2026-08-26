@@ -183,3 +183,81 @@ def test_a_missing_subcommand_exits_nonzero():
     with pytest.raises(SystemExit) as excinfo:
         main([])
     assert excinfo.value.code != 0
+
+
+# --------------------------------------------------------------------------
+# triage and authorize must not disagree (#136, #137, #138)
+# --------------------------------------------------------------------------
+
+
+def _triage_recommendation(profile_path: Path, capsys, *allow: str) -> str | None:
+    args = ["triage", "--profile", str(profile_path), "--json"]
+    for name in allow:
+        args += ["--allow", name]
+    assert main(args) == 0
+    report = json.loads(capsys.readouterr().out)
+    recommended = report["stages"][0]["recommended_available"]
+    return None if recommended is None else recommended["provider"]
+
+
+def _authorize_provider(profile_path: Path, capsys, *allow: str) -> str | None:
+    args = ["authorize", "--profile", str(profile_path), "--stage", "discovery", "--json"]
+    for name in allow:
+        args += ["--allow", name]
+    code = main(args)
+    payload = json.loads(capsys.readouterr().out)
+    return payload["provider"] if code == 0 else None
+
+
+def test_triage_and_authorize_agree_on_an_aliased_allowlist(
+    monkeypatch, profile_path, capsys
+):
+    """#136: triage said nothing fit while authorize routed to claude_code."""
+    monkeypatch.setenv("ASTA_API_KEY", "x")
+    monkeypatch.setattr(
+        "kg_microbe_research.providers.SystemProbe.which",
+        lambda self, executable: executable == "claude",
+    )
+    assert _triage_recommendation(profile_path, capsys, "claude-code") == "claude_code"
+    assert _authorize_provider(profile_path, capsys, "claude-code") == "claude_code"
+
+
+def test_triage_and_authorize_agree_on_a_canonical_allowlist(
+    monkeypatch, profile_path, capsys
+):
+    monkeypatch.setenv("ASTA_API_KEY", "x")
+    assert _triage_recommendation(profile_path, capsys, "asta") == "asta"
+    assert _authorize_provider(profile_path, capsys, "asta") == "asta"
+
+
+def test_triage_refuses_an_unknown_allowlist_entry(monkeypatch, profile_path, capsys):
+    """#137: a typo'd --allow used to look like 'no provider fits' and exit 0."""
+    monkeypatch.setenv("ASTA_API_KEY", "x")
+    assert main(
+        ["triage", "--profile", str(profile_path), "--allow", "nosuchprovider"]
+    ) == 1
+    assert "Unknown provider" in capsys.readouterr().err
+
+
+def test_an_unknown_stage_is_reported_not_raised(profile_path, capsys):
+    """#138: an unknown stage dumped a traceback while an unknown focus did not."""
+    assert main(
+        ["authorize", "--profile", str(profile_path), "--stage", "nosuchstage"]
+    ) == 1
+    err = capsys.readouterr().err
+    assert "error:" in err
+    assert "discovery" in err, "the message must name the available stages"
+    assert "Traceback" not in err
+
+
+def test_an_unknown_focus_and_an_unknown_stage_fail_the_same_way(
+    profile_path, capsys
+):
+    assert main(["triage", "--profile", str(profile_path), "--focus", "nope"]) == 1
+    focus_error = capsys.readouterr().err
+    assert main(
+        ["authorize", "--profile", str(profile_path), "--stage", "nope"]
+    ) == 1
+    stage_error = capsys.readouterr().err
+    assert focus_error.startswith("error:")
+    assert stage_error.startswith("error:")

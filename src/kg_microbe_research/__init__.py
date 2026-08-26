@@ -44,7 +44,9 @@ from .providers import (
     canonical_provider,
     credential_status,
     is_paid,
+    normalize_allowlist,
     provider_status,
+    unknown_providers,
 )
 from .triage import Ranked, build_report, rank_stage, recommendable, score
 
@@ -77,6 +79,7 @@ __all__ = [
     "credential_status",
     "is_paid",
     "load_profile",
+    "normalize_allowlist",
     "parse_profile",
     "plan_stage",
     "provider_status",
@@ -84,4 +87,5 @@ __all__ = [
     "recommendable",
     "requires_paid_authorization",
     "score",
+    "unknown_providers",
 ]

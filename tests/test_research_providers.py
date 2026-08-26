@@ -307,7 +307,7 @@ def test_ranking_is_sorted_by_descending_fit(tmp_path):
 
 def test_an_unknown_stage_names_the_available_stages(tmp_path):
     profile = load_profile(write_profile(tmp_path))
-    with pytest.raises(KeyError, match="discovery"):
+    with pytest.raises(ProfileError, match="discovery"):
         rank_stage(profile.focus(), "nosuchstage", environ={})
 
 
@@ -373,3 +373,56 @@ def test_report_is_json_serializable(tmp_path):
     profile = load_profile(write_profile(tmp_path))
     report = build_report(profile, environ={"ASTA_API_KEY": "x"}, probe=NO_LOCAL_TOOLING)
     assert json.loads(json.dumps(report))["mech"] == "TestMech"
+
+
+def test_build_report_canonicalizes_an_aliased_allowlist(tmp_path):
+    """#136 at the library boundary, where the CLI's own normalization cannot mask it.
+
+    `plan_stage` canonicalized its allowlist and `build_report` did not, so the
+    same alias produced a recommendation from one and nothing from the other.
+    """
+    profile = load_profile(write_profile(tmp_path))
+    report = build_report(
+        profile,
+        allow={"claude-code"},
+        environ={},
+        probe=StaticProbe(executables=frozenset({"claude"})),
+    )
+    recommended = report["stages"][0]["recommended_available"]
+    assert recommended is not None, "the alias must resolve to claude_code"
+    assert recommended["provider"] == "claude_code"
+
+
+def test_recommendable_canonicalizes_an_aliased_allowlist(tmp_path):
+    """The alias must name an AVAILABLE provider, or the assertion is vacuous.
+
+    A first draft used `edison`, whose target falcon is blocked and therefore
+    filtered out regardless -- so the test passed with the canonicalization
+    removed. `claude-code` resolves to an available provider, so the alias has
+    to actually resolve for the assertion to hold.
+    """
+    profile = load_profile(write_profile(tmp_path))
+    rows = rank_stage(
+        profile.focus(),
+        "discovery",
+        environ={"ASTA_API_KEY": "x"},
+        probe=StaticProbe(executables=frozenset({"claude"})),
+    )
+    assert [row.provider for row in recommendable(rows, allow={"claude-code"})] == [
+        "claude_code"
+    ]
+
+
+def test_plan_and_report_agree_on_an_aliased_allowlist(tmp_path):
+    """The two filters are one implementation; pin that they cannot diverge again."""
+    from kg_microbe_research import plan_stage
+
+    profile = load_profile(write_profile(tmp_path))
+    probe = StaticProbe(executables=frozenset({"claude"}))
+    report = build_report(profile, allow={"claude-code"}, environ={}, probe=probe)
+    plan = plan_stage(
+        profile, "discovery", allow=["claude-code"], environ={}, probe=probe
+    )
+    assert report["stages"][0]["recommended_available"]["provider"] == (
+        plan.recommended.provider
+    )

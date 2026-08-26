@@ -7,11 +7,11 @@ never depend on the developer's shell.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from .profile import Focus, ResearchProfile, Stage
+from .profile import Focus, ProfileError, ResearchProfile, Stage
 from .providers import (
     COST_VALUE,
     PAID_COSTS,
@@ -20,6 +20,7 @@ from .providers import (
     TIME_VALUE,
     LocalProbe,
     Provider,
+    normalize_allowlist,
     provider_status,
 )
 
@@ -85,7 +86,10 @@ def rank_stage(
 ) -> list[Ranked]:
     """Rank every catalogue provider for one stage, best first."""
     if stage_name not in focus.stages:
-        raise KeyError(
+        # ProfileError, not KeyError: `main` handles the profile-error family, and
+        # an unknown *focus* already reports cleanly. A tool whose job is to gate
+        # spending must not answer a typo with a traceback.
+        raise ProfileError(
             f"Focus {focus.name!r} has no stage {stage_name!r}; choose one of: "
             f"{', '.join(focus.stages)}"
         )
@@ -128,7 +132,7 @@ def rank_stage(
 def recommendable(
     rows: list[Ranked],
     *,
-    allow: frozenset[str] | None = None,
+    allow: Iterable[str] | None = None,
     no_paid: bool = False,
 ) -> list[Ranked]:
     """The rows a recommendation may be drawn from, in ranked order.
@@ -139,8 +143,9 @@ def recommendable(
     only ranked provider was asta (CultureMech#290).
     """
     out = [row for row in rows if row.status == "available" and row.provider != "mock"]
-    if allow is not None:
-        out = [row for row in out if row.provider in allow]
+    allowlist = normalize_allowlist(allow)
+    if allowlist is not None:
+        out = [row for row in out if row.provider in allowlist]
     if no_paid:
         out = [row for row in out if not row.paid]
     return out
@@ -150,17 +155,18 @@ def build_report(
     profile: ResearchProfile,
     focus_name: str | None = None,
     *,
-    allow: frozenset[str] | None = None,
+    allow: Iterable[str] | None = None,
     no_paid: bool = False,
     environ: Mapping[str, str] | None = None,
     probe: LocalProbe | None = None,
 ) -> dict[str, Any]:
     """A complete, JSON-serializable triage report for one focus."""
     focus = profile.focus(focus_name)
+    allowlist = normalize_allowlist(allow)
     stages = []
     for stage_name in focus.stages:
         ranking = rank_stage(focus, stage_name, environ=environ, probe=probe)
-        available = recommendable(ranking, allow=allow, no_paid=no_paid)
+        available = recommendable(ranking, allow=allowlist, no_paid=no_paid)
         stages.append(
             {
                 "name": stage_name,

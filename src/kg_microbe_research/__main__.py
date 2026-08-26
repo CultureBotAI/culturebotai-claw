@@ -17,7 +17,12 @@ from typing import Any
 
 from .policy import COST_TIERS, PolicyError, authorize, plan_stage
 from .profile import ProfileError, ResearchProfile, load_profile
-from .providers import PROVIDERS, provider_status
+from .providers import (
+    PROVIDERS,
+    normalize_allowlist,
+    provider_status,
+    unknown_providers,
+)
 from .triage import build_report
 
 
@@ -97,10 +102,20 @@ def _cmd_providers(args: argparse.Namespace) -> int:
 
 def _cmd_triage(args: argparse.Namespace) -> int:
     profile = _load(args)
+    allow = normalize_allowlist(args.allow or None)
+    if allow is not None:
+        unknown = unknown_providers(allow)
+        if unknown:
+            # Same refusal as `authorize`; otherwise a typo'd --allow is
+            # indistinguishable from "no provider fits" and still exits 0.
+            raise PolicyError(
+                f"Unknown provider(s) in allowlist: {unknown}; choose from "
+                f"{', '.join(sorted(PROVIDERS))}"
+            )
     report = build_report(
         profile,
         args.focus,
-        allow=frozenset(args.allow) if args.allow else None,
+        allow=allow,
         no_paid=args.no_paid,
     )
     if args.json:
