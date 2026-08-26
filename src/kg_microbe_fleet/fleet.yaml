@@ -46,16 +46,19 @@ capability_catalogue:
         minimum: 1
   vendored_sync: {}
 
-# Vendored shared-file governance roles.
-#
-#   hub    holds the canonical copy that spokes diff against
-#   spoke  vendors byte-identical copies and checks them against the hub
-#
-# Today CultureMech is the hub (`shared/spoke/scripts/check_vendored_sync.sh`
-# pins `CANON_REPO="CultureBotAI/CultureMech"`). Phase 1 of the standardization
-# plan proposes moving that authority to claw; this manifest records the
-# current state, not the intended end state.
-vendored_hub: culturemech
+# Vendored shared-file governance is deliberately modeled separately from
+# fleet membership: claw is the external authority and must never pin itself.
+# Phase 1 is a coordinated two-commit migration. In `transition`, the legacy
+# CultureMech hub remains available to consumers that have not yet moved while
+# the immutable claw bootstrap revision is rolled out. The final flip changes
+# this to `authoritative`, removes `legacy_hub`, and makes every Mech a
+# `consumer`; the loader rejects mixed authoritative state.
+vendored_governance:
+  state: transition
+  canonical_repository: CultureBotAI/culturebotai-claw
+  manifest_path: src/kg_microbe_governance/vendored_artifacts.json
+  pin_path: scripts/.vendored_canon_ref
+  legacy_hub: culturemech
 
 mechs:
   culturemech:
@@ -105,9 +108,9 @@ mechs:
       vendored_sync:
         status: not_applicable
         reason: >-
-          Canonical hub for the vendored shared files. A hub-side copy of
-          check_vendored_sync.sh would diff the hub against itself, which is
-          the self-referential-pin anti-pattern the spoke design replaced.
+          Temporary legacy hub during the Phase 1 transition. The coordinated
+          downstream rollout makes CultureMech a pinned claw consumer before
+          the final authoritative-state flip; claw itself never self-pins.
 
   mediaingredientmech:
     display_name: MediaIngredientMech

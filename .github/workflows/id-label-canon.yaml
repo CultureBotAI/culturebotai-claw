@@ -6,11 +6,10 @@ name: id-label canonical
 # the temporary vendored-hub role are scientific/rollout inputs; neither is a
 # second definition of fleet membership.
 #
-# Phase 0 preserves CultureMech as the compatibility comparison target while
-# claw becomes the shared control plane. Phase 1 of the standardization plan
-# migrates artifact authority and immutable pins to claw in a coordinated fleet
-# rollout. The temporary comparison direction is not a policy that consumers
-# must avoid claw.
+# Phase 1 is now explicitly in its bootstrap transition. Claw's complete
+# packaged manifest/payload is the new authority for downstream pins, while the
+# old CultureMech comparison remains active until all five PRs consume one
+# immutable claw merge commit. The final flip removes this compatibility job.
 #
 # This workflow:
 #   1. audits the complete manifest-declared consumer set and claw's checked-in
@@ -31,6 +30,7 @@ on:
     paths:
       - "shared/idlabel/**"
       - "shared/spoke/**"
+      - "src/kg_microbe_governance/**"
       - "scripts/audit_idlabel_fleet.sh"
       - "src/kg_microbe_fleet/**"
       - "pyproject.toml"
@@ -41,6 +41,7 @@ on:
     paths:
       - "shared/idlabel/**"
       - "shared/spoke/**"
+      - "src/kg_microbe_governance/**"
       - "scripts/audit_idlabel_fleet.sh"
       - "src/kg_microbe_fleet/**"
       - "pyproject.toml"

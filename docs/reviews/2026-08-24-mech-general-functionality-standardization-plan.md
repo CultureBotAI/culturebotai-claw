@@ -281,6 +281,21 @@ Acceptance criteria:
 
 ### Phase 1 — Move shared-schema and vendored governance to claw
 
+> **Implementation note (Phase 1 bootstrap in progress).** Authority migration
+> uses two claw commits around a coordinated five-Mech rollout. The bootstrap
+> packages one strict artifact manifest, the converged canonical payloads, an
+> identity-validated dry-run/apply synchronizer, and a dependency-free pinned
+> checker while `fleet.yaml` is explicitly in `transition`. The synchronizer
+> proves that the requested claw SHA contains the installed manifest and bytes
+> before writing it as a pin. The five Mechs then pin the reviewed bootstrap
+> merge SHA. Only after the local five-worktree audit verifies exact committed
+> `origin/main` roots, binds that SHA to the installed manifest/payload bytes,
+> and compares every pin, file, and Git mode directly with each `HEAD` tree does
+> the final claw commit switch to `authoritative` and forbid a Mech hub. Before
+> retiring compatibility mirrors, the history package/default/tests/workflow and
+> ID-label behavioral job must be repointed to their canonical packaged assets.
+> This avoids circular/self pins and never calls a research provider.
+
 1. Make claw canonical for `mech_shared.yaml`, `history.yaml`, shared validator
    code, shared behavioral tests, and the backlog-loop contract.
 2. Preserve commit pins so public Mech CI can consume immutable claw revisions.
@@ -290,13 +305,20 @@ Acceptance criteria:
 5. Roll out the new pin to all five Mechs in coordinated PRs.
 6. Retire the old CultureMech authority only after the fleet audit passes
    against claw.
+7. Migrate claw's remaining operational `shared/history` and `shared/idlabel`
+   consumers before removing those compatibility paths: history defaults/help,
+   package data, tests/workflow/docs; ID-label workflow working directory,
+   Pytest/Ruff exclusions, and fleet audit script; mirror tests; all three
+   `shared/{history,idlabel,spoke}` trees; and the root skill/backlog contract
+   copies. Add a no-reference/no-reintroduction guard for retired paths.
 
 Acceptance criteria:
 
 - claw contains every canonical shared artifact;
 - each Mech consumes an immutable claw revision;
 - no circular or self-referential pin remains; and
-- the fleet audit checks both missing files and byte drift.
+- the fleet audit checks committed missing files, byte drift, and Git modes,
+  including when ignore or index flags hide working-tree state.
 
 ### Phase 2 — Build the shared deep-research subsystem
 

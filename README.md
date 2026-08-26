@@ -77,17 +77,22 @@ console-script forms are available:
 
 ```bash
 uv run kg-microbe-history --help
+uv run kg-microbe-governance --help
 uv run kg-microbe-kgscan --help
 uv run kg-microbe-qc --help
 uv run kg-microbe-discussions --help
 
 uv run python -m kg_microbe_history --help
+uv run python -m kg_microbe_governance --help
 uv run python -m kg_microbe_kgscan --help
 uv run python -m kg_microbe_qc --help
 uv run python -m kg_microbe_discussions --help
 ```
 
-The shared schemas and vendored fleet checks live under `shared/`.
+Canonical shared schemas, behavioral contracts, and vendored fleet checks live
+under `src/kg_microbe_governance/`. The old `shared/` mirrors remain only for
+the bounded Phase 1 compatibility window. See
+[`docs/guides/VENDORED_GOVERNANCE.md`](docs/guides/VENDORED_GOVERNANCE.md).
 
 ## Safety model
 
@@ -124,7 +129,11 @@ uvx ruff@0.16.3 check cli plugins pipelines src tests
 uv run --extra dev mypy \
   cli/main.py plugins/repository_settings.py plugins/lock_manager.py \
   plugins/git_integration.py plugins/just_runner.py \
-  src/kg_microbe_history src/kg_microbe_kgscan src/kg_microbe_fleet
+  src/kg_microbe_history src/kg_microbe_kgscan src/kg_microbe_fleet \
+  src/kg_microbe_governance/__init__.py \
+  src/kg_microbe_governance/__main__.py \
+  src/kg_microbe_governance/fleet_audit.py \
+  src/kg_microbe_governance/artifacts/scripts/check_vendored_sync.py
 uv run --extra dev python -m pytest -q \
   --cov=src --cov=cli.main --cov=plugins.repository_settings \
   --cov=plugins.lock_manager --cov=plugins/git_integration \
@@ -144,8 +153,8 @@ src/kg_microbe_agents/definitions/  packaged declarative agent definitions
 cli/          openclaw-cli discovery and validation interface
 pipelines/    orchestration workflows
 plugins/      repository, lock, validation, ontology, and curation adapters
-src/          packaged shared Mech utilities
-shared/       shared schemas and vendored fleet validators
+src/          packaged shared Mech utilities and canonical governance payloads
+shared/       temporary pre-Phase-1 compatibility mirrors
 scripts/      maintenance, migration, and curation commands
 tests/        maintained assertion-based test suite
 docs/         current guides, proposals, reviews, and historical archive

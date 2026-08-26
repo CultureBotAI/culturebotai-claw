@@ -523,14 +523,16 @@ the fleet until a human labels it.
    - MIM → unmapped inventory
 6. **`untrusted-comment-guard`** — mandatory before any `@claude` responder.
 
-### 5.5 Vendor the workflows through the hub
+### 5.5 Vendor shared contracts through claw
 
-We already have a working pattern for fleet-identical files: the id-label
-vendored set, where CultureMech is the hub, spokes pin
-`scripts/.vendored_canon_ref`, and a nightly `vendored-fleet-audit` catches drift.
-Agent workflow templates should ride the same rail rather than being copy-pasted
-four times — otherwise they drift exactly like `trigger_paths` did (MIM#160,
-CommunityMech#280, TraitMech#184).
+The Phase 1 governance rail makes claw the external authority for
+fleet-identical artifacts. Every Mech, including CultureMech, consumes a full
+claw commit pin; applicability comes from the canonical fleet capabilities and
+one artifact manifest. Agent workflow templates should use that same rail (or a
+pinned reusable workflow in Phase 5) rather than being copied independently.
+See `docs/guides/VENDORED_GOVERNANCE.md` for the transitional rollout—during
+that bounded window the legacy CultureMech comparison remains active solely to
+avoid an unpinned gap.
 
 ### 5.6 Safety rails to adopt verbatim
 
@@ -637,7 +639,9 @@ across four repos is far harder than a rename.
   inside `reference/` subdirs and the stale prose references updated. Archived
   docs (`ATTIC/`, `docs/archive/`) deliberately left as historical record.
 - **`history/` provenance layer** (§2.9) — canonical LinkML schema at
-  `shared/history/history.yaml`, scaffolder at `src/kg_microbe_history/`,
+  `src/kg_microbe_governance/artifacts/schema/history.yaml` (with the old
+  `shared/history/history.yaml` compatibility path retained during rollout),
+  scaffolder at `src/kg_microbe_history/`,
   vendored schema + `just new-history` / `just validate-history` + advisory
   `curation-history.yaml` workflow in TraitMech as the pilot consumer.
 - **Weekly knowledge-gap scan** — `.github/workflows/knowledge-gap-scan.yaml`

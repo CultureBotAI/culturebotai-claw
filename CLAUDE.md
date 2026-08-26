@@ -62,6 +62,8 @@ Supported:
 - `LockManager` atomic, lease-owned file coordination.
 - Plugin and agent discovery and validated CLI dry runs.
 - Packaged history, QC dashboard, discussion-browser, and knowledge-gap tools.
+- Packaged canonical vendored-artifact manifest and identity-validated,
+  dry-run-first synchronization.
 - The assertion-based suite under `tests/` and fleet workflows under `.github/`.
 
 Experimental or disabled:
@@ -85,7 +87,11 @@ uvx ruff@0.16.3 check cli plugins pipelines src tests
 uv run --extra dev mypy \
   cli/main.py plugins/repository_settings.py plugins/lock_manager.py \
   plugins/git_integration.py plugins/just_runner.py \
-  src/kg_microbe_history src/kg_microbe_kgscan src/kg_microbe_fleet
+  src/kg_microbe_history src/kg_microbe_kgscan src/kg_microbe_fleet \
+  src/kg_microbe_governance/__init__.py \
+  src/kg_microbe_governance/__main__.py \
+  src/kg_microbe_governance/fleet_audit.py \
+  src/kg_microbe_governance/artifacts/scripts/check_vendored_sync.py
 uv run --extra dev python -m pytest -q \
   --cov=src --cov=cli.main --cov=plugins.repository_settings \
   --cov=plugins.lock_manager --cov=plugins.git_integration \
@@ -146,8 +152,8 @@ src/kg_microbe_agents/definitions/  packaged YAML agent definitions; declaration
 cli/          discovery, status, plugin checks, and configuration validation
 plugins/      validated repository adapters and coordination primitives
 pipelines/    curation/orchestration workflows with explicit support status
-src/          installed kg_microbe_* shared libraries and CLIs
-shared/       history schema, ID/label checks, and spoke sync manifests
+src/          installed kg_microbe_* libraries, CLIs, and canonical governance payloads
+shared/       temporary legacy mirrors retained through the Phase 1 fleet rollout
 scripts/      maintenance and migration scripts; audit before treating as supported
 tests/        the only default pytest collection root
 docs/         current index, guides, proposals, reviews, and archive
@@ -158,6 +164,7 @@ Key shared console scripts:
 
 ```bash
 uv run kg-microbe-history --help
+uv run kg-microbe-governance --help
 uv run kg-microbe-kgscan --help
 uv run kg-microbe-qc --help
 uv run kg-microbe-discussions --help

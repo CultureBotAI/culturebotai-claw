@@ -30,12 +30,14 @@ __all__ = [
     "CapabilityDefinition",
     "Capability",
     "MechDefinition",
+    "VendoredGovernance",
     "FleetManifest",
     "load_fleet_manifest",
     "default_manifest_path",
     "CAPABILITY_STATUSES",
     "STATUSES_REQUIRING_REASON",
     "VENDORED_ROLES",
+    "VENDORED_GOVERNANCE_STATES",
     "UniqueKeySafeLoader",
 ]
 
@@ -50,7 +52,8 @@ CAPABILITY_STATUSES = frozenset({"enabled", "disabled", "not_applicable"})
 # A capability that is off must say why. Without this, "absent" and
 # "deliberately excluded" look identical in the manifest.
 STATUSES_REQUIRING_REASON = frozenset({"disabled", "not_applicable"})
-VENDORED_ROLES = frozenset({"hub", "spoke"})
+VENDORED_ROLES = frozenset({"hub", "spoke", "consumer"})
+VENDORED_GOVERNANCE_STATES = frozenset({"transition", "authoritative"})
 SETTING_TYPES = frozenset(
     {"boolean", "integer", "number", "string", "string_list"}
 )
@@ -170,6 +173,23 @@ class MechDefinition:
         return capability is not None and capability.is_enabled
 
 
+@dataclass(frozen=True)
+class VendoredGovernance:
+    """Authority and rollout state for shared, deliberately vendored artifacts.
+
+    During the coordinated Phase 1 migration, ``legacy_hub`` identifies the
+    former Mech authority that old pins still consume.  In the authoritative
+    state claw is external to the Mech fleet, every Mech is a consumer, and no
+    Mech may retain a hub role.
+    """
+
+    state: str
+    canonical_repository: str
+    manifest_path: str
+    pin_path: str
+    legacy_hub: Optional[str] = None
+
+
 class FleetManifest:
     """The validated fleet definition."""
 
@@ -177,12 +197,12 @@ class FleetManifest:
         self,
         mechs: Mapping[str, MechDefinition],
         capability_catalogue: Mapping[str, CapabilityDefinition],
-        vendored_hub: str,
+        vendored_governance: VendoredGovernance,
         source: Path,
     ) -> None:
         self._mechs = dict(mechs)
         self._capability_catalogue = dict(capability_catalogue)
-        self._vendored_hub = vendored_hub
+        self._vendored_governance = vendored_governance
         self._source = source
 
     @property
@@ -212,8 +232,14 @@ class FleetManifest:
         return tuple(self._capability_catalogue)
 
     @property
-    def vendored_hub(self) -> str:
-        return self._vendored_hub
+    def vendored_governance(self) -> VendoredGovernance:
+        return self._vendored_governance
+
+    @property
+    def vendored_hub(self) -> Optional[str]:
+        """Return the temporary legacy Mech hub, if the migration still has one."""
+
+        return self._vendored_governance.legacy_hub
 
     def get(self, key: str) -> MechDefinition:
         try:
@@ -654,6 +680,145 @@ def _parse_mech(
     )
 
 
+def _parse_vendored_governance(
+    value: Any,
+    identities_by_key: Mapping[str, _MechIdentity],
+) -> VendoredGovernance:
+    """Parse the external authority and the temporary legacy rollout state."""
+
+    mapping = _require_mapping(value, "vendored_governance")
+    allowed_keys = {
+        "state",
+        "canonical_repository",
+        "manifest_path",
+        "pin_path",
+        "legacy_hub",
+    }
+    unknown_keys = set(mapping) - allowed_keys
+    if unknown_keys:
+        unknown = ", ".join(sorted(str(key) for key in unknown_keys))
+        raise FleetManifestError(
+            f"vendored_governance has unknown keys: {unknown}"
+        )
+
+    state = _require_nonempty_string(mapping.get("state"), "vendored_governance.state")
+    if state not in VENDORED_GOVERNANCE_STATES:
+        allowed = ", ".join(sorted(VENDORED_GOVERNANCE_STATES))
+        raise FleetManifestError(
+            "vendored_governance.state must be one of: "
+            f"{allowed} (got {state!r})"
+        )
+
+    canonical_repository = _require_nonempty_string(
+        mapping.get("canonical_repository"),
+        "vendored_governance.canonical_repository",
+    )
+    if (
+        not _GITHUB_IDENTITY_PATTERN.fullmatch(canonical_repository)
+        or canonical_repository.rsplit("/", 1)[-1] in {".", ".."}
+    ):
+        raise FleetManifestError(
+            "vendored_governance.canonical_repository must be an "
+            "owner/repository GitHub identity"
+        )
+    if canonical_repository.lower() in {
+        identity.github.lower() for identity in identities_by_key.values()
+    }:
+        raise FleetManifestError(
+            "vendored_governance.canonical_repository must be external to the "
+            "Mech fleet; a Mech authority would recreate a circular/self pin"
+        )
+
+    manifest_path = _require_relative_path(
+        mapping.get("manifest_path"), "vendored_governance.manifest_path"
+    )
+    pin_path = _require_relative_path(
+        mapping.get("pin_path"), "vendored_governance.pin_path"
+    )
+
+    hubs = [
+        key
+        for key, identity in identities_by_key.items()
+        if identity.vendored_role == "hub"
+    ]
+    non_consumers = [
+        key
+        for key, identity in identities_by_key.items()
+        if identity.vendored_role != "consumer"
+    ]
+    legacy_value = mapping.get("legacy_hub")
+
+    if state == "transition":
+        if len(hubs) != 1:
+            found = ", ".join(sorted(hubs)) or "none"
+            raise FleetManifestError(
+                "Transition governance must declare exactly one legacy "
+                f"vendored hub (found: {found})"
+            )
+        legacy_hub = _require_nonempty_string(
+            legacy_value, "vendored_governance.legacy_hub"
+        )
+        if legacy_hub != hubs[0]:
+            raise FleetManifestError(
+                f"vendored_governance.legacy_hub is '{legacy_hub}' but the "
+                f"repository declaring vendored_role 'hub' is '{hubs[0]}'"
+            )
+        invalid_roles = [
+            key
+            for key, identity in identities_by_key.items()
+            if identity.vendored_role not in {"hub", "spoke"}
+        ]
+        if invalid_roles:
+            raise FleetManifestError(
+                "Transition governance cannot declare consumer roles before "
+                f"the atomic authority flip: {', '.join(sorted(invalid_roles))}"
+            )
+    else:
+        if "legacy_hub" in mapping:
+            raise FleetManifestError(
+                "Authoritative governance must omit legacy_hub"
+            )
+        if non_consumers:
+            raise FleetManifestError(
+                "Authoritative governance requires every Mech to declare "
+                f"vendored_role 'consumer': {', '.join(sorted(non_consumers))}"
+            )
+        legacy_hub = None
+
+    return VendoredGovernance(
+        state=state,
+        canonical_repository=canonical_repository,
+        manifest_path=manifest_path,
+        pin_path=pin_path,
+        legacy_hub=legacy_hub,
+    )
+
+
+def _validate_vendored_governance_capabilities(
+    governance: VendoredGovernance,
+    mechs: Mapping[str, MechDefinition],
+) -> None:
+    """Keep vendored roles and capability availability in one atomic state."""
+
+    for key, mech in mechs.items():
+        capability = mech.capability("vendored_sync")
+        status = capability.status if capability is not None else None
+        if governance.state == "authoritative":
+            required_status = "enabled"
+            state_role = "an authoritative consumer"
+        elif mech.vendored_role == "hub":
+            required_status = "not_applicable"
+            state_role = "a transition legacy hub"
+        else:
+            required_status = "enabled"
+            state_role = "a transition spoke"
+        if status != required_status:
+            raise FleetManifestError(
+                f"mechs.{key}.capabilities.vendored_sync.status must be "
+                f"'{required_status}' for {state_role} (got {status!r})"
+            )
+
+
 def parse_fleet_manifest(document: Any, source: Path) -> FleetManifest:
     """Validate an already-loaded manifest document."""
 
@@ -693,28 +858,14 @@ def parse_fleet_manifest(document: Any, source: Path) -> FleetManifest:
             "Fleet manifest declares a duplicate environment variable"
         )
 
-    hubs = [
-        key
-        for key, mech in identities_by_key.items()
-        if mech.vendored_role == "hub"
-    ]
-    if len(hubs) != 1:
-        found = ", ".join(sorted(hubs)) or "none"
-        raise FleetManifestError(
-            f"Fleet manifest must declare exactly one vendored hub (found: {found})"
-        )
-
-    vendored_hub = _require_nonempty_string(mapping.get("vendored_hub"), "vendored_hub")
-    if vendored_hub != hubs[0]:
-        raise FleetManifestError(
-            f"vendored_hub is '{vendored_hub}' but the repository declaring "
-            f"vendored_role 'hub' is '{hubs[0]}'"
-        )
+    vendored_governance = _parse_vendored_governance(
+        mapping.get("vendored_governance"), identities_by_key
+    )
 
     allowed_top_level_keys = {
         "version",
         "capability_catalogue",
-        "vendored_hub",
+        "vendored_governance",
         "mechs",
     }
     unknown_top_level_keys = set(mapping) - allowed_top_level_keys
@@ -729,10 +880,11 @@ def parse_fleet_manifest(document: Any, source: Path) -> FleetManifest:
         key: _parse_mech(key, raw_mechs[key], capability_catalogue)
         for key in mech_keys
     }
+    _validate_vendored_governance_capabilities(vendored_governance, mechs)
     return FleetManifest(
         mechs=mechs,
         capability_catalogue=capability_catalogue,
-        vendored_hub=vendored_hub,
+        vendored_governance=vendored_governance,
         source=source,
     )
 
