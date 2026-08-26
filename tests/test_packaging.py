@@ -96,3 +96,11 @@ def test_packaged_history_schema_is_canonical():
     )
 
     assert packaged == canonical_path.read_text(encoding="utf-8")
+
+
+def test_packaged_research_schema_exists_and_declares_result_root():
+    schema = files("kg_microbe_research").joinpath("schema/research.yaml")
+
+    assert schema.is_file()
+    text = schema.read_text(encoding="utf-8")
+    assert "ResearchResult:" in text

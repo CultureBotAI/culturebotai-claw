@@ -13,6 +13,7 @@ only checks whether such a variable has a non-empty value.
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import os
@@ -235,6 +236,45 @@ PROVIDERS: dict[str, Provider] = {
     ),
 }
 
+PROVIDER_CATALOGUE_VERSION = 1
+TRIAGE_CONTRACT_VERSION = 1
+TRIAGE_ALGORITHM_ID = "weighted-capability-v1:max-fit-v1:fit-score-name-order-v1"
+
+
+def _catalogue_sha256() -> str:
+    """Digest the public provider facts used when a plan is ranked.
+
+    This is provenance, not an authorization token.  The serialization is
+    deliberately explicit and stable so a saved result identifies catalogue
+    drift without capturing credentials or machine-local availability.
+    """
+
+    payload = {
+        name: {
+            "label": provider.label,
+            "source_scope": provider.source_scope,
+            "synthesis": provider.synthesis,
+            "cost": provider.cost,
+            "billing": provider.billing,
+            "time": provider.time,
+            "capabilities": sorted(provider.capabilities),
+            "best_for": provider.best_for,
+            "limitation": provider.limitation,
+        }
+        for name, provider in sorted(PROVIDERS.items())
+    }
+    encoded = json.dumps(
+        payload,
+        ensure_ascii=False,
+        allow_nan=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+PROVIDER_CATALOGUE_SHA256 = _catalogue_sha256()
+
 ALIASES = {"edison": "falcon", "futurehouse": "falcon", "claude-code": "claude_code"}
 
 ALL_CAPABILITIES = frozenset(
@@ -264,6 +304,63 @@ KNOWN_BLOCKED: dict[str, str] = {
     "cyberian": ("HTTP 500; wraps an agentapi service that is not running (CultureMech#284)"),
 }
 
+DEEPER_MED_STUB_REASON = "no public API"
+MOCK_UNAVAILABLE_REASON = "set ENABLE_MOCK_PROVIDER=true to expose the catalogue-only stub"
+MOCK_STUB_REASON = "catalogue-only mock; executable provider is not implemented"
+
+
+def _triage_contract_sha256() -> str:
+    """Digest every static input that changes provider ranking or admission.
+
+    Availability evidence and credential values are deliberately excluded
+    because they are per-plan observations. Their resulting status and reason
+    are recorded on every assignment. Credential *names* and expiry policy are
+    static admission inputs and are included. The algorithm identifier is an
+    explicit versioned review boundary: changing scoring or sorting requires
+    changing that identifier and retaining support for the prior contract.
+    """
+
+    payload = {
+        "algorithm": TRIAGE_ALGORITHM_ID,
+        "provider_catalogue_sha256": PROVIDER_CATALOGUE_SHA256,
+        "aliases": dict(sorted(ALIASES.items())),
+        "known_blocked": dict(sorted(KNOWN_BLOCKED.items())),
+        "static_status_reasons": {
+            "deeper_med": {"stub": DEEPER_MED_STUB_REASON},
+            "mock": {
+                "unavailable": MOCK_UNAVAILABLE_REASON,
+                "stub": MOCK_STUB_REASON,
+            },
+        },
+        "cost_value": dict(sorted(COST_VALUE.items())),
+        "time_value": dict(sorted(TIME_VALUE.items())),
+        "synthesis_value": dict(sorted(SYNTHESIS_VALUE.items())),
+        "availability_evidence_version": AVAILABILITY_EVIDENCE_VERSION,
+        "maximum_availability_lifetime_seconds": int(
+            MAX_AVAILABILITY_EVIDENCE_LIFETIME.total_seconds()
+        ),
+        "availability_clock_skew_seconds": int(AVAILABILITY_CLOCK_SKEW.total_seconds()),
+        "credential_names": {
+            provider: list(names) for provider, names in sorted(CREDENTIALS.items())
+        },
+        "recommendable_policy": {
+            "available_status": "available",
+            "exclude_mock": True,
+            "no_paid_requires_billing": "free",
+            "configuration_is_not_availability": True,
+            "local_probe_providers": ["claude_code", "cyberian"],
+        },
+    }
+    encoded = json.dumps(
+        payload,
+        ensure_ascii=False,
+        allow_nan=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
 # Credential variables per provider. Providers resolved by probing the local
 # machine instead (claude_code, cyberian) are handled in `credential_status`.
 CREDENTIALS: dict[str, tuple[str, ...]] = {
@@ -275,6 +372,8 @@ CREDENTIALS: dict[str, tuple[str, ...]] = {
     "consensus": ("CONSENSUS_API_KEY",),
     "cborg": ("CBORG_API_KEY",),
 }
+
+TRIAGE_CONTRACT_SHA256 = _triage_contract_sha256()
 
 
 class LocalProbe(Protocol):
@@ -622,7 +721,7 @@ def provider_status(
     if configured in {"stub", "unavailable"}:
         return configured, reason
     if name == "mock":
-        return "stub", "catalogue-only mock; executable provider is not implemented"
+        return "stub", MOCK_STUB_REASON
 
     evidence = availability.verified_status(name) if availability is not None else None
     if evidence is not None:
@@ -648,7 +747,7 @@ def credential_status(
     if name not in PROVIDERS:
         return "unavailable", f"unknown provider {provider!r}"
     if name == "deeper_med":
-        return "stub", "no public API"
+        return "stub", DEEPER_MED_STUB_REASON
     if name == "mock":
         enabled = env.get("ENABLE_MOCK_PROVIDER", "").casefold() in {"1", "true", "yes"}
         return (
@@ -656,7 +755,7 @@ def credential_status(
             if enabled
             else (
                 "unavailable",
-                "set ENABLE_MOCK_PROVIDER=true to expose the catalogue-only stub",
+                MOCK_UNAVAILABLE_REASON,
             )
         )
     if name == "claude_code":

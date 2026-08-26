@@ -115,7 +115,11 @@ def test_the_default_decision_is_a_dry_run(plan):
 
 def test_a_dry_run_of_a_metered_provider_needs_no_usage_authorization(plan):
     """Planning is offline; only live execution consumes provider resources."""
-    decision = authorize(plan, provider="openai")
+    decision = authorize(
+        plan,
+        provider="openai",
+        override_reason="exercise a metered fallback without a live call",
+    )
     assert decision.dry_run is True
     assert decision.usage_authorization_required is True
 
@@ -145,24 +149,47 @@ def test_a_free_catalogue_class_does_not_make_an_unimplemented_mock_routable(pro
 
 def test_a_live_metered_call_is_refused_without_explicit_usage_authorization(plan):
     with pytest.raises(PolicyError, match="explicit usage authorization"):
-        authorize(plan, provider="openai", apply=True)
+        authorize(
+            plan,
+            provider="openai",
+            apply=True,
+            override_reason="exercise the usage gate for a fallback",
+        )
 
 
 def test_acknowledging_usage_authorizes_a_live_metered_call(plan):
-    decision = authorize(plan, provider="openai", apply=True, acknowledge_usage=True)
+    decision = authorize(
+        plan,
+        provider="openai",
+        apply=True,
+        acknowledge_usage=True,
+        override_reason="exercise an explicitly selected fallback",
+    )
     assert decision.live is True
     assert any("acknowledged" in reason for reason in decision.reasons)
 
 
 def test_a_cost_ceiling_that_admits_the_tier_authorizes_the_call(plan):
-    decision = authorize(plan, provider="openai", apply=True, max_cost="very_high")
+    decision = authorize(
+        plan,
+        provider="openai",
+        apply=True,
+        max_cost="very_high",
+        override_reason="exercise an explicitly selected fallback",
+    )
     assert decision.live is True
     assert any("cost ceiling" in reason for reason in decision.reasons)
 
 
 def test_a_cost_ceiling_below_the_tier_refuses_the_call(plan):
     with pytest.raises(PolicyError, match="does not admit provider tier very_high"):
-        authorize(plan, provider="openai", apply=True, max_cost="medium")
+        authorize(
+            plan,
+            provider="openai",
+            apply=True,
+            max_cost="medium",
+            override_reason="exercise an explicitly selected fallback",
+        )
 
 
 def test_a_ceiling_admits_tiers_at_or_below_itself(profile):
@@ -176,7 +203,13 @@ def test_a_ceiling_admits_tiers_at_or_below_itself(profile):
         probe=NO_LOCAL_TOOLING,
         availability=VERIFIED,
     )
-    decision = authorize(extended, provider="perplexity", apply=True, max_cost="high")
+    decision = authorize(
+        extended,
+        provider="perplexity",
+        apply=True,
+        max_cost="high",
+        override_reason="exercise an explicitly selected fallback",
+    )
     assert decision.live is True
 
 
@@ -189,8 +222,19 @@ def test_medium_cost_provider_still_needs_usage_authorization(plan):
     """Relative cost is not evidence that CBORG consumes no quota or credits."""
     assert requires_usage_authorization("cborg") is True
     with pytest.raises(PolicyError, match="explicit usage authorization"):
-        authorize(plan, provider="cborg", apply=True)
-    decision = authorize(plan, provider="cborg", apply=True, acknowledge_usage=True)
+        authorize(
+            plan,
+            provider="cborg",
+            apply=True,
+            override_reason="exercise the usage gate for a fallback",
+        )
+    decision = authorize(
+        plan,
+        provider="cborg",
+        apply=True,
+        acknowledge_usage=True,
+        override_reason="exercise an explicitly selected fallback",
+    )
     assert decision.live is True
     assert decision.usage_authorization_required is True
 
@@ -203,12 +247,22 @@ def test_acknowledgement_cannot_override_a_lower_cost_ceiling(plan):
             apply=True,
             acknowledge_usage=True,
             max_cost="medium",
+            override_reason="exercise an explicitly selected fallback",
         )
 
 
 # --------------------------------------------------------------------------
 # Plan agreement — the silent bypass this gate exists to close
 # --------------------------------------------------------------------------
+
+
+def test_an_eligible_fallback_cannot_silently_replace_the_recommendation(plan):
+    assert plan.recommended is not None
+    assert plan.recommended.provider == "asta"
+    assert plan.permits("cborg")
+
+    with pytest.raises(PolicyError, match="eligible fallback.*override reason"):
+        authorize(plan, provider="cborg", apply=True, acknowledge_usage=True)
 
 
 def test_a_provider_the_no_paid_plan_excludes_cannot_be_named_directly(profile):

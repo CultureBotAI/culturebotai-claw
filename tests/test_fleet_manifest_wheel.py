@@ -63,6 +63,7 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path) -> None
     assert "src/kg_microbe_config/openclaw_config.yaml" in source_names
     assert "src/kg_microbe_research/__init__.py" in source_names
     assert "src/kg_microbe_research/__main__.py" in source_names
+    assert "src/kg_microbe_research/schema/research.yaml" in source_names
     assert not any(name.startswith("agents/") for name in source_names)
     assert not any(name.startswith("conf/") for name in source_names)
     assert not any(name.startswith("build/") for name in source_names)
@@ -104,6 +105,7 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path) -> None
         assert "kg_microbe_config/openclaw_config.yaml" in names
         assert "kg_microbe_research/__init__.py" in names
         assert "kg_microbe_research/__main__.py" in names
+        assert "kg_microbe_research/schema/research.yaml" in names
         assert "kg_microbe_agents/definitions/dev_workflow/validation_agent.yaml" in names
         assert "conf/fleet.yaml" not in names
         assert "openclaw_config.yaml" not in names
@@ -157,6 +159,14 @@ from kg_microbe_research.__main__ import (
     build_parser as build_research_parser,
     main as research_main,
 )
+from kg_microbe_research import (
+    StaticProbe,
+    build_dry_run_result,
+    default_research_schema_path,
+    load_availability,
+    load_result,
+    write_result,
+)
 
 unpacked = Path(sys.argv[1]).resolve()
 runtime_modules = (
@@ -203,7 +213,7 @@ assert history_main(["validate", str(history_root), "--structural-only"]) == 0
 assert build_research_parser().prog == "kg-microbe-research"
 research_profile = history_root.parent / "wheel-research-profile.json"
 research_profile.write_text(json.dumps({
-    "mech": "WheelMech",
+    "mech": "CultureMech",
     "target": "offline wheel smoke",
     "evidence_policy": "cite every material claim",
     "default_focus": "primary",
@@ -242,6 +252,31 @@ assert research_main(["authorize", *research_args]) == 3
 assert research_main([
     "authorize", *research_args[:-1], "--apply", "--acknowledge-usage", "--json",
 ]) == 0
+research_schema = default_research_schema_path().resolve()
+assert research_schema == unpacked / "kg_microbe_research/schema/research.yaml"
+research_target = history_root.parent / "wheel-target.yaml"
+research_target.write_text("id: WHEEL:1\\nlabel: Wheel target\\n", encoding="utf-8")
+dry_result = build_dry_run_result(
+    repository_root=history_root.parent,
+    profile_path=research_profile,
+    target_path=research_target,
+    target_id="WHEEL:1",
+    target_label="Wheel target",
+    target_type="medium",
+    question="Which source-backed facts should be assessed?",
+    availability=load_availability(research_evidence),
+    environ={"ASTA_API_KEY": "offline-wheel-fixture"},
+    probe=StaticProbe(),
+    short_id="wheel-smoke",
+)
+dry_path = history_root.parent / "research/runs/wheel-smoke.yaml"
+write_result(dry_path, dry_result, repository_root=history_root.parent)
+assert load_result(
+    dry_path,
+    repository_root=history_root.parent,
+    verify_artifacts=True,
+    verify_snapshots=True,
+)["status"] == "DRY_RUN"
 assert callable(cli)
 runner = CliRunner()
 listed = runner.invoke(cli, ["agent", "list"])

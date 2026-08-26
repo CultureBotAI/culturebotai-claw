@@ -345,22 +345,34 @@ def authorize(
             "rebuild the triage plan"
         )
 
-    # A named provider that triage would not have offered is exactly the silent
-    # bypass this gate exists to stop. An allowlist/triage override must be on
-    # the record; the no-paid hard exclusion cannot be overridden at all.
+    # Any explicitly named provider other than the recommendation changes the
+    # triage choice, even when it remains in the eligible fallback list. That
+    # choice must be explainable in the result plan as an ordinal-1 OVERRIDE;
+    # otherwise a caller could silently use a fallback as attempt 1. The
+    # no-paid hard exclusion cannot be overridden at all.
     normalized_override = override_reason.strip() if override_reason is not None else ""
+    named_override = (
+        provider is not None
+        and (plan.recommended is None or name != plan.recommended.provider)
+    )
     if provider is not None and not plan.permits(name):
         if plan.no_paid and chosen.usage_authorization_required:
             raise PolicyError(
                 f"Provider {name} is excluded by the no-paid policy; this hard "
                 "exclusion cannot be overridden."
             )
-        if not normalized_override:
-            raise PolicyError(
-                f"Provider {name} is not permitted for {plan.mech} "
-                f"{plan.focus}/{plan.stage} by triage. Supply an explicit override "
-                f"reason to route to it anyway."
-            )
+    if named_override and not normalized_override:
+        admission = (
+            "is an eligible fallback rather than the recommendation"
+            if plan.permits(name)
+            else "is not permitted by ordinary triage"
+        )
+        raise PolicyError(
+            f"Provider {name} {admission} for {plan.mech} "
+            f"{plan.focus}/{plan.stage}. Supply an explicit override reason "
+            "to route to it."
+        )
+    if named_override:
         reasons.append(f"override: {normalized_override}")
 
     entry = PROVIDERS[name]

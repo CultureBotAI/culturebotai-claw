@@ -1,10 +1,9 @@
 """Shared deep-research subsystem for the CultureBotAI fleet.
 
-Owns the provider catalogue, focus-profile validation, deterministic triage, and
-the execution policy that governs whether a provider may actually be called.
-Each Mech keeps its own `conf/deep_research_provider.yaml` focus profile; the
-method, safety rules, and triage/policy JSON contract live here. The eventual
-schema-compliant research result contract does not.
+Owns the provider catalogue, focus-profile validation, deterministic triage,
+execution policy, and schema-governed result capture. Each Mech keeps its own
+``conf/deep_research_provider.yaml`` focus profile and domain promotion rules;
+the method, safety rules, triage contract, and audit record live here.
 
 Nothing in this package performs network access. Values read from recognised
 credential environment variables are only checked for non-emptiness and are
@@ -25,6 +24,7 @@ from .profile import (
     ResearchProfile,
     Stage,
     load_profile,
+    load_profile_bytes,
     parse_profile,
 )
 from .providers import (
@@ -35,9 +35,14 @@ from .providers import (
     COST_VALUE,
     CREDENTIALS,
     KNOWN_BLOCKED,
+    PROVIDER_CATALOGUE_SHA256,
+    PROVIDER_CATALOGUE_VERSION,
     PROVIDERS,
     SYNTHESIS_VALUE,
     TIME_VALUE,
+    TRIAGE_ALGORITHM_ID,
+    TRIAGE_CONTRACT_SHA256,
+    TRIAGE_CONTRACT_VERSION,
     AvailabilityError,
     AvailabilityEvidence,
     LocalProbe,
@@ -53,6 +58,20 @@ from .providers import (
     requires_usage_authorization,
     unknown_providers,
 )
+from .records import (
+    RESEARCH_VERSION,
+    ResearchRecordError,
+    build_dry_run_result,
+    default_research_schema_path,
+    load_result,
+    new_result_path,
+    render_stage_query,
+    result_yaml,
+    sha256_bytes,
+    sha256_text,
+    validate_result,
+    write_result,
+)
 from .triage import build_report, rank_stage, recommendable, score
 
 __all__ = [
@@ -65,8 +84,13 @@ __all__ = [
     "CREDENTIALS",
     "KNOWN_BLOCKED",
     "PROVIDERS",
+    "PROVIDER_CATALOGUE_SHA256",
+    "PROVIDER_CATALOGUE_VERSION",
     "SYNTHESIS_VALUE",
     "TIME_VALUE",
+    "TRIAGE_ALGORITHM_ID",
+    "TRIAGE_CONTRACT_SHA256",
+    "TRIAGE_CONTRACT_VERSION",
     "AvailabilityEvidence",
     "AvailabilityError",
     "Focus",
@@ -74,24 +98,37 @@ __all__ = [
     "PolicyError",
     "ProfileError",
     "Provider",
+    "RESEARCH_VERSION",
+    "ResearchRecordError",
     "ResearchProfile",
     "Stage",
     "StaticAvailability",
     "StaticProbe",
     "SystemProbe",
     "authorize",
+    "build_dry_run_result",
     "build_report",
     "canonical_provider",
     "credential_status",
+    "default_research_schema_path",
     "load_profile",
+    "load_profile_bytes",
+    "load_result",
     "load_availability",
     "normalize_allowlist",
+    "new_result_path",
     "parse_profile",
     "plan_stage",
     "provider_status",
     "rank_stage",
     "recommendable",
+    "render_stage_query",
     "requires_usage_authorization",
+    "result_yaml",
     "score",
+    "sha256_bytes",
+    "sha256_text",
     "unknown_providers",
+    "validate_result",
+    "write_result",
 ]

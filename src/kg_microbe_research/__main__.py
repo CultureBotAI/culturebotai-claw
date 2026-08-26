@@ -1,9 +1,10 @@
-"""Offline triage and execution-policy queries over a Mech research profile.
+"""Offline triage, policy, and research-result tools for the Mech fleet.
 
-Every command here is read-only and never contacts a provider. `authorize`
-exits zero only for an explicitly live authorization; a successful dry-run
-report exits three. That distinction makes `kg-microbe-research authorize &&
-provider-command` fail closed instead of treating a dry run as permission.
+No command here contacts a provider. ``scaffold-result`` writes an append-only
+dry-run record; the other commands are read-only. ``authorize`` exits zero only
+for an explicitly live authorization and exits three for a successful dry run.
+That distinction makes ``kg-microbe-research authorize && provider-command``
+fail closed instead of treating a dry run as permission.
 """
 
 from __future__ import annotations
@@ -26,6 +27,13 @@ from .providers import (
     provider_status,
     requires_usage_authorization,
     unknown_providers,
+)
+from .records import (
+    ResearchRecordError,
+    build_dry_run_result,
+    load_result,
+    new_result_path,
+    write_result,
 )
 from .triage import build_report
 
@@ -214,6 +222,87 @@ def _cmd_authorize(args: argparse.Namespace) -> int:
     return 0 if decision.live else 3
 
 
+def _repository_file(root: Path, value: str, label: str) -> Path:
+    """Resolve a CLI path beneath a repository without accepting escape."""
+
+    repository = root.resolve(strict=True)
+    candidate = Path(value)
+    if not candidate.is_absolute():
+        candidate = repository / candidate
+    try:
+        resolved = candidate.resolve(strict=True)
+        resolved.relative_to(repository)
+    except (FileNotFoundError, RuntimeError, ValueError) as exc:
+        raise ResearchRecordError(
+            f"{label} must be an existing file inside repository root {repository}"
+        ) from exc
+    if not resolved.is_file():
+        raise ResearchRecordError(f"{label} is not a file: {resolved}")
+    return resolved
+
+
+def _repository_root(value: str) -> Path:
+    try:
+        root = Path(value).resolve(strict=True)
+    except (FileNotFoundError, RuntimeError, OSError) as exc:
+        raise ResearchRecordError(f"repository root does not exist: {value}") from exc
+    if not root.is_dir():
+        raise ResearchRecordError(f"repository root is not a directory: {root}")
+    return root
+
+
+def _cmd_scaffold_result(args: argparse.Namespace) -> int:
+    repository = _repository_root(args.repository_root)
+    profile_path = _repository_file(repository, args.profile, "--profile")
+    target_path = _repository_file(repository, args.target_path, "--target-path")
+    availability = _availability(args)
+    result = build_dry_run_result(
+        repository_root=repository,
+        profile_path=profile_path,
+        target_path=target_path,
+        target_id=args.target_id,
+        target_label=args.target_label,
+        target_type=args.target_type,
+        question=args.question,
+        question_id=args.question_id,
+        focus_name=args.focus,
+        allow=args.allow or None,
+        no_paid=args.no_paid,
+        availability=availability,
+    )
+    if args.output:
+        raw_output = Path(args.output)
+        output = raw_output if raw_output.is_absolute() else repository / raw_output
+        try:
+            output.resolve(strict=False).relative_to(repository)
+        except (RuntimeError, ValueError) as exc:
+            raise ResearchRecordError(
+                f"--output must stay inside repository root {repository}"
+            ) from exc
+    else:
+        output = new_result_path(
+            repository,
+            target_id=args.target_id,
+            result_id=result["result_id"],
+        )
+    written = write_result(output, result, repository_root=repository)
+    print(written)
+    return 0
+
+
+def _cmd_validate_result(args: argparse.Namespace) -> int:
+    repository = _repository_root(args.repository_root)
+    result_path = _repository_file(repository, args.result, "RESULT")
+    load_result(
+        result_path,
+        repository_root=repository,
+        verify_artifacts=True,
+        verify_snapshots=args.verify_snapshots,
+    )
+    print(f"OK: {result_path}", file=sys.stderr)
+    return 0
+
+
 def _add_profile_argument(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--profile",
@@ -298,10 +387,58 @@ def build_parser() -> argparse.ArgumentParser:
     )
     authorize_parser.add_argument(
         "--override-reason",
-        help="Record why a provider triage would not offer is being used anyway.",
+        help=(
+            "Record why an explicitly selected provider replaces the triage "
+            "recommendation, including selection of an eligible fallback."
+        ),
     )
     authorize_parser.add_argument("--json", action="store_true")
     authorize_parser.set_defaults(func=_cmd_authorize)
+
+    scaffold = subparsers.add_parser(
+        "scaffold-result",
+        help="Write a schema-valid dry-run result; never call a provider.",
+    )
+    _add_profile_argument(scaffold)
+    _add_availability_argument(scaffold)
+    scaffold.add_argument(
+        "--repository-root",
+        default=".",
+        help="Mech repository root used to constrain paths and verify snapshots.",
+    )
+    scaffold.add_argument("--target-path", required=True, help="Repo-relative target file.")
+    scaffold.add_argument("--target-id", required=True)
+    scaffold.add_argument("--target-label", required=True)
+    scaffold.add_argument("--target-type", required=True)
+    scaffold.add_argument("--question", required=True)
+    scaffold.add_argument("--question-id")
+    scaffold.add_argument("--focus", help="Focus name; defaults to the profile default.")
+    scaffold.add_argument(
+        "--allow", action="append", metavar="PROVIDER", help="Restrict recommendations."
+    )
+    scaffold.add_argument(
+        "--no-paid",
+        action="store_true",
+        help="Exclude every provider not explicitly classified free.",
+    )
+    scaffold.add_argument(
+        "--output",
+        help="YAML path inside the repository; defaults to research/runs/<target>/<result-id>.yaml.",
+    )
+    scaffold.set_defaults(func=_cmd_scaffold_result)
+
+    validate = subparsers.add_parser(
+        "validate-result",
+        help="Validate schema, semantics, references, and artifact bytes offline.",
+    )
+    validate.add_argument("result", help="Research-result YAML inside the repository.")
+    validate.add_argument("--repository-root", default=".")
+    validate.add_argument(
+        "--verify-snapshots",
+        action="store_true",
+        help="Also compare the current profile and target files with historical digests.",
+    )
+    validate.set_defaults(func=_cmd_validate_result)
 
     return parser
 
@@ -311,7 +448,13 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         return int(args.func(args))
-    except (AvailabilityError, ProfileError, PolicyError) as exc:
+    except (
+        AvailabilityError,
+        FileExistsError,
+        ProfileError,
+        PolicyError,
+        ResearchRecordError,
+    ) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 

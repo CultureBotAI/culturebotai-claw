@@ -6,6 +6,8 @@ This directory contains longer-lived domain and cross-repository guidance:
 - `MULTI_CLAUDE_ARCHITECTURE.md` — a retired proposal retained only as a
   redirect to the supported contract
 - `VALIDATION_STRATEGY.md`
+- `DEEP_RESEARCH_RESULTS.md` — the shared, audit-only research-result schema,
+  offline scaffold/validation commands, and evidence-promotion boundary
 - `ENVO_TERM_SOURCING_GUIDE.md` and `SOIL_ONTOLOGY_GUIDE.md`
 - `UNMAPPED_CAS_RN_TSV_GUIDE.md`
 - `GITHUB_SETUP.md`
