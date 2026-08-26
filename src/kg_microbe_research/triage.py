@@ -1,12 +1,14 @@
 """Deterministic provider ranking and stage assignment.
 
-Scoring is a pure function of the profile and the catalogue; only availability
-consults the environment, and it does so through an injectable mapping so tests
-never depend on the developer's shell.
+Scoring is a pure function of the profile and the catalogue. Configuration and
+previously verified availability are separate injectable inputs, so tests never
+depend on the developer's shell and configuration alone is never treated as a
+working provider.
 """
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -17,11 +19,13 @@ from .providers import (
     PROVIDERS,
     SYNTHESIS_VALUE,
     TIME_VALUE,
+    AvailabilityEvidence,
     LocalProbe,
     Provider,
-    is_paid,
     normalize_allowlist,
     provider_status,
+    requires_usage_authorization,
+    unknown_providers,
 )
 
 
@@ -36,6 +40,7 @@ class Ranked:
     fit: int
     score: float
     cost: str
+    billing: str
     time: str
     synthesis: str
     source_scope: str
@@ -43,9 +48,9 @@ class Ranked:
     limitation: str
 
     @property
-    def paid(self) -> bool:
-        """Whether routing here can incur a charge. See `providers.is_paid`."""
-        return is_paid(self.provider)
+    def usage_authorization_required(self) -> bool:
+        """Whether live use needs a separate quota/billing decision."""
+        return requires_usage_authorization(self.provider)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -55,12 +60,13 @@ class Ranked:
             "status_reason": self.status_reason,
             "fit": self.fit,
             "cost": self.cost,
+            "billing": self.billing,
             "time": self.time,
             "synthesis": self.synthesis,
             "source_scope": self.source_scope,
             "best_for": self.best_for,
             "limitation": self.limitation,
-            "paid": self.paid,
+            "usage_authorization_required": self.usage_authorization_required,
         }
 
 
@@ -75,6 +81,11 @@ def score(provider: Provider, stage: Stage, adjustments: Mapping[str, float]) ->
     total += stage.weight("speed_weight") * (5 - TIME_VALUE[provider.time])
     total += stage.weight("cost_weight") * (5 - COST_VALUE[provider.cost])
     total += float(adjustments.get(provider.name, 0.0))
+    if not math.isfinite(total):
+        raise ProfileError(
+            f"Scoring provider {provider.name!r} for stage {stage.name!r} produced "
+            "a non-finite result; reduce the profile weights"
+        )
     return total
 
 
@@ -84,6 +95,7 @@ def rank_stage(
     *,
     environ: Mapping[str, str] | None = None,
     probe: LocalProbe | None = None,
+    availability: AvailabilityEvidence | None = None,
 ) -> list[Ranked]:
     """Rank every catalogue provider for one stage, best first."""
     if stage_name not in focus.stages:
@@ -110,16 +122,20 @@ def rank_stage(
 
     rows = []
     for name, provider in PROVIDERS.items():
-        status, reason = provider_status(name, environ, probe)
+        status, reason = provider_status(name, environ, probe, availability)
         rows.append(
             Ranked(
                 provider=name,
                 label=provider.label,
                 status=status,
                 status_reason=reason,
-                fit=round(100 * max(0.0, raw[name]) / high),
+                # Divide before multiplying. Both operands may be valid finite
+                # floats near their maximum magnitude, where multiplying the
+                # numerator by 100 first would overflow to infinity.
+                fit=round(100 * (max(0.0, raw[name]) / high)),
                 score=raw[name],
                 cost=provider.cost,
+                billing=provider.billing,
                 time=provider.time,
                 synthesis=provider.synthesis,
                 source_scope=provider.source_scope,
@@ -148,7 +164,10 @@ def recommendable(
     if allowlist is not None:
         out = [row for row in out if row.provider in allowlist]
     if no_paid:
-        out = [row for row in out if not row.paid]
+        # `--no-paid` is retained as the user-facing spelling from the Mech
+        # tools. Its safe meaning is broader: exclude every provider that is not
+        # explicitly free, including quota-metered and unknown billing.
+        out = [row for row in out if not row.usage_authorization_required]
     return out
 
 
@@ -160,13 +179,27 @@ def build_report(
     no_paid: bool = False,
     environ: Mapping[str, str] | None = None,
     probe: LocalProbe | None = None,
+    availability: AvailabilityEvidence | None = None,
 ) -> dict[str, Any]:
     """A complete, JSON-serializable triage report for one focus."""
     focus = profile.focus(focus_name)
     allowlist = normalize_allowlist(allow)
+    if allowlist is not None:
+        unknown = unknown_providers(allowlist)
+        if unknown:
+            raise ProfileError(
+                f"Unknown provider(s) in allowlist: {unknown}; choose from "
+                f"{', '.join(sorted(PROVIDERS))}"
+            )
     stages = []
     for stage_name in focus.stages:
-        ranking = rank_stage(focus, stage_name, environ=environ, probe=probe)
+        ranking = rank_stage(
+            focus,
+            stage_name,
+            environ=environ,
+            probe=probe,
+            availability=availability,
+        )
         available = recommendable(ranking, allow=allowlist, no_paid=no_paid)
         stages.append(
             {
@@ -174,9 +207,7 @@ def build_report(
                 "objective": focus.stages[stage_name].objective,
                 "ranking": [row.as_dict() for row in ranking],
                 "recommended_available": available[0].as_dict() if available else None,
-                "fallback_available": (
-                    available[1].as_dict() if len(available) > 1 else None
-                ),
+                "fallback_available": (available[1].as_dict() if len(available) > 1 else None),
             }
         )
     return {

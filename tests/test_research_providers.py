@@ -1,26 +1,31 @@
 """Contracts for the shared provider catalogue, profile loader, and triage.
 
-Every test here is offline and deterministic: availability is injected through
-`environ` and `StaticProbe`, never read from the developer's machine.
+Every test here is offline and deterministic: configuration, local tooling, and
+previously verified availability are injected separately. No test contacts a
+provider or depends on the developer's machine.
 """
 
 from __future__ import annotations
 
+import gc
 import textwrap
+import weakref
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
 from kg_microbe_research import (
     ALL_CAPABILITIES,
+    BILLING_CLASSES,
     COST_VALUE,
     CREDENTIALS,
     KNOWN_BLOCKED,
-    PAID_COSTS,
     PROVIDERS,
     SYNTHESIS_VALUE,
     TIME_VALUE,
     ProfileError,
+    StaticAvailability,
     StaticProbe,
     build_report,
     canonical_provider,
@@ -30,14 +35,29 @@ from kg_microbe_research import (
     provider_status,
     rank_stage,
     recommendable,
+    requires_usage_authorization,
 )
 
 NO_LOCAL_TOOLING = StaticProbe()
+VERIFIED = StaticAvailability(
+    {
+        name: ("available", "offline test attestation")
+        for name in {"asta", "openai", "perplexity", "cborg", "claude_code"}
+    }
+)
+
+
+class WeakSecret(str):
+    """A string whose lifetime can prove configuration checks do not cache it."""
+
+    __slots__ = ("__weakref__",)
+
 
 MINIMAL = textwrap.dedent(
     """\
     mech: TestMech
     target: things
+    evidence_policy: cite every claim
     default_focus: primary
     focuses:
       primary:
@@ -82,6 +102,7 @@ def test_every_provider_uses_a_known_cost_time_and_synthesis_vocabulary():
     """A typo in any of these scores silently rather than failing (KeyError in _score)."""
     for name, provider in PROVIDERS.items():
         assert provider.cost in COST_VALUE, name
+        assert provider.billing in BILLING_CLASSES, name
         assert provider.time in TIME_VALUE, name
         assert provider.synthesis in SYNTHESIS_VALUE, name
 
@@ -133,7 +154,7 @@ def test_a_blocked_provider_reports_blocked_even_with_its_credential_set():
 
 def test_credential_status_still_recognises_a_blocked_providers_variables():
     """Otherwise adding a provider to KNOWN_BLOCKED silently drops its alias test."""
-    assert credential_status("falcon", {"FUTUREHOUSE_API_KEY": "set"})[0] == "available"
+    assert credential_status("falcon", {"FUTUREHOUSE_API_KEY": "set"})[0] == "configured"
     assert credential_status("falcon", {})[0] == "unavailable"
 
 
@@ -144,25 +165,97 @@ def test_an_empty_credential_value_does_not_count_as_configured():
 def test_local_tooling_status_is_injectable_and_does_not_read_the_machine():
     """Without an injectable probe these two answers vary by developer machine."""
     absent = credential_status("claude_code", {}, NO_LOCAL_TOOLING)
-    present = credential_status(
-        "claude_code", {}, StaticProbe(executables=frozenset({"claude"}))
-    )
+    present = credential_status("claude_code", {}, StaticProbe(executables=frozenset({"claude"})))
     assert absent == ("unavailable", "claude CLI not found")
-    assert present == ("available", "local CLI")
+    assert present == ("configured", "local CLI found")
 
     assert credential_status("cyberian", {}, NO_LOCAL_TOOLING)[0] == "unavailable"
 
 
 def test_mock_provider_requires_an_explicit_opt_in():
     assert credential_status("mock", {})[0] == "unavailable"
-    assert credential_status("mock", {"ENABLE_MOCK_PROVIDER": "true"})[0] == "available"
+    assert credential_status("mock", {"ENABLE_MOCK_PROVIDER": "true"})[0] == "configured"
+    assert provider_status("mock", {"ENABLE_MOCK_PROVIDER": "true"})[0] == "stub"
+
+
+def test_injected_evidence_cannot_make_the_unimplemented_mock_routable():
+    evidence = StaticAvailability({"mock": ("available", "caller assertion")})
+    assert (
+        provider_status(
+            "mock",
+            {"ENABLE_MOCK_PROVIDER": "true"},
+            availability=evidence,
+        )[0]
+        == "stub"
+    )
 
 
 def test_credential_status_never_returns_the_credential_value():
     secret = "super-secret-token"
     status, reason = credential_status("asta", {"ASTA_API_KEY": secret})
-    assert status == "available"
+    assert status == "configured"
     assert secret not in reason
+
+
+def test_credential_status_does_not_retain_the_credential_value():
+    secret = WeakSecret("ephemeral-super-secret-token")
+    reference = weakref.ref(secret)
+    environment = {"ASTA_API_KEY": secret}
+    assert credential_status("asta", environment)[0] == "configured"
+    del environment
+    del secret
+    gc.collect()
+    assert reference() is None
+
+
+def test_configuration_is_not_functional_availability():
+    assert provider_status("asta", {"ASTA_API_KEY": "x"})[0] == "configured"
+    assert provider_status("asta", {"ASTA_API_KEY": "x"}, availability=VERIFIED) == (
+        "available",
+        "offline test attestation",
+    )
+
+
+def test_availability_evidence_does_not_replace_required_configuration():
+    assert provider_status("asta", {}, availability=VERIFIED)[0] == "unavailable"
+
+
+def test_known_blockage_overrides_injected_available_evidence():
+    evidence = StaticAvailability({"falcon": ("available", "stale attestation")})
+    assert provider_status("edison", {"EDISON_API_KEY": "x"}, availability=evidence) == (
+        "blocked",
+        KNOWN_BLOCKED["falcon"],
+    )
+
+
+def test_status_apis_canonicalize_aliases():
+    assert credential_status("edison", {"EDISON_API_KEY": "x"})[0] == "configured"
+    assert provider_status("edison", {"EDISON_API_KEY": "x"})[0] == "blocked"
+
+
+def test_static_availability_refuses_unknown_or_malformed_evidence():
+    with pytest.raises(ValueError, match="unknown provider"):
+        StaticAvailability({"nosuchprovider": ("available", "fixture")})
+    with pytest.raises(ValueError, match="non-empty reason"):
+        StaticAvailability({"asta": ("available", "")})
+    with pytest.raises(ValueError, match="availability evidence must be"):
+        StaticAvailability({"asta": ([], "fixture")})  # type: ignore[dict-item]
+    with pytest.raises(ValueError, match="multiple names resolving"):
+        StaticAvailability(
+            {
+                "falcon": ("blocked", "first"),
+                "edison": ("available", "second"),
+            }
+        )
+
+
+def test_static_availability_copies_and_freezes_its_mapping():
+    source = {"asta": ("available", "fixture")}
+    evidence = StaticAvailability(source)
+    source["asta"] = ("blocked", "changed later")
+    assert evidence.verified_status("asta") == ("available", "fixture")
+    with pytest.raises(TypeError):
+        evidence.statuses["asta"] = ("blocked", "mutation")  # type: ignore[index]
 
 
 # --------------------------------------------------------------------------
@@ -220,7 +313,10 @@ def test_a_non_numeric_provider_adjustment_is_refused(tmp_path):
 
 def test_an_unknown_capability_is_refused_with_the_known_list(tmp_path):
     """An unknown capability scores 0 for every provider, so it must not load."""
-    text = variant("        capabilities: {academic_search: 4, snippets: 2}", "        capabilities: {telepathy: 4}")
+    text = variant(
+        "        capabilities: {academic_search: 4, snippets: 2}",
+        "        capabilities: {telepathy: 4}",
+    )
     with pytest.raises(ProfileError) as excinfo:
         load_profile(write_profile(tmp_path, text))
     assert "telepathy" in str(excinfo.value)
@@ -228,14 +324,18 @@ def test_an_unknown_capability_is_refused_with_the_known_list(tmp_path):
 
 
 def test_an_unknown_provider_adjustment_is_refused(tmp_path):
-    text = variant("    provider_adjustments: {asta: 2}", "    provider_adjustments: {nosuchprovider: 2}")
+    text = variant(
+        "    provider_adjustments: {asta: 2}", "    provider_adjustments: {nosuchprovider: 2}"
+    )
     with pytest.raises(ProfileError, match="unknown provider"):
         load_profile(write_profile(tmp_path, text))
 
 
 def test_two_aliases_of_one_provider_are_refused(tmp_path):
     """`{edison: 2, falcon: 3}` silently kept whichever survived the dict merge."""
-    text = variant("    provider_adjustments: {asta: 2}", "    provider_adjustments: {edison: 2, falcon: 3}")
+    text = variant(
+        "    provider_adjustments: {asta: 2}", "    provider_adjustments: {edison: 2, falcon: 3}"
+    )
     with pytest.raises(ProfileError, match="multiple keys resolving"):
         load_profile(write_profile(tmp_path, text))
 
@@ -254,7 +354,15 @@ def test_a_default_focus_absent_from_focuses_is_refused(tmp_path):
 
 def test_a_focus_without_stages_is_refused():
     with pytest.raises(ProfileError, match="non-empty 'stages' mapping"):
-        parse_profile({"default_focus": "a", "focuses": {"a": {"stages": {}}}})
+        parse_profile(
+            {
+                "mech": "TestMech",
+                "target": "things",
+                "evidence_policy": "cite every claim",
+                "default_focus": "a",
+                "focuses": {"a": {"stages": {}}},
+            }
+        )
 
 
 def test_a_non_mapping_profile_is_refused():
@@ -322,6 +430,7 @@ def test_recommendable_excludes_blocked_unavailable_and_mock(tmp_path):
             "ENABLE_MOCK_PROVIDER": "true",
         },
         probe=NO_LOCAL_TOOLING,
+        availability=VERIFIED,
     )
     names = [row.provider for row in recommendable(rows)]
     assert "asta" in names
@@ -330,20 +439,56 @@ def test_recommendable_excludes_blocked_unavailable_and_mock(tmp_path):
     assert "openai" not in names, "no credential configured"
 
 
-def test_no_paid_excludes_high_and_very_high_but_keeps_medium(tmp_path):
-    """medium is deliberately not paid: dropping claude_code defeats the purpose."""
+def test_no_paid_conservatively_excludes_every_metered_provider(tmp_path):
+    """Relative cost does not decide whether quota or credits can be consumed."""
     profile = load_profile(write_profile(tmp_path))
     rows = rank_stage(
         profile.focus(),
         "discovery",
         environ={"ASTA_API_KEY": "x", "OPENAI_API_KEY": "x", "CBORG_API_KEY": "x"},
         probe=NO_LOCAL_TOOLING,
+        availability=VERIFIED,
     )
     names = [row.provider for row in recommendable(rows, no_paid=True)]
-    assert "openai" not in names
-    assert "cborg" in names
+    assert names == []
     assert PROVIDERS["cborg"].cost == "medium"
-    assert PROVIDERS["openai"].cost in PAID_COSTS
+    assert PROVIDERS["cborg"].billing == "metered"
+    assert requires_usage_authorization("cborg")
+
+
+def test_no_paid_filter_retains_a_provider_explicitly_classified_free(tmp_path, monkeypatch):
+    """Prove the filter is selective, even though today's only free row is mock."""
+    monkeypatch.setitem(
+        PROVIDERS,
+        "asta",
+        replace(PROVIDERS["asta"], billing="free"),
+    )
+    profile = load_profile(write_profile(tmp_path))
+    rows = rank_stage(
+        profile.focus(),
+        "discovery",
+        environ={"ASTA_API_KEY": "x"},
+        probe=NO_LOCAL_TOOLING,
+        availability=VERIFIED,
+    )
+    assert [row.provider for row in recommendable(rows, no_paid=True)] == ["asta"]
+
+
+def test_no_paid_filter_excludes_unknown_billing(tmp_path, monkeypatch):
+    monkeypatch.setitem(
+        PROVIDERS,
+        "asta",
+        replace(PROVIDERS["asta"], billing="unknown"),
+    )
+    profile = load_profile(write_profile(tmp_path))
+    rows = rank_stage(
+        profile.focus(),
+        "discovery",
+        environ={"ASTA_API_KEY": "x"},
+        probe=NO_LOCAL_TOOLING,
+        availability=VERIFIED,
+    )
+    assert "asta" not in [row.provider for row in recommendable(rows, no_paid=True)]
 
 
 def test_the_allowlist_narrows_the_recommendation_itself(tmp_path):
@@ -354,6 +499,7 @@ def test_the_allowlist_narrows_the_recommendation_itself(tmp_path):
         allow=frozenset({"asta"}),
         environ={"ASTA_API_KEY": "x", "CBORG_API_KEY": "x"},
         probe=NO_LOCAL_TOOLING,
+        availability=VERIFIED,
     )
     stage = report["stages"][0]
     assert stage["recommended_available"]["provider"] == "asta"
@@ -371,7 +517,12 @@ def test_report_is_json_serializable(tmp_path):
     import json
 
     profile = load_profile(write_profile(tmp_path))
-    report = build_report(profile, environ={"ASTA_API_KEY": "x"}, probe=NO_LOCAL_TOOLING)
+    report = build_report(
+        profile,
+        environ={"ASTA_API_KEY": "x"},
+        probe=NO_LOCAL_TOOLING,
+        availability=VERIFIED,
+    )
     assert json.loads(json.dumps(report))["mech"] == "TestMech"
 
 
@@ -387,6 +538,7 @@ def test_build_report_canonicalizes_an_aliased_allowlist(tmp_path):
         allow={"claude-code"},
         environ={},
         probe=StaticProbe(executables=frozenset({"claude"})),
+        availability=VERIFIED,
     )
     recommended = report["stages"][0]["recommended_available"]
     assert recommended is not None, "the alias must resolve to claude_code"
@@ -407,10 +559,9 @@ def test_recommendable_canonicalizes_an_aliased_allowlist(tmp_path):
         "discovery",
         environ={"ASTA_API_KEY": "x"},
         probe=StaticProbe(executables=frozenset({"claude"})),
+        availability=VERIFIED,
     )
-    assert [row.provider for row in recommendable(rows, allow={"claude-code"})] == [
-        "claude_code"
-    ]
+    assert [row.provider for row in recommendable(rows, allow={"claude-code"})] == ["claude_code"]
 
 
 def test_plan_and_report_agree_on_an_aliased_allowlist(tmp_path):
@@ -419,53 +570,54 @@ def test_plan_and_report_agree_on_an_aliased_allowlist(tmp_path):
 
     profile = load_profile(write_profile(tmp_path))
     probe = StaticProbe(executables=frozenset({"claude"}))
-    report = build_report(profile, allow={"claude-code"}, environ={}, probe=probe)
+    report = build_report(
+        profile,
+        allow={"claude-code"},
+        environ={},
+        probe=probe,
+        availability=VERIFIED,
+    )
     plan = plan_stage(
-        profile, "discovery", allow=["claude-code"], environ={}, probe=probe
+        profile,
+        "discovery",
+        allow=["claude-code"],
+        environ={},
+        probe=probe,
+        availability=VERIFIED,
     )
-    assert report["stages"][0]["recommended_available"]["provider"] == (
-        plan.recommended.provider
-    )
+    assert report["stages"][0]["recommended_available"]["provider"] == (plan.recommended.provider)
 
 
 # --------------------------------------------------------------------------
-# The paid rule has exactly one definition (#139)
+# Usage authorization is explicit and independent of relative cost (#139)
 # --------------------------------------------------------------------------
 
 
-def test_is_paid_matches_the_cost_table_for_every_provider():
-    from kg_microbe_research import is_paid
-
+def test_every_external_provider_requires_usage_authorization():
     for name, provider in PROVIDERS.items():
-        assert is_paid(name) is (provider.cost in PAID_COSTS), name
+        assert requires_usage_authorization(name) is (provider.billing != "free"), name
 
 
-def test_is_paid_resolves_aliases():
-    from kg_microbe_research import is_paid
-
-    assert is_paid("edison") is is_paid("falcon")
+def test_usage_authorization_resolves_aliases():
+    assert requires_usage_authorization("edison") is requires_usage_authorization("falcon")
 
 
-def test_is_paid_is_false_for_an_unknown_provider():
-    from kg_microbe_research import is_paid
-
-    assert is_paid("nosuchprovider") is False
+def test_usage_authorization_fails_closed_for_an_unknown_provider():
+    assert requires_usage_authorization("nosuchprovider") is True
 
 
-def test_the_policy_spelling_of_the_paid_rule_agrees_with_the_catalogue():
-    """`requires_paid_authorization` had a byte-identical duplicate body."""
-    from kg_microbe_research import is_paid, requires_paid_authorization
-
-    for name in PROVIDERS:
-        assert requires_paid_authorization(name) is is_paid(name), name
-
-
-def test_every_reported_paid_flag_agrees_with_the_one_predicate(tmp_path):
+def test_every_reported_usage_flag_agrees_with_the_one_predicate(tmp_path):
     """The ranking rows are a third consumer; they must not drift either."""
-    from kg_microbe_research import is_paid
-
     profile = load_profile(write_profile(tmp_path))
     rows = rank_stage(profile.focus(), "discovery", environ={}, probe=NO_LOCAL_TOOLING)
     assert rows, "no rows to check"
     for row in rows:
-        assert row.paid is is_paid(row.provider), row.provider
+        assert row.usage_authorization_required is requires_usage_authorization(row.provider), (
+            row.provider
+        )
+
+
+def test_build_report_refuses_an_unknown_allowlist(tmp_path):
+    profile = load_profile(write_profile(tmp_path))
+    with pytest.raises(ProfileError, match="Unknown provider"):
+        build_report(profile, allow={"nosuchprovider"}, environ={})

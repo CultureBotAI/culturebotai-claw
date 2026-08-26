@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "profiles": {
+    "culturemech": {
+      "repository": "CultureBotAI/CultureMech",
+      "commit": "0422968004b99c91ed356d6ee4e38b7e93f371d5",
+      "path": "conf/deep_research_provider.yaml",
+      "sha256": "f3e33fa215579ec701fe2022e6c020d2f298d9b9cc93295bd383ad907c9a98bc"
+    },
+    "mediaingredientmech": {
+      "repository": "CultureBotAI/MediaIngredientMech",
+      "commit": "82694054f5bbf74b5392bf8858c9962c2152a35a",
+      "path": "conf/deep_research_provider.yaml",
+      "sha256": "b2ed8cfb839114828f0a7203ac6005d0003a423e5f1b03554616a3c8a6df818a"
+    },
+    "communitymech": {
+      "repository": "CultureBotAI/CommunityMech",
+      "commit": "ba596731b23b799f4baca96984ceb8f0d56874fe",
+      "path": "conf/deep_research_provider.yaml",
+      "sha256": "16647a77d7a22742979e41e2699b85f0a198f5736144568820afc88580756431"
+    },
+    "traitmech": {
+      "repository": "CultureBotAI/TraitMech",
+      "commit": "3ee94eeec831d98d2a2cc1ebe2368fe3fa122f69",
+      "path": "conf/deep_research_provider.yaml",
+      "sha256": "ddf039e5382a438f2cbe8fd6490547acd0f80bf1b9bf6f01d1b2ebd52c590ac6"
+    },
+    "proteintraitsmech": {
+      "repository": "CultureBotAI/proteintraitsmech",
+      "commit": "a70ff8f5564b77a50963daafaacc2dde013eb1a2",
+      "path": "conf/deep_research_provider.yaml",
+      "sha256": "a8e7fce4542dafdeb399d45b3a121ac25394105d89702d5cdd0e152bbac10544"
+    }
+  }
+}

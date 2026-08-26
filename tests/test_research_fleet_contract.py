@@ -1,19 +1,19 @@
-"""The shared subsystem must accept every real Mech profile, unchanged.
+"""Fleet contracts for the shared research profile loader and policy.
 
-Centralizing a validator is only safe if the strictest variant still accepts
-what the fleet actually ships. These tests resolve each Mech through the Phase 0
-manifest and validate its committed `conf/deep_research_provider.yaml` with the
-shared loader.
-
-A Mech that is not checked out locally is skipped, never silently passed: the
-count of what was actually exercised is asserted so an empty run cannot look
-like a green one.
+The five checked-in fixtures are deterministic snapshots of the domain-owned
+focus structures. They make CI exercise the exact canonical fleet even when no
+sibling Mech checkout is configured. Configured local checkouts remain a useful
+optional drift audit, but are never the only evidence behind a green run.
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
+import re
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -21,6 +21,7 @@ from kg_microbe_fleet import load_fleet_manifest
 from kg_microbe_research import (
     PolicyError,
     ProfileError,
+    ResearchProfile,
     StaticProbe,
     authorize,
     build_report,
@@ -29,11 +30,53 @@ from kg_microbe_research import (
 )
 
 PROFILE_RELATIVE_PATH = Path("conf") / "deep_research_provider.yaml"
+FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "research_profiles"
+PROVENANCE_PATH = FIXTURE_ROOT / "provenance.json"
 NO_LOCAL_TOOLING = StaticProbe()
+
+EXPECTED_FOCUS_STAGES = {
+    "culturemech": {
+        "growth_evidence": ("discovery", "synthesis", "verification"),
+        "formulation": ("discovery", "synthesis", "verification"),
+    },
+    "mediaingredientmech": {
+        "identity_mapping": ("discovery", "synthesis", "verification"),
+        "functional_roles": ("discovery", "synthesis", "verification"),
+    },
+    "communitymech": {
+        "ecological_mechanism": ("discovery", "synthesis", "verification"),
+        "datasets_environment": ("discovery", "synthesis", "verification"),
+    },
+    "traitmech": {
+        "causal_mechanism": ("discovery", "synthesis", "verification"),
+        "definition_grounding": ("discovery", "synthesis", "verification"),
+    },
+    "proteintraitsmech": {
+        "mechanism": ("discovery", "synthesis", "verification"),
+        "family_grounding": ("discovery", "synthesis", "verification"),
+    },
+}
+EXPECTED_MECH_KEYS = tuple(EXPECTED_FOCUS_STAGES)
+
+
+def _fixture_paths() -> dict[str, Path]:
+    return {path.stem: path for path in sorted(FIXTURE_ROOT.glob("*.yaml"))}
+
+
+def _focus_stages(profile: ResearchProfile) -> dict[str, tuple[str, ...]]:
+    return {focus_name: tuple(focus.stages) for focus_name, focus in profile.focuses.items()}
+
+
+def _provenance() -> dict[str, dict[str, Any]]:
+    document = json.loads(PROVENANCE_PATH.read_text(encoding="utf-8"))
+    assert document["version"] == 1
+    assert set(document) == {"version", "profiles"}
+    assert isinstance(document["profiles"], dict)
+    return document["profiles"]
 
 
 def _configured_mech_profiles() -> list[tuple[str, Path]]:
-    """(key, profile path) for every Mech whose checkout is present locally."""
+    """Return configured local profiles for the optional drift audit."""
     manifest = load_fleet_manifest()
     found = []
     for key, mech in manifest.mechs.items():
@@ -41,62 +84,94 @@ def _configured_mech_profiles() -> list[tuple[str, Path]]:
         if not root:
             continue
         candidate = Path(root).expanduser() / PROFILE_RELATIVE_PATH
-        if candidate.is_file():
-            found.append((key, candidate))
+        if not candidate.is_file():
+            raise AssertionError(
+                f"{mech.environment_variable} is set but the research profile "
+                f"does not exist: {candidate}"
+            )
+        found.append((key, candidate))
     return found
 
 
-MECH_PROFILES = _configured_mech_profiles()
-MECH_IDS = [key for key, _ in MECH_PROFILES]
-
-
-def test_the_manifest_declares_the_whole_fleet():
-    """Guards the parametrization source: an empty manifest would skip everything."""
+def test_fixture_inventory_matches_the_exact_manifest_fleet() -> None:
     manifest = load_fleet_manifest()
-    assert len(manifest.mechs) >= 5
+    assert manifest.keys == EXPECTED_MECH_KEYS
+    assert set(_fixture_paths()) == set(manifest.keys)
+    assert set(_provenance()) == set(manifest.keys)
 
 
-@pytest.mark.skipif(not MECH_PROFILES, reason="no Mech checkout is configured locally")
-@pytest.mark.parametrize(("key", "path"), MECH_PROFILES, ids=MECH_IDS)
-def test_a_real_mech_profile_validates_against_the_shared_loader(key, path):
-    profile = load_profile(path)
-    assert profile.focuses, f"{key} declares no focuses"
+@pytest.mark.parametrize("key", EXPECTED_MECH_KEYS)
+def test_fixture_bytes_are_locked_to_machine_readable_provenance(key: str) -> None:
+    manifest = load_fleet_manifest()
+    record = _provenance()[key]
+    assert set(record) == {"repository", "commit", "path", "sha256"}
+    assert record["repository"] == manifest.mechs[key].github
+    assert record["path"] == PROFILE_RELATIVE_PATH.as_posix()
+    assert re.fullmatch(r"[0-9a-f]{40}", record["commit"])
+    digest = hashlib.sha256(_fixture_paths()[key].read_bytes()).hexdigest()
+    assert digest == record["sha256"]
+
+
+@pytest.mark.parametrize("key", EXPECTED_MECH_KEYS)
+def test_owned_profile_fixture_preserves_identity_and_focus_structure(key: str) -> None:
+    manifest = load_fleet_manifest()
+    profile = load_profile(_fixture_paths()[key])
+
+    assert profile.mech == manifest.mechs[key].display_name
     assert profile.default_focus in profile.focuses
+    assert _focus_stages(profile) == EXPECTED_FOCUS_STAGES[key]
 
 
-@pytest.mark.skipif(not MECH_PROFILES, reason="no Mech checkout is configured locally")
-@pytest.mark.parametrize(("key", "path"), MECH_PROFILES, ids=MECH_IDS)
-def test_every_focus_of_a_real_profile_ranks_without_a_provider_call(key, path):
-    profile = load_profile(path)
+@pytest.mark.parametrize("key", EXPECTED_MECH_KEYS)
+def test_every_owned_focus_ranks_offline(key: str) -> None:
+    profile = load_profile(_fixture_paths()[key])
     for focus_name in profile.focuses:
-        report = build_report(
-            profile, focus_name, environ={}, probe=NO_LOCAL_TOOLING
-        )
+        report = build_report(profile, focus_name, environ={}, probe=NO_LOCAL_TOOLING)
         assert report["stages"], f"{key}/{focus_name} produced no stages"
         for stage in report["stages"]:
             assert len(stage["ranking"]) >= 1
 
 
-@pytest.mark.skipif(not MECH_PROFILES, reason="no Mech checkout is configured locally")
-@pytest.mark.parametrize(("key", "path"), MECH_PROFILES, ids=MECH_IDS)
-def test_no_real_profile_authorizes_a_call_with_no_credentials(key, path):
-    """With nothing configured, every Mech's default stage must refuse, not route."""
-    profile = load_profile(path)
-    focus = profile.focus()
-    for stage_name in focus.stages:
+@pytest.mark.parametrize("key", EXPECTED_MECH_KEYS)
+def test_no_owned_profile_authorizes_a_call_without_configuration(key: str) -> None:
+    """With no configured provider, every default-focus stage must refuse."""
+    profile = load_profile(_fixture_paths()[key])
+    for stage_name in profile.focus().stages:
         plan = plan_stage(
-            profile, stage_name, environ={}, probe=NO_LOCAL_TOOLING
+            profile,
+            stage_name,
+            environ={},
+            probe=NO_LOCAL_TOOLING,
         )
         with pytest.raises(PolicyError, match="No provider is available"):
             authorize(plan, apply=True)
 
 
-def test_the_local_fleet_coverage_is_reported(record_property):
-    """Make the skip visible: a run that exercised nothing must say so."""
-    record_property("mech_profiles_exercised", ",".join(MECH_IDS) or "none")
-    assert isinstance(MECH_PROFILES, list)
+def test_configured_local_profiles_match_the_owned_contract() -> None:
+    """Optionally detect downstream drift without making CI depend on siblings."""
+    configured = _configured_mech_profiles()
+    if not configured:
+        pytest.skip("no Mech checkout is configured locally")
+
+    manifest = load_fleet_manifest()
+    for key, path in configured:
+        profile = load_profile(path)
+        assert profile.mech == manifest.mechs[key].display_name
+        assert _focus_stages(profile) == EXPECTED_FOCUS_STAGES[key]
+        assert profile == load_profile(_fixture_paths()[key])
 
 
-def test_a_profile_path_that_does_not_exist_raises_profile_error(tmp_path):
+def test_an_explicit_but_missing_local_root_fails_closed(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    manifest = load_fleet_manifest()
+    for mech in manifest.mechs.values():
+        monkeypatch.delenv(mech.environment_variable, raising=False)
+    monkeypatch.setenv("CULTUREMECH_ROOT", str(tmp_path / "missing-culturemech"))
+    with pytest.raises(AssertionError, match="CULTUREMECH_ROOT is set"):
+        _configured_mech_profiles()
+
+
+def test_a_profile_path_that_does_not_exist_raises_profile_error(tmp_path: Path) -> None:
     with pytest.raises(ProfileError):
         load_profile(tmp_path / "conf" / "deep_research_provider.yaml")
