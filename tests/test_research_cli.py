@@ -72,7 +72,7 @@ def profile_path(tmp_path: Path) -> Path:
 
 @pytest.fixture(autouse=True)
 def _no_ambient_credentials(monkeypatch):
-    """The CLI reads the real environment; pin it so results are deterministic."""
+    """Pin ambient credentials and local tooling so CLI tests are deterministic."""
     for key in (
         "ASTA_API_KEY",
         "OPENAI_API_KEY",
@@ -86,6 +86,14 @@ def _no_ambient_credentials(monkeypatch):
         "ENABLE_MOCK_PROVIDER",
     ):
         monkeypatch.delenv(key, raising=False)
+    monkeypatch.setattr(
+        "kg_microbe_research.providers.SystemProbe.which",
+        lambda _self, _executable: False,
+    )
+    monkeypatch.setattr(
+        "kg_microbe_research.providers.SystemProbe.has_module",
+        lambda _self, _module: False,
+    )
 
 
 @pytest.fixture
@@ -336,6 +344,7 @@ def test_authorize_refuses_a_live_paid_call_with_exit_code_two(
 def test_authorize_permits_the_same_call_once_the_charge_is_acknowledged(
     monkeypatch, availability_path, profile_path, capsys
 ):
+    monkeypatch.setenv("ASTA_API_KEY", "x")
     monkeypatch.setenv("OPENAI_API_KEY", "x")
     exit_code = main(
         [
@@ -360,11 +369,13 @@ def test_authorize_permits_the_same_call_once_the_charge_is_acknowledged(
     assert payload["mode"] == "live"
     assert payload["execution_authorized"] is True
     assert payload["usage_authorization_required"] is True
+    assert any(reason.startswith("override:") for reason in payload["reasons"])
 
 
 def test_authorize_refuses_an_eligible_fallback_without_an_override_reason(
     monkeypatch, availability_path, profile_path, capsys
 ):
+    monkeypatch.setenv("ASTA_API_KEY", "x")
     monkeypatch.setenv("OPENAI_API_KEY", "x")
     exit_code = main(
         [
