@@ -117,6 +117,13 @@ EXACT_QUALITIES = {"EXACT_MATCH", "SYNONYM_MATCH"}
 # ontology's own label instead, so anything added to their `other` is dropped.
 SYMMETRIC_PREDICATES = {"skos:exactMatch", "skos:closeMatch"}
 
+# MIM retains curator-rejected candidate labels on the record so their source
+# and review decision are auditable.  They are deliberately not names the
+# record answers to and must never be emitted through SSSOM ``other``.  Keep the
+# comparison case-insensitive so an upstream spelling variant cannot recreate a
+# reviewed rejection.
+NON_PUBLISHABLE_MIM_SYNONYM_TYPES = {"REJECTED_LABEL"}
+
 JUST_MANUAL = "semapv:ManualMappingCuration"
 JUST_LEXICAL = "semapv:LexicalMatching"
 
@@ -600,10 +607,21 @@ def _row_from_yaml(
     # kg-microbe cross-source data is CHEBI-only.
     kgm_name, kgm_syns = kgm_labels.get(obj_id, ("", [])) if is_chebi else ("", [])
     kgm_src = kgm_sources.get(obj_id, "") if is_chebi else ""
+    mim_synonym_rows = [
+        s for s in (data.get("synonyms") or [])
+        if isinstance(s, dict) and (s.get("synonym_text") or "").strip()
+    ]
+    rejected_labels = {
+        (s.get("synonym_text") or "").strip().casefold()
+        for s in mim_synonym_rows
+        if (s.get("synonym_type") or "").strip().upper()
+        in NON_PUBLISHABLE_MIM_SYNONYM_TYPES
+    }
     mim_yaml_syns = [
         (s.get("synonym_text") or "").strip()
-        for s in (data.get("synonyms") or [])
-        if isinstance(s, dict) and s.get("synonym_text")
+        for s in mim_synonym_rows
+        if (s.get("synonym_type") or "").strip().upper()
+        not in NON_PUBLISHABLE_MIM_SYNONYM_TYPES
     ]
     # `other` carries alternate surface forms that downstream consumers can
     # adopt as synonyms. Order: MIM's original ontology_label (preserved
@@ -617,7 +635,8 @@ def _row_from_yaml(
     # not chemical synonyms.
     candidate_alts = [
         a for a in candidate_alts
-        if not re.match(r"^\s*(Role:|Cross-references:|Properties:)", a or "")
+        if (a or "").strip().casefold() not in rejected_labels
+        and not re.match(r"^\s*(Role:|Cross-references:|Properties:)", a or "")
     ]
     other = _pipe(candidate_alts, drop=drop, max_entries=MAX_OTHER_ENTRIES)
 
