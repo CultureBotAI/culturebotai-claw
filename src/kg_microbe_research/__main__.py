@@ -363,6 +363,12 @@ def no_paid_unsatisfiable_note() -> str | None:
     )
 
 
+# The refusal shape the --no-paid note explains: an empty candidate set. Both
+# emitters phrase it this way; `test_both_emitters_still_phrase_an_empty_set
+# _this_way` fails if either is reworded, so the coupling cannot rot silently.
+_EMPTY_CANDIDATE_SET = "no provider is available"
+
+
 def _explain_no_paid(message: str, no_paid: bool) -> str:
     """Append the unsatisfiable-`--no-paid` explanation to a refusal, if it applies.
 
@@ -371,8 +377,13 @@ def _explain_no_paid(message: str, no_paid: bool) -> str:
     reported the same empty result as a statement about the research target
     rather than about the flag (#155). Fixing them one at a time is what let the
     third slip.
+
+    Only refusals the flag actually caused are annotated. Appending it whenever
+    `--no-paid` was merely *set* told a caller whose provider was blocked, or
+    whose credential was missing, to try `--max-cost` -- advice that could not
+    have helped, on top of a paragraph about a different problem (#157).
     """
-    if not no_paid:
+    if not no_paid or _EMPTY_CANDIDATE_SET not in message.casefold():
         return message
     note = no_paid_unsatisfiable_note()
     return message if note is None else f"{message}. {note}"

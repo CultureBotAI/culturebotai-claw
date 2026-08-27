@@ -339,3 +339,79 @@ def test_no_command_mentions_no_paid_when_the_flag_is_not_passed(
 
     output = capsys.readouterr()
     assert "--no-paid cannot currently be satisfied" not in output.out + output.err
+
+
+# --------------------------------------------------------------------------
+# #157: the explanation belongs only on refusals the flag actually caused
+# --------------------------------------------------------------------------
+
+
+UNRELATED_REFUSALS = {
+    # falcon is measured-dead; --max-cost cannot help.
+    "blocked-provider": (
+        {"EDISON_API_KEY": "x"},
+        ["--provider", "falcon", "--apply", "--acknowledge-usage"],
+    ),
+    # consensus needs a credential; --max-cost cannot help either.
+    "missing-credential": ({}, ["--provider", "consensus", "--apply"]),
+}
+
+
+@pytest.mark.parametrize(
+    ("environ", "extra"), list(UNRELATED_REFUSALS.values()), ids=list(UNRELATED_REFUSALS)
+)
+def test_an_unrelated_refusal_is_not_annotated_with_the_no_paid_note(
+    monkeypatch, capsys, environ, extra
+):
+    """#157: the note was appended whenever --no-paid was merely *set*.
+
+    A caller whose provider is blocked, or whose credential is missing, was told
+    to try `--max-cost` -- advice that could not have helped -- with the real
+    cause buried under a paragraph about a different problem.
+
+    The existing negative test only covered "the flag was not passed", which is
+    exactly why this slipped through.
+    """
+    for key, value in environ.items():
+        monkeypatch.setenv(key, value)
+    code = _run(monkeypatch, [
+        "authorize", "--profile", str(FIXTURE), "--stage", "discovery",
+        "--no-paid", "--json", *extra,
+    ])
+    assert code == POLICY_REFUSAL
+    error = json.loads(capsys.readouterr().out)["error"]
+    assert "--no-paid cannot currently be satisfied" not in error
+    assert "--max-cost" not in error, "suggested a remedy that cannot apply"
+
+
+def test_the_genuine_no_paid_refusal_is_still_annotated(monkeypatch, capsys):
+    """The guard must not silence the case the note exists for."""
+    assert _run(monkeypatch, [
+        "authorize", "--profile", str(FIXTURE), "--stage", "discovery",
+        "--no-paid", "--json",
+    ]) == POLICY_REFUSAL
+    assert "--no-paid cannot currently be satisfied" in (
+        json.loads(capsys.readouterr().out)["error"]
+    )
+
+
+def test_both_emitters_still_phrase_an_empty_set_this_way(monkeypatch, tmp_path, capsys):
+    """The note keys on a message shape; pin that both emitters still produce it.
+
+    A rewording of either refusal would otherwise silently stop annotating the
+    one case the note exists for, with every test still green.
+    """
+    from kg_microbe_research.__main__ import _EMPTY_CANDIDATE_SET
+
+    monkeypatch.setenv("ASTA_API_KEY", "x")
+    monkeypatch.setenv("CBORG_API_KEY", "x")
+
+    _run(monkeypatch, [
+        "authorize", "--profile", str(FIXTURE), "--stage", "discovery", "--no-paid",
+    ])
+    authorize_error = capsys.readouterr().err
+    assert _EMPTY_CANDIDATE_SET in authorize_error.casefold()
+
+    _run(monkeypatch, _no_paid_invocation("scaffold-result", tmp_path))
+    scaffold_error = capsys.readouterr().err
+    assert _EMPTY_CANDIDATE_SET in scaffold_error.casefold()
