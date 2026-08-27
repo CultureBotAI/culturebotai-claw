@@ -18,6 +18,7 @@ import pytest
 from kg_microbe_research import (
     PROVIDERS,
     PolicyError,
+    PolicyInputError,
     StaticAvailability,
     StaticProbe,
     authorize,
@@ -442,7 +443,9 @@ def test_changed_evidence_invalidates_an_existing_plan(profile):
 
 
 def test_an_unknown_allowlist_entry_is_refused_when_planning(profile):
-    with pytest.raises(PolicyError, match="Unknown provider"):
+    """PolicyInputError, not PolicyError: a typo is malformed input, and the CLI
+    maps the two to different exit codes (#153)."""
+    with pytest.raises(PolicyInputError, match="Unknown provider"):
         plan_stage(
             profile,
             "discovery",

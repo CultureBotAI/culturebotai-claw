@@ -14,15 +14,17 @@ import json
 import sys
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
-from .policy import COST_TIERS, PolicyError, authorize, plan_stage
+from .policy import COST_TIERS, PolicyError, PolicyInputError, authorize, plan_stage
 from .profile import ProfileError, ResearchProfile, load_profile
 from .providers import (
     PROVIDERS,
     AvailabilityError,
     AvailabilityEvidence,
+    free_providers,
     load_availability,
+    no_paid_candidates,
     normalize_allowlist,
     provider_status,
     requires_usage_authorization,
@@ -139,7 +141,9 @@ def _cmd_triage(args: argparse.Namespace) -> int:
         if unknown:
             # Same refusal as `authorize`; otherwise a typo'd --allow is
             # indistinguishable from "no provider fits" and still exits 0.
-            raise PolicyError(
+            # PolicyInputError, not PolicyError: this is a malformed argument,
+            # and both commands must classify it identically (#153).
+            raise PolicyInputError(
                 f"Unknown provider(s) in allowlist: {unknown}; choose from "
                 f"{', '.join(sorted(PROVIDERS))}"
             )
@@ -150,8 +154,19 @@ def _cmd_triage(args: argparse.Namespace) -> int:
         no_paid=args.no_paid,
         availability=availability,
     )
+    note = (
+        no_paid_unsatisfiable_note()
+        if args.no_paid
+        and all(stage["recommended_available"] is None for stage in report["stages"])
+        else None
+    )
+    if note is not None:
+        report["no_paid_unsatisfiable"] = note
     if args.json:
         print(json.dumps(report, indent=2))
+        if note is not None:
+            print(f"error: {note}", file=sys.stderr)
+            return 1
         return 0
     print(f"{report['mech']} — {report['focus_label']} ({report['focus']})")
     if report["target"]:
@@ -179,6 +194,9 @@ def _cmd_triage(args: argparse.Namespace) -> int:
             for row in stage["ranking"]
         ]
         print(_table(RANKED_HEADERS, rows))
+    if note is not None:
+        print(f"error: {note}", file=sys.stderr)
+        return 1
     return 0
 
 
@@ -202,16 +220,25 @@ def _cmd_authorize(args: argparse.Namespace) -> int:
             max_cost=args.max_cost,
             override_reason=args.override_reason,
         )
-    except PolicyError as exc:
+    except (PolicyInputError, PolicyError) as exc:
+        # Same machine-readable shape for both, because a --json caller needs a
+        # payload either way. Only the exit code separates them: 2 is reserved
+        # for a refusal policy actually decided, 1 for malformed input (#153).
+        malformed = isinstance(exc, PolicyInputError)
+        message = str(exc)
+        if not malformed and args.no_paid and "no-paid" in message:
+            note = no_paid_unsatisfiable_note()
+            if note is not None:
+                message = f"{message}. {note}"
         payload: dict[str, Any] = {
             "execution_authorized": False,
-            "error": str(exc),
+            "error": message,
         }
         if args.json:
             print(json.dumps(payload, indent=2))
         else:
-            print(f"Refused: {exc}", file=sys.stderr)
-        return 2
+            print(f"Refused: {message}", file=sys.stderr)
+        return 1 if malformed else 2
     payload = {"execution_authorized": decision.live, **decision.as_dict()}
     if args.json:
         print(json.dumps(payload, indent=2))
@@ -303,6 +330,36 @@ def _cmd_validate_result(args: argparse.Namespace) -> int:
     return 0
 
 
+def no_paid_unsatisfiable_note() -> str | None:
+    """Why `--no-paid` returned nothing, when it could never have returned more.
+
+    `recommendable` keeps only billing-class `free` providers and drops
+    `NEVER_RECOMMENDED` ones, so a catalogue whose only free provider is `mock`
+    makes the flag empty for every profile, stage, and configuration. Reporting
+    that as a bare "recommends None" is indistinguishable from a misconfigured
+    profile, which is the failure #137 was about (#152).
+
+    Returns None when the flag is satisfiable, so classifying any routable
+    provider as `free` retires this message with no code change.
+    """
+    if no_paid_candidates():
+        return None
+    free = free_providers()
+    detail = (
+        f"the only provider(s) classified free are {list(free)}, which are never "
+        f"recommended"
+        if free
+        else "no provider is classified free"
+    )
+    return (
+        f"--no-paid cannot currently be satisfied: {detail}. Every routable "
+        f"provider is metered or of unknown billing, so this flag returns no "
+        f"recommendation for any profile or stage. Bound relative cost with "
+        f"--max-cost instead, or authorize metered use explicitly with "
+        f"--acknowledge-usage."
+    )
+
+
 def _add_profile_argument(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--profile",
@@ -323,13 +380,29 @@ def _add_availability_argument(parser: argparse.ArgumentParser) -> None:
     )
 
 
+class _UsageExitParser(argparse.ArgumentParser):
+    """An argument parser whose usage errors exit 1, not argparse's default 2.
+
+    This CLI documents 2 as "a policy refusal". argparse exits 2 for a missing
+    argument, an unknown subcommand, or a bad `choices` value, so without this
+    a wrapper reading exit 2 as "policy said no" cannot tell a decision from a
+    typo (#153). Malformed input is 1 here, uniformly.
+    """
+
+    def error(self, message: str) -> NoReturn:
+        self.print_usage(sys.stderr)
+        self.exit(1, f"{self.prog}: error: {message}\n")
+
+
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
+    parser = _UsageExitParser(
         prog="kg-microbe-research",
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers = parser.add_subparsers(
+        dest="command", required=True, parser_class=_UsageExitParser
+    )
 
     providers = subparsers.add_parser(
         "providers", help="List the shared provider catalogue and local status."
@@ -451,6 +524,7 @@ def main(argv: list[str] | None = None) -> int:
     except (
         AvailabilityError,
         FileExistsError,
+        PolicyInputError,
         ProfileError,
         PolicyError,
         ResearchRecordError,

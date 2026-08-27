@@ -800,6 +800,28 @@ def unknown_providers(names: Iterable[str]) -> list[str]:
     return sorted({str(name) for name in names} - set(PROVIDERS))
 
 
+# Providers that are never a recommendation, whatever their status or billing.
+# `recommendable` and the --no-paid satisfiability check must agree on this, so
+# it is named once rather than spelled `!= "mock"` in each (the #139 lesson).
+NEVER_RECOMMENDED = frozenset({"mock"})
+
+
+def free_providers() -> tuple[str, ...]:
+    """Catalogue providers whose billing class is explicitly `free`."""
+    return tuple(sorted(name for name, p in PROVIDERS.items() if p.billing == "free"))
+
+
+def no_paid_candidates() -> tuple[str, ...]:
+    """Providers `--no-paid` could ever recommend.
+
+    Empty means the flag is unsatisfiable by construction rather than by
+    configuration: every provider a caller could be routed to is metered or of
+    unknown billing, so no credential, evidence, or profile can make --no-paid
+    produce a recommendation (#152).
+    """
+    return tuple(name for name in free_providers() if name not in NEVER_RECOMMENDED)
+
+
 def requires_usage_authorization(provider: str) -> bool:
     """Whether live use needs a separate quota/billing decision.
 

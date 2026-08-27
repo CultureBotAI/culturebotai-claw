@@ -16,6 +16,7 @@ from typing import Any
 from .profile import Focus, ProfileError, ResearchProfile, Stage
 from .providers import (
     COST_VALUE,
+    NEVER_RECOMMENDED,
     PROVIDERS,
     SYNTHESIS_VALUE,
     TIME_VALUE,
@@ -159,7 +160,11 @@ def recommendable(
     `--provider asta --json` recommended `claude_code` out of a document whose
     only ranked provider was asta (CultureMech#290).
     """
-    out = [row for row in rows if row.status == "available" and row.provider != "mock"]
+    out = [
+        row
+        for row in rows
+        if row.status == "available" and row.provider not in NEVER_RECOMMENDED
+    ]
     allowlist = normalize_allowlist(allow)
     if allowlist is not None:
         out = [row for row in out if row.provider in allowlist]

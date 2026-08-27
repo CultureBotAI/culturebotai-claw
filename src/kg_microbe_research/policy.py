@@ -45,6 +45,16 @@ from .triage import Ranked, rank_stage, recommendable
 COST_TIERS: tuple[str, ...] = tuple(sorted(COST_VALUE, key=lambda tier: COST_VALUE[tier]))
 
 
+class PolicyInputError(ValueError):
+    """An argument to planning is malformed, before any policy question is asked.
+
+    Deliberately NOT a `PolicyError`: the CLI reports a policy refusal as exit 2,
+    and a misspelled provider name is a typo, not a decision policy made. A
+    caller that reads exit 2 as "policy said no, try another provider" would act
+    on a typo as though it were a refusal (#153).
+    """
+
+
 class PolicyError(RuntimeError):
     """A requested execution is not permitted."""
 
@@ -191,7 +201,7 @@ def plan_stage(
     if allowlist is not None:
         unknown = unknown_providers(allowlist)
         if unknown:
-            raise PolicyError(
+            raise PolicyInputError(
                 f"Unknown provider(s) in allowlist: {unknown}; choose from "
                 f"{', '.join(sorted(PROVIDERS))}"
             )

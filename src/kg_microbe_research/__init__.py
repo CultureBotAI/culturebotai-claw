@@ -15,6 +15,7 @@ from __future__ import annotations
 from .policy import (
     COST_TIERS,
     PolicyError,
+    PolicyInputError,
     authorize,
     plan_stage,
 )
@@ -96,6 +97,7 @@ __all__ = [
     "Focus",
     "LocalProbe",
     "PolicyError",
+    "PolicyInputError",
     "ProfileError",
     "Provider",
     "RESEARCH_VERSION",

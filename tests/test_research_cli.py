@@ -642,7 +642,16 @@ def test_triage_refuses_an_unknown_allowlist_entry(monkeypatch, profile_path, ca
     assert "Unknown provider" in capsys.readouterr().err
 
 
-def test_authorize_planning_refusal_uses_json_and_exit_code_two(profile_path, capsys):
+def test_authorize_planning_refusal_uses_json_and_the_malformed_input_code(
+    profile_path, capsys
+):
+    """A --json caller still gets a payload; the code says "typo", not "refused".
+
+    This asserted exit 2 until #153. Exit 2 is documented as a policy refusal,
+    and a misspelled provider name is not one -- a caller reading 2 as "policy
+    said no, try another provider" would act on a typo. The JSON shape is
+    unchanged, because a machine-readable refusal is still what --json owes.
+    """
     assert (
         main(
             [
@@ -656,7 +665,7 @@ def test_authorize_planning_refusal_uses_json_and_exit_code_two(profile_path, ca
                 "--json",
             ]
         )
-        == 2
+        == 1
     )
     payload = json.loads(capsys.readouterr().out)
     assert payload["execution_authorized"] is False
