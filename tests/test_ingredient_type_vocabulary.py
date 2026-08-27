@@ -114,9 +114,15 @@ def test_classify_emits_the_schema_token_not_a_literal(monkeypatch, tmp_path):
 
 def test_no_module_in_claw_hardcodes_the_medium_token():
     """A second literal would drift from the schema exactly the way
-    report_hydrate_grounding.py's regex copy drifted from hydrate_guard.py."""
+    report_hydrate_grounding.py's regex copy drifted from hydrate_guard.py.
+
+    Covers src/ as well as scripts/ (#148): nothing in src/ references the
+    token today, so scoping the guard to scripts/ would have read as "this is
+    checked" to anyone later adding ingredient-type handling there.
+    """
     offenders = []
-    for path in (REPO_ROOT / "scripts").rglob("*.py"):
+    roots = [REPO_ROOT / "scripts", REPO_ROOT / "src"]
+    for path in (p for root in roots for p in root.rglob("*.py")):
         for lineno, line in enumerate(
                 path.read_text(encoding="utf-8").splitlines(), start=1):
             if '"DEFINED_MEDIUM"' in line or "'DEFINED_MEDIUM'" in line:
