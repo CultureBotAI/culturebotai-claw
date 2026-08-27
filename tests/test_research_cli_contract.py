@@ -262,3 +262,80 @@ def _evidence(tmp_path: Path, *names: str) -> Path:
         },
     }), encoding="utf-8")
     return path
+
+
+# --------------------------------------------------------------------------
+# #155: every command that accepts --no-paid must explain an empty result
+# --------------------------------------------------------------------------
+
+
+def _scaffold_repository(tmp_path: Path) -> Path:
+    """A minimal repository the scaffold command will accept."""
+    root = tmp_path / "repo"
+    (root / "conf").mkdir(parents=True)
+    (root / "research").mkdir(parents=True)
+    (root / "conf" / "deep_research_provider.yaml").write_text(
+        FIXTURE.read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    (root / "research" / "target.yaml").write_text("id: TEST:1\n", encoding="utf-8")
+    return root
+
+
+def _no_paid_invocation(command: str, tmp_path: Path) -> list[str]:
+    if command == "triage":
+        return ["triage", "--profile", str(FIXTURE), "--no-paid"]
+    if command == "authorize":
+        return [
+            "authorize", "--profile", str(FIXTURE), "--stage", "discovery", "--no-paid",
+        ]
+    root = _scaffold_repository(tmp_path)
+    return [
+        "scaffold-result", "--repository-root", str(root),
+        "--profile", "conf/deep_research_provider.yaml",
+        "--target-path", "research/target.yaml",
+        "--target-id", "TEST:1", "--target-label", "t", "--target-type", "medium",
+        "--question", "q", "--output", "research/result.yaml",
+        "--availability-evidence", str(_evidence(tmp_path, "asta", "cborg")),
+        "--no-paid",
+    ]
+
+
+@pytest.mark.parametrize("command", ["triage", "authorize", "scaffold-result"])
+def test_every_no_paid_command_explains_an_unsatisfiable_flag(
+    monkeypatch, tmp_path, capsys, command
+):
+    """One test for all three, because fixing them one at a time is what let
+    `scaffold-result` slip after #152 was closed for the other two.
+
+    `scaffold-result` is the worst place to be silent: it reports the empty
+    result as "no provider is available for this target", which reads as a
+    claim about the research target rather than about a flag.
+    """
+    monkeypatch.setenv("ASTA_API_KEY", "x")
+    monkeypatch.setenv("CBORG_API_KEY", "x")
+    assert providers_module.no_paid_candidates() == ()
+
+    code = _run(monkeypatch, _no_paid_invocation(command, tmp_path))
+
+    assert code != 0, f"{command} --no-paid should not succeed while unsatisfiable"
+    output = capsys.readouterr()
+    combined = output.out + output.err
+    assert "--no-paid cannot currently be satisfied" in combined, (
+        f"{command} gave no explanation for an empty --no-paid result"
+    )
+    assert "--max-cost" in combined
+
+
+@pytest.mark.parametrize("command", ["triage", "authorize", "scaffold-result"])
+def test_no_command_mentions_no_paid_when_the_flag_is_not_passed(
+    monkeypatch, tmp_path, capsys, command
+):
+    """The explanation must not leak into unrelated failures."""
+    monkeypatch.setenv("ASTA_API_KEY", "x")
+    monkeypatch.setenv("CBORG_API_KEY", "x")
+    argv = [arg for arg in _no_paid_invocation(command, tmp_path) if arg != "--no-paid"]
+
+    _run(monkeypatch, argv)
+
+    output = capsys.readouterr()
+    assert "--no-paid cannot currently be satisfied" not in output.out + output.err

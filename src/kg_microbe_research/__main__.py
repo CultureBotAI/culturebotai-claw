@@ -226,10 +226,8 @@ def _cmd_authorize(args: argparse.Namespace) -> int:
         # for a refusal policy actually decided, 1 for malformed input (#153).
         malformed = isinstance(exc, PolicyInputError)
         message = str(exc)
-        if not malformed and args.no_paid and "no-paid" in message:
-            note = no_paid_unsatisfiable_note()
-            if note is not None:
-                message = f"{message}. {note}"
+        if not malformed:
+            message = _explain_no_paid(message, args.no_paid)
         payload: dict[str, Any] = {
             "execution_authorized": False,
             "error": message,
@@ -283,20 +281,25 @@ def _cmd_scaffold_result(args: argparse.Namespace) -> int:
     profile_path = _repository_file(repository, args.profile, "--profile")
     target_path = _repository_file(repository, args.target_path, "--target-path")
     availability = _availability(args)
-    result = build_dry_run_result(
-        repository_root=repository,
-        profile_path=profile_path,
-        target_path=target_path,
-        target_id=args.target_id,
-        target_label=args.target_label,
-        target_type=args.target_type,
-        question=args.question,
-        question_id=args.question_id,
-        focus_name=args.focus,
-        allow=args.allow or None,
-        no_paid=args.no_paid,
-        availability=availability,
-    )
+    try:
+        result = build_dry_run_result(
+            repository_root=repository,
+            profile_path=profile_path,
+            target_path=target_path,
+            target_id=args.target_id,
+            target_label=args.target_label,
+            target_type=args.target_type,
+            question=args.question,
+            question_id=args.question_id,
+            focus_name=args.focus,
+            allow=args.allow or None,
+            no_paid=args.no_paid,
+            availability=availability,
+        )
+    except (PolicyError, ResearchRecordError) as exc:
+        # Otherwise this reads as "no provider suits this research target",
+        # which is a claim about the science rather than about a flag (#155).
+        raise type(exc)(_explain_no_paid(str(exc), args.no_paid)) from exc
     if args.output:
         raw_output = Path(args.output)
         output = raw_output if raw_output.is_absolute() else repository / raw_output
@@ -358,6 +361,21 @@ def no_paid_unsatisfiable_note() -> str | None:
         f"--max-cost instead, or authorize metered use explicitly with "
         f"--acknowledge-usage."
     )
+
+
+def _explain_no_paid(message: str, no_paid: bool) -> str:
+    """Append the unsatisfiable-`--no-paid` explanation to a refusal, if it applies.
+
+    Shared by every command that accepts the flag. #152 was fixed for `triage`
+    and `authorize` and missed `scaffold-result`, which takes the same flag and
+    reported the same empty result as a statement about the research target
+    rather than about the flag (#155). Fixing them one at a time is what let the
+    third slip.
+    """
+    if not no_paid:
+        return message
+    note = no_paid_unsatisfiable_note()
+    return message if note is None else f"{message}. {note}"
 
 
 def _add_profile_argument(parser: argparse.ArgumentParser) -> None:
