@@ -112,8 +112,15 @@ def medium_granularity_token() -> str:
             f"vocabulary."
         )
 
-    enum = ((schema.get("enums") or {}).get("IngredientTypeEnum")) or {}
-    values = (enum.get("permissible_values") if isinstance(enum, dict) else None) or {}
+    # Every level is isinstance-guarded, not just `or {}`-guarded: a truthy
+    # non-mapping (`enums: [a, b]`) passes `or {}` untouched and then raises
+    # AttributeError, which escapes the VocabularyError contract this function
+    # advertises and reaches the caller as a traceback (#150).
+    enums = schema.get("enums")
+    enum = enums.get("IngredientTypeEnum") if isinstance(enums, dict) else None
+    values = enum.get("permissible_values") if isinstance(enum, dict) else None
+    if not isinstance(values, (dict, list)):
+        values = {}
     for token in _MEDIUM_GRANULARITY:
         if token in values:
             return token

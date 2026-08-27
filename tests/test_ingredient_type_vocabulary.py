@@ -213,3 +213,29 @@ def test_no_module_in_claw_hardcodes_the_medium_token():
     assert not offenders, (
         "hardcoded medium token; call medium_granularity_token() instead: "
         + ", ".join(offenders))
+
+
+@pytest.mark.parametrize(
+    "enums_block",
+    ["enums:\n  - a\n  - b\n", "enums: just-a-string\n",
+     "enums:\n  IngredientTypeEnum:\n    - not\n    - a mapping\n",
+     "enums:\n  IngredientTypeEnum:\n    permissible_values: nope\n"],
+    ids=["enums-list", "enums-string", "enum-list", "values-string"],
+)
+def test_a_structurally_wrong_enums_block_raises_vocabulary_error(
+        monkeypatch, tmp_path, enums_block):
+    """#150: `or {}` does nothing for a truthy non-mapping.
+
+    These parse as valid YAML, so they reach the lookup and used to raise
+    AttributeError -- which the entry points do not catch, so a malformed
+    schema printed a traceback instead of the clean refusal every other
+    unreadable-vocabulary case gets.
+    """
+    schema = tmp_path / "src" / "mediaingredientmech" / "schema"
+    schema.mkdir(parents=True)
+    (schema / "mediaingredientmech.yaml").write_text(enums_block, encoding="utf-8")
+
+    mod = _load(monkeypatch, tmp_path)
+
+    with pytest.raises(mod.VocabularyError):
+        mod.medium_granularity_token()
