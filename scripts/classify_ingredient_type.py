@@ -293,6 +293,16 @@ def main() -> int:
                     help="overwrite ingredient_type even if already set")
     args = ap.parse_args()
 
+    # Resolve the vocabulary BEFORE the walk. It is used lazily, on the first
+    # record whose name matches the medium pattern, and --apply writes per
+    # record -- so a present-but-unreadable MIM schema used to write every
+    # earlier record and then abort, leaving an unknown subset of someone
+    # else's corpus modified with no recovery path in the output (#156).
+    # Failing here touches nothing. It also removes a hidden inconsistency:
+    # whether a broken schema was noticed at all depended on whether the corpus
+    # happened to contain a medium-pattern record.
+    medium_granularity_token()
+
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     rows: list[tuple[str, str, str, str, str]] = []
     counts: dict[str, int] = {}

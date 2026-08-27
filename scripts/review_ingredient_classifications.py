@@ -66,6 +66,13 @@ def suggest_for_unset(record: dict) -> tuple[str, str]:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.parse_args()  # no flags yet; placeholder for future filtering
+
+    # Resolve the vocabulary up front, as classify_ingredient_type does. This
+    # command does not write, so there is no partial-mutation risk, but failing
+    # immediately rather than after a full corpus scan keeps the two entry
+    # points behaving alike (#156).
+    medium_granularity_token()
+
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
     rows: list[tuple[str, str, str, str, str, str, str]] = []

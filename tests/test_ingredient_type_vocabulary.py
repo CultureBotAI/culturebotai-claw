@@ -326,3 +326,107 @@ def test_the_token_is_always_a_known_spelling_or_a_vocabulary_error(
     assert token in text, (
         f"returned {token!r}, which this schema does not name -- a guess"
     )
+
+
+# --------------------------------------------------------------------------
+# #156: an unreadable vocabulary must not leave a partially written corpus
+# --------------------------------------------------------------------------
+
+
+def _corpus(root: Path) -> Path:
+    """Two records: a plain chemical that sorts first, and a medium.
+
+    Order matters. The chemical does not need the medium token, so it is
+    classified and written before anything asks for the vocabulary; the medium
+    is what triggers the lookup. That ordering is the bug.
+    """
+    ingredients = root / "data" / "ingredients"
+    ingredients.mkdir(parents=True)
+    (ingredients / "aaa_nacl.yaml").write_text(
+        "identifier: CHEBI:26710\npreferred_term: sodium chloride\n", encoding="utf-8"
+    )
+    (ingredients / "zzz_r2a.yaml").write_text(
+        "identifier: UNMAPPED_0001\npreferred_term: R2A agar\n", encoding="utf-8"
+    )
+    return ingredients
+
+
+def test_apply_writes_nothing_when_the_vocabulary_is_unreadable(
+    monkeypatch, tmp_path, capsys
+):
+    """#156: --apply wrote per record while the token resolved lazily.
+
+    A present-but-unreadable schema wrote every record classified before the
+    first medium-pattern one, then aborted -- leaving an unknown subset of
+    another repository's corpus modified, with no recovery path in the output.
+    """
+    ingredients = _corpus(tmp_path)
+    mod = _load(monkeypatch, tmp_path)
+    monkeypatch.setattr(sys, "argv", ["classify_ingredient_type.py", "--apply"])
+
+    with pytest.raises(mod.VocabularyError):
+        mod.main()
+
+    for path in sorted(ingredients.glob("*.yaml")):
+        assert "ingredient_type" not in path.read_text(encoding="utf-8"), (
+            f"{path.name} was written before the vocabulary was known"
+        )
+
+
+def test_the_vocabulary_is_resolved_before_the_corpus_is_walked(
+    monkeypatch, tmp_path
+):
+    """Pins the ordering rather than only its visible effect.
+
+    Asserting "nothing was written" passes for the wrong reason if the walk
+    never reaches a writable record; this fails if the lookup moves back after
+    the first `write_yaml`.
+    """
+    _corpus(tmp_path)
+    mod = _load(monkeypatch, tmp_path)
+    calls: list[str] = []
+    monkeypatch.setattr(mod, "write_yaml", lambda *a, **k: calls.append("write"))
+    monkeypatch.setattr(
+        mod,
+        "medium_granularity_token",
+        lambda: calls.append("vocabulary") or "NAMED_MEDIUM",
+    )
+    monkeypatch.setattr(sys, "argv", ["classify_ingredient_type.py", "--apply"])
+
+    mod.main()
+
+    assert calls, "nothing happened; the test would pass vacuously"
+    assert calls[0] == "vocabulary", (
+        f"the corpus was touched before the vocabulary was resolved: {calls[:3]}"
+    )
+
+
+def test_a_healthy_checkout_still_applies_the_schema_spelling(
+    monkeypatch, tmp_path, capsys
+):
+    """The preflight must not break the working path."""
+    ingredients = _corpus(tmp_path)
+    _write_schema(tmp_path, "NAMED_MEDIUM")
+    mod = _load(monkeypatch, tmp_path)
+    monkeypatch.setattr(sys, "argv", ["classify_ingredient_type.py", "--apply"])
+
+    assert mod.main() == 0
+
+    written = (ingredients / "zzz_r2a.yaml").read_text(encoding="utf-8")
+    assert "ingredient_type: NAMED_MEDIUM" in written
+
+
+def test_an_empty_corpus_with_a_broken_schema_now_fails_rather_than_passing(
+    monkeypatch, tmp_path
+):
+    """Removes the hidden dependence on corpus contents.
+
+    Whether a broken schema was noticed at all used to depend on whether the
+    corpus happened to contain a medium-pattern record; an empty one exited 0.
+    """
+    (tmp_path / "data" / "ingredients").mkdir(parents=True)
+    mod = _load(monkeypatch, tmp_path)
+    monkeypatch.setattr(sys, "argv", ["classify_ingredient_type.py"])
+
+    with pytest.raises(mod.VocabularyError):
+        mod.main()
