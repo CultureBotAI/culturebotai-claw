@@ -38,6 +38,7 @@ OUT_MD = OUT_DIR / "ingredient_classification_review.md"
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from classify_ingredient_type import (  # noqa: E402
     load_yaml, _COMPLEX_RE, _SOLUTION_RE, _MEDIUM_RE,
+    medium_granularity_token,
 )
 
 
@@ -55,7 +56,8 @@ def suggest_for_unset(record: dict) -> tuple[str, str]:
         return "STOCK_SOLUTION", f"name matches solution pattern {m.group(0)!r}"
     m = _MEDIUM_RE.search(name)
     if m:
-        return "DEFINED_MEDIUM", f"name matches medium pattern {m.group(0)!r}"
+        return (medium_granularity_token(),
+                f"name matches medium pattern {m.group(0)!r}")
     if ident.startswith("UNMAPPED_"):
         return "", "no pattern match; needs curator (likely chemical)"
     return "", "no heuristic suggestion"
@@ -91,7 +93,7 @@ def main() -> int:
             rows.append((
                 rel, ident, name, "", suggestion or "(needs curator)",
                 rationale, ""))
-        # else: SINGLE_INGREDIENT, STOCK_SOLUTION, DEFINED_MEDIUM —
+        # else: SINGLE_INGREDIENT, STOCK_SOLUTION, NAMED_MEDIUM —
         # high-confidence; no review needed
 
     with open(OUT_TSV, "w", newline="") as f:

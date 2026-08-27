@@ -17,7 +17,7 @@ always remain unset (curator decides).
 Vocabulary (existing schema):
   SINGLE_INGREDIENT — pure compound (defined; CHEBI/NCIT/cas:)
   UNDEFINED_MIXTURE — yeast extract / peptone / soil extract
-  DEFINED_MEDIUM    — full media recipe
+  NAMED_MEDIUM      — full media recipe (DEFINED_MEDIUM pre-#222)
   STOCK_SOLUTION    — pre-mixed defined components
 
 Usage:
@@ -33,6 +33,7 @@ import datetime as _dt
 import os
 import re
 import sys
+from functools import lru_cache
 from pathlib import Path
 
 import yaml
@@ -43,6 +44,37 @@ MIM_ROOT = Path(os.environ.get(
     REPO_ROOT.parent / "MediaIngredientMech",
 ))
 INGREDIENTS = MIM_ROOT / "data" / "ingredients"
+SCHEMA = MIM_ROOT / "src" / "mediaingredientmech" / "schema" / "mediaingredientmech.yaml"
+
+# Candidates for "this record is a whole named medium", newest spelling first.
+_MEDIUM_GRANULARITY = ("NAMED_MEDIUM", "DEFINED_MEDIUM")
+
+
+@lru_cache(maxsize=1)
+def medium_granularity_token() -> str:
+    """The IngredientTypeEnum value meaning "a whole named medium".
+
+    Read from MIM's schema rather than written as a literal. This script
+    WRITES ingredient_type back into MIM records under --apply, so a hardcoded
+    token guarantees a window during MediaIngredientMech#222 -- which renames
+    DEFINED_MEDIUM to NAMED_MEDIUM -- where claw writes a value the target
+    schema rejects. That window exists in whichever order the two repos land,
+    so no sequencing of the two PRs closes it; reading the target's own
+    vocabulary does.
+
+    Falls back to the pre-rename spelling when the schema cannot be read, so
+    importing this module never depends on a MIM checkout being present.
+    """
+    try:
+        schema = yaml.safe_load(SCHEMA.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        return _MEDIUM_GRANULARITY[-1]
+    values = (((schema or {}).get("enums") or {})
+              .get("IngredientTypeEnum", {}).get("permissible_values") or {})
+    for token in _MEDIUM_GRANULARITY:
+        if token in values:
+            return token
+    return _MEDIUM_GRANULARITY[-1]
 
 OUT_DIR = REPO_ROOT / "workspace" / "reports"
 OUT_TSV = OUT_DIR / "ingredient_type_classification.tsv"
@@ -140,7 +172,8 @@ def classify(record: dict) -> tuple[str, str]:
         return "STOCK_SOLUTION", f"name matches solution pattern {m.group(0)!r}"
     m = _MEDIUM_RE.search(name)
     if m:
-        return "DEFINED_MEDIUM", f"name matches medium pattern {m.group(0)!r}"
+        return (medium_granularity_token(),
+                f"name matches medium pattern {m.group(0)!r}")
 
     # 2. Ontology-source defaults
     if prefix == "CHEBI":
