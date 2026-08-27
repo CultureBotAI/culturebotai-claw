@@ -183,10 +183,33 @@ Never put credential values in an evidence file. Programmatic callers and tests
 can inject non-expiring, ephemeral evidence with `StaticAvailability`.
 
 `--no-paid` excludes every provider whose billing class is not explicitly
-`free`, regardless of its relative cost tier. The
-`kg-microbe-research authorize` command evaluates policy only and never invokes
-a provider. It exits 0 only for live authorization, 3 for a permitted dry run,
-and 2 for a policy refusal.
+`free`, regardless of its relative cost tier. Because `mock` is currently the
+only `free` provider and is never recommended, the flag cannot presently be
+satisfied by any profile or configuration. The filter still runs -- `--no-paid`
+remains a hard exclusion that no override waives -- but an empty result now
+says why, in the `triage` JSON as `no_paid_unsatisfiable` and inside the
+`authorize` refusal, instead of reporting a bare "recommends None" that reads
+as a misconfigured profile (#152). The check reads the catalogue, so
+classifying any routable provider as `free` retires the message with no code
+change. Bound relative cost with `--max-cost` instead.
+
+The `kg-microbe-research authorize` command evaluates policy only and never
+invokes a provider. Its exit codes are the machine-readable half of the
+contract:
+
+| Exit | Meaning |
+|---:|---|
+| 0 | live execution authorized |
+| 2 | a policy refusal, and nothing else |
+| 3 | a permitted dry run |
+| 1 | malformed or unsatisfiable input: unknown subcommand, missing or bad argument, unknown focus/stage, unknown provider in `--allow`, unreadable profile, `--no-paid` that no provider can satisfy |
+
+Argparse exits 2 for a usage error by default, which would collide with a
+policy refusal, so the parser is overridden to exit 1 (#153). A malformed
+allowlist raises `PolicyInputError`, deliberately outside the `PolicyError`
+hierarchy, so a caller reading exit 2 as "policy said no" never sees a typo.
+`--json` still emits the same refusal payload for a malformed request; only the
+exit code distinguishes it, so machine callers lose nothing.
 
 `kg-microbe-research scaffold-result` saves a schema-valid `DRY_RUN` bundle with
 an evaluation row for every catalogue provider at every stage, policy-eligible
