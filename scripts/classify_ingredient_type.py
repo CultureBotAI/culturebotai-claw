@@ -46,8 +46,19 @@ MIM_ROOT = Path(os.environ.get(
 INGREDIENTS = MIM_ROOT / "data" / "ingredients"
 SCHEMA = MIM_ROOT / "src" / "mediaingredientmech" / "schema" / "mediaingredientmech.yaml"
 
+# The spelling MIM's schema uses today; MediaIngredientMech#479 renamed
+# DEFINED_MEDIUM to NAMED_MEDIUM for #222.
+CANONICAL_MEDIUM_GRANULARITY = "NAMED_MEDIUM"
+
 # Candidates for "this record is a whole named medium", newest spelling first.
-_MEDIUM_GRANULARITY = ("NAMED_MEDIUM", "DEFINED_MEDIUM")
+# The retired spelling stays in the *lookup* so a pre-rename MIM checkout still
+# gets a token its own schema accepts. It is no longer an answer of last
+# resort: nothing returns it unless that checkout's schema names it (#147).
+_MEDIUM_GRANULARITY = (CANONICAL_MEDIUM_GRANULARITY, "DEFINED_MEDIUM")
+
+
+class VocabularyError(RuntimeError):
+    """A MIM checkout is present but its ingredient-type vocabulary is unreadable."""
 
 
 @lru_cache(maxsize=1)
@@ -56,25 +67,75 @@ def medium_granularity_token() -> str:
 
     Read from MIM's schema rather than written as a literal. This script
     WRITES ingredient_type back into MIM records under --apply, so a hardcoded
-    token guarantees a window during MediaIngredientMech#222 -- which renames
-    DEFINED_MEDIUM to NAMED_MEDIUM -- where claw writes a value the target
-    schema rejects. That window exists in whichever order the two repos land,
-    so no sequencing of the two PRs closes it; reading the target's own
+    token guaranteed a window during MediaIngredientMech#222 -- which renamed
+    DEFINED_MEDIUM to NAMED_MEDIUM -- where claw wrote a value the target
+    schema rejects. That window existed in whichever order the two repos
+    landed, so no sequencing of the two PRs closed it; reading the target's own
     vocabulary does.
 
-    Falls back to the pre-rename spelling when the schema cannot be read, so
-    importing this module never depends on a MIM checkout being present.
+    Two cases that the pre-#147 fallback collapsed into one are now distinct:
+
+    * **No MIM at all.** Nothing to classify and nothing to write, so there is
+      no wrong answer to give. Returns the canonical spelling, because several
+      scripts import this module for its regexes alone and must not start
+      requiring a checkout.
+    * **MIM present, vocabulary undeterminable.** Raises. The vocabulary is
+      right there and merely unreadable, and this script is about to write a
+      token into someone else's corpus -- a partial checkout used to get a
+      quiet wrong answer instead of a loud one.
     """
+    if not MIM_ROOT.is_dir():
+        return CANONICAL_MEDIUM_GRANULARITY
+
     try:
-        schema = yaml.safe_load(SCHEMA.read_text(encoding="utf-8"))
-    except (OSError, yaml.YAMLError):
-        return _MEDIUM_GRANULARITY[-1]
-    values = (((schema or {}).get("enums") or {})
-              .get("IngredientTypeEnum", {}).get("permissible_values") or {})
+        text = SCHEMA.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise VocabularyError(
+            f"MIM checkout {MIM_ROOT} exists but its schema could not be read "
+            f"({SCHEMA}): {exc}. Refusing to guess the ingredient_type "
+            f"vocabulary; complete the checkout or unset "
+            f"MEDIAINGREDIENTMECH_ROOT."
+        ) from exc
+
+    try:
+        schema = yaml.safe_load(text)
+    except yaml.YAMLError as exc:
+        raise VocabularyError(
+            f"MIM schema {SCHEMA} is not valid YAML: {exc}. Refusing to guess "
+            f"the ingredient_type vocabulary."
+        ) from exc
+
+    if not isinstance(schema, dict):
+        raise VocabularyError(
+            f"MIM schema {SCHEMA} is not a YAML mapping (parsed as "
+            f"{type(schema).__name__}). Refusing to guess the ingredient_type "
+            f"vocabulary."
+        )
+
+    # Every level is isinstance-guarded, not just `or {}`-guarded: a truthy
+    # non-mapping (`enums: [a, b]`) passes `or {}` untouched and then raises
+    # AttributeError, which escapes the VocabularyError contract this function
+    # advertises and reaches the caller as a traceback (#150).
+    enums = schema.get("enums")
+    enum = enums.get("IngredientTypeEnum") if isinstance(enums, dict) else None
+    values = enum.get("permissible_values") if isinstance(enum, dict) else None
+    if not isinstance(values, (dict, list)):
+        values = {}
     for token in _MEDIUM_GRANULARITY:
         if token in values:
             return token
-    return _MEDIUM_GRANULARITY[-1]
+
+    # map(str, ...) because `values` may be a list (`token in values` is right
+    # for either shape) and an unorderable one makes sorted() raise while this
+    # error is being built -- a second failure on the failure path (#151).
+    raise VocabularyError(
+        f"MIM schema {SCHEMA} defines IngredientTypeEnum without any of "
+        f"{list(_MEDIUM_GRANULARITY)}; it names "
+        f"{sorted(map(str, values)) if values else 'no permissible values'}. The "
+        f"medium-granularity value was renamed again, or this is not the "
+        f"ingredient schema -- update _MEDIUM_GRANULARITY rather than letting "
+        f"a stale spelling be written into the corpus."
+    )
 
 OUT_DIR = REPO_ROOT / "workspace" / "reports"
 OUT_TSV = OUT_DIR / "ingredient_type_classification.tsv"
@@ -232,6 +293,16 @@ def main() -> int:
                     help="overwrite ingredient_type even if already set")
     args = ap.parse_args()
 
+    # Resolve the vocabulary BEFORE the walk. It is used lazily, on the first
+    # record whose name matches the medium pattern, and --apply writes per
+    # record -- so a present-but-unreadable MIM schema used to write every
+    # earlier record and then abort, leaving an unknown subset of someone
+    # else's corpus modified with no recovery path in the output (#156).
+    # Failing here touches nothing. It also removes a hidden inconsistency:
+    # whether a broken schema was noticed at all depended on whether the corpus
+    # happened to contain a medium-pattern record.
+    medium_granularity_token()
+
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     rows: list[tuple[str, str, str, str, str]] = []
     counts: dict[str, int] = {}
@@ -314,4 +385,11 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    # A VocabularyError means a MIM checkout is present but its ingredient-type
+    # vocabulary could not be determined (#147). Report it as an error rather
+    # than a traceback, and exit nonzero so a caller can gate on it.
+    try:
+        sys.exit(main())
+    except VocabularyError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        sys.exit(2)
