@@ -38,7 +38,7 @@ OUT_MD = OUT_DIR / "ingredient_classification_review.md"
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from classify_ingredient_type import (  # noqa: E402
     load_yaml, _COMPLEX_RE, _SOLUTION_RE, _MEDIUM_RE,
-    medium_granularity_token,
+    medium_granularity_token, VocabularyError,
 )
 
 
@@ -143,4 +143,11 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    # A VocabularyError means a MIM checkout is present but its ingredient-type
+    # vocabulary could not be determined (#147). Report it as an error rather
+    # than a traceback, and exit nonzero so a caller can gate on it.
+    try:
+        sys.exit(main())
+    except VocabularyError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        sys.exit(2)

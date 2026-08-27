@@ -1,10 +1,15 @@
 """The medium-granularity token is read from MIM's schema, not hardcoded.
 
 `classify_ingredient_type.py --apply` WRITES `ingredient_type` back into MIM
-records. MediaIngredientMech#222 renames `DEFINED_MEDIUM` to `NAMED_MEDIUM`, so
-a literal in this repo would guarantee a window where claw writes a token the
-target schema rejects -- and that window exists in whichever order the two PRs
-land, so no sequencing closes it. These pin the property that does.
+records. MediaIngredientMech#222 renamed `DEFINED_MEDIUM` to `NAMED_MEDIUM`
+(MediaIngredientMech#479, merged), so a literal in this repo would have
+guaranteed a window where claw writes a token the target schema rejects -- and
+that window existed in whichever order the two PRs landed, so no sequencing
+closed it. These pin the property that does.
+
+Since #147 they also pin the distinction the original fallback collapsed: "no
+MIM at all" is answerable without a schema, "MIM present but its vocabulary is
+unreadable" is not, and only the first gets a default.
 """
 
 import importlib.util
@@ -83,13 +88,26 @@ def test_the_new_spelling_wins_when_the_schema_offers_both(monkeypatch, tmp_path
 
 def test_a_missing_mim_checkout_does_not_break_import(monkeypatch, tmp_path):
     """Five other scripts import this module for its regexes alone; none of
-    them should start requiring a MIM checkout to be present."""
+    them should start requiring a MIM checkout to be present.
+
+    With no MIM there is nothing to classify and nothing to write, so the
+    default cannot be written anywhere -- it just has to exist. It is the
+    CURRENT spelling: before #147 this returned `DEFINED_MEDIUM`, which
+    MediaIngredientMech#479 has since retired.
+    """
     mod = _load(monkeypatch, tmp_path / "nonexistent")
 
-    assert mod.medium_granularity_token() == "DEFINED_MEDIUM"
+    assert mod.medium_granularity_token() == "NAMED_MEDIUM"
+    assert mod.medium_granularity_token() == mod.CANONICAL_MEDIUM_GRANULARITY
 
 
-def test_an_unparseable_schema_falls_back_rather_than_raising(monkeypatch, tmp_path):
+def test_an_unparseable_schema_raises_rather_than_guessing(monkeypatch, tmp_path):
+    """#147: a partial checkout used to get a quiet wrong answer.
+
+    MIM is present, so records exist to write; the vocabulary is right there
+    and merely unreadable. Guessing writes a token into someone else's corpus
+    on the strength of a parse failure.
+    """
     schema = tmp_path / "src" / "mediaingredientmech" / "schema"
     schema.mkdir(parents=True)
     (schema / "mediaingredientmech.yaml").write_text(
@@ -97,7 +115,69 @@ def test_an_unparseable_schema_falls_back_rather_than_raising(monkeypatch, tmp_p
 
     mod = _load(monkeypatch, tmp_path)
 
+    with pytest.raises(mod.VocabularyError, match="not valid YAML"):
+        mod.medium_granularity_token()
+
+
+def test_a_present_checkout_with_no_schema_file_raises(monkeypatch, tmp_path):
+    """The exact exposure #147 names: MIM present, schema absent."""
+    (tmp_path / "data" / "ingredients").mkdir(parents=True)
+
+    mod = _load(monkeypatch, tmp_path)
+
+    with pytest.raises(mod.VocabularyError, match="could not be read"):
+        mod.medium_granularity_token()
+
+
+def test_a_schema_naming_no_known_medium_token_raises(monkeypatch, tmp_path):
+    """A future rename must fail loudly, not silently reuse a retired spelling.
+
+    This is the failure the old `return _MEDIUM_GRANULARITY[-1]` tail hid: the
+    enum had been renamed out from under claw and the script carried on
+    writing the previous value.
+    """
+    mod = _load(monkeypatch, _write_schema(tmp_path, "RENAMED_AGAIN_MEDIUM"))
+
+    with pytest.raises(mod.VocabularyError, match="RENAMED_AGAIN_MEDIUM"):
+        mod.medium_granularity_token()
+
+
+def test_a_non_mapping_schema_raises(monkeypatch, tmp_path):
+    schema = tmp_path / "src" / "mediaingredientmech" / "schema"
+    schema.mkdir(parents=True)
+    (schema / "mediaingredientmech.yaml").write_text(
+        "- just\n- a\n- list\n", encoding="utf-8")
+
+    mod = _load(monkeypatch, tmp_path)
+
+    with pytest.raises(mod.VocabularyError, match="not a YAML mapping"):
+        mod.medium_granularity_token()
+
+
+def test_the_retired_spelling_stays_in_the_lookup(monkeypatch, tmp_path):
+    """It must still be readable, so a pre-rename checkout gets a token its own
+    schema accepts. That is the one case where it is still the right answer."""
+    mod = _load(monkeypatch, _write_schema(tmp_path, "DEFINED_MEDIUM"))
+
+    assert "DEFINED_MEDIUM" in mod._MEDIUM_GRANULARITY
     assert mod.medium_granularity_token() == "DEFINED_MEDIUM"
+
+
+def test_the_retired_spelling_is_never_an_answer_of_last_resort(monkeypatch, tmp_path):
+    """#147's core complaint: the tuple kept `DEFINED_MEDIUM` reachable as the
+    default for every caller without a readable MIM checkout.
+
+    No input may produce it now except a schema that actually names it -- which
+    `test_the_retired_spelling_stays_in_the_lookup` covers. Here: the two
+    schema-less paths must not.
+    """
+    absent = _load(monkeypatch, tmp_path / "absent")
+    assert absent.medium_granularity_token() == "NAMED_MEDIUM"
+
+    (tmp_path / "present").mkdir()
+    partial = _load(monkeypatch, tmp_path / "present")
+    with pytest.raises(partial.VocabularyError):
+        partial.medium_granularity_token()
 
 
 def test_classify_emits_the_schema_token_not_a_literal(monkeypatch, tmp_path):
