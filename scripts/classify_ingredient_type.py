@@ -125,10 +125,13 @@ def medium_granularity_token() -> str:
         if token in values:
             return token
 
+    # map(str, ...) because `values` may be a list (`token in values` is right
+    # for either shape) and an unorderable one makes sorted() raise while this
+    # error is being built -- a second failure on the failure path (#151).
     raise VocabularyError(
         f"MIM schema {SCHEMA} defines IngredientTypeEnum without any of "
         f"{list(_MEDIUM_GRANULARITY)}; it names "
-        f"{sorted(values) if values else 'no permissible values'}. The "
+        f"{sorted(map(str, values)) if values else 'no permissible values'}. The "
         f"medium-granularity value was renamed again, or this is not the "
         f"ingredient schema -- update _MEDIUM_GRANULARITY rather than letting "
         f"a stale spelling be written into the corpus."

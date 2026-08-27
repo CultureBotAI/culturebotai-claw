@@ -239,3 +239,90 @@ def test_a_structurally_wrong_enums_block_raises_vocabulary_error(
 
     with pytest.raises(mod.VocabularyError):
         mod.medium_granularity_token()
+
+
+@pytest.mark.parametrize(
+    "values_block",
+    ["      - 1\n      - \"a\"\n", "      - {a: 1}\n      - {b: 2}\n"],
+    ids=["mixed-scalars", "mappings"],
+)
+def test_an_unorderable_permissible_values_list_still_raises_cleanly(
+        monkeypatch, tmp_path, values_block):
+    """#151: sorted() in the refusal message must not raise while building it.
+
+    A list is a legitimate shape here -- `token in values` is correct for a
+    mapping or a sequence -- so an unorderable one reached sorted() and escaped
+    the VocabularyError contract as a TypeError.
+    """
+    schema = tmp_path / "src" / "mediaingredientmech" / "schema"
+    schema.mkdir(parents=True)
+    (schema / "mediaingredientmech.yaml").write_text(
+        "enums:\n  IngredientTypeEnum:\n    permissible_values:\n" + values_block,
+        encoding="utf-8")
+
+    mod = _load(monkeypatch, tmp_path)
+
+    with pytest.raises(mod.VocabularyError, match="without any of"):
+        mod.medium_granularity_token()
+
+
+# Shapes a schema file can take, well beyond what LinkML would emit. The point
+# is not that any of these is likely; it is that the contract below holds
+# without enumerating them one issue at a time -- #150 and #151 were each a
+# single escaped shape, found separately, in a function whose whole purpose is
+# to be trustworthy about a value it writes into another repository's corpus.
+_HOSTILE_SCHEMAS = [
+    "",
+    "null\n",
+    "- a\n- b\n",
+    "just a string\n",
+    "42\n",
+    "enums:\n",
+    "enums: null\n",
+    "enums: []\n",
+    "enums: text\n",
+    "enums:\n  - a\n",
+    "enums:\n  IngredientTypeEnum:\n",
+    "enums:\n  IngredientTypeEnum: null\n",
+    "enums:\n  IngredientTypeEnum: text\n",
+    "enums:\n  IngredientTypeEnum:\n    - a\n",
+    "enums:\n  IngredientTypeEnum:\n    permissible_values:\n",
+    "enums:\n  IngredientTypeEnum:\n    permissible_values: null\n",
+    "enums:\n  IngredientTypeEnum:\n    permissible_values: text\n",
+    "enums:\n  IngredientTypeEnum:\n    permissible_values: []\n",
+    "enums:\n  IngredientTypeEnum:\n    permissible_values: {}\n",
+    "enums:\n  IngredientTypeEnum:\n    permissible_values:\n      - 1\n      - 'a'\n",
+    "enums:\n  IngredientTypeEnum:\n    permissible_values:\n      - {a: 1}\n",
+    "enums:\n  IngredientTypeEnum:\n    permissible_values:\n      OTHER: {}\n",
+    "enums:\n  OtherEnum:\n    permissible_values:\n      NAMED_MEDIUM: {}\n",
+    "enums:\n  IngredientTypeEnum:\n    permissible_values:\n      - NAMED_MEDIUM\n",
+    "enums: [this is: not, a mapping\n",
+]
+
+
+@pytest.mark.parametrize("text", _HOSTILE_SCHEMAS, ids=range(len(_HOSTILE_SCHEMAS)))
+def test_the_token_is_always_a_known_spelling_or_a_vocabulary_error(
+        monkeypatch, tmp_path, text):
+    """The whole contract, in one place.
+
+    For a present MIM checkout the function must either return a spelling the
+    target schema actually names, or raise VocabularyError. Anything else --
+    AttributeError (#150), TypeError from the message itself (#151), or a
+    plausible-looking guess -- is a value that could be written into MIM.
+    """
+    schema = tmp_path / "src" / "mediaingredientmech" / "schema"
+    schema.mkdir(parents=True)
+    (schema / "mediaingredientmech.yaml").write_text(text, encoding="utf-8")
+
+    mod = _load(monkeypatch, tmp_path)
+
+    try:
+        token = mod.medium_granularity_token()
+    except mod.VocabularyError:
+        return
+    assert token in mod._MEDIUM_GRANULARITY, (
+        f"returned {token!r}, which is not a known medium spelling"
+    )
+    assert token in text, (
+        f"returned {token!r}, which this schema does not name -- a guess"
+    )
