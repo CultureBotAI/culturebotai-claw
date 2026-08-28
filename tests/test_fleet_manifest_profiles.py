@@ -60,6 +60,7 @@ EXPECTED_CAPABILITIES = {
     "environment_coverage",
     "knowledge_gap_scan",
     "vendored_sync",
+    "unmapped_inventory_input",
 }
 
 EXPECTED_ENVIRONMENT_COVERAGE_GLOBS = {

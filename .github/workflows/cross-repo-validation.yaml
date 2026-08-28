@@ -29,6 +29,13 @@ jobs:
         with:
           path: culturebotai-claw
 
+      # The three Mechs below are the unmapped-ingredient INPUT SET, not fleet
+      # membership: they are the corpora scripts/inventory_unmapped_ingredients.py
+      # defines loaders for. The set is declared in the packaged manifest as the
+      # `unmapped_inventory_input` capability, and
+      # tests/test_cross_repo_validation_scope.py fails if these checkouts and
+      # that declaration diverge. TraitMech and ProteinTraitsMech are declared
+      # not_applicable there with reasons; they are not omissions (#131).
       - name: Checkout MediaIngredientMech
         uses: actions/checkout@v4
         with:
@@ -76,11 +83,21 @@ jobs:
           MEDIAINGREDIENTMECH_ROOT: ${{ github.workspace }}/MediaIngredientMech
           CULTUREMECH_ROOT: ${{ github.workspace }}/CultureMech
           # Was CommunityMech-outer/CommunityMech, a path that has never existed
-          # on a runner — the extra level is a local clone artifact. The `|| true`
-          # below meant the inventory silently ran without CommunityMech data.
+          # on a runner — the extra level is a local clone artifact. A `|| true`
+          # here used to mean the inventory silently ran without CommunityMech
+          # data; it is gone, and --require-sources now makes the same class of
+          # regression fail instead of shrinking the report (#131, #161).
           COMMUNITYMECH_ROOT: ${{ github.workspace }}/CommunityMech
         run: |
-          python3 scripts/inventory_unmapped_ingredients.py || true
+          # kg-microbe is deliberately NOT required: it is an external corpus
+          # this workflow does not check out, so its two sources are expected to
+          # report ABSENT here. The report states that rather than implying the
+          # inventory was complete.
+          python3 scripts/inventory_unmapped_ingredients.py \
+            --require-sources MIM:unmapped \
+            --require-sources MIM:mapped-placeholder \
+            --require-sources culturemech:pending \
+            --require-sources communitymech:unmapped
 
       - name: Upload inventory + validation reports
         uses: actions/upload-artifact@v4
@@ -91,6 +108,7 @@ jobs:
             culturebotai-claw/workspace/reports/evidence_reference_validation.md
             culturebotai-claw/workspace/reports/unmapped_inventory.tsv
             culturebotai-claw/workspace/reports/unmapped_inventory.md
+            culturebotai-claw/workspace/reports/unmapped_inventory_coverage.tsv
           retention-days: 30
           if-no-files-found: warn
 
