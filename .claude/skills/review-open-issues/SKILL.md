@@ -37,12 +37,12 @@ Check these before trusting an issue title or an older planning document:
   experimental surfaces** table. An issue about an experimental surface is not
   automatically P2, but an issue asserting that an experimental surface is
   broken has usually mistaken "declared" for "implemented".
-- The packaged fleet manifest (`fleet.yaml`) — the definitive Mech list and
-  per-Mech capability status. Read it rather than assuming which repositories
-  exist; a capability may be `not_applicable` with a recorded reason, and that
-  is a recorded decision, not a gap. This skill only *cites* the manifest when
-  judging an issue; it does not resolve fleet scope from it, which is what
-  `fleet-pr-status`, `fleet-pr-review`, and `cross-mech-sync` do.
+- `src/kg_microbe_fleet/fleet.yaml` — the definitive Mech list and per-Mech
+  capability status. Read it rather than assuming which repositories exist; a
+  capability may be `not_applicable` with a recorded reason, and that is a
+  recorded decision, not a gap. This skill cites the manifest when judging an
+  issue; it does not resolve fleet scope from it, which is what the skills
+  tagged `fleet` do.
 - `pyproject.toml` — console scripts, packaged data, and what actually ships in
   the wheel.
 - `.github/workflows/` — what CI genuinely runs, as opposed to what a document
