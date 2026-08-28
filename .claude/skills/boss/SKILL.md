@@ -6,7 +6,7 @@ category: orchestration
 requires_database: false
 requires_internet: true
 version: 1.0.0
-tags: [orchestration, parallel, worktree, tmux, multi-repo, agents, boss]
+tags: [orchestration, parallel, worktree, tmux, multi-repo, agents, boss, fleet]
 ---
 
 # boss: orchestrate parallel agents across the CultureBotAI repos

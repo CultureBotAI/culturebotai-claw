@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import yaml
+
 from kg_microbe_fleet import load_fleet_manifest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,21 +22,89 @@ def _skill(name: str) -> str:
     )
 
 
-def test_general_fleet_skill_catalogue_covers_every_manifest_consumer():
-    discovered = {
+# A skill that *runs* the manifest resolves fleet scope from it. Naming the
+# manifest in prose does not: a repo-scoped skill may legitimately cite
+# `src/kg_microbe_fleet/fleet.yaml` as a source of truth without enumerating
+# the fleet. The previous substring net could not tell those apart, so a
+# citation-only skill tripped it and the failure pointed at registering a
+# capability the skill does not have (#158).
+MANIFEST_EXECUTION_MARKERS = (
+    "python -m kg_microbe_fleet",
+    "from kg_microbe_fleet",
+    "load_fleet_manifest",
+)
+
+
+def _skill_paths() -> list[Path]:
+    return sorted((ROOT / ".claude" / "skills").glob("*/SKILL.md"))
+
+
+def _frontmatter(path: Path) -> dict:
+    """Parse a skill's YAML frontmatter, naming the file when it cannot.
+
+    Parsed with the real YAML loader rather than by hand: a block-style
+    `tags:` list reads as no tags under a single-line parser, which drops the
+    skill out of the declared set and reports the wrong reason (#160).
+    """
+    parts = path.read_text(encoding="utf-8").split("---")
+    assert len(parts) >= 3, f"{path} has no YAML frontmatter block"
+    loaded = yaml.safe_load(parts[1])
+    assert isinstance(loaded, dict), f"{path} frontmatter is not a YAML mapping"
+    return loaded
+
+
+def _tags(path: Path) -> set[str]:
+    return {str(tag) for tag in _frontmatter(path).get("tags") or ()}
+
+
+def test_general_fleet_skill_catalogue_matches_the_declared_fleet_tag():
+    """The catalogue is what skills declare, not what their prose mentions."""
+    declared = {path.parent.name for path in _skill_paths() if "fleet" in _tags(path)}
+
+    assert declared == GENERAL_FLEET_SKILLS
+
+
+def test_every_skill_that_runs_the_manifest_is_in_the_catalogue():
+    """A forgotten `fleet` tag must still be caught.
+
+    Subset, not equality: a registered skill may resolve scope through a script
+    rather than an inline call (`fleet-pr-status` does), so the catalogue may be
+    larger than this set -- but nothing may execute the manifest from outside it.
+    """
+    executing = {
         path.parent.name
-        for path in (ROOT / ".claude" / "skills").glob("*/SKILL.md")
+        for path in _skill_paths()
         if any(
             marker in path.read_text(encoding="utf-8")
-            for marker in (
-                "kg_microbe_fleet",
-                "canonical fleet manifest",
-                "manifest-defined Mech fleet",
-            )
+            for marker in MANIFEST_EXECUTION_MARKERS
         )
     }
 
-    assert discovered == GENERAL_FLEET_SKILLS
+    assert executing <= GENERAL_FLEET_SKILLS, (
+        f"skills run the fleet manifest but are not in GENERAL_FLEET_SKILLS: "
+        f"{sorted(executing - GENERAL_FLEET_SKILLS)}. Add the `fleet` tag and "
+        f"register them, or stop resolving fleet scope from the manifest."
+    )
+
+
+def test_citing_the_manifest_in_prose_does_not_join_the_catalogue():
+    """#158: the guard must leave a repo-scoped skill free to name the manifest."""
+    citation_only = [
+        path.parent.name
+        for path in _skill_paths()
+        if "kg_microbe_fleet" in path.read_text(encoding="utf-8")
+        and not any(
+            marker in path.read_text(encoding="utf-8")
+            for marker in MANIFEST_EXECUTION_MARKERS
+        )
+        and "fleet" not in _tags(path)
+    ]
+
+    for name in citation_only:
+        assert name not in GENERAL_FLEET_SKILLS, (
+            f"{name} only cites the manifest; it should not be registered as a "
+            f"fleet-scope-resolving skill"
+        )
 
 
 def test_cross_mech_sync_queries_applicable_manifest_repositories():
