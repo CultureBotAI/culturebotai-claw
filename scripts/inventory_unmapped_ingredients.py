@@ -12,6 +12,7 @@ Run via `just inventory-unmapped` — see skill `unmapped-inventory`.
 """
 from __future__ import annotations
 
+import argparse
 import csv
 import json
 import os
@@ -210,28 +211,109 @@ def load_communitymech_unmapped() -> Iterable[Row]:
             )
 
 
-SOURCES: list[tuple[str, callable]] = [
-    ("MIM:unmapped", load_mim_unmapped),
-    ("MIM:mapped-placeholder", load_mim_mapped_placeholders),
-    ("kgm:metatraits", load_kgm_metatraits_unmapped),
-    ("kgm:mediadive", load_kgm_mediadive_unmapped),
-    ("culturemech:pending", load_culturemech_pending),
-    ("communitymech:unmapped", load_communitymech_unmapped),
+# (label, loader, the repository root the loader reads, the variable that sets it).
+# The root is declared here so an absent one is REPORTED rather than silently
+# contributing zero rows: every loader returns early when its directory is
+# missing, which produced a well-formed report whose totals were quietly
+# conditioned on which checkouts happened to exist (#161).
+SOURCES: list[tuple[str, callable, Path, str]] = [
+    ("MIM:unmapped", load_mim_unmapped, MIM_ROOT, "MEDIAINGREDIENTMECH_ROOT"),
+    ("MIM:mapped-placeholder", load_mim_mapped_placeholders, MIM_ROOT,
+     "MEDIAINGREDIENTMECH_ROOT"),
+    ("kgm:metatraits", load_kgm_metatraits_unmapped, KGM_ROOT, "KGMICROBE_ROOT"),
+    ("kgm:mediadive", load_kgm_mediadive_unmapped, KGM_ROOT, "KGMICROBE_ROOT"),
+    ("culturemech:pending", load_culturemech_pending, CULTUREMECH_ROOT,
+     "CULTUREMECH_ROOT"),
+    ("communitymech:unmapped", load_communitymech_unmapped, COMMUNITYMECH_ROOT,
+     "COMMUNITYMECH_ROOT"),
 ]
 
 
-def main() -> int:
+@dataclass
+class Coverage:
+    """Whether a source was actually read, and why not when it was not."""
+
+    label: str
+    root: Path
+    variable: str
+    present: bool
+    rows: int
+
+    @property
+    def state(self) -> str:
+        if not self.present:
+            return "ABSENT"
+        return "read" if self.rows else "empty"
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--require-sources",
+        metavar="LABEL",
+        action="append",
+        default=[],
+        help=(
+            "Fail when this source's repository root is absent, instead of "
+            "reporting a smaller inventory. Repeatable; use in CI so a checkout "
+            "regression cannot silently narrow the report."
+        ),
+    )
+    parser.add_argument(
+        "--require-all-sources",
+        action="store_true",
+        help="Fail when any declared source root is absent.",
+    )
+    args = parser.parse_args(argv)
+
+    known = {label for label, _, _, _ in SOURCES}
+    unknown = sorted(set(args.require_sources) - known)
+    if unknown:
+        print(
+            f"error: unknown source(s) {unknown}; choose from "
+            f"{', '.join(sorted(known))}",
+            file=sys.stderr,
+        )
+        return 2
+
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
     rows: list[Row] = []
     counts: dict[str, int] = {}
-    for label, fn in SOURCES:
+    coverage: list[Coverage] = []
+    for label, fn, root, variable in SOURCES:
         n = 0
         for row in fn():
             rows.append(row)
             n += 1
         counts[label] = n
+        coverage.append(Coverage(label, root, variable, root.is_dir(), n))
         print(f"  {label:38s}  {n:>5d} rows")
+
+    print("\nSource coverage:")
+    for entry in coverage:
+        detail = f"set {entry.variable}" if not entry.present else str(entry.root)
+        print(f"  {entry.label:38s}  {entry.state:>6s}  {detail}")
+
+    absent = [entry for entry in coverage if not entry.present]
+    if absent:
+        print(
+            f"\nWARNING: {len(absent)} source(s) were not read, so the totals "
+            f"below cover only the sources marked read/empty above."
+        )
+
+    required = set(args.require_sources)
+    if args.require_all_sources:
+        required |= known
+    missing = sorted(entry.label for entry in absent if entry.label in required)
+    if missing:
+        print(
+            f"error: required source(s) absent: {missing}. Their repository "
+            f"roots are not directories, so the inventory would silently under-"
+            f"report rather than fail.",
+            file=sys.stderr,
+        )
+        return 1
 
     # Cross-source overlap by normalized name
     by_norm: dict[str, list[Row]] = defaultdict(list)
@@ -243,6 +325,9 @@ def main() -> int:
     # Emit TSV
     with open(OUT_TSV, "w", newline="") as f:
         w = csv.writer(f, delimiter="\t")
+        for entry in coverage:
+            w.writerow([f"# coverage\t{entry.label}\t{entry.state}\t"
+                        f"{entry.root if entry.present else entry.variable}"])
         w.writerow(["source", "name", "norm_key", "status", "current_id",
                     "n_other_sources", "other_sources", "extra_json"])
         for r in rows:
@@ -257,7 +342,26 @@ def main() -> int:
     # Emit markdown summary
     md: list[str] = []
     md.append("# Unmapped Ingredient Inventory\n")
-    md.append(f"Total rows across all sources: **{len(rows)}**\n")
+
+    # Coverage first: the totals below mean nothing without knowing which
+    # sources produced them, and an archived artifact must carry that with it
+    # rather than relying on the console log of the run that made it (#161).
+    md.append("## Source coverage\n")
+    if absent:
+        md.append(
+            f"> **Partial inventory.** {len(absent)} of {len(coverage)} sources "
+            f"were not read; every total below excludes them.\n"
+        )
+    md.append("| Source | State | Root or missing variable |")
+    md.append("|---|---|---|")
+    for entry in coverage:
+        detail = f"`{entry.variable}` not set to a directory" if not entry.present \
+            else f"`{entry.root}`"
+        md.append(f"| `{entry.label}` | {entry.state} | {detail} |")
+    md.append("")
+
+    scope = "across the sources read above" if absent else "across all sources"
+    md.append(f"Total rows {scope}: **{len(rows)}**\n")
     md.append(f"Distinct normalized names: **{len(by_norm)}**\n")
     md.append(f"Names appearing in 2+ sources: **{len(multi)}** (priority targets)\n")
     md.append("\n## Per-source row counts\n")

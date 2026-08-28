@@ -45,6 +45,7 @@ capability_catalogue:
         required_when_enabled: true
         minimum: 1
   vendored_sync: {}
+  unmapped_inventory_input: {}
 
 # Vendored shared-file governance is deliberately modeled separately from
 # fleet membership: claw is the external authority and must never pin itself.
@@ -105,6 +106,8 @@ mechs:
           window: 300
       vendored_sync:
         status: enabled
+      unmapped_inventory_input:
+        status: enabled
 
   mediaingredientmech:
     display_name: MediaIngredientMech
@@ -151,6 +154,8 @@ mechs:
         settings:
           window: 300
       vendored_sync:
+        status: enabled
+      unmapped_inventory_input:
         status: enabled
 
   communitymech:
@@ -202,6 +207,8 @@ mechs:
           window: 305
       vendored_sync:
         status: enabled
+      unmapped_inventory_input:
+        status: enabled
 
   traitmech:
     display_name: TraitMech
@@ -250,6 +257,13 @@ mechs:
           window: 300
       vendored_sync:
         status: enabled
+      unmapped_inventory_input:
+        status: not_applicable
+        reason: >-
+          The unmapped-ingredient inventory reads culture-media and
+          ingredient corpora; TraitMech curates traits and has no
+          ingredient records, so scripts/inventory_unmapped_ingredients.py
+          defines no loader for it.
 
   proteintraitsmech:
     # The GitHub slug is lowercase while the display name is CamelCase. Code
@@ -308,3 +322,10 @@ mechs:
           absent from the knowledge-gap-scan workflow matrix.
       vendored_sync:
         status: enabled
+      unmapped_inventory_input:
+        status: not_applicable
+        reason: >-
+          The unmapped-ingredient inventory reads culture-media and
+          ingredient corpora; ProteinTraitsMech curates protein-trait
+          records and has no ingredient corpus, so
+          scripts/inventory_unmapped_ingredients.py defines no loader for it.
