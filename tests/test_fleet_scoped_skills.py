@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import yaml
+
 from kg_microbe_fleet import load_fleet_manifest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -37,16 +39,22 @@ def _skill_paths() -> list[Path]:
     return sorted((ROOT / ".claude" / "skills").glob("*/SKILL.md"))
 
 
+def _frontmatter(path: Path) -> dict:
+    """Parse a skill's YAML frontmatter, naming the file when it cannot.
+
+    Parsed with the real YAML loader rather than by hand: a block-style
+    `tags:` list reads as no tags under a single-line parser, which drops the
+    skill out of the declared set and reports the wrong reason (#160).
+    """
+    parts = path.read_text(encoding="utf-8").split("---")
+    assert len(parts) >= 3, f"{path} has no YAML frontmatter block"
+    loaded = yaml.safe_load(parts[1])
+    assert isinstance(loaded, dict), f"{path} frontmatter is not a YAML mapping"
+    return loaded
+
+
 def _tags(path: Path) -> set[str]:
-    text = path.read_text(encoding="utf-8")
-    for line in text.split("---")[1].splitlines():
-        if line.startswith("tags:"):
-            return {
-                tag.strip()
-                for tag in line.split(":", 1)[1].strip().strip("[]").split(",")
-                if tag.strip()
-            }
-    return set()
+    return {str(tag) for tag in _frontmatter(path).get("tags") or ()}
 
 
 def test_general_fleet_skill_catalogue_matches_the_declared_fleet_tag():
