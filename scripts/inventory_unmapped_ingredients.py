@@ -306,18 +306,6 @@ def main(argv: list[str] | None = None) -> int:
             f"below cover only the sources marked read/empty above."
         )
 
-    required = set(args.require_sources)
-    if args.require_all_sources:
-        required |= known
-    missing = sorted(entry.label for entry in absent if entry.label in required)
-    if missing:
-        print(
-            f"error: required source(s) absent: {missing}. Their repository "
-            f"roots are not directories, so the inventory would silently under-"
-            f"report rather than fail.",
-            file=sys.stderr,
-        )
-        return 1
 
     # Cross-source overlap by normalized name
     by_norm: dict[str, list[Row]] = defaultdict(list)
@@ -432,6 +420,24 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Wrote {OUT_COVERAGE_TSV.relative_to(REPO_ROOT)}")
     print(f"\n{len(rows)} total rows / {len(by_norm)} distinct names / "
           f"{len(multi)} cross-source")
+
+    # Evaluated last, on purpose: every report and the coverage sidecar are
+    # already on disk, so a failing CI run still uploads the artifact that says
+    # WHICH source was missing. Deciding this earlier withheld the diagnostic
+    # on exactly the run that needed it (#164).
+    required = set(args.require_sources)
+    if args.require_all_sources:
+        required |= known
+    missing = sorted(entry.label for entry in absent if entry.label in required)
+    if missing:
+        print(
+            f"error: required source(s) absent: {missing}. Their repository "
+            f"roots are not directories, so the inventory would silently under-"
+            f"report rather than fail. Coverage is recorded in "
+            f"{OUT_COVERAGE_TSV.name}.",
+            file=sys.stderr,
+        )
+        return 1
     return 0
 
 

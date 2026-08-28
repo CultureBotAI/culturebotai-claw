@@ -150,29 +150,7 @@ def test_every_source_declares_the_root_it_reads():
 
 def _run_inventory(tmp_path: Path, monkeypatch) -> object:
     """Run the inventory against a one-record MIM tree and nothing else."""
-    ingredients = tmp_path / "mim" / "data" / "ingredients" / "unmapped"
-    ingredients.mkdir(parents=True)
-    (ingredients / "t.yaml").write_text(
-        "preferred_term: Test Substance\nidentifier: UNMAPPED_0001\n",
-        encoding="utf-8",
-    )
-    for variable, value in (
-        ("MEDIAINGREDIENTMECH_ROOT", str(tmp_path / "mim")),
-        ("KGMICROBE_ROOT", str(tmp_path / "absent")),
-        ("CULTUREMECH_ROOT", str(tmp_path / "absent")),
-        ("COMMUNITYMECH_ROOT", str(tmp_path / "absent")),
-    ):
-        monkeypatch.setenv(variable, value)
-    module = _script()
-    # REPO_ROOT too: the script prints its outputs with `relative_to(REPO_ROOT)`,
-    # which raises when they are redirected outside the repository.
-    monkeypatch.setattr(module, "REPO_ROOT", tmp_path)
-    monkeypatch.setattr(module, "OUT_DIR", tmp_path / "out")
-    monkeypatch.setattr(module, "OUT_TSV", tmp_path / "out" / "inventory.tsv")
-    monkeypatch.setattr(module, "OUT_MD", tmp_path / "out" / "inventory.md")
-    monkeypatch.setattr(
-        module, "OUT_COVERAGE_TSV", tmp_path / "out" / "coverage.tsv"
-    )
+    module = _prepare_inventory(tmp_path, monkeypatch)
     assert module.main([]) == 0
     return module
 
@@ -218,3 +196,81 @@ def test_the_workflow_uploads_the_coverage_sidecar():
     )
 
     assert "unmapped_inventory_coverage.tsv" in upload["with"]["path"]
+
+
+# --------------------------------------------------------------------------
+# #164: the fail-closed path must still produce its diagnostics
+# --------------------------------------------------------------------------
+
+
+def _prepare_inventory(tmp_path: Path, monkeypatch, *, all_roots_exist=False):
+    """Build a MIM tree and import the script bound to it.
+
+    The script resolves every root at import time, so the environment must be
+    set before `_script()` runs. `all_roots_exist` creates the other three as
+    empty directories, which makes them report `empty` rather than `ABSENT` --
+    the distinction `--require-*` turns on.
+    """
+    ingredients = tmp_path / "mim" / "data" / "ingredients" / "unmapped"
+    ingredients.mkdir(parents=True)
+    (ingredients / "t.yaml").write_text(
+        "preferred_term: Test Substance\nidentifier: UNMAPPED_0001\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("MEDIAINGREDIENTMECH_ROOT", str(tmp_path / "mim"))
+    for variable in ("KGMICROBE_ROOT", "CULTUREMECH_ROOT", "COMMUNITYMECH_ROOT"):
+        root = tmp_path / variable.lower()
+        if all_roots_exist:
+            root.mkdir()
+        monkeypatch.setenv(variable, str(root))
+
+    module = _script()
+    monkeypatch.setattr(module, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(module, "OUT_DIR", tmp_path / "out")
+    monkeypatch.setattr(module, "OUT_TSV", tmp_path / "out" / "inventory.tsv")
+    monkeypatch.setattr(module, "OUT_MD", tmp_path / "out" / "inventory.md")
+    monkeypatch.setattr(
+        module, "OUT_COVERAGE_TSV", tmp_path / "out" / "coverage.tsv"
+    )
+    return module
+
+
+def test_a_failing_required_source_still_writes_every_report(tmp_path, monkeypatch):
+    """#164: the verdict used to return before any artifact was written.
+
+    CI uploads these files. Withholding them on the failing run removes the
+    evidence of which source was missing, which is the whole point of #161.
+    """
+    module = _prepare_inventory(tmp_path, monkeypatch)
+
+    assert module.main(["--require-sources", "culturemech:pending"]) == 1
+
+    out = tmp_path / "out"
+    assert (out / "inventory.tsv").is_file()
+    assert (out / "inventory.md").is_file()
+    assert (out / "coverage.tsv").is_file()
+    assert "culturemech:pending\tABSENT" in (out / "coverage.tsv").read_text(
+        encoding="utf-8"
+    )
+
+
+def test_require_all_sources_fails_when_any_root_is_absent(tmp_path, monkeypatch):
+    """The flag had no test at all; deleting its enforcement stayed green."""
+    module = _prepare_inventory(tmp_path, monkeypatch)
+
+    assert module.main(["--require-all-sources"]) == 1
+
+
+def test_require_all_sources_passes_when_every_root_is_present(
+    tmp_path, monkeypatch
+):
+    """Non-vacuity: the flag must not simply always fail."""
+    module = _prepare_inventory(tmp_path, monkeypatch, all_roots_exist=True)
+
+    assert module.main(["--require-all-sources"]) == 0
+
+
+def test_an_unknown_required_source_is_a_usage_error(tmp_path, monkeypatch):
+    module = _prepare_inventory(tmp_path, monkeypatch)
+
+    assert module.main(["--require-sources", "nosuchsource"]) == 2
