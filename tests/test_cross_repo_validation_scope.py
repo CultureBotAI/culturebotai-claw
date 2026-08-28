@@ -141,3 +141,80 @@ def test_every_source_declares_the_root_it_reads():
         assert callable(loader)
         assert isinstance(root, Path)
         assert isinstance(variable, str) and variable.endswith("_ROOT")
+
+
+# --------------------------------------------------------------------------
+# #163: coverage must not change the shape of the published inventory TSV
+# --------------------------------------------------------------------------
+
+
+def _run_inventory(tmp_path: Path, monkeypatch) -> object:
+    """Run the inventory against a one-record MIM tree and nothing else."""
+    ingredients = tmp_path / "mim" / "data" / "ingredients" / "unmapped"
+    ingredients.mkdir(parents=True)
+    (ingredients / "t.yaml").write_text(
+        "preferred_term: Test Substance\nidentifier: UNMAPPED_0001\n",
+        encoding="utf-8",
+    )
+    for variable, value in (
+        ("MEDIAINGREDIENTMECH_ROOT", str(tmp_path / "mim")),
+        ("KGMICROBE_ROOT", str(tmp_path / "absent")),
+        ("CULTUREMECH_ROOT", str(tmp_path / "absent")),
+        ("COMMUNITYMECH_ROOT", str(tmp_path / "absent")),
+    ):
+        monkeypatch.setenv(variable, value)
+    module = _script()
+    # REPO_ROOT too: the script prints its outputs with `relative_to(REPO_ROOT)`,
+    # which raises when they are redirected outside the repository.
+    monkeypatch.setattr(module, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(module, "OUT_DIR", tmp_path / "out")
+    monkeypatch.setattr(module, "OUT_TSV", tmp_path / "out" / "inventory.tsv")
+    monkeypatch.setattr(module, "OUT_MD", tmp_path / "out" / "inventory.md")
+    monkeypatch.setattr(
+        module, "OUT_COVERAGE_TSV", tmp_path / "out" / "coverage.tsv"
+    )
+    assert module.main([]) == 0
+    return module
+
+
+def test_the_inventory_tsv_header_is_still_the_first_row(tmp_path, monkeypatch):
+    """#163: coverage rows were prepended into this file, displacing the header.
+
+    `complex-ingredient-resolver` consumes this TSV as input, so its shape is a
+    published contract.
+    """
+    import csv
+
+    _run_inventory(tmp_path, monkeypatch)
+    rows = list(
+        csv.reader((tmp_path / "out" / "inventory.tsv").open(), delimiter="\t")
+    )
+
+    assert rows[0][0] == "source"
+    assert len(rows[0]) == 8
+    assert not any(row and row[0].startswith("#") for row in rows)
+
+
+def test_coverage_is_a_well_formed_sidecar(tmp_path, monkeypatch):
+    import csv
+
+    _run_inventory(tmp_path, monkeypatch)
+    rows = list(
+        csv.reader((tmp_path / "out" / "coverage.tsv").open(), delimiter="\t")
+    )
+
+    assert rows[0] == ["source", "state", "root_or_missing_variable", "rows"]
+    assert all(len(row) == 4 for row in rows), "every row must have four columns"
+    states = {row[1] for row in rows[1:]}
+    assert states <= {"read", "empty", "ABSENT"}
+    assert "ABSENT" in states, "the fixture leaves three roots absent"
+
+
+def test_the_workflow_uploads_the_coverage_sidecar():
+    """An archived artifact set that omits coverage is back to square one."""
+    upload = next(
+        step for step in _steps()
+        if step.get("uses", "").startswith("actions/upload-artifact")
+    )
+
+    assert "unmapped_inventory_coverage.tsv" in upload["with"]["path"]

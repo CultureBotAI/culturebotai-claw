@@ -108,6 +108,7 @@ jobs:
             culturebotai-claw/workspace/reports/evidence_reference_validation.md
             culturebotai-claw/workspace/reports/unmapped_inventory.tsv
             culturebotai-claw/workspace/reports/unmapped_inventory.md
+            culturebotai-claw/workspace/reports/unmapped_inventory_coverage.tsv
           retention-days: 30
           if-no-files-found: warn
 

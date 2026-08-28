@@ -42,6 +42,10 @@ COMMUNITYMECH_ROOT = Path(os.environ.get(
 OUT_DIR = REPO_ROOT / "workspace" / "reports"
 OUT_TSV = OUT_DIR / "unmapped_inventory.tsv"
 OUT_MD = OUT_DIR / "unmapped_inventory.md"
+# A sidecar rather than rows inside OUT_TSV: that file's first row is its header
+# and `complex-ingredient-resolver` consumes it as input, so prepending comment
+# rows to it is a breaking change to a published artifact (#163).
+OUT_COVERAGE_TSV = OUT_DIR / "unmapped_inventory_coverage.tsv"
 
 
 _NORM_RE = re.compile(r"[^a-z0-9]+")
@@ -325,9 +329,6 @@ def main(argv: list[str] | None = None) -> int:
     # Emit TSV
     with open(OUT_TSV, "w", newline="") as f:
         w = csv.writer(f, delimiter="\t")
-        for entry in coverage:
-            w.writerow([f"# coverage\t{entry.label}\t{entry.state}\t"
-                        f"{entry.root if entry.present else entry.variable}"])
         w.writerow(["source", "name", "norm_key", "status", "current_id",
                     "n_other_sources", "other_sources", "extra_json"])
         for r in rows:
@@ -337,6 +338,17 @@ def main(argv: list[str] | None = None) -> int:
                 len(set(others)),
                 "|".join(sorted(set(others))),
                 json.dumps(r.extra, sort_keys=True) if r.extra else "",
+            ])
+
+    with open(OUT_COVERAGE_TSV, "w", newline="") as f:
+        w = csv.writer(f, delimiter="\t")
+        w.writerow(["source", "state", "root_or_missing_variable", "rows"])
+        for entry in coverage:
+            w.writerow([
+                entry.label,
+                entry.state,
+                str(entry.root) if entry.present else entry.variable,
+                entry.rows,
             ])
 
     # Emit markdown summary
@@ -417,6 +429,7 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"\nWrote {OUT_TSV.relative_to(REPO_ROOT)}")
     print(f"Wrote {OUT_MD.relative_to(REPO_ROOT)}")
+    print(f"Wrote {OUT_COVERAGE_TSV.relative_to(REPO_ROOT)}")
     print(f"\n{len(rows)} total rows / {len(by_norm)} distinct names / "
           f"{len(multi)} cross-source")
     return 0
