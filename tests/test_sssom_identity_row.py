@@ -314,3 +314,67 @@ def test_the_same_predicate_does_not_count_as_strengthening():
     fallback; if they did, counting them as carried would misreport."""
     for predicate in builder.PREDICATE_STRENGTH:
         assert builder._strengthens(predicate, predicate) is False
+
+
+# --------------------------------------------------------------------------
+# #166: the loop that applies the decision must be exercised, not just the
+# decision itself
+# --------------------------------------------------------------------------
+
+
+def _row(subject, predicate, obj, stamp=""):
+    return {
+        "subject_id": subject,
+        "predicate_id": predicate,
+        "object_id": obj,
+        "validation_method": stamp,
+    }
+
+
+def test_the_replay_loop_actually_writes_the_stamps_it_decides():
+    """#166: with the loop inline, breaking its assignment left the suite green
+    while the build would have emitted every validation_method blank."""
+    prior = {
+        ("MIM:A", "skos:closeMatch", "CHEBI:1"): "v|SYNONYM_ENRICH|d",
+        ("MIM:B", "skos:exactMatch", "CHEBI:2"): "v|CONFIRMED|d",
+        ("MIM:C", "skos:exactMatch", "CHEBI:3"): "v|CONFIRMED|d",
+    }
+    rows = [
+        _row("MIM:A", "skos:exactMatch", "CHEBI:1"),    # strengthened -> carried
+        _row("MIM:B", "skos:exactMatch", "CHEBI:2"),    # unchanged    -> replayed
+        _row("MIM:C", "skos:narrowMatch", "CHEBI:3"),   # weakened     -> reset
+        _row("MIM:D", "skos:exactMatch", "CHEBI:4"),    # no history   -> absent
+    ]
+
+    outcomes = builder.apply_replayed_stamps(rows, prior)
+
+    assert outcomes == {"replayed": 1, "carried": 1, "reset": 1, "absent": 1}
+    assert rows[0]["validation_method"] == "v|SYNONYM_ENRICH|d"
+    assert rows[1]["validation_method"] == "v|CONFIRMED|d"
+    assert rows[2]["validation_method"] == "", "a weakened row must go out blank"
+    assert rows[3]["validation_method"] == ""
+
+
+def test_the_replay_loop_never_overwrites_a_stamp_the_build_already_set():
+    """A freshly-computed verdict outranks a replayed one and is not counted."""
+    prior = {("MIM:A", "skos:exactMatch", "CHEBI:1"): "old|CONFIRMED|d"}
+    rows = [_row("MIM:A", "skos:exactMatch", "CHEBI:1", stamp="new|CONFIRMED|d")]
+
+    outcomes = builder.apply_replayed_stamps(rows, prior)
+
+    assert rows[0]["validation_method"] == "new|CONFIRMED|d"
+    assert sum(outcomes.values()) == 0
+
+
+def test_the_outcome_counts_sum_to_the_rows_considered():
+    """A miscounted key would misreport the build without changing any stamp."""
+    prior = {("MIM:A", "skos:closeMatch", "CHEBI:1"): "v|X|d"}
+    rows = [
+        _row("MIM:A", "skos:exactMatch", "CHEBI:1"),
+        _row("MIM:B", "skos:exactMatch", "CHEBI:2"),
+        _row("MIM:C", "skos:exactMatch", "CHEBI:3", stamp="kept|X|d"),
+    ]
+
+    outcomes = builder.apply_replayed_stamps(rows, prior)
+
+    assert sum(outcomes.values()) == 2, "the pre-stamped row is skipped, not counted"

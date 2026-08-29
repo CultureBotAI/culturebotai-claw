@@ -296,6 +296,33 @@ def replay_stamp(
     return None, "reset"
 
 
+def apply_replayed_stamps(
+    rows: list[dict],
+    prior_stamps: dict[tuple[str, str, str], str],
+) -> dict[str, int]:
+    """Stamp `rows` in place from `prior_stamps`; return the outcome counts.
+
+    Extracted so the wiring is exercised and not only the decision it delegates
+    to: with the loop inline, breaking its assignment left the whole suite green
+    while the build would have emitted every validation_method blank (#166).
+
+    A row that already carries a stamp is left alone and not counted.
+    """
+    index = build_subject_object_index(prior_stamps)
+    outcomes = {"replayed": 0, "carried": 0, "reset": 0, "absent": 0}
+    for row in rows:
+        if (row.get("validation_method") or "").strip():
+            continue
+        stamp, outcome = replay_stamp(
+            row["subject_id"], row["predicate_id"], row["object_id"],
+            prior_stamps, index,
+        )
+        outcomes[outcome] += 1
+        if stamp:
+            row["validation_method"] = stamp
+    return outcomes
+
+
 def _load_existing_validation_method(
     path: Path,
 ) -> dict[tuple[str, str, str], str]:
@@ -1082,18 +1109,7 @@ def main():
         # relation -- exactMatch to narrowMatch after a specificity review --
         # inherited the endorsement it was meant to withdraw and stayed out of
         # the review queue.
-        by_subject_object = build_subject_object_index(prior_stamps)
-        outcomes = {"replayed": 0, "carried": 0, "reset": 0, "absent": 0}
-        for r in final:
-            if (r.get("validation_method") or "").strip():
-                continue
-            stamp, outcome = replay_stamp(
-                r["subject_id"], r["predicate_id"], r["object_id"],
-                prior_stamps, by_subject_object,
-            )
-            outcomes[outcome] += 1
-            if stamp:
-                r["validation_method"] = stamp
+        outcomes = apply_replayed_stamps(final, prior_stamps)
         replayed = outcomes["replayed"]
         carried = outcomes["carried"]
         reset = outcomes["reset"]
