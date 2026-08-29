@@ -1,0 +1,69 @@
+# Registry of in-place corpus writers (standardization Phase 3, items 2 and 5).
+#
+# Scope: callers of the shared `write_yaml(path, record)` helper, which writes a
+# record dict straight to a path with `open(path, "w")`. Every caller is
+# therefore an in-place, non-atomic corpus writer. This is the migration debt
+# left by keeping `write_yaml` when classify_ingredient_type moved to
+# ValidatedWriteTransaction.
+#
+# It is NOT a general "does this script mutate a Mech" registry -- deciding that
+# needs dataflow analysis of whether a write target derives from a Mech root.
+# See the module docstring in registry.py for why a regex approximation was
+# rejected rather than shipped.
+#
+# tests/test_writer_registry.py fails when a script starts calling write_yaml
+# without being declared here, so a new unmanaged writer cannot appear silently.
+#
+# status: `transaction` (uses ValidatedWriteTransaction) or `exception`
+# (does not yet). An exception REQUIRES a reason and a review_by date: an
+# untimed exception is a permanent one.
+version: 1
+
+writers:
+  scripts/apply_evidence_proposals.py:
+    status: exception
+    targets: >-
+      MediaIngredientMech ingredient YAMLs, adding MappingEvidence blocks
+      parsed from workspace/reports/evidence_proposals/.
+    reason: >-
+      Not yet migrated to ValidatedWriteTransaction. Applies curator-reviewed
+      drafts record by record, so a failure part-way through leaves an unknown
+      subset applied.
+    review_by: 2027-02-28
+
+  scripts/backfill_cas_chemistry.py:
+    status: exception
+    targets: >-
+      MediaIngredientMech ingredient YAMLs, filling chemical_properties
+      (molecular_formula, smiles, inchi) for cas:* identifiers from PubChem.
+    reason: >-
+      Not yet migrated. Writes per record while calling an external API, so an
+      interruption mid-run is likely rather than theoretical.
+    review_by: 2027-02-28
+
+  scripts/backfill_chebi_chemistry.py:
+    status: exception
+    targets: >-
+      MediaIngredientMech ingredient YAMLs, filling chemical_properties from
+      the local CHEBI sqlite for CHEBI-identified records.
+    reason: >-
+      Not yet migrated. Same per-record write loop as its CAS sibling.
+    review_by: 2027-02-28
+
+  scripts/foodon_pass.py:
+    status: exception
+    targets: >-
+      MediaIngredientMech ingredient YAMLs in the heuristic-complex bucket,
+      applying FOODON groundings.
+    reason: >-
+      Not yet migrated. Writes groundings per record during a resolver pass.
+    review_by: 2027-02-28
+
+  scripts/recurate_deprecated_and_removed.py:
+    status: exception
+    targets: >-
+      MediaIngredientMech ingredient YAMLs whose CHEBI term is obsolete or
+      removed, re-curating them from patch files.
+    reason: >-
+      Not yet migrated. Defines its own write_yaml as well as calling one.
+    review_by: 2027-02-28

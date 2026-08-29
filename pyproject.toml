@@ -71,6 +71,7 @@ namespaces = false
 # The fleet manifest is imported at package-import time, so it must ship in
 # the wheel; `conf/` at the repository root would not be packaged.
 kg_microbe_fleet = ["fleet.yaml"]
+kg_microbe_write = ["writers.yaml"]
 kg_microbe_research = ["schema/*.yaml"]
 kg_microbe_governance = [
     "vendored_artifacts.json",
