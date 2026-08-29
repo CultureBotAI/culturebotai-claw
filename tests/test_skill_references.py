@@ -577,3 +577,32 @@ def test_a_cd_through_an_environment_fallback_still_names_the_repository(tmp_pat
     path = _block(tmp_path, 'cd "${KGMICROBE_ROOT:-../kg-microbe}"\npython scripts/x.py')
 
     assert extract_references(path)[0].repository == "kg-microbe"
+
+
+def test_a_per_mech_path_absent_from_the_mechs_present_is_unverifiable(tmp_path):
+    """#219. CI checks out three of five Mechs, so a path belonging to one of
+    the other two was reported missing for no reason other than that Mech not
+    being cloned. Absent from the Mechs that are here says nothing about the
+    ones that are not."""
+    one = tmp_path / "A"
+    (one / "src").mkdir(parents=True)
+    _skill(
+        tmp_path, "s", "Read `src/traitmech/schema.yaml`.\n", frontmatter="reference-root: mech\n"
+    )
+
+    finding = check(tmp_path, {"A": one}, mech_labels={"A", "B"})[0]
+
+    assert finding.verdict == "unverifiable"
+    assert "B could not be checked" in finding.detail
+
+
+def test_a_per_mech_path_absent_from_every_mech_is_still_missing(tmp_path):
+    """The teeth survive: with all of them present, absent means absent."""
+    one, two = tmp_path / "A", tmp_path / "B"
+    one.mkdir()
+    two.mkdir()
+    _skill(tmp_path, "s", "Read `src/nope.yaml`.\n", frontmatter="reference-root: mech\n")
+
+    finding = check(tmp_path, {"A": one, "B": two}, mech_labels={"A", "B"})[0]
+
+    assert finding.verdict == "missing"
