@@ -1,0 +1,122 @@
+# A reusable id<->label correspondence gate, called by each Mech (#132 Phase 5,
+# #180).
+#
+# `label-correspondence.yaml` exists in four Mechs with four distinct hashes and
+# one common core: install just + uv, cache the OAK ontologies, generate a drift
+# report, upload it, then fail on any error-class verdict. What legitimately
+# differs is the Python version, which recipes build the product the gate reads,
+# and where the report lands -- so those are inputs, and everything else lives
+# here once.
+#
+# What does NOT move here: each Mech's `paths:` trigger filter, which is scoped
+# to that corpus, and its domain-specific gates -- CommunityMech's
+# `validate-terms-taxa` and `validate-terms-all` are extra jobs in its own
+# caller, not something this workflow knows about. Consolidation must not erase
+# a gate that only one repository needs.
+#
+# A reusable workflow is only exercised by a caller, so this file proves nothing
+# until a Mech adopts it. TraitMech is the canary; the rest follow only after
+# its CI passes for real (#180).
+
+name: label-correspondence (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        description: "Python the gate runs under; Mechs differ (3.10 to 3.12)."
+        required: true
+        type: string
+      prepare-recipe:
+        description: >-
+          A just recipe that builds the product the gate reads, run before the
+          drift report. CultureMech builds its SSSOM, CommunityMech its KGX
+          export; a Mech whose corpus is already on disk leaves this empty.
+        required: false
+        default: ""
+        type: string
+      drift-report-recipe:
+        description: "just recipe that writes the drift report."
+        required: false
+        default: "report-label-drift"
+        type: string
+      enforce-recipe:
+        description: "just recipe that fails on any error-class verdict."
+        required: false
+        default: "validate-products"
+        type: string
+      drift-report-path:
+        description: "Where the drift report lands, for the upload."
+        required: false
+        default: "reports/label_drift.tsv"
+        type: string
+      uv-sync-args:
+        description: >-
+          Extra arguments for `uv sync`. CultureMech and MediaIngredientMech
+          pass `--frozen`, which refuses to update the lockfile -- a hardening
+          this workflow must not quietly drop when they adopt it. Empty by
+          default, matching what TraitMech and CommunityMech run today.
+        required: false
+        default: ""
+        type: string
+      oak-cache-key:
+        description: >-
+          Cache key for the OAK sqlite ontologies. Bump the suffix to discard a
+          poisoned cache without editing this workflow.
+        required: false
+        default: "v1"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  label-correspondence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync ${{ inputs.uv-sync-args }}
+
+      # The gate resolves `sqlite:obo:` through OAK, which downloads CHEBI, GO,
+      # ENVO, PATO and RO. Caching them is the difference between ~2 minutes and
+      # a multi-gigabyte download per run.
+      - name: Cache OAK ontologies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.data/oaklib
+          key: oaklib-${{ runner.os }}-${{ inputs.oak-cache-key }}
+
+      - name: Build the product the gate reads
+        if: inputs.prepare-recipe != ''
+        run: just ${{ inputs.prepare-recipe }}
+
+      # Report first, and upload with `always()`, so the triage artifact exists
+      # on exactly the runs that need it -- the failing ones. CultureMech had
+      # this the other way round, generating the report only on failure, which
+      # loses the passing-run baseline a reader compares against.
+      - name: Generate id-label drift report
+        run: just ${{ inputs.drift-report-recipe }}
+
+      - name: Upload drift report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: label-drift-report-${{ github.run_id }}
+          path: ${{ inputs.drift-report-path }}
+          if-no-files-found: warn
+
+      - name: Enforce id-label correspondence
+        run: just ${{ inputs.enforce-recipe }}
