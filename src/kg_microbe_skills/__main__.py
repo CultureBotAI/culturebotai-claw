@@ -43,17 +43,24 @@ def find_claw_root(start: Path | None = None) -> Path:
     )
 
 
-def _downstream(claw_root: Path) -> tuple[dict[str, Path], list[str], set[str]]:
+def _downstream(
+    claw_root: Path,
+) -> tuple[dict[str, Path], list[str], set[str], set[str]]:
     """Every checkout that could be resolved, and the ones that could not.
 
     An unresolvable checkout is not an error here: the checker reports what it
     could not verify instead of failing outright, and `--require-sources`
     turns that into a failure for callers that need the full answer.
     """
-    resolved: dict[str, Path] = {}
+    # Claw answers for its own paths. Without it, a claw skill citing a claw
+    # file that no longer exists came back `unverifiable` rather than
+    # `missing` -- the checker's whole purpose, defeated in the one
+    # configuration the gate actually runs in (#216).
+    resolved: dict[str, Path] = {"culturebotai-claw": claw_root}
     absent: list[str] = []
     manifest = load_fleet_manifest()
     known = {"kg-microbe"}
+    mech_labels = {m.display_name for m in manifest.mechs.values()}
     for key in sorted(manifest.mechs):
         display = manifest.mechs[key].display_name
         known.add(display)
@@ -68,7 +75,7 @@ def _downstream(claw_root: Path) -> tuple[dict[str, Path], list[str], set[str]]:
         resolved["kg-microbe"] = kgm
     else:
         absent.append("kg-microbe")
-    return resolved, absent, known
+    return resolved, absent, known, mech_labels
 
 
 def _print_catalogue() -> int:
@@ -141,8 +148,10 @@ def main(argv: list[str] | None = None) -> int:
         return _render(args.skill, args.mech)
 
     claw_root = find_claw_root()
-    downstream, absent, known = _downstream(claw_root)
-    findings = check(claw_root, downstream, repositories=known)
+    downstream, absent, known, mech_labels = _downstream(claw_root)
+    findings = check(
+        claw_root, downstream, repositories=known, mech_labels=mech_labels
+    )
 
     print(format_report(findings))
     if absent:

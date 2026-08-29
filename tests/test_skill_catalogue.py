@@ -24,6 +24,7 @@ import pytest
 import yaml
 
 from kg_microbe_fleet import load_fleet_manifest
+from kg_microbe_fleet.roots import MechRootError, resolve_mech_root
 from kg_microbe_skills.catalogue import (
     CANONICAL_DIR,
     SCOPES,
@@ -237,17 +238,51 @@ def test_a_rendered_adapter_names_the_mech_it_was_rendered_for(name, mech, adapt
 def test_a_rendered_adapter_has_no_broken_reference(tmp_path, name, mech, adapter):
     """The other Phase 4 acceptance criterion, run through the real checker.
 
-    The adapter is written into a temporary skills tree and checked there, so
-    what is verified is the rendered text rather than the template.
-    """
-    directory = tmp_path / ".claude" / "skills" / name
-    directory.mkdir(parents=True)
-    (directory / "SKILL.md").write_text(adapter, encoding="utf-8")
+    An adapter's bare paths are the MECH's -- `src/traitmech`, its schema, its
+    corpus -- so it has to be checked against that checkout. Checked against
+    claw with no downstream root, every one of them comes back `unverifiable`
+    and the test cannot fail: written that way first, it passed with a
+    deliberately broken `src/definitely_not_here/nope.py` in the template.
 
-    findings = check(tmp_path)
+    Without the checkout this genuinely cannot be answered, so it skips with
+    the reason rather than passing quietly.
+    """
+    try:
+        mech_root = resolve_mech_root(mech, claw_root=ROOT)
+    except MechRootError as exc:
+        pytest.skip(f"needs a {mech} checkout to resolve its paths: {exc}")
+
+    written = tmp_path / "SKILL.md"
+    written.write_text(adapter, encoding="utf-8")
+
+    findings = check(mech_root, {mech: mech_root}, files=[written], mech_labels={mech})
     broken = [f for f in findings if f.verdict in ("missing", "ambiguous")]
 
     assert not broken, format_report(findings)
+
+
+def test_the_adapter_reference_check_is_not_vacuous():
+    """Guards the test above. A skill file with a path that exists in no
+    repository must be reported broken; if it is not, that test is checking
+    nothing and would pass any adapter."""
+    try:
+        mech_root = resolve_mech_root("traitmech", claw_root=ROOT)
+    except MechRootError as exc:
+        pytest.skip(f"needs a TraitMech checkout: {exc}")
+
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as directory:
+        probe = Path(directory) / "SKILL.md"
+        probe.write_text(
+            "---\nname: probe\n---\nRead `src/definitely_not_here/nope.py`.\n",
+            encoding="utf-8",
+        )
+        findings = check(
+            mech_root, {"traitmech": mech_root}, files=[probe], mech_labels={"traitmech"}
+        )
+
+    assert [f.verdict for f in findings] == ["missing"], format_report(findings)
 
 
 def test_an_unknown_placeholder_refuses_rather_than_rendering_it_literally():
