@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """
 Decontaminate Agar.yaml: extract the complex-medium synonyms that got
 absorbed during the duplicate-CHEBI consolidation pass and shouldn't be
@@ -24,6 +24,8 @@ What gets extracted into a new UNMAPPED YAML per synonym:
 
 from __future__ import annotations
 
+import os
+import sys
 import argparse
 import re
 from datetime import datetime, timezone
@@ -31,10 +33,17 @@ from pathlib import Path
 
 import yaml
 
-MIM_MAPPED_DIR = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
-    "MediaIngredientMech/data/ingredients"
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+MIM_ROOT = Path(
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
 )
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+MIM_MAPPED_DIR = MIM_ROOT / "data/ingredients"
 MAPPED_DIR = MIM_MAPPED_DIR / "mapped"
 UNMAPPED_DIR = MIM_MAPPED_DIR / "unmapped"
 
@@ -153,6 +162,8 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--apply", action="store_true")
     args = ap.parse_args()
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
+
 
     if not AGAR_YAML.exists():
         print(f"MISSING: {AGAR_YAML}")

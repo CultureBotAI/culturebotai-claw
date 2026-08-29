@@ -18,9 +18,9 @@ import shutil
 import sys
 from pathlib import Path
 
-CLAW_ROOT = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw"
-)
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+CLAW_ROOT = REPO_ROOT
 DEFAULT_INPUT = CLAW_ROOT / "workspace" / "reports" / "mim_ingredient_mappings.sssom.tsv"
 DEFAULT_SHARD_DIR = CLAW_ROOT / "workspace" / "shards" / "sssom_review"
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """Merge per-shard outputs from `resolve_unmapped.py` into a single
 report and (optionally) apply HIGH-confidence upgrades."""
 from __future__ import annotations

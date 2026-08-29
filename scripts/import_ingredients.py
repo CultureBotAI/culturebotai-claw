@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """
 Unified ingredient-import pipeline. See
 .claude/skills/ingredient-mapping/SKILL.md for the full architecture.
@@ -36,9 +36,29 @@ import yaml
 
 # ---------- paths ----------
 
-WORKSPACE = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/workspace"
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+COMMUNITYMECH_ROOT_PATH = Path(
+    os.environ.get("COMMUNITYMECH_ROOT", REPO_ROOT.parent / "CommunityMech")
 )
+CULTUREBOTHT_ROOT_PATH = Path(
+    os.environ.get("CULTUREBOTHT_ROOT", REPO_ROOT.parent / "CultureBotHT")
+)
+CULTUREMECH_ROOT_PATH = Path(
+    os.environ.get("CULTUREMECH_ROOT", REPO_ROOT.parent / "CultureMech")
+)
+MIM_ROOT = Path(
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
+)
+KGM_ROOT_PATH = Path(
+    os.environ.get("KGMICROBE_ROOT", REPO_ROOT.parent / "kg-microbe")
+)
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+WORKSPACE = REPO_ROOT / "workspace"
 # Overridable so an import can target a git worktree instead of the primary
 # checkout. Without this the hardcoded path writes into whatever branch the main
 # MediaIngredientMech checkout happens to have out — which, when the onboarding
@@ -47,23 +67,16 @@ WORKSPACE = Path(
 MIM_INGREDIENTS = Path(
     os.environ.get(
         "MIM_INGREDIENTS_DIR",
-        "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
-        "MediaIngredientMech/data/ingredients",
+        MIM_ROOT / "data/ingredients",
     )
 )
 MAPPED_DIR = MIM_INGREDIENTS / "mapped"
 UNMAPPED_DIR = MIM_INGREDIENTS / "unmapped"
 
-CULTUREBOT_ROOT = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureBotHT/CultureBotHT"
-)
-KGM_ROOT = Path("/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe")
-CULTUREMECH_ROOT = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech"
-)
-COMMUNITYMECH_ROOT = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CommunityMech/CommunityMech"
-)
+CULTUREBOT_ROOT = CULTUREBOTHT_ROOT_PATH / "CultureBotHT"
+KGM_ROOT = KGM_ROOT_PATH
+CULTUREMECH_ROOT = CULTUREMECH_ROOT_PATH
+COMMUNITYMECH_ROOT = COMMUNITYMECH_ROOT_PATH / "CommunityMech"
 
 OLS_CAS_CACHE = WORKSPACE / "cache/ols_cas_cache.json"
 PUBCHEM_CACHE = WORKSPACE / "cache/pubchem_cas_chebi.json"
@@ -780,6 +793,8 @@ def main() -> None:
     ap.add_argument("--max", type=int, default=None,
                     help="Stop after N candidates (for testing).")
     args = ap.parse_args()
+    require_mech_roots("communitymech", "culturemech", "mediaingredientmech", claw_root=REPO_ROOT)
+
 
     print("[1/5] Indexing existing MIM")
     labels, by_cas, by_chebi, slugs = build_mim_index()

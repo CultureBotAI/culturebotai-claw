@@ -9,7 +9,9 @@ Focused on the two kg-microbe rules to bound OLS API calls — other rules
 
 from __future__ import annotations
 
+import argparse
 import json
+import os
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -17,9 +19,17 @@ from pathlib import Path
 
 import yaml
 
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
 MIM_ROOT = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech"
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
 )
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+MIM_ROOT = MIM_ROOT
 sys.path.insert(0, str(MIM_ROOT / "src"))
 
 from mediaingredientmech.validation.ingredient_reviewer import (  # noqa: E402
@@ -29,9 +39,7 @@ from mediaingredientmech.validation.ingredient_reviewer import (  # noqa: E402
 )
 from mediaingredientmech.validation.kg_microbe_dict import KgMicrobeDict  # noqa: E402
 
-WORKSPACE = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/workspace"
-)
+WORKSPACE = REPO_ROOT / "workspace"
 REPORT_DIR = WORKSPACE / "reports"
 REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -98,6 +106,9 @@ def review_one(reviewer: IngredientReviewer, record: dict):
 
 
 def main():
+    argparse.ArgumentParser(description=__doc__).parse_args()
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
+
     print("Loading kg-microbe dict...", flush=True)
     kg_dict = KgMicrobeDict()
     kg_dict.load()

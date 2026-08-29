@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """Backfill `ontology_mapping` with a parent-class ontology term for
 MIM records whose primary identifier is a non-ontology placeholder
 (`kgmicrobe.compound:*`, `kgmicrobe.ingredient:*`, `UNMAPPED_*`,

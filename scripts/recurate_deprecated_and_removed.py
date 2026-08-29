@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """
 Re-curate the 6 MIM ingredients whose CHEBI is either obsolete (3 rows from
 mim_deprecated_chebi_patches.yaml) or removed entirely from CHEBI (3 rows
@@ -16,21 +16,29 @@ confidence per row.
 
 from __future__ import annotations
 
+import argparse
 import json
+import os
 import re
+import sys
 import time
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
-WORKSPACE = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/workspace"
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+MIM_ROOT = Path(
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
 )
-MIM_MAPPED_DIR = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
-    "MediaIngredientMech/data/ingredients/mapped"
-)
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+WORKSPACE = REPO_ROOT / "workspace"
+MIM_MAPPED_DIR = MIM_ROOT / "data/ingredients/mapped"
 OUT_YAML = WORKSPACE / "patches/mim_chebi_recuration_patches.yaml"
 OUT_MD = WORKSPACE / "reports/mim_chebi_recuration_summary.md"
 
@@ -169,6 +177,9 @@ def write_md(path: Path, patches: list[dict]) -> None:
 
 
 def main() -> None:
+    argparse.ArgumentParser(description=__doc__).parse_args()
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
+
     print(f"[1/2] Re-curating {len(TARGETS)} CHEBIs via OLS search")
     patches = build_patches()
     print(f"      {len(patches)} patches built")

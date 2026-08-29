@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """
 Generate workspace/reports/kg_microbe_review.md — a row-level diff
 of MIM's published SSSOM against kg-microbe's SSSOM-first consolidated
@@ -48,33 +48,34 @@ Also scans kg-microbe's SSSOM for:
 
 from __future__ import annotations
 
+import argparse
 import gzip
+import os
+import sys
 from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
 
 # ---------- paths ----------
 
-MIM_SSSOM = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
-    "MediaIngredientMech/mappings/ingredient_mappings.sssom.tsv"
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+MIM_ROOT = Path(
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
 )
-KGM_SSSOM_GZ = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
-    "kg-microbe/mappings/kgmicrobe_unified_entity_mappings.sssom.tsv.gz"
+KGM_ROOT_PATH = Path(
+    os.environ.get("KGMICROBE_ROOT", REPO_ROOT.parent / "kg-microbe")
 )
-KGM_LEGACY_TSV_GZ = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
-    "kg-microbe/mappings/unified_chemical_mappings.tsv.gz"
-)
-KGM_METATRAITS_DIR = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
-    "kg-microbe/kg_microbe/transform_utils/metatraits/mappings"
-)
-OUT = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
-    "culturebotai-claw/workspace/reports/kg_microbe_review.md"
-)
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+MIM_SSSOM = MIM_ROOT / "mappings/ingredient_mappings.sssom.tsv"
+KGM_SSSOM_GZ = KGM_ROOT_PATH / "mappings/kgmicrobe_unified_entity_mappings.sssom.tsv.gz"
+KGM_LEGACY_TSV_GZ = KGM_ROOT_PATH / "mappings/unified_chemical_mappings.tsv.gz"
+KGM_METATRAITS_DIR = KGM_ROOT_PATH / "kg_microbe/transform_utils/metatraits/mappings"
+OUT = REPO_ROOT / "workspace/reports/kg_microbe_review.md"
 
 
 # ---------- loaders ----------
@@ -572,6 +573,9 @@ def render(
 # ---------- main ----------
 
 def main() -> None:
+    argparse.ArgumentParser(description=__doc__).parse_args()
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
+
     print(f"[1/4] Loading MIM SSSOM from {MIM_SSSOM}")
     mim_rows = load_mim()
     print(f"      {len(mim_rows)} rows (no dedup; multi-row subjects preserved)")

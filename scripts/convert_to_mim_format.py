@@ -12,6 +12,8 @@ import yaml
 from pathlib import Path
 from datetime import datetime
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
 
 def convert_to_mim_format(input_file: Path, output_file: Path) -> int:
     """
@@ -117,7 +119,7 @@ def main():
     print(f"Ingredients converted: {count}")
     print(f"\n✅ Ready for MediaIngredientMech batch curation")
     print(f"\nNext command:")
-    print(f"cd /Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech")
+    print(f"cd {MIM_ROOT}")
     print(f"python scripts/batch_curate.py \\")
     print(f"    --batch-size 150 \\")
     print(f"    --auto-accept-threshold 0.9 \\")

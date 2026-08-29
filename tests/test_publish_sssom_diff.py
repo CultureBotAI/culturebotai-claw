@@ -390,6 +390,18 @@ def _write_sssom_tsv(path, rows):
     path.write_text("".join(lines))
 
 
+def _stub_root_verification(monkeypatch):
+    """main() verifies its MediaIngredientMech checkout before working (#198).
+
+    These tests drive main() against temporary fixtures, never a real
+    checkout, so the verification has nothing to verify. Stubbing it keeps the
+    suite runnable where no Mech is cloned -- which is CI, and is how this was
+    found: every local run had the roots set, so eight tests passed here and
+    failed on the runner.
+    """
+    monkeypatch.setattr(publish_sssom, "require_mech_roots", lambda *a, **k: {})
+
+
 def _patch_diff_report_default(monkeypatch, tmp_path):
     """_write_diff_report's `path` default is bound to the real DIFF_REPORT
     at module-def time, so monkeypatching the DIFF_REPORT *name* alone does
@@ -411,6 +423,7 @@ def test_main_refuses_to_promote_a_widening_flip_by_default(tmp_path, monkeypatc
 
     monkeypatch.setattr(publish_sssom, "WORKING_COPY", working_copy)
     monkeypatch.setattr(publish_sssom, "PUBLISHED", published)
+    _stub_root_verification(monkeypatch)
     _patch_diff_report_default(monkeypatch, tmp_path)
     monkeypatch.setattr(sys, "argv", ["publish_sssom.py", "--dry-run"])
 
@@ -444,6 +457,7 @@ def test_main_apply_writes_a_pointer_and_counts_not_the_full_diff(tmp_path, monk
     # path otherwise -- unpatched, this passes locally and fails on CI.
     monkeypatch.setattr(publish_sssom, "CLAW_ROOT", Path(__file__).resolve().parents[1])
     monkeypatch.setattr(publish_sssom, "_validate", lambda path: [])
+    _stub_root_verification(monkeypatch)
     _patch_diff_report_default(monkeypatch, tmp_path)
     monkeypatch.setattr(sys, "argv", ["publish_sssom.py", "--apply"])
 
@@ -481,6 +495,7 @@ def test_main_refuses_to_promote_a_respelled_widening_flip(tmp_path, monkeypatch
 
     monkeypatch.setattr(publish_sssom, "WORKING_COPY", working_copy)
     monkeypatch.setattr(publish_sssom, "PUBLISHED", published)
+    _stub_root_verification(monkeypatch)
     _patch_diff_report_default(monkeypatch, tmp_path)
     monkeypatch.setattr(sys, "argv", ["publish_sssom.py", "--dry-run"])
 
@@ -510,6 +525,7 @@ def test_main_proceeds_past_the_widening_gate_when_explicitly_overridden(tmp_pat
     # test does, keeps this test isolated to the widening-gate override logic
     # and avoids depending on an external binary's exact error wording.
     monkeypatch.setattr(publish_sssom, "_validate", lambda path: [])
+    _stub_root_verification(monkeypatch)
     _patch_diff_report_default(monkeypatch, tmp_path)
     monkeypatch.setattr(
         sys, "argv", ["publish_sssom.py", "--dry-run", "--allow-widening-flips", "1"]
@@ -541,6 +557,7 @@ def test_main_apply_surfaces_a_partial_failure_after_published_is_already_commit
     monkeypatch.setattr(publish_sssom, "LOCKS_DIR", tmp_path / "locks")
     monkeypatch.setattr(publish_sssom, "CLAW_ROOT", Path(__file__).resolve().parents[1])
     monkeypatch.setattr(publish_sssom, "_validate", lambda path: [])
+    _stub_root_verification(monkeypatch)
     _patch_diff_report_default(monkeypatch, tmp_path)
 
     real_write_diff_report = publish_sssom._write_diff_report
@@ -593,6 +610,7 @@ def test_main_apply_partial_failure_message_reflects_a_surviving_diff_archive(
     monkeypatch.setattr(publish_sssom, "LOCKS_DIR", tmp_path / "locks")
     monkeypatch.setattr(publish_sssom, "CLAW_ROOT", Path(__file__).resolve().parents[1])
     monkeypatch.setattr(publish_sssom, "_validate", lambda path: [])
+    _stub_root_verification(monkeypatch)
     _patch_diff_report_default(monkeypatch, tmp_path)
     monkeypatch.setattr(sys, "argv", ["publish_sssom.py", "--apply"])
 
@@ -628,6 +646,7 @@ def test_diff_archive_filename_incorporates_prev_hash_not_just_published_hash(
     monkeypatch.setattr(publish_sssom, "LOCKS_DIR", tmp_path / "locks")
     monkeypatch.setattr(publish_sssom, "CLAW_ROOT", Path(__file__).resolve().parents[1])
     monkeypatch.setattr(publish_sssom, "_validate", lambda path: [])
+    _stub_root_verification(monkeypatch)
     _patch_diff_report_default(monkeypatch, tmp_path)
     monkeypatch.setattr(sys, "argv", ["publish_sssom.py", "--apply"])
 
@@ -677,6 +696,7 @@ def test_main_apply_surfaces_a_partial_failure_when_the_audit_dir_cannot_be_crea
     monkeypatch.setattr(publish_sssom, "LOCKS_DIR", tmp_path / "locks")
     monkeypatch.setattr(publish_sssom, "CLAW_ROOT", Path(__file__).resolve().parents[1])
     monkeypatch.setattr(publish_sssom, "_validate", lambda path: [])
+    _stub_root_verification(monkeypatch)
     _patch_diff_report_default(monkeypatch, tmp_path)
     monkeypatch.setattr(sys, "argv", ["publish_sssom.py", "--apply"])
 

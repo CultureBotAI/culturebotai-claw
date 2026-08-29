@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """Propose PMID + snippet candidates for a MIM ingredient (or set).
 
 Phase 4 of the dismech-pattern port. Bridges Phase 1 (validator) by

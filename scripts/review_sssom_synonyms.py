@@ -57,9 +57,9 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-CLAW_ROOT = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw"
-)
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+CLAW_ROOT = REPO_ROOT
 DEFAULT_SSSOM = CLAW_ROOT / "workspace" / "reports" / "mim_ingredient_mappings.sssom.tsv"
 DEFAULT_TSV_OUT = CLAW_ROOT / "workspace" / "reports" / "sssom_synonym_review.tsv"
 DEFAULT_MD_OUT = CLAW_ROOT / "workspace" / "reports" / "sssom_synonym_review.md"

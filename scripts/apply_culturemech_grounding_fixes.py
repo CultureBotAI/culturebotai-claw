@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """Apply verified grounding corrections and name repairs to CultureMech YAMLs.
 
 Two independent edit kinds, each gated on its own confidence:
@@ -19,6 +19,7 @@ comments and key order — a YAML round-trip would reflow 26,000 files.
 
 from __future__ import annotations
 
+import os
 import argparse
 import csv
 import re
@@ -28,9 +29,15 @@ from pathlib import Path
 
 import yaml
 
-KGH = Path("/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe")
-CM = KGH / "CultureMech"
-CLAW = KGH / "culturebotai-claw"
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+CM = Path(
+    os.environ.get("CULTUREMECH_ROOT", REPO_ROOT.parent / "CultureMech")
+)
+CLAW = REPO_ROOT
 
 
 def load_edits(resolutions: Path, repairs: Path, min_conf: str):
@@ -166,6 +173,8 @@ def main() -> None:
     ap.add_argument("--confidence", choices=["HIGH", "ALL"], default="HIGH")
     ap.add_argument("--apply", action="store_true", help="write changes (default: dry run)")
     args = ap.parse_args()
+    require_mech_roots("culturemech", claw_root=REPO_ROOT)
+
 
     corrections, renames = load_edits(args.resolutions, args.repairs, args.confidence)
     print(f"{len(corrections)} id corrections, {len(renames)} name repairs "

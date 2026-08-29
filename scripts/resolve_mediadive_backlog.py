@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """Resolve the live MediaDive unmapped backlog against CHEBI / FOODON / UBERON.
 
 Runs the 202 still-unmapped ``mediadive.ingredient:*`` nodes from the current
@@ -13,6 +13,7 @@ triage bucket attached rather than being guessed at.
 
 from __future__ import annotations
 
+import os
 import argparse
 import csv
 import re
@@ -20,10 +21,20 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
-KGH = Path("/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe")
-CLAW = KGH / "culturebotai-claw"
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+CM = Path(
+    os.environ.get("CULTUREMECH_ROOT", REPO_ROOT.parent / "CultureMech")
+)
+KGM_ROOT_PATH = Path(
+    os.environ.get("KGMICROBE_ROOT", REPO_ROOT.parent / "kg-microbe")
+)
+CLAW = REPO_ROOT
 sys.path.insert(0, str(CLAW / "scripts"))
-sys.path.insert(0, str(KGH / "CultureMech" / "scripts"))
+sys.path.insert(0, str(CM / "scripts"))
 
 import chem_formula  # noqa: E402
 from resolve_label_plausibility_defects import (  # noqa: E402
@@ -52,10 +63,12 @@ def bucket(name: str) -> str:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--nodes", type=Path,
-                    default=KGH / "kg-microbe/data/transformed/mediadive/nodes.tsv")
+                    default=KGM_ROOT_PATH / "data/transformed/mediadive/nodes.tsv")
     ap.add_argument("--out", type=Path,
                     default=CLAW / "workspace/reports/mediadive_backlog_resolutions.tsv")
     args = ap.parse_args()
+    require_mech_roots("culturemech", claw_root=REPO_ROOT)
+
 
     live: list[tuple[str, str]] = []
     with args.nodes.open(newline="") as f:

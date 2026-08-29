@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """Multi-ontology cascading resolver for the 595 MIM `unmapped/` records.
 
 Walks every YAML in `MediaIngredientMech/data/ingredients/unmapped/`,

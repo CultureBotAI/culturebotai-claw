@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """Curator-review report for MIM ingredient_type classifications.
 
 Two buckets surfaced for human review in a single TSV + Markdown:

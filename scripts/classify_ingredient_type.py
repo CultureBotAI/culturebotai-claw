@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """Auto-populate the `ingredient_type` slot on every MIM ingredient YAML.
 
 The schema's `IngredientTypeEnum` (mediaingredientmech.yaml) already

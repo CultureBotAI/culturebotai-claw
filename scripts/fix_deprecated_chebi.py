@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """
 Emit patch proposals for MIM ingredients that map to obsolete CHEBI terms.
 
@@ -15,24 +15,32 @@ workspace/patches/ for later application through the lock + task system.
 
 from __future__ import annotations
 
+import argparse
 import csv
 import json
+import os
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-WORKSPACE = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/workspace"
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+MIM_ROOT = Path(
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
 )
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+WORKSPACE = REPO_ROOT / "workspace"
 AUDIT_TSV = WORKSPACE / "reports/kgm_mim_audit.tsv"
 PATCHES_DIR = WORKSPACE / "patches"
 REPORT_DIR = WORKSPACE / "reports"
 PATCH_YAML = PATCHES_DIR / "mim_deprecated_chebi_patches.yaml"
 SUMMARY_MD = REPORT_DIR / "mim_deprecated_chebi_summary.md"
 
-MIM_MAPPED_DIR = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
-    "MediaIngredientMech/data/ingredients/mapped"
-)
+MIM_MAPPED_DIR = MIM_ROOT / "data/ingredients/mapped"
 
 IAO_REPLACED_BY = "IAO:0100001"
 
@@ -146,6 +154,9 @@ def write_summary(path: Path, patches: list[dict], skipped: list[dict]) -> None:
 
 
 def main() -> None:
+    argparse.ArgumentParser(description=__doc__).parse_args()
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
+
     rows = load_deprecated_rows()
     print(f"[1/3] Found {len(rows)} DEPRECATED_CHEBI MIM-side rows")
 

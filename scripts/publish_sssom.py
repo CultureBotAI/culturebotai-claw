@@ -54,12 +54,18 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-CLAW_ROOT = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw"
-)
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
 MIM_ROOT = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech"
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
 )
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+CLAW_ROOT = REPO_ROOT
+MIM_ROOT = MIM_ROOT
 WORKING_COPY = CLAW_ROOT / "workspace" / "reports" / "mim_ingredient_mappings.sssom.tsv"
 PUBLISHED = MIM_ROOT / "mappings" / "ingredient_mappings.sssom.tsv"
 # One line per promotion: timestamp, hashes, row counts, and a diff_counts
@@ -491,6 +497,8 @@ def main():
                          "noise (MediaIngredientMech#409). Set explicitly (with "
                          "justification) when intentionally relaxing a mapping.")
     args = ap.parse_args()
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
+
     apply = args.apply and not args.dry_run
 
     if not WORKING_COPY.exists():

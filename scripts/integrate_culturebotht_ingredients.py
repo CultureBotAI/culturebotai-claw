@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """
 Integrate CultureBotHT data sources into MediaIngredientMech.
 
@@ -30,6 +30,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import re
 import sys
 import time
@@ -41,20 +42,26 @@ from pathlib import Path
 
 import yaml
 
-CULTUREBOT_ROOT = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureBotHT/CultureBotHT"
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+CULTUREBOTHT_ROOT_PATH = Path(
+    os.environ.get("CULTUREBOTHT_ROOT", REPO_ROOT.parent / "CultureBotHT")
 )
+MIM_ROOT = Path(
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
+)
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+CULTUREBOT_ROOT = CULTUREBOTHT_ROOT_PATH / "CultureBotHT"
 COMPOUNDS_CSV = CULTUREBOT_ROOT / "data/raw/google_sheets/compounds_to_cas.csv"
 CONSOLIDATED_JSON = CULTUREBOT_ROOT / "data/consolidated/consolidated_media.json"
 SYNONYM_CACHE = CULTUREBOT_ROOT / "data/cache/synonym_mappings.json"
 
-MIM_MAPPED_DIR = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
-    "MediaIngredientMech/data/ingredients/mapped"
-)
-WORKSPACE = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/workspace"
-)
+MIM_MAPPED_DIR = MIM_ROOT / "data/ingredients/mapped"
+WORKSPACE = REPO_ROOT / "workspace"
 OLS_CACHE = WORKSPACE / "cache/ols_cas_cache.json"
 QUEUE_TSV = WORKSPACE / "reports/culturebotht_curation_queue.tsv"
 SUMMARY_MD = WORKSPACE / "reports/culturebotht_integration_summary.md"
@@ -281,6 +288,8 @@ def main() -> None:
                     help="Process only the consolidated_media.json source.")
     ap.add_argument("--compounds-only", action="store_true")
     args = ap.parse_args()
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
+
 
     print(f"[1/5] Building MIM existing index")
     mim_labels, mim_by_cas, mim_by_chebi = _build_mim_index()

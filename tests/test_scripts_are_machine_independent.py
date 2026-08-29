@@ -9,13 +9,17 @@ by the honest `REPO_ROOT.parent` idiom and asks whether they verify. A script
 with a literal absolute path never resolves a root at all, so the guard that
 exists for exactly this class of bug structurally skips the worst offenders.
 
-These two lists are burn-down ledgers, not exemptions (#198). A new script may
-not join them, and a fixed one must be removed -- the tests below fail either
-way, so the count can only go down.
+These two lists were burn-down ledgers (#198). Both are empty: all 52 scripts
+now derive their paths from the file's own location with the fleet's
+environment variables as overrides, and all 54 shebangs name `python3` rather
+than one Homebrew install. They stay in the file as the mechanism that keeps
+them empty -- a new script cannot be added to either without a deliberate edit
+here, and the tests fail in both directions.
 """
 
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 
 import pytest
@@ -24,120 +28,12 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"
 
 # Scripts that still embed a home-directory path. Shrink this; never grow it.
-HARDCODED_PATHS = {
-    "add_remaining_culturebotht.py",
-    "analyze_mim_chebi_duplicates.py",
-    "apply_culturemech_grounding_fixes.py",
-    "apply_hydrate_siblings.py",
-    "apply_medium_unmapped_candidates.py",
-    "apply_mim_chebi_fixes.py",
-    "apply_mim_merges.py",
-    "apply_mim_wrong_fixes.py",
-    "apply_p44_hydration_routing.py",
-    "apply_p44_synonym_enrichment.py",
-    "build_complex_ingredients_tsv.py",
-    "build_mim_ingredient_sssom.py",
-    "cas_chebi_lookup_pubchem.py",
-    "categorize_residual_p25.py",
-    "chebi_semantic_audit.py",
-    "convert_to_mim_format.py",
-    "curate_environments.py",
-    "curate_envo_candidates.py",
-    "curate_unmapped_kgm_antibiotics.py",
-    "disambiguate_p44_hydration.py",
-    "emit_low_curator_queue.py",
-    "extract_complex_media_from_agar.py",
-    "extract_complex_media_synonyms.py",
-    "fix_deprecated_chebi.py",
-    "fix_label_drift.py",
-    "fix_wrong_chebi_mappings.py",
-    "generate_kg_microbe_review.py",
-    "generate_mapping_taxonomy_report.py",
-    "generate_residual_p25_sssom.py",
-    "import_ingredients.py",
-    "integrate_culturebotht_ingredients.py",
-    "merge_sssom_shard_reviews.py",
-    "plan_mim_merges.py",
-    "propose_chebi_for_unmapped.py",
-    "propose_hydrate_siblings.py",
-    "prune_residual_for_chebi_fixes.py",
-    "publish_sssom.py",
-    "recurate_deprecated_and_removed.py",
-    "repair_damaged_ingredient_names.py",
-    "report_mim_chebi_duplicates.py",
-    "resolve_label_plausibility_defects.py",
-    "resolve_mediadive_backlog.py",
-    "resolve_residual_defects.py",
-    "resolve_risky_cas_rn.py",
-    "review_p44_synonym_enrichment.py",
-    "review_sssom_synonyms.py",
-    "round_trip_true_bugs.py",
-    "route_chebi_collision_synonyms.py",
-    "shard_sssom_for_review.py",
-    "sweep_kg_microbe_rules.py",
-    "triage_p25_findings.py",
-    "verify_31.py",
-}
+HARDCODED_PATHS: set[str] = set()
 
 # Scripts whose shebang names an interpreter by absolute path. Same ledger,
 # different symptom: `#!/usr/bin/env /opt/homebrew/bin/python3.13` is a Mac
 # with Homebrew and that exact Python.
-ABSOLUTE_INTERPRETER = {
-    "add_remaining_culturebotht.py",
-    "analyze_mim_chebi_duplicates.py",
-    "apply_culturemech_grounding_fixes.py",
-    "apply_evidence_proposals.py",
-    "apply_hydrate_siblings.py",
-    "apply_medium_unmapped_candidates.py",
-    "apply_mim_chebi_fixes.py",
-    "apply_mim_merges.py",
-    "apply_mim_wrong_fixes.py",
-    "apply_p44_hydration_routing.py",
-    "backfill_cas_chemistry.py",
-    "backfill_chebi_chemistry.py",
-    "backfill_parent_terms.py",
-    "build_complex_ingredients_tsv.py",
-    "cas_chebi_lookup_pubchem.py",
-    "chebi_adjudicate.py",
-    "chebi_semantic_audit.py",
-    "classify_ingredient_type.py",
-    "curate_unmapped_kgm_antibiotics.py",
-    "detect_specificity_loss.py",
-    "disambiguate_p44_hydration.py",
-    "emit_low_curator_queue.py",
-    "extract_complex_media_from_agar.py",
-    "extract_complex_media_synonyms.py",
-    "fetch_pubmed_abstracts.py",
-    "fix_deprecated_chebi.py",
-    "fix_label_drift.py",
-    "foodon_pass.py",
-    "generate_kg_microbe_review.py",
-    "generate_mapping_taxonomy_report.py",
-    "import_ingredients.py",
-    "integrate_culturebotht_ingredients.py",
-    "merge_resolve_unmapped.py",
-    "merge_resolve_unmapped_v2.py",
-    "mint_kgm_ingredient.py",
-    "plan_mim_merges.py",
-    "propose_chebi_for_unmapped.py",
-    "propose_evidence.py",
-    "propose_hydrate_siblings.py",
-    "recurate_deprecated_and_removed.py",
-    "repair_damaged_ingredient_names.py",
-    "report_mim_chebi_duplicates.py",
-    "resolve_label_plausibility_defects.py",
-    "resolve_mediadive_backlog.py",
-    "resolve_residual_defects.py",
-    "resolve_risky_cas_rn.py",
-    "resolve_unmapped.py",
-    "resolve_unmapped_v2.py",
-    "review_ingredient_classifications.py",
-    "route_chebi_collision_synonyms.py",
-    "sync_kgm_dependencies.py",
-    "upgrade_placeholders.py",
-    "validate_evidence_references.py",
-    "verify_31.py",
-}
+ABSOLUTE_INTERPRETER: set[str] = set()
 
 
 def _scripts():
@@ -197,4 +93,117 @@ def test_a_fixed_script_leaves_the_interpreter_ledger(name):
     assert path.read_text(encoding="utf-8").startswith("#!/usr/bin/env /"), (
         f"{name} no longer pins an absolute interpreter -- remove it from "
         f"ABSOLUTE_INTERPRETER"
+    )
+
+
+# --------------------------------------------------------------------------
+# #205: --help must not need a checkout, and a module-level downstream import
+#       makes it need one
+# --------------------------------------------------------------------------
+
+# Scripts that import a module from a downstream checkout at module level, so
+# `--help` fails without that checkout. Shrink this; never grow it.
+DOWNSTREAM_IMPORT_AT_MODULE_LEVEL = {
+    "resolve_label_plausibility_defects.py",
+    "resolve_mediadive_backlog.py",
+    "resolve_residual_defects.py",
+    "review_p44_synonym_enrichment.py",
+    "sweep_kg_microbe_rules.py",
+}
+
+# Path variables that name a checkout other than this one.
+_DOWNSTREAM_VARIABLES = {
+    "MIM_ROOT",
+    "CM",
+    "CULTUREMECH_ROOT_PATH",
+    "COMMUNITYMECH_ROOT_PATH",
+    "KGM_ROOT_PATH",
+    "CULTUREBOTHT_ROOT_PATH",
+}
+
+
+def _imports_from_a_downstream_path(path: Path) -> bool:
+    """A top-level import that follows a sys.path.insert of a downstream root.
+
+    Static rather than a subprocess sweep: running `--help` on sixty scripts
+    is a minute of test time, and this reads the same fact off the AST.
+    """
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    inserted = False
+    for node in tree.body:
+        if (
+            isinstance(node, ast.Expr)
+            and isinstance(node.value, ast.Call)
+            and "sys.path.insert" in ast.unparse(node.value.func)
+        ):
+            names = {n.id for n in ast.walk(node) if isinstance(n, ast.Name)}
+            if names & _DOWNSTREAM_VARIABLES:
+                inserted = True
+        elif isinstance(node, (ast.Import, ast.ImportFrom)) and inserted:
+            return True
+    return False
+
+
+@pytest.mark.parametrize("path", _scripts(), ids=lambda p: p.name)
+def test_help_does_not_require_a_downstream_checkout(path):
+    """#179 again, through a door the AST guard could not see.
+
+    That guard checks `require_mech_roots` runs after `parse_args`, which these
+    scripts do. It cannot see an import that fails before `main()` is ever
+    reached -- and `--help` is how a reader discovers which variable to set, so
+    needing the checkout to print it is circular.
+    """
+    if path.name in DOWNSTREAM_IMPORT_AT_MODULE_LEVEL:
+        pytest.skip("known offender; tracked in #205")
+    assert not _imports_from_a_downstream_path(path), (
+        f"{path.name} imports from a downstream checkout at module level, so "
+        f"--help fails without it; import inside the function that uses it"
+    )
+
+
+@pytest.mark.parametrize("name", sorted(DOWNSTREAM_IMPORT_AT_MODULE_LEVEL))
+def test_a_fixed_script_leaves_the_downstream_import_ledger(name):
+    path = SCRIPTS / name
+    assert path.is_file(), f"{name} is listed but does not exist; remove it"
+    assert _imports_from_a_downstream_path(path), (
+        f"{name} no longer imports from a downstream checkout at module level "
+        f"-- remove it from DOWNSTREAM_IMPORT_AT_MODULE_LEVEL"
+    )
+
+
+# --------------------------------------------------------------------------
+# #207 review: adding a parser must not reject arguments a script already took
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("path", _scripts(), ids=lambda p: p.name)
+def test_a_script_that_reads_argv_declares_what_it_reads(path):
+    """#198 gave twenty scripts an argument parser so `--help` would work.
+    A bare parser rejects every positional -- and `chebi_semantic_audit` had
+    always taken its destination as `sys.argv[1]`, so parsing silently turned
+    a working invocation into `error: unrecognized arguments`.
+    """
+    source = path.read_text(encoding="utf-8")
+    if "parse_args" not in source or "sys.argv" not in source:
+        return
+
+    tree = ast.parse(source)
+    indexed = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Subscript)
+        and ast.unparse(node.value) == "sys.argv"
+    ]
+    if not indexed:
+        return
+
+    declared = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and getattr(node.func, "attr", "") == "add_argument"
+    ]
+    assert declared, (
+        f"{path.name} indexes sys.argv and also parses arguments, but declares "
+        f"none; the parser will reject what the indexing expects"
     )

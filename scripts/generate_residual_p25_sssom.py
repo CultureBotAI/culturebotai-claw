@@ -24,24 +24,34 @@ Validation:
 
 from __future__ import annotations
 
+import argparse
 import gzip
 import json
+import os
 import re
+import sys
 from pathlib import Path
 
 import yaml
 
 from kgm_unified_mappings import load_kgm_source_index
 
-CLAW_ROOT = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw"
-)
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
 MIM_ROOT = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech"
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
 )
-KGM_ROOT = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe"
+KGM_ROOT_PATH = Path(
+    os.environ.get("KGMICROBE_ROOT", REPO_ROOT.parent / "kg-microbe")
 )
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+CLAW_ROOT = REPO_ROOT
+MIM_ROOT = MIM_ROOT
+KGM_ROOT = KGM_ROOT_PATH
 REPORT_DIR = CLAW_ROOT / "workspace" / "reports"
 CATEGORIZED_JSON = REPORT_DIR / "kg_microbe_residual_p25_categorized.json"
 OUT_TSV = REPORT_DIR / "residual_p25_mappings.sssom.tsv"
@@ -208,6 +218,9 @@ def _join_sources(mim_ev: str, kgm_src: str, last_curator: str) -> str:
 
 
 def main():
+    argparse.ArgumentParser(description=__doc__).parse_args()
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
+
     data = json.loads(CATEGORIZED_JSON.read_text())
     decisions = data["decisions"]
     kgm_sources = _load_kgm_source_index()

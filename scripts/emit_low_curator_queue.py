@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """
 Emit a curator-friendly TSV for the LOW-confidence hydrate-sibling
 proposals (433 rows from workspace/reports/hydrate_sibling_proposals.json).
@@ -13,20 +13,28 @@ Output: workspace/reports/mim_low_confidence_curation_queue.tsv
 
 from __future__ import annotations
 
+import argparse
 import csv
 import json
+import os
+import sys
 from collections import defaultdict
 from pathlib import Path
 
 import yaml
 
-MIM_MAPPED_DIR = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
-    "MediaIngredientMech/data/ingredients/mapped"
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+MIM_ROOT = Path(
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
 )
-WORKSPACE = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/workspace"
-)
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+MIM_MAPPED_DIR = MIM_ROOT / "data/ingredients/mapped"
+WORKSPACE = REPO_ROOT / "workspace"
 IN_JSON = WORKSPACE / "reports/hydrate_sibling_proposals.json"
 OUT_TSV = WORKSPACE / "reports/mim_low_confidence_curation_queue.tsv"
 
@@ -53,6 +61,9 @@ def _load_existing_chebi_index() -> dict[str, list[str]]:
 
 
 def main() -> None:
+    argparse.ArgumentParser(description=__doc__).parse_args()
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
+
     proposals = json.loads(IN_JSON.read_text())["proposals"]
     low = [p for p in proposals if p["confidence"] == "LOW"]
     existing = _load_existing_chebi_index()

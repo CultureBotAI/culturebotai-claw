@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """Backfill `chemical_properties.molecular_formula` / `smiles` / `inchi`
 for every MIM ingredient with a `cas:*` primary identifier, using
 PubChem's REST API (CAS → CID → properties).

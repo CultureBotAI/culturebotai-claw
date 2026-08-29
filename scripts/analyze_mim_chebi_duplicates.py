@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """
 Classify the 220 MIM CHEBIs-with-multiple-YAMLs into three groups:
 
@@ -22,20 +22,28 @@ then LEGITIMATE_VARIANTS.
 
 from __future__ import annotations
 
+import argparse
 import csv
+import os
 import re
+import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
 import yaml
 
-MIM_MAPPED_DIR = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
-    "MediaIngredientMech/data/ingredients/mapped"
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+MIM_ROOT = Path(
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
 )
-WORKSPACE = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/workspace"
-)
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+MIM_MAPPED_DIR = MIM_ROOT / "data/ingredients/mapped"
+WORKSPACE = REPO_ROOT / "workspace"
 OUT_TSV = WORKSPACE / "reports/mim_duplicate_consolidation_queue.tsv"
 OUT_MD = WORKSPACE / "reports/mim_duplicate_consolidation_queue.md"
 
@@ -75,6 +83,9 @@ def hydration_count(text: str) -> int | None:
 
 
 def main() -> None:
+    argparse.ArgumentParser(description=__doc__).parse_args()
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
+
     by_chebi: dict[str, list[dict]] = defaultdict(list)
     for path in sorted(MIM_MAPPED_DIR.glob("*.yaml")):
         try:

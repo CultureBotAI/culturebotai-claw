@@ -29,9 +29,9 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
-WORKSPACE = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/workspace"
-)
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+WORKSPACE = REPO_ROOT / "workspace"
 REPORT_DIR = WORKSPACE / "reports"
 
 # Fixes applied in this session — exclude from the remaining-work view

@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """FOODON-focused resolver pass for heuristic-complex MIM ingredients.
 
 Walks the unmapped-inventory's "complex (heuristic)" bucket — names
