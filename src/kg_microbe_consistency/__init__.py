@@ -9,6 +9,7 @@ from .proposals import (
     build_proposals,
     is_fallback,
     is_ontology_grounded,
+    proposals_from_groups,
     propose_for_group,
     render_markdown,
 )
@@ -18,6 +19,7 @@ from .scanner import (
     Group,
     Record,
     ScannerError,
+    build_report,
     find_disagreements,
     group_records,
     load_corpus,
@@ -28,6 +30,8 @@ from .scanner import (
 )
 
 __all__ = [
+    "build_report",
+    "proposals_from_groups",
     "FALLBACK_QUALITIES",
     "IDENTITY_QUALITIES",
     "Proposal",

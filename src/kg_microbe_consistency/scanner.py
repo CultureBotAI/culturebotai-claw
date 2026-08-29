@@ -258,9 +258,18 @@ def scan_groups(
     return records, skipped, groups
 
 
-def scan(root: Path, glob: str = "**/*.yaml") -> dict[str, Any]:
-    """Scan a corpus and report every matched group that disagrees."""
-    records, skipped, groups = scan_groups(root, glob)
+def build_report(
+    root: Path,
+    records: Sequence[Record],
+    skipped: int,
+    groups: Sequence[Group],
+) -> dict[str, Any]:
+    """Assemble the report from an already-completed scan.
+
+    Split out so a caller that needs both the report and the proposals gets
+    them from ONE traversal; re-scanning would be the second definition of
+    "the same substance" that scan_groups exists to prevent (#190).
+    """
     flagged = [group for group in groups if group.disagreements]
     return {
         "root": str(root),
@@ -270,3 +279,9 @@ def scan(root: Path, glob: str = "**/*.yaml") -> dict[str, Any]:
         "groups_disagreeing": len(flagged),
         "findings": [group.as_dict() for group in flagged],
     }
+
+
+def scan(root: Path, glob: str = "**/*.yaml") -> dict[str, Any]:
+    """Scan a corpus and report every matched group that disagrees."""
+    records, skipped, groups = scan_groups(root, glob)
+    return build_report(root, records, skipped, groups)

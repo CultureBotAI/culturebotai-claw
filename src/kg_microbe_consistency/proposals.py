@@ -26,7 +26,7 @@ Nothing here writes to a corpus. A proposal is a document for a curator.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -135,9 +135,15 @@ def propose_for_group(group: Group) -> list[Proposal]:
     return proposals
 
 
-def build_proposals(root: Path, glob: str = "**/*.yaml") -> dict[str, Any]:
-    """Scan `root` and return proposals plus the groups deliberately left alone."""
-    records, skipped, groups = scan_groups(root, glob)
+def proposals_from_groups(
+    groups: Sequence[Group],
+) -> tuple[list[Proposal], list[Group]]:
+    """Split disagreeing groups into proposals and surface-only findings.
+
+    Takes groups rather than a path so one traversal can answer both the scan
+    and the proposal question. Re-scanning would be the second definition of
+    "the same substance" that `scan_groups` exists to prevent (#190).
+    """
     proposed: list[Proposal] = []
     surfaced: list[Group] = []
     for group in groups:
@@ -148,6 +154,13 @@ def build_proposals(root: Path, glob: str = "**/*.yaml") -> dict[str, Any]:
             proposed.extend(group_proposals)
         else:
             surfaced.append(group)
+    return proposed, surfaced
+
+
+def build_proposals(root: Path, glob: str = "**/*.yaml") -> dict[str, Any]:
+    """Scan `root` and return proposals plus the groups deliberately left alone."""
+    records, skipped, groups = scan_groups(root, glob)
+    proposed, surfaced = proposals_from_groups(groups)
     return {
         "root": str(root),
         "records_scanned": len(records),

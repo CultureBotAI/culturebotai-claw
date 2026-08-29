@@ -7,8 +7,8 @@ import json
 import sys
 from pathlib import Path
 
-from .proposals import build_proposals, render_markdown
-from .scanner import COMPARED_FIELDS, ScannerError, scan
+from .proposals import proposals_from_groups, render_markdown
+from .scanner import COMPARED_FIELDS, ScannerError, build_report, scan_groups
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -44,22 +44,27 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
-        report = scan(Path(args.corpus), args.glob)
+        records, skipped, groups = scan_groups(Path(args.corpus), args.glob)
     except ScannerError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
-    if args.propose:
-        proposals = build_proposals(Path(args.corpus), args.glob)
-        if args.json:
-            print(json.dumps(proposals, indent=2))
-        else:
-            print(render_markdown(proposals))
-        if args.fail_on_findings and report["groups_disagreeing"]:
-            return 1
-        return 0
+    report = build_report(Path(args.corpus), records, skipped, groups)
 
-    if args.json:
+    if args.propose:
+        proposed, surfaced = proposals_from_groups(groups)
+        payload = {
+            "root": str(args.corpus),
+            "records_scanned": len(records),
+            "files_skipped": skipped,
+            "proposals": [item.as_dict() for item in proposed],
+            "surfaced_without_proposal": [g.as_dict() for g in surfaced],
+        }
+        if args.json:
+            print(json.dumps(payload, indent=2))
+        else:
+            print(render_markdown(payload))
+    elif args.json:
         print(json.dumps(report, indent=2))
     else:
         print(

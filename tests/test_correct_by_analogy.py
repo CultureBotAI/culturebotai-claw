@@ -219,3 +219,62 @@ def test_building_proposals_writes_nothing(corpus):
     build_proposals(corpus)
 
     assert {p: p.read_bytes() for p in (a, b)} == before
+
+
+# --------------------------------------------------------------------------
+# #190: one traversal answers both questions
+# --------------------------------------------------------------------------
+
+
+def test_propose_reads_the_corpus_once(corpus, monkeypatch):
+    """`scan_groups` was extracted so the scan and the proposals could not
+    disagree about what "the same substance" means. Traversing twice
+    reintroduces exactly that possibility at the only place both are used."""
+    from kg_microbe_consistency import __main__ as cli
+    from kg_microbe_consistency import scanner
+
+    write(corpus, "a", identifier="CHEBI:1", term="thing",
+          ontology_id="CHEBI:1", quality="EXACT_MATCH", source="CHEBI")
+    write(corpus, "b", identifier="cas:2", term="Thing",
+          ontology_id="cas:2", quality="FALLBACK_REGISTRY", source="CAS")
+
+    calls = []
+    original = scanner.load_corpus
+    monkeypatch.setattr(
+        scanner, "load_corpus",
+        lambda *a, **k: (calls.append(1), original(*a, **k))[1],
+    )
+
+    assert cli.main(["--corpus", str(corpus), "--propose"]) == 0
+    assert len(calls) == 1, f"corpus loaded {len(calls)} times"
+
+
+def test_propose_and_scan_agree_on_the_same_grouping(corpus):
+    """Both paths must see one set of groups, not two independently built ones."""
+    from kg_microbe_consistency import build_report, proposals_from_groups, scan_groups
+
+    write(corpus, "a", identifier="CHEBI:1", term="thing",
+          ontology_id="CHEBI:1", quality="EXACT_MATCH", source="CHEBI")
+    write(corpus, "b", identifier="cas:2", term="Thing",
+          ontology_id="cas:2", quality="FALLBACK_REGISTRY", source="CAS")
+
+    records, skipped, groups = scan_groups(corpus)
+    report = build_report(corpus, records, skipped, groups)
+    proposed, surfaced = proposals_from_groups(groups)
+
+    assert report["groups_disagreeing"] == len(proposed) + len(surfaced)
+
+
+def test_fail_on_findings_still_applies_under_propose(corpus):
+    """The exit-code logic runs once at the end; --propose must not bypass it."""
+    from kg_microbe_consistency import __main__ as cli
+
+    write(corpus, "a", identifier="CHEBI:1", term="thing",
+          ontology_id="CHEBI:1", quality="EXACT_MATCH", source="CHEBI")
+    write(corpus, "b", identifier="cas:2", term="Thing",
+          ontology_id="cas:2", quality="FALLBACK_REGISTRY", source="CAS")
+
+    assert cli.main(["--corpus", str(corpus), "--propose"]) == 0
+    assert cli.main(
+        ["--corpus", str(corpus), "--propose", "--fail-on-findings"]
+    ) == 1
