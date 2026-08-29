@@ -42,7 +42,7 @@ SSSOM row per record with:
   residual-P2.5 categorization (`workspace/reports/kg_microbe_residual_p25_categorized.json`).
 - **Source column** — pipe-separated `MIM:<evidence>|MIM:curator=<name>|kgm:<sources>...` drawn
   from the MIM YAML `ontology_mapping.evidence` + `curation_history` and
-  from `kg-microbe/mappings/unified_chemical_mappings.tsv.gz`.
+  from `kg-microbe/mappings/kgmicrobe_unified_entity_mappings.sssom.tsv.gz`.
 - **Dates** — taken from the most recent `curation_history` entry so the
   SSSOM mapping_date reflects the curation provenance, not the build
   machine's clock.

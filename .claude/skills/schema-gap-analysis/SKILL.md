@@ -6,6 +6,7 @@ requires_database: false
 requires_internet: false
 version: 2.1.0
 tags: [schema, gap-analysis, cross-repo, fleet, audit]
+reference-root: mech
 ---
 
 # Schema gap analysis (cross-Mech reference)

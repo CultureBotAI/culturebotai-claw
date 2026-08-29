@@ -11,6 +11,8 @@ on:
       - "scripts/inventory_unmapped_ingredients.py"
       - "scripts/generate_kg_microbe_review.py"
       - ".github/workflows/cross-repo-validation.yaml"
+      - ".claude/skills/**"
+      - "src/kg_microbe_skills/**"
 
 permissions:
   contents: read
@@ -98,6 +100,21 @@ jobs:
             --require-sources MIM:mapped-placeholder \
             --require-sources culturemech:pending \
             --require-sources communitymech:unmapped
+
+      # The offline half of this check runs in pytest on every PR, against
+      # claw alone. Here three Mech checkouts exist, so paths that claw cannot
+      # resolve by itself get judged too. kg-microbe, TraitMech and
+      # ProteinTraitsMech are not checked out: their references report as
+      # unverifiable, which the run states rather than passing over.
+      - name: Check skill references
+        working-directory: culturebotai-claw
+        env:
+          MEDIAINGREDIENTMECH_ROOT: ${{ github.workspace }}/MediaIngredientMech
+          CULTUREMECH_ROOT: ${{ github.workspace }}/CultureMech
+          COMMUNITYMECH_ROOT: ${{ github.workspace }}/CommunityMech
+        run: |
+          python3 -m pip install --quiet .
+          python3 -m kg_microbe_skills check
 
       - name: Upload inventory + validation reports
         uses: actions/upload-artifact@v4

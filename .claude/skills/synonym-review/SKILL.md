@@ -138,7 +138,7 @@ The SSSOM file emitted by `generate_residual_p25_sssom.py` carries a
 - `MIM:curator=<name>` — the last `curation_history[].curator` on the
   MIM YAML (e.g. `cbclaw_kg_microbe_sweep`, `fetch_cas_rn_from_pubchem`)
 - `kgm:<sources>` — one entry per source that contributed the CHEBI in
-  `kg-microbe/mappings/unified_chemical_mappings.tsv.gz` (e.g.
+  `kg-microbe/mappings/kgmicrobe_unified_entity_mappings.sssom.tsv.gz` (e.g.
   `kgm:chebi_xrefs`, `kgm:mediadive_compounds`, `kgm:bacdive_metabolites`,
   `kgm:primary_mappings[kegg_compound]`, `kgm:culturebotai_reviewed`)
 

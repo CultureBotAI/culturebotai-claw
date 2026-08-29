@@ -6,6 +6,7 @@ requires_database: false
 requires_internet: false
 version: 1.0.0
 tags: [kg-microbe, sync, snapshot, vendor, dependency, mim, cross-repo]
+reference-root: kg-microbe
 ---
 
 # kg-microbe Sync Skill

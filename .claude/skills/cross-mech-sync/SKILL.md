@@ -6,6 +6,7 @@ requires_database: false
 requires_internet: true
 version: 1.0.0
 tags: [sync, cross-repo, cross-mech, fleet, vendored, byte-identical, worktree, pin, invariant]
+reference-root: mech
 ---
 
 # Cross-Mech Sync Skill
