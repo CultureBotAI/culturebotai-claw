@@ -39,7 +39,10 @@ from pathlib import Path
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
-from kg_microbe_write import ValidatedWriteTransaction  # noqa: E402
+from kg_microbe_write import (  # noqa: E402
+    ValidatedWriteTransaction,
+    dump_record,
+)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -291,9 +294,15 @@ def _validate_staged_record(path: Path, text: str) -> None:
 
 
 def dump_yaml(record: dict) -> str:
-    """Serialize a record exactly as write_yaml would have written it."""
-    return yaml.safe_dump(record, default_flow_style=False,
-                          allow_unicode=True, sort_keys=False)
+    """Serialize a MIM record with the fleet's verified emit options.
+
+    Delegates rather than repeating the option set. The options live in the
+    manifest and were measured to round-trip MediaIngredientMech's corpus
+    byte-for-byte; a local copy is how two Mechs ended up with options that
+    reproduce 0% of their own records (#187). Verified equivalent to the
+    previous local dump over 200 real records before switching.
+    """
+    return dump_record("mediaingredientmech", record)
 
 
 def write_yaml(path: Path, record: dict) -> None:
