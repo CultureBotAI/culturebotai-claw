@@ -12,6 +12,11 @@ from .registry import (
     overdue,
     parse_registry,
 )
+from .serialize import (
+    SerializationUnavailable,
+    dump_record,
+    emit_options,
+)
 from .transaction import (
     DEFAULT_JOURNAL_RETENTION,
     JOURNAL_VERSION,
@@ -25,6 +30,9 @@ from .transaction import (
 )
 
 __all__ = [
+    "SerializationUnavailable",
+    "dump_record",
+    "emit_options",
     "REGISTRY_VERSION",
     "RegistryError",
     "WriterEntry",

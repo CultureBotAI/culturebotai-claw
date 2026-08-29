@@ -145,6 +145,22 @@ class Capability:
 
 
 @dataclass(frozen=True)
+class Serialization:
+    """How a Mech's records must be re-emitted so a write is not a reformat.
+
+    `verified` means the options were measured to round-trip that Mech's real
+    corpus byte-for-byte, not merely copied from its writer. Two Mechs have no
+    option set that reproduces theirs (#187), so they declare `verified: false`
+    with a reason and carry no options at all -- there is no correct value, and
+    guessing one would reformat a corpus on the next write.
+    """
+
+    verified: bool
+    options: Mapping[str, object] = field(default_factory=dict)
+    reason: str = ""
+
+
+@dataclass(frozen=True)
 class MechDefinition:
     """Identity and declared capabilities for one Mech repository."""
 
@@ -157,6 +173,7 @@ class MechDefinition:
     record_globs: tuple[str, ...]
     vendored_role: str
     capabilities: Mapping[str, Capability]
+    serialization: Optional["Serialization"] = None
 
     def capability(self, name: str) -> Optional[Capability]:
         return self.capabilities.get(name)
@@ -578,6 +595,49 @@ class _MechIdentity:
     vendored_role: str
 
 
+_SERIALIZATION_KEYS = frozenset({"verified", "options", "reason"})
+_ALLOWED_EMIT_OPTIONS = frozenset(
+    {"default_flow_style", "sort_keys", "allow_unicode", "width", "indent"}
+)
+
+
+def _parse_serialization(raw: Any, label: str) -> Serialization:
+    mapping = _require_mapping(raw, label)
+    unknown = set(mapping) - _SERIALIZATION_KEYS
+    if unknown:
+        raise FleetManifestError(
+            f"{label} has unknown keys: {', '.join(sorted(str(k) for k in unknown))}"
+        )
+    verified = mapping.get("verified")
+    if not isinstance(verified, bool):
+        raise FleetManifestError(f"{label}.verified must be true or false")
+
+    options = mapping.get("options")
+    reason = mapping.get("reason", "")
+    if verified:
+        options_mapping = _require_mapping(options, f"{label}.options")
+        unknown_options = set(options_mapping) - _ALLOWED_EMIT_OPTIONS
+        if unknown_options:
+            raise FleetManifestError(
+                f"{label}.options has unknown keys: "
+                f"{', '.join(sorted(str(k) for k in unknown_options))}"
+            )
+        if not options_mapping:
+            raise FleetManifestError(f"{label}.options must not be empty")
+        return Serialization(True, dict(options_mapping), "")
+
+    # Unverified: no options, and a recorded reason. An unverified profile that
+    # carried options would be exactly the guess this models away from.
+    if options:
+        raise FleetManifestError(
+            f"{label} is unverified and must not declare options; there is no "
+            f"correct value to declare"
+        )
+    if not isinstance(reason, str) or not reason.strip():
+        raise FleetManifestError(f"{label} is unverified and requires a reason")
+    return Serialization(False, {}, reason.strip())
+
+
 def _parse_mech_identity(key: str, raw: Any) -> _MechIdentity:
     label = f"mechs.{key}"
     mapping = _require_mapping(raw, label)
@@ -622,6 +682,7 @@ def _parse_mech(
         "record_globs",
         "vendored_role",
         "capabilities",
+        "serialization",
     }
     unknown_keys = set(mapping) - allowed_keys
     if unknown_keys:
@@ -629,6 +690,11 @@ def _parse_mech(
         raise FleetManifestError(f"{label} has unknown keys: {unknown}")
 
     identity = _parse_mech_identity(key, mapping)
+    serialization = (
+        _parse_serialization(mapping["serialization"], f"{label}.serialization")
+        if "serialization" in mapping
+        else None
+    )
     schema_paths = _require_path_sequence(
         mapping.get("schema_paths"), f"{label}.schema_paths"
     )
@@ -677,6 +743,7 @@ def _parse_mech(
         record_globs=record_globs,
         vendored_role=identity.vendored_role,
         capabilities=MappingProxyType(capabilities),
+        serialization=serialization,
     )
 
 

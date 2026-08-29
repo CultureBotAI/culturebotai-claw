@@ -108,6 +108,13 @@ mechs:
         status: enabled
       unmapped_inventory_input:
         status: enabled
+    serialization:
+      verified: true
+      options:
+        default_flow_style: false
+        sort_keys: false
+        allow_unicode: true
+        width: 80
 
   mediaingredientmech:
     display_name: MediaIngredientMech
@@ -157,6 +164,13 @@ mechs:
         status: enabled
       unmapped_inventory_input:
         status: enabled
+    serialization:
+      verified: true
+      options:
+        default_flow_style: false
+        sort_keys: false
+        allow_unicode: true
+        width: 80
 
   communitymech:
     display_name: CommunityMech
@@ -209,6 +223,12 @@ mechs:
         status: enabled
       unmapped_inventory_input:
         status: enabled
+    serialization:
+      verified: false
+      reason: >-
+        No PyYAML option set reproduces this corpus, so there is no
+        correct value to declare and writing a record back would
+        reformat it. Measured in #187.
 
   traitmech:
     display_name: TraitMech
@@ -264,6 +284,13 @@ mechs:
           ingredient corpora; TraitMech curates traits and has no
           ingredient records, so scripts/inventory_unmapped_ingredients.py
           defines no loader for it.
+    serialization:
+      verified: true
+      options:
+        default_flow_style: false
+        sort_keys: false
+        allow_unicode: true
+        width: 80
 
   proteintraitsmech:
     # The GitHub slug is lowercase while the display name is CamelCase. Code
@@ -329,3 +356,9 @@ mechs:
           ingredient corpora; ProteinTraitsMech curates protein-trait
           records and has no ingredient corpus, so
           scripts/inventory_unmapped_ingredients.py defines no loader for it.
+    serialization:
+      verified: false
+      reason: >-
+        No PyYAML option set reproduces this corpus, so there is no
+        correct value to declare and writing a record back would
+        reformat it. Measured in #187.

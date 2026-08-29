@@ -287,6 +287,11 @@ uv run kg-microbe-discussions --help
 - Return nonzero from CLI failures; printing an error is not sufficient.
 - Do not swallow partial failures into a successful report.
 - Use timezone-aware UTC timestamps.
+- Serialize a downstream record with `kg_microbe_write.dump_record(mech_key, …)`,
+  never a local `yaml.safe_dump`. The emit options live in the manifest and are
+  declared only where they were measured to round-trip that Mech's corpus
+  byte-for-byte; two Mechs have no such option set and the call refuses rather
+  than reformatting their records (#187).
 - Use atomic creation/replacement for locks and curated data. For a writer that
   touches more than one file, prefer `ValidatedWriteTransaction` over a
   per-record write loop: writing as you go means a failure part-way through
