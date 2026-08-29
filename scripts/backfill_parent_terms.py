@@ -44,6 +44,8 @@ from pathlib import Path
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_write import dump_record  # noqa: E402
 
 sys.path.insert(0, str(REPO_ROOT / "src"))
 from kg_microbe_fleet import require_mech_roots  # noqa: E402
@@ -312,8 +314,7 @@ def main() -> int:
         if parent and args.apply:
             apply_parent(record, parent)
             with open(path, "w") as f:
-                yaml.safe_dump(record, f, default_flow_style=False,
-                               allow_unicode=True, sort_keys=False)
+                f.write(dump_record("mediaingredientmech", record))
             action = "applied"
             counts["APPLIED"] = counts.get("APPLIED", 0) + 1
         elif parent:

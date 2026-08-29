@@ -125,3 +125,45 @@ def test_a_verified_profile_round_trips_the_real_corpus(key):
         f"{key}: {len(mismatched)}/{len(sample)} records would be reformatted by "
         f"the declared options, e.g. {mismatched[:3]}"
     )
+
+
+def test_the_claw_writers_use_the_shared_serializer_not_a_local_copy():
+    """A local option set is how two Mechs ended up with options reproducing 0%
+    of their own records (#187). claw's writers must not keep their own."""
+    import importlib.util
+    import sys
+
+    root = Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(root / "scripts"))
+    spec = importlib.util.spec_from_file_location(
+        "_classify_for_serialization", root / "scripts" / "classify_ingredient_type.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+
+    record = {"identifier": "CHEBI:1", "note": "y" * 300}
+
+    assert module.dump_yaml(record) == dump_record("mediaingredientmech", record)
+
+
+def test_no_claw_writer_hardcodes_yaml_emit_options():
+    """A second option set anywhere is a second thing to keep in step."""
+    root = Path(__file__).resolve().parents[1]
+    offenders = []
+    for path in sorted((root / "scripts").glob("*.py")):
+        for number, line in enumerate(
+            path.read_text(encoding="utf-8").splitlines(), start=1
+        ):
+            stripped = line.strip()
+            if stripped.startswith("#"):
+                continue
+            if "safe_dump" in stripped and (
+                "default_flow_style" in stripped or "width=" in stripped
+            ):
+                offenders.append(f"{path.name}:{number}")
+
+    assert not offenders, (
+        "emit options are hardcoded; call kg_microbe_write.dump_record instead: "
+        + ", ".join(offenders)
+    )
