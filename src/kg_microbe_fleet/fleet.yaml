@@ -46,6 +46,7 @@ capability_catalogue:
         minimum: 1
   vendored_sync: {}
   unmapped_inventory_input: {}
+  source_catalogue: {}
 
 # Vendored shared-file governance is deliberately modeled separately from
 # fleet membership: claw is the external authority and must never pin itself.
@@ -106,6 +107,13 @@ mechs:
           window: 300
       vendored_sync:
         status: enabled
+      source_catalogue:
+        status: disabled
+        reason: >-
+          Fetches each source from its own script -- fetch_komodo_base_volumes,
+          fetch_mediadive_solution_volumes, fetch_pubmed_abstracts -- with no
+          download.yaml declaring them, so there is no catalogue to validate.
+          Adopting one would apply here; it has not been written.
       unmapped_inventory_input:
         status: enabled
     serialization:
@@ -162,6 +170,12 @@ mechs:
           window: 300
       vendored_sync:
         status: enabled
+      source_catalogue:
+        status: disabled
+        reason: >-
+          Fetches ontologies through download_ontologies.py rather than a
+          declared catalogue, so there is no download.yaml to validate.
+          Adopting one would apply here; it has not been written.
       unmapped_inventory_input:
         status: enabled
     serialization:
@@ -221,6 +235,12 @@ mechs:
           window: 305
       vendored_sync:
         status: enabled
+      source_catalogue:
+        status: disabled
+        reason: >-
+          Has no download.yaml; its inputs arrive through per-source scripts
+          rather than a declared catalogue. Adopting one would apply here;
+          it has not been written.
       unmapped_inventory_input:
         status: enabled
     serialization:
@@ -276,6 +296,8 @@ mechs:
         settings:
           window: 300
       vendored_sync:
+        status: enabled
+      source_catalogue:
         status: enabled
       unmapped_inventory_input:
         status: not_applicable
@@ -348,6 +370,8 @@ mechs:
           per-record gap surface to scan; the repository is correspondingly
           absent from the knowledge-gap-scan workflow matrix.
       vendored_sync:
+        status: enabled
+      source_catalogue:
         status: enabled
       unmapped_inventory_input:
         status: not_applicable

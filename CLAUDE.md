@@ -296,7 +296,17 @@ uv run kg-microbe-kgscan --help
 uv run kg-microbe-qc --help
 uv run kg-microbe-discussions --help
 uv run kg-microbe-skills --help
+uv run kg-microbe-sources --help
 ```
+
+`kg-microbe-sources check --mech X` validates that Mech's `download.yaml`
+source catalogue. A source is a group of one or more file blocks: `name`,
+`license` and `seeder` are the source's obligations, met by any block in it,
+while `url` and `status` are each block's own, and a multi-file source must say
+which file each block describes. Restrictive or unresolved licences are
+surfaced as warnings, since carrying licence provenance is what the catalogue
+is for. A Mech that declares `source_catalogue: disabled` reports the recorded
+reason and exits zero, rather than reading as a missing file.
 
 `kg-microbe-skills check` validates every path and sibling-skill reference in
 `.claude/`. It judges a reference against the repository it belongs to, and
