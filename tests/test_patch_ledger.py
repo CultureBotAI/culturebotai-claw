@@ -4,7 +4,10 @@
 recorded whether anyone acted. The evidence that this matters is the artifact:
 513 rows, last written 2026-04-20, untouched for four months, with no
 indication anywhere that it was old or outstanding. Regenerating it against
-current inputs gives 571 -- fifty-eight proposals accumulated unseen.
+current inputs gives 88, and the difference is itself the point: the old
+artifact was built from a four-month-old workspace intermediate whose
+numeric-namespace migration has since completed (#197). Nothing said either
+number was stale.
 
 This tracks; it never applies. Applying means changing kg-microbe, a separate
 repository and a separate decision.
@@ -12,7 +15,9 @@ repository and a separate decision.
 
 from __future__ import annotations
 
+import ast
 import json
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -180,7 +185,6 @@ def test_the_generator_survives_a_corrupt_ledger(tmp_path, monkeypatch, capsys):
     """The patches are the product; the ledger is bookkeeping. A run that wrote
     its patches must not then fail on the history file (#195)."""
     import importlib.util
-    import sys
 
     root = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(root / "scripts"))
@@ -204,6 +208,10 @@ def test_the_generator_survives_a_corrupt_ledger(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(module, "load_mim_sssom_chebi_to_mim", lambda: {})
     monkeypatch.setattr(module, "load_kgm_xrefs", lambda: {})
     monkeypatch.setattr(module, "load_migration_map", lambda: [])
+    monkeypatch.setattr(module, "require_mech_roots", lambda *a, **k: {})
+    # main() parses arguments now (#179 wants --help to work without a
+    # checkout), so it must not inherit pytest's argv.
+    monkeypatch.setattr(sys, "argv", ["generate_kgm_xref_patches.py"])
 
     module.main()
 
@@ -221,3 +229,32 @@ def test_an_unwritable_ledger_fails_as_a_ledger_error(tmp_path):
             record(blocked / "sub" / "ledger.json", ["a"], now=MOMENT)
     finally:
         blocked.chmod(0o700)
+
+
+def test_staleness_covers_the_intermediate_the_patches_are_built_from(tmp_path):
+    """A stale workspace intermediate silently inflates the patch set.
+
+    The 2026-04-20 migration map carried 1,510 rows from the completed
+    numeric-namespace migration and produced 571 patches; the regenerated
+    13-row map produces 88. Comparing the patch file only against MIM's SSSOM
+    and kg-microbe's dictionary cannot see that, because neither of those
+    moved (#197).
+    """
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "scripts"
+        / "generate_kgm_xref_patches.py"
+    ).read_text(encoding="utf-8")
+
+    tree = ast.parse(source)
+    call = next(
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and getattr(node.func, "id", "") == "staleness"
+    )
+    inputs = {ast.unparse(element) for element in call.args[1].elts}
+
+    assert "MIGRATION_TSV" in inputs, (
+        f"staleness compares against {sorted(inputs)}; a stale MIGRATION_TSV "
+        f"would go unreported"
+    )

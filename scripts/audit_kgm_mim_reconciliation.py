@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """
 Bidirectional MIM ↔ kg-microbe ingredient mapping audit.
 
@@ -28,8 +28,11 @@ Outputs:
 
 from __future__ import annotations
 
+import argparse
 import json
+import os
 import re
+import sys
 from collections import defaultdict
 from pathlib import Path
 
@@ -39,21 +42,25 @@ from kgm_unified_mappings import (
     load_kgm_entity_index,
 )
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+
 # ---------- paths ----------
 
-MIM_SSSOM = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
-    "MediaIngredientMech/mappings/ingredient_mappings.sssom.tsv"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+MIM_ROOT = Path(
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
 )
+KGM_ROOT_PATH = Path(os.environ.get("KGMICROBE_ROOT", REPO_ROOT.parent / "kg-microbe"))
+
+MIM_SSSOM = MIM_ROOT / "mappings" / "ingredient_mappings.sssom.tsv"
 KGM_DICT = KGM_UNIFIED_SSSOM
-KGM_MEDIADIVE_UNMAPPED = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
-    "kg-microbe/mappings/mediadive_unmapped_ingredients_to_curate.tsv"
+KGM_MEDIADIVE_UNMAPPED = (
+    KGM_ROOT_PATH / "mappings" / "mediadive_unmapped_ingredients_to_curate.tsv"
 )
-REPORT_DIR = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
-    "culturebotai-claw/workspace/reports"
-)
+REPORT_DIR = REPO_ROOT / "workspace" / "reports"
 AUDIT_TSV = REPORT_DIR / "kgm_mim_audit.tsv"
 AUDIT_MD = REPORT_DIR / "kgm_mim_audit.md"
 PR_TSV = REPORT_DIR / "kgm_pr_candidates.tsv"
@@ -489,6 +496,15 @@ def write_pr_candidates(path: Path, rows: list[dict]) -> None:
 
 
 def main() -> None:
+    argparse.ArgumentParser(
+        description=(
+            "Bidirectional MIM <-> kg-microbe ingredient mapping audit. Reads "
+            "MediaIngredientMech (MEDIAINGREDIENTMECH_ROOT) and kg-microbe "
+            f"(KGMICROBE_ROOT); writes to {REPORT_DIR}."
+        )
+    ).parse_args()
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
+
     print(f"[1/7] Loading MIM SSSOM from {MIM_SSSOM}")
     mim_rows = load_mim_sssom(MIM_SSSOM)
     print(f"      {len(mim_rows)} rows")

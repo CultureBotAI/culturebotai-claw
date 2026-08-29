@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """
 Emit kg-microbe xref patches: per-CHEBI deltas that bring kg-microbe's
 unified_chemical_mappings.tsv.gz in sync with MIM's current published
@@ -16,32 +16,36 @@ Two patch sources:
        - if action=orphan  → REMOVE (old id no longer corresponds to any MIM record)
        - if action=ambiguous → flag only (curator must pick)
 
-Output:
+Output (under the workspace of the checkout this script lives in):
   workspace/patches/kgm_xref_patches.tsv
   workspace/patches/kgm_xref_patches.md
 """
 
 from __future__ import annotations
 
+import argparse
 import csv
+import os
 import sys
 from collections import defaultdict
 from pathlib import Path
 
 from kgm_unified_mappings import KGM_UNIFIED_SSSOM, load_kgm_entity_index
 
-WORKSPACE = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/workspace"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+MIM_ROOT = Path(
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
 )
-MIM_SSSOM = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
-    "MediaIngredientMech/mappings/ingredient_mappings.sssom.tsv"
-)
+WORKSPACE = REPO_ROOT / "workspace"
+MIM_SSSOM = MIM_ROOT / "mappings" / "ingredient_mappings.sssom.tsv"
 KGM_DICT = KGM_UNIFIED_SSSOM
 MIGRATION_TSV = WORKSPACE / "reports/mim_numeric_namespace_migration.tsv"
 PATCHES_DIR = WORKSPACE / "patches"
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
 from kg_microbe_patches import (  # noqa: E402
     LEDGER_FILENAME,
     LedgerError,
@@ -213,6 +217,16 @@ def write_md(path: Path, rows: list[dict]) -> None:
 
 
 def main() -> None:
+    argparse.ArgumentParser(
+        description=(
+            "Emit kg-microbe xref patches from MIM's published SSSOM and the "
+            "numeric-namespace migration map. Reads MediaIngredientMech "
+            "(MEDIAINGREDIENTMECH_ROOT) and kg-microbe (KGMICROBE_ROOT); "
+            f"writes to {PATCHES_DIR}."
+        )
+    ).parse_args()
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
+
     print("[1/4] Loading MIM SSSOM CHEBI -> MIM id index")
     mim_idx = load_mim_sssom_chebi_to_mim()
     print(f"      {len(mim_idx)} CHEBIs, {sum(len(v) for v in mim_idx.values())} MIM ids")
@@ -231,7 +245,12 @@ def main() -> None:
     # Staleness of the PREVIOUS artifact, checked before overwriting it. The
     # file in the repository was four months old with nothing saying so (#129
     # item 4).
-    outdated_by = staleness(OUT_TSV, [MIM_SSSOM, KGM_DICT])
+    # MIGRATION_TSV belongs here: it is a workspace intermediate, and a stale
+    # one silently inflates the patch set. The 2026-04-20 map had 1,510 rows
+    # from the completed numeric-namespace migration and produced 571 patches;
+    # the regenerated 13-row map produces 88. Comparing only against the two
+    # external sources could not see that (#197).
+    outdated_by = staleness(OUT_TSV, [MIM_SSSOM, KGM_DICT, MIGRATION_TSV])
 
     write_tsv(OUT_TSV, rows)
     write_md(OUT_MD, rows)
