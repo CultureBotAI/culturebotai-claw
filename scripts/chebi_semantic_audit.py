@@ -30,7 +30,11 @@ CULTUREMECH_ROOT_PATH = Path(
 sys.path.insert(0, str(REPO_ROOT / "src"))
 from kg_microbe_fleet import require_mech_roots  # noqa: E402
 CM = CULTUREMECH_ROOT_PATH
-DEFAULT_OUT = Path("chebi_semantic_audit.tsv")
+# Under workspace/, like every other report here: workspace/ is gitignored
+# precisely so generated output cannot reach version control by accident.
+# It used to default to the current directory, which put the file wherever
+# the script was invoked from -- once, the root of a git worktree (#206).
+DEFAULT_OUT = REPO_ROOT / "workspace" / "reports" / "chebi_semantic_audit.tsv"
 
 STOP = {
     "acid", "salt", "solution", "water", "x", "of", "and", "the", "a",
@@ -72,6 +76,7 @@ def main() -> None:
     )
     args = parser.parse_args()
     out = args.output
+    out.parent.mkdir(parents=True, exist_ok=True)
     require_mech_roots("culturemech", claw_root=REPO_ROOT)
 
     # ---- 1. harvest every (chebi_id, asserted_label, preferred_term, quality) ----

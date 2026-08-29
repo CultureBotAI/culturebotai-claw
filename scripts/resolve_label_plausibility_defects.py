@@ -26,6 +26,7 @@ validator's ``exceptions:`` allow-list rather than as corrections.
 
 from __future__ import annotations
 
+import functools
 import os
 import argparse
 import csv
@@ -42,8 +43,15 @@ from kg_microbe_fleet import require_mech_roots  # noqa: E402
 CM = Path(
     os.environ.get("CULTUREMECH_ROOT", REPO_ROOT.parent / "CultureMech")
 )
-sys.path.insert(0, str(CM / "scripts"))
-import chem_formula  # noqa: E402
+from _lazy_import import LazyModule  # noqa: E402
+
+# Imported on first use, not at import time, so --help works without a
+# CultureMech checkout (#205).
+chem_formula = LazyModule(
+    "chem_formula",
+    lambda: (CM / "scripts", REPO_ROOT / "scripts"),
+    hint="Set CULTUREMECH_ROOT to a checkout that has scripts/chem_formula.py.",
+)
 
 ADAPTERS = {
     "CHEBI": "sqlite:obo:chebi",
@@ -118,9 +126,13 @@ def formula_key(counts: dict[str, int] | None) -> str:
     return "".join(f"{k}{v}" for k, v in sorted(counts.items())) if counts else ""
 
 
-_ELEM_TOKEN_RE = re.compile(
-    r"(" + "|".join(sorted(chem_formula.ELEMENTS, key=len, reverse=True)) + r")"
-)
+@functools.cache
+def _elem_token_re() -> re.Pattern[str]:
+    """Built on first use: the element list comes from chem_formula, and
+    importing that needs a CultureMech checkout (#205)."""
+    return re.compile(
+        r"(" + "|".join(sorted(chem_formula.ELEMENTS, key=len, reverse=True)) + r")"
+    )
 
 
 def element_set(text: str) -> set[str]:
@@ -135,7 +147,7 @@ def element_set(text: str) -> set[str]:
         return set()
     pos, found = 0, set()
     while pos < len(core):
-        m = _ELEM_TOKEN_RE.match(core, pos)
+        m = _elem_token_re().match(core, pos)
         if not m:
             return set()  # unparseable — refuse to judge
         found.add(m.group(1))

@@ -30,18 +30,24 @@ MIM_ROOT = Path(
 sys.path.insert(0, str(REPO_ROOT / "src"))
 from kg_microbe_fleet import require_mech_roots  # noqa: E402
 MIM_ROOT = MIM_ROOT
-sys.path.insert(0, str(MIM_ROOT / "src"))
 
-from mediaingredientmech.validation.ingredient_reviewer import (  # noqa: E402
-    IngredientReviewer,
-    RULE_P2_5,
-    RULE_P4_4,
+from _lazy_import import LazyModule  # noqa: E402
+
+# Imported on first use, not at import time, so --help works without a
+# MediaIngredientMech checkout (#205).
+_reviewer = LazyModule(
+    "mediaingredientmech.validation.ingredient_reviewer",
+    lambda: (MIM_ROOT / "src",),
+    hint="Set MEDIAINGREDIENTMECH_ROOT to a MediaIngredientMech checkout.",
 )
-from mediaingredientmech.validation.kg_microbe_dict import KgMicrobeDict  # noqa: E402
+_kgm_dict = LazyModule(
+    "mediaingredientmech.validation.kg_microbe_dict",
+    lambda: (MIM_ROOT / "src",),
+    hint="Set MEDIAINGREDIENTMECH_ROOT to a MediaIngredientMech checkout.",
+)
 
 WORKSPACE = REPO_ROOT / "workspace"
 REPORT_DIR = WORKSPACE / "reports"
-REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def load_ingredients():
@@ -61,7 +67,7 @@ def load_ingredients():
     return records
 
 
-def review_one(reviewer: IngredientReviewer, record: dict):
+def review_one(reviewer: _reviewer.IngredientReviewer, record: dict):
     """Run ONLY the P2.5 and P4.4 checks; return list of plain-dict findings."""
     ontology_id = (record.get("ontology_mapping") or {}).get("ontology_id")
     ingredient_id = record.get("preferred_term", record["_source_file"])
@@ -110,7 +116,7 @@ def main():
     require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
 
     print("Loading kg-microbe dict...", flush=True)
-    kg_dict = KgMicrobeDict()
+    kg_dict = _kgm_dict.KgMicrobeDict()
     kg_dict.load()
     print(f"  {kg_dict.size} CHEBI entries loaded", flush=True)
 
@@ -118,7 +124,7 @@ def main():
     records = load_ingredients()
     print(f"  {len(records)} mapped ingredients", flush=True)
 
-    reviewer = IngredientReviewer(kg_microbe_dict=kg_dict)
+    reviewer = _reviewer.IngredientReviewer(kg_microbe_dict=kg_dict)
 
     print("Sweeping (parallel, 8 workers)...", flush=True)
     start = time.time()
@@ -144,8 +150,8 @@ def main():
     elapsed = time.time() - start
     print(f"Done in {elapsed:.0f}s. {len(all_findings)} findings.", flush=True)
 
-    p25 = [f for f in all_findings if f["rule_id"] == RULE_P2_5]
-    p44 = [f for f in all_findings if f["rule_id"] == RULE_P4_4]
+    p25 = [f for f in all_findings if f["rule_id"] == _reviewer.RULE_P2_5]
+    p44 = [f for f in all_findings if f["rule_id"] == _reviewer.RULE_P4_4]
 
     json_path = REPORT_DIR / "kg_microbe_sweep.json"
     with open(json_path, "w") as f:

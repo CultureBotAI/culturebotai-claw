@@ -54,10 +54,14 @@ MIM_ROOT = MIM_ROOT
 REPORT_DIR = CLAW_ROOT / "workspace" / "reports"
 INGREDIENTS_DIR = MIM_ROOT / "data" / "ingredients" / "mapped"
 
-sys.path.insert(0, str(MIM_ROOT / "src"))
-from mediaingredientmech.validation.kg_microbe_dict import (  # noqa: E402
-    AMBIGUITY_THRESHOLD,
-    KgMicrobeDict,
+from _lazy_import import LazyModule  # noqa: E402
+
+# Imported on first use, not at import time, so --help works without a
+# MediaIngredientMech checkout (#205).
+_kgm_dict = LazyModule(
+    "mediaingredientmech.validation.kg_microbe_dict",
+    lambda: (MIM_ROOT / "src",),
+    hint="Set MEDIAINGREDIENTMECH_ROOT to a MediaIngredientMech checkout.",
 )
 
 
@@ -124,7 +128,7 @@ def _classify_candidate(
     this_chebi: str,
     preferred_term: str,
     mim_synonym_index: dict[str, set[str]],
-    kg_dict: KgMicrobeDict,
+    kg_dict: _kgm_dict.KgMicrobeDict,
 ) -> tuple[str, str]:
     """(bucket, rationale) for one candidate synonym string.
 
@@ -170,7 +174,7 @@ def _classify_candidate(
 
     # Ambiguity check against kg-microbe's own index
     hits = kg_dict.lookup_synonym(candidate)
-    if len(hits) > AMBIGUITY_THRESHOLD:
+    if len(hits) > _kgm_dict.AMBIGUITY_THRESHOLD:
         return "AMBIGUOUS", f"maps-to-{len(hits)}-chebis"
 
     return "CLEAN_ADD", "novel-unambiguous"
@@ -185,7 +189,7 @@ def main():
     p44 = data.get("p44_findings", [])
     print(f"Loaded {len(p44)} P4.4 findings", flush=True)
 
-    kg_dict = KgMicrobeDict()
+    kg_dict = _kgm_dict.KgMicrobeDict()
     kg_dict.load()
     print(f"kg-microbe dict: {kg_dict.size} CHEBI entries loaded", flush=True)
 
@@ -277,7 +281,7 @@ def main():
                     "buckets": dict(bucket_counter),
                     "files_with_clean_adds": len(per_file_clean_adds),
                 },
-                "ambiguity_threshold": AMBIGUITY_THRESHOLD,
+                "ambiguity_threshold": _kgm_dict.AMBIGUITY_THRESHOLD,
                 "per_finding": per_finding,
             },
             indent=2,
@@ -294,7 +298,7 @@ def main():
     lines.append(
         f"**Candidate synonyms total:** {sum(bucket_counter.values())}\n"
     )
-    lines.append(f"**Ambiguity threshold:** >{AMBIGUITY_THRESHOLD} CHEBI hits\n\n")
+    lines.append(f"**Ambiguity threshold:** >{_kgm_dict.AMBIGUITY_THRESHOLD} CHEBI hits\n\n")
 
     lines.append("## Candidate classification\n\n")
     lines.append("| Bucket | Count | Action |\n|---|---:|---|\n")
