@@ -86,7 +86,7 @@ Curator must fix before publishing. Otherwise advance.
 ## Stage 7 — Sync kg-microbe
 
 ```bash
-cd /Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe
+cd "${KGMICROBE_ROOT:-../kg-microbe}"
 poetry run python scripts/consolidate_chemical_mappings.py
 ```
 

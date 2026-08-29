@@ -14,13 +14,15 @@ kg-microbe. Calling it broken would be wrong, and calling it fine would let a
 genuinely dead path through. So an unprefixed path that resolves only
 downstream is reported as AMBIGUOUS: it exists, and the skill should say where.
 
-What it does NOT cover: only backticked text is read, so a path written inside
-a fenced code block is invisible to it. That is deliberate rather than an
-oversight -- 85 path-shaped tokens live in those blocks and most are not paths
-at all (`25842/-2246`, `CHEBI/NCIT`, `HIGH/MEDIUM/LOW`, `$AUDIT_DIR/fleet.tsv`),
-so applying these rules there would produce far more noise than findings. The
-consequence is real and worth stating: a command example citing a file that has
-moved will not be caught. Extending coverage needs shell-aware parsing (#202).
+Fenced code blocks are read too, but only shell ones, and only through a shell
+tokenizer (#202). Reading every fence with the prose rules would have produced
+far more noise than findings: 85 path-shaped tokens live in those blocks and
+most are not paths at all -- `25842/-2246` is a diff stat, `CHEBI/NCIT` an
+ontology list, `HIGH/MEDIUM/LOW` an enum, `$AUDIT_DIR/fleet.tsv` a shell
+variable. Restricting to shell fences drops the python, json and text blocks
+where the ratios and enums live; `shlex` then separates words from flags and
+quoted strings, and the same rules that reject a git ref or a placeholder in
+prose apply again.
 
 Existence is decided by git, not by the filesystem. A developer's downstream
 checkout carries generated data and local snapshots a fresh clone does not, so
@@ -39,6 +41,7 @@ says so.
 from __future__ import annotations
 
 import re
+import shlex
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -128,6 +131,11 @@ class Reference:
     text: str
     source: Path
     line: int
+    # The repository a preceding `cd` put the shell in, when the block moved
+    # somewhere before running anything. Without this, `cd ../kg-microbe &&
+    # python scripts/x.py` reads as a claw path and is reported ambiguous --
+    # a reference that was right all along.
+    repository: str | None = None
 
     @property
     def skill(self) -> str:
@@ -163,10 +171,25 @@ def skill_files(claw_root: Path) -> list[Path]:
 
 
 def extract_references(path: Path, text: str | None = None) -> list[Reference]:
-    """Every backticked reference in one file, in source order."""
+    """Every reference in one file, in source order.
+
+    Prose is read through backticks; shell fences through `shlex`.
+    """
     body = text if text is not None else Path(path).read_text(encoding="utf-8")
     references: list[Reference] = []
+    fence: str | None = None
+    cwd: str | None = None
     for number, line in enumerate(body.splitlines(), start=1):
+        stripped = line.lstrip()
+        if stripped.startswith("```"):
+            fence = None if fence is not None else stripped[3:].strip().lower()
+            cwd = None  # each block starts where the reader started
+            continue
+        if fence is not None:
+            if fence in _SHELL_FENCES:
+                found, cwd = _shell_references(path, line, number, cwd)
+                references.extend(found)
+            continue
         for match in _BACKTICK.finditer(line):
             token = match.group(1).strip()
             if _SLASH_REFERENCE.match(token):
@@ -258,6 +281,71 @@ class _Repository:
         return "missing"
 
 
+# Only these fences are read. A python, json or text block carries ratios,
+# enums and literal data that the path rules would misread wholesale.
+_SHELL_FENCES = frozenset({"", "bash", "sh", "shell", "zsh", "console"})
+
+# An ALL-CAPS first segment with no extension anywhere is an ontology prefix or
+# an enum -- `CHEBI/NCIT`, `FEBA/Hans80` -- not a directory.
+_LABEL_PAIR = re.compile(r"^[A-Z0-9]+/")
+
+# `${KGMICROBE_ROOT:-../kg-microbe}` is the portable way to write a checkout
+# that an environment variable may override. Reading the fallback is what lets
+# a command be portable AND checkable; without it, writing the better command
+# loses the reference.
+_ENV_FALLBACK = re.compile(r"^\$\{[A-Z_][A-Z0-9_]*:-([^}]+)\}$")
+
+
+def _cd_target(words: list[str]) -> str | None:
+    """The repository a `cd` moves to, if it names one.
+
+    `cd ../kg-microbe`, `cd /abs/path/to/kg-microbe` and `cd kg-microbe` all
+    say the same thing about the paths that follow. Anything else -- a
+    subdirectory, a variable, `cd -` -- returns None, and the block goes back
+    to being read against the repository it started in.
+    """
+    for index, word in enumerate(words[:-1]):
+        if word == "cd":
+            target = words[index + 1].rstrip("/")
+            fallback = _ENV_FALLBACK.match(target)
+            if fallback:
+                target = fallback.group(1).rstrip("/")
+            if not target or "$" in target:
+                return None
+            return target.rsplit("/", 1)[-1] or None
+    return None
+
+
+def _shell_references(
+    path: Path, line: str, number: int, cwd: str | None
+) -> tuple[list[Reference], str | None]:
+    """Path-shaped words in one line of a shell block, and where it left the shell.
+
+    `shlex` is what separates a path from a flag, a quoted sentence, or a
+    comment. An unbalanced quote -- common in an illustrative fragment -- makes
+    it raise, and the line is skipped rather than guessed at.
+    """
+    try:
+        words = shlex.split(line, comments=True)
+    except ValueError:
+        return [], cwd
+
+    moved = _cd_target(words)
+    found: list[Reference] = []
+    for word in words:
+        if word.startswith(("http", "/", "-", "~", "..")) or "$" in word or "*" in word:
+            continue
+        if _PLACEHOLDER.search(word) or _GIT_REF.match(word) or _HOSTNAME.match(word):
+            continue
+        if _LABEL_PAIR.match(word) and "." not in word:
+            continue
+        if _PATH_SHAPED.match(word):
+            found.append(
+                Reference("path", word.rstrip("/"), path, number, moved or cwd)
+            )
+    return found, moved or cwd
+
+
 def _known_commands(claw_root: Path) -> set[str]:
     root = Path(claw_root) / ".claude"
     names: set[str] = set()
@@ -336,6 +424,14 @@ def _resolve_path(
     declared: str | None = None,
 ) -> Finding:
     """Decide what one path reference actually points at."""
+    # Whether or not that repository is resolvable here. If it is not,
+    # `_resolve_declared` says so; falling through to claw instead would report
+    # a path that is correct in its own repository as missing from this one.
+    if reference.repository:
+        return _resolve_declared(
+            reference, repos, downstream, labels, mechs, reference.repository
+        )
+
     head, _, rest = reference.text.partition("/")
 
     if head == _OUTPUT_ROOT:
