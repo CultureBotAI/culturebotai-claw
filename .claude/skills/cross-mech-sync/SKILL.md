@@ -455,8 +455,8 @@ memory.
   acid) spanned 4 surfaces: CultureMech YAML (source) → MIM unified TSV →
   kg-microbe reviewed TSV + unified SSSOM (surgical row removal — the generator
   *seeds from its own output*, so a re-run wouldn't purge it) → regenerated
-  CultureMech HTML/UMAP. Left the vendored ChEBI ontology snapshot (`data/kgm/`)
-  alone — 33134 = 1H-phosphole is *correct* there. Lesson: trace every surface;
+  CultureMech HTML/UMAP. Left the vendored ChEBI ontology snapshot (CultureMech's
+  untracked data/kgm/) alone — 33134 = 1H-phosphole is *correct* there. Lesson: trace every surface;
   distinguish the error from legitimate uses of the same id.
 
 ## Pitfalls

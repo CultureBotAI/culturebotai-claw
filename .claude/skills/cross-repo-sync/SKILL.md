@@ -123,7 +123,8 @@ just build-unified-mapping
 - `UNMATCHED_IN_MIM`: name not found in MIM at all (add to MIM or check spelling)
 
 **KG match failures:**
-- Verify embeddings file exists in `CultureMech/data/embeddings/`
+- Verify the embeddings file exists in CultureMech's data/embeddings/ —
+  it is generated and untracked, so a fresh clone will not have it
 - CHEBI nodes must exist in the KG graph; new CHEBI IDs may lag by one KG release
 
 ---

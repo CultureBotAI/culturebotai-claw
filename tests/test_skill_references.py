@@ -17,6 +17,7 @@ gate stops being read.
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -151,7 +152,7 @@ def test_a_prefixed_path_is_judged_against_that_repository(tmp_path):
     finding = check(tmp_path, {"OtherMech": other})[0]
 
     assert finding.verdict == "missing"
-    assert finding.detail == "no such path in OtherMech"
+    assert finding.detail.startswith("not in OtherMech")
 
 
 def test_a_repeated_prefix_is_a_layout_not_a_typo(tmp_path):
@@ -328,3 +329,87 @@ def test_a_fenced_code_block_is_out_of_scope_and_stays_that_way(tmp_path):
     )
 
     assert check(tmp_path) == []
+
+
+# --------------------------------------------------------------------------
+# #203: the same reference must get the same verdict on every machine
+# --------------------------------------------------------------------------
+
+
+def _git(root: Path, *args: str) -> None:
+    subprocess.run(["git", *args], cwd=root, check=True, capture_output=True)
+
+
+def _repository(root: Path, tracked: dict[str, str], ignore: str = "") -> Path:
+    root.mkdir(parents=True, exist_ok=True)
+    _git(root, "init", "-q")
+    _git(root, "config", "user.email", "t@example.invalid")
+    _git(root, "config", "user.name", "t")
+    if ignore:
+        (root / ".gitignore").write_text(ignore, encoding="utf-8")
+        tracked = {**tracked, ".gitignore": ignore}
+    for relative, content in tracked.items():
+        target = root / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
+        _git(root, "add", "--", relative)
+    if tracked:
+        _git(root, "commit", "-qm", "seed")
+    return root
+
+
+def test_an_untracked_file_is_missing_even_though_it_is_right_there(tmp_path):
+    """The #203 failure. `data/kgm` existed on one laptop and in no clone, so
+    the checker passed locally and failed in CI on the same commit."""
+    mech = _repository(tmp_path / "OtherMech", {"README.md": "x"})
+    (mech / "data" / "kgm").mkdir(parents=True)
+    (mech / "data" / "kgm" / "local.owl").write_text("x", encoding="utf-8")
+    _skill(tmp_path, "s", "Left `OtherMech/data/kgm` alone.\n")
+
+    finding = check(tmp_path, {"OtherMech": mech})[0]
+
+    assert finding.verdict == "missing", "present locally is not present for a reader"
+    assert "git neither tracks it nor declares it generated" in finding.detail
+
+
+def test_a_gitignored_artifact_is_an_output_not_a_failure(tmp_path):
+    """CommunityMech ignores `reports/*.csv`. A skill naming an artifact the
+    repository itself declares generated is describing output, which is the
+    workspace/ rule generalized instead of special-cased for claw."""
+    mech = _repository(
+        tmp_path / "OtherMech", {"README.md": "x"}, ignore="reports/*.csv\n"
+    )
+    _skill(tmp_path, "s", "Reads `OtherMech/reports/ingredient_mapping.csv`.\n")
+
+    finding = check(tmp_path, {"OtherMech": mech})[0]
+
+    assert finding.verdict == "output"
+    assert "generated" in finding.detail
+
+
+def test_a_tracked_file_is_ok_when_it_is_not_even_checked_out(tmp_path):
+    """git answers for a path the working tree does not have, which is what
+    makes the verdict the same in a sparse or partial clone."""
+    mech = _repository(tmp_path / "OtherMech", {"mappings/x.tsv": "a"})
+    (mech / "mappings" / "x.tsv").unlink()
+    _skill(tmp_path, "s", "Read `OtherMech/mappings/x.tsv`.\n")
+
+    assert check(tmp_path, {"OtherMech": mech})[0].verdict == "ok"
+
+
+def test_a_directory_counts_as_tracked_when_it_holds_tracked_files(tmp_path):
+    mech = _repository(tmp_path / "OtherMech", {"mappings/canonical/x.tsv": "a"})
+    _skill(tmp_path, "s", "See `OtherMech/mappings/canonical`.\n")
+
+    assert check(tmp_path, {"OtherMech": mech})[0].verdict == "ok"
+
+
+def test_a_directory_that_is_not_a_checkout_falls_back_to_the_filesystem(tmp_path):
+    """Tests and ad-hoc callers hand in plain directories; refusing them would
+    make the library unusable outside a clone."""
+    plain = tmp_path / "Plain"
+    (plain / "data").mkdir(parents=True)
+    (plain / "data" / "x.tsv").write_text("", encoding="utf-8")
+    _skill(tmp_path, "s", "Read `Plain/data/x.tsv`.\n")
+
+    assert check(tmp_path, {"Plain": plain})[0].verdict == "ok"

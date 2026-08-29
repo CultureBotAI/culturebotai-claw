@@ -299,7 +299,9 @@ reports what it could not resolve rather than calling it broken: `missing` and
 `ambiguous` fail the command, `unverifiable` does not. A skill whose bare paths
 are relative to another repository declares `reference-root:` in its
 frontmatter -- a repository name, or `mech` for a path that exists in every
-Mech. Paths under `workspace/` are outputs and are counted, not checked. It reads
+Mech. Existence is decided by git, not the filesystem, so the verdict is the same on
+a laptop and in CI: tracked is fine, gitignored counts as a generated artifact,
+and neither means no clone of that repository has it. It reads
 backticked text only, so a path inside a fenced code block is not checked
 (#202).
 
