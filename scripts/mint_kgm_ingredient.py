@@ -23,6 +23,10 @@ from pathlib import Path
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+
 MIM_ROOT = Path(os.environ.get(
     "MEDIAINGREDIENTMECH_ROOT",
     REPO_ROOT.parent / "MediaIngredientMech",
@@ -140,6 +144,9 @@ def main() -> int:
     src.add_argument("--from-tsv", type=Path,
                      help="batch: rows with action=='mint' in this TSV")
     args = ap.parse_args()
+    # Verify the checkout before doing work; module-level roots stay
+    # plain paths so importing this file never needs one (#176).
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
 
     if args.slug:
         yaml_path = find_yaml_by_slug(args.slug)

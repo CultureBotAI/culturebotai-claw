@@ -42,6 +42,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 from kg_microbe_write import ValidatedWriteTransaction  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+
 MIM_ROOT = Path(os.environ.get(
     "MEDIAINGREDIENTMECH_ROOT",
     REPO_ROOT.parent / "MediaIngredientMech",
@@ -322,6 +326,9 @@ def main() -> int:
     ap.add_argument("--override", action="store_true",
                     help="overwrite ingredient_type even if already set")
     args = ap.parse_args()
+    # Verify the checkout before doing work; module-level roots stay
+    # plain paths so importing this file never needs one (#176).
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
 
     # Resolve the vocabulary BEFORE the walk. It is used lazily, on the first
     # record whose name matches the medium pattern, and --apply writes per

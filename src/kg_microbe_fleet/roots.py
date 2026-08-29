@@ -97,3 +97,29 @@ def resolve_mech_root(
             f"guess -- set {mech.environment_variable} to the right checkout."
         )
     return guess.resolve()
+
+
+def require_mech_roots(
+    *keys: str,
+    claw_root: Path,
+    environ: Mapping[str, str] | None = None,
+    manifest: FleetManifest | None = None,
+) -> dict[str, Path]:
+    """Verify each Mech checkout before work begins, raising on the first bad one.
+
+    Meant to be called at the top of a command, not at import. Module-level
+    constants stay plain paths so importing a script for its helpers never
+    requires a checkout -- five scripts import `classify_ingredient_type` for
+    its regexes alone, and #147 pinned that. Verification belongs where the
+    work is, which is the split #176 describes.
+
+    A command that legitimately tolerates an absent root must NOT call this:
+    `inventory_unmapped_ingredients` reports per-source coverage instead,
+    because a partial inventory is a real answer there (#161).
+    """
+    resolved: dict[str, Path] = {}
+    for key in keys:
+        resolved[key] = resolve_mech_root(
+            key, claw_root=claw_root, environ=environ, manifest=manifest
+        )
+    return resolved

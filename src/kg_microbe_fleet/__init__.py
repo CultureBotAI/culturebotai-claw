@@ -926,7 +926,13 @@ def load_fleet_manifest(path: Optional[Path] = None) -> FleetManifest:
 
 def __getattr__(name: str):
     """Expose the root resolver lazily, avoiding an import cycle at module load."""
-    if name in {"MechRootError", "resolve_mech_root", "sibling_default", "looks_like"}:
+    if name in {
+        "MechRootError",
+        "resolve_mech_root",
+        "require_mech_roots",
+        "sibling_default",
+        "looks_like",
+    }:
         from . import roots
 
         return getattr(roots, name)

@@ -26,6 +26,10 @@ from typing import Iterable
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+
 MIM_ROOT = Path(os.environ.get(
     "MEDIAINGREDIENTMECH_ROOT",
     REPO_ROOT.parent / "MediaIngredientMech",
@@ -177,6 +181,9 @@ def main() -> int:
     ap.add_argument("--rate", type=float, default=None,
                     help="req/s (default: 3.0, or 10.0 with NCBI_API_KEY)")
     args = ap.parse_args()
+    # Verify the checkout before doing work; module-level roots stay
+    # plain paths so importing this file never needs one (#176).
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
 
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     api_key = os.environ.get("NCBI_API_KEY")
