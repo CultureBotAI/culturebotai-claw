@@ -95,6 +95,11 @@ Supported:
 
 Experimental or disabled:
 
+- `.github/workflows/label-correspondence-reusable.yaml` until a Mech calls it.
+  A `workflow_call` workflow is only executed by a caller, so claw's own CI can
+  check its shape and nothing more. TraitMech is the canary (#180); the other
+  four adopt it only after that run passes for real.
+
 - `openclaw-cli agent run` and `pipeline run` execution without `--dry-run`.
 - Environment-curation apply mode; it raises until an atomic validated writer exists.
 - Unified ingredient-mapping apply mode; it raises until all YAML writes are transactional.
