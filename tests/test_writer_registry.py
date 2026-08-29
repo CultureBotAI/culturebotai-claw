@@ -155,12 +155,26 @@ def test_an_empty_registry_is_refused():
 
 
 def test_the_registry_ships_inside_the_package():
-    """A registry outside the package is absent from the wheel, exactly as the
-    fleet manifest was before it moved."""
-    packaged = Path(load_registry.__module__.replace(".", "/"))
-    assert (ROOT / "src" / "kg_microbe_write" / "writers.yaml").is_file()
-    data = yaml.safe_load(
-        (ROOT / "src" / "kg_microbe_write" / "writers.yaml").read_text(encoding="utf-8")
+    """The registry must be packaged, not merely present in the source tree.
+
+    An editable install hides a missing package-data declaration, so assert the
+    declaration directly -- checking only that the file exists on disk would
+    pass with the wheel silently omitting it, exactly as the fleet manifest
+    could before Phase 0 moved it.
+    """
+    import tomllib
+
+    registry_file = ROOT / "src" / "kg_microbe_write" / "writers.yaml"
+    pyproject = tomllib.loads(
+        (ROOT / "pyproject.toml").read_text(encoding="utf-8")
     )
-    assert data["version"] == REGISTRY_VERSION
-    assert packaged  # the module resolves; the file sits beside it
+    package_data = pyproject["tool"]["setuptools"]["package-data"]
+
+    assert registry_file.is_file(), "the registry must live inside the package"
+    assert registry_file.name in package_data.get("kg_microbe_write", []), (
+        "writers.yaml is not declared in package-data, so it would be absent "
+        "from the wheel"
+    )
+    assert yaml.safe_load(
+        registry_file.read_text(encoding="utf-8")
+    )["version"] == REGISTRY_VERSION
