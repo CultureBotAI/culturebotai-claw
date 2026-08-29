@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """
 Route UNRESOLVED P4.4 candidates into existing MIM YAMLs when the
 target CHEBI is already present in MIM (CHEBI-collision case).
@@ -19,6 +19,8 @@ Flow:
 
 from __future__ import annotations
 
+import os
+import sys
 import argparse
 import json
 import re
@@ -28,13 +30,18 @@ from pathlib import Path
 
 import yaml
 
-MIM_MAPPED_DIR = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
-    "MediaIngredientMech/data/ingredients/mapped"
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+MIM_ROOT = Path(
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
 )
-WORKSPACE = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/workspace"
-)
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+MIM_MAPPED_DIR = MIM_ROOT / "data/ingredients/mapped"
+WORKSPACE = REPO_ROOT / "workspace"
 IN_JSON = WORKSPACE / "reports/hydrate_sibling_proposals.json"
 IN_RESOLUTION = WORKSPACE / "reports/p44_hydration_resolution.json"
 FLAGS_MD = WORKSPACE / "reports/chebi_collision_routing_flags.md"
@@ -160,6 +167,8 @@ def main() -> None:
     ap.add_argument("--include-medium", action="store_true",
                     help="Also route MEDIUM-confidence proposal candidates.")
     args = ap.parse_args()
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
+
 
     data = json.loads(IN_JSON.read_text())
     levels = ("HIGH", "MEDIUM") if args.include_medium else ("HIGH",)

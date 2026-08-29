@@ -36,10 +36,9 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-REPORT_DIR = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
-    "culturebotai-claw/workspace/reports"
-)
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+REPORT_DIR = REPO_ROOT / "workspace/reports"
 
 OLS_TERM_URL = (
     "https://www.ebi.ac.uk/ols4/api/ontologies/chebi/terms?iri={iri}"

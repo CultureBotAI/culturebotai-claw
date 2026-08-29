@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """Upgrade MIM `kgmicrobe.compound:*` placeholder primaries to real
 ontology IDs via the multi-ontology cascade.
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """
 Resolve the 7 RISKY merges from mim_merge_plan.tsv whose CAS-RN values
 disagree across the group.
@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import os
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -29,12 +30,18 @@ from pathlib import Path
 
 import yaml
 
-WORKSPACE = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/workspace"
-)
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
 MIM_ROOT = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech"
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
 )
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+WORKSPACE = REPO_ROOT / "workspace"
+MIM_ROOT = MIM_ROOT
 MIM_MAPPED_DIR = MIM_ROOT / "data" / "ingredients" / "mapped"
 PLAN_TSV = WORKSPACE / "reports/mim_merge_plan.tsv"
 
@@ -155,6 +162,8 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--apply", action="store_true")
     args = ap.parse_args()
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
+
 
     rows = _load_risky()
     print(f"{'APPLY' if args.apply else 'DRY-RUN'}: {len(rows)} RISKY merges\n")

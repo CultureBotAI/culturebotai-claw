@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """Mint a `kgmicrobe.ingredient:<slug>` custom term as the new primary
 identifier for a MIM ingredient YAML. Preserves the parent ontology
 relationship via skos:narrowMatch in the SSSOM emission and an

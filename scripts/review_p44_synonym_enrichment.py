@@ -29,7 +29,9 @@ and only touches CLEAN_ADD candidates.
 
 from __future__ import annotations
 
+import argparse
 import json
+import os
 import re
 import sys
 from collections import Counter, defaultdict
@@ -37,12 +39,18 @@ from pathlib import Path
 
 import yaml
 
-CLAW_ROOT = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw"
-)
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
 MIM_ROOT = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech"
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
 )
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+CLAW_ROOT = REPO_ROOT
+MIM_ROOT = MIM_ROOT
 REPORT_DIR = CLAW_ROOT / "workspace" / "reports"
 INGREDIENTS_DIR = MIM_ROOT / "data" / "ingredients" / "mapped"
 
@@ -169,6 +177,9 @@ def _classify_candidate(
 
 
 def main():
+    argparse.ArgumentParser(description=__doc__).parse_args()
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
+
     src = REPORT_DIR / "kg_microbe_sweep.json"
     data = json.loads(src.read_text())
     p44 = data.get("p44_findings", [])

@@ -25,9 +25,9 @@ from pathlib import Path
 # Reuse the loader / writer / summary helpers from the serial reviewer.
 import importlib.util
 
-CLAW_ROOT = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw"
-)
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+CLAW_ROOT = REPO_ROOT
 DEFAULT_SSSOM = CLAW_ROOT / "workspace" / "reports" / "mim_ingredient_mappings.sssom.tsv"
 DEFAULT_RESULTS_DIR = CLAW_ROOT / "workspace" / "results"
 DEFAULT_SHARD_GLOB = "sssom_review_shard_*.jsonl"

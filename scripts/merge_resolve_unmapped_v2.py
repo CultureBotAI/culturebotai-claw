@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """Merge v2 shard outputs from `resolve_unmapped_v2.py`. Applies HIGH
 matches (any-ontology label/synonym-exact); reports STEM_MATCH
 candidates for curator review."""

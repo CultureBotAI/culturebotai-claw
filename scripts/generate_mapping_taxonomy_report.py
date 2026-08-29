@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """
 Emit workspace/reports/mapping_taxonomy.md — a canonical reference of
 every categorical state produced by the MIM ↔ kg-microbe reconciliation
@@ -12,18 +12,27 @@ gets a pointer to the producer + consumer scripts.
 
 from __future__ import annotations
 
+import argparse
 import gzip
+import os
+import sys
 from datetime import datetime
 from pathlib import Path
 
 # ---------- paths ----------
 
-REPO = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw"
-)
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
 MIM_ROOT = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech"
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
 )
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+REPO = REPO_ROOT
+MIM_ROOT = MIM_ROOT
 OUT = REPO / "workspace/reports/mapping_taxonomy.md"
 
 
@@ -715,6 +724,9 @@ extract_complex_media_synonyms.py  (generalized, per-target config)
 
 
 def main() -> None:
+    argparse.ArgumentParser(description=__doc__).parse_args()
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
+
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     lines = [
         "# MIM ↔ kg-microbe Mapping Case Taxonomy\n",

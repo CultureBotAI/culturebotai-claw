@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """Semantic audit of CultureMech ingredient→CHEBI assertions.
 
 The existing id↔label gate waives canonical-label matching for `term` /
@@ -8,8 +8,10 @@ OAK's label + synonyms and flags the ones with no lexical support at all.
 """
 from __future__ import annotations
 
+import argparse
 import csv
 import json
+import os
 import re
 import sys
 from collections import defaultdict
@@ -17,7 +19,17 @@ from pathlib import Path
 
 import yaml
 
-CM = Path("/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech")
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+CULTUREMECH_ROOT_PATH = Path(
+    os.environ.get("CULTUREMECH_ROOT", REPO_ROOT.parent / "CultureMech")
+)
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+CM = CULTUREMECH_ROOT_PATH
 OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("chebi_semantic_audit.tsv")
 
 STOP = {
@@ -47,6 +59,9 @@ def walk(node, out: list, path: str = ""):
 
 
 def main() -> None:
+    argparse.ArgumentParser(description=__doc__).parse_args()
+    require_mech_roots("culturemech", claw_root=REPO_ROOT)
+
     # ---- 1. harvest every (chebi_id, asserted_label, preferred_term, quality) ----
     assertions: dict[tuple[str, str], dict] = {}
     files = sorted(CM.glob("data/merge_yaml/**/*.yaml")) + sorted(

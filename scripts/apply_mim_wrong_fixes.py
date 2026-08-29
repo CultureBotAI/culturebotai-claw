@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """
 Apply CHEBI swaps for MIM_WRONG rows from the DISAGREE round-trip.
 
@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from collections import defaultdict
@@ -37,13 +38,18 @@ import yaml
 sys.path.insert(0, str(Path(__file__).parent))
 from round_trip_true_bugs import classify, fetch_ols_label, _stem_tokens  # noqa: E402
 
-MIM_MAPPED_DIR = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
-    "MediaIngredientMech/data/ingredients/mapped"
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+MIM_ROOT = Path(
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
 )
-WORKSPACE = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/workspace"
-)
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+MIM_MAPPED_DIR = MIM_ROOT / "data/ingredients/mapped"
+WORKSPACE = REPO_ROOT / "workspace"
 IN_JSON = WORKSPACE / "reports/kgm_mim_disagree_roundtrip.json"
 FLAGS_MD = WORKSPACE / "reports/mim_wrong_fix_flags.md"
 
@@ -83,6 +89,8 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--apply", action="store_true")
     args = ap.parse_args()
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
+
 
     data = json.loads(IN_JSON.read_text())
     wrongs = [r for r in data["results"] if r.get("decision") == "MIM_WRONG"]

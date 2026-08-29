@@ -35,9 +35,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-CLAW_ROOT = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw"
-)
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+CLAW_ROOT = REPO_ROOT
 RESIDUAL_JSON = CLAW_ROOT / "workspace" / "reports" / "kg_microbe_residual_p25_categorized.json"
 
 STALE_SOURCE_FILES = {

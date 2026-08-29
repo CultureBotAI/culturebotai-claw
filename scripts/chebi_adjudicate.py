@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """Adjudicate CultureMech ingredient→CHEBI assertions with two hard signals.
 
 1. FORMULA: many ingredient names ARE chemical formulas ("KH2PO4",

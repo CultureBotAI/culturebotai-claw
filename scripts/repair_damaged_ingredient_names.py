@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """Repair subscript-damaged ingredient names from their intact corpus twins.
 
 CultureMech's scraped recipes lost subscript glyphs on some ingredient names
@@ -20,6 +20,7 @@ already spells it that way.
 
 from __future__ import annotations
 
+import os
 import argparse
 import csv
 import re
@@ -29,9 +30,15 @@ from pathlib import Path
 
 import yaml
 
-KGH = Path("/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe")
-CM = KGH / "CultureMech"
-CLAW = KGH / "culturebotai-claw"
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+CM = Path(
+    os.environ.get("CULTUREMECH_ROOT", REPO_ROOT.parent / "CultureMech")
+)
+CLAW = REPO_ROOT
 
 # Hydrate tail in either the damaged ("... .6H O") or intact ("... x 6 H2O",
 # "·6H2O", "26H2O") spelling. Anchored so it cannot match inside a formula body
@@ -105,6 +112,8 @@ def main() -> None:
     ap.add_argument("--out", type=Path,
                     default=CLAW / "workspace/reports/name_repairs.tsv")
     args = ap.parse_args()
+    require_mech_roots("culturemech", claw_root=REPO_ROOT)
+
 
     rows = [r for r in csv.DictReader(args.resolutions.open(), delimiter="\t")
             if r["resolution"] == "EXCEPTION_LABEL_DAMAGED"]

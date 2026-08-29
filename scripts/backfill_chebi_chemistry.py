@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """Backfill `chemical_properties.molecular_formula / smiles / inchi`
 for every MIM ingredient YAML whose primary identifier is a CHEBI
 term, using the local CHEBI sqlite that OAK already maintains at

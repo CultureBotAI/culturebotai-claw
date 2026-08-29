@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """Resolve the residual id↔label defects the earlier passes could not.
 
 Two classes remain after exact label/synonym/formula matching:
@@ -22,6 +22,7 @@ applied by this script.
 
 from __future__ import annotations
 
+import os
 import argparse
 import csv
 import re
@@ -29,9 +30,15 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
-KGH = Path("/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe")
-CM = KGH / "CultureMech"
-CLAW = KGH / "culturebotai-claw"
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+CM = Path(
+    os.environ.get("CULTUREMECH_ROOT", REPO_ROOT.parent / "CultureMech")
+)
+CLAW = REPO_ROOT
 sys.path.insert(0, str(CM / "scripts"))
 sys.path.insert(0, str(CLAW / "scripts"))
 import chem_formula  # noqa: E402
@@ -106,6 +113,8 @@ def main() -> None:
     ap.add_argument("--out", type=Path,
                     default=CLAW / "workspace/reports/residual_defect_proposals.tsv")
     args = ap.parse_args()
+    require_mech_roots("culturemech", claw_root=REPO_ROOT)
+
 
     rows = [r for r in csv.DictReader(args.report.open(), delimiter="\t")
             if r["verdict"] in ("IMPLAUSIBLE_LABEL", "ID_NOT_FOUND", "ID_OUT_OF_RANGE")]

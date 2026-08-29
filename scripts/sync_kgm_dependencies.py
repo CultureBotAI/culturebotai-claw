@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """Snapshot the kg-microbe data files claw scripts depend on into
 `workspace/kgm_snapshot/`. Captures the current local kg-microbe state
 without `git pull` — useful for reproducible audits and as a fallback

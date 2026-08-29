@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """Apply propose-evidence drafts to MIM ingredient YAMLs.
 
 Reads `workspace/reports/evidence_proposals/<slug>.md`, parses every

@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """
 For each UNRESOLVED (stem, hydration) group from the hydration
 disambiguator, search OLS for a CHEBI ID that matches the hydrate/anhydrous
@@ -28,9 +28,9 @@ import urllib.request
 from collections import defaultdict
 from pathlib import Path
 
-WORKSPACE = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/workspace"
-)
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+WORKSPACE = REPO_ROOT / "workspace"
 IN_JSON = WORKSPACE / "reports/p44_hydration_resolution.json"
 OUT_JSON = WORKSPACE / "reports/hydrate_sibling_proposals.json"
 OUT_MD = WORKSPACE / "reports/hydrate_sibling_proposals.md"

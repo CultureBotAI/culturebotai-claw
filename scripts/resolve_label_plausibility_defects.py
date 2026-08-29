@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """Propose a correct ontology term for every id↔label plausibility defect.
 
 Consumes the drift report from
@@ -26,6 +26,7 @@ validator's ``exceptions:`` allow-list rather than as corrections.
 
 from __future__ import annotations
 
+import os
 import argparse
 import csv
 import re
@@ -33,8 +34,14 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-KGH = Path("/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe")
-CM = KGH / "CultureMech"
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+CM = Path(
+    os.environ.get("CULTUREMECH_ROOT", REPO_ROOT.parent / "CultureMech")
+)
 sys.path.insert(0, str(CM / "scripts"))
 import chem_formula  # noqa: E402
 
@@ -156,12 +163,14 @@ def main() -> None:
     ap.add_argument("--report", type=Path,
                     default=CM / "reports" / "label_plausibility_2026-07-19.tsv")
     ap.add_argument("--adjudicated", type=Path,
-                    default=KGH / "culturebotai-claw/workspace/reports/chebi_adjudicated.tsv",
+                    default=REPO_ROOT / "workspace/reports/chebi_adjudicated.tsv",
                     help="Corpus-wide (name, CHEBI) adjudication used as the source "
                          "of trustworthy groundings for skeleton transfer.")
     ap.add_argument("--out", type=Path,
-                    default=KGH / "culturebotai-claw/workspace/reports/label_defect_resolutions.tsv")
+                    default=REPO_ROOT / "workspace/reports/label_defect_resolutions.tsv")
     args = ap.parse_args()
+    require_mech_roots("culturemech", claw_root=REPO_ROOT)
+
 
     rows = list(csv.DictReader(args.report.open(), delimiter="\t"))
     flagged = [r for r in rows if r["verdict"] in

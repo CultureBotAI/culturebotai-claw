@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """
 Build workspace/reports/complex_ingredients.tsv.gz — the concrete artifact
 proposed in docs/proposals/kg_microbe_dict_extend_beyond_chebi.md.
@@ -13,17 +13,25 @@ existing CHEBI-only unified_chemical_mappings.tsv.gz.
 
 from __future__ import annotations
 
+import os
+import sys
 import argparse
 import gzip
 import shutil
 from pathlib import Path
 
-WORKSPACE = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/workspace"
-)
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
 MIM_ROOT = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech"
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
 )
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+WORKSPACE = REPO_ROOT / "workspace"
+MIM_ROOT = MIM_ROOT
 MIM_SSSOM = MIM_ROOT / "mappings/ingredient_mappings.sssom.tsv"
 OUT_GZ = WORKSPACE / "reports/complex_ingredients.tsv.gz"
 OUT_TSV_PREVIEW = WORKSPACE / "reports/complex_ingredients_preview.tsv"
@@ -128,6 +136,8 @@ def main() -> None:
                     help="Also copy the artifact into MediaIngredientMech/mappings/ "
                          "as the canonical published location consumed by kg-microbe.")
     args = ap.parse_args()
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
+
 
     rows = build()
     print(f"Built {len(rows)} complex-ingredient rows")

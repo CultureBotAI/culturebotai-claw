@@ -45,6 +45,7 @@ from __future__ import annotations
 import argparse
 import gzip
 import json
+import os
 import re
 import subprocess
 import sys
@@ -55,15 +56,22 @@ import yaml
 
 from kgm_unified_mappings import load_kgm_labels, load_kgm_source_index
 
-CLAW_ROOT = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw"
-)
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
 MIM_ROOT = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech"
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
 )
-KGM_ROOT = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe"
+KGM_ROOT_PATH = Path(
+    os.environ.get("KGMICROBE_ROOT", REPO_ROOT.parent / "kg-microbe")
 )
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+CLAW_ROOT = REPO_ROOT
+MIM_ROOT = MIM_ROOT
+KGM_ROOT = KGM_ROOT_PATH
 
 MIM_INGREDIENTS_DIR = MIM_ROOT / "data" / "ingredients" / "mapped"
 MIM_PUBLISHED_SSSOM = MIM_ROOT / "mappings" / "ingredient_mappings.sssom.tsv"
@@ -993,6 +1001,8 @@ def main():
              "checkout).",
     )
     args = ap.parse_args()
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
+
 
     residual = _load_residual_categorization()
     kgm_sources = _load_kgm_source_index()

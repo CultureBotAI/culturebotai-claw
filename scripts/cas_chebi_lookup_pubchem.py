@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """
 Follow-up CAS→CHEBI pass for the 684 compounds left in
 culturebotht_curation_queue.tsv after the initial OLS-based integration.
@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import re
 import sys
 import time
@@ -34,22 +35,28 @@ from pathlib import Path
 
 import yaml
 
-WORKSPACE = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/workspace"
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+CULTUREBOTHT_ROOT_PATH = Path(
+    os.environ.get("CULTUREBOTHT_ROOT", REPO_ROOT.parent / "CultureBotHT")
 )
+MIM_ROOT = Path(
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
+)
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+WORKSPACE = REPO_ROOT / "workspace"
 QUEUE_TSV = WORKSPACE / "reports/culturebotht_curation_queue.tsv"
 CAS_CACHE = WORKSPACE / "cache/cas_to_chebi.json"
 PUBCHEM_CACHE = WORKSPACE / "cache/pubchem_cas_chebi.json"
 SUMMARY_MD = WORKSPACE / "reports/cas_chebi_followup_summary.md"
 
-CULTUREBOT_ROOT = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureBotHT/CultureBotHT"
-)
+CULTUREBOT_ROOT = CULTUREBOTHT_ROOT_PATH / "CultureBotHT"
 COMPOUNDS_CSV = CULTUREBOT_ROOT / "data/raw/google_sheets/compounds_to_cas.csv"
-MIM_MAPPED_DIR = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
-    "MediaIngredientMech/data/ingredients/mapped"
-)
+MIM_MAPPED_DIR = MIM_ROOT / "data/ingredients/mapped"
 
 TIMESTAMP = datetime.now(timezone.utc).isoformat()
 
@@ -195,6 +202,8 @@ def main() -> None:
     ap.add_argument("--no-pubchem", action="store_true",
                     help="Skip PubChem fallback (OAK-only).")
     args = ap.parse_args()
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
+
 
     print(f"[1/4] Loading CAS→CHEBI index from OAK")
     cas_to_chebi = json.loads(CAS_CACHE.read_text())

@@ -20,6 +20,7 @@ Usage:
 
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
 from typing import List, Dict, Any
@@ -260,6 +261,16 @@ def run_prioritize(args):
     return 0
 
 
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+CULTUREMECH_ROOT_PATH = Path(
+    os.environ.get("CULTUREMECH_ROOT", REPO_ROOT.parent / "CultureMech")
+)
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
 def main():
     parser = argparse.ArgumentParser(
         description="Citation-backed environment curation for CultureMech",
@@ -271,7 +282,7 @@ def main():
     parser.add_argument(
         "--culturemech-root",
         type=str,
-        default="/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech",
+        default=CULTUREMECH_ROOT_PATH,
         help="Path to CultureMech repository"
     )
 
@@ -343,6 +354,8 @@ def main():
     )
 
     args = parser.parse_args()
+    require_mech_roots("culturemech", claw_root=REPO_ROOT)
+
 
     # Default to curate if no command specified
     if not args.command:

@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """Definitive per-record verdict for the 31 'ontology term known, no MIM record'
 ingredients, by direct comparison of the asserted term's real ontology label
 against the ingredient name. Emits the corrected mapping where one is findable.
@@ -9,7 +9,9 @@ import csv
 import re
 from pathlib import Path
 
-C = Path("/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw")
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+C = REPO_ROOT
 BACKLOG = C / "workspace/reports/mim_missing_records_backlog.tsv"
 OUT = C / "workspace/reports/mim_missing_records_VERIFIED.tsv"
 

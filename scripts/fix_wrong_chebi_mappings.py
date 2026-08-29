@@ -16,6 +16,7 @@ before any writes. Default is --dry-run.
 from __future__ import annotations
 
 import argparse
+import os
 import importlib.util
 import sys
 from datetime import datetime, timezone
@@ -23,12 +24,18 @@ from pathlib import Path
 
 import yaml
 
-CLAW_ROOT = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw"
-)
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
 MIM_ROOT = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech"
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
 )
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+CLAW_ROOT = REPO_ROOT
+MIM_ROOT = MIM_ROOT
 MAPPED_DIR = MIM_ROOT / "data" / "ingredients" / "mapped"
 LOCKS_DIR = CLAW_ROOT / "workspace" / "locks"
 
@@ -147,6 +154,8 @@ def main():
     ap.add_argument("--apply", action="store_true", help="actually write")
     ap.add_argument("--dry-run", action="store_true", help="(default)")
     args = ap.parse_args()
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
+
     apply = args.apply and not args.dry_run
 
     if apply:

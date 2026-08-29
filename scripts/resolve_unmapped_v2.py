@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """More aggressive multi-strategy resolver for the still-unmapped MIM
 records. Builds on resolve_unmapped.py (v1) which found 59/595 HIGH
 hits via cascading per-ontology label/synonym-exact search.

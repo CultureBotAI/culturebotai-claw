@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """Detect MIM mappings where the ontology term is more general than the
 named ingredient (e.g., "Vermont Soil" → ENVO:00001998 "soil").
 

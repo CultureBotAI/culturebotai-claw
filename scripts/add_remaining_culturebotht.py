@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """
 Add the remaining CultureBotHT compounds to MIM as either MAPPED records
 keyed by `cas:<cas-rn>` (when a CAS-RN is available but no CHEBI exists)
@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import re
 import sys
 from collections import defaultdict
@@ -24,22 +25,28 @@ from pathlib import Path
 
 import yaml
 
-CULTUREBOT_ROOT = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureBotHT/CultureBotHT"
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+CULTUREBOTHT_ROOT_PATH = Path(
+    os.environ.get("CULTUREBOTHT_ROOT", REPO_ROOT.parent / "CultureBotHT")
 )
+MIM_ROOT = Path(
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
+)
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+CULTUREBOT_ROOT = CULTUREBOTHT_ROOT_PATH / "CultureBotHT"
 COMPOUNDS_CSV = CULTUREBOT_ROOT / "data/raw/google_sheets/compounds_to_cas.csv"
 CONSOLIDATED_JSON = CULTUREBOT_ROOT / "data/consolidated/consolidated_media.json"
 
-MIM_INGREDIENTS = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
-    "MediaIngredientMech/data/ingredients"
-)
+MIM_INGREDIENTS = MIM_ROOT / "data/ingredients"
 MAPPED_DIR = MIM_INGREDIENTS / "mapped"
 UNMAPPED_DIR = MIM_INGREDIENTS / "unmapped"
 
-WORKSPACE = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/workspace"
-)
+WORKSPACE = REPO_ROOT / "workspace"
 SUMMARY_MD = WORKSPACE / "reports/culturebotht_remaining_summary.md"
 
 PANEL_COLUMNS = (
@@ -207,6 +214,8 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--apply", action="store_true")
     args = ap.parse_args()
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
+
 
     print(f"[1/4] Indexing existing MIM")
     labels, cas_set, slugs = _build_mim_index()

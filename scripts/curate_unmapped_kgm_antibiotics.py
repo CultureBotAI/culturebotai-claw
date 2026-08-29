@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """
 Curate kg-microbe's unmapped antibiotic placeholders by searching
 OLS for CHEBI matches and creating MIM YAMLs for high-confidence hits.
@@ -27,6 +27,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import re
 import sys
 import time
@@ -37,17 +38,22 @@ from pathlib import Path
 
 import yaml
 
-WORKSPACE = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/workspace"
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+MIM_ROOT = Path(
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
 )
-MIM_MAPPED_DIR = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
-    "MediaIngredientMech/data/ingredients/mapped"
+KGM_ROOT_PATH = Path(
+    os.environ.get("KGMICROBE_ROOT", REPO_ROOT.parent / "kg-microbe")
 )
-INPUT_TSV = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
-    "kg-microbe/docs/metatraits/unmapped_compounds.tsv"
-)
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+WORKSPACE = REPO_ROOT / "workspace"
+MIM_MAPPED_DIR = MIM_ROOT / "data/ingredients/mapped"
+INPUT_TSV = KGM_ROOT_PATH / "docs/metatraits/unmapped_compounds.tsv"
 CACHE = WORKSPACE / "cache/chebi_search_cache.json"
 QUEUE_TSV = WORKSPACE / "reports/kgm_antibiotics_curation_queue.tsv"
 QUEUE_MD = WORKSPACE / "reports/kgm_antibiotics_curation_queue.md"
@@ -235,6 +241,8 @@ def main() -> None:
     ap.add_argument("--include-medium", action="store_true",
                     help="Also auto-apply MEDIUM after stem-overlap verification.")
     args = ap.parse_args()
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
+
 
     print(f"[1/4] Loading {INPUT_TSV}")
     rows = []

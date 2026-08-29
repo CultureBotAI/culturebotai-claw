@@ -40,9 +40,9 @@ import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
-CLAW_ROOT = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw"
-)
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+CLAW_ROOT = REPO_ROOT
 REPORT_DIR = CLAW_ROOT / "workspace" / "reports"
 
 TRIAGED_JSON = REPORT_DIR / "kg_microbe_sweep_triaged.json"
