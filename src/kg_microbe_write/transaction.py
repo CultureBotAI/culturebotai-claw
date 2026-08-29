@@ -119,7 +119,21 @@ class ValidatedWriteTransaction:
     _changes: dict[Path, Change] = field(default_factory=dict, init=False)
 
     def __post_init__(self) -> None:
-        self.root = Path(self.root).resolve(strict=True)
+        # Own every exit from the public surface. `resolve(strict=True)` raises
+        # OSError, which escapes the WriteError contract this module
+        # advertises, and `[Errno 2]` does not say what an absent root here
+        # usually means: a Mech checkout that is missing, or a *_ROOT variable
+        # pointing nowhere (#169).
+        try:
+            self.root = Path(self.root).resolve(strict=True)
+        except OSError as exc:
+            raise WriteError(
+                f"transaction root {self.root} is not an existing directory "
+                f"({exc.strerror or exc}); a repository checkout is missing or "
+                f"its root variable points elsewhere"
+            ) from exc
+        if not self.root.is_dir():
+            raise WriteError(f"transaction root {self.root} is not a directory")
         if self.journal_retention < 1:
             raise WriteError("journal_retention must be at least 1")
 

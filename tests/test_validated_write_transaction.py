@@ -371,3 +371,34 @@ def test_pruning_ignores_an_unreadable_journal_rather_than_crashing(root, tmp_pa
 
     assert result.applied is True
     assert (journal / "write-garbage.json").is_file()
+
+
+# --------------------------------------------------------------------------
+# #169: every exit from the public surface raises the declared error type
+# --------------------------------------------------------------------------
+
+
+def test_an_absent_root_raises_write_error_not_a_bare_oserror(tmp_path):
+    """`except WriteError` is the obvious thing a caller writes; it must work.
+
+    Third instance of this class here -- #150 (AttributeError escaping
+    VocabularyError) and #151 (TypeError from inside an error message) were the
+    others -- so the message also says what an absent root usually means.
+    """
+    with pytest.raises(WriteError, match="not an existing directory"):
+        ValidatedWriteTransaction(tmp_path / "nonexistent")
+
+
+def test_a_file_as_the_root_is_refused(tmp_path):
+    target = tmp_path / "a-file"
+    target.write_text("x", encoding="utf-8")
+
+    with pytest.raises(WriteError, match="not a directory"):
+        ValidatedWriteTransaction(target)
+
+
+def test_the_absent_root_message_names_the_likely_cause(tmp_path):
+    with pytest.raises(WriteError) as excinfo:
+        ValidatedWriteTransaction(tmp_path / "nonexistent")
+
+    assert "checkout is missing" in str(excinfo.value)
