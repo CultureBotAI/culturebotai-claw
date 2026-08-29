@@ -357,8 +357,10 @@ build, or deploy.
 - Every repo already runs `uv`, `just`, and a real validation gate in CI — which
   is what makes an agent's output checkable.
 
-**The producer layer is far further along than the workflow count suggests.** All
-four Mechs already ship, as justfile recipes, the DisMech-derived scan pipeline:
+**The producer layer is far further along than the workflow count suggests.**
+Every Mech that declares `knowledge_gap_scan` as enabled -- four of the five;
+ProteinTraitsMech declares it `not_applicable`, with a recorded reason -- already
+ships the DisMech-derived scan pipeline as justfile recipes:
 
 - `knowledge-gap-scan` — seeds `Discussion(kind=KNOWLEDGE_GAP)`
 - `gen-discussions-data` — builds the Discussions browser

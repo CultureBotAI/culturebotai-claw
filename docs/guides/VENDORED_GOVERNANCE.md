@@ -160,7 +160,7 @@ separate candidate-validation step checks the proposed authority layout and
 workflow contract while the deployed-fleet audit remains bound to the protected
 base revision.
 
-The final claw state is `authoritative`: all five Mechs are consumers, no Mech
+The final claw state is `authoritative`: every Mech is a consumer, no Mech
 hub exists, and `legacy_hub` is forbidden. The compatibility mirrors, duplicate
 root contracts, and CultureMech-hub audit were removed only after the fleet
 audit passed. Claw's maintained history CLI and ID-label behavioral workflow now
@@ -193,6 +193,6 @@ that separate coordinated release.
 
 ## Rollback
 
-Rollback means pinning all five Mechs to the previous reviewed claw commit; do
+Rollback means pinning every Mech to the previous reviewed claw commit; do
 not reinstate a Mech authority or use a mutable branch. The canonical bytes
 remain recoverable from every reviewed claw commit.

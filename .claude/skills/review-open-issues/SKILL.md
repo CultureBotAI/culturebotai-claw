@@ -277,7 +277,7 @@ orchestration command as part of triage.
 
 ## Related
 
-- `fleet-pr-status` — open-PR inventory across claw and the five Mechs.
+- `fleet-pr-status` — open-PR inventory across claw and the Mechs.
 - `fleet-pr-review` — ranked merge verdicts for those PRs.
 - `cross-mech-sync` — propagating a change once triage says it must land in
   more than one repository.

@@ -294,7 +294,7 @@ artifacts.
 
 ## Fleet-specific focus
 
-The result schema and validation method are shared by all five Mechs. Research
+The result schema and validation method are shared by every Mech. Research
 focus remains domain-owned:
 
 - CultureMech investigates culturing media, growth evidence, and formulation;

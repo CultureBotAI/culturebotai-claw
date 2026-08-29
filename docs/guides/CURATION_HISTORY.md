@@ -37,7 +37,7 @@ audit, and rollback.
 
 ## Fleet adoption
 
-All five Mechs carry the governed schema and repository-local history workflow:
+Every Mech carries the governed schema and repository-local history workflow:
 
 | Repo | Governed schema | Recipes | Advisory CI |
 |---|:--:|:--:|:--:|
