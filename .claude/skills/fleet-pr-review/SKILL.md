@@ -6,6 +6,7 @@ requires_database: false
 requires_internet: true
 version: 1.0.0
 tags: [review, pr, cross-repo, fleet, quality, read-only, gate]
+reference-root: mech
 ---
 
 # Fleet PR review

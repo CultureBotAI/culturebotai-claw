@@ -290,7 +290,18 @@ uv run kg-microbe-governance --help
 uv run kg-microbe-kgscan --help
 uv run kg-microbe-qc --help
 uv run kg-microbe-discussions --help
+uv run kg-microbe-skills --help
 ```
+
+`kg-microbe-skills check` validates every path and sibling-skill reference in
+`.claude/`. It judges a reference against the repository it belongs to, and
+reports what it could not resolve rather than calling it broken: `missing` and
+`ambiguous` fail the command, `unverifiable` does not. A skill whose bare paths
+are relative to another repository declares `reference-root:` in its
+frontmatter -- a repository name, or `mech` for a path that exists in every
+Mech. Paths under `workspace/` are outputs and are counted, not checked. It reads
+backticked text only, so a path inside a fenced code block is not checked
+(#202).
 
 ## Change conventions
 

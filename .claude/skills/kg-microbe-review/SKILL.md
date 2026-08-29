@@ -6,6 +6,7 @@ requires_database: false
 requires_internet: false
 version: 2.0.0
 tags: [kg-microbe, sssom, mim, review, diff, pr-prep, chemical-mappings-mim-priority]
+reference-root: kg-microbe
 ---
 
 # kg-microbe Review Skill
@@ -61,7 +62,7 @@ matches the consolidator's actual data model.
 ### Secondary diff: kg-microbe metatraits chemical mappings vs MIM
 
 The review additionally checks two **out-of-SSSOM** files in
-`kg-microbe/kg_microbe/transform_utils/metatraits/mappings/`:
+`kg-microbe/mappings/canonical/`:
 
 - `chemical_mappings.tsv` — trait → CHEBI for carbon/nitrogen substrates
 - `special_chemical_mappings.tsv` — trait_pattern → ontology overrides
