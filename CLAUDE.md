@@ -62,6 +62,10 @@ Supported:
 - `LockManager` atomic, lease-owned file coordination.
 - Plugin and agent discovery and validated CLI dry runs.
 - Packaged history, QC dashboard, discussion-browser, and knowledge-gap tools.
+- `kg_microbe_consistency`: a read-only cross-record scanner. Groups records
+  that plausibly denote the same substance and reports where a curated field
+  disagrees. It proposes nothing and writes nothing; a disagreement is a
+  question for a curator, and some are legitimate distinctions.
 - `kg_microbe_write`: the shared `ValidatedWriteTransaction` -- stage every
   change, validate the complete set, then replace atomically with a recovery
   journal. Nothing is written until `commit(apply=True)`; a dry run still
@@ -107,6 +111,7 @@ uv run --extra dev mypy \
   plugins/git_integration.py plugins/just_runner.py \
   src/kg_microbe_history src/kg_microbe_kgscan src/kg_microbe_fleet \
   src/kg_microbe_research src/kg_microbe_write \
+  src/kg_microbe_consistency \
   src/kg_microbe_governance/__init__.py \
   src/kg_microbe_governance/__main__.py \
   src/kg_microbe_governance/fleet_audit.py \
@@ -267,6 +272,7 @@ workspace/    gitignored runtime state
 Key shared console scripts:
 
 ```bash
+uv run kg-microbe-consistency --help
 uv run kg-microbe-research --help
 uv run kg-microbe-history --help
 uv run kg-microbe-governance --help
