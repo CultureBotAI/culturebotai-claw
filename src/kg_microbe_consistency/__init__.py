@@ -12,14 +12,17 @@ from .proposals import (
     proposals_from_groups,
     propose_for_group,
     render_markdown,
+    unmodelled_qualities,
 )
 from .scanner import (
     COMPARED_FIELDS,
+    EXTRACTORS,
     Disagreement,
     Group,
     Record,
     ScannerError,
     build_report,
+    extract_embedded,
     find_disagreements,
     group_records,
     load_corpus,
@@ -30,8 +33,11 @@ from .scanner import (
 )
 
 __all__ = [
+    "EXTRACTORS",
+    "extract_embedded",
     "build_report",
     "proposals_from_groups",
+    "unmodelled_qualities",
     "FALLBACK_QUALITIES",
     "IDENTITY_QUALITIES",
     "Proposal",

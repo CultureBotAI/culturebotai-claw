@@ -135,6 +135,24 @@ def propose_for_group(group: Group) -> list[Proposal]:
     return proposals
 
 
+def unmodelled_qualities(groups: Sequence[Group]) -> set[str]:
+    """Mapping qualities in these groups that the proposal rule does not know.
+
+    The rule keys on MediaIngredientMech's vocabulary. CultureMech's is
+    entirely different -- `(none)`, `LLM_ASSISTED`, `MANUAL` -- so no record
+    there classifies as grounded or as a fallback and nothing is ever proposed.
+    Declining is right; declining silently is the failure shape recorded in
+    #161 and again in the scanner's skip count (#192).
+    """
+    known = FALLBACK_QUALITIES | IDENTITY_QUALITIES
+    seen = {
+        record.fields.get("mapping_quality", "")
+        for group in groups
+        for record in group.records
+    }
+    return {quality for quality in seen if quality and quality not in known}
+
+
 def proposals_from_groups(
     groups: Sequence[Group],
 ) -> tuple[list[Proposal], list[Group]]:
