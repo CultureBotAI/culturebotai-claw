@@ -19,7 +19,7 @@ downstream repo *also* maintains its own list of "still-unmapped"
 ingredients — rows it found locally but couldn't resolve. Those lists
 are MIM's curation backlog.
 
-This skill walks all four repos, harvests every unmapped/pending
+This skill walks every source it is given, harvests each unmapped/pending
 surface, and emits one unified inventory keyed by normalized name. It
 tells you:
 
@@ -245,9 +245,10 @@ the per-source semantics inside `extra`.
 
 - Python 3 + `pyyaml` only
 - No internet, no DB
-- Read access to all four repo checkouts (env vars
-  `MEDIAINGREDIENTMECH_ROOT`, `KGMICROBE_ROOT`, `CULTUREMECH_ROOT`,
-  `COMMUNITYMECH_ROOT` if non-default)
+- Read access to each source checkout. The Mechs come from the
+  `unmapped_inventory_input` capability, so their variables come from the
+  manifest too; kg-microbe adds `KGMICROBE_ROOT`. A checkout that is absent is
+  reported as an uncovered source rather than silently skipped (#161).
 
 ## Related skills
 

@@ -14,6 +14,8 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Optional
 
+from kg_microbe_fleet import load_fleet_manifest
+
 from . import (
     _desired_files,
     _require_clean_worktree,
@@ -36,7 +38,20 @@ from .artifacts.scripts.check_vendored_sync import (
     read_pin,
 )
 
-EXPECTED_MECH_COUNT = 5
+
+def expected_mechs() -> frozenset[str]:
+    """The Mechs the governance manifest is supposed to cover.
+
+    Was `EXPECTED_MECH_COUNT = 5`, a hardcoded fleet size -- a list of one
+    number, which is what #131 is removing everywhere else. It would have
+    rejected a correct consumer set the day a sixth Mech was declared, and
+    accepted a wrong one of the right size today.
+
+    Comparing the two manifests instead is both stale-proof and stricter: the
+    failure it is really guarding against is the governance manifest and the
+    fleet manifest describing different fleets.
+    """
+    return frozenset(load_fleet_manifest().mechs)
 
 
 @dataclass(frozen=True)
@@ -88,9 +103,9 @@ class FleetAuditResult:
 
     @property
     def ok(self) -> bool:
-        """Return whether all five repositories passed every check."""
+        """Return whether every declared Mech passed every check."""
 
-        return not self.issues and len(self.repositories) == EXPECTED_MECH_COUNT
+        return not self.issues and len(self.repositories) == len(expected_mechs())
 
     def for_repository(self, key: str) -> RepositoryAuditResult:
         """Return one repository result by canonical consumer key."""
@@ -338,20 +353,28 @@ def audit_fleet_pins(
     bounded HTTPS fetcher.
 
     Local preflight is all-or-nothing.  No canonical bytes are fetched unless
-    all five roots have the correct identity, are clean, point exactly at their
-    local ``origin/main``, and contain the requested immutable pin.
+    every declared root has the correct identity, is clean, points exactly at
+    its local ``origin/main``, and contains the requested immutable pin.
     """
 
     expected_ref = _validate_ref(expected_ref)
     manifest = load_governance_manifest()
     consumers = manifest.consumers
-    if len(consumers) != EXPECTED_MECH_COUNT:
+    expected = expected_mechs()
+    if set(consumers) != expected:
+        extra = sorted(set(consumers) - expected)
+        missing = sorted(expected - set(consumers))
+        detail = ", ".join(
+            part
+            for part in (
+                f"not in the fleet manifest: {', '.join(extra)}" if extra else "",
+                f"declared but not a consumer: {', '.join(missing)}" if missing else "",
+            )
+            if part
+        )
         issue = FleetAuditIssue(
             code="fleet_size",
-            message=(
-                f"Governance manifest has {len(consumers)} consumers; "
-                f"expected exactly {EXPECTED_MECH_COUNT}"
-            ),
+            message=f"Governance and fleet manifests describe different fleets ({detail})",
         )
         return FleetAuditResult(expected_ref, (), (issue,))
 
