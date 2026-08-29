@@ -23,6 +23,10 @@ from pathlib import Path
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+
 MIM_ROOT = Path(os.environ.get(
     "MEDIAINGREDIENTMECH_ROOT",
     REPO_ROOT.parent / "MediaIngredientMech",
@@ -134,6 +138,9 @@ def mint_one(yaml_path: Path) -> dict:
 
 
 def main() -> int:
+    # Verify the checkout before doing work; module-level roots stay
+    # plain paths so importing this file never needs one (#176).
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
     ap = argparse.ArgumentParser()
     src = ap.add_mutually_exclusive_group(required=True)
     src.add_argument("--slug", help="MIM YAML stem (e.g. Vermont_Soil)")

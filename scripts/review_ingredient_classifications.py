@@ -26,6 +26,10 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+
 MIM_ROOT = Path(os.environ.get(
     "MEDIAINGREDIENTMECH_ROOT",
     REPO_ROOT.parent / "MediaIngredientMech",
@@ -64,6 +68,9 @@ def suggest_for_unset(record: dict) -> tuple[str, str]:
 
 
 def main() -> int:
+    # Verify the checkout before doing work; module-level roots stay
+    # plain paths so importing this file never needs one (#176).
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
     ap = argparse.ArgumentParser()
     ap.parse_args()  # no flags yet; placeholder for future filtering
 
