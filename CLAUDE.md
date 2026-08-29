@@ -314,9 +314,10 @@ cross-repository checklist as its own change.
 
 Existence is decided by git, not the filesystem, so the verdict is the same on
 a laptop and in CI: tracked is fine, gitignored counts as a generated artifact,
-and neither means no clone of that repository has it. It reads
-backticked text only, so a path inside a fenced code block is not checked
-(#202).
+and neither means no clone of that repository has it. It reads backticked
+prose and shell code fences; a `cd` inside a fence moves the paths that follow,
+including through a `${VAR:-default}` fallback. Non-shell fences are not read,
+because they carry literal data the path rules would misread.
 
 ## Change conventions
 

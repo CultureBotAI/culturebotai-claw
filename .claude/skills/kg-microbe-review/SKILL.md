@@ -122,7 +122,7 @@ likely contribution surfaces are:
 - Python 3 + pyyaml
 - No internet or DB access required
 - Access to the kg-microbe repo at
-  `/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe`
+  the checkout `KGMICROBE_ROOT` names, `../kg-microbe` by default
   on the `chemical-mappings-mim-priority` branch
 
 ## Files

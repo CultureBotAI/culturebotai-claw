@@ -333,18 +333,16 @@ def test_no_checkout_is_a_refusal_not_an_empty_pass(tmp_path, monkeypatch):
         find_claw_root(tmp_path)
 
 
-def test_a_fenced_code_block_is_out_of_scope_and_stays_that_way(tmp_path):
-    """Backticked text only. Fenced blocks carry shell variables, ratios and
-    slash-separated word lists that these rules would misread as paths; the
-    cost is that a moved file cited in a command example is not caught (#202).
-    """
-    _skill(
-        tmp_path,
-        "s",
-        "```bash\npython3 scripts/definitely_gone.py --flag\n```\n",
-    )
+def test_a_shell_block_in_a_repository_we_cannot_see_is_unverifiable(tmp_path):
+    """`cd ../kg-microbe && python scripts/x.py` is correct in kg-microbe. With
+    no kg-microbe checkout the checker cannot confirm it, and must say that
+    rather than reporting it missing from claw."""
+    _skill(tmp_path, "s", "```bash\ncd ../kg-microbe\npython scripts/x.py\n```\n")
 
-    assert check(tmp_path) == []
+    finding = check(tmp_path)[0]
+
+    assert finding.verdict == "unverifiable"
+    assert "kg-microbe" in finding.detail
 
 
 # --------------------------------------------------------------------------
@@ -464,3 +462,118 @@ def test_the_cli_catches_a_deleted_claw_path_with_no_mech_checked_out(
 
     assert main(["check"]) == 1, capsys.readouterr().out
     assert "MISSING" in capsys.readouterr().out
+
+
+# --------------------------------------------------------------------------
+# #202: shell code blocks
+# --------------------------------------------------------------------------
+
+
+def _block(tmp_path: Path, body: str, language: str = "bash") -> Path:
+    return _skill(tmp_path, "s", f"```{language}\n{body}\n```\n")
+
+
+def test_a_path_in_a_shell_block_is_a_reference(tmp_path):
+    """The gap #202 recorded: command examples are where paths that moved hide,
+    and the three dead references found when the checker landed were all in
+    prose only because prose was all it read."""
+    path = _block(tmp_path, "uv run python scripts/thing.py --flag")
+
+    assert [r.text for r in extract_references(path)] == ["scripts/thing.py"]
+
+
+@pytest.mark.parametrize("language", ["python", "json", "text", "markdown", "yaml"])
+def test_only_shell_blocks_are_read(tmp_path, language):
+    """A python or json block carries literal data; reading it with path rules
+    would misread ratios, enums and dotted names wholesale."""
+    path = _block(tmp_path, "scripts/thing.py", language=language)
+
+    assert extract_references(path) == []
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "gh pr view 25842/-2246",  # a diff stat
+        "echo CHEBI/NCIT",  # an ontology list
+        "echo HIGH/MEDIUM/LOW",  # an enum
+        "cat $AUDIT_DIR/fleet.tsv",  # a shell variable
+        "python x.py --out reports/*.tsv",  # a glob
+        "git diff origin/main",  # a git ref
+        "curl https://example.org/a/b",
+        "curl pubchem.ncbi.nlm.nih.gov/rest/pug",
+        "cat references_cache/PMID_NNNN.md",  # a placeholder
+        "# python scripts/commented_out.py",  # a comment
+    ],
+)
+def test_shell_noise_is_not_a_reference(tmp_path, line):
+    path = _block(tmp_path, line)
+
+    assert extract_references(path) == []
+
+
+def test_an_unbalanced_quote_skips_the_line_rather_than_guessing(tmp_path):
+    path = _block(tmp_path, "echo 'unterminated scripts/thing.py")
+
+    assert extract_references(path) == []
+
+
+def test_a_cd_moves_the_paths_that_follow(tmp_path):
+    """`cd ../kg-microbe && python scripts/x.py` was reported ambiguous against
+    claw -- a reference that was right all along, which is how a checker
+    teaches people to ignore it."""
+    path = _block(
+        tmp_path, "cd ../kg-microbe\npoetry run python scripts/consolidate.py"
+    )
+    references = extract_references(path)
+
+    assert [r.text for r in references] == ["scripts/consolidate.py"]
+    assert references[0].repository == "kg-microbe"
+
+
+@pytest.mark.parametrize(
+    "target", ["../kg-microbe", "kg-microbe", "/abs/path/to/kg-microbe"]
+)
+def test_a_cd_names_the_repository_however_it_is_written(tmp_path, target):
+    path = _block(tmp_path, f"cd {target}\npython scripts/x.py")
+
+    assert extract_references(path)[0].repository == "kg-microbe"
+
+
+def test_a_cd_the_checker_cannot_resolve_leaves_the_block_where_it_was(tmp_path):
+    path = _block(tmp_path, "cd $SOMEWHERE\npython scripts/x.py")
+
+    assert extract_references(path)[0].repository is None
+
+
+def test_each_block_starts_where_the_reader_started(tmp_path):
+    """A `cd` in one block does not carry into the next: they are separate
+    examples, and a reader runs them from wherever they are."""
+    path = _skill(
+        tmp_path,
+        "s",
+        "```bash\ncd ../kg-microbe\n```\n\ntext\n\n```bash\npython scripts/x.py\n```\n",
+    )
+
+    assert extract_references(path)[0].repository is None
+
+
+def test_a_cd_repository_decides_where_the_path_is_looked_for(tmp_path):
+    other = tmp_path / "kg-microbe"
+    (other / "scripts").mkdir(parents=True)
+    (other / "scripts" / "x.py").write_text("", encoding="utf-8")
+    _block(tmp_path, "cd ../kg-microbe\npython scripts/x.py")
+
+    findings = check(tmp_path, {"kg-microbe": other}, repositories={"kg-microbe"})
+
+    assert [f.verdict for f in findings] == ["ok"]
+
+
+def test_a_cd_through_an_environment_fallback_still_names_the_repository(tmp_path):
+    """`cd "${KGMICROBE_ROOT:-../kg-microbe}"` is the portable form. Reading the
+    fallback is what lets a command be portable and checkable at once --
+    otherwise writing the better command silently loses the reference, which
+    is a gate teaching the wrong lesson."""
+    path = _block(tmp_path, 'cd "${KGMICROBE_ROOT:-../kg-microbe}"\npython scripts/x.py')
+
+    assert extract_references(path)[0].repository == "kg-microbe"
