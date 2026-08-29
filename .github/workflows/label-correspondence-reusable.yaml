@@ -50,6 +50,15 @@ on:
         required: false
         default: "reports/label_drift.tsv"
         type: string
+      uv-sync-args:
+        description: >-
+          Extra arguments for `uv sync`. CultureMech and MediaIngredientMech
+          pass `--frozen`, which refuses to update the lockfile -- a hardening
+          this workflow must not quietly drop when they adopt it. Empty by
+          default, matching what TraitMech and CommunityMech run today.
+        required: false
+        default: ""
+        type: string
       oak-cache-key:
         description: >-
           Cache key for the OAK sqlite ontologies. Bump the suffix to discard a
@@ -79,7 +88,7 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync ${{ inputs.uv-sync-args }}
 
       # The gate resolves `sqlite:obo:` through OAK, which downloads CHEBI, GO,
       # ENVO, PATO and RO. Caching them is the difference between ~2 minutes and

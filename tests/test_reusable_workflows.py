@@ -126,3 +126,21 @@ def test_the_file_says_it_is_unproven_until_a_mech_calls_it():
     header = WORKFLOW.read_text(encoding="utf-8").split("name:")[0]
 
     assert "only exercised by a caller" in header or "proves nothing" in header
+
+
+def test_a_caller_can_keep_its_frozen_lockfile(workflow):
+    """CultureMech and MediaIngredientMech run `uv sync --frozen`, which refuses
+    to update the lockfile. Hard-coding a bare `uv sync` here would silently
+    drop that hardening the moment either adopted this workflow -- they would
+    have to choose between the shared gate and their own resolution guarantee.
+    """
+    inputs = workflow[True]["workflow_call"]["inputs"]
+    assert "uv-sync-args" in inputs
+    assert inputs["uv-sync-args"]["default"] == "", (
+        "empty by default: TraitMech and CommunityMech run a plain uv sync, and "
+        "a default of --frozen would change what they do on adoption"
+    )
+
+    steps = workflow["jobs"]["label-correspondence"]["steps"]
+    install = next(s for s in steps if s.get("name") == "Install dependencies")
+    assert install["run"] == "uv sync ${{ inputs.uv-sync-args }}"
