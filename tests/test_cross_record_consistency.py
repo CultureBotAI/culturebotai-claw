@@ -261,3 +261,58 @@ def test_a_record_may_belong_to_more_than_one_relationship(corpus):
     report = scan(corpus)
 
     assert report["groups_disagreeing"] == 2
+
+
+# --------------------------------------------------------------------------
+# #183: the CLI contract, including the flag that was shipped untested
+# --------------------------------------------------------------------------
+
+
+def _cli(argv: list[str]) -> int:
+    from kg_microbe_consistency.__main__ import main
+
+    return main(argv)
+
+
+def test_findings_alone_do_not_fail_the_command(corpus, capsys):
+    """Deliberate: a disagreement is a question for a curator, and some are
+    legitimate distinctions. Pinned so the choice cannot flip by accident."""
+    write(corpus, "a", preferred_term="thing", ontology_id="CHEBI:1")
+    write(corpus, "b", preferred_term="Thing", ontology_id="CHEBI:2")
+
+    assert _cli(["--corpus", str(corpus)]) == 0
+    assert "disagree" in capsys.readouterr().out
+
+
+def test_fail_on_findings_turns_a_disagreement_into_a_failure(corpus):
+    write(corpus, "a", preferred_term="thing", ontology_id="CHEBI:1")
+    write(corpus, "b", preferred_term="Thing", ontology_id="CHEBI:2")
+
+    assert _cli(["--corpus", str(corpus), "--fail-on-findings"]) == 1
+
+
+def test_fail_on_findings_passes_a_clean_corpus(corpus):
+    """Non-vacuity: the flag must not simply always fail."""
+    write(corpus, "a", preferred_term="thing", ontology_id="CHEBI:1")
+    write(corpus, "b", preferred_term="Thing", ontology_id="CHEBI:1")
+
+    assert _cli(["--corpus", str(corpus), "--fail-on-findings"]) == 0
+
+
+def test_a_missing_corpus_exits_one_with_a_message(corpus, capsys):
+    assert _cli(["--corpus", str(corpus / "absent")]) == 1
+    assert "error:" in capsys.readouterr().err
+
+
+def test_the_json_payload_carries_the_counts_and_findings(corpus, capsys):
+    import json
+
+    write(corpus, "a", preferred_term="thing", ontology_id="CHEBI:1")
+    write(corpus, "b", preferred_term="Thing", ontology_id="CHEBI:2")
+
+    assert _cli(["--corpus", str(corpus), "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["records_scanned"] == 2
+    assert payload["groups_disagreeing"] == 1
+    assert payload["findings"][0]["disagreements"][0]["field"] == "ontology_id"
