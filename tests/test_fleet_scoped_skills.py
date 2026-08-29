@@ -5,14 +5,15 @@ from pathlib import Path
 import yaml
 
 from kg_microbe_fleet import load_fleet_manifest
+from kg_microbe_skills.catalogue import load_catalogue
 
 ROOT = Path(__file__).resolve().parents[1]
+# Was a hardcoded set of five names here -- invisible to anything else, and
+# already stale: `cross-repo-sync` and `unmapped-inventory` are fleet-scoped
+# too and were never added. It now comes from the packaged catalogue, which is
+# checked against .claude/skills in both directions (#132 Phase 4, #131).
 GENERAL_FLEET_SKILLS = {
-    "boss",
-    "cross-mech-sync",
-    "fleet-pr-review",
-    "fleet-pr-status",
-    "schema-gap-analysis",
+    name for name, entry in load_catalogue().items() if entry.scope == "fleet"
 }
 
 

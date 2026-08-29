@@ -1,0 +1,114 @@
+# What each skill in .claude/skills/ is for, and who it applies to (#132 Phase 4).
+#
+# The point of declaring this is that "general" was previously a hardcoded set
+# of five names inside a test, invisible to anything else and drifting silently
+# as skills were added -- the same shape #131 is removing everywhere else in
+# this repository.
+#
+# scope:
+#   claw    the control plane's own workflow; no Mech runs it
+#   fleet   resolves the repositories it acts on FROM THE MANIFEST at runtime,
+#           so there is nothing to render per Mech. This is the same meaning
+#           the skill's own `fleet` tag carries, and the two must agree: a
+#           scope that contradicted the declaration would just be a second
+#           opinion nobody checks.
+#   domain  scientific policy specific to one corpus; deliberately not general
+#
+# `canonical:` below is a different question from `skills:`. `skills:` governs
+# what lives in this repository; `canonical:` declares the templates from which
+# each applicable Mech's adapter is RENDERED. They are separate because claw's
+# own copy of a skill is claw's, aimed at claw's queue and guarantees, while
+# the template is written with placeholders and is unusable as a skill until
+# filled. Conflating them would mean either claw runs a skill full of
+# `{{ }}` or the template is quietly claw-shaped.
+version: 1
+
+skills:
+  boss:
+    scope: fleet
+    reason: Orchestrates parallel work across manifest-resolved worktrees.
+  cas-rn-integration:
+    scope: domain
+    reason: CAS Registry enrichment of MIM ingredient records.
+  complex-ingredient-resolver:
+    scope: domain
+    reason: Multi-ontology cascade for heuristic-complex MIM ingredients.
+  cross-mech-sync:
+    scope: fleet
+    reason: Propagates a vendored artifact across manifest-declared consumers.
+  cross-repo-sync:
+    scope: claw
+    reason: >-
+      Reconciles identifiers across a named set -- CultureMech, MIM and
+      kg-microbe, which is not a Mech at all. It does not resolve the fleet
+      from the manifest, which is what `fleet` means here and what the skill's
+      own `fleet` tag asserts.
+  evidence-curation:
+    scope: domain
+    reason: Proposes PMID evidence for MIM ingredient claims.
+  evidence-reference-validation:
+    scope: domain
+    reason: Anti-hallucination gate over MIM literature evidence.
+  feba-integration:
+    scope: domain
+    reason: FEBA functional-enrichment import into MIM.
+  fleet-pr-review:
+    scope: fleet
+    reason: Reviews open PRs across the manifest-defined control plane.
+  fleet-pr-status:
+    scope: fleet
+    reason: Answers "what is open" across claw and the manifest-defined Mechs.
+  ingredient-mapping:
+    scope: domain
+    reason: Imports a new ingredient source into MIM with provenance.
+  kg-microbe-review:
+    scope: claw
+    reason: Reviews kg-microbe, which is not a Mech and has no adapter.
+  kg-microbe-sync:
+    scope: claw
+    reason: Snapshots kg-microbe files into claw's own workspace.
+  map-ingredients:
+    scope: domain
+    reason: Runs the unified ingredient-mapping pipeline over MIM.
+  mapping-taxonomy:
+    scope: domain
+    reason: Documents the MIM to kg-microbe mapping cases.
+  publish-sssom:
+    scope: domain
+    reason: Builds and promotes MIM's canonical SSSOM product.
+  review-open-issues:
+    scope: claw
+    reason: >-
+      Triages claw's own queue against the control plane. The same task in a
+      Mech is rendered from the canonical template below, not shared with this
+      file.
+  schema-gap-analysis:
+    scope: fleet
+    reason: Selects its target repository from the manifest at runtime.
+  specificity-loss-review:
+    scope: domain
+    reason: Detects over-general ontology terms in MIM mappings.
+  synonym-review:
+    scope: domain
+    reason: Cross-checks MIM SSSOM synonyms against CHEBI.
+  team-review-sssom:
+    scope: domain
+    reason: Parallel agent review of MIM's SSSOM product.
+  unmapped-inventory:
+    scope: claw
+    reason: >-
+      Runs from claw over sources it names in prose. The script it drives IS
+      manifest-driven, through the `unmapped_inventory_input` capability, but
+      the skill is not -- see #214.
+
+# Canonical templates, rendered per applicable Mech. `capability` decides which
+# Mechs those are -- from the manifest, so the set cannot drift the way a list
+# written here would the moment a Mech gained or lost the capability.
+canonical:
+  review-open-issues:
+    capability: testing
+    reason: >-
+      Triaging an open issue queue against a repository's own guarantees is the
+      same task in every Mech. What differs -- the repository, its corpus
+      globs, its schema, the variable naming its checkout -- comes from the
+      manifest, which is exactly what a rendered adapter is for.

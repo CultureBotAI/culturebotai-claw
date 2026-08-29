@@ -75,6 +75,9 @@ namespaces = false
 kg_microbe_fleet = ["fleet.yaml"]
 kg_microbe_write = ["writers.yaml"]
 kg_microbe_research = ["schema/*.yaml"]
+# The catalogue and its canonical templates are read at runtime, so an
+# installed package without them renders nothing while importing fine.
+kg_microbe_skills = ["skills.yaml", "canonical/*.md"]
 kg_microbe_governance = [
     "vendored_artifacts.json",
     "artifacts/**/*.py",
