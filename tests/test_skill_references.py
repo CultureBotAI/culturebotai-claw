@@ -314,3 +314,17 @@ def test_no_checkout_is_a_refusal_not_an_empty_pass(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     with pytest.raises(SystemExit, match="no .claude/skills directory"):
         find_claw_root(tmp_path)
+
+
+def test_a_fenced_code_block_is_out_of_scope_and_stays_that_way(tmp_path):
+    """Backticked text only. Fenced blocks carry shell variables, ratios and
+    slash-separated word lists that these rules would misread as paths; the
+    cost is that a moved file cited in a command example is not caught (#202).
+    """
+    _skill(
+        tmp_path,
+        "s",
+        "```bash\npython3 scripts/definitely_gone.py --flag\n```\n",
+    )
+
+    assert check(tmp_path) == []

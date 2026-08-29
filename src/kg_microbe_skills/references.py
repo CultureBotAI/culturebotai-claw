@@ -14,6 +14,14 @@ kg-microbe. Calling it broken would be wrong, and calling it fine would let a
 genuinely dead path through. So an unprefixed path that resolves only
 downstream is reported as AMBIGUOUS: it exists, and the skill should say where.
 
+What it does NOT cover: only backticked text is read, so a path written inside
+a fenced code block is invisible to it. That is deliberate rather than an
+oversight -- 85 path-shaped tokens live in those blocks and most are not paths
+at all (`25842/-2246`, `CHEBI/NCIT`, `HIGH/MEDIUM/LOW`, `$AUDIT_DIR/fleet.tsv`),
+so applying these rules there would produce far more noise than findings. The
+consequence is real and worth stating: a command example citing a file that has
+moved will not be caught. Extending coverage needs shell-aware parsing (#202).
+
 The checker refuses to guess when it cannot see. With no downstream checkout
 resolvable, a path absent from claw is UNVERIFIABLE, never MISSING -- the
 distinction #161 established for the unmapped inventory, for the same reason:
