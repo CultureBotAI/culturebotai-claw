@@ -22,7 +22,6 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Iterable
 
 import yaml
 
@@ -37,12 +36,33 @@ OUT_TSV = OUT_DIR / "evidence_proposals_apply.tsv"
 OUT_MD = OUT_DIR / "evidence_proposals_apply.md"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from validate_evidence_references import (  # noqa: E402
-    check_evidence, normalize, load_cache,
-)
 from classify_ingredient_type import (  # noqa: E402
-    load_yaml, write_yaml, append_curation_event,
+    append_curation_event,
+    load_yaml,
 )
+from validate_evidence_references import (  # noqa: E402
+    load_cache,
+    normalize,
+)
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+from classify_ingredient_type import dump_yaml  # noqa: E402
+
+from kg_microbe_write import ValidatedWriteTransaction  # noqa: E402
+
+# Staged rather than written per record: a failure part-way through a per-record
+# write loop leaves an unknown subset of MediaIngredientMech modified with no
+# recovery path (#156). The transaction validates the whole set first, replaces
+# atomically, and journals prior contents.
+_TRANSACTION = None
+
+
+def _staged_write(path, record) -> None:
+    """Stage a record into the run's transaction instead of writing it."""
+    if _TRANSACTION is None:
+        raise RuntimeError("no write transaction is open for this run")
+    _TRANSACTION.stage(path, dump_yaml(record))
+
 
 
 _YAML_BLOCK_RE = re.compile(r"```yaml\n(.*?)\n```", re.DOTALL)
@@ -146,6 +166,11 @@ def main() -> int:
                     help="write YAMLs (default: dry-run)")
     ap.add_argument("--limit", type=int, default=None)
     args = ap.parse_args()
+    global _TRANSACTION
+    _TRANSACTION = ValidatedWriteTransaction(
+        MIM_ROOT,
+        journal_dir=OUT_DIR / "write_journal",
+    )
 
     if not PROPOSALS_DIR.is_dir():
         print(f"No proposals at {PROPOSALS_DIR}", file=sys.stderr)
@@ -198,7 +223,7 @@ def main() -> int:
             append_curation_event(
                 record, "APPLY_EVIDENCE_PROPOSAL",
                 f"added pmid={ev['pmid']} from propose-evidence batch")
-            write_yaml(target_path, record)
+            _staged_write(target_path, record)
             verdict = "APPLIED"
         else:
             verdict = "WOULD_APPLY"
@@ -227,6 +252,9 @@ def main() -> int:
         print(f"  {k:25s} {v}")
     print(f"\nReports: {OUT_TSV.relative_to(REPO_ROOT)}")
     print(f"         {OUT_MD.relative_to(REPO_ROOT)}")
+    _result = _TRANSACTION.commit(apply=args.apply)
+    if args.apply and _result.touched:
+        print(f"Wrote {_result.touched} record(s); journal: {_result.journal_path}")
     return 0
 
 

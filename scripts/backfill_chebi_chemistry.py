@@ -51,8 +51,28 @@ _PREDICATE_TO_SLOT = {
 # Reuse YAML I/O + curation history append from the classifier
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from classify_ingredient_type import (  # noqa: E402
-    load_yaml, write_yaml, append_curation_event,
+    append_curation_event,
+    load_yaml,
 )
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+from classify_ingredient_type import dump_yaml  # noqa: E402
+
+from kg_microbe_write import ValidatedWriteTransaction  # noqa: E402
+
+# Staged rather than written per record: a failure part-way through a per-record
+# write loop leaves an unknown subset of MediaIngredientMech modified with no
+# recovery path (#156). The transaction validates the whole set first, replaces
+# atomically, and journals prior contents.
+_TRANSACTION = None
+
+
+def _staged_write(path, record) -> None:
+    """Stage a record into the run's transaction instead of writing it."""
+    if _TRANSACTION is None:
+        raise RuntimeError("no write transaction is open for this run")
+    _TRANSACTION.stage(path, dump_yaml(record))
+
 
 
 def fetch_chebi_chemistry(conn: sqlite3.Connection, chebi_id: str
@@ -82,6 +102,11 @@ def main() -> int:
     ap.add_argument("--limit", type=int, default=None,
                     help="cap number of CHEBI records processed")
     args = ap.parse_args()
+    global _TRANSACTION
+    _TRANSACTION = ValidatedWriteTransaction(
+        MIM_ROOT,
+        journal_dir=OUT_DIR / "write_journal",
+    )
 
     if not CHEBI_DB.is_file():
         print(f"CHEBI sqlite not found at {CHEBI_DB}", file=sys.stderr)
@@ -139,7 +164,7 @@ def main() -> int:
             cp.setdefault("data_source", "CHEBI sqlite (oaklib)")
             append_curation_event(
                 record, "AUTO_BACKFILL_CHEBI_CHEMISTRY", slot_summary)
-            write_yaml(path, record)
+            _staged_write(path, record)
 
     # Reports
     with open(OUT_TSV, "w", newline="") as f:
@@ -149,7 +174,7 @@ def main() -> int:
         w.writerows(rows)
 
     md: list[str] = []
-    md.append(f"# CHEBI chemistry backfill\n")
+    md.append("# CHEBI chemistry backfill\n")
     md.append(f"Mode: **{'APPLY' if args.apply else 'DRY-RUN'}**\n")
     md.append(f"Total YAMLs scanned: **{n_total}**")
     md.append(f"With CHEBI primary: **{n_chebi}**")
@@ -168,6 +193,9 @@ def main() -> int:
     print(f"  no chebi chemistry:  {n_no_chebi_data}")
     print(f"\nReports: {OUT_TSV.relative_to(REPO_ROOT)}")
     print(f"         {OUT_MD.relative_to(REPO_ROOT)}")
+    _result = _TRANSACTION.commit(apply=args.apply)
+    if args.apply and _result.touched:
+        print(f"Wrote {_result.touched} record(s); journal: {_result.journal_path}")
     return 0
 
 
