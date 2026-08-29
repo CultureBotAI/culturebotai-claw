@@ -34,9 +34,16 @@ KGM_ROOT_PATH = Path(
 )
 CLAW = REPO_ROOT
 sys.path.insert(0, str(CLAW / "scripts"))
-sys.path.insert(0, str(CM / "scripts"))
 
-import chem_formula  # noqa: E402
+from _lazy_import import LazyModule  # noqa: E402
+
+# Imported on first use, not at import time, so --help works without a
+# CultureMech checkout (#205).
+chem_formula = LazyModule(
+    "chem_formula",
+    lambda: (CM / "scripts", REPO_ROOT / "scripts"),
+    hint="Set CULTUREMECH_ROOT to a checkout that has scripts/chem_formula.py.",
+)
 from resolve_label_plausibility_defects import (  # noqa: E402
     ADAPTERS, build_indexes, formula_key, norm,
 )

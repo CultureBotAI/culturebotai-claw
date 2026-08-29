@@ -22,6 +22,7 @@ applied by this script.
 
 from __future__ import annotations
 
+import functools
 import os
 import argparse
 import csv
@@ -39,9 +40,16 @@ CM = Path(
     os.environ.get("CULTUREMECH_ROOT", REPO_ROOT.parent / "CultureMech")
 )
 CLAW = REPO_ROOT
-sys.path.insert(0, str(CM / "scripts"))
 sys.path.insert(0, str(CLAW / "scripts"))
-import chem_formula  # noqa: E402
+from _lazy_import import LazyModule  # noqa: E402
+
+# Imported on first use, not at import time, so --help works without a
+# CultureMech checkout (#205).
+chem_formula = LazyModule(
+    "chem_formula",
+    lambda: (CM / "scripts", REPO_ROOT / "scripts"),
+    hint="Set CULTUREMECH_ROOT to a checkout that has scripts/chem_formula.py.",
+)
 from resolve_label_plausibility_defects import ADAPTERS, build_indexes, norm  # noqa: E402
 
 # Grade/purity/basicity qualifiers that never change chemical identity.
@@ -66,8 +74,12 @@ ALIASES = {
     "sodium succinate dibasic": "sodium succinate",
 }
 
-_ELEM_RE = re.compile(
-    r"(" + "|".join(sorted(chem_formula.ELEMENTS, key=len, reverse=True)) + r")")
+@functools.cache
+def _elem_re() -> re.Pattern[str]:
+    """Built on first use: the element list comes from chem_formula."""
+    return re.compile(
+        r"(" + "|".join(sorted(chem_formula.ELEMENTS, key=len, reverse=True)) + r")"
+    )
 _HYDRATE_RE = re.compile(r"[\s.·・*x]*\s*(\d*)\s*H\s*2?\s*O\s*$", re.IGNORECASE)
 
 
@@ -85,7 +97,7 @@ def element_set(core: str) -> set[str]:
         return set()
     pos, found = 0, set()
     while pos < len(s):
-        m = _ELEM_RE.match(s, pos)
+        m = _elem_re().match(s, pos)
         if not m:
             return set()
         found.add(m.group(1))

@@ -102,14 +102,11 @@ def test_a_fixed_script_leaves_the_interpreter_ledger(name):
 # --------------------------------------------------------------------------
 
 # Scripts that import a module from a downstream checkout at module level, so
-# `--help` fails without that checkout. Shrink this; never grow it.
-DOWNSTREAM_IMPORT_AT_MODULE_LEVEL = {
-    "resolve_label_plausibility_defects.py",
-    "resolve_mediadive_backlog.py",
-    "resolve_residual_defects.py",
-    "review_p44_synonym_enrichment.py",
-    "sweep_kg_microbe_rules.py",
-}
+# `--help` fails without that checkout. Empty since #205: the five that did now
+# go through `scripts/_lazy_import.LazyModule`, which imports on first
+# attribute access instead. The list stays as the mechanism that keeps it
+# empty.
+DOWNSTREAM_IMPORT_AT_MODULE_LEVEL: set[str] = set()
 
 # Path variables that name a checkout other than this one.
 _DOWNSTREAM_VARIABLES = {
@@ -206,4 +203,51 @@ def test_a_script_that_reads_argv_declares_what_it_reads(path):
     assert declared, (
         f"{path.name} indexes sys.argv and also parses arguments, but declares "
         f"none; the parser will reject what the indexing expects"
+    )
+
+
+# --------------------------------------------------------------------------
+# #206: a generated report belongs under workspace/, not wherever you stood
+# --------------------------------------------------------------------------
+
+
+def _bare_output_constants(path: Path) -> list[str]:
+    """Module-level output paths that are a bare filename.
+
+    `Path("chebi_semantic_audit.tsv")` resolves against the working directory,
+    so the report lands wherever the script was invoked from -- in one case the
+    root of a git worktree, as an untracked file one `git add -A` away from
+    being committed. `workspace/` is gitignored precisely so that cannot
+    happen.
+    """
+    found = []
+    for node in ast.parse(path.read_text(encoding="utf-8")).body:
+        if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+            continue
+        targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+        names = [t.id for t in targets if isinstance(t, ast.Name)]
+        if not any(
+            key in name for name in names for key in ("OUT", "REPORT", "DEST")
+        ):
+            continue
+        value = node.value
+        if (
+            isinstance(value, ast.Call)
+            and getattr(value.func, "id", "") == "Path"
+            and len(value.args) == 1
+            and isinstance(value.args[0], ast.Constant)
+            and isinstance(value.args[0].value, str)
+            and "/" not in value.args[0].value
+        ):
+            found.extend(names)
+    return found
+
+
+@pytest.mark.parametrize("path", _scripts(), ids=lambda p: p.name)
+def test_a_generated_report_does_not_default_to_the_working_directory(path):
+    bare = _bare_output_constants(path)
+    assert not bare, (
+        f"{path.name} defaults {', '.join(bare)} to a bare filename, so the "
+        f"output lands wherever the script was invoked from; derive it from "
+        f"REPO_ROOT / 'workspace'"
     )
