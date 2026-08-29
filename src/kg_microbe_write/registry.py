@@ -37,7 +37,14 @@ REGISTRY_VERSION = 1
 # `write_yaml(path, record)` writes a record dict straight to a path. A call to
 # it is an in-place corpus write by construction, which is why this signal can
 # be trusted where a general "writes under a Mech root" regex cannot.
-_WRITE_YAML_CALL = re.compile(r"(?<!def )\bwrite_yaml\s*\(")
+_WRITE_YAML_CALL = re.compile(r"\bwrite_yaml\s*\(")
+
+# Definition lines are removed before looking for calls rather than excluded by
+# a lookbehind: a lookbehind is fixed-width, so `(?<!def )` matched exactly one
+# space and read `def  write_yaml(` or `def\twrite_yaml(` as a call (#171). That
+# would register a module that merely DEFINES the helper -- which
+# classify_ingredient_type does for its importers -- as a corpus writer.
+_WRITE_YAML_DEF = re.compile(r"^\s*(?:async\s+)?def\s+write_yaml\b")
 
 STATUSES = frozenset({"transaction", "exception"})
 
@@ -61,10 +68,16 @@ class WriterEntry:
         return self.status == "transaction"
 
 
-def _strip_comments(source: str) -> str:
-    """Drop whole-line comments so a mention in prose does not register."""
+def _significant_lines(source: str) -> str:
+    """Source with comment lines and `write_yaml` definitions removed.
+
+    Comments go so a mention in prose does not register; definitions go so
+    defining the helper is not mistaken for calling it.
+    """
     return "\n".join(
-        line for line in source.splitlines() if not line.lstrip().startswith("#")
+        line
+        for line in source.splitlines()
+        if not line.lstrip().startswith("#") and not _WRITE_YAML_DEF.match(line)
     )
 
 
@@ -74,7 +87,7 @@ def calls_shared_record_writer(source: str) -> bool:
     The definition itself does not count -- only a call site, since defining
     the helper is what `classify_ingredient_type` still does for its importers.
     """
-    return bool(_WRITE_YAML_CALL.search(_strip_comments(source)))
+    return bool(_WRITE_YAML_CALL.search(_significant_lines(source)))
 
 
 def discover_corpus_writers(root: Path) -> set[str]:

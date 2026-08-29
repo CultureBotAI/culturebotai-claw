@@ -79,10 +79,32 @@ def test_a_call_to_the_shared_helper_is_detected():
     assert calls_shared_record_writer("write_yaml(path, record)\n") is True
 
 
-def test_defining_the_helper_is_not_a_call():
+@pytest.mark.parametrize(
+    "definition",
+    [
+        "def write_yaml(path, record):",
+        "def  write_yaml(path, record):",
+        "def\twrite_yaml(path, record):",
+        "async def write_yaml(path, record):",
+        "    def write_yaml(self, path, record):",
+    ],
+)
+def test_defining_the_helper_is_not_a_call(definition):
     """classify_ingredient_type defines write_yaml for its importers while
-    using the transaction itself; defining it must not register it."""
-    assert calls_shared_record_writer("def write_yaml(path, record):\n") is False
+    using the transaction itself; defining it must not register it.
+
+    #171: a fixed-width `(?<!def )` lookbehind matched exactly one space, so
+    two spaces or a tab read as a call and would have registered a module that
+    only defines the helper as a corpus writer.
+    """
+    assert calls_shared_record_writer(definition + "\n") is False
+
+
+def test_a_call_below_a_definition_is_still_detected():
+    """Removing definition lines must not hide a real call in the same file."""
+    source = "def write_yaml(path, record):\n    ...\n\nwrite_yaml(p, r)\n"
+
+    assert calls_shared_record_writer(source) is True
 
 
 def test_a_mention_in_a_comment_is_not_a_call():
