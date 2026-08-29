@@ -64,8 +64,11 @@ Supported:
 - Packaged history, QC dashboard, discussion-browser, and knowledge-gap tools.
 - `kg_microbe_consistency`: a read-only cross-record scanner. Groups records
   that plausibly denote the same substance and reports where a curated field
-  disagrees. It proposes nothing and writes nothing; a disagreement is a
-  question for a curator, and some are legitimate distinctions.
+  disagrees. `--propose` additionally emits correct-by-analogy proposals, but
+  only for the one unambiguous shape: an ontology-grounded record beside a
+  registry or placeholder fallback for the same substance. Two competing
+  ontology terms are surfaced and never resolved -- there is no basis in the
+  data for picking a winner. Nothing is ever written to a corpus.
 - `kg_microbe_write`: the shared `ValidatedWriteTransaction` -- stage every
   change, validate the complete set, then replace atomically with a recovery
   journal. Nothing is written until `commit(apply=True)`; a dry run still

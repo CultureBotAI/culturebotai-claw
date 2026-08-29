@@ -149,6 +149,11 @@ def load_record(path: Path) -> Record | None:
             "ontology_id": _first_string(mapping.get("ontology_id")),
             "mapping_predicate": _first_string(mapping.get("mapping_predicate")),
             "ingredient_type": _first_string(raw.get("ingredient_type")),
+            # Context, not compared: a differing mapping_quality is not a
+            # contradiction, it is what tells a proposal which record is
+            # standing in for a grounding it does not have (#129 item 2).
+            "mapping_quality": _first_string(mapping.get("mapping_quality")),
+            "ontology_source": _first_string(mapping.get("ontology_source")),
         },
     )
 
@@ -237,17 +242,26 @@ def find_disagreements(
     return tuple(found)
 
 
+def scan_groups(
+    root: Path, glob: str = "**/*.yaml"
+) -> tuple[list[Record], int, list[Group]]:
+    """Records, skipped-file count, and every matched group with its verdict.
+
+    Shared by `scan` and the proposal builder so both see the same grouping --
+    a second traversal would be a second definition of "the same substance".
+    """
+    records, skipped = load_corpus(root, glob)
+    groups = [
+        Group(g.key, g.reason, g.records, find_disagreements(g))
+        for g in group_records(records)
+    ]
+    return records, skipped, groups
+
+
 def scan(root: Path, glob: str = "**/*.yaml") -> dict[str, Any]:
     """Scan a corpus and report every matched group that disagrees."""
-    records, skipped = load_corpus(root, glob)
-    groups = group_records(records)
-    flagged = []
-    for group in groups:
-        disagreements = find_disagreements(group)
-        if disagreements:
-            flagged.append(
-                Group(group.key, group.reason, group.records, disagreements)
-            )
+    records, skipped, groups = scan_groups(root, glob)
+    flagged = [group for group in groups if group.disagreements]
     return {
         "root": str(root),
         "records_scanned": len(records),

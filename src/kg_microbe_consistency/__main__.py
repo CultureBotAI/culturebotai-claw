@@ -7,6 +7,7 @@ import json
 import sys
 from pathlib import Path
 
+from .proposals import build_proposals, render_markdown
 from .scanner import COMPARED_FIELDS, ScannerError, scan
 
 
@@ -21,6 +22,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--glob", default="**/*.yaml")
     parser.add_argument("--json", action="store_true")
+    parser.add_argument(
+        "--propose",
+        action="store_true",
+        help=(
+            "Also generate correct-by-analogy proposals. Read-only: a proposal "
+            "is a document for a curator, never applied."
+        ),
+    )
     parser.add_argument(
         "--fail-on-findings", action="store_true",
         help=(
@@ -39,6 +48,16 @@ def main(argv: list[str] | None = None) -> int:
     except ScannerError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
+
+    if args.propose:
+        proposals = build_proposals(Path(args.corpus), args.glob)
+        if args.json:
+            print(json.dumps(proposals, indent=2))
+        else:
+            print(render_markdown(proposals))
+        if args.fail_on_findings and report["groups_disagreeing"]:
+            return 1
+        return 0
 
     if args.json:
         print(json.dumps(report, indent=2))

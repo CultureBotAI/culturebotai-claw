@@ -2,6 +2,16 @@
 
 from __future__ import annotations
 
+from .proposals import (
+    FALLBACK_QUALITIES,
+    IDENTITY_QUALITIES,
+    Proposal,
+    build_proposals,
+    is_fallback,
+    is_ontology_grounded,
+    propose_for_group,
+    render_markdown,
+)
 from .scanner import (
     COMPARED_FIELDS,
     Disagreement,
@@ -14,9 +24,19 @@ from .scanner import (
     load_record,
     normalize_name,
     scan,
+    scan_groups,
 )
 
 __all__ = [
+    "FALLBACK_QUALITIES",
+    "IDENTITY_QUALITIES",
+    "Proposal",
+    "build_proposals",
+    "is_fallback",
+    "is_ontology_grounded",
+    "propose_for_group",
+    "render_markdown",
+    "scan_groups",
     "COMPARED_FIELDS",
     "Disagreement",
     "Group",
