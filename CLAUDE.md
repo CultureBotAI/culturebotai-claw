@@ -62,6 +62,10 @@ Supported:
 - `LockManager` atomic, lease-owned file coordination.
 - Plugin and agent discovery and validated CLI dry runs.
 - Packaged history, QC dashboard, discussion-browser, and knowledge-gap tools.
+- `kg_microbe_patches`: a ledger for generated, not-yet-applied patch sets.
+  Records each run's fingerprint so a set returning unchanged is reported as an
+  unapplied backlog with an age, and warns when a generated artifact predates
+  its inputs. It tracks; applying a patch means changing another repository.
 - `kg_microbe_consistency`: a read-only cross-record scanner. Groups records
   that plausibly denote the same substance and reports where a curated field
   disagrees. `--propose` additionally emits correct-by-analogy proposals, but
@@ -118,7 +122,7 @@ uv run --extra dev mypy \
   plugins/git_integration.py plugins/just_runner.py \
   src/kg_microbe_history src/kg_microbe_kgscan src/kg_microbe_fleet \
   src/kg_microbe_research src/kg_microbe_write \
-  src/kg_microbe_consistency \
+  src/kg_microbe_consistency src/kg_microbe_patches \
   src/kg_microbe_governance/__init__.py \
   src/kg_microbe_governance/__main__.py \
   src/kg_microbe_governance/fleet_audit.py \
