@@ -124,19 +124,82 @@ def test_a_stamp_survives_its_row_changing_predicate(tmp_path):
     `UNKNOWN_TERM` -- so strengthening closeMatch to exactMatch does not
     invalidate them, and this loader exists precisely so a rebuild does not
     wipe review state.
-    """
-    prior_key = ("MIM:A", "skos:closeMatch", "CHEBI:1")
-    prior_stamps = {prior_key: "OAK+OLS:chebi|SYNONYM_ENRICH|2026-07-07"}
 
-    by_subject_object = {}
-    for (subj, _pred, obj), stamp in prior_stamps.items():
-        by_subject_object.setdefault((subj, obj), stamp)
+    Calls the builder's own `replay_stamp`. An earlier version of this test
+    reimplemented the fallback inline, so a change to the real loop could not
+    fail it.
+    """
+    prior_stamps = {
+        ("MIM:A", "skos:closeMatch", "CHEBI:1"):
+            "OAK+OLS:chebi|SYNONYM_ENRICH|2026-07-07",
+    }
+    index = builder.build_subject_object_index(prior_stamps)
 
     # The row as the builder now emits it: same subject and object, corrected
-    # predicate. The exact key misses; the (subject, object) key must not.
+    # predicate. The exact key misses; the strengthened fallback must not.
     assert prior_stamps.get(("MIM:A", "skos:exactMatch", "CHEBI:1")) is None
-    assert by_subject_object[("MIM:A", "CHEBI:1")] == (
-        "OAK+OLS:chebi|SYNONYM_ENRICH|2026-07-07")
+    stamp, outcome = builder.replay_stamp(
+        "MIM:A", "skos:exactMatch", "CHEBI:1", prior_stamps, index)
+
+    assert outcome == "carried"
+    assert stamp == "OAK+OLS:chebi|SYNONYM_ENRICH|2026-07-07"
+
+
+def test_an_exact_key_hit_is_replayed_not_carried():
+    """The unchanged-predicate path must not be miscounted as a carry-over."""
+    prior_stamps = {("MIM:A", "skos:exactMatch", "CHEBI:1"): "v|CONFIRMED|d"}
+    index = builder.build_subject_object_index(prior_stamps)
+
+    stamp, outcome = builder.replay_stamp(
+        "MIM:A", "skos:exactMatch", "CHEBI:1", prior_stamps, index)
+
+    assert (stamp, outcome) == ("v|CONFIRMED|d", "replayed")
+
+
+def test_a_weakened_predicate_resets_the_row_into_the_review_queue():
+    """#126: this inherited the stamp unconditionally.
+
+    A curator downgrading exactMatch to narrowMatch after a specificity review
+    has withdrawn the endorsement; carrying it kept the row out of review.
+    """
+    prior_stamps = {("MIM:A", "skos:exactMatch", "CHEBI:1"): "v|CONFIRMED|d"}
+    index = builder.build_subject_object_index(prior_stamps)
+
+    stamp, outcome = builder.replay_stamp(
+        "MIM:A", "skos:narrowMatch", "CHEBI:1", prior_stamps, index)
+
+    assert stamp is None
+    assert outcome == "reset"
+
+
+def test_a_pair_with_two_prior_predicates_never_carries():
+    """Ambiguous history cannot be compared for strength, so it must not carry.
+
+    Does not occur in the corpus today -- 2885 rows, 2885 distinct
+    subject+object pairs -- but the loader must not depend on that.
+    """
+    prior_stamps = {
+        ("MIM:A", "skos:closeMatch", "CHEBI:1"): "v|CONFIRMED|d",
+        ("MIM:A", "skos:narrowMatch", "CHEBI:1"): "v|OTHER|d",
+    }
+    index = builder.build_subject_object_index(prior_stamps)
+
+    stamp, outcome = builder.replay_stamp(
+        "MIM:A", "skos:exactMatch", "CHEBI:1", prior_stamps, index)
+
+    assert stamp is None
+    assert outcome == "reset"
+
+
+def test_a_row_with_no_prior_stamp_is_absent_not_reset():
+    """`absent` and `reset` must stay distinguishable: one is a row that was
+    never reviewed, the other is a row whose review was deliberately dropped."""
+    index = builder.build_subject_object_index({})
+
+    stamp, outcome = builder.replay_stamp(
+        "MIM:Z", "skos:exactMatch", "CHEBI:9", {}, index)
+
+    assert (stamp, outcome) == (None, "absent")
 
 
 def test_narrow_match_to_a_different_parent_stays_narrow(tmp_path):
@@ -178,3 +241,76 @@ def test_a_non_identity_row_keeps_its_symmetric_comment(tmp_path):
 
     parent = next(r for r in rows if r["object_id"] == "CHEBI:17634")
     assert "SYMMETRIC" in (parent["comment"] or "")
+
+
+# --------------------------------------------------------------------------
+# #126: a stamp survives a STRENGTHENED predicate, not a weakened one
+# --------------------------------------------------------------------------
+
+
+def test_the_strength_table_covers_every_predicate_the_builder_emits():
+    """An emittable predicate missing from the table would never strengthen,
+    silently resetting stamps it should have carried."""
+    import re
+
+    source = (_SCRIPTS / "build_mim_ingredient_sssom.py").read_text(encoding="utf-8")
+    emitted = set(re.findall(r'"(skos:[a-zA-Z]+)"', source))
+
+    assert emitted, "found no predicates in the builder; the test is vacuous"
+    assert emitted <= set(builder.PREDICATE_STRENGTH), (
+        f"not in PREDICATE_STRENGTH: {sorted(emitted - set(builder.PREDICATE_STRENGTH))}"
+    )
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    [
+        ("skos:closeMatch", "skos:exactMatch"),
+        ("skos:narrowMatch", "skos:exactMatch"),
+        ("skos:broadMatch", "skos:exactMatch"),
+        ("skos:narrowMatch", "skos:closeMatch"),
+    ],
+)
+def test_a_strengthened_predicate_keeps_the_object_level_verdict(old, new):
+    """The stamps assert things about the OBJECT -- that the term resolved, that
+    its synonyms were enriched. Strengthening the relation cannot falsify that."""
+    assert builder._strengthens(old, new) is True
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    [
+        ("skos:exactMatch", "skos:closeMatch"),
+        ("skos:exactMatch", "skos:narrowMatch"),
+        ("skos:closeMatch", "skos:narrowMatch"),
+        ("skos:narrowMatch", "skos:broadMatch"),
+        ("skos:broadMatch", "skos:narrowMatch"),
+    ],
+)
+def test_a_weakened_or_sideways_predicate_drops_the_verdict(old, new):
+    """Downgrading after a specificity review is someone changing their mind
+    about the pair; inheriting the stamp would carry an endorsement just
+    withdrawn. narrowMatch and broadMatch are directional subsumption, not
+    degrees of identity, so neither strengthens the other."""
+    assert builder._strengthens(old, new) is False
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    [
+        ("skos:exactMatch", "skos:mysteryMatch"),
+        ("skos:mysteryMatch", "skos:exactMatch"),
+        ("", "skos:exactMatch"),
+    ],
+)
+def test_an_unrecognised_predicate_never_strengthens(old, new):
+    """A vocabulary the table does not describe is a reason to re-review, not
+    to inherit a verdict."""
+    assert builder._strengthens(old, new) is False
+
+
+def test_the_same_predicate_does_not_count_as_strengthening():
+    """Equal predicates are the exact-key replay path and must never reach the
+    fallback; if they did, counting them as carried would misreport."""
+    for predicate in builder.PREDICATE_STRENGTH:
+        assert builder._strengthens(predicate, predicate) is False

@@ -209,6 +209,93 @@ def _registry_slug_for_curie(mim_curie: str) -> str:
     return mim_curie[4:].lower()
 
 
+# How strong an identity claim each mapping predicate makes. Used to decide
+# whether a `validation_method` stamp survives a predicate change (#126).
+#
+# The stamps are verdicts about the OBJECT -- `OAK+OLS:chebi|SYNONYM_ENRICH|...`,
+# `none|UNKNOWN_TERM|...` -- so strengthening a relation cannot invalidate one:
+# if the term resolved and its synonyms were enriched, that stays true when
+# closeMatch becomes exactMatch. Weakening is different. Someone downgrading
+# exactMatch to narrowMatch after a specificity review has changed their mind
+# about the pair, and inheriting the old stamp would carry an endorsement they
+# just withdrew, silently keeping the row out of the review queue.
+#
+# narrowMatch and broadMatch share a rank deliberately: they are directional
+# subsumption rather than degrees of identity, so neither strengthens the
+# other and a change between them resets.
+PREDICATE_STRENGTH: dict[str, int] = {
+    "skos:exactMatch": 3,
+    "skos:closeMatch": 2,
+    "skos:narrowMatch": 1,
+    "skos:broadMatch": 1,
+}
+
+# A pair whose history holds more than one predicate cannot be compared, so it
+# never carries. Does not occur in the corpus today (2885 rows, 2885 distinct
+# subject+object pairs, none with two predicates) but the loader must not
+# depend on that staying true.
+_AMBIGUOUS = object()
+
+
+def _strengthens(old_predicate: str, new_predicate: str) -> bool:
+    """Whether moving to `new_predicate` makes a strictly stronger claim.
+
+    Unknown predicates never strengthen: a vocabulary this table does not
+    describe is a reason to re-review, not to inherit a verdict.
+    """
+    old = PREDICATE_STRENGTH.get(old_predicate)
+    new = PREDICATE_STRENGTH.get(new_predicate)
+    if old is None or new is None:
+        return False
+    return new > old
+
+
+def build_subject_object_index(
+    prior_stamps: dict[tuple[str, str, str], str],
+) -> dict[tuple[str, str], object]:
+    """Index prior stamps by (subject, object), marking ambiguous pairs.
+
+    A pair whose history holds more than one predicate cannot be compared for
+    strength, so it is marked and never carries.
+    """
+    index: dict[tuple[str, str], object] = {}
+    for (subject, predicate, obj), stamp in prior_stamps.items():
+        key = (subject, obj)
+        index[key] = _AMBIGUOUS if key in index else (stamp, predicate)
+    return index
+
+
+def replay_stamp(
+    subject: str,
+    predicate: str,
+    obj: str,
+    prior_stamps: dict[tuple[str, str, str], str],
+    subject_object_index: dict[tuple[str, str], object],
+) -> tuple[str | None, str]:
+    """Decide this row's replayed stamp, and why.
+
+    Returns `(stamp_or_None, outcome)` where outcome is one of `replayed` (the
+    exact subject+predicate+object key hit), `carried` (the predicate changed
+    but strengthened, so the object-level verdict still holds), `reset` (a
+    prior stamp exists but the predicate weakened, went sideways, is
+    unrecognised, or the pair is ambiguous), or `absent` (no prior stamp).
+    """
+    exact = prior_stamps.get((subject, predicate, obj))
+    if exact:
+        return exact, "replayed"
+
+    prior = subject_object_index.get((subject, obj))
+    if prior is None:
+        return None, "absent"
+    if prior is _AMBIGUOUS:
+        return None, "reset"
+
+    prior_stamp, prior_predicate = prior
+    if _strengthens(prior_predicate, predicate):
+        return prior_stamp, "carried"
+    return None, "reset"
+
+
 def _load_existing_validation_method(
     path: Path,
 ) -> dict[tuple[str, str, str], str]:
@@ -989,24 +1076,27 @@ def main():
         # Counted separately and reported: a carry-over across a predicate
         # change is a weaker claim than an exact-key replay, and a reviewer
         # who endorsed the old predicate should be able to see how many.
-        by_subject_object: dict[tuple[str, str], str] = {}
-        for (subj, _pred, obj), stamp in prior_stamps.items():
-            by_subject_object.setdefault((subj, obj), stamp)
-        replayed = 0
-        carried = 0
+        #
+        # The carry-over is restricted to STRENGTHENING changes (#126). It was
+        # unconditional, which meant a genuine curation decision to weaken a
+        # relation -- exactMatch to narrowMatch after a specificity review --
+        # inherited the endorsement it was meant to withdraw and stayed out of
+        # the review queue.
+        by_subject_object = build_subject_object_index(prior_stamps)
+        outcomes = {"replayed": 0, "carried": 0, "reset": 0, "absent": 0}
         for r in final:
             if (r.get("validation_method") or "").strip():
                 continue
-            stamp = prior_stamps.get(
-                (r["subject_id"], r["predicate_id"], r["object_id"]))
-            if stamp:
-                replayed += 1
-            else:
-                stamp = by_subject_object.get((r["subject_id"], r["object_id"]))
-                if stamp:
-                    carried += 1
+            stamp, outcome = replay_stamp(
+                r["subject_id"], r["predicate_id"], r["object_id"],
+                prior_stamps, by_subject_object,
+            )
+            outcomes[outcome] += 1
             if stamp:
                 r["validation_method"] = stamp
+        replayed = outcomes["replayed"]
+        carried = outcomes["carried"]
+        reset = outcomes["reset"]
         if prior_stamps:
             srcs = ", ".join(f"{p.name}={n}" for p, n in per_source if n)
             print(
@@ -1016,8 +1106,16 @@ def main():
             )
             if carried:
                 print(
-                    f"  ...plus {carried} carried across a predicate change "
-                    f"(matched on subject+object, not subject+predicate+object)",
+                    f"  ...plus {carried} carried across a STRENGTHENED "
+                    f"predicate (matched on subject+object; the object-level "
+                    f"verdict still holds)",
+                    file=sys.stderr,
+                )
+            if reset:
+                print(
+                    f"  ...and {reset} NOT carried because the predicate "
+                    f"weakened or is unrecognised; those rows re-enter the "
+                    f"review queue unstamped",
                     file=sys.stderr,
                 )
 
