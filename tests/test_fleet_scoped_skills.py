@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import pytest
 import yaml
 
 from kg_microbe_fleet import load_fleet_manifest
@@ -279,3 +280,46 @@ def test_fleet_pr_review_uses_only_declared_repository_identities():
     assert "| Repo | Role |" not in text
     assert all(mech.github not in text for mech in manifest.mechs.values())
     assert all(mech.display_name not in text for mech in manifest.mechs.values())
+
+
+# A `fleet` skill that resolves scope through a script rather than an inline
+# call. The claim is still checkable -- the script it names must itself read
+# the manifest -- so this is a redirection, not an exemption.
+RESOLVES_THROUGH_A_SCRIPT = {"fleet-pr-status": "scripts/fleet_pr_status.py"}
+
+
+@pytest.mark.parametrize("name", sorted(GENERAL_FLEET_SKILLS))
+def test_a_fleet_skill_actually_resolves_the_fleet_from_the_manifest(name):
+    """The reverse of the subset check above.
+
+    Without this, `fleet` is self-asserted: a skill could carry the tag, sit in
+    the catalogue as fleet-scoped, and enumerate its repositories in prose --
+    which is exactly the drift #214 found in `unmapped-inventory`. Removing
+    that fix while leaving the tag in place passed everything until this test
+    existed.
+    """
+    source = _skill(name)
+    if any(marker in source for marker in MANIFEST_EXECUTION_MARKERS):
+        return
+
+    script = RESOLVES_THROUGH_A_SCRIPT.get(name)
+    assert script, (
+        f"{name} is tagged `fleet` but never resolves the manifest; either it "
+        f"does and should say how, or the tag and its catalogue scope are wrong"
+    )
+    assert script in source, f"{name} does not name {script}"
+    text = (ROOT / script).read_text(encoding="utf-8")
+    assert any(marker in text for marker in MANIFEST_EXECUTION_MARKERS), (
+        f"{script} is named as {name}'s way of reaching the manifest but does "
+        f"not read it"
+    )
+
+
+@pytest.mark.parametrize("name", sorted(RESOLVES_THROUGH_A_SCRIPT))
+def test_a_redirected_skill_still_needs_the_redirection(name):
+    """If it grew an inline call, the redirection is dead and should go."""
+    assert name in GENERAL_FLEET_SKILLS, f"{name} is no longer fleet-scoped"
+    assert not any(marker in _skill(name) for marker in MANIFEST_EXECUTION_MARKERS), (
+        f"{name} now reads the manifest directly -- remove it from "
+        f"RESOLVES_THROUGH_A_SCRIPT"
+    )

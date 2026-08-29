@@ -1,11 +1,11 @@
 ---
 name: unmapped-inventory
-description: Inventory every "unmapped / pending-curation" ingredient surface across the four repos (MIM, kg-microbe, CultureMech, CommunityMech) into a single report keyed by normalized name, with cross-source overlap analysis. Drives the "MIM as single source of truth" goal — surfaces what still needs to land in MIM, in priority order, and documents the lightweight upstream→MIM→downstream sync mechanisms.
+description: Inventory every "unmapped / pending-curation" ingredient surface across the Mechs declaring the `unmapped_inventory_input` capability, plus kg-microbe, into a single report keyed by normalized name, with cross-source overlap analysis. Drives the "MIM as single source of truth" goal — surfaces what still needs to land in MIM, in priority order, and documents the lightweight upstream→MIM→downstream sync mechanisms.
 category: cross-repo
 requires_database: false
 requires_internet: false
 version: 1.0.0
-tags: [mim, kg-microbe, culturemech, communitymech, unmapped, inventory, sync, single-source-of-truth]
+tags: [fleet, mim, kg-microbe, culturemech, communitymech, unmapped, inventory, sync, single-source-of-truth]
 ---
 
 # Unmapped Ingredient Inventory Skill
@@ -43,8 +43,29 @@ tells you:
 | `culturemech:new-solution-ingredients` | `CultureMech/data/import_tracking/new_solution_ingredients_vs_mediaingredientmech.tsv` | TSV | Solution ingredients flagged as `NEW - Not in MediaIngredientMech` |
 | `communitymech:ingredient_mapping` | `CommunityMech/CommunityMech/reports/ingredient_mapping.csv` (status=unmapped) | CSV | Per-community ingredients without a MIM mapping |
 
+### The Mech set is the manifest's, not this table's
+
+The table above illustrates the sources; it does not define them. Which Mechs
+the inventory reads is declared in the fleet manifest as the
+`unmapped_inventory_input` capability, and the script resolves them from there
+(#161, #162). Ask the manifest rather than this page:
+
+```bash
+uv run python -m kg_microbe_fleet matrix --capability unmapped_inventory_input
+```
+
+A Mech that gains the capability is picked up by the script whether or not
+anyone updates this table, so a table read as the definition would be silently
+short by a whole corpus. Two Mechs are declared `not_applicable` with recorded
+reasons -- TraitMech and ProteinTraitsMech curate traits, not ingredients --
+which is a decision on the record rather than an omission.
+
+kg-microbe is not a Mech and is not in the manifest; it is an external corpus
+the inventory reads and reports on separately.
+
 Adding a new source is a one-function addition to the script (see
-`SOURCES` list near the bottom of `scripts/inventory_unmapped_ingredients.py`).
+`SOURCES` list near the bottom of `scripts/inventory_unmapped_ingredients.py`),
+plus the capability declaration if it is a Mech.
 
 ## Run it
 
