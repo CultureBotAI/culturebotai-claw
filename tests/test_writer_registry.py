@@ -131,11 +131,19 @@ def test_defining_the_helper_is_not_a_call(definition):
     assert calls_shared_record_writer(definition + "\n") is False
 
 
-def test_a_call_below_a_definition_is_still_detected():
-    """Removing definition lines must not hide a real call in the same file."""
+def test_a_call_below_other_definitions_is_still_detected():
+    """A call is a call wherever it sits in the file.
+
+    This previously used a source that ALSO redefined `write_yaml`, and
+    asserted True. The AST detector says False there, and it is right: a
+    module-level `def write_yaml` rebinds the name, so the call below it goes
+    to the local function, not the shared helper. That case is now
+    `test_a_module_that_shadows_the_import_is_not_a_caller`; this one keeps the
+    original intent with a source that does not shadow.
+    """
     source = (
         "from classify_ingredient_type import write_yaml\n"
-        "def write_yaml(path, record):\n    ...\n\nwrite_yaml(p, r)\n"
+        "def helper(path, record):\n    ...\n\nwrite_yaml(p, r)\n"
     )
 
     assert calls_shared_record_writer(source) is True
@@ -282,3 +290,110 @@ def test_the_registry_ships_inside_the_package():
     assert yaml.safe_load(
         registry_file.read_text(encoding="utf-8")
     )["version"] == REGISTRY_VERSION
+
+
+# --------------------------------------------------------------------------
+# Phase 3 item 3: AST detection, generalizing the strongest Mech writer audit
+# --------------------------------------------------------------------------
+
+
+def test_an_aliased_import_is_still_the_shared_helper():
+    """`import write_yaml as _w` then `_w(...)` reads nothing like a call to the
+    shared helper. Text matching cannot follow the rename; a parser can."""
+    source = (
+        "from classify_ingredient_type import write_yaml as _w\n"
+        "_w(path, record)\n"
+    )
+
+    assert calls_shared_record_writer(source) is True
+
+
+def test_a_module_that_shadows_the_import_is_not_a_caller():
+    """Importing then redefining the same name rebinds it; the calls that
+    follow are to the local function, not the shared helper."""
+    source = (
+        "from classify_ingredient_type import write_yaml\n"
+        "def write_yaml(path, patches):\n"
+        "    path.write_text(patches)\n"
+        "write_yaml(OUT, patches)\n"
+    )
+
+    assert calls_shared_record_writer(source) is False
+
+
+def test_unparseable_source_is_not_reported_as_a_writer():
+    """A syntax error is a broken file, not a corpus writer; claiming otherwise
+    would put a nonsense entry in the registry."""
+    assert calls_shared_record_writer("def broken(:\n") is False
+
+
+@pytest.mark.parametrize(
+    "definition",
+    [
+        "def write_yaml(path, record):",
+        "def  write_yaml(path, record):",
+        "def\twrite_yaml(path, record):",
+        "async def write_yaml(path, record):",
+    ],
+)
+def test_spacing_in_a_definition_is_irrelevant_to_a_parser(definition):
+    """#171 was a fixed-width lookbehind matching exactly one space. An AST has
+    no notion of the whitespace between `def` and the name."""
+    source = f"from classify_ingredient_type import write_yaml\n{definition}\n    ...\n"
+
+    assert calls_shared_record_writer(source) is False
+
+
+def test_a_call_in_a_nested_function_is_still_a_call():
+    source = (
+        "from classify_ingredient_type import write_yaml\n"
+        "def outer():\n"
+        "    def inner():\n"
+        "        write_yaml(path, record)\n"
+        "    return inner\n"
+    )
+
+    assert calls_shared_record_writer(source) is True
+
+
+# --------------------------------------------------------------------------
+# #185: both import forms reach the same function
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "import classify_ingredient_type as m\nm.write_yaml(p, r)\n",
+        "import classify_ingredient_type\nclassify_ingredient_type.write_yaml(p, r)\n",
+    ],
+    ids=["aliased-module", "plain-module"],
+)
+def test_a_module_attribute_call_reaches_the_shared_helper(source):
+    """#185: only the from-import form was understood, so a detector meant to
+    be unevadable could be evaded by writing ordinary Python."""
+    assert calls_shared_record_writer(source) is True
+
+
+def test_importing_the_module_without_calling_the_writer_is_not_a_writer():
+    """Non-vacuity: the module import alone must not register."""
+    source = "import classify_ingredient_type as m\nm.load_yaml(path)\n"
+
+    assert calls_shared_record_writer(source) is False
+
+
+def test_an_indirect_binding_is_a_stated_limit_not_a_silent_one():
+    """`f = write_yaml; f(...)` is NOT detected, and the docstring says so.
+
+    Following a value through arbitrary rebinding is dataflow analysis rather
+    than a parse. The test exists so the boundary is recorded and anyone
+    changing it sees the intent.
+    """
+    source = (
+        "from classify_ingredient_type import write_yaml\n"
+        "f = write_yaml\n"
+        "f(path, record)\n"
+    )
+
+    assert calls_shared_record_writer(source) is False
+    assert "dataflow analysis" in calls_shared_record_writer.__doc__
