@@ -58,12 +58,3 @@ writers:
     reason: >-
       Not yet migrated. Writes groundings per record during a resolver pass.
     review_by: 2027-02-28
-
-  scripts/recurate_deprecated_and_removed.py:
-    status: exception
-    targets: >-
-      MediaIngredientMech ingredient YAMLs whose CHEBI term is obsolete or
-      removed, re-curating them from patch files.
-    reason: >-
-      Not yet migrated. Defines its own write_yaml as well as calling one.
-    review_by: 2027-02-28

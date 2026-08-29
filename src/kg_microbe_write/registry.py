@@ -39,6 +39,16 @@ REGISTRY_VERSION = 1
 # be trusted where a general "writes under a Mech root" regex cannot.
 _WRITE_YAML_CALL = re.compile(r"\bwrite_yaml\s*\(")
 
+# Matching the NAME is not enough. `recurate_deprecated_and_removed` defines its
+# own `write_yaml(path, patches: list[dict])` -- a different function with a
+# different signature -- and writes a patch file into claw's own workspace, yet
+# was registered as an in-place MIM corpus writer (#172). The real signal is
+# using the SHARED helper, which means importing it.
+_SHARED_IMPORT = re.compile(
+    r"from\s+classify_ingredient_type\s+import\b[^\n]*"
+    r"(?:\(|\\)?[^\n]*\bwrite_yaml\b",
+)
+
 # Definition lines are removed before looking for calls rather than excluded by
 # a lookbehind: a lookbehind is fixed-width, so `(?<!def )` matched exactly one
 # space and read `def  write_yaml(` or `def\twrite_yaml(` as a call (#171). That
@@ -84,10 +94,33 @@ def _significant_lines(source: str) -> str:
 def calls_shared_record_writer(source: str) -> bool:
     """Whether this module calls the shared `write_yaml` record helper.
 
-    The definition itself does not count -- only a call site, since defining
-    the helper is what `classify_ingredient_type` still does for its importers.
+    Both halves are required: the module must import the shared helper AND
+    call it. A same-named local function is not the shared helper, however
+    identical the call site looks (#172).
+
+    The definition itself never counts -- defining `write_yaml` is what
+    `classify_ingredient_type` still does for its importers.
     """
+    if not _imports_shared_helper(source):
+        return False
     return bool(_WRITE_YAML_CALL.search(_significant_lines(source)))
+
+
+def _imports_shared_helper(source: str) -> bool:
+    """Whether `write_yaml` is imported from `classify_ingredient_type`.
+
+    Handles the parenthesised multi-name import form these scripts use, so the
+    check reads the import statement rather than a single line of it.
+    """
+    body = _significant_lines(source)
+    for match in re.finditer(
+        r"from\s+classify_ingredient_type\s+import\s*(\(?)([^)\n]*(?:\n[^)]*)?)",
+        body,
+    ):
+        names = match.group(2)
+        if "write_yaml" in names:
+            return True
+    return False
 
 
 def discover_corpus_writers(root: Path) -> set[str]:
