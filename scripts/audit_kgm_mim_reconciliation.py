@@ -117,9 +117,21 @@ def build_kgm_synonym_index(kgm: dict[str, dict]) -> dict[str, set[str]]:
 
 
 def load_mediadive_unmapped(path: Path) -> list[dict]:
-    """Load MediaDive-unmapped ingredients, with occurrence counts."""
+    """Load MediaDive-unmapped ingredients, with occurrence counts.
+
+    An absent file contributes nothing and says so. It was unreachable while
+    the path was a literal; now that KGMICROBE_ROOT decides it, a checkout
+    without this file would otherwise shorten the unmapped-candidate count
+    with no indication that a whole source was missing.
+    """
     rows: list[dict] = []
     if not path.exists():
+        print(
+            f"WARNING: MediaDive unmapped ingredients not found ({path}); the "
+            f"unmapped-candidate count below covers kg-microbe compound "
+            f"placeholders only. Check KGMICROBE_ROOT.",
+            file=sys.stderr,
+        )
         return rows
     with path.open() as f:
         header = f.readline().rstrip("\n").split("\t")

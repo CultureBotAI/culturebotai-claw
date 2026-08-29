@@ -32,8 +32,10 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 # kg-microbe is not a Mech, so the manifest does not describe it and
 # `require_mech_roots` does not cover it. The env-then-sibling shape is the
-# same one `sync_kgm_dependencies.py` uses, and `load_kgm_entity_index`
-# refuses a missing artifact with a regeneration command rather than guessing.
+# same one `sync_kgm_dependencies.py` uses. Note that `load_kgm_entity_index`
+# below returns {} for a missing file rather than refusing -- each caller
+# checks `.exists()` itself and raises with the regeneration command, so a
+# wrong root surfaces there, not here.
 KGM_ROOT = Path(os.environ.get("KGMICROBE_ROOT", REPO_ROOT.parent / "kg-microbe"))
 KGM_UNIFIED_SSSOM = (
     KGM_ROOT / "mappings" / "kgmicrobe_unified_entity_mappings.sssom.tsv.gz"
