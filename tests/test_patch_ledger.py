@@ -209,3 +209,15 @@ def test_the_generator_survives_a_corrupt_ledger(tmp_path, monkeypatch, capsys):
 
     assert (patches / "p.tsv").is_file(), "the product must still be written"
     assert "patch ledger unavailable" in capsys.readouterr().out
+
+
+def test_an_unwritable_ledger_fails_as_a_ledger_error(tmp_path):
+    """A ledger that cannot be written must fail the same way as one that
+    cannot be read, so one except clause covers the bookkeeping (#195)."""
+    blocked = tmp_path / "read-only"
+    blocked.mkdir(mode=0o500)
+    try:
+        with pytest.raises(LedgerError, match="cannot write patch ledger"):
+            record(blocked / "sub" / "ledger.json", ["a"], now=MOMENT)
+    finally:
+        blocked.chmod(0o700)

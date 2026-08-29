@@ -117,16 +117,22 @@ def record(
     else:
         entry, verdict = Entry(moment, moment, 1, len(rows), digest), "changed"
 
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
-    Path(path).write_text(
-        json.dumps(
-            {"version": LEDGER_VERSION, "entry": entry.as_dict()},
-            indent=2,
-            sort_keys=True,
+    # A ledger that cannot be written fails the same way as one that cannot be
+    # read, so a caller needs only one except clause to keep bookkeeping from
+    # taking down its real work.
+    try:
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        Path(path).write_text(
+            json.dumps(
+                {"version": LEDGER_VERSION, "entry": entry.as_dict()},
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
         )
-        + "\n",
-        encoding="utf-8",
-    )
+    except OSError as exc:
+        raise LedgerError(f"cannot write patch ledger {path}: {exc}") from exc
     return entry, verdict
 
 

@@ -251,8 +251,8 @@ def main() -> None:
     try:
         entry, verdict = record(
             PATCHES_DIR / LEDGER_FILENAME,
-        # Fingerprint the exact rows the TSV publishes, so the ledger tracks
-        # what a reader is asked to act on rather than an internal shape.
+            # Fingerprint the exact rows the TSV publishes, so the ledger
+            # tracks what a reader is asked to act on, not an internal shape.
             ["\t".join(str(r.get(c, "")) for c in COLS) for r in rows],
         )
     except LedgerError as exc:
