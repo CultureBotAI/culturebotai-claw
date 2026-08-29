@@ -48,6 +48,12 @@ class LazyModule:
             try:
                 self._module = importlib.import_module(self._name)
             except ModuleNotFoundError as exc:
+                # Only when *this* module is the one missing. A dependency
+                # absent inside it is a different problem with a different
+                # fix, and reporting it as "set the root variable" sends the
+                # reader somewhere the answer is not.
+                if exc.name not in (self._name, self._name.split(".")[0]):
+                    raise
                 raise SystemExit(
                     f"{self._name} could not be imported from "
                     f"{', '.join(str(p) for p in self._search_paths())}"
