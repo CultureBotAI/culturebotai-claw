@@ -206,3 +206,58 @@ def test_the_scanner_writes_nothing(corpus):
     scan(corpus)
 
     assert {p: p.read_bytes() for p in (a, b)} == before
+
+
+# --------------------------------------------------------------------------
+# #182: a new pairing must not be suppressed because its members are known
+# --------------------------------------------------------------------------
+
+
+def test_a_shared_synonym_pairing_survives_both_records_being_grouped(corpus):
+    """#182: the one disagreement in the corpus was the one not reported.
+
+    A and B agree under one name; C and D agree under another; A and C share a
+    synonym and disagree. Suppressing by membership dropped exactly that.
+    """
+    write(corpus, "a", identifier="MIM:A", preferred_term="thing",
+          synonyms=["shared"], ontology_id="CHEBI:1")
+    write(corpus, "b", identifier="MIM:B", preferred_term="Thing",
+          ontology_id="CHEBI:1")
+    write(corpus, "c", identifier="MIM:C", preferred_term="other",
+          synonyms=["shared"], ontology_id="CHEBI:9")
+    write(corpus, "d", identifier="MIM:D", preferred_term="Other",
+          ontology_id="CHEBI:9")
+
+    report = scan(corpus)
+
+    assert report["groups_disagreeing"] == 1
+    finding = report["findings"][0]
+    assert finding["matched_on"] == "shared synonym"
+    assert {r["identifier"] for r in finding["records"]} == {"MIM:A", "MIM:C"}
+
+
+def test_the_same_record_set_is_not_reported_twice(corpus):
+    """Two records matching by BOTH name and synonym are one relationship."""
+    write(corpus, "a", preferred_term="thing", synonyms=["thing"],
+          ontology_id="CHEBI:1")
+    write(corpus, "b", preferred_term="Thing", synonyms=["thing"],
+          ontology_id="CHEBI:2")
+
+    report = scan(corpus)
+
+    assert report["groups_matched"] == 1
+    assert report["groups_disagreeing"] == 1
+
+
+def test_a_record_may_belong_to_more_than_one_relationship(corpus):
+    """Each relationship is a separate question, so a record appearing in two
+    is information rather than duplication."""
+    write(corpus, "a", preferred_term="thing", synonyms=["alias"],
+          ontology_id="CHEBI:1")
+    write(corpus, "b", preferred_term="Thing", ontology_id="CHEBI:2")
+    write(corpus, "c", preferred_term="other", synonyms=["alias"],
+          ontology_id="CHEBI:3")
+
+    report = scan(corpus)
+
+    assert report["groups_disagreeing"] == 2

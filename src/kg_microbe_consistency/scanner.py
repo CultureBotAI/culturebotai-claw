@@ -176,11 +176,23 @@ def group_records(records: Sequence[Record]) -> list[Group]:
             by_name[record.name_key].append(record)
 
     groups: list[Group] = []
-    grouped: set[Path] = set()
+    # Keyed on the exact SET of records, not on membership. Suppressing a group
+    # because its members are individually known elsewhere drops genuinely new
+    # pairings: two records can each sit in an agreeing name group and still
+    # disagree with each other through a shared synonym, and that disagreement
+    # was the one being silently dropped (#182). A record legitimately belongs
+    # to more than one match relationship, and each is a separate question.
+    emitted: set[frozenset[Path]] = set()
+
+    def _emit(key: str, reason: str, members: Sequence[Record]) -> None:
+        paths = frozenset(record.path for record in members)
+        if len(paths) < 2 or paths in emitted:
+            return
+        emitted.add(paths)
+        groups.append(Group(key, reason, tuple(members)))
+
     for key, members in sorted(by_name.items()):
-        if len(members) > 1:
-            groups.append(Group(key, "identical normalized name", tuple(members)))
-            grouped.update(r.path for r in members)
+        _emit(key, "identical normalized name", members)
 
     by_synonym: dict[str, list[Record]] = defaultdict(list)
     for record in records:
@@ -189,11 +201,7 @@ def group_records(records: Sequence[Record]) -> list[Group]:
                 by_synonym[synonym].append(record)
 
     for key, members in sorted(by_synonym.items()):
-        distinct = {r.path for r in members}
-        if len(distinct) < 2 or distinct <= grouped:
-            continue
-        groups.append(Group(key, "shared synonym", tuple(members)))
-        grouped.update(distinct)
+        _emit(key, "shared synonym", members)
     return groups
 
 
