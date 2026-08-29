@@ -23,7 +23,7 @@ tracked separately; this covers the surface it can cover honestly.
 
 from __future__ import annotations
 
-import re
+import ast
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -34,27 +34,15 @@ import yaml
 REGISTRY_FILENAME = "writers.yaml"
 REGISTRY_VERSION = 1
 
-# `write_yaml(path, record)` writes a record dict straight to a path. A call to
-# it is an in-place corpus write by construction, which is why this signal can
-# be trusted where a general "writes under a Mech root" regex cannot.
-_WRITE_YAML_CALL = re.compile(r"\bwrite_yaml\s*\(")
-
-# Matching the NAME is not enough. `recurate_deprecated_and_removed` defines its
-# own `write_yaml(path, patches: list[dict])` -- a different function with a
-# different signature -- and writes a patch file into claw's own workspace, yet
-# was registered as an in-place MIM corpus writer (#172). The real signal is
-# using the SHARED helper, which means importing it.
-_SHARED_IMPORT = re.compile(
-    r"from\s+classify_ingredient_type\s+import\b[^\n]*"
-    r"(?:\(|\\)?[^\n]*\bwrite_yaml\b",
-)
-
-# Definition lines are removed before looking for calls rather than excluded by
-# a lookbehind: a lookbehind is fixed-width, so `(?<!def )` matched exactly one
-# space and read `def  write_yaml(` or `def\twrite_yaml(` as a call (#171). That
-# would register a module that merely DEFINES the helper -- which
-# classify_ingredient_type does for its importers -- as a corpus writer.
-_WRITE_YAML_DEF = re.compile(r"^\s*(?:async\s+)?def\s+write_yaml\b")
+# Detection is AST-based, generalizing the strongest of the five Mech writer
+# audits (ProteinTraitsMech's, which resolves imports and inspects call nodes
+# rather than matching text). The regex it replaces produced two defects in one
+# session: a fixed-width `(?<!def )` lookbehind that read `def  write_yaml(` as
+# a call (#171), and matching the NAME so a module defining its own same-named
+# helper was registered as a corpus writer (#172). Both are classes a parser
+# does not have.
+SHARED_WRITER_MODULE = "classify_ingredient_type"
+SHARED_WRITER_NAME = "write_yaml"
 
 STATUSES = frozenset({"transaction", "exception"})
 
@@ -78,49 +66,52 @@ class WriterEntry:
         return self.status == "transaction"
 
 
-def _significant_lines(source: str) -> str:
-    """Source with comment lines and `write_yaml` definitions removed.
+def _local_name_for_shared_writer(tree: ast.AST) -> str | None:
+    """The local name the shared helper is bound to, or None if not imported.
 
-    Comments go so a mention in prose does not register; definitions go so
-    defining the helper is not mistaken for calling it.
+    Follows `as` renaming, which text matching cannot: `from … import write_yaml
+    as _w` then `_w(path, record)` is a call to the shared helper and reads
+    nothing like one.
     """
-    return "\n".join(
-        line
-        for line in source.splitlines()
-        if not line.lstrip().startswith("#") and not _WRITE_YAML_DEF.match(line)
-    )
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module == SHARED_WRITER_MODULE:
+            for alias in node.names:
+                if alias.name == SHARED_WRITER_NAME:
+                    return alias.asname or alias.name
+    return None
 
 
 def calls_shared_record_writer(source: str) -> bool:
     """Whether this module calls the shared `write_yaml` record helper.
 
-    Both halves are required: the module must import the shared helper AND
-    call it. A same-named local function is not the shared helper, however
-    identical the call site looks (#172).
-
-    The definition itself never counts -- defining `write_yaml` is what
-    `classify_ingredient_type` still does for its importers.
+    Both halves are required: the module must import the shared helper AND call
+    it under whatever name it bound. A same-named local function is not the
+    shared helper however identical the call site looks (#172), and a defining
+    module is not a calling one (#171).
     """
-    if not _imports_shared_helper(source):
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
         return False
-    return bool(_WRITE_YAML_CALL.search(_significant_lines(source)))
 
+    local_name = _local_name_for_shared_writer(tree)
+    if local_name is None:
+        return False
 
-def _imports_shared_helper(source: str) -> bool:
-    """Whether `write_yaml` is imported from `classify_ingredient_type`.
+    # A module-level def of the same name shadows the import from that point
+    # on, so the binding no longer refers to the shared helper.
+    shadowed = any(
+        isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name == local_name
+        for node in tree.body
+    )
+    if shadowed:
+        return False
 
-    Handles the parenthesised multi-name import form these scripts use, so the
-    check reads the import statement rather than a single line of it.
-    """
-    body = _significant_lines(source)
-    for match in re.finditer(
-        r"from\s+classify_ingredient_type\s+import\s*(\(?)([^)\n]*(?:\n[^)]*)?)",
-        body,
-    ):
-        names = match.group(2)
-        if "write_yaml" in names:
-            return True
-    return False
+    return any(
+        isinstance(node, ast.Call) and getattr(node.func, "id", None) == local_name
+        for node in ast.walk(tree)
+    )
 
 
 def discover_corpus_writers(root: Path) -> set[str]:
