@@ -38,6 +38,9 @@ from pathlib import Path
 
 import yaml
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+from kg_microbe_write import ValidatedWriteTransaction  # noqa: E402
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 MIM_ROOT = Path(os.environ.get(
     "MEDIAINGREDIENTMECH_ROOT",
@@ -268,10 +271,37 @@ def load_yaml(path: Path) -> dict | None:
         return None
 
 
+def _validate_staged_record(path: Path, text: str) -> None:
+    """Reject staged content that would not load back as a usable record.
+
+    Cheap, but it is the difference between "we wrote YAML" and "we wrote YAML
+    that parses and still carries an identifier and the value we just set".
+    """
+    loaded = yaml.safe_load(text)
+    if not isinstance(loaded, dict):
+        raise ValueError("staged record is not a YAML mapping")
+    if not loaded.get("identifier"):
+        raise ValueError("staged record lost its identifier")
+    if not loaded.get("ingredient_type"):
+        raise ValueError("staged record has no ingredient_type")
+
+
+def dump_yaml(record: dict) -> str:
+    """Serialize a record exactly as write_yaml would have written it."""
+    return yaml.safe_dump(record, default_flow_style=False,
+                          allow_unicode=True, sort_keys=False)
+
+
 def write_yaml(path: Path, record: dict) -> None:
+    """Direct write, kept for the five sibling scripts that import it.
+
+    `classify_ingredient_type` itself no longer uses this: it stages every
+    record into a ValidatedWriteTransaction and commits once, so a failure
+    part-way through cannot leave a partially rewritten corpus (#156). This
+    remains non-atomic and is a migration target for Phase 3.
+    """
     with open(path, "w") as f:
-        yaml.safe_dump(record, f, default_flow_style=False,
-                       allow_unicode=True, sort_keys=False)
+        f.write(dump_yaml(record))
 
 
 def append_curation_event(record: dict, action: str, changes: str) -> None:
@@ -304,6 +334,17 @@ def main() -> int:
     medium_granularity_token()
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Every record is staged and the whole set committed once. Writing per
+    # record meant a failure part-way through left an unknown subset of MIM
+    # modified with no recovery path (#156); the transaction makes that
+    # all-or-nothing and records prior contents before touching anything.
+    transaction = ValidatedWriteTransaction(
+        MIM_ROOT,
+        validator=_validate_staged_record,
+        journal_dir=OUT_DIR / "write_journal",
+    )
+
     rows: list[tuple[str, str, str, str, str]] = []
     counts: dict[str, int] = {}
     n_total = n_already = n_set = n_skip = 0
@@ -335,13 +376,16 @@ def main() -> int:
                      new_type, "auto", rationale))
         counts[new_type] = counts.get(new_type, 0) + 1
 
-        if args.apply:
-            record["ingredient_type"] = new_type
-            append_curation_event(
-                record, "AUTO_CLASSIFY_INGREDIENT_TYPE",
-                f"set ingredient_type={new_type} ({rationale})")
-            write_yaml(path, record)
-            n_set += 1
+        record["ingredient_type"] = new_type
+        append_curation_event(
+            record, "AUTO_CLASSIFY_INGREDIENT_TYPE",
+            f"set ingredient_type={new_type} ({rationale})")
+        transaction.stage(path, dump_yaml(record))
+        n_set += 1
+
+    result = transaction.commit(apply=args.apply)
+    if args.apply and result.touched:
+        print(f"Wrote {result.touched} record(s); journal: {result.journal_path}")
 
     # Emit reports
     import csv
@@ -355,9 +399,9 @@ def main() -> int:
     md.append(f"Total records: **{n_total}**")
     md.append(f"Mode: **{'APPLY' if args.apply else 'DRY-RUN'}**")
     if args.apply:
-        md.append(f"Records written: **{n_set}**")
+        md.append(f"Records written: **{result.touched}**")
     else:
-        md.append(f"Records that would be written: **{sum(1 for r in rows if r[3]=='auto')}**")
+        md.append(f"Records that would be written: **{result.touched}**")
     md.append(f"Records already set (preserved): **{n_already}**")
     md.append(f"Records skipped (no rule fit): **{n_skip}**\n")
     md.append("\n## Distribution\n")
@@ -370,9 +414,9 @@ def main() -> int:
 
     print(f"Total: {n_total}")
     if args.apply:
-        print(f"  Set: {n_set}")
+        print(f"  Set: {result.touched}")
     else:
-        print(f"  Would set: {sum(1 for r in rows if r[3]=='auto')}")
+        print(f"  Would set: {result.touched}")
     print(f"  Already set: {n_already}")
     print(f"  Skipped: {n_skip}")
     print()
