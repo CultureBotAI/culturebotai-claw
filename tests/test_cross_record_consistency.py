@@ -337,3 +337,105 @@ def test_a_wholly_unreadable_corpus_says_so(corpus, capsys):
 
     assert _cli(["--corpus", str(corpus)]) == 0
     assert "not a clean corpus" in capsys.readouterr().err
+
+
+# --------------------------------------------------------------------------
+# #129 item 3: records held inside a document, and the hallucination signal
+# --------------------------------------------------------------------------
+
+
+def write_medium(root: Path, stem: str, ingredients: list[tuple[str, str, str]]) -> Path:
+    """A CultureMech-shaped medium: one file, many grounded ingredients."""
+    lines = [f"medium_name: {stem}", "ingredients:"]
+    for term, ident, quality in ingredients:
+        lines.append(f"- preferred_term: {term}")
+        lines.append("  term:")
+        lines.append(f"    id: {ident}")
+        lines.append(f"    label: {term}")
+        if quality:
+            lines.append("  curation_metadata:")
+            lines.append(f"    mapping_quality: {quality}")
+    path = root / f"{stem}.yaml"
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return path
+
+
+def test_embedded_ingredients_are_read_as_separate_records(corpus):
+    """Treating the file as one record misses every ingredient in it -- the
+    scanner read 0 records from CultureMech before this existed."""
+    write_medium(corpus, "m1", [("glucose", "CHEBI:17234", ""),
+                                ("tricine", "CHEBI:46760", "")])
+
+    report = scan(corpus, shape="embedded-ingredients")
+
+    assert report["records_scanned"] == 2
+
+
+def test_two_media_grounding_one_ingredient_differently_disagree(corpus):
+    write_medium(corpus, "m1", [("tricine", "CHEBI:46760", "")])
+    write_medium(corpus, "m2", [("tricine", "CHEBI:39063", "")])
+
+    report = scan(corpus, shape="embedded-ingredients")
+
+    assert report["groups_disagreeing"] == 1
+
+
+def test_records_in_one_file_are_distinguished_by_locator(corpus):
+    """Group identity is per record, not per file; two entries in one document
+    are two records and must not collapse."""
+    write_medium(corpus, "m1", [("tricine", "CHEBI:46760", ""),
+                                ("Tricine", "CHEBI:39063", "")])
+
+    report = scan(corpus, shape="embedded-ingredients")
+
+    assert report["groups_disagreeing"] == 1
+    paths = {r["path"] for r in report["findings"][0]["records"]}
+    assert len(paths) == 2, "both entries must be addressable"
+    assert all("#ingredients[" in p for p in paths)
+
+
+def test_a_disagreement_involving_an_llm_grounding_is_counted(corpus):
+    """#129's first named instance. An LLM-assisted CURIE can point at an
+    unrelated molecule while the record stays internally consistent, so
+    id-label correspondence cannot see it."""
+    write_medium(corpus, "m1", [("inositol", "CHEBI:17268", "LLM_ASSISTED")])
+    write_medium(corpus, "m2", [("inositol", "CHEBI:24848", "")])
+
+    report = scan(corpus, shape="embedded-ingredients")
+
+    assert report["groups_disagreeing"] == 1
+    assert report["groups_involving_llm_assisted"] == 1
+    assert any(r["llm_assisted"] for r in report["findings"][0]["records"])
+
+
+def test_a_disagreement_without_an_llm_grounding_is_not_counted(corpus):
+    """Non-vacuity: the counter must not simply equal the disagreement count."""
+    write_medium(corpus, "m1", [("tricine", "CHEBI:46760", "")])
+    write_medium(corpus, "m2", [("tricine", "CHEBI:39063", "")])
+
+    report = scan(corpus, shape="embedded-ingredients")
+
+    assert report["groups_disagreeing"] == 1
+    assert report["groups_involving_llm_assisted"] == 0
+
+
+def test_an_ingredient_without_a_term_id_is_skipped(corpus):
+    write_medium(corpus, "m1", [("glucose", "CHEBI:17234", "")])
+    (corpus / "m2.yaml").write_text(
+        "ingredients:\n- preferred_term: ungrounded\n", encoding="utf-8"
+    )
+
+    assert scan(corpus, shape="embedded-ingredients")["records_scanned"] == 1
+
+
+def test_an_unknown_shape_is_refused(corpus):
+    with pytest.raises(ScannerError, match="unknown corpus shape"):
+        scan(corpus, shape="nonsense")
+
+
+def test_the_default_shape_is_unchanged(corpus):
+    """MediaIngredientMech's one-record-per-file corpus must be unaffected."""
+    write(corpus, "a", preferred_term="thing", ontology_id="CHEBI:1")
+    write(corpus, "b", preferred_term="Thing", ontology_id="CHEBI:2")
+
+    assert scan(corpus)["groups_disagreeing"] == 1

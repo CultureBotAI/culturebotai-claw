@@ -15,11 +15,13 @@ from .proposals import (
 )
 from .scanner import (
     COMPARED_FIELDS,
+    EXTRACTORS,
     Disagreement,
     Group,
     Record,
     ScannerError,
     build_report,
+    extract_embedded,
     find_disagreements,
     group_records,
     load_corpus,
@@ -30,6 +32,8 @@ from .scanner import (
 )
 
 __all__ = [
+    "EXTRACTORS",
+    "extract_embedded",
     "build_report",
     "proposals_from_groups",
     "FALLBACK_QUALITIES",

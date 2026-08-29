@@ -68,7 +68,11 @@ Supported:
   only for the one unambiguous shape: an ontology-grounded record beside a
   registry or placeholder fallback for the same substance. Two competing
   ontology terms are surfaced and never resolved -- there is no basis in the
-  data for picking a winner. Nothing is ever written to a corpus.
+  data for picking a winner. `--shape embedded-ingredients` reads corpora that
+  hold many grounded entries per document, such as CultureMech media, and a
+  disagreement involving an `LLM_ASSISTED` grounding is counted separately:
+  that record is internally consistent, so id-label correspondence cannot see
+  it. Nothing is ever written to a corpus.
 - `kg_microbe_write`: the shared `ValidatedWriteTransaction` -- stage every
   change, validate the complete set, then replace atomically with a recovery
   journal. Nothing is written until `commit(apply=True)`; a dry run still
