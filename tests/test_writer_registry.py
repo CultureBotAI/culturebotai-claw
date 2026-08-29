@@ -354,3 +354,46 @@ def test_a_call_in_a_nested_function_is_still_a_call():
     )
 
     assert calls_shared_record_writer(source) is True
+
+
+# --------------------------------------------------------------------------
+# #185: both import forms reach the same function
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "import classify_ingredient_type as m\nm.write_yaml(p, r)\n",
+        "import classify_ingredient_type\nclassify_ingredient_type.write_yaml(p, r)\n",
+    ],
+    ids=["aliased-module", "plain-module"],
+)
+def test_a_module_attribute_call_reaches_the_shared_helper(source):
+    """#185: only the from-import form was understood, so a detector meant to
+    be unevadable could be evaded by writing ordinary Python."""
+    assert calls_shared_record_writer(source) is True
+
+
+def test_importing_the_module_without_calling_the_writer_is_not_a_writer():
+    """Non-vacuity: the module import alone must not register."""
+    source = "import classify_ingredient_type as m\nm.load_yaml(path)\n"
+
+    assert calls_shared_record_writer(source) is False
+
+
+def test_an_indirect_binding_is_a_stated_limit_not_a_silent_one():
+    """`f = write_yaml; f(...)` is NOT detected, and the docstring says so.
+
+    Following a value through arbitrary rebinding is dataflow analysis rather
+    than a parse. The test exists so the boundary is recorded and anyone
+    changing it sees the intent.
+    """
+    source = (
+        "from classify_ingredient_type import write_yaml\n"
+        "f = write_yaml\n"
+        "f(path, record)\n"
+    )
+
+    assert calls_shared_record_writer(source) is False
+    assert "dataflow analysis" in calls_shared_record_writer.__doc__

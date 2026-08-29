@@ -81,13 +81,35 @@ def _local_name_for_shared_writer(tree: ast.AST) -> str | None:
     return None
 
 
+def _module_names_for_shared_writer(tree: ast.AST) -> set[str]:
+    """Names the writer's MODULE is bound to by a plain `import` (#185).
+
+    `import classify_ingredient_type as m` then `m.write_yaml(...)` reaches the
+    same function as a from-import, and a detector that only understood one of
+    the two forms could be evaded by writing ordinary Python.
+    """
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == SHARED_WRITER_MODULE:
+                    names.add(alias.asname or alias.name)
+    return names
+
+
 def calls_shared_record_writer(source: str) -> bool:
     """Whether this module calls the shared `write_yaml` record helper.
 
     Both halves are required: the module must import the shared helper AND call
     it under whatever name it bound. A same-named local function is not the
     shared helper however identical the call site looks (#172), and a defining
-    module is not a calling one (#171).
+    module is not a calling one (#171). Both import forms count -- a
+    from-import of the function and a plain import of its module (#185).
+
+    Known limit, stated rather than papered over: an indirect binding such as
+    `f = write_yaml; f(path, record)` is NOT detected. Following a value
+    through arbitrary rebinding is dataflow analysis rather than a parse, and a
+    detector that claimed to catch it would be promising what it cannot do.
     """
     try:
         tree = ast.parse(source)
@@ -95,23 +117,32 @@ def calls_shared_record_writer(source: str) -> bool:
         return False
 
     local_name = _local_name_for_shared_writer(tree)
-    if local_name is None:
+    module_names = _module_names_for_shared_writer(tree)
+    if local_name is None and not module_names:
         return False
 
     # A module-level def of the same name shadows the import from that point
     # on, so the binding no longer refers to the shared helper.
-    shadowed = any(
+    if local_name is not None and any(
         isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
         and node.name == local_name
         for node in tree.body
-    )
-    if shadowed:
-        return False
+    ):
+        local_name = None
 
-    return any(
-        isinstance(node, ast.Call) and getattr(node.func, "id", None) == local_name
-        for node in ast.walk(tree)
-    )
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if local_name is not None and getattr(func, "id", None) == local_name:
+            return True
+        if (
+            isinstance(func, ast.Attribute)
+            and func.attr == SHARED_WRITER_NAME
+            and getattr(func.value, "id", None) in module_names
+        ):
+            return True
+    return False
 
 
 def discover_corpus_writers(root: Path) -> set[str]:
