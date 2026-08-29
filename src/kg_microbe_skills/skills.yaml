@@ -95,11 +95,11 @@ skills:
     scope: domain
     reason: Parallel agent review of MIM's SSSOM product.
   unmapped-inventory:
-    scope: claw
+    scope: fleet
     reason: >-
-      Runs from claw over sources it names in prose. The script it drives IS
-      manifest-driven, through the `unmapped_inventory_input` capability, but
-      the skill is not -- see #214.
+      Reads the Mechs declaring `unmapped_inventory_input`, resolved from the
+      manifest rather than from a list in the skill (#214). kg-microbe is read
+      too but is not a Mech and is not in the manifest.
 
 # Canonical templates, rendered per applicable Mech. `capability` decides which
 # Mechs those are -- from the manifest, so the set cannot drift the way a list
