@@ -922,3 +922,12 @@ def load_fleet_manifest(path: Optional[Path] = None) -> FleetManifest:
             f"Unable to resolve fleet manifest path {resolved}: {exc}"
         ) from exc
     return _load_cached(resolved)
+
+
+def __getattr__(name: str):
+    """Expose the root resolver lazily, avoiding an import cycle at module load."""
+    if name in {"MechRootError", "resolve_mech_root", "sibling_default", "looks_like"}:
+        from . import roots
+
+        return getattr(roots, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
