@@ -22,6 +22,13 @@ so applying these rules there would produce far more noise than findings. The
 consequence is real and worth stating: a command example citing a file that has
 moved will not be caught. Extending coverage needs shell-aware parsing (#202).
 
+Existence is decided by git, not by the filesystem. A developer's downstream
+checkout carries generated data and local snapshots a fresh clone does not, so
+`Path.exists()` gave different verdicts on a laptop and in CI -- four of them,
+the day this landed (#203). `git ls-files` and `git check-ignore` answer the
+same on both, including for paths absent locally: tracked is OK, ignored is a
+generated artifact, and neither means no clone of that repository has it.
+
 The checker refuses to guess when it cannot see. With no downstream checkout
 resolvable, a path absent from claw is UNVERIFIABLE, never MISSING -- the
 distinction #161 established for the unmapped inventory, for the same reason:
@@ -32,6 +39,7 @@ says so.
 from __future__ import annotations
 
 import re
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Mapping
@@ -177,6 +185,79 @@ def extract_references(path: Path, text: str | None = None) -> list[Reference]:
     return references
 
 
+class _Repository:
+    """One checkout, answering "does this path belong here?" from git.
+
+    Answers are cached per root: `git ls-files` runs once, and the ignore
+    check runs at most once per distinct path.
+    """
+
+    def __init__(self, root: Path) -> None:
+        self.root = Path(root)
+        self._tracked: set[str] | None = None
+        self._prefixes: set[str] | None = None
+        self._ignored: dict[str, bool] = {}
+
+    @property
+    def is_git(self) -> bool:
+        return (self.root / ".git").exists()
+
+    def _load(self) -> None:
+        if self._tracked is not None:
+            return
+        result = subprocess.run(
+            ["git", "ls-files", "-z"],
+            cwd=self.root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        tracked = {
+            entry for entry in result.stdout.split("\0") if entry
+        } if result.returncode == 0 else set()
+        prefixes: set[str] = set()
+        for entry in tracked:
+            parts = entry.split("/")
+            for index in range(1, len(parts)):
+                prefixes.add("/".join(parts[:index]))
+        self._tracked, self._prefixes = tracked, prefixes
+
+    def tracked(self, relative: str) -> bool:
+        """Whether git tracks this file, or any file beneath this directory."""
+        self._load()
+        assert self._tracked is not None and self._prefixes is not None
+        return relative in self._tracked or relative in self._prefixes
+
+    def ignored(self, relative: str) -> bool:
+        """Whether the repository declares this path generated.
+
+        `git check-ignore` answers for paths that do not exist, which is the
+        whole point: a clone without the artifact must reach the same verdict
+        as a working tree that has it.
+        """
+        if relative not in self._ignored:
+            result = subprocess.run(
+                ["git", "check-ignore", "-q", "--no-index", "--", relative],
+                cwd=self.root,
+                capture_output=True,
+                check=False,
+            )
+            self._ignored[relative] = result.returncode == 0
+        return self._ignored[relative]
+
+    def verdict(self, relative: str) -> str:
+        """"ok", "generated", or "missing" for one path in this repository."""
+        if not self.is_git:
+            # Not a checkout -- a temporary directory in a test, or a path
+            # handed in directly. Fall back to the filesystem and say so.
+            return "ok" if (self.root / relative).exists() else "missing"
+        if self.tracked(relative):
+            return "ok"
+        if self.ignored(relative):
+            return "generated"
+        return "missing"
+
+
 def _known_commands(claw_root: Path) -> set[str]:
     root = Path(claw_root) / ".claude"
     names: set[str] = set()
@@ -207,6 +288,8 @@ def check(
     downstream = dict(downstream or {})
     labels = set(repositories or ()) | set(downstream) | {_CLAW_LABEL}
     commands = _known_commands(claw_root)
+    repos = {label: _Repository(root) for label, root in downstream.items()}
+    repos[_CLAW_LABEL] = _Repository(claw_root)
     findings: list[Finding] = []
 
     for path in files if files is not None else skill_files(claw_root):
@@ -227,14 +310,14 @@ def check(
                 continue
 
             findings.append(
-                _resolve_path(reference, claw_root, downstream, labels, declared)
+                _resolve_path(reference, repos, downstream, labels, declared)
             )
     return findings
 
 
 def _resolve_path(
     reference: Reference,
-    claw_root: Path,
+    repos: Mapping[str, "_Repository"],
     downstream: Mapping[str, Path],
     labels: set[str],
     declared: str | None = None,
@@ -249,11 +332,8 @@ def _resolve_path(
     # function otherwise has to guess at: the path is relative to *that*
     # checkout, and there is nothing ambiguous left to report.
     if head in labels:
-        if head == _CLAW_LABEL:
-            root: Path | None = claw_root
-        else:
-            root = downstream.get(head)
-        if root is None:
+        repo = repos.get(head)
+        if repo is None:
             return Finding(
                 reference,
                 "unverifiable",
@@ -268,13 +348,20 @@ def _resolve_path(
         # them until the remainder is relative to the checkout itself.
         while rest.split("/")[0] == head:
             rest = rest.partition("/")[2]
-        if (Path(root) / rest).exists():
+        verdict = repo.verdict(rest)
+        if verdict == "ok":
             return Finding(reference, "ok")
+        if verdict == "generated":
+            return Finding(reference, "output", f"{head} declares this generated")
         if rest.split("/")[0] == _OUTPUT_ROOT:
             return Finding(reference, "output", f"runtime artifact under {head}")
-        return Finding(reference, "missing", f"no such path in {head}")
+        return Finding(
+            reference,
+            "missing",
+            f"not in {head}: git neither tracks it nor declares it generated",
+        )
 
-    if (claw_root / reference.text).exists():
+    if repos[_CLAW_LABEL].verdict(reference.text) == "ok":
         return Finding(reference, "ok")
 
     # A declaration says where the skill's *other* paths live; it does not stop
@@ -282,15 +369,15 @@ def _resolve_path(
     # tried first above, so the declaration only decides what claw does not
     # already answer -- and that leaves nothing ambiguous to report.
     if declared:
-        return _resolve_declared(reference, downstream, labels, declared)
+        return _resolve_declared(reference, repos, downstream, labels, declared)
 
     # A path written without a repository prefix may still name a real file
     # downstream -- most do. Say which, so the fix is to add the prefix rather
     # than to hunt for a file that was never missing.
     elsewhere = [
         label
-        for label, root in sorted(downstream.items())
-        if (Path(root) / reference.text).exists()
+        for label in sorted(downstream)
+        if repos[label].verdict(reference.text) == "ok"
     ]
     if elsewhere:
         return Finding(
@@ -348,6 +435,7 @@ def format_report(findings: list[Finding]) -> str:
 
 def _resolve_declared(
     reference: Reference,
+    repos: Mapping[str, "_Repository"],
     downstream: Mapping[str, Path],
     labels: set[str],
     declared: str,
@@ -358,7 +446,7 @@ def _resolve_declared(
         # checkout, and naming one Mech would be wrong. Existing anywhere in
         # the fleet is the whole claim being made.
         mechs = {
-            label: root for label, root in downstream.items() if label != "kg-microbe"
+            label: repos[label] for label in downstream if label != "kg-microbe"
         }
         if not mechs:
             return Finding(
@@ -366,8 +454,10 @@ def _resolve_declared(
                 "unverifiable",
                 "declared per-Mech, and no Mech checkout was resolvable",
             )
-        if any((Path(root) / reference.text).exists() for root in mechs.values()):
+        if any(repo.verdict(reference.text) == "ok" for repo in mechs.values()):
             return Finding(reference, "ok")
+        if any(repo.verdict(reference.text) == "generated" for repo in mechs.values()):
+            return Finding(reference, "output", "declared generated by a Mech")
         return Finding(
             reference,
             "missing",
@@ -381,13 +471,20 @@ def _resolve_declared(
             f"declared reference-root {declared!r} is not a repository the "
             f"manifest knows",
         )
-    root = downstream.get(declared)
-    if root is None:
+    repo = repos.get(declared)
+    if repo is None:
         return Finding(
             reference,
             "unverifiable",
             f"declared reference-root {declared} is not a resolvable checkout here",
         )
-    if (Path(root) / reference.text).exists():
+    verdict = repo.verdict(reference.text)
+    if verdict == "ok":
         return Finding(reference, "ok")
-    return Finding(reference, "missing", f"no such path in {declared}")
+    if verdict == "generated":
+        return Finding(reference, "output", f"{declared} declares this generated")
+    return Finding(
+        reference,
+        "missing",
+        f"not in {declared}: git neither tracks it nor declares it generated",
+    )
