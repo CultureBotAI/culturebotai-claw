@@ -34,7 +34,7 @@ import yaml
 REGISTRY_FILENAME = "writers.yaml"
 REGISTRY_VERSION = 1
 
-# Detection is AST-based, generalizing the strongest of the five Mech writer
+# Detection is AST-based, generalizing the strongest of the per-Mech writer
 # audits (ProteinTraitsMech's, which resolves imports and inspects call nodes
 # rather than matching text). The regex it replaces produced two defects in one
 # session: a fixed-width `(?<!def )` lookbehind that read `def  write_yaml(` as

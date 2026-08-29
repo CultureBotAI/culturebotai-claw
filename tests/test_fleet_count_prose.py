@@ -31,13 +31,30 @@ MAINTAINED = (
     "docs/README.md",
     "docs/guides",
     ".claude/skills",
+    ".claude/commands",
+    # #131 item 3 says "maintained prose AND package docstrings". Leaving src/
+    # out let "all five repositories" sit in the governance audit's own
+    # docstrings, beside a hardcoded EXPECTED_MECH_COUNT = 5.
+    "src",
+    "cli",
+    "plugins",
+    "pipelines",
 )
 EXCLUDED = ("docs/archive", "docs/reviews", "docs/proposals")
 
 # "one Mech" is not a fleet count ("a change must exist in more than one Mech"),
 # so counting starts at two.
+# "N repos" is the same claim as "N Mechs" and was missed by a pattern that
+# only looked for the word Mech: `unmapped-inventory` said "all four repos"
+# twice while its script read the set from a capability.
+_NUMBER = r"(?:two|three|four|five|six|[2-9]|\d\d+)"
 _COUNT = re.compile(
-    r"\b(?:two|three|four|five|six|[2-9]|\d\d+)[- ](?:Mech|mech)",
+    # "N Mechs" is always a claim about the fleet.
+    rf"\b{_NUMBER}[- ](?:Mechs?)\b"
+    # "N repos" is only one when it says ALL of them. boss/SKILL.md warns
+    # against "modifying two repos at once from the same worktree", which is a
+    # claim about an action, not about how many exist.
+    rf"|\ball\s+{_NUMBER}\s+(?:repos|repositories|checkouts)\b",
     re.IGNORECASE,
 )
 # A count whose basis is stated nearby is a claim about something real.
@@ -55,6 +72,7 @@ def _maintained_files() -> list[Path]:
             files.append(target)
         elif target.is_dir():
             files.extend(sorted(target.rglob("*.md")))
+            files.extend(sorted(target.rglob("*.py")))
     return [
         path
         for path in files
@@ -93,3 +111,34 @@ def test_the_fleet_size_the_prose_describes_is_the_manifest_size():
     or removed makes the documentation demonstrably wrong rather than quietly
     so."""
     assert len(load_fleet_manifest().mechs) == 5
+
+
+def test_no_module_hardcodes_the_fleet_size_as_a_constant():
+    """A count is a list of one number, and goes stale the same way.
+
+    `EXPECTED_MECH_COUNT = 5` in the governance audit would have rejected a
+    correct consumer set the day a sixth Mech was declared -- and accepted a
+    wrong one of the right size before then.
+    """
+    pattern = re.compile(
+        r"^[A-Z_]*(?:MECH|FLEET)[A-Z_]*(?:COUNT|SIZE|N)\s*=\s*\d+", re.MULTILINE
+    )
+    offenders = [
+        f"{path.relative_to(ROOT)}: {pattern.search(text).group(0)}"
+        for path in sorted((ROOT / "src").rglob("*.py"))
+        if pattern.search(text := path.read_text(encoding="utf-8"))
+    ]
+
+    assert not offenders, (
+        "derive the fleet size from the manifest instead:\n  "
+        + "\n  ".join(offenders)
+    )
+
+
+def test_the_governance_manifest_covers_exactly_the_declared_fleet():
+    """The invariant the hardcoded count was standing in for, and a stronger
+    one: two manifests describing different fleets is the actual failure."""
+    from kg_microbe_governance import load_governance_manifest
+    from kg_microbe_governance.fleet_audit import expected_mechs
+
+    assert set(load_governance_manifest().consumers) == set(expected_mechs())

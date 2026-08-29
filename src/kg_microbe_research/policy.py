@@ -1,10 +1,10 @@
 """Execution policy: what it takes before a provider may actually be called.
 
-Today four of the five Mech runners execute a provider unless the caller passes
-`--dry-run`, so the *default* action spends credits; only ProteinTraitsMech
-defaults to dry-run and requires `--apply`. None of the five has any notion of
-authorizing a *paid* call specifically, and none binds execution to the triage
-result — `--provider` is accepted verbatim, so a manually named provider
+Today every Mech runner but one executes a provider unless the caller passes
+`--dry-run`, so the *default* action spends credits; ProteinTraitsMech is the
+exception, defaulting to dry-run and requiring `--apply`. None of them has any
+notion of authorizing a *paid* call specifically, and none binds execution to
+the triage result — `--provider` is accepted verbatim, so a manually named provider
 silently escapes both the profile's allowlist and its no-paid filter.
 
 This module is the single gate. Three independent conditions govern a call:

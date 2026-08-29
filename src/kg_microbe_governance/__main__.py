@@ -30,7 +30,10 @@ def _parser() -> argparse.ArgumentParser:
 
     fleet_parser = subparsers.add_parser(
         "fleet-audit",
-        help="Audit all five clean origin/main worktrees against one claw pin",
+        help=(
+            "Audit every manifest-declared Mech's clean origin/main worktree "
+            "against one claw pin"
+        ),
     )
     fleet_parser.add_argument("--ref", required=True, help="Expected full claw commit SHA")
     fleet_parser.add_argument(

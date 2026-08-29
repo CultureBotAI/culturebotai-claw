@@ -398,7 +398,11 @@ plugin.clear_cache(older_than_seconds=604800)  # Remove entries > 7 days old
 2. **Implement MediaIngredientMech environmental_context field** (schema + relevance enum)
 3. **Create ENVO term lookup utilities** for batch curation workflows
 4. **Add validation rules** for ENVO ID format and term existence
-5. **Build environment-aware queries** across all three repositories
+5. **Build environment-aware queries** across the repositories that carry an
+   environment field — CultureMech (`source_environment`),
+   MediaIngredientMech (`environmental_context`) and CommunityMech
+   (`environment_term`). That is a scientific input set, not fleet
+   membership: a Mech without an environment field is not missing from it.
 6. **Integrate with ingredient/media curation pipelines** for automated enrichment
 7. **Create curation workflows** that leverage environment metadata for discovery
 
