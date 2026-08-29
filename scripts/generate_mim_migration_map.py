@@ -1,4 +1,4 @@
-#!/usr/bin/env /opt/homebrew/bin/python3.13
+#!/usr/bin/env python3
 """
 Build a migration map: old MediaIngredientMech:000xxx numeric IDs that
 kg-microbe still xrefs → current MIM:<slug> IDs (where determinable).
@@ -16,20 +16,27 @@ Actions:
 
 from __future__ import annotations
 
+import argparse
 import csv
+import os
+import sys
 from collections import defaultdict
 from pathlib import Path
 
-WORKSPACE = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/workspace"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+MIM_ROOT = Path(
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
 )
+WORKSPACE = REPO_ROOT / "workspace"
 AUDIT_TSV = WORKSPACE / "reports/kgm_mim_audit.tsv"
-MIM_SSSOM = Path(
-    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/"
-    "MediaIngredientMech/mappings/ingredient_mappings.sssom.tsv"
-)
+MIM_SSSOM = MIM_ROOT / "mappings" / "ingredient_mappings.sssom.tsv"
 OUT_TSV = WORKSPACE / "reports/mim_numeric_namespace_migration.tsv"
 OUT_MD = WORKSPACE / "reports/mim_numeric_namespace_migration.md"
+
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
 
 COLS = [
     "old_id", "kgm_chebi", "kgm_label", "new_mim_id",
@@ -179,6 +186,16 @@ def write_md(path: Path, rows: list[dict]) -> None:
 
 
 def main() -> None:
+    argparse.ArgumentParser(
+        description=(
+            "Map old MediaIngredientMech:000xxx numeric IDs that kg-microbe "
+            "still xrefs onto current MIM:<slug> IDs. Reads "
+            f"{AUDIT_TSV.name} and MediaIngredientMech "
+            f"(MEDIAINGREDIENTMECH_ROOT); writes to {WORKSPACE / 'reports'}."
+        )
+    ).parse_args()
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
+
     print("[1/3] Loading MIM SSSOM CHEBI index")
     mim_index = load_mim_chebi_index()
     print(f"      {len(mim_index)} unique CHEBIs in MIM")
