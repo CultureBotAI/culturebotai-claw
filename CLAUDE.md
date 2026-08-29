@@ -308,6 +308,13 @@ surfaced as warnings, since carrying licence provenance is what the catalogue
 is for. A Mech that declares `source_catalogue: disabled` reports the recorded
 reason and exits zero, rather than reading as a missing file.
 
+`kg_microbe_sources.fetch` downloads one source release: bounded retries, then
+size/digest/prefix/content validation, then an atomic replace with a provenance
+sidecar. The transport is injectable, so the interesting behaviour is testable
+offline; `curl` is only the default. `verify(path)` reads a file back against
+its sidecar, which is what makes a torn promotion detectable rather than
+believed.
+
 `kg-microbe-skills check` validates every path and sibling-skill reference in
 `.claude/`. It judges a reference against the repository it belongs to, and
 reports what it could not resolve rather than calling it broken: `missing` and
