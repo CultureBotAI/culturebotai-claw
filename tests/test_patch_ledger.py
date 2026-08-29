@@ -160,3 +160,52 @@ def test_a_missing_input_is_ignored(tmp_path):
     artifact.write_text("out\n", encoding="utf-8")
 
     assert staleness(artifact, [tmp_path / "absent.tsv"]) == []
+
+
+# --------------------------------------------------------------------------
+# #195: bookkeeping must not fail a run that produced its product
+# --------------------------------------------------------------------------
+
+
+def test_record_stays_strict_for_callers_that_want_the_history(ledger):
+    """The generator tolerates a corrupt ledger; `record` itself must not
+    pretend it read one."""
+    ledger.write_text("{broken", encoding="utf-8")
+
+    with pytest.raises(LedgerError):
+        record(ledger, ["a"], now=MOMENT)
+
+
+def test_the_generator_survives_a_corrupt_ledger(tmp_path, monkeypatch, capsys):
+    """The patches are the product; the ledger is bookkeeping. A run that wrote
+    its patches must not then fail on the history file (#195)."""
+    import importlib.util
+    import sys
+
+    root = Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(root / "scripts"))
+    spec = importlib.util.spec_from_file_location(
+        "_xref_patches_under_test", root / "scripts" / "generate_kgm_xref_patches.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    try:
+        spec.loader.exec_module(module)
+    except Exception:  # pragma: no cover - needs kg-microbe to import
+        pytest.skip("generator dependencies are not available")
+
+    patches = tmp_path / "patches"
+    patches.mkdir()
+    (patches / "patch_ledger.json").write_text("{broken", encoding="utf-8")
+    monkeypatch.setattr(module, "PATCHES_DIR", patches)
+    monkeypatch.setattr(module, "OUT_TSV", patches / "p.tsv")
+    monkeypatch.setattr(module, "OUT_MD", patches / "p.md")
+    monkeypatch.setattr(module, "build_patches", lambda *a, **k: [])
+    monkeypatch.setattr(module, "load_mim_sssom_chebi_to_mim", lambda: {})
+    monkeypatch.setattr(module, "load_kgm_xrefs", lambda: {})
+    monkeypatch.setattr(module, "load_migration_map", lambda: [])
+
+    module.main()
+
+    assert (patches / "p.tsv").is_file(), "the product must still be written"
+    assert "patch ledger unavailable" in capsys.readouterr().out

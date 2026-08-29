@@ -44,6 +44,7 @@ PATCHES_DIR = WORKSPACE / "patches"
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 from kg_microbe_patches import (  # noqa: E402
     LEDGER_FILENAME,
+    LedgerError,
     describe,
     record,
     staleness,
@@ -243,13 +244,25 @@ def main() -> None:
 
     # Record the set so an unapplied backlog is visible. This tracks; applying
     # means changing kg-microbe, a separate repository and a separate decision.
-    entry, verdict = record(
-        PATCHES_DIR / LEDGER_FILENAME,
+    #
+    # The ledger is bookkeeping and the patches are the product, so a corrupt
+    # ledger warns rather than failing a generation that already succeeded
+    # (#195). record() itself stays strict for callers that want the history.
+    try:
+        entry, verdict = record(
+            PATCHES_DIR / LEDGER_FILENAME,
         # Fingerprint the exact rows the TSV publishes, so the ledger tracks
         # what a reader is asked to act on rather than an internal shape.
-        ["\t".join(str(r.get(c, "")) for c in COLS) for r in rows],
-    )
-    print(f"      {describe(entry, verdict)}")
+            ["\t".join(str(r.get(c, "")) for c in COLS) for r in rows],
+        )
+    except LedgerError as exc:
+        print(
+            f"      (patch ledger unavailable: {exc}; the patches above are "
+            f"unaffected. Delete {PATCHES_DIR / LEDGER_FILENAME} to start a new "
+            f"history.)"
+        )
+    else:
+        print(f"      {describe(entry, verdict)}")
 
 
 if __name__ == "__main__":
