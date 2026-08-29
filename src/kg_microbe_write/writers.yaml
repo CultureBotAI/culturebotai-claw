@@ -21,40 +21,25 @@ version: 1
 
 writers:
   scripts/apply_evidence_proposals.py:
-    status: exception
+    status: transaction
     targets: >-
       MediaIngredientMech ingredient YAMLs, adding MappingEvidence blocks
       parsed from workspace/reports/evidence_proposals/.
-    reason: >-
-      Not yet migrated to ValidatedWriteTransaction. Applies curator-reviewed
-      drafts record by record, so a failure part-way through leaves an unknown
-      subset applied.
-    review_by: 2027-02-28
 
   scripts/backfill_cas_chemistry.py:
-    status: exception
+    status: transaction
     targets: >-
       MediaIngredientMech ingredient YAMLs, filling chemical_properties
       (molecular_formula, smiles, inchi) for cas:* identifiers from PubChem.
-    reason: >-
-      Not yet migrated. Writes per record while calling an external API, so an
-      interruption mid-run is likely rather than theoretical.
-    review_by: 2027-02-28
 
   scripts/backfill_chebi_chemistry.py:
-    status: exception
+    status: transaction
     targets: >-
       MediaIngredientMech ingredient YAMLs, filling chemical_properties from
       the local CHEBI sqlite for CHEBI-identified records.
-    reason: >-
-      Not yet migrated. Same per-record write loop as its CAS sibling.
-    review_by: 2027-02-28
 
   scripts/foodon_pass.py:
-    status: exception
+    status: transaction
     targets: >-
       MediaIngredientMech ingredient YAMLs in the heuristic-complex bucket,
       applying FOODON groundings.
-    reason: >-
-      Not yet migrated. Writes groundings per record during a resolver pass.
-    review_by: 2027-02-28

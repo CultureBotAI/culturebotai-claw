@@ -26,14 +26,46 @@ from kg_microbe_write import (
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_the_registry_declares_exactly_the_writers_that_exist():
-    """A script that starts calling write_yaml must be declared, and a script
-    that stops must be removed -- both directions, or the registry drifts."""
+def test_every_unmigrated_writer_is_declared():
+    """The detector finds scripts still using the shared, non-atomic helper.
+
+    Those are the UNMIGRATED writers, so the detected set must be a subset of
+    the registry -- not equal to it. Once a writer moves to the transaction it
+    stops importing the helper and drops out of detection while staying
+    declared, which is the whole point of the migration.
+    """
     declared = set(load_registry())
     found = discover_corpus_writers(ROOT)
 
-    assert found, "no corpus writers detected; this test would be vacuous"
-    assert declared == found
+    unregistered = found - declared
+    assert not unregistered, (
+        f"scripts use the shared non-atomic write helper but are not in the "
+        f"registry: {sorted(unregistered)}"
+    )
+
+
+def test_a_detected_writer_is_never_marked_as_migrated():
+    """A script still importing the helper cannot be using the transaction."""
+    registry = load_registry()
+    found = discover_corpus_writers(ROOT)
+
+    for path in found:
+        assert registry[path].status == "exception", (
+            f"{path} still uses the shared write helper but is registered as "
+            f"having moved to the transaction"
+        )
+
+
+def test_a_migrated_writer_no_longer_uses_the_shared_helper():
+    """The converse: `transaction` status must be earned, not asserted."""
+    found = discover_corpus_writers(ROOT)
+
+    for path, entry in load_registry().items():
+        if entry.uses_transaction:
+            assert path not in found, (
+                f"{path} claims to use the transaction while still importing "
+                f"and calling the shared write helper"
+            )
 
 
 def test_every_exception_is_reasoned_and_time_bounded():
@@ -59,12 +91,10 @@ def test_every_declared_writer_file_exists():
         assert (ROOT / path).is_file(), path
 
 
-def test_a_writer_using_the_transaction_is_not_registered_as_an_exception():
-    """classify_ingredient_type moved to the transaction; if it were still
-    listed as an exception the registry would understate the progress."""
-    registry = load_registry()
-
-    for path, entry in registry.items():
+def test_a_writer_importing_the_transaction_is_registered_as_migrated():
+    """If a converted writer were still listed as an exception the registry
+    would understate the progress and keep a stale review date alive."""
+    for path, entry in load_registry().items():
         source = (ROOT / path).read_text(encoding="utf-8")
         if "ValidatedWriteTransaction" in source:
             assert entry.status == "transaction", path

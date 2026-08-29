@@ -57,8 +57,29 @@ RATE_DELAY = 0.25  # 4 req/s
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from classify_ingredient_type import (  # noqa: E402
-    _COMPLEX_RE, load_yaml, write_yaml, append_curation_event,
+    _COMPLEX_RE,
+    append_curation_event,
+    load_yaml,
 )
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+from classify_ingredient_type import dump_yaml  # noqa: E402
+
+from kg_microbe_write import ValidatedWriteTransaction  # noqa: E402
+
+# Staged rather than written per record: a failure part-way through a per-record
+# write loop leaves an unknown subset of MediaIngredientMech modified with no
+# recovery path (#156). The transaction validates the whole set first, replaces
+# atomically, and journals prior contents.
+_TRANSACTION = None
+
+
+def _staged_write(path, record) -> None:
+    """Stage a record into the run's transaction instead of writing it."""
+    if _TRANSACTION is None:
+        raise RuntimeError("no write transaction is open for this run")
+    _TRANSACTION.stage(path, dump_yaml(record))
+
 
 
 def _norm(s: str) -> str:
@@ -229,7 +250,7 @@ def upgrade_yaml(path: Path, ontology_id: str, ontology_label: str,
     append_curation_event(
         record, f"AUTO_UPGRADE_TO_{prefix or 'ONTOLOGY'}",
         f"primary {prev_ident} → {ontology_id} ({match_type})")
-    write_yaml(path, record)
+    _staged_write(path, record)
     return "upgraded"
 
 
@@ -241,6 +262,11 @@ def main() -> int:
                     help="skip MEDIUM (fuzzy-top) matches")
     ap.add_argument("--limit", type=int, default=None)
     args = ap.parse_args()
+    global _TRANSACTION
+    _TRANSACTION = ValidatedWriteTransaction(
+        MIM_ROOT,
+        journal_dir=OUT_DIR / "write_journal",
+    )
 
     if not INVENTORY_TSV.is_file():
         print("Run `just inventory-unmapped` first.", file=sys.stderr)
@@ -408,6 +434,9 @@ def main() -> int:
         print(f"  {k:25s} {v}")
     print(f"\nReports: {OUT_TSV.relative_to(REPO_ROOT)}")
     print(f"         {OUT_MD.relative_to(REPO_ROOT)}")
+    _result = _TRANSACTION.commit(apply=args.apply)
+    if args.apply and _result.touched:
+        print(f"Wrote {_result.touched} record(s); journal: {_result.journal_path}")
     return 0
 
 
