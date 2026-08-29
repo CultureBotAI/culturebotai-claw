@@ -316,3 +316,24 @@ def test_the_json_payload_carries_the_counts_and_findings(corpus, capsys):
     assert payload["records_scanned"] == 2
     assert payload["groups_disagreeing"] == 1
     assert payload["findings"][0]["disagreements"][0]["field"] == "ontology_id"
+
+
+def test_skipped_files_are_counted_not_silently_dropped(corpus):
+    """"0 records" and "0 records out of 900 I could not read" are different
+    answers, and only the first means the corpus is clean. Pointing the scanner
+    at a Mech whose records have another shape reported the former."""
+    (corpus / "not_a_record.yaml").write_text("some: mapping\n", encoding="utf-8")
+    (corpus / "also_not.yaml").write_text("other: thing\n", encoding="utf-8")
+    write(corpus, "real", preferred_term="glucose", ontology_id="CHEBI:17234")
+
+    report = scan(corpus)
+
+    assert report["records_scanned"] == 1
+    assert report["files_skipped"] == 2
+
+
+def test_a_wholly_unreadable_corpus_says_so(corpus, capsys):
+    (corpus / "a.yaml").write_text("some: mapping\n", encoding="utf-8")
+
+    assert _cli(["--corpus", str(corpus)]) == 0
+    assert "not a clean corpus" in capsys.readouterr().err

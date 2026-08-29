@@ -48,6 +48,13 @@ def main(argv: list[str] | None = None) -> int:
             f"{report['groups_matched']} matched group(s); "
             f"{report['groups_disagreeing']} disagree."
         )
+        if report["files_skipped"]:
+            print(
+                f"Skipped {report['files_skipped']} file(s) with no usable "
+                f"record shape. A corpus where everything is skipped is not a "
+                f"clean corpus -- check --corpus and --glob.",
+                file=sys.stderr,
+            )
         print(f"Compared fields: {', '.join(COMPARED_FIELDS)}\n")
         for finding in report["findings"]:
             print(f"[{finding['matched_on']}] {finding['key']}")

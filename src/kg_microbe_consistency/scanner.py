@@ -153,13 +153,22 @@ def load_record(path: Path) -> Record | None:
     )
 
 
-def load_corpus(root: Path, glob: str = "**/*.yaml") -> list[Record]:
-    """Every usable record under `root`."""
+def load_corpus(root: Path, glob: str = "**/*.yaml") -> tuple[list[Record], int]:
+    """Every usable record under `root`, and how many files were skipped.
+
+    The skipped count is returned rather than discarded because "0 records"
+    and "0 records out of 900 files I could not read" are different answers,
+    and only the first means the corpus is clean. Pointing this at a Mech whose
+    records use a different shape reported the former (#161's failure, in a new
+    place).
+    """
     directory = Path(root)
     if not directory.is_dir():
         raise ScannerError(f"corpus directory does not exist: {directory}")
-    records = [load_record(path) for path in sorted(directory.glob(glob))]
-    return [record for record in records if record is not None]
+    paths = sorted(directory.glob(glob))
+    records = [load_record(path) for path in paths]
+    usable = [record for record in records if record is not None]
+    return usable, len(paths) - len(usable)
 
 
 def group_records(records: Sequence[Record]) -> list[Group]:
@@ -230,7 +239,7 @@ def find_disagreements(
 
 def scan(root: Path, glob: str = "**/*.yaml") -> dict[str, Any]:
     """Scan a corpus and report every matched group that disagrees."""
-    records = load_corpus(root, glob)
+    records, skipped = load_corpus(root, glob)
     groups = group_records(records)
     flagged = []
     for group in groups:
@@ -242,6 +251,7 @@ def scan(root: Path, glob: str = "**/*.yaml") -> dict[str, Any]:
     return {
         "root": str(root),
         "records_scanned": len(records),
+        "files_skipped": skipped,
         "groups_matched": len(groups),
         "groups_disagreeing": len(flagged),
         "findings": [group.as_dict() for group in flagged],
