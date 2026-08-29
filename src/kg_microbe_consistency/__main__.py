@@ -83,9 +83,9 @@ def main(argv: list[str] | None = None) -> int:
             "proposals": [item.as_dict() for item in proposed],
             "surfaced_without_proposal": [g.as_dict() for g in surfaced],
         }
-        unmodelled = unmodelled_qualities(groups)
+        unmodelled = sorted(unmodelled_qualities(groups))
         if not proposed and surfaced and unmodelled:
-            payload["unmodelled_mapping_qualities"] = sorted(unmodelled)
+            payload["unmodelled_mapping_qualities"] = unmodelled
         if args.json:
             print(json.dumps(payload, indent=2))
         else:
@@ -94,7 +94,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(
                     f"No proposal was made for any of them. The rule classifies "
                     f"records by mapping_quality, and this corpus uses "
-                    f"{', '.join(payload['unmodelled_mapping_qualities'])}, which "
+                    f"{', '.join(unmodelled)}, which "
                     f"it does not model -- so this is 'not applicable here', not "
                     f"'nothing to propose'.",
                     file=sys.stderr,
