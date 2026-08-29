@@ -273,10 +273,26 @@ def test_no_skill_reference_is_broken_within_claw():
     what one checkout can know -- which is exactly the distinction the
     unverifiable verdict exists to preserve.
     """
-    findings = check(ROOT)
+    findings = check(ROOT, {"culturebotai-claw": ROOT}, mech_labels=set())
     broken = [f for f in findings if f.verdict in ("missing", "ambiguous")]
 
     assert not broken, format_report(findings)
+
+
+def test_the_claw_gate_can_actually_fail(tmp_path):
+    """Guards the test above. Run without claw as its own repository, a claw
+    path that no longer exists came back `unverifiable` and the gate passed --
+    the checker's whole purpose defeated in the configuration it runs in
+    (#216)."""
+    probe = tmp_path / "SKILL.md"
+    probe.write_text(
+        "---\nname: p\n---\nRun `src/kg_microbe_fleet/deleted.py`.\n",
+        encoding="utf-8",
+    )
+
+    findings = check(ROOT, {"culturebotai-claw": ROOT}, files=[probe], mech_labels=set())
+
+    assert [f.verdict for f in findings] == ["missing"], format_report(findings)
 
 
 def test_the_report_lists_problems_and_only_counts_the_rest(tmp_path):
@@ -413,3 +429,38 @@ def test_a_directory_that_is_not_a_checkout_falls_back_to_the_filesystem(tmp_pat
     _skill(tmp_path, "s", "Read `Plain/data/x.tsv`.\n")
 
     assert check(tmp_path, {"Plain": plain})[0].verdict == "ok"
+
+
+def test_the_cli_catches_a_deleted_claw_path_with_no_mech_checked_out(
+    tmp_path, monkeypatch, capsys
+):
+    """#216, in the configuration CI actually runs.
+
+    With Mech checkouts present, a claw path absent from claw already falls to
+    `missing` because *some* repository was configured. With none -- which is
+    every CI runner -- it fell to `unverifiable`, and the command exited 0.
+    Claw answering for its own paths is what closes that, and it only shows
+    when nothing else is resolvable, which is why this test unsets the roots.
+    """
+    from kg_microbe_skills.__main__ import main
+
+    for variable in (
+        "CULTUREMECH_ROOT",
+        "MEDIAINGREDIENTMECH_ROOT",
+        "COMMUNITYMECH_ROOT",
+        "TRAITMECH_ROOT",
+        "PROTEINTRAITSMECH_ROOT",
+        "KGMICROBE_ROOT",
+    ):
+        monkeypatch.delenv(variable, raising=False)
+
+    skill = tmp_path / ".claude" / "skills" / "probe"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text(
+        "---\nname: probe\n---\nRun `src/kg_microbe_fleet/deleted.py`.\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+
+    assert main(["check"]) == 1, capsys.readouterr().out
+    assert "MISSING" in capsys.readouterr().out

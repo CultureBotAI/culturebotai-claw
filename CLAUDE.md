@@ -304,7 +304,15 @@ reports what it could not resolve rather than calling it broken: `missing` and
 `ambiguous` fail the command, `unverifiable` does not. A skill whose bare paths
 are relative to another repository declares `reference-root:` in its
 frontmatter -- a repository name, or `mech` for a path that exists in every
-Mech. Existence is decided by git, not the filesystem, so the verdict is the same on
+Mech. `kg-microbe-skills catalogue` lists every skill with its scope -- `claw`,
+`fleet` (resolves the repositories it acts on from the manifest), or `domain`
+(scientific policy for one corpus) -- plus the canonical templates and, from
+the capability each declares, which Mechs need an adapter.
+`kg-microbe-skills render --skill X --mech Y` prints one. It prints; installing
+an adapter into a Mech checkout is a downstream mutation and goes through the
+cross-repository checklist as its own change.
+
+Existence is decided by git, not the filesystem, so the verdict is the same on
 a laptop and in CI: tracked is fine, gitignored counts as a generated artifact,
 and neither means no clone of that repository has it. It reads
 backticked text only, so a path inside a fenced code block is not checked

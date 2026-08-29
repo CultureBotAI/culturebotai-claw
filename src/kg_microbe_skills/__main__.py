@@ -9,6 +9,14 @@ from pathlib import Path
 
 from kg_microbe_fleet import load_fleet_manifest
 from kg_microbe_fleet.roots import MechRootError, resolve_mech_root
+from kg_microbe_skills.catalogue import (
+    CatalogueError,
+    applicable_mechs,
+    canonical_text,
+    load_canonical,
+    load_catalogue,
+    render_adapter,
+)
 from kg_microbe_skills.references import check, format_report
 
 # kg-microbe is not a Mech, so the manifest does not describe it; the
@@ -35,17 +43,24 @@ def find_claw_root(start: Path | None = None) -> Path:
     )
 
 
-def _downstream(claw_root: Path) -> tuple[dict[str, Path], list[str], set[str]]:
+def _downstream(
+    claw_root: Path,
+) -> tuple[dict[str, Path], list[str], set[str], set[str]]:
     """Every checkout that could be resolved, and the ones that could not.
 
     An unresolvable checkout is not an error here: the checker reports what it
     could not verify instead of failing outright, and `--require-sources`
     turns that into a failure for callers that need the full answer.
     """
-    resolved: dict[str, Path] = {}
+    # Claw answers for its own paths. Without it, a claw skill citing a claw
+    # file that no longer exists came back `unverifiable` rather than
+    # `missing` -- the checker's whole purpose, defeated in the one
+    # configuration the gate actually runs in (#216).
+    resolved: dict[str, Path] = {"culturebotai-claw": claw_root}
     absent: list[str] = []
     manifest = load_fleet_manifest()
     known = {"kg-microbe"}
+    mech_labels = {m.display_name for m in manifest.mechs.values()}
     for key in sorted(manifest.mechs):
         display = manifest.mechs[key].display_name
         known.add(display)
@@ -60,7 +75,38 @@ def _downstream(claw_root: Path) -> tuple[dict[str, Path], list[str], set[str]]:
         resolved["kg-microbe"] = kgm
     else:
         absent.append("kg-microbe")
-    return resolved, absent, known
+    return resolved, absent, known, mech_labels
+
+
+def _print_catalogue() -> int:
+    """What is here, what it is for, and what gets rendered per Mech."""
+    entries = load_catalogue()
+    width = max(len(name) for name in entries)
+    for scope in ("claw", "fleet", "domain"):
+        named = sorted(n for n, e in entries.items() if e.scope == scope)
+        print(f"{scope} ({len(named)})")
+        for name in named:
+            print(f"  {name:<{width}}  {entries[name].reason.splitlines()[0]}")
+    canonical = load_canonical()
+    print(f"\ncanonical templates ({len(canonical)})")
+    for name, skill in sorted(canonical.items()):
+        mechs = applicable_mechs(skill)
+        print(f"  {name}  [{skill.capability}] -> {', '.join(mechs)}")
+    return 0
+
+
+def _render(skill: str | None, mech: str | None) -> int:
+    """Print one adapter. Printing, not installing: writing it into a Mech is a
+    downstream mutation and goes through the cross-repository checklist."""
+    if not skill or not mech:
+        print("render needs --skill and --mech", file=sys.stderr)
+        return 2
+    try:
+        print(render_adapter(canonical_text(skill), mech), end="")
+    except CatalogueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -71,7 +117,18 @@ def main(argv: list[str] | None = None) -> int:
             "repository's skills points at something that exists."
         ),
     )
-    parser.add_argument("command", choices=["check"])
+    parser.add_argument(
+        "command",
+        choices=["check", "catalogue", "render"],
+        help=(
+            "check: validate every reference; catalogue: list every skill and "
+            "its scope; render: print one Mech's adapter for a canonical skill"
+        ),
+    )
+    parser.add_argument(
+        "--skill", help="render: which canonical skill (see `catalogue`)"
+    )
+    parser.add_argument("--mech", help="render: which Mech, by manifest key")
     parser.add_argument(
         "--require-sources",
         action="store_true",
@@ -82,9 +139,19 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
+    # `catalogue` and `render` read packaged data, so they work from anywhere.
+    # Only `check` needs a checkout, and it finds one after parsing so --help
+    # still works without (#179).
+    if args.command == "catalogue":
+        return _print_catalogue()
+    if args.command == "render":
+        return _render(args.skill, args.mech)
+
     claw_root = find_claw_root()
-    downstream, absent, known = _downstream(claw_root)
-    findings = check(claw_root, downstream, repositories=known)
+    downstream, absent, known, mech_labels = _downstream(claw_root)
+    findings = check(
+        claw_root, downstream, repositories=known, mech_labels=mech_labels
+    )
 
     print(format_report(findings))
     if absent:
