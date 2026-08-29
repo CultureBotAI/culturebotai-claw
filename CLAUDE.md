@@ -85,7 +85,7 @@ Experimental or disabled:
 - Unified ingredient-mapping apply mode; it raises until all YAML writes are transactional.
 - Provider command construction and *execution*, including an executable mock
   provider. `kg_microbe_research` decides whether a call is permitted; it does
-  not make one. None of the five Mech runners consults this gate yet. Four
+  not make one. None of the Mech runners consults this gate yet. Four
   runners still execute live by default; ProteinTraitsMech is dry-run-first.
 - Provider executors, domain adapters, historical-result migrations, and the
   five migrated Mech runners.

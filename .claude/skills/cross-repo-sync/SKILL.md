@@ -12,8 +12,14 @@ tags: [sync, integration, chebi, kg-microbe, unified-mapping, culturemech, mim, 
 
 ## Overview
 
-Maintains consistency across the three downstream repos by running a standard
-sequence of scripts that:
+Maintains consistency across CultureMech, MediaIngredientMech, and kg-microbe
+by running a standard sequence of scripts. Those three are a **scientific input
+set**, not fleet membership: kg-microbe is not a Mech, and the Mechs without an
+ingredient corpus are absent because they have no part in this pipeline, not
+because they were overlooked. The fleet itself is defined in the packaged
+manifest.
+
+The sequence:
 
 1. Build a unified ingredient mapping (CultureMech names × MIM records)
 2. Backfill CHEBI IDs from MIM into CultureMech ingredient `term.id` fields
