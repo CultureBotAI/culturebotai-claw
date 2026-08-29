@@ -62,6 +62,12 @@ Supported:
 - `LockManager` atomic, lease-owned file coordination.
 - Plugin and agent discovery and validated CLI dry runs.
 - Packaged history, QC dashboard, discussion-browser, and knowledge-gap tools.
+- `kg_microbe_write`: the shared `ValidatedWriteTransaction` -- stage every
+  change, validate the complete set, then replace atomically with a recovery
+  journal. Nothing is written until `commit(apply=True)`; a dry run still
+  validates. It does not resolve repositories, take locks, or decide
+  authorization: `RepositorySettings` and `LockManager` own those, and it
+  refuses to write outside the root it is handed.
 - `kg_microbe_research`: the shared provider catalogue, focus-profile
   validation, deterministic triage, execution-policy gate, packaged LinkML
   result schema, strict result validator, and append-only dry-run scaffolder.
@@ -100,7 +106,7 @@ uv run --extra dev mypy \
   cli/main.py plugins/repository_settings.py plugins/lock_manager.py \
   plugins/git_integration.py plugins/just_runner.py \
   src/kg_microbe_history src/kg_microbe_kgscan src/kg_microbe_fleet \
-  src/kg_microbe_research \
+  src/kg_microbe_research src/kg_microbe_write \
   src/kg_microbe_governance/__init__.py \
   src/kg_microbe_governance/__main__.py \
   src/kg_microbe_governance/fleet_audit.py \
@@ -275,7 +281,10 @@ uv run kg-microbe-discussions --help
 - Return nonzero from CLI failures; printing an error is not sufficient.
 - Do not swallow partial failures into a successful report.
 - Use timezone-aware UTC timestamps.
-- Use atomic creation/replacement for locks and curated data.
+- Use atomic creation/replacement for locks and curated data. For a writer that
+  touches more than one file, prefer `ValidatedWriteTransaction` over a
+  per-record write loop: writing as you go means a failure part-way through
+  leaves an unknown subset of the corpus modified.
 - Preserve unrelated user changes and generated artifacts.
 - Prefer `uv run python` over machine-specific interpreter paths.
 - Keep README user-facing; put agent-only constraints here; put detailed design
