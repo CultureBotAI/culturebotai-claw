@@ -24,6 +24,7 @@ Output:
 from __future__ import annotations
 
 import csv
+import sys
 from collections import defaultdict
 from pathlib import Path
 
@@ -39,6 +40,15 @@ MIM_SSSOM = Path(
 KGM_DICT = KGM_UNIFIED_SSSOM
 MIGRATION_TSV = WORKSPACE / "reports/mim_numeric_namespace_migration.tsv"
 PATCHES_DIR = WORKSPACE / "patches"
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+from kg_microbe_patches import (  # noqa: E402
+    LEDGER_FILENAME,
+    describe,
+    record,
+    staleness,
+)
+
 OUT_TSV = PATCHES_DIR / "kgm_xref_patches.tsv"
 OUT_MD = PATCHES_DIR / "kgm_xref_patches.md"
 
@@ -216,10 +226,30 @@ def main() -> None:
 
     rows = build_patches(mim_idx, kgm_xrefs, migration)
     PATCHES_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Staleness of the PREVIOUS artifact, checked before overwriting it. The
+    # file in the repository was four months old with nothing saying so (#129
+    # item 4).
+    outdated_by = staleness(OUT_TSV, [MIM_SSSOM, KGM_DICT])
+
     write_tsv(OUT_TSV, rows)
     write_md(OUT_MD, rows)
     print(f"[4/4] Wrote {OUT_TSV}")
     print(f"      Wrote {OUT_MD}")
+
+    if outdated_by:
+        names = ", ".join(Path(p).name for p in outdated_by)
+        print(f"      (the previous patch set predated {names})")
+
+    # Record the set so an unapplied backlog is visible. This tracks; applying
+    # means changing kg-microbe, a separate repository and a separate decision.
+    entry, verdict = record(
+        PATCHES_DIR / LEDGER_FILENAME,
+        # Fingerprint the exact rows the TSV publishes, so the ledger tracks
+        # what a reader is asked to act on rather than an internal shape.
+        ["\t".join(str(r.get(c, "")) for c in COLS) for r in rows],
+    )
+    print(f"      {describe(entry, verdict)}")
 
 
 if __name__ == "__main__":

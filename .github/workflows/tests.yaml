@@ -57,6 +57,7 @@ jobs:
           src/kg_microbe_research
           src/kg_microbe_write
           src/kg_microbe_consistency
+          src/kg_microbe_patches
           src/kg_microbe_governance/__init__.py
           src/kg_microbe_governance/__main__.py
           src/kg_microbe_governance/fleet_audit.py
