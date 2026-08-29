@@ -75,8 +75,9 @@ def test_a_writer_using_the_transaction_is_not_registered_as_an_exception():
 # --------------------------------------------------------------------------
 
 
-def test_a_call_to_the_shared_helper_is_detected():
-    assert calls_shared_record_writer("write_yaml(path, record)\n") is True
+def test_a_bare_call_without_the_shared_import_is_not_detected():
+    """Calling something named write_yaml proves nothing on its own (#172)."""
+    assert calls_shared_record_writer("write_yaml(path, record)\n") is False
 
 
 @pytest.mark.parametrize(
@@ -102,13 +103,64 @@ def test_defining_the_helper_is_not_a_call(definition):
 
 def test_a_call_below_a_definition_is_still_detected():
     """Removing definition lines must not hide a real call in the same file."""
-    source = "def write_yaml(path, record):\n    ...\n\nwrite_yaml(p, r)\n"
+    source = (
+        "from classify_ingredient_type import write_yaml\n"
+        "def write_yaml(path, record):\n    ...\n\nwrite_yaml(p, r)\n"
+    )
 
     assert calls_shared_record_writer(source) is True
 
 
 def test_a_mention_in_a_comment_is_not_a_call():
     assert calls_shared_record_writer("# write_yaml(path, record) is legacy\n") is False
+
+
+def test_a_same_named_local_helper_is_not_the_shared_one():
+    """#172: `recurate_deprecated_and_removed` defines its own
+    `write_yaml(path, patches)` -- different signature, writes a patch file into
+    claw's own workspace -- and was registered as an in-place MIM corpus writer.
+
+    A fourth way to be wrong, alongside the report/cache/temp-file cases below:
+    the call site looks identical, so only the import distinguishes them.
+    """
+    source = (
+        "def write_yaml(path, patches):\n"
+        "    path.write_text(yaml.safe_dump(patches))\n"
+        "\n"
+        "write_yaml(OUT_YAML, patches)\n"
+    )
+
+    assert calls_shared_record_writer(source) is False
+
+
+def test_importing_and_calling_the_shared_helper_is_detected():
+    source = (
+        "from classify_ingredient_type import load_yaml, write_yaml\n"
+        "write_yaml(path, record)\n"
+    )
+
+    assert calls_shared_record_writer(source) is True
+
+
+def test_a_parenthesised_multi_name_import_is_detected():
+    """These scripts import several names across lines; reading one line of the
+    statement would miss the helper."""
+    source = (
+        "from classify_ingredient_type import (\n"
+        "    load_yaml,\n"
+        "    write_yaml,\n"
+        "    append_curation_event,\n"
+        ")\n"
+        "write_yaml(path, record)\n"
+    )
+
+    assert calls_shared_record_writer(source) is True
+
+
+def test_importing_without_calling_is_not_a_writer():
+    source = "from classify_ingredient_type import write_yaml\nprint('unused')\n"
+
+    assert calls_shared_record_writer(source) is False
 
 
 def test_the_detector_does_not_flag_report_or_cache_writers():
