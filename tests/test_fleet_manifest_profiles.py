@@ -45,6 +45,9 @@ EXPECTED_PROFILES = {
 }
 
 EXPECTED_CAPABILITIES = {
+    # Declared by #223: who keeps a download.yaml source catalogue, and why
+    # the three who do not have decided against one rather than forgotten.
+    "source_catalogue",
     "id_label_validation",
     "curation_history",
     "strict_validation",
