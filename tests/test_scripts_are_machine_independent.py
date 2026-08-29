@@ -169,3 +169,41 @@ def test_a_fixed_script_leaves_the_downstream_import_ledger(name):
         f"{name} no longer imports from a downstream checkout at module level "
         f"-- remove it from DOWNSTREAM_IMPORT_AT_MODULE_LEVEL"
     )
+
+
+# --------------------------------------------------------------------------
+# #207 review: adding a parser must not reject arguments a script already took
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("path", _scripts(), ids=lambda p: p.name)
+def test_a_script_that_reads_argv_declares_what_it_reads(path):
+    """#198 gave twenty scripts an argument parser so `--help` would work.
+    A bare parser rejects every positional -- and `chebi_semantic_audit` had
+    always taken its destination as `sys.argv[1]`, so parsing silently turned
+    a working invocation into `error: unrecognized arguments`.
+    """
+    source = path.read_text(encoding="utf-8")
+    if "parse_args" not in source or "sys.argv" not in source:
+        return
+
+    tree = ast.parse(source)
+    indexed = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Subscript)
+        and ast.unparse(node.value) == "sys.argv"
+    ]
+    if not indexed:
+        return
+
+    declared = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and getattr(node.func, "attr", "") == "add_argument"
+    ]
+    assert declared, (
+        f"{path.name} indexes sys.argv and also parses arguments, but declares "
+        f"none; the parser will reject what the indexing expects"
+    )
