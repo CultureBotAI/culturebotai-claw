@@ -7,7 +7,8 @@ import json
 import sys
 from pathlib import Path
 
-from .scanner import COMPARED_FIELDS, ScannerError, scan
+from .proposals import proposals_from_groups, render_markdown
+from .scanner import COMPARED_FIELDS, ScannerError, build_report, scan_groups
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -22,6 +23,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--glob", default="**/*.yaml")
     parser.add_argument("--json", action="store_true")
     parser.add_argument(
+        "--propose",
+        action="store_true",
+        help=(
+            "Also generate correct-by-analogy proposals. Read-only: a proposal "
+            "is a document for a curator, never applied."
+        ),
+    )
+    parser.add_argument(
         "--fail-on-findings", action="store_true",
         help=(
             "Exit 1 when any group disagrees. Off by default: a disagreement is "
@@ -35,12 +44,27 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
-        report = scan(Path(args.corpus), args.glob)
+        records, skipped, groups = scan_groups(Path(args.corpus), args.glob)
     except ScannerError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
-    if args.json:
+    report = build_report(Path(args.corpus), records, skipped, groups)
+
+    if args.propose:
+        proposed, surfaced = proposals_from_groups(groups)
+        payload = {
+            "root": str(args.corpus),
+            "records_scanned": len(records),
+            "files_skipped": skipped,
+            "proposals": [item.as_dict() for item in proposed],
+            "surfaced_without_proposal": [g.as_dict() for g in surfaced],
+        }
+        if args.json:
+            print(json.dumps(payload, indent=2))
+        else:
+            print(render_markdown(payload))
+    elif args.json:
         print(json.dumps(report, indent=2))
     else:
         print(
