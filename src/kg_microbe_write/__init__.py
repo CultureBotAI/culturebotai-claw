@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .transaction import (
+    DEFAULT_JOURNAL_RETENTION,
     JOURNAL_VERSION,
     Change,
     ValidatedWriteTransaction,
@@ -14,6 +15,7 @@ from .transaction import (
 )
 
 __all__ = [
+    "DEFAULT_JOURNAL_RETENTION",
     "JOURNAL_VERSION",
     "Change",
     "ValidatedWriteTransaction",

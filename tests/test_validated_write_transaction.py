@@ -289,3 +289,85 @@ def test_a_failed_write_leaves_no_temporary_files(root, monkeypatch):
     leftovers = [p.name for p in root.iterdir() if p.name.startswith(".")]
     assert leftovers == [], f"temporary files left behind: {leftovers}"
     assert (root / "a.yaml").read_text(encoding="utf-8") == "old\n"
+
+
+# --------------------------------------------------------------------------
+# #168: journals must stay bounded, without losing an interrupted one
+# --------------------------------------------------------------------------
+
+
+def _commit_once(root: Path, journal: Path, text: str, retention: int = 3):
+    transaction = ValidatedWriteTransaction(
+        root, journal_dir=journal, journal_retention=retention
+    )
+    transaction.stage("a.yaml", text)
+    return transaction.commit(apply=True)
+
+
+def test_completed_journals_are_pruned_to_the_retention_limit(root, tmp_path):
+    """Each journal embeds every changed file's prior content, so an apply over
+    a few thousand records is large and they otherwise accumulate for ever."""
+    journal = tmp_path / "journal"
+    _seed(root, "a.yaml", "v0\n")
+
+    for index in range(8):
+        _commit_once(root, journal, f"v{index + 1}\n", retention=3)
+
+    assert len(list(journal.glob("write-*.json"))) == 3
+
+
+def test_retention_of_one_keeps_only_the_run_that_just_finished(root, tmp_path):
+    journal = tmp_path / "journal"
+    _seed(root, "a.yaml", "v0\n")
+
+    _commit_once(root, journal, "v1\n", retention=1)
+    result = _commit_once(root, journal, "v2\n", retention=1)
+
+    remaining = list(journal.glob("write-*.json"))
+    assert remaining == [result.journal_path]
+
+
+def test_an_in_progress_journal_is_never_pruned(root, tmp_path):
+    """It is the one an interrupted run left behind, and the only record of
+    what it was doing. Pruning by age alone would delete exactly that."""
+    journal = tmp_path / "journal"
+    journal.mkdir()
+    stranded = journal / "write-interrupted.json"
+    stranded.write_text(
+        json.dumps({
+            "version": JOURNAL_VERSION,
+            "status": "in_progress",
+            "root": str(root),
+            "changed": [str(root / "a.yaml")],
+            "created": [],
+            "previous": {str(root / "a.yaml"): "the only copy\n"},
+        }),
+        encoding="utf-8",
+    )
+    _seed(root, "a.yaml", "v0\n")
+
+    for index in range(6):
+        _commit_once(root, journal, f"v{index + 1}\n", retention=2)
+
+    assert stranded.is_file(), "the interrupted journal was pruned"
+    assert recover(stranded)[str(root / "a.yaml")] == "the only copy\n"
+
+
+def test_a_retention_below_one_is_refused(root, tmp_path):
+    with pytest.raises(WriteError, match="at least 1"):
+        ValidatedWriteTransaction(
+            root, journal_dir=tmp_path / "j", journal_retention=0
+        )
+
+
+def test_pruning_ignores_an_unreadable_journal_rather_than_crashing(root, tmp_path):
+    """A corrupt file in the directory must not take down an unrelated write."""
+    journal = tmp_path / "journal"
+    journal.mkdir()
+    (journal / "write-garbage.json").write_text("{not json", encoding="utf-8")
+    _seed(root, "a.yaml", "v0\n")
+
+    result = _commit_once(root, journal, "v1\n", retention=2)
+
+    assert result.applied is True
+    assert (journal / "write-garbage.json").is_file()

@@ -31,6 +31,12 @@ from typing import Any
 
 JOURNAL_VERSION = 1
 
+# How many completed journals to keep. Each embeds the full prior content of
+# every file it changed, so an apply over a few thousand records produces a
+# large one and they otherwise accumulate for ever (#168). The same reasoning
+# bounded the publish-sssom audit log in #118.
+DEFAULT_JOURNAL_RETENTION = 10
+
 
 class WriteError(RuntimeError):
     """A write was refused, or could not be completed safely."""
@@ -109,10 +115,13 @@ class ValidatedWriteTransaction:
     root: Path
     validator: Validator | None = None
     journal_dir: Path | None = None
+    journal_retention: int = DEFAULT_JOURNAL_RETENTION
     _changes: dict[Path, Change] = field(default_factory=dict, init=False)
 
     def __post_init__(self) -> None:
         self.root = Path(self.root).resolve(strict=True)
+        if self.journal_retention < 1:
+            raise WriteError("journal_retention must be at least 1")
 
     # -- staging -----------------------------------------------------------
 
@@ -192,6 +201,7 @@ class ValidatedWriteTransaction:
                 f"{journal_path} records the intended set and prior contents"
             ) from exc
         self._complete_journal(journal_path)
+        self._prune_journals(keep=journal_path)
         return WriteResult(True, changed, unchanged, created, journal_path)
 
     # -- internals ---------------------------------------------------------
@@ -249,6 +259,35 @@ class ValidatedWriteTransaction:
         payload = json.loads(path.read_text(encoding="utf-8"))
         payload["status"] = "complete"
         _atomic_replace(path, json.dumps(payload, indent=2, sort_keys=True))
+
+
+    def _prune_journals(self, *, keep: Path | None) -> None:
+        """Drop the oldest completed journals, keeping the newest N.
+
+        An `in_progress` journal is never pruned however old it is: that is
+        exactly the one an interrupted run left behind, and the only record of
+        what it was doing. Pruning by age alone would delete the file recovery
+        depends on.
+        """
+        if self.journal_dir is None:
+            return
+        directory = Path(self.journal_dir)
+        completed: list[tuple[float, Path]] = []
+        for candidate in directory.glob("write-*.json"):
+            if keep is not None and candidate == keep:
+                continue
+            try:
+                payload = json.loads(candidate.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            if payload.get("status") != "complete":
+                continue
+            completed.append((candidate.stat().st_mtime, candidate))
+
+        # `keep` is the run that just finished and counts toward the budget.
+        surplus = len(completed) + (1 if keep is not None else 0)
+        for _, path in sorted(completed)[: max(0, surplus - self.journal_retention)]:
+            path.unlink(missing_ok=True)
 
 
 def _atomic_replace(path: Path, text: str) -> None:
