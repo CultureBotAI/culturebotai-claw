@@ -7,7 +7,11 @@ import json
 import sys
 from pathlib import Path
 
-from .proposals import proposals_from_groups, render_markdown
+from .proposals import (
+    proposals_from_groups,
+    render_markdown,
+    unmodelled_qualities,
+)
 from .scanner import (
     COMPARED_FIELDS,
     EXTRACTORS,
@@ -79,10 +83,22 @@ def main(argv: list[str] | None = None) -> int:
             "proposals": [item.as_dict() for item in proposed],
             "surfaced_without_proposal": [g.as_dict() for g in surfaced],
         }
+        unmodelled = unmodelled_qualities(groups)
+        if not proposed and surfaced and unmodelled:
+            payload["unmodelled_mapping_qualities"] = sorted(unmodelled)
         if args.json:
             print(json.dumps(payload, indent=2))
         else:
             print(render_markdown(payload))
+            if "unmodelled_mapping_qualities" in payload:
+                print(
+                    f"No proposal was made for any of them. The rule classifies "
+                    f"records by mapping_quality, and this corpus uses "
+                    f"{', '.join(payload['unmodelled_mapping_qualities'])}, which "
+                    f"it does not model -- so this is 'not applicable here', not "
+                    f"'nothing to propose'.",
+                    file=sys.stderr,
+                )
     elif args.json:
         print(json.dumps(report, indent=2))
     else:

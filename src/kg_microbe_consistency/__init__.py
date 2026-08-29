@@ -12,6 +12,7 @@ from .proposals import (
     proposals_from_groups,
     propose_for_group,
     render_markdown,
+    unmodelled_qualities,
 )
 from .scanner import (
     COMPARED_FIELDS,
@@ -36,6 +37,7 @@ __all__ = [
     "extract_embedded",
     "build_report",
     "proposals_from_groups",
+    "unmodelled_qualities",
     "FALLBACK_QUALITIES",
     "IDENTITY_QUALITIES",
     "Proposal",

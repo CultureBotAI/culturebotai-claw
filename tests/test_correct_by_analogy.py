@@ -278,3 +278,55 @@ def test_fail_on_findings_still_applies_under_propose(corpus):
     assert cli.main(
         ["--corpus", str(corpus), "--propose", "--fail-on-findings"]
     ) == 1
+
+
+# --------------------------------------------------------------------------
+# #192: "not applicable here" is not "nothing to propose"
+# --------------------------------------------------------------------------
+
+
+def test_an_unmodelled_vocabulary_is_named_rather_than_silently_yielding_zero(
+    corpus, capsys
+):
+    """CultureMech uses `(none)`/`LLM_ASSISTED`/`MANUAL`, none of which the
+    proposal rule classifies, so it proposes nothing for every group. Declining
+    is right; declining silently is the shape recorded in #161."""
+    from kg_microbe_consistency import __main__ as cli
+
+    write(corpus, "a", identifier="CHEBI:1", term="thing",
+          ontology_id="CHEBI:1", quality="LLM_ASSISTED")
+    write(corpus, "b", identifier="CHEBI:2", term="Thing",
+          ontology_id="CHEBI:2", quality="MANUAL")
+
+    assert cli.main(["--corpus", str(corpus), "--propose"]) == 0
+    message = capsys.readouterr().err
+
+    assert "does not model" in message
+    assert "LLM_ASSISTED" in message and "MANUAL" in message
+
+
+def test_a_modelled_vocabulary_produces_no_such_message(corpus, capsys):
+    """Non-vacuity: the message must not appear whenever proposals are zero."""
+    from kg_microbe_consistency import __main__ as cli
+
+    write(corpus, "a", identifier="CHEBI:1", term="thing",
+          ontology_id="CHEBI:1", quality="EXACT_MATCH", source="CHEBI")
+    write(corpus, "b", identifier="CHEBI:2", term="Thing",
+          ontology_id="CHEBI:2", quality="EXACT_MATCH", source="CHEBI")
+
+    assert cli.main(["--corpus", str(corpus), "--propose"]) == 0
+
+    assert "does not model" not in capsys.readouterr().err
+
+
+def test_unmodelled_qualities_ignores_the_ones_the_rule_knows():
+    from kg_microbe_consistency import Group, Record, unmodelled_qualities
+
+    def record(quality: str) -> Record:
+        return Record(path=Path("x.yaml"), identifier="i", preferred_term="t",
+                      synonyms=frozenset(), fields={"mapping_quality": quality})
+
+    groups = [Group("k", "r", (record("EXACT_MATCH"), record("FALLBACK_REGISTRY"),
+                               record("LLM_ASSISTED"), record("")))]
+
+    assert unmodelled_qualities(groups) == {"LLM_ASSISTED"}
