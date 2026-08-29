@@ -86,15 +86,15 @@ def upgrade_unmapped(yaml_path: Path, new_id: str, new_label: str,
 
 
 def main() -> int:
-    # Verify the checkout before doing work; module-level roots stay
-    # plain paths so importing this file never needs one (#176).
-    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
     ap = argparse.ArgumentParser()
     ap.add_argument("--apply", action="store_true",
                     help="apply HIGH upgrades")
     ap.add_argument("--apply-stem", action="store_true",
                     help="ALSO apply STEM_MATCH (medium confidence)")
     args = ap.parse_args()
+    # Verify the checkout before doing work; module-level roots stay
+    # plain paths so importing this file never needs one (#176).
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
 
     rows = load_all_shards()
     if not rows:

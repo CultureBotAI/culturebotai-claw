@@ -260,9 +260,6 @@ def render_proposal_md(c: dict, result: dict) -> str:
 # ---------- driver ----------
 
 def main() -> int:
-    # Verify the checkout before doing work; module-level roots stay
-    # plain paths so importing this file never needs one (#176).
-    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
     ap = argparse.ArgumentParser()
     src = ap.add_mutually_exclusive_group(required=True)
     src.add_argument("--yaml", type=Path,
@@ -277,6 +274,9 @@ def main() -> int:
     ap.add_argument("--rate", type=float, default=None,
                     help="req/s; default: 3 (or 10 with NCBI_API_KEY)")
     args = ap.parse_args()
+    # Verify the checkout before doing work; module-level roots stay
+    # plain paths so importing this file never needs one (#176).
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     api_key = os.environ.get("NCBI_API_KEY")

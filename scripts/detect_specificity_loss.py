@@ -110,12 +110,12 @@ def slugify(name: str) -> str:
 
 
 def main() -> int:
-    # Verify the checkout before doing work; module-level roots stay
-    # plain paths so importing this file never needs one (#176).
-    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=None)
     args = ap.parse_args()
+    # Verify the checkout before doing work; module-level roots stay
+    # plain paths so importing this file never needs one (#176).
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
     rows: list[dict] = []

@@ -129,3 +129,38 @@ def test_the_exempt_script_is_exempt_for_a_recorded_reason():
         assert "require_mech_roots(" not in path.read_text(encoding="utf-8"), (
             f"{name} is listed as exempt but verifies anyway; remove the exemption"
         )
+
+
+# --------------------------------------------------------------------------
+# #179: --help must work without a checkout
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("path", REQUIRED, ids=lambda p: p.name)
+def test_verification_happens_after_argument_parsing(path):
+    """#179: inserted as the first statement of main(), it ran before
+    parse_args, so `--help` failed without a checkout -- and `--help` is how
+    someone discovers which variable to set. Refusing to print it because that
+    variable is unset is circular.
+    """
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    main = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "main")
+
+    parse_lines = [
+        node.lineno
+        for node in ast.walk(main)
+        if isinstance(node, ast.Call) and "parse_args" in ast.unparse(node.func)
+    ]
+    verify_lines = [
+        node.lineno
+        for node in ast.walk(main)
+        if isinstance(node, ast.Call)
+        and getattr(node.func, "id", "") == "require_mech_roots"
+    ]
+
+    assert parse_lines, f"{path.name} never parses arguments"
+    assert verify_lines, f"{path.name} never verifies"
+    assert min(verify_lines) > max(parse_lines), (
+        f"{path.name} verifies at line {min(verify_lines)}, before arguments are "
+        f"parsed at line {max(parse_lines)}; --help would fail without a checkout"
+    )

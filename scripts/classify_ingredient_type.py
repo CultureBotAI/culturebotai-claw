@@ -320,15 +320,15 @@ def append_curation_event(record: dict, action: str, changes: str) -> None:
 
 
 def main() -> int:
-    # Verify the checkout before doing work; module-level roots stay
-    # plain paths so importing this file never needs one (#176).
-    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
     ap = argparse.ArgumentParser()
     ap.add_argument("--apply", action="store_true",
                     help="write YAMLs (default: dry-run)")
     ap.add_argument("--override", action="store_true",
                     help="overwrite ingredient_type even if already set")
     args = ap.parse_args()
+    # Verify the checkout before doing work; module-level roots stay
+    # plain paths so importing this file never needs one (#176).
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
 
     # Resolve the vocabulary BEFORE the walk. It is used lazily, on the first
     # record whose name matches the medium pattern, and --apply writes per

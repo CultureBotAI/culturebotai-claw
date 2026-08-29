@@ -85,14 +85,14 @@ def best_cascade_match(name: str) -> tuple[dict | None, str]:
 
 
 def main() -> int:
-    # Verify the checkout before doing work; module-level roots stay
-    # plain paths so importing this file never needs one (#176).
-    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
     ap = argparse.ArgumentParser()
     ap.add_argument("--apply", action="store_true",
                     help="write YAMLs (default: dry-run)")
     ap.add_argument("--limit", type=int, default=None)
     args = ap.parse_args()
+    # Verify the checkout before doing work; module-level roots stay
+    # plain paths so importing this file never needs one (#176).
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     targets = find_placeholder_yamls()

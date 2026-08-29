@@ -100,15 +100,15 @@ def fetch_chebi_chemistry(conn: sqlite3.Connection, chebi_id: str
 
 
 def main() -> int:
-    # Verify the checkout before doing work; module-level roots stay
-    # plain paths so importing this file never needs one (#176).
-    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
     ap = argparse.ArgumentParser()
     ap.add_argument("--apply", action="store_true",
                     help="write YAMLs (default: dry-run)")
     ap.add_argument("--limit", type=int, default=None,
                     help="cap number of CHEBI records processed")
     args = ap.parse_args()
+    # Verify the checkout before doing work; module-level roots stay
+    # plain paths so importing this file never needs one (#176).
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
     global _TRANSACTION
     _TRANSACTION = ValidatedWriteTransaction(
         MIM_ROOT,

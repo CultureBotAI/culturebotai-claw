@@ -159,14 +159,14 @@ def collect_targets(shard: int, total: int) -> list[Path]:
 
 
 def main() -> int:
-    # Verify the checkout before doing work; module-level roots stay
-    # plain paths so importing this file never needs one (#176).
-    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
     ap = argparse.ArgumentParser()
     ap.add_argument("--shard", type=int, default=0)
     ap.add_argument("--total", type=int, default=1)
     ap.add_argument("--limit", type=int, default=None)
     args = ap.parse_args()
+    # Verify the checkout before doing work; module-level roots stay
+    # plain paths so importing this file never needs one (#176).
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
     out_path = OUT_DIR / f"shard_{args.shard}_of_{args.total}.jsonl"

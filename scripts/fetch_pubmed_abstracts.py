@@ -173,9 +173,6 @@ def fetch_one(pmid: str, api_key: str | None) -> str:
 
 
 def main() -> int:
-    # Verify the checkout before doing work; module-level roots stay
-    # plain paths so importing this file never needs one (#176).
-    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
     ap = argparse.ArgumentParser()
     ap.add_argument("--pmids", nargs="*",
                     help="explicit PMIDs to fetch (skips harvest)")
@@ -184,6 +181,9 @@ def main() -> int:
     ap.add_argument("--rate", type=float, default=None,
                     help="req/s (default: 3.0, or 10.0 with NCBI_API_KEY)")
     args = ap.parse_args()
+    # Verify the checkout before doing work; module-level roots stay
+    # plain paths so importing this file never needs one (#176).
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
 
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     api_key = os.environ.get("NCBI_API_KEY")

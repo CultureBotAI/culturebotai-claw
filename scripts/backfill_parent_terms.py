@@ -239,9 +239,6 @@ def save_cache(cache: dict) -> None:
 
 
 def main() -> int:
-    # Verify the checkout before doing work; module-level roots stay
-    # plain paths so importing this file never needs one (#176).
-    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
     ap = argparse.ArgumentParser()
     ap.add_argument("--apply", action="store_true",
                     help="write YAMLs (default: dry-run)")
@@ -251,6 +248,9 @@ def main() -> int:
                              "unmapped", "cas"],
                     default="all")
     args = ap.parse_args()
+    # Verify the checkout before doing work; module-level roots stay
+    # plain paths so importing this file never needs one (#176).
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     cache = load_cache()

@@ -138,15 +138,15 @@ def mint_one(yaml_path: Path) -> dict:
 
 
 def main() -> int:
-    # Verify the checkout before doing work; module-level roots stay
-    # plain paths so importing this file never needs one (#176).
-    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
     ap = argparse.ArgumentParser()
     src = ap.add_mutually_exclusive_group(required=True)
     src.add_argument("--slug", help="MIM YAML stem (e.g. Vermont_Soil)")
     src.add_argument("--from-tsv", type=Path,
                      help="batch: rows with action=='mint' in this TSV")
     args = ap.parse_args()
+    # Verify the checkout before doing work; module-level roots stay
+    # plain paths so importing this file never needs one (#176).
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
 
     if args.slug:
         yaml_path = find_yaml_by_slug(args.slug)

@@ -160,14 +160,14 @@ def walk_yamls() -> Iterable[Verdict]:
 
 
 def main() -> int:
-    # Verify the checkout before doing work; module-level roots stay
-    # plain paths so importing this file never needs one (#176).
-    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
     ap = argparse.ArgumentParser()
     ap.add_argument("--strict", action="store_true",
                     help=("exit 2 if any MISSING_CACHE present (default: "
                           "only SNIPPET_NOT_IN_ABSTRACT triggers exit 2)"))
     args = ap.parse_args()
+    # Verify the checkout before doing work; module-level roots stay
+    # plain paths so importing this file never needs one (#176).
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
     verdicts = list(walk_yamls())
