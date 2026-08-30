@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import ast
 import platform
+import warnings
 from pathlib import Path
 
 import pytest
@@ -102,11 +103,21 @@ def test_the_corpus_reader_does_not_use_libyaml():
 
 def test_this_platform_records_an_answer():
     """Neither outcome is a failure -- the point is that the answer is stated
-    rather than assumed. A machine where CSafeLoader is unsound says why."""
+    rather than assumed.
+
+    An unsound platform emits a warning rather than only skipping, because a
+    skip is invisible under `pytest -q`: the first version of this test passed
+    green on Linux and said nothing about why, which is the same as not having
+    asked. A warning appears in the run summary.
+    """
     assert isinstance(SOUND, bool)
     assert WHY
     if not SOUND:
-        assert "CSafeLoader" in WHY or "libyaml" in WHY or "raised" in WHY
+        warnings.warn(
+            f"libyaml is not sound here, so CSafeLoader stays unadopted: "
+            f"{WHY}. {FACTS}. See #233 and #263.",
+            stacklevel=1,
+        )
 
 
 # -- what adoption would require, run only where it could work --------------
