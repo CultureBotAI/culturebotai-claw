@@ -39,6 +39,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+from kg_microbe_corpus.loader import judge, loader_is_sound, safe_loader, soundness
+
 CSAFE = getattr(yaml, "CSafeLoader", None)
 
 FACTS = (
@@ -50,29 +52,9 @@ VALID = "identifier: X:1\nlabel: a thing\nvalues:\n  - one\n  - two\n"
 INVALID = "identifier: [unclosed\n"
 
 
-def _soundness() -> tuple[bool, str]:
-    """Whether libyaml's loader can be substituted for SafeLoader here."""
-    if CSAFE is None:
-        return False, "no CSafeLoader in this build"
-    try:
-        if yaml.load(VALID, Loader=CSAFE) != yaml.safe_load(VALID):
-            return False, "CSafeLoader disagrees with SafeLoader on a valid record"
-    except Exception as exc:  # noqa: BLE001 - any failure is unsoundness
-        return False, f"a valid record raised {type(exc).__qualname__}"
-    try:
-        yaml.load(INVALID, Loader=CSAFE)
-    except yaml.YAMLError:
-        return True, "sound"
-    except Exception as exc:  # noqa: BLE001 - the whole point
-        mro = [c.__qualname__ for c in type(exc).__mro__]
-        return False, (
-            f"a parse error raised {type(exc).__module__}.{type(exc).__qualname__}, "
-            f"which `except yaml.YAMLError` does not catch (MRO {mro})"
-        )
-    return False, "invalid YAML did not raise at all"
-
-
-SOUND, WHY = _soundness()
+# One implementation, in the package rather than beside it: keeping a second
+# copy here is the habit #132 Phase 7 exists to end.
+SOUND, WHY = soundness()
 needs_sound = pytest.mark.skipif(not SOUND, reason=f"{WHY}; {FACTS}")
 
 
@@ -146,3 +128,139 @@ def test_a_parse_error_is_the_yaml_error_this_package_catches():
 def test_repeated_loads_do_not_degrade():
     for _ in range(200):
         assert yaml.load(VALID, Loader=CSAFE) is not None
+
+
+# -- the loader helper (#263) -----------------------------------------------
+
+
+def test_the_helper_picks_a_loader_that_actually_works():
+    """`getattr(yaml, "CSafeLoader", yaml.SafeLoader)` asks whether the name
+    exists, not whether it works -- and on Linux it exists and does not. Two
+    claw scripts chose it that way, and because they wrapped the load in
+    `except Exception` they reported zero changes instead of failing: a silent
+    wrong answer from scripts that write curated data."""
+    chosen = safe_loader()
+    assert chosen is (yaml.CSafeLoader if SOUND else yaml.SafeLoader)
+    # Whatever was chosen must round-trip a valid record and raise catchably.
+    assert yaml.load(VALID, Loader=chosen) == yaml.safe_load(VALID)
+    with pytest.raises(yaml.YAMLError):
+        yaml.load(INVALID, Loader=chosen)
+
+
+def test_the_helper_agrees_with_its_own_verdict():
+    assert loader_is_sound() is SOUND
+
+
+def test_the_verdict_is_computed_once():
+    """Trying a parse on every call would cost more than the loader saves."""
+    soundness.cache_clear()
+    first = soundness()
+    assert soundness() is first
+    assert soundness.cache_info().hits >= 1
+
+
+def test_no_claw_script_chooses_a_loader_by_name():
+    """The bug this fixes, kept fixed. A script that reaches for CSafeLoader
+    directly has not asked whether it works here."""
+    offenders = []
+    for path in sorted(Path(__file__).resolve().parents[1].glob("scripts/*.py")):
+        source = path.read_text(encoding="utf-8", errors="replace")
+        tree = ast.parse(source)
+        names = {
+            node.attr if isinstance(node, ast.Attribute) else node.id
+            for node in ast.walk(tree)
+            if isinstance(node, (ast.Attribute, ast.Name))
+        }
+        strings = {
+            node.value
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Constant) and isinstance(node.value, str)
+        }
+        # Strings as well as names: the shape being outlawed is
+        # `getattr(yaml, "CSafeLoader", ...)`, where the loader is named by a
+        # string constant and no Name or Attribute node mentions it at all.
+        if {"CSafeLoader", "CLoader"} & (names | strings):
+            offenders.append(path.name)
+    assert not offenders, (
+        f"{offenders} choose a YAML loader by name; use "
+        f"kg_microbe_corpus.loader.safe_loader(), which tries it first (#263)"
+    )
+
+
+@pytest.mark.parametrize(
+    ("loader", "expected"),
+    [
+        (None, "no CSafeLoader"),
+        ("disagrees", "disagrees with SafeLoader"),
+        ("raises-on-valid", "a valid record raised"),
+        ("uncatchable", "does not catch"),
+        ("never-raises", "did not raise"),
+    ],
+)
+def test_the_rule_rejects_each_way_a_loader_can_be_unsound(loader, expected):
+    """The failure paths, run on a machine where the real loader works.
+
+    Every one of these is a mutation that survived when the rule was only ever
+    applied to this build's CSafeLoader -- on macOS it is sound, so removing a
+    check changed nothing observable. The rule has to be given a broken loader
+    to show that it notices.
+    """
+
+    class Disagrees(yaml.SafeLoader):
+        pass
+
+    class NotAYAMLError(Exception):
+        pass
+
+    def _construct_wrong(self, node):
+        return {"wrong": True}
+
+    Disagrees.add_constructor("tag:yaml.org,2002:map", _construct_wrong)
+
+    class RaisesOnValid(yaml.SafeLoader):
+        def get_single_data(self):
+            raise RuntimeError("boom")
+
+    class Uncatchable(yaml.SafeLoader):
+        """Sound on a valid record, and raises something uncatchable on a bad
+        one -- which is exactly the Linux build's second failure mode, and why
+        the rule cannot stop at "does it parse"."""
+
+        def get_single_data(self):
+            try:
+                return super().get_single_data()
+            except yaml.YAMLError as exc:
+                raise NotAYAMLError(str(exc)) from None
+
+    class NeverRaises(yaml.SafeLoader):
+        def get_single_data(self):
+            return yaml.safe_load(VALID)
+
+    chosen = {
+        None: None,
+        "disagrees": Disagrees,
+        "raises-on-valid": RaisesOnValid,
+        "uncatchable": Uncatchable,
+        "never-raises": NeverRaises,
+    }[loader]
+    sound, why = judge(chosen)
+    assert sound is False
+    assert expected in why, why
+
+
+def test_the_rule_accepts_a_loader_that_behaves():
+    sound, why = judge(yaml.SafeLoader)
+    assert sound is True and why == "sound"
+
+
+def test_the_helper_falls_back_when_the_verdict_is_unsound(monkeypatch):
+    """On a sound machine `safe_loader()` returning CSafeLoader unconditionally
+    is indistinguishable from the correct code, so the fallback has to be forced
+    to be tested at all. It is the only branch that runs on Linux."""
+    from kg_microbe_corpus import loader as module
+
+    monkeypatch.setattr(module, "loader_is_sound", lambda: False)
+    assert module.safe_loader() is yaml.SafeLoader
+
+    monkeypatch.setattr(module, "loader_is_sound", lambda: True)
+    assert module.safe_loader() is yaml.CSafeLoader

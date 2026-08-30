@@ -30,6 +30,8 @@ from pathlib import Path
 
 import yaml
 
+from kg_microbe_corpus.loader import safe_loader
+
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -78,7 +80,7 @@ def harvest_corpus() -> dict[tuple[str, int | None, str], Counter]:
     files = sorted(CM.glob("data/merge_yaml/**/*.yaml")) + \
         sorted(CM.glob("data/normalized_yaml/**/*.yaml"))
     print(f"harvesting spellings from {len(files)} CultureMech YAMLs ...", flush=True)
-    loader = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
+    loader = safe_loader()
     for i, p in enumerate(files):
         if i and i % 8000 == 0:
             print(f"  {i}/{len(files)}", flush=True)
