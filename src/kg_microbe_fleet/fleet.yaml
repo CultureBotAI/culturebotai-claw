@@ -60,6 +60,19 @@ capability_catalogue:
       budgets_path:
         type: string
         required_when_enabled: true
+  writer_audit:
+    settings:
+      search_dirs:
+        type: string_list
+        required_when_enabled: true
+      save_helpers:
+        type: string_list
+      validators:
+        type: string_list
+      curation_markers:
+        type: string_list
+      exclude:
+        type: string_list
   site_contract:
     settings:
       site_path:
@@ -147,6 +160,12 @@ mechs:
         reason_claims:
           present:
             - .github/workflows/generate-pages.yaml
+      writer_audit:
+        status: enabled
+        settings:
+          search_dirs: [scripts, src/culturemech]
+          save_helpers: [write_validated_recipe]
+          exclude: [scripts/audit_writers.py]
       site_contract:
         status: disabled
         reason: >-
@@ -242,6 +261,12 @@ mechs:
         reason_claims:
           present:
             - .github/workflows/generate-pages.yaml
+      writer_audit:
+        status: enabled
+        settings:
+          search_dirs: [scripts, src/mediaingredientmech]
+          save_helpers: [save_yaml, write_validated_ingredient]
+          exclude: [scripts/audit_writers.py]
       site_contract:
         status: disabled
         reason: >-
@@ -334,6 +359,13 @@ mechs:
         reason_claims:
           present:
             - .github/workflows/generate-pages.yaml
+      writer_audit:
+        status: enabled
+        settings:
+          search_dirs: [scripts, src/communitymech]
+          save_helpers: [write_validated_community]
+          curation_markers: [record_curation_event]
+          exclude: [scripts/audit_writers.py]
       site_contract:
         status: enabled
         settings:
@@ -421,6 +453,13 @@ mechs:
             - pages
           absent:
             - .github/workflows/generate-pages.yaml
+      writer_audit:
+        status: enabled
+        settings:
+          search_dirs: [scripts, src/traitmech]
+          save_helpers: [write_validated_trait]
+          curation_markers: [record_curation]
+          exclude: [scripts/audit_writers.py]
       site_contract:
         status: enabled
         settings:
@@ -520,6 +559,17 @@ mechs:
         settings:
           site_path: _site
           budgets_path: conf/pages_budgets.json
+      writer_audit:
+        status: not_applicable
+        reason: >-
+          Its scripts/audit_writers.py shares the name and nothing else -- a
+          different tool built on registered editors and guard tests, ~600
+          lines apart from the other four. This audit does not describe what
+          that one checks, and consolidating them would mean choosing one
+          model over the other rather than removing a duplicate.
+        reason_claims:
+          present:
+            - scripts/audit_writers.py
       site_contract:
         status: disabled
         reason: >-
@@ -636,6 +686,15 @@ mechs:
             - pages
           absent:
             - .github/workflows/generate-pages.yaml
+      writer_audit:
+        status: disabled
+        reason: >-
+          Has no scripts/audit_writers.py, so there is no drift to remove yet.
+          Adopting it applies here once the corpus grows; the settings are the
+          repository's to declare.
+        reason_claims:
+          absent:
+            - scripts/audit_writers.py
       site_contract:
         status: enabled
         settings:
