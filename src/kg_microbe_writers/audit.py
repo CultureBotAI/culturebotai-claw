@@ -158,7 +158,8 @@ def _blocks(source: str) -> list[str]:
     another, ninety lines apart -- which a whole-file name match reads as an
     in-place YAML edit. Splitting first is what makes the name mean something.
     """
-    parts, current = [], []
+    parts: list[str] = []
+    current: list[str] = []
     for line in source.splitlines(keepends=True):
         if line.startswith("def ") and current:
             parts.append("".join(current))
