@@ -47,6 +47,11 @@ capability_catalogue:
   vendored_sync: {}
   unmapped_inventory_input: {}
   source_catalogue: {}
+  corpus_statistics:
+    settings:
+      fields:
+        type: string_list
+        required_when_enabled: true
 
 # Vendored shared-file governance is deliberately modeled separately from
 # fleet membership: claw is the external authority and must never pin itself.
@@ -107,6 +112,12 @@ mechs:
           window: 300
       vendored_sync:
         status: enabled
+      corpus_statistics:
+        status: enabled
+        settings:
+          fields:
+            - source_environment
+            - medium_type
       source_catalogue:
         status: disabled
         reason: >-
@@ -170,6 +181,12 @@ mechs:
           window: 300
       vendored_sync:
         status: enabled
+      corpus_statistics:
+        status: enabled
+        settings:
+          fields:
+            - ingredient_type
+            - ontology_mapping.mapping_quality
       source_catalogue:
         status: disabled
         reason: >-
@@ -235,6 +252,11 @@ mechs:
           window: 305
       vendored_sync:
         status: enabled
+      corpus_statistics:
+        status: enabled
+        settings:
+          fields:
+            - environment_term
       source_catalogue:
         status: disabled
         reason: >-
@@ -297,6 +319,12 @@ mechs:
           window: 300
       vendored_sync:
         status: enabled
+      corpus_statistics:
+        status: enabled
+        settings:
+          fields:
+            - mapping_status
+            - trait_category
       source_catalogue:
         status: enabled
       unmapped_inventory_input:
@@ -371,6 +399,12 @@ mechs:
           absent from the knowledge-gap-scan workflow matrix.
       vendored_sync:
         status: enabled
+      corpus_statistics:
+        status: enabled
+        settings:
+          fields:
+            - trait_axis
+            - mapping_status
       source_catalogue:
         status: enabled
       unmapped_inventory_input:
