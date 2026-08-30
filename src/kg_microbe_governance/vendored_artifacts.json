@@ -157,7 +157,7 @@
       "source": "src/kg_microbe_governance/artifacts/scripts/deep_research_contract.py",
       "target": "scripts/deep_research_contract.py",
       "consumers": "all",
-      "sha256": "81323d8b96c7001578ead4b0346a1fd266d7305882bd4d44d9b5381dc28d7303",
+      "sha256": "149344548272ab30ee0f65bda3ddd426401a5310c168332dd1537d7280db931d",
       "mode": "0644"
     }
   ]

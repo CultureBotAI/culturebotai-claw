@@ -52,9 +52,12 @@ def test_codex_command_is_native_explicit_web_search_and_read_only(tmp_path):
 def test_prompt_template_must_be_fully_filled(tmp_path):
     template = tmp_path / "prompt.md"
     template.write_text("Target: {label}\nEvidence: {evidence}\n", encoding="utf-8")
-    assert contract.render_prompt_template(
-        template, {"label": "biofilm", "evidence": "none yet"}
-    ) == "Target: biofilm\nEvidence: none yet\n"
+    assert (
+        contract.render_prompt_template(
+            template, {"label": "biofilm", "evidence": "none yet"}
+        )
+        == "Target: biofilm\nEvidence: none yet\n"
+    )
     with pytest.raises(contract.ContractError, match="evidence"):
         contract.render_prompt_template(template, {"label": "biofilm"})
 
@@ -96,24 +99,30 @@ def test_invalid_codex_response_never_overwrites_an_existing_report(tmp_path):
         return subprocess.CompletedProcess(command, 0, "", "")
 
     with pytest.raises(contract.ContractError, match="too short"):
-        contract.run_codex_research("prompt", destination, repo_root=REPO, runner=runner)
+        contract.run_codex_research(
+            "prompt", destination, repo_root=REPO, runner=runner
+        )
     assert destination.read_text() == "curator-reviewed previous report\n"
 
 
 @pytest.mark.parametrize(
     "value,valid",
-    [("researcher:secret", True), ("bare-token", False), (":secret", False), ("name:", False)],
+    [
+        ("researcher:secret", True),
+        ("bare-token", False),
+        (":secret", False),
+        ("name:", False),
+    ],
 )
 def test_openscientist_credential_contract(value, valid):
     if valid:
-        assert contract.validate_openscientist_credential(
-            {"OPENSCIENTIST_API_KEY": value}
-        ) == "researcher"
+        assert (
+            contract.validate_openscientist_credential({"OPENSCIENTIST_API_KEY": value})
+            == "researcher"
+        )
     else:
         with pytest.raises(contract.ContractError, match="name:secret"):
-            contract.validate_openscientist_credential(
-                {"OPENSCIENTIST_API_KEY": value}
-            )
+            contract.validate_openscientist_credential({"OPENSCIENTIST_API_KEY": value})
 
 
 def test_openscientist_canary_discovers_provider_without_submitting_job():
