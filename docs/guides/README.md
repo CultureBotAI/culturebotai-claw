@@ -2,6 +2,10 @@
 
 This directory contains longer-lived domain and cross-repository guidance:
 
+- `MECH_STANDARD.md` — what a repository must hold to in order to be a Mech,
+  derived by measuring the five established Mechs rather than asserted:
+  universal requirements, capabilities a Mech must decide about, and
+  domain-specific work no other Mech should copy
 - `MULTI_CLAUDE_COORDINATION.md` — the supported local coordination contract
 - `MULTI_CLAUDE_ARCHITECTURE.md` — a retired proposal retained only as a
   redirect to the supported contract

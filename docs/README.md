@@ -12,6 +12,9 @@ for provenance; they do not describe the supported interface.
 
 Other maintained references:
 
+- [`guides/MECH_STANDARD.md`](guides/MECH_STANDARD.md) — the measured Mech
+  standard: universal requirements, declared-decision capabilities, and
+  domain-specific work; what a new Mech adopts, and in what order
 - [`guides/VENDORED_GOVERNANCE.md`](guides/VENDORED_GOVERNANCE.md) — canonical
   shared-artifact manifest, synchronization, rollout, and rollback.
 - [`guides/CURATION_HISTORY.md`](guides/CURATION_HISTORY.md) — append-only
