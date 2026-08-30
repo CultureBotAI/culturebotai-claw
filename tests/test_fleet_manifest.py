@@ -28,6 +28,7 @@ EXPECTED_MECHS = (
     "communitymech",
     "traitmech",
     "proteintraitsmech",
+    "cellstructuremech",
 )
 
 
@@ -102,7 +103,7 @@ def _minimal(*extra_lines: str, **overrides: str) -> str:
 # --------------------------------------------------------------------------
 
 
-def test_shipped_manifest_declares_all_five_mechs():
+def test_shipped_manifest_declares_every_expected_mech():
     manifest = load_fleet_manifest(MANIFEST_PATH)
 
     assert set(manifest.keys) == set(EXPECTED_MECHS)

@@ -80,6 +80,11 @@ def _configured_mech_profiles() -> list[tuple[str, Path]]:
     manifest = load_fleet_manifest()
     found = []
     for key, mech in manifest.mechs.items():
+        # A Mech that declares deep_research disabled owns no profile by
+        # design; demanding one of it fails closed on a gap the manifest
+        # already accounts for (#254).
+        if not mech.supports("deep_research"):
+            continue
         root = os.environ.get(mech.environment_variable, "").strip()
         if not root:
             continue
@@ -94,10 +99,15 @@ def _configured_mech_profiles() -> list[tuple[str, Path]]:
 
 
 def test_fixture_inventory_matches_the_exact_manifest_fleet() -> None:
+    """One fixture per Mech that enables deep_research. A Mech that declares
+    the capability disabled (CellStructureMech, which has no provider
+    profile) owns no profile to snapshot; the manifest, not this list, says
+    which is which."""
     manifest = load_fleet_manifest()
-    assert manifest.keys == EXPECTED_MECH_KEYS
-    assert set(_fixture_paths()) == set(manifest.keys)
-    assert set(_provenance()) == set(manifest.keys)
+    researching = tuple(k for k, m in manifest.mechs.items() if m.supports("deep_research"))
+    assert researching == EXPECTED_MECH_KEYS
+    assert set(_fixture_paths()) == set(researching)
+    assert set(_provenance()) == set(researching)
 
 
 @pytest.mark.parametrize("key", EXPECTED_MECH_KEYS)
