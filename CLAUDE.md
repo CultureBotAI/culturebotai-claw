@@ -341,6 +341,14 @@ declared anchor type. These are properties of a graph rather than of a schema,
 so enum membership, evidence and CURIE shapes stay in each Mech. Connectivity is
 undirected -- a mechanism written effect-to-cause is the same mechanism.
 
+`kg-microbe-site check` judges a built site: a title, a declared language, alt
+text, headings that do not skip a level, references that resolve, and no
+dependency on a third party to render. Run it on build output. On template
+sources it reports pages the build has not created yet and unrendered
+expressions as dangling references, which is the check being run one step too
+early rather than a defect. A repository declares a deliberate CDN through
+`allowed_hosts` in its `site_contract` capability.
+
 `kg-microbe-skills check` validates every path and sibling-skill reference in
 `.claude/`. It judges a reference against the repository it belongs to, and
 reports what it could not resolve rather than calling it broken: `missing` and
