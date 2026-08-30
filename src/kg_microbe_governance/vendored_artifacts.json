@@ -78,7 +78,13 @@
       "id": "provider_triage_contract",
       "source": "src/kg_microbe_governance/artifacts/tests/test_provider_triage_contract.py",
       "target": "tests/test_provider_triage_contract.py",
-      "consumers": "all",
+      "consumers": [
+        "culturemech",
+        "mediaingredientmech",
+        "communitymech",
+        "traitmech",
+        "proteintraitsmech"
+      ],
       "sha256": "91b9c0d5a564c479f26b1cb548620e2c481dbd1c4ec0dfd5aa980b205b10da70",
       "mode": "0644"
     },
