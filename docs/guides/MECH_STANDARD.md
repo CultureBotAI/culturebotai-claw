@@ -117,7 +117,7 @@ is independently converging on.
 **`persist-credentials: false` on checkout.** Present in 1 of 1 workflows in
 each new Mech; **0 of 46 workflows across all five established Mechs.** Without
 it the job's `.git/config` keeps a credential any later step can read. Filed
-against the fleet as claw#243.
+against the fleet as claw#244.
 
 A standard derived by majority vote would have recorded both of these backwards.
 They are recorded here as requirements the established Mechs owe, not as
