@@ -43,8 +43,17 @@ CLAW_ROOT = Path(__file__).resolve().parents[1]
 # A path-like token: a name carrying an extension we would expect to resolve.
 # `.html` is deliberately absent -- several reasons say "missing .html files"
 # as a description of a class of file, not as a path.
+# Two shapes, because a reason names two kinds of thing. A file is recognised by
+# its extension. A directory is recognised by its trailing slash -- "under
+# pages/" is a claim about a path, "per-source scripts" is a plural noun, and the
+# slash is the only thing that tells them apart without guessing. Requiring the
+# slash also tells an author how to make a claim checkable (#246).
+#
+# `.html` is deliberately absent from the extension list: several reasons say
+# "missing .html files" as a description of a class of file, not as a path.
 _PATH_TOKEN = re.compile(
-    r"(?<![\w/.])\.?[\w][\w./-]*\.(?:py|ya?ml|json|tsv|toml|cfg|sh)\b"
+    r"(?<![\w/.])\.?[\w][\w./-]*"
+    r"(?:\.(?:py|ya?ml|json|tsv|toml|cfg|sh)\b|/(?=[\s,;.)\]]|$))"
 )
 
 CLAW_PREFIX = "claw:"
@@ -94,13 +103,14 @@ def test_every_declared_path_is_one_the_reason_names(mech, cap, reason, capabili
 
 
 def test_the_reasons_that_make_checkable_claims_are_the_ones_declared():
-    """A ledger, so the count can only go up deliberately. Nine of the sixteen
-    reasons name a path; the rest are judgements about scope ("trait records are
-    not an environment inventory input") with nothing to resolve."""
+    """A ledger, so the count can only go up deliberately. The rest are
+    judgements about scope ("trait records are not an environment inventory
+    input") with nothing to resolve."""
     declared = sorted(
         f"{m}.{c}" for m, c, _, cap in _ALL if cap.reason_claims
     )
     assert declared == [
+        "cellstructuremech.deep_research",
         "cellstructuremech.page_budgets",
         "cellstructuremech.source_catalogue",
         "cellstructuremech.unmapped_inventory_input",
@@ -116,7 +126,6 @@ def test_the_reasons_that_make_checkable_claims_are_the_ones_declared():
     ]
 
 
-@pytest.mark.parametrize(("mech", "cap", "reason", "capability"), _ALL, ids=_IDS)
 def _tracked_on_main(root: Path, relative: str) -> bool | None:
     """Whether `origin/main` of the repository at `root` tracks `relative`.
 
@@ -409,3 +418,56 @@ def test_an_unreadable_repository_skips_rather_than_passing(tmp_path: Path, monk
         test_a_declared_claim_holds_against_the_repository(
             "traitmech", "x", "anything.txt", _stub(absent=("anything.txt",))
         )
+
+
+# -- what the token scanner can see (#246) ----------------------------------
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("built through .github/workflows/generate-pages.yaml", [".github/workflows/generate-pages.yaml"]),
+        ("has no download.yaml", ["download.yaml"]),
+        ("through scripts/seed.py, which", ["scripts/seed.py"]),
+        # The gap #246 was filed for: a directory carries no extension.
+        ("written by hand under research/ with", ["research/"]),
+        ("serves 490 pages under pages/, straight from main", ["pages/"]),
+        ("everything below data/", ["data/"]),
+        ("nothing under conf/.", ["conf/"]),
+        # ...and the prose that must not be mistaken for one.
+        ("arrives through per-source scripts rather than", []),
+        ("the repository has not decided", []),
+        ("reports missing .html files that the build creates", []),
+        ("adopting research would apply here", []),
+    ],
+    ids=[
+        "workflow-path", "bare-file", "script-with-comma",
+        "directory", "directory-before-comma", "directory-at-end",
+        "directory-before-period",
+        "plural-noun", "prose", "extension-as-a-class", "bare-word",
+    ],
+)
+def test_the_scanner_sees_paths_and_not_prose(text, expected):
+    """A file is recognised by its extension, a directory by its trailing
+    slash. Without the slash there is nothing to separate "under research/"
+    from "per-source scripts", and guessing would either miss real claims or
+    demand declarations for ordinary English."""
+    assert _PATH_TOKEN.findall(text) == expected
+
+
+def test_a_directory_claim_is_matched_against_its_declaration():
+    """`Path("pages/").name` is "pages", which is how a trailing-slash token in
+    prose lines up with the declaration that carries no slash."""
+    assert Path("pages/").name == "pages"
+    assert Path("research/").name == "research"
+
+
+def test_the_widened_scanner_found_a_real_undeclared_claim():
+    """CellStructureMech's deep_research reason says its research is "written by
+    hand under research/". True, and undeclared until #246 -- the scanner could
+    not see a path without an extension, so the forward guarantee did not reach
+    it. This pins the declaration that closed it."""
+    claims = (
+        MANIFEST.mechs["cellstructuremech"].capabilities["deep_research"].reason_claims
+    )
+    assert claims.present == ("research",)
