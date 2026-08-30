@@ -80,6 +80,11 @@ def _configured_mech_profiles() -> list[tuple[str, Path]]:
     manifest = load_fleet_manifest()
     found = []
     for key, mech in manifest.mechs.items():
+        # A Mech that declares deep_research disabled owns no profile by
+        # design; demanding one of it fails closed on a gap the manifest
+        # already accounts for (#254).
+        if not mech.supports("deep_research"):
+            continue
         root = os.environ.get(mech.environment_variable, "").strip()
         if not root:
             continue

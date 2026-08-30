@@ -551,26 +551,15 @@ mechs:
       - data/structures/**/*.yaml
     vendored_role: consumer
     capabilities:
+      # Enabled rather than disabled-with-an-absent-claim (#255): both arrive in
+      # CellStructureMech#53, which is open and green, so a claim that the files
+      # are absent is true only until that merges. An enabled declaration carries
+      # no claim to falsify and lets the fleet audit report the real gap, which
+      # is the same choice vendored_sync makes below.
       id_label_validation:
-        status: disabled
-        reason: >-
-          Records are grounded in GO cellular component, so the check applies,
-          but the vendored scripts/validate_id_label_correspondence.py is not
-          yet in the repository; it arrives with the vendored artifact set
-          (CellStructureMech#48, #51).
-        reason_claims:
-          absent:
-            - scripts/validate_id_label_correspondence.py
+        status: enabled
       curation_history:
-        status: disabled
-        reason: >-
-          Records carry curation_history entries written through the
-          repository's own helper, but src/cellstructuremech/schema/history.yaml
-          is not vendored and the justfile has no new-history recipe
-          (CellStructureMech#49).
-        reason_claims:
-          absent:
-            - src/cellstructuremech/schema/history.yaml
+        status: enabled
       strict_validation:
         status: enabled
       schema_sync:
