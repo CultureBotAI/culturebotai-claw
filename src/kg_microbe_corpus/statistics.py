@@ -30,22 +30,15 @@ from typing import Any, Iterable, Iterator, Sequence
 
 import yaml
 
-# libyaml's parser where it is available, which it usually is. On
-# ProteinTraitsMech's 429,271 records the pure-Python loader runs at ~134
-# records a second and this at ~2,129 -- the difference between a corpus walk
-# of roughly an hour and one of a few minutes. It is not guaranteed to be
-# built, so the fallback is real and the report says which was used.
-try:
-    from yaml import CSafeLoader as _Loader  # type: ignore[attr-defined]
-
-    FAST_YAML = True
-except ImportError:  # pragma: no cover - depends on the libyaml build
-    from yaml import SafeLoader as _Loader  # type: ignore[assignment]
-
-    FAST_YAML = False
+# The pure-Python parser, deliberately. `CSafeLoader` is ~16x faster (2,129
+# records a second against 134) and swapping to it passed every test on macOS
+# and failed fourteen of them on Linux CI: every corpus test found zero records,
+# and a ParserError escaped an `except yaml.YAMLError` that catches it here.
+# That difference is unexplained and unreproducible on this machine, and a
+# parser that behaves differently by platform is not something to ship for a
+# speed-up. #233 keeps the measurement and the evidence.
 
 __all__ = [
-    "FAST_YAML",
     "CorpusError",
     "CorpusReport",
     "FieldStats",
@@ -85,7 +78,6 @@ class CorpusReport:
     records: int = 0
     bytes: int = 0
     unreadable: list[str] = field(default_factory=list)
-    fast_yaml: bool = FAST_YAML
     by_glob: dict[str, int] = field(default_factory=dict)
     fields: dict[str, FieldStats] = field(default_factory=dict)
     sampled: bool = False
@@ -101,7 +93,6 @@ class CorpusReport:
             "records": self.records,
             "bytes": self.bytes,
             "sampled": self.sampled,
-            "fast_yaml": self.fast_yaml,
             "unreadable": sorted(self.unreadable),
             "by_glob": dict(sorted(self.by_glob.items())),
             "fields": {
@@ -191,7 +182,7 @@ def iter_records(
         paths = paths[:sample]
     for path in paths:
         try:
-            yield path, yaml.load(path.read_text(encoding="utf-8"), Loader=_Loader)
+            yield path, yaml.safe_load(path.read_text(encoding="utf-8"))
         except (OSError, yaml.YAMLError):
             yield path, None
 

@@ -278,14 +278,3 @@ def test_the_corpus_is_globbed_once(tmp_path, monkeypatch):
     statistics.collect("m", root, ["d/*.yaml"], ["x"])
 
     assert calls["n"] == 1
-
-
-def test_the_report_says_which_yaml_parser_it_used(tmp_path):
-    """libyaml is 16x the pure-Python parser and is not guaranteed to be built.
-    A report that takes minutes on one machine and an hour on another should
-    say why."""
-    root = _corpus(tmp_path, {"d/a.yaml": {"x": 1}})
-
-    recorded = json.loads(collect("m", root, ["d/*.yaml"]).to_json())
-
-    assert isinstance(recorded["fast_yaml"], bool)
