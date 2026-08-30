@@ -10,12 +10,7 @@ import pytest
 
 REPO = Path(__file__).resolve().parent.parent
 MODULE = (
-    REPO
-    / "src"
-    / "kg_microbe_governance"
-    / "artifacts"
-    / "scripts"
-    / "deep_research_contract.py"
+    REPO / "src" / "kg_microbe_governance" / "artifacts" / "scripts" / "deep_research_contract.py"
 )
 SPEC = importlib.util.spec_from_file_location("deep_research_contract", MODULE)
 assert SPEC and SPEC.loader
@@ -53,9 +48,7 @@ def test_prompt_template_must_be_fully_filled(tmp_path):
     template = tmp_path / "prompt.md"
     template.write_text("Target: {label}\nEvidence: {evidence}\n", encoding="utf-8")
     assert (
-        contract.render_prompt_template(
-            template, {"label": "biofilm", "evidence": "none yet"}
-        )
+        contract.render_prompt_template(template, {"label": "biofilm", "evidence": "none yet"})
         == "Target: biofilm\nEvidence: none yet\n"
     )
     with pytest.raises(contract.ContractError, match="evidence"):
@@ -99,9 +92,7 @@ def test_invalid_codex_response_never_overwrites_an_existing_report(tmp_path):
         return subprocess.CompletedProcess(command, 0, "", "")
 
     with pytest.raises(contract.ContractError, match="too short"):
-        contract.run_codex_research(
-            "prompt", destination, repo_root=REPO, runner=runner
-        )
+        contract.run_codex_research("prompt", destination, repo_root=REPO, runner=runner)
     assert destination.read_text() == "curator-reviewed previous report\n"
 
 
@@ -153,6 +144,4 @@ def test_openscientist_canary_accepts_an_isolated_multiword_client_command():
         runner=runner,
     )
     assert result.ok
-    assert calls == [
-        ["uvx", "--from", "deep-research-client", "deep-research-client", "providers"]
-    ]
+    assert calls == [["uvx", "--from", "deep-research-client", "deep-research-client", "providers"]]
