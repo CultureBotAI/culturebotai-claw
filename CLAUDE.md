@@ -315,6 +315,15 @@ offline; `curl` is only the default. `verify(path)` reads a file back against
 its sidecar, which is what makes a torn promotion detectable rather than
 believed.
 
+`kg-microbe-corpus report --mech X` walks that Mech's `record_globs` and reports
+record and byte counts per glob plus how each declared field is populated, as
+deterministic JSON two releases can be diffed. Which fields are tabulated is the
+`corpus_statistics` capability's `fields` setting -- the domain part -- and every
+declared field is checked against its own corpus by a test, because a field no
+record carries reports as a data problem rather than a wrong declaration. An
+unreadable record is named and exits nonzero, since it is excluded from every
+count above it.
+
 `kg-microbe-skills check` validates every path and sibling-skill reference in
 `.claude/`. It judges a reference against the repository it belongs to, and
 reports what it could not resolve rather than calling it broken: `missing` and
