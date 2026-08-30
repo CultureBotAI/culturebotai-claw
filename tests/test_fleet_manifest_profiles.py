@@ -51,6 +51,9 @@ EXPECTED_CAPABILITIES = {
     # Declared by Phase 6 item 4: which fields each Mech tabulates, so one
     # report shape can be compared across corpora.
     "corpus_statistics",
+    # Phase 6 item 1: which Mech watches its generated site's size, and why
+    # the four that do not have decided rather than forgotten.
+    "page_budgets",
     "id_label_validation",
     "curation_history",
     "strict_validation",
