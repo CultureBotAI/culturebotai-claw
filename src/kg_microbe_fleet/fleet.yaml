@@ -592,6 +592,9 @@ mechs:
           Research so far is source assessment written by hand under research/
           with no provider client or research recipe in the justfile; the
           repository has not decided on a paid research route.
+        reason_claims:
+          present:
+            - research
       edison_key_discovery:
         status: not_applicable
         reason: >-
