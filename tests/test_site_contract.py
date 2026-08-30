@@ -389,3 +389,35 @@ def test_the_cli_fails_closed_when_the_checkout_cannot_be_resolved(capsys, monke
     )
     assert main(["check", "--mech", "communitymech"]) == 2
     assert "no checkout" in capsys.readouterr().err
+
+
+def test_the_cli_walks_the_site_once(capsys, tmp_path, monkeypatch):
+    """#242, the shape #231 hid in the corpus reader: a second traversal just to
+    count what the first one already visited is invisible until the corpus is
+    large, and then it is not."""
+    (tmp_path / "p.html").write_text(PAGE)
+    walks = {"n": 0}
+    original = Path.rglob
+
+    def counted(self, pattern):
+        if pattern == "*.html":
+            walks["n"] += 1
+        return original(self, pattern)
+
+    monkeypatch.setattr(Path, "rglob", counted)
+    assert main(["check", "--mech", "traitmech", "--site", str(tmp_path)]) == 0
+    assert walks["n"] == 1
+    assert "1 pages" in capsys.readouterr().out
+
+
+def test_a_host_hidden_in_userinfo_does_not_match_the_allowlist():
+    """https://cdn.jsdelivr.net@evil.example/x.js is served by evil.example. The
+    netloc keeps the userinfo, so it cannot equal an allowed host and the check
+    fails closed -- but only by construction, so it is pinned here."""
+    html = (
+        '<html lang="en"><title>t</title>'
+        '<script src="https://cdn.jsdelivr.net@evil.example/x.js"></script></html>'
+    )
+    findings = check_page(html, "p.html", allowed_hosts=["cdn.jsdelivr.net"])
+    assert codes(findings) == ["EXTERNAL_ASSET"]
+    assert "evil.example" in findings[0].detail

@@ -57,14 +57,17 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     allowed = capability.settings.get("allowed_hosts", ())
-    findings = check_site(site, allowed_hosts=list(allowed))
+    # Walked once and passed in, rather than counted again afterwards: #242,
+    # the same duplicate-traversal #231 hid in the corpus reader for months
+    # because every corpus it was tried on was too small to notice.
+    pages = sorted(site.rglob("*.html"))
+    findings = check_site(site, allowed_hosts=list(allowed), pages=pages)
 
     for finding in findings:
         print(finding, file=sys.stderr)
     counts = Counter(finding.code for finding in findings)
-    pages = sum(1 for _ in site.rglob("*.html"))
     summary = ", ".join(f"{code} {n}" for code, n in sorted(counts.items())) or "clean"
-    print(f"{args.mech}: {pages} pages under {site}: {summary}")
+    print(f"{args.mech}: {len(pages)} pages under {site}: {summary}")
     return 1 if findings else 0
 
 

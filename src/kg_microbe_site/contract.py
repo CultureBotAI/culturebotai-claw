@@ -19,6 +19,11 @@ Measured on CommunityMech's 330 published pages and TraitMech's 490:
     heading levels skipped          3 and 0
     external asset loads            0 and 353
 
+Ten of TraitMech's references point outside its declared site_path, at pages
+the repository publishes from elsewhere; they are resolved against the checkout
+and happen to be right. #238 covers separating "the pages to check" from "the
+root references resolve against", which TraitMech shows are not the same thing.
+
 TraitMech's 353 are one `<script>` per trait page pulling a charting library
 from cdn.jsdelivr.net. That is a real dependency on a third party to render a
 published page, and `allowed_hosts` is how a repository says it is deliberate
