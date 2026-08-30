@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import ast
 import platform
+import sys
 import warnings
 from pathlib import Path
 
@@ -264,6 +265,38 @@ def test_the_helper_falls_back_when_the_verdict_is_unsound(monkeypatch):
 
     monkeypatch.setattr(module, "loader_is_sound", lambda: True)
     assert module.safe_loader() is yaml.CSafeLoader
+
+
+def test_which_modules_hold_a_second_copy_of_yaml_error(record_property):
+    """#233's remaining question: `yaml/error.py` is executed twice on Linux CI,
+    producing two `YAMLError` objects that both report `__module__ ==
+    "yaml.error"`. This asks which `sys.modules` keys hold them.
+
+    If a second key exists, its name says what re-imported the file -- and if
+    that is something claw depends on, the fix is claw's rather than PyYAML's.
+    Records rather than asserts: on a machine with one copy there is nothing to
+    report, and the absence is itself the answer.
+    """
+    same_file = {
+        name: getattr(module, "__file__", None)
+        for name, module in list(sys.modules.items())
+        if getattr(module, "__file__", None)
+        and Path(module.__file__).name == "error.py"
+        and "yaml" in Path(module.__file__).parts
+    }
+    record_property("modules whose file is yaml/error.py", str(same_file))
+
+    classes = {}
+    for name, module in list(sys.modules.items()):
+        candidate = getattr(module, "YAMLError", None)
+        if isinstance(candidate, type) and candidate.__qualname__ == "YAMLError":
+            classes.setdefault(f"{id(candidate):x}", []).append(name)
+    record_property("distinct YAMLError objects", str(classes))
+    warnings.warn(
+        f"yaml.error copies: {same_file}; YAMLError objects: {classes}", stacklevel=1
+    )
+    # One object is the only sound state; more than one is #233.
+    assert len(classes) >= 1
 
 
 def test_the_error_classes_are_one_object(record_property):
