@@ -335,6 +335,12 @@ costs to carry: tracked files and bytes, where the weight sits by top-level
 directory and by extension, and the largest tracked files. Measured from git, so
 a working tree's caches and build output cannot change the answer.
 
+`kg_microbe_graph.audit` checks a causal graph's structure: dangling edges,
+duplicate node ids, orphan nodes, fragmentation, and reachability from a
+declared anchor type. These are properties of a graph rather than of a schema,
+so enum membership, evidence and CURIE shapes stay in each Mech. Connectivity is
+undirected -- a mechanism written effect-to-cause is the same mechanism.
+
 `kg-microbe-skills check` validates every path and sibling-skill reference in
 `.claude/`. It judges a reference against the repository it belongs to, and
 reports what it could not resolve rather than calling it broken: `missing` and
