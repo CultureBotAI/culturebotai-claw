@@ -13,6 +13,15 @@ AntibioticMech and CellStructureMech are deliberately **excluded** from the
 derivation: they are the repositories this standard is meant to judge, so
 letting them vote on it would make the exercise circular.
 
+> **Since this was derived**, CellStructureMech has joined the fleet manifest and
+> the vendored-consumer registry (claw#247), which is Tier 1.12 — so the worked
+> example below of a repository "conforming by accident of origin" now describes
+> AntibioticMech alone. Joining also turned claw's `main` red, because admitting
+> a consumer advances the canonical ref and invalidates every existing pin
+> (claw#257): **adding a Mech to vendored governance is a fleet-wide re-pin**,
+> which nothing in the model said and nothing checked. That is now the sharpest
+> thing this document has to say about Tier 1.12.
+
 > **How to read the counts.** `5/5` means every established Mech does this.
 > `3/5` means three do. A count is evidence, not an argument — where the
 > majority is wrong, this document says so and says which Mechs are right.
@@ -63,7 +72,7 @@ or `disabled`/`not_applicable` *with a reason* — rather than simply not have i
 
 | Capability | Count | Notes |
 |---|---|---|
-| `audit-writers` — every YAML-writing script declares dry-run/validate/history behaviour | 4/5 | All five actually carry `scripts/audit_writers.py`, but the five copies differ pairwise by 174–228 lines. See "Known fleet debt". |
+| `audit-writers` — every YAML-writing script declares dry-run/validate/history behaviour | 4/5 | Now shared as `kg-microbe-writers audit`, declared per Mech through the `writer_audit` capability. The four per-repo copies are still in place; removing them is #132 Phase 7's remaining work. |
 | ID↔label correspondence checking | 4/5 workflow; vendored script in 5/5 | |
 | `vendored-sync` — verify vendored artifacts against claw's pin | 4/5 | Absent in PTM, which also carries the most drift |
 | QC dashboard (`gen-qc-dashboard`) | 4/5 | |
@@ -127,13 +136,19 @@ deviations the new ones should correct.
 
 ## Known fleet debt this standard does not paper over
 
-- **`audit_writers.py` is duplicated five ways**, 199–463 lines, pairwise
-  differing by 174–228 lines. Same tool, five drifted copies, each answering a
-  slightly different question. This is claw #132 Phase 7's clearest target.
+- **`audit_writers.py` is still duplicated** in CultureMech,
+  MediaIngredientMech, CommunityMech and TraitMech. A shared
+  implementation now exists in claw (#261); the copies remain until they are
+  removed. Measuring them (#260) showed the drift was not stylistic: a script in
+  this fleet writes YAML five ways, and **no copy detects more than three**. The
+  shared version gains 15 writers the copies miss and drops 25 rows that are not
+  writers. ProteinTraitsMech's file shares the name and nothing else, and is
+  deliberately out of scope.
 - **Vendored artifacts have drifted** where the sync check is absent or not
   enforced: MediaIngredientMech on 3 artifacts, ProteinTraitsMech on 2.
-- **Manifest `reason:` strings assert facts nothing checks** (claw#236). One
-  named a workflow file that did not exist.
+- ~~**Manifest `reason:` strings assert facts nothing checks** (claw#236).~~
+  Fixed: a reason now declares the paths it asserts about and in which
+  direction, checked against the repository's `origin/main` in both directions.
 
 A new Mech should not replicate any of these to "match the fleet".
 
