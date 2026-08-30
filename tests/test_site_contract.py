@@ -193,6 +193,7 @@ def site(tmp_path: Path) -> Path:
 
 
 def write(root: Path, name: str, body: str) -> None:
+    (root / name).parent.mkdir(parents=True, exist_ok=True)
     (root / name).write_text(
         f'<html lang="en"><head><title>t</title></head><body><h1>h</h1>{body}</body></html>'
     )
@@ -274,6 +275,184 @@ def test_pages_may_be_supplied_explicitly(site: Path):
     assert {f.page for f in findings} == {"p.html"}
 
 
+
+# -- srcset (#239) ----------------------------------------------------------
+
+
+def test_a_responsive_image_from_a_cdn_is_an_external_asset():
+    """<picture><source srcset> is the standard responsive pattern, and before
+    #239 it was invisible to every rule: srcset is a candidate list, not a
+    single URL, so it could not be another ASSET_TAGS entry."""
+    html = (
+        '<html lang="en"><title>t</title><picture>'
+        '<source srcset="https://cdn.example/x.webp 2x">'
+        '<img src="x.png" alt="x"></picture></html>'
+    )
+    findings = check_page(html, "p.html")
+    assert codes(findings) == ["EXTERNAL_ASSET"]
+    assert "cdn.example" in findings[0].detail
+
+
+def test_every_srcset_candidate_is_judged_not_only_the_first():
+    html = (
+        '<html lang="en"><title>t</title>'
+        '<img alt="x" src="a.png" srcset="a.png 1x, https://cdn.one/b.png 2x, '
+        'https://cdn.two/c.png 3x"></html>'
+    )
+    findings = check_page(html, "p.html")
+    assert codes(findings) == ["EXTERNAL_ASSET", "EXTERNAL_ASSET"]
+    assert {"cdn.one", "cdn.two"} == {
+        f.detail.split("loads from ")[1].split(";")[0] for f in findings
+    }
+
+
+def test_a_srcset_descriptor_is_not_mistaken_for_a_url(site: Path):
+    (site / "a.png").write_text("")
+    write(site, "p.html", '<img alt="x" src="a.png" srcset="a.png 1x, a.png 640w">')
+    assert [f for f in check_site(site) if f.page == "p.html"] == []
+
+
+def test_a_srcset_candidate_that_does_not_exist_is_broken(site: Path):
+    write(site, "p.html", '<img alt="x" src="assets/x.js" srcset="gone.png 2x">')
+    findings = [f for f in check_site(site) if f.page == "p.html"]
+    assert codes(findings) == ["BROKEN_REFERENCE"]
+    assert "gone.png" in findings[0].detail
+
+
+# -- case-exact resolution (#240) -------------------------------------------
+
+
+def test_a_reference_whose_case_differs_is_broken_on_every_machine(site: Path):
+    """The site is served from Linux. macOS resolves REAL.html to real.html, so
+    asking the filesystem gives one verdict on a laptop and another in
+    production -- #240, the machine-dependence #203 moved off the filesystem for
+    a different check. This test would pass for the wrong reason on Linux and
+    used to fail on macOS; now it passes for the same reason on both."""
+    (site / "real.html").write_text(PAGE)
+    write(site, "p.html", '<a href="REAL.html">x</a>')
+    findings = [f for f in check_site(site) if f.page == "p.html"]
+    assert codes(findings) == ["BROKEN_REFERENCE"]
+
+
+def test_a_directory_whose_case_differs_is_broken(site: Path):
+    write(site, "p.html", '<a href="SUB/">x</a>')
+    assert codes([f for f in check_site(site) if f.page == "p.html"]) == [
+        "BROKEN_REFERENCE"
+    ]
+
+
+def test_exact_case_still_resolves(site: Path):
+    write(site, "p.html", '<a href="sub/index.html">x</a><script src="assets/x.js"></script>')
+    assert [f for f in check_site(site) if f.page == "p.html"] == []
+
+
+
+def test_a_reference_that_walks_through_a_file_is_broken(site: Path):
+    """`page.html/thing.html` treats a file as a directory. The walk asks that
+    file for a listing and must report broken rather than raise."""
+    (site / "real.html").write_text(PAGE)
+    write(site, "p.html", '<a href="real.html/deeper.html">x</a>')
+    assert codes([f for f in check_site(site) if f.page == "p.html"]) == [
+        "BROKEN_REFERENCE"
+    ]
+
+
+def test_a_dot_component_is_normalised_away_before_matching(site: Path):
+    """"./sub/./index.html" names the same file as "sub/index.html". PurePosixPath
+    drops the "." components, so the walk never looks for a directory entry
+    called "." -- which no listing would contain."""
+    write(site, "p.html", '<a href="./sub/./index.html">x</a>')
+    assert [f for f in check_site(site) if f.page == "p.html"] == []
+# -- percent-encoding and <base href> (#241) --------------------------------
+
+
+def test_a_percent_encoded_reference_resolves_to_the_file_it_names(site: Path):
+    """%20 is the correct way to write a space. Comparing the encoded form
+    against a filesystem name called a working link broken."""
+    (site / "a b.html").write_text(PAGE)
+    write(site, "p.html", '<a href="a%20b.html">x</a>')
+    assert [f for f in check_site(site) if f.page == "p.html"] == []
+
+
+def test_a_percent_encoded_reference_to_nothing_is_still_broken(site: Path):
+    write(site, "p.html", '<a href="no%20such.html">x</a>')
+    assert codes([f for f in check_site(site) if f.page == "p.html"]) == [
+        "BROKEN_REFERENCE"
+    ]
+
+
+def test_base_href_redefines_what_relative_means(site: Path):
+    """Ignoring <base> judges every relative reference on the page against the
+    wrong directory."""
+    write(site, "p.html", '<base href="sub/"><a href="index.html">x</a>')
+    assert [f for f in check_site(site) if f.page == "p.html"] == []
+    # ...and the same reference without the base does not resolve.
+    write(site, "q.html", '<a href="index.html">x</a>')
+    assert codes([f for f in check_site(site) if f.page == "q.html"]) == [
+        "BROKEN_REFERENCE"
+    ]
+
+
+def test_a_site_absolute_base_is_read_against_the_site_root(site: Path):
+    (site / "sub" / "deep").mkdir()
+    (site / "sub" / "deep" / "leaf.html").write_text(PAGE)
+    write(site, "sub/p.html", '<base href="/sub/deep/"><a href="leaf.html">x</a>')
+    assert [f for f in check_site(site) if f.page == "sub/p.html"] == []
+
+
+@pytest.mark.parametrize(
+    "base", ["https://example.org/x/", "//example.org/x/"], ids=["absolute", "protocol-relative"]
+)
+def test_an_external_base_makes_relative_references_not_ours(site: Path, base: str):
+    """A page based at another origin has no relative reference to this site, so
+    there is nothing local to resolve. The first version of this test named a
+    file that happened to exist beside the page, so it passed while the code
+    still resolved locally -- and a page whose neighbour was missing got a
+    BROKEN_REFERENCE for a link that points at another host entirely."""
+    write(site, "sub/p.html", f'<base href="{base}"><a href="nothing-here.html">x</a>')
+    assert [f for f in check_site(site) if f.page == "sub/p.html"] == []
+
+
+def test_a_base_without_a_trailing_slash_replaces_its_last_segment(site: Path):
+    """`<base href="sub">` makes the document base `/sub`; a sibling reference
+    resolves beside it, not inside it. Only `sub/` means "inside"."""
+    (site / "beside.html").write_text(PAGE)
+    write(site, "p.html", '<base href="sub"><a href="beside.html">x</a>')
+    assert [f for f in check_site(site) if f.page == "p.html"] == []
+
+    write(site, "q.html", '<base href="sub"><a href="index.html">x</a>')
+    assert codes([f for f in check_site(site) if f.page == "q.html"]) == [
+        "BROKEN_REFERENCE"
+    ]
+
+
+def test_only_the_first_base_counts(site: Path):
+    """Browsers ignore a second <base>, so honouring it would judge references
+    against a directory no reader's browser uses."""
+    write(site, "p.html", '<base href="sub/"><base href="assets/"><a href="index.html">x</a>')
+    assert [f for f in check_site(site) if f.page == "p.html"] == []
+
+
+def test_a_site_absolute_reference_ignores_the_base(site: Path):
+    write(site, "sub/p.html", '<base href="/assets/"><script src="/assets/x.js"></script>')
+    assert [f for f in check_site(site) if f.page == "sub/p.html"] == []
+
+
+def test_a_reference_outside_the_site_falls_back_to_plain_existence(site: Path):
+    """#238: site_path conflates "the pages to check" with "the root references
+    resolve against", and TraitMech has ten references that legitimately point
+    at pages the repository publishes from outside its pages/ directory. Until
+    that is modelled, an escaping reference keeps the old behaviour rather than
+    silently becoming a finding."""
+    outside = site.parent / "outside.html"
+    outside.write_text(PAGE)
+    write(site, "sub/p.html", '<a href="../../outside.html">x</a>')
+    assert [f for f in check_site(site) if f.page == "sub/p.html"] == []
+
+    write(site, "sub/q.html", '<a href="../../absent.html">x</a>')
+    assert codes([f for f in check_site(site) if f.page == "sub/q.html"]) == [
+        "BROKEN_REFERENCE"
+    ]
 # -- the manifest declaration and the CLI -----------------------------------
 
 
