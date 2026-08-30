@@ -30,7 +30,22 @@ from typing import Any, Iterable, Iterator, Sequence
 
 import yaml
 
+# libyaml's parser where it is available, which it usually is. On
+# ProteinTraitsMech's 429,271 records the pure-Python loader runs at ~134
+# records a second and this at ~2,129 -- the difference between a corpus walk
+# of roughly an hour and one of a few minutes. It is not guaranteed to be
+# built, so the fallback is real and the report says which was used.
+try:
+    from yaml import CSafeLoader as _Loader  # type: ignore[attr-defined]
+
+    FAST_YAML = True
+except ImportError:  # pragma: no cover - depends on the libyaml build
+    from yaml import SafeLoader as _Loader  # type: ignore[assignment]
+
+    FAST_YAML = False
+
 __all__ = [
+    "FAST_YAML",
     "CorpusError",
     "CorpusReport",
     "FieldStats",
@@ -70,6 +85,7 @@ class CorpusReport:
     records: int = 0
     bytes: int = 0
     unreadable: list[str] = field(default_factory=list)
+    fast_yaml: bool = FAST_YAML
     by_glob: dict[str, int] = field(default_factory=dict)
     fields: dict[str, FieldStats] = field(default_factory=dict)
     sampled: bool = False
@@ -85,6 +101,7 @@ class CorpusReport:
             "records": self.records,
             "bytes": self.bytes,
             "sampled": self.sampled,
+            "fast_yaml": self.fast_yaml,
             "unreadable": sorted(self.unreadable),
             "by_glob": dict(sorted(self.by_glob.items())),
             "fields": {
@@ -150,7 +167,11 @@ def _paths_by_glob(root: Path, globs: Sequence[str]) -> dict[str, list[Path]]:
 
 
 def iter_records(
-    root: Path, globs: Sequence[str], *, sample: int | None = None
+    root: Path,
+    globs: Sequence[str],
+    *,
+    sample: int | None = None,
+    paths_by_glob: dict[str, list[Path]] | None = None,
 ) -> Iterator[tuple[Path, Any]]:
     """Yield (path, parsed) for each record, in a stable order.
 
@@ -160,12 +181,17 @@ def iter_records(
     the report names it.
     """
     root = Path(root)
-    paths = [p for matches in _paths_by_glob(root, globs).values() for p in matches]
+    # Accepting the caller's listing matters at scale: globbing and sorting
+    # ProteinTraitsMech's 429,271 records takes ~13s, and `collect` needs the
+    # same listing to attribute each file to a glob. Doing it twice was most of
+    # the runtime on that corpus.
+    matched = paths_by_glob if paths_by_glob is not None else _paths_by_glob(root, globs)
+    paths = [p for matches in matched.values() for p in matches]
     if sample is not None:
         paths = paths[:sample]
     for path in paths:
         try:
-            yield path, yaml.safe_load(path.read_text(encoding="utf-8"))
+            yield path, yaml.load(path.read_text(encoding="utf-8"), Loader=_Loader)
         except (OSError, yaml.YAMLError):
             yield path, None
 
@@ -192,15 +218,16 @@ def collect(
     counters: dict[str, Counter] = {name: Counter() for name in fields}
     populated: dict[str, int] = {name: 0 for name in counters}
 
+    matched = _paths_by_glob(root, globs)
     owner = {
-        path: pattern
-        for pattern, matches in _paths_by_glob(root, globs).items()
-        for path in matches
+        path: pattern for pattern, matches in matched.items() for path in matches
     }
     for pattern in globs:
         report.by_glob[pattern] = 0
 
-    for path, record in iter_records(root, globs, sample=sample):
+    for path, record in iter_records(
+        root, globs, sample=sample, paths_by_glob=matched
+    ):
         relative = path.relative_to(root).as_posix()
         report.bytes += path.stat().st_size
         report.by_glob[owner[path]] += 1
