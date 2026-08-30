@@ -140,6 +140,54 @@ def test_a_write_to_a_path_with_no_yaml_anywhere_is_not_a_write():
     assert reasons(source) == ()
 
 
+def test_a_reused_variable_name_in_another_function_is_not_an_in_place_edit():
+    """CommunityMech's growth_conditions_sweep.py reads a community YAML through
+    `path` in one function and writes INDEX.md through a different `path` in
+    another, ninety lines apart. Matching names across the whole file read that
+    as an in-place YAML edit; scoping to the function is what makes the name
+    mean something. This was a false positive the first version of this module
+    added to a Mech whose own audit was already right."""
+    source = (
+        'def collect():\n'
+        '    for p in COMMUNITIES.glob("*.yaml"):\n'
+        "        text = path.read_text()\n"
+        "\n"
+        "def index():\n"
+        '    path = OUT_DIR / "INDEX.md"\n'
+        '    path.write_text("\\n".join(lines))\n'
+    )
+    assert reasons(source) == ()
+
+
+def test_a_path_carrying_another_extension_is_that_file(tmp_path: Path):
+    """A name assigned from an expression that introduces a different extension
+    is that file, whatever it was derived from -- otherwise the taint spreads
+    from a YAML *input* to an unrelated writer."""
+    assert reasons('def f():\n    p = OUT / "INDEX.md"\n    p.write_text(body)\n') == ()
+    assert reasons('def f():\n    p = OUT / "x.json"\n    p.write_text(body)\n') == ()
+
+
+def test_a_yaml_path_converted_to_another_extension_is_no_longer_yaml():
+    """The transitive half of the same rule. `src` holds a .yaml, so it seeds
+    the set -- but `out` is derived from it *by changing the extension*, and
+    what gets written is a .md. Following the derivation without re-checking
+    the extension is how a YAML input taints an unrelated writer."""
+    source = (
+        "def f():\n"
+        '    src = ROOT / "x.yaml"\n'
+        '    out = src.with_suffix(".md")\n'
+        "    out.write_text(body)\n"
+    )
+    assert reasons(source) == ()
+
+
+def test_a_module_level_yaml_path_still_reaches_a_function(tmp_path: Path):
+    """Scoping must not lose the common case of a constant defined at module
+    level and written inside a function."""
+    source = 'TARGET = ROOT / "records.yaml"\n\ndef save(doc):\n    TARGET.write_text(dump(doc))\n'
+    assert reasons(source) == ("in-place-edit",)
+
+
 # -- the declared columns ---------------------------------------------------
 
 
@@ -335,11 +383,19 @@ def test_the_shared_audit_beats_the_copy_it_replaces(mech):
     }
     theirs.discard("scripts/audit_writers.py")
 
-    dropped_allowed = {"communitymech": 0, "traitmech": 0}
-    if mech in dropped_allowed:
+    if mech in {"communitymech", "traitmech"}:
         assert not (theirs - mine), (
             f"{mech}'s copy is already accurate, so the shared audit must not "
             f"lose any of its rows; it dropped {sorted(theirs - mine)}"
+        )
+    if mech == "communitymech":
+        # The strictest case available: its copy detects exactly the techniques
+        # this one does, so the two must agree row for row. A disagreement here
+        # is a defect in the shared rule, not a difference of opinion -- it is
+        # how the false positive on growth_conditions_sweep.py was found.
+        assert mine == theirs, (
+            f"communitymech should agree exactly; "
+            f"added {sorted(mine - theirs)}, dropped {sorted(theirs - mine)}"
         )
     assert mine, f"{mech}: the shared audit found no writers at all"
 

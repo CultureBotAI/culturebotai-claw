@@ -67,6 +67,12 @@ _DUMPS_YAML = re.compile(r"yaml\.(?:safe_)?dump\s*\(")
 # and writes it to `..._{name}.yaml`, which techniques 1 to 4 all miss.
 _YAML_GLOB = re.compile(r"(?:r?glob)\s*\(\s*['\"][^'\"]*\.ya?ml['\"]")
 _ASSIGNMENT = re.compile(r"^\s*(\w+)\s*=\s*([^\n]*)$", re.MULTILINE)
+# A name assigned from an expression that introduces a different file
+# extension is that file, whatever it was derived from. Without this the taint
+# spreads from a YAML *input* -- `files = COMMUNITIES.glob("*.yaml")` -- through
+# unrelated assignments to a writer of `INDEX.md`, which is how CommunityMech's
+# growth_conditions_sweep.py was briefly reported as a YAML writer.
+_OTHER_EXTENSION = re.compile(r"\.(?:md|json|tsv|csv|txt|html?|mmd|xml|ya?ml\w)\b")
 _READ_TEXT_VAR = re.compile(r"(\w+)\s*\.\s*read_text\s*\(")
 _WRITE_TEXT_VAR = re.compile(r"(\w+)\s*\.\s*write_text\s*\(\s*([^\n]*)")
 # A write whose argument is JSON is not a YAML write however the path was found.
@@ -143,6 +149,25 @@ class Evidence:
         return tuple(name for name, on in named if on)
 
 
+def _blocks(source: str) -> list[str]:
+    """The source split at top-level `def`s.
+
+    A variable name is only evidence within the function that uses it.
+    CommunityMech's growth_conditions_sweep.py reads a community YAML through
+    `path` in one function and writes INDEX.md through a different `path` in
+    another, ninety lines apart -- which a whole-file name match reads as an
+    in-place YAML edit. Splitting first is what makes the name mean something.
+    """
+    parts, current = [], []
+    for line in source.splitlines(keepends=True):
+        if line.startswith("def ") and current:
+            parts.append("".join(current))
+            current = []
+        current.append(line)
+    parts.append("".join(current))
+    return parts
+
+
 def _yaml_path_names(source: str) -> set[str]:
     """Variables that hold a path to a `.yaml` file.
 
@@ -154,11 +179,15 @@ def _yaml_path_names(source: str) -> set[str]:
     """
     assignments = _ASSIGNMENT.findall(source)
     names = {
-        target for target, value in assignments if re.search(r"\.ya?ml\b", value)
+        target
+        for target, value in assignments
+        if re.search(r"\.ya?ml\b", value) and not _OTHER_EXTENSION.search(value)
     }
     for _ in range(4):  # a fixpoint in practice; bounded so it always ends
         grown = set(names)
         for target, value in assignments:
+            if _OTHER_EXTENSION.search(value):
+                continue
             if any(re.search(rf"\b{re.escape(n)}\b", value) for n in names):
                 grown.add(target)
         if grown == names:
@@ -171,19 +200,21 @@ def writes_yaml(source: str, profile: WriterProfile) -> Evidence:
     """All four detection techniques, in one place."""
     helper = profile.helper_pattern()
     in_place = False
-    writes = _WRITE_TEXT_VAR.findall(source)
-    if _YAML_GLOB.search(source):
-        read = set(_READ_TEXT_VAR.findall(source))
+    globs_yaml = bool(_YAML_GLOB.search(source))
+    for block in _blocks(source):
+        writes = _WRITE_TEXT_VAR.findall(block)
+        if not writes:
+            continue
+        read = set(_READ_TEXT_VAR.findall(block)) if globs_yaml else set()
+        yaml_paths = _yaml_path_names(block) | _yaml_path_names(source.split("def ")[0])
         for name, argument in writes:
-            if name in read and not _JSON_ARGUMENT.search(argument):
+            if _JSON_ARGUMENT.search(argument):
+                continue
+            if name in read or name in yaml_paths:
                 in_place = True
                 break
-    if not in_place:
-        yaml_paths = _yaml_path_names(source)
-        for name, argument in writes:
-            if name in yaml_paths and not _JSON_ARGUMENT.search(argument):
-                in_place = True
-                break
+        if in_place:
+            break
     return Evidence(
         dumps=bool(_DUMPS_YAML.search(source)),
         helper=bool(helper.search(source)) if helper else False,
