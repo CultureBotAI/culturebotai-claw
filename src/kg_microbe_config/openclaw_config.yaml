@@ -40,6 +40,13 @@ repositories:
     task_runner: just
     description: "Ontology-derived protein-trait corpus"
 
+  cellstructuremech:
+    path: ${CELLSTRUCTUREMECH_ROOT}
+    type: python
+    package_manager: uv
+    task_runner: just
+    description: "Microbial cell structures: organelles, envelope layers, appendages, complexes"
+
 agents:
   discovery_paths:
     - kg_microbe_agents/definitions

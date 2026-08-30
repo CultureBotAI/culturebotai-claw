@@ -42,6 +42,11 @@ EXPECTED_PROFILES = {
         ("src/proteintraitsmech/schema/proteintraitsmech.yaml",),
         ("data/traits/**/*.yaml",),
     ),
+    "cellstructuremech": (
+        "src/cellstructuremech",
+        ("src/cellstructuremech/schema/cellstructuremech.yaml",),
+        ("data/structures/**/*.yaml",),
+    ),
 }
 
 EXPECTED_CAPABILITIES = {

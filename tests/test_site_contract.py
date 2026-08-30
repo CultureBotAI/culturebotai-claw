@@ -297,10 +297,12 @@ def test_every_mech_decides_about_the_site_contract():
 
 
 def test_the_measured_corpora_are_the_ones_declared():
-    """The docstring's numbers come from these two. If a third is enabled the
-    numbers below stop describing what the check runs on, and the claim that
-    every rule was measured stops being true until it is re-measured."""
-    assert _ENABLED == ["communitymech", "traitmech"]
+    """The docstring's numbers come from these three: CommunityMech and
+    TraitMech as measured for the contract, and CellStructureMech measured on
+    joining (10 pages, no findings; CellStructureMech#50). If a fourth is
+    enabled the numbers stop describing what the check runs on until it is
+    re-measured."""
+    assert _ENABLED == ["cellstructuremech", "communitymech", "traitmech"]
 
 
 @pytest.mark.parametrize("mech", _ENABLED)

@@ -22,6 +22,10 @@
     "proteintraitsmech": {
       "github": "CultureBotAI/proteintraitsmech",
       "package_path": "src/proteintraitsmech"
+    },
+    "cellstructuremech": {
+      "github": "CultureBotAI/CellStructureMech",
+      "package_path": "src/cellstructuremech"
     }
   },
   "artifacts": [

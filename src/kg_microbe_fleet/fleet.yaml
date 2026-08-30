@@ -536,3 +536,136 @@ mechs:
         No PyYAML option set reproduces this corpus, so there is no
         correct value to declare and writing a record back would
         reformat it. Measured in #187.
+
+  cellstructuremech:
+    # Joined 2026-08-30 (CellStructureMech#47). Capability decisions below were
+    # measured against the repository's tracked files at that date; every
+    # disabled/not_applicable status names the issue that would flip it.
+    display_name: CellStructureMech
+    github: CultureBotAI/CellStructureMech
+    environment_variable: CELLSTRUCTUREMECH_ROOT
+    package_path: src/cellstructuremech
+    schema_paths:
+      - src/cellstructuremech/schema/cellstructuremech.yaml
+    record_globs:
+      - data/structures/**/*.yaml
+    vendored_role: consumer
+    capabilities:
+      id_label_validation:
+        status: disabled
+        reason: >-
+          Records are grounded in GO cellular component, so the check applies,
+          but the vendored scripts/validate_id_label_correspondence.py is not
+          yet in the repository; it arrives with the vendored artifact set
+          (CellStructureMech#48, #51).
+        reason_claims:
+          absent:
+            - scripts/validate_id_label_correspondence.py
+      curation_history:
+        status: disabled
+        reason: >-
+          Records carry curation_history entries written through the
+          repository's own helper, but src/cellstructuremech/schema/history.yaml
+          is not vendored and the justfile has no new-history recipe
+          (CellStructureMech#49).
+        reason_claims:
+          absent:
+            - src/cellstructuremech/schema/history.yaml
+      strict_validation:
+        status: enabled
+      schema_sync:
+        status: enabled
+      release_management:
+        status: enabled
+      build_coordination:
+        status: enabled
+      documentation:
+        status: enabled
+      testing:
+        status: enabled
+      refactoring:
+        status: enabled
+      coordination_hooks:
+        status: enabled
+      deep_research:
+        status: disabled
+        reason: >-
+          Research so far is source assessment written by hand under research/
+          with no provider client or research recipe in the justfile; the
+          repository has not decided on a paid research route.
+      edison_key_discovery:
+        status: not_applicable
+        reason: >-
+          CellStructureMech does not use an Edison research-provider key; it has
+          no research provider integration at all.
+      environment_coverage:
+        status: not_applicable
+        reason: >-
+          Environment coverage currently compares culture media, ingredients,
+          and microbial communities; cell-structure records are not an
+          environment inventory input.
+      knowledge_gap_scan:
+        status: disabled
+        reason: >-
+          Records carry the shared Discussion section, so the scan applies, but
+          the corpus is four records and the repository is not yet in the
+          knowledge-gap-scan workflow matrix; enable once the first tranche of
+          records lands (CellStructureMech#12).
+      # An authoritative consumer must sync; the loader rejects anything else.
+      # CellStructureMech#48 vendors the artifact set and pin that this
+      # declaration obliges; until it lands, the fleet audit reports the gap.
+      vendored_sync:
+        status: enabled
+      corpus_statistics:
+        status: enabled
+        settings:
+          fields:
+            - structure_category
+            - mapping_status
+      page_budgets:
+        status: disabled
+        reason: >-
+          Serves tracked pages under pages/ straight from main via GitHub Pages
+          -- it has no generate-pages.yaml -- and declares no size or
+          file-count budgets, so nothing watches them grow. Adopting them
+          applies here; the limits are the repository's to set.
+        reason_claims:
+          present:
+            - pages
+          absent:
+            - .github/workflows/generate-pages.yaml
+      site_contract:
+        status: enabled
+        settings:
+          site_path: pages
+      source_catalogue:
+        status: disabled
+        reason: >-
+          The repository keeps its ranked source list as
+          curation/source_queue.tsv, machine-checked by
+          scripts/check_source_queue.py inside its qc gate, rather than a
+          download.yaml in the fleet's catalogue shape; there is no
+          download.yaml to parse. Converging on one shape is open.
+        reason_claims:
+          present:
+            - curation/source_queue.tsv
+            - scripts/check_source_queue.py
+          absent:
+            - download.yaml
+      unmapped_inventory_input:
+        status: not_applicable
+        reason: >-
+          The unmapped-ingredient inventory reads culture-media and
+          ingredient corpora; CellStructureMech curates cell structures and
+          has no ingredient records, so scripts/inventory_unmapped_ingredients.py
+          defines no loader for it.
+        reason_claims:
+          present:
+            - claw:scripts/inventory_unmapped_ingredients.py
+    serialization:
+      verified: true
+      options:
+        default_flow_style: false
+        sort_keys: false
+        allow_unicode: true
+        width: 80

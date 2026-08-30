@@ -98,6 +98,11 @@ def test_the_reasons_that_make_checkable_claims_are_the_ones_declared():
         f"{m}.{c}" for m, c, _, cap in _ALL if cap.reason_claims
     )
     assert declared == [
+        "cellstructuremech.curation_history",
+        "cellstructuremech.id_label_validation",
+        "cellstructuremech.page_budgets",
+        "cellstructuremech.source_catalogue",
+        "cellstructuremech.unmapped_inventory_input",
         "communitymech.page_budgets",
         "communitymech.source_catalogue",
         "culturemech.page_budgets",
@@ -141,7 +146,7 @@ def test_a_declared_claim_holds_against_the_checkout(mech, cap, reason, capabili
 
 
 def test_the_claw_prefixed_claims_are_checked_even_with_no_mech_checkout():
-    """`claw:` paths live in this repository, so they never skip. Both
+    """`claw:` paths live in this repository, so they never skip. All three
     unmapped_inventory_input reasons name a claw script; if that check could
     skip, the only always-runnable case would be the one that never runs."""
     checked = 0
@@ -152,7 +157,7 @@ def test_the_claw_prefixed_claims_are_checked_even_with_no_mech_checkout():
                     f"{mech}.{cap} names a claw path that does not exist"
                 )
                 checked += 1
-    assert checked == 2
+    assert checked == 3
 
 
 # -- what the loader rejects ------------------------------------------------
