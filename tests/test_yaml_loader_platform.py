@@ -264,3 +264,47 @@ def test_the_helper_falls_back_when_the_verdict_is_unsound(monkeypatch):
 
     monkeypatch.setattr(module, "loader_is_sound", lambda: True)
     assert module.safe_loader() is yaml.CSafeLoader
+
+
+def test_the_error_classes_are_one_object(record_property):
+    """#233's root cause, asked directly.
+
+    The hypothesis: PyYAML's `yaml/__init__.py` re-exports `yaml.error`, and the
+    compiled `_yaml` extension carries its own error classes. If the extension
+    was built against a different PyYAML than the one imported, there are two
+    `YAMLError` objects with the same name, and `except` -- which matches by
+    identity -- misses the compiled one.
+
+    This does not assert; it records. On a sound machine the identity holds and
+    there is nothing to see. On Linux CI the properties are the evidence, and
+    they say whether the two classes are genuinely distinct objects or whether
+    something else is going on.
+    """
+    facts = {
+        "yaml.__file__": getattr(yaml, "__file__", "?"),
+        "yaml.error.YAMLError": f"{id(yaml.error.YAMLError):x}",
+        "yaml.YAMLError is yaml.error.YAMLError": yaml.YAMLError is yaml.error.YAMLError,
+    }
+    if CSAFE is not None:
+        try:
+            yaml.load(INVALID, Loader=CSAFE)
+        except BaseException as exc:  # noqa: BLE001 - the class is the subject
+            raised = type(exc)
+            same_name = [c for c in raised.__mro__ if c.__qualname__ == "YAMLError"]
+            facts["raised"] = f"{raised.__module__}.{raised.__qualname__}"
+            facts["raised module file"] = getattr(
+                __import__(raised.__module__, fromlist=["_"]), "__file__", "?"
+            )
+            facts["YAMLError in its MRO"] = (
+                f"{id(same_name[0]):x} from {same_name[0].__module__}"
+                if same_name
+                else "none"
+            )
+            facts["is the same object"] = bool(
+                same_name and same_name[0] is yaml.error.YAMLError
+            )
+    for key, value in facts.items():
+        record_property(key, str(value))
+    # Surfaced where a green run can still be read.
+    warnings.warn("libyaml identity: " + "; ".join(f"{k}={v}" for k, v in facts.items()), stacklevel=1)
+    assert facts["yaml.YAMLError is yaml.error.YAMLError"] is True
