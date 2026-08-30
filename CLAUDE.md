@@ -343,7 +343,10 @@ undirected -- a mechanism written effect-to-cause is the same mechanism.
 
 `kg-microbe-site check` judges a built site: a title, a declared language, alt
 text, headings that do not skip a level, references that resolve, and no
-dependency on a third party to render. Run it on build output. On template
+dependency on a third party to render. `site_path` is the set of pages to check
+and `published_root` is what a site-absolute reference means and how far a
+relative one may climb; they differ when a repository checks part of what it
+publishes. Run it on build output. On template
 sources it reports pages the build has not created yet and unrendered
 expressions as dangling references, which is the check being run one step too
 early rather than a defect. A repository declares a deliberate CDN through

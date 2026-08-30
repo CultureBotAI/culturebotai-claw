@@ -65,6 +65,11 @@ capability_catalogue:
       site_path:
         type: string
         required_when_enabled: true
+      # What a site-absolute reference means, and how far a relative one may
+      # climb. Defaults to site_path; they differ when a repository checks part
+      # of what it publishes (#238).
+      published_root:
+        type: string
       allowed_hosts:
         type: string_list
 
@@ -420,6 +425,11 @@ mechs:
         status: enabled
         settings:
           site_path: pages
+          # GitHub Pages serves this repository from main at /, so the whole
+          # checkout is published even though only pages/ is checked. Ten trait
+          # pages link ../../../app/discussions/, which is served and would
+          # otherwise read as climbing out of the site.
+          published_root: .
           allowed_hosts:
             - cdn.jsdelivr.net
       source_catalogue:

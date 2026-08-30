@@ -438,21 +438,75 @@ def test_a_site_absolute_reference_ignores_the_base(site: Path):
     assert [f for f in check_site(site) if f.page == "sub/p.html"] == []
 
 
-def test_a_reference_outside_the_site_falls_back_to_plain_existence(site: Path):
-    """#238: site_path conflates "the pages to check" with "the root references
-    resolve against", and TraitMech has ten references that legitimately point
-    at pages the repository publishes from outside its pages/ directory. Until
-    that is modelled, an escaping reference keeps the old behaviour rather than
-    silently becoming a finding."""
-    outside = site.parent / "outside.html"
-    outside.write_text(PAGE)
+def test_a_reference_that_leaves_the_published_site_is_named_as_such(site: Path):
+    """Neither resolved nor broken. What is served beyond the declared root is
+    not this check's to know, and answering from the checkout would answer a
+    different question -- whether a file exists here, not whether the site
+    serves it."""
+    (site.parent / "outside.html").write_text(PAGE)
     write(site, "sub/p.html", '<a href="../../outside.html">x</a>')
-    assert [f for f in check_site(site) if f.page == "sub/p.html"] == []
+    findings = [f for f in check_site(site) if f.page == "sub/p.html"]
+    assert codes(findings) == ["REFERENCE_OUTSIDE_SITE"]
+    assert "climbs out" in findings[0].detail
 
-    write(site, "sub/q.html", '<a href="../../absent.html">x</a>')
-    assert codes([f for f in check_site(site) if f.page == "sub/q.html"]) == [
+
+def test_the_outside_verdict_is_falsy():
+    """`check_site` distinguishes it by identity, but any caller treating the
+    verdict as a boolean must not read "outside the site" as "resolves"."""
+    from kg_microbe_site.contract import _OUTSIDE
+
+    assert bool(_OUTSIDE) is False
+    assert not _OUTSIDE
+
+
+def test_a_published_root_wider_than_the_checked_pages_resolves_the_climb(site: Path):
+    """TraitMech's shape: check pages/, serve the whole repository. Ten of its
+    trait pages link ../../../app/discussions/, which is published but sits
+    outside the directory being checked."""
+    wider = site.parent
+    (wider / "app").mkdir(exist_ok=True)
+    (wider / "app" / "index.html").write_text(PAGE)
+    write(site, "sub/p.html", '<a href="../../app/index.html">x</a>')
+
+    assert codes([f for f in check_site(site) if f.page == "sub/p.html"]) == [
+        "REFERENCE_OUTSIDE_SITE"
+    ]
+    assert [
+        f for f in check_site(site, published_root=wider) if f.page == "sub/p.html"
+    ] == []
+
+
+def test_a_wider_published_root_still_reports_a_reference_to_nothing(site: Path):
+    """Widening the root must not turn the check off."""
+    write(site, "sub/q.html", '<a href="../../app/absent.html">x</a>')
+    findings = [
+        f for f in check_site(site, published_root=site.parent) if f.page == "sub/q.html"
+    ]
+    assert codes(findings) == ["BROKEN_REFERENCE"]
+
+
+def test_a_site_absolute_reference_means_the_published_root(site: Path):
+    wider = site.parent
+    (wider / "top.html").write_text(PAGE)
+    write(site, "sub/p.html", '<a href="/top.html">x</a>')
+    assert [
+        f for f in check_site(site, published_root=wider) if f.page == "sub/p.html"
+    ] == []
+    # Without the wider root, "/top.html" means the checked directory's own root.
+    assert codes([f for f in check_site(site) if f.page == "sub/p.html"]) == [
         "BROKEN_REFERENCE"
     ]
+
+
+def test_a_climb_out_of_a_wider_published_root_is_still_outside(site: Path):
+    (site.parent.parent / "elsewhere.html").write_text(PAGE)
+    write(site, "sub/p.html", '<a href="../../../elsewhere.html">x</a>')
+    assert codes(
+        [f for f in check_site(site, published_root=site.parent) if f.page == "sub/p.html"]
+    ) == ["REFERENCE_OUTSIDE_SITE"]
+
+
+
 # -- the manifest declaration and the CLI -----------------------------------
 
 
@@ -496,11 +550,46 @@ def test_a_declared_site_still_holds_to_the_contract(mech):
     if not site.is_dir():
         pytest.skip(f"{mech} has no site at {site}")
 
+    declared = capability.settings.get("published_root")
     findings = check_site(
-        site, allowed_hosts=list(capability.settings.get("allowed_hosts", ()))
+        site,
+        allowed_hosts=list(capability.settings.get("allowed_hosts", ())),
+        published_root=(root / declared).resolve() if declared else None,
     )
     baseline = {"communitymech": {"HEADING_LEVEL_SKIPPED"}, "traitmech": set()}[mech]
     assert {f.code for f in findings} == baseline, [str(f) for f in findings[:5]]
+
+
+def test_traitmech_needs_its_published_root_to_come_out_clean():
+    """#238, on the corpus that motivated it. Ten trait pages link
+    ../../../app/discussions/, which TraitMech publishes (Pages serves main at
+    /) but which sits outside the pages/ directory being checked. Without the
+    declaration they read as climbing out of the site; with it they resolve, and
+    they resolve case-exactly rather than by asking the checkout."""
+    try:
+        root = resolve_mech_root("traitmech", claw_root=CLAW_ROOT)
+    except MechRootError as exc:
+        pytest.skip(f"needs a traitmech checkout: {exc}")
+    site = root / "pages"
+    if not site.is_dir():
+        pytest.skip("traitmech has no pages/ here")
+
+    hosts = ["cdn.jsdelivr.net"]
+    without = check_site(site, allowed_hosts=hosts)
+    assert {f.code for f in without} == {"REFERENCE_OUTSIDE_SITE"}
+    assert len(without) == 10
+
+    assert check_site(site, allowed_hosts=hosts, published_root=root) == []
+
+
+def test_the_declared_published_root_is_the_one_traitmech_needs():
+    """A ledger: if the manifest stops declaring it, the test above stops being
+    about anything."""
+    settings = MANIFEST.mechs["traitmech"].capabilities["site_contract"].settings
+    assert settings["published_root"] == "."
+    assert "published_root" not in (
+        MANIFEST.mechs["communitymech"].capabilities["site_contract"].settings
+    )
 
 
 def test_an_undeclared_cdn_would_be_caught_on_a_real_corpus():
@@ -515,7 +604,7 @@ def test_an_undeclared_cdn_would_be_caught_on_a_real_corpus():
     if not site.is_dir():
         pytest.skip("traitmech has no pages/ here")
 
-    findings = check_site(site)
+    findings = check_site(site, published_root=root)
     assert {f.code for f in findings} == {"EXTERNAL_ASSET"}
     assert len(findings) > 300
 
@@ -556,6 +645,35 @@ def test_the_cli_resolves_the_site_from_the_manifest_when_none_is_given(capsys):
         "site_path"
     ]
     assert f"/{site}:" in capsys.readouterr().out
+
+
+def test_the_cli_passes_the_declared_published_root_through(capsys):
+    """The library semantics being right is not enough: the CLI is what CI runs.
+    TraitMech comes out clean only if published_root reaches `check_site` AND is
+    resolved against the repository rather than the site -- resolving "." against
+    pages/ gives pages/ back, and the ten references still read as outside."""
+    try:
+        resolve_mech_root("traitmech", claw_root=CLAW_ROOT)
+    except MechRootError as exc:
+        pytest.skip(f"needs a traitmech checkout: {exc}")
+
+    assert main(["check", "--mech", "traitmech"]) == 0
+    captured = capsys.readouterr()
+    assert "clean" in captured.out
+    assert "REFERENCE_OUTSIDE_SITE" not in captured.err
+
+
+def test_the_cli_checks_an_explicit_site_without_a_checkout(capsys, tmp_path, monkeypatch):
+    """CI builds into a directory that is not in any checkout, so --site must
+    work when the Mech root cannot be resolved. Only published_root loses its
+    repository-relative meaning then, and it falls back to the site."""
+    (tmp_path / "p.html").write_text(PAGE)
+    monkeypatch.setattr(
+        "kg_microbe_site.__main__.resolve_mech_root",
+        lambda *a, **k: (_ for _ in ()).throw(MechRootError("no checkout")),
+    )
+    assert main(["check", "--mech", "traitmech", "--site", str(tmp_path)]) == 0
+    assert "clean" in capsys.readouterr().out
 
 
 def test_the_cli_fails_closed_when_the_checkout_cannot_be_resolved(capsys, monkeypatch):

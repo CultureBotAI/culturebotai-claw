@@ -19,10 +19,14 @@ Measured on CommunityMech's 330 published pages and TraitMech's 490:
     heading levels skipped          3 and 0
     external asset loads            0 and 353
 
-Ten of TraitMech's references point outside its declared site_path, at pages
-the repository publishes from elsewhere; they are resolved against the checkout
-and happen to be right. #238 covers separating "the pages to check" from "the
-root references resolve against", which TraitMech shows are not the same thing.
+"The pages to check" and "the root references resolve against" are separate
+settings, because TraitMech shows they are not the same thing: it checks pages/
+and serves its whole repository, so ten of its trait pages legitimately link
+../../../app/discussions/. A reference that leaves the published root is neither
+resolved nor broken but REFERENCE_OUTSIDE_SITE -- answering it from the checkout
+would answer a different question, whether a file exists here rather than
+whether the site serves it, and on a Mech whose site is a build directory that
+answers yes to something that 404s (#238).
 
 TraitMech's 353 are one `<script>` per trait page pulling a charting library
 from cdn.jsdelivr.net. That is a real dependency on a third party to render a
@@ -360,7 +364,20 @@ def _resolution_base(
     return start / trimmed
 
 
-def _resolves(root: Path, page: Path, facts: PageFacts, reference: str) -> bool:
+class _Outside:
+    """A reference that leaves the published site. Neither resolved nor broken:
+    what is served beyond the declared root is not this check's to know."""
+
+    def __bool__(self) -> bool:
+        return False
+
+
+_OUTSIDE = _Outside()
+
+
+def _resolves(
+    root: Path, page: Path, facts: PageFacts, reference: str
+) -> bool | _Outside:
     # A leading "/" is site-absolute, not filesystem-absolute. Resolving it
     # against the filesystem would look outside the site and, on a machine that
     # happens to have /assets, wrongly pass.
@@ -372,11 +389,11 @@ def _resolves(root: Path, page: Path, facts: PageFacts, reference: str) -> bool:
     try:
         relative = PurePosixPath(combined.relative_to(root.resolve()).as_posix())
     except ValueError:
-        # Outside the declared site. Resolving it against the checkout is what
-        # #238 covers; until that is modelled, fall back to plain existence so
-        # this change does not silently start reporting references that today
-        # resolve -- TraitMech has ten.
-        return combined.is_file() or (combined / "index.html").is_file()
+        # Outside the published root. Asking the checkout would answer a
+        # different question -- whether a file exists here, not whether the site
+        # serves it -- and on a Mech whose site is a build directory it would
+        # answer yes to something that 404s (#238).
+        return _OUTSIDE
 
     found = _exists_case_exactly(root.resolve(), relative)
     if found is None:
@@ -392,13 +409,23 @@ def check_site(
     *,
     allowed_hosts: Sequence[str] = (),
     pages: Iterable[Path] | None = None,
+    published_root: Path | None = None,
 ) -> list[Finding]:
     """Judge every page, and resolve every internal reference.
 
     Reference resolution needs the whole site, which is why it lives here rather
     than in `check_page`: a page cannot know whether its neighbour exists.
+
+    `root` is the set of pages to check. `published_root` is what a site-absolute
+    reference means and how far a relative one may climb; it defaults to `root`.
+    They are not always the same directory: TraitMech checks `pages/` but serves
+    its whole repository, and ten of its trait pages legitimately link
+    `../../../app/discussions/`. Conflating the two made those references
+    unresolvable inside the site and silently resolved against the checkout
+    instead (#238).
     """
     root = Path(root)
+    published = Path(published_root) if published_root is not None else root
     found = sorted(pages) if pages is not None else sorted(root.rglob("*.html"))
     findings: list[Finding] = []
 
@@ -423,7 +450,17 @@ def check_site(
                     )
                 )
                 continue
-            if not _resolves(root, path, facts, target):
+            verdict = _resolves(published, path, facts, target)
+            if verdict is _OUTSIDE:
+                findings.append(
+                    Finding(
+                        "REFERENCE_OUTSIDE_SITE",
+                        name,
+                        f"{target!r} climbs out of the published site; nothing "
+                        f"here can say whether it is served",
+                    )
+                )
+            elif not verdict:
                 findings.append(
                     Finding(
                         "BROKEN_REFERENCE", name, f"{target!r} resolves to nothing"
