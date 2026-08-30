@@ -20,8 +20,11 @@ would have nothing to say about them.
 
 from __future__ import annotations
 
+import os
 import re
+import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import yaml
@@ -111,32 +114,70 @@ def test_the_reasons_that_make_checkable_claims_are_the_ones_declared():
 
 
 @pytest.mark.parametrize(("mech", "cap", "reason", "capability"), _ALL, ids=_IDS)
-def test_a_declared_claim_holds_against_the_checkout(mech, cap, reason, capability):
-    """The point of the whole exercise: `present` must exist and `absent` must
-    not, in the repository the declaration belongs to."""
+def _tracked_on_main(root: Path, relative: str) -> bool | None:
+    """Whether `origin/main` of the repository at `root` tracks `relative`.
+
+    None when that cannot be answered -- no git, no `origin/main`.
+
+    Deliberately not `(root / relative).exists()`. A capability reason describes
+    the repository, and a local checkout is on whatever branch its owner is
+    working on. Asking the filesystem asked "is this file here right now",
+    which is a different question with a different answer: CellStructureMech's
+    `vendored-governance` branch carries two files its main does not, and every
+    claim about their absence failed for anyone who happened to have that branch
+    checked out while passing in CI, which has no checkout at all. Reading from
+    `origin/main` is the #203 move -- ask git, not the working tree.
+    """
+    probe = subprocess.run(
+        ["git", "-C", str(root), "cat-file", "-e", f"origin/main:{relative}"],
+        capture_output=True,
+    )
+    if probe.returncode == 0:
+        return True
+    # Distinguish "main does not have it" from "there is no main to ask".
+    has_main = subprocess.run(
+        ["git", "-C", str(root), "rev-parse", "--verify", "--quiet", "origin/main"],
+        capture_output=True,
+    )
+    return False if has_main.returncode == 0 else None
+
+
+@pytest.mark.parametrize(("mech", "cap", "reason", "capability"), _ALL, ids=_IDS)
+def test_a_declared_claim_holds_against_the_repository(mech, cap, reason, capability):
+    """The point of the whole exercise: `present` must be tracked and `absent`
+    must not be, on the branch the repository actually publishes."""
     claims = capability.reason_claims
     if not claims:
         pytest.skip(f"{mech}.{cap} makes no checkable claim")
 
-    def root_for(path: str) -> tuple[Path, str]:
+    def tracked(path: str) -> tuple[bool | None, str, str]:
         if path.startswith(CLAW_PREFIX):
-            return CLAW_ROOT, path.removeprefix(CLAW_PREFIX)
+            # claw is the repository under review, so its working tree is the
+            # state that matters -- a claim about a file this branch adds should
+            # hold before that branch merges.
+            relative = path.removeprefix(CLAW_PREFIX)
+            return (CLAW_ROOT / relative).exists(), relative, "claw"
         try:
-            return resolve_mech_root(mech, claw_root=CLAW_ROOT), path
+            root = resolve_mech_root(mech, claw_root=CLAW_ROOT)
         except MechRootError as exc:
             pytest.skip(f"needs a {mech} checkout: {exc}")
+        return _tracked_on_main(root, path), path, f"{root.name} origin/main"
 
     for path in claims.present:
-        root, relative = root_for(path)
-        assert (root / relative).exists(), (
-            f"{mech}.{cap}'s reason asserts {relative} exists in {root.name}, "
+        found, relative, where = tracked(path)
+        if found is None:
+            pytest.skip(f"{where} cannot be read")
+        assert found, (
+            f"{mech}.{cap}'s reason asserts {relative} exists in {where}, "
             f"and it does not"
         )
     for path in claims.absent:
-        root, relative = root_for(path)
-        assert not (root / relative).exists(), (
+        found, relative, where = tracked(path)
+        if found is None:
+            pytest.skip(f"{where} cannot be read")
+        assert not found, (
             f"{mech}.{cap}'s reason asserts {relative} does NOT exist in "
-            f"{root.name}, and it does"
+            f"{where}, and it does"
         )
 
 
@@ -236,3 +277,132 @@ def test_claims_without_a_reason_are_rejected():
     )
     with pytest.raises(FleetManifestError, match="nothing to check"):
         _parse(broken)
+
+
+# -- reading the repository rather than the working tree ---------------------
+
+
+def _git(root: Path, *args: str) -> None:
+    subprocess.run(
+        ["git", "-C", str(root), *args],
+        check=True,
+        capture_output=True,
+        env={
+            **os.environ,
+            "GIT_AUTHOR_NAME": "t",
+            "GIT_AUTHOR_EMAIL": "t@x",
+            "GIT_COMMITTER_NAME": "t",
+            "GIT_COMMITTER_EMAIL": "t@x",
+        },
+    )
+
+
+@pytest.fixture
+def repository(tmp_path: Path) -> Path:
+    """A checkout with an `origin/main` and a feature branch that adds a file.
+
+    This is the shape that broke: CellStructureMech's `vendored-governance`
+    branch carries `scripts/validate_id_label_correspondence.py`, its main does
+    not, and a claim that main lacks the file failed for anyone with that branch
+    checked out while passing in CI, which has no checkout at all.
+    """
+    upstream = tmp_path / "upstream.git"
+    work = tmp_path / "work"
+    _git(tmp_path, "init", "--bare", "-b", "main", str(upstream))
+    _git(tmp_path, "clone", str(upstream), str(work))
+    (work / "on-main.txt").write_text("")
+    _git(work, "add", "on-main.txt")
+    _git(work, "commit", "-m", "main")
+    _git(work, "push", "-u", "origin", "main")
+    _git(work, "checkout", "-b", "feature")
+    (work / "only-on-branch.txt").write_text("")
+    _git(work, "add", "only-on-branch.txt")
+    _git(work, "commit", "-m", "branch")
+    return work
+
+
+def test_a_file_tracked_on_main_is_found(repository: Path):
+    assert _tracked_on_main(repository, "on-main.txt") is True
+
+
+def test_a_file_only_on_the_checked_out_branch_is_not_on_main(repository: Path):
+    """The whole point. It is right there in the working tree, and the answer is
+    still False, because the reason describes the repository rather than
+    whichever branch its owner is working on."""
+    assert (repository / "only-on-branch.txt").exists()
+    assert _tracked_on_main(repository, "only-on-branch.txt") is False
+
+
+def test_a_file_in_neither_is_absent(repository: Path):
+    assert _tracked_on_main(repository, "nowhere.txt") is False
+
+
+def test_a_repository_with_no_origin_main_cannot_answer(tmp_path: Path):
+    """Distinguished from "absent": a checkout with no origin/main has not said
+    the file is missing, it has said nothing. Conflating the two would report
+    every `present` claim as broken against such a checkout."""
+    solo = tmp_path / "solo"
+    solo.mkdir()
+    _git(tmp_path, "init", "-b", "main", str(solo))
+    (solo / "here.txt").write_text("")
+    _git(solo, "add", "here.txt")
+    _git(solo, "commit", "-m", "only local")
+    assert _tracked_on_main(solo, "here.txt") is None
+
+
+def test_a_directory_that_is_not_a_repository_cannot_answer(tmp_path: Path):
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    (plain / "here.txt").write_text("")
+    assert _tracked_on_main(plain, "here.txt") is None
+
+
+def _stub(present: tuple[str, ...] = (), absent: tuple[str, ...] = ()):
+    return SimpleNamespace(reason_claims=ReasonClaims(present=present, absent=absent))
+
+
+def test_the_check_itself_reads_main_not_the_working_tree(repository: Path, monkeypatch):
+    """`_tracked_on_main` being right is not enough -- the assertion has to use
+    it. This drives the real check against a checkout whose branch carries a
+    file its main does not, which is the situation that broke."""
+    monkeypatch.setattr(
+        "kg_microbe_fleet.roots.resolve_mech_root", lambda *a, **k: repository
+    )
+    monkeypatch.setitem(
+        test_a_declared_claim_holds_against_the_repository.__globals__,
+        "resolve_mech_root",
+        lambda *a, **k: repository,
+    )
+    # main does not track it, so asserting its absence must hold even though the
+    # file is sitting in the working tree.
+    assert (repository / "only-on-branch.txt").exists()
+    test_a_declared_claim_holds_against_the_repository(
+        "traitmech", "x", "only-on-branch.txt", _stub(absent=("only-on-branch.txt",))
+    )
+    # ...and asserting its presence must not.
+    with pytest.raises(AssertionError, match="and it does not"):
+        test_a_declared_claim_holds_against_the_repository(
+            "traitmech", "x", "only-on-branch.txt", _stub(present=("only-on-branch.txt",))
+        )
+
+
+def test_an_unreadable_repository_skips_rather_than_passing(tmp_path: Path, monkeypatch):
+    """A checkout that cannot answer must not be read as agreement. Returning
+    instead of skipping would turn every claim about such a repository into a
+    silent pass -- the #216 shape, where the guard reports success precisely
+    when it has learned nothing."""
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    monkeypatch.setitem(
+        test_a_declared_claim_holds_against_the_repository.__globals__,
+        "resolve_mech_root",
+        lambda *a, **k: plain,
+    )
+    with pytest.raises(pytest.skip.Exception):
+        test_a_declared_claim_holds_against_the_repository(
+            "traitmech", "x", "anything.txt", _stub(present=("anything.txt",))
+        )
+    with pytest.raises(pytest.skip.Exception):
+        test_a_declared_claim_holds_against_the_repository(
+            "traitmech", "x", "anything.txt", _stub(absent=("anything.txt",))
+        )
