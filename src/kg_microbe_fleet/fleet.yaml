@@ -52,6 +52,14 @@ capability_catalogue:
       fields:
         type: string_list
         required_when_enabled: true
+  page_budgets:
+    settings:
+      site_path:
+        type: string
+        required_when_enabled: true
+      budgets_path:
+        type: string
+        required_when_enabled: true
 
 # Vendored shared-file governance is deliberately modeled separately from
 # fleet membership: claw is the external authority and must never pin itself.
@@ -118,6 +126,12 @@ mechs:
           fields:
             - source_environment
             - medium_type
+      page_budgets:
+        status: disabled
+        reason: >-
+          Generates a site through .github/workflows/generate-pages.yaml but
+          declares no size or file-count budgets, so nothing watches it grow.
+          Adopting them applies here; the limits are the repository's to set.
       source_catalogue:
         status: disabled
         reason: >-
@@ -187,6 +201,12 @@ mechs:
           fields:
             - ingredient_type
             - ontology_mapping.mapping_quality
+      page_budgets:
+        status: disabled
+        reason: >-
+          Generates a site through .github/workflows/generate-pages.yaml but
+          declares no size or file-count budgets, so nothing watches it grow.
+          Adopting them applies here; the limits are the repository's to set.
       source_catalogue:
         status: disabled
         reason: >-
@@ -257,6 +277,12 @@ mechs:
         settings:
           fields:
             - environment_term
+      page_budgets:
+        status: disabled
+        reason: >-
+          Generates a site through .github/workflows/generate-pages.yaml but
+          declares no size or file-count budgets, so nothing watches it grow.
+          Adopting them applies here; the limits are the repository's to set.
       source_catalogue:
         status: disabled
         reason: >-
@@ -325,6 +351,12 @@ mechs:
           fields:
             - mapping_status
             - trait_category
+      page_budgets:
+        status: disabled
+        reason: >-
+          Generates a site through .github/workflows/generate-pages.yaml but
+          declares no size or file-count budgets, so nothing watches it grow.
+          Adopting them applies here; the limits are the repository's to set.
       source_catalogue:
         status: enabled
       unmapped_inventory_input:
@@ -405,6 +437,11 @@ mechs:
           fields:
             - trait_axis
             - mapping_status
+      page_budgets:
+        status: enabled
+        settings:
+          site_path: _site
+          budgets_path: conf/pages_budgets.json
       source_catalogue:
         status: enabled
       unmapped_inventory_input:

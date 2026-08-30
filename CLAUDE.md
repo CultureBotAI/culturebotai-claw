@@ -324,6 +324,12 @@ record carries reports as a data problem rather than a wrong declaration. An
 unreadable record is named and exits nonzero, since it is excluded from every
 count above it.
 
+`kg-microbe-pages audit --mech X` measures a built site against the budgets that
+repository declares -- total bytes, file count, and per-group totals and largest
+members, where a group is a glob the Mech names. A site with too few files fails
+before any size limit, because an empty site is under all of them. The limits
+live in the Mech; only the mechanism is here.
+
 `kg-microbe-skills check` validates every path and sibling-skill reference in
 `.claude/`. It judges a reference against the repository it belongs to, and
 reports what it could not resolve rather than calling it broken: `missing` and
