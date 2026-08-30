@@ -69,6 +69,16 @@ def main(argv: list[str] | None = None) -> int:
         # and publishes the whole checkout, so its published_root is ".".
         base = root if root is not None else site
         published = (base / declared_root).resolve()
+        if not published.is_dir():
+            # Otherwise every reference silently becomes REFERENCE_OUTSIDE_SITE,
+            # because nothing can be inside a directory that is not there --
+            # a whole-site failure that reads like a whole-site finding.
+            print(
+                f"{args.mech}: declared published_root {declared_root!r} is not "
+                f"a directory ({published})",
+                file=sys.stderr,
+            )
+            return 2
     pages = sorted(site.rglob("*.html"))
     findings = check_site(
         site, allowed_hosts=list(allowed), pages=pages, published_root=published

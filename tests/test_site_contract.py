@@ -9,6 +9,7 @@ them is a false positive an earlier draft actually produced.
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -645,6 +646,35 @@ def test_the_cli_resolves_the_site_from_the_manifest_when_none_is_given(capsys):
         "site_path"
     ]
     assert f"/{site}:" in capsys.readouterr().out
+
+
+def test_the_cli_rejects_a_published_root_that_is_not_there(capsys, tmp_path, monkeypatch):
+    """A typo in published_root would otherwise turn every reference on every
+    page into REFERENCE_OUTSIDE_SITE -- nothing can be inside a directory that
+    does not exist -- so a whole-site misconfiguration reads like a whole-site
+    finding. It must fail loudly instead."""
+    import dataclasses
+
+    (tmp_path / "p.html").write_text(PAGE)
+    mech = MANIFEST.mechs["traitmech"]
+    capability = mech.capabilities["site_contract"]
+    broken = dataclasses.replace(
+        capability,
+        settings=dict(capability.settings, published_root="no-such-directory"),
+    )
+    patched = dataclasses.replace(
+        mech, capabilities=dict(mech.capabilities, site_contract=broken)
+    )
+    # FleetManifest is not a dataclass, and the CLI only reads `.mechs`.
+    manifest = SimpleNamespace(mechs=dict(MANIFEST.mechs, traitmech=patched))
+    monkeypatch.setattr(
+        "kg_microbe_site.__main__.load_fleet_manifest", lambda *a, **k: manifest
+    )
+    monkeypatch.setattr(
+        "kg_microbe_site.__main__.resolve_mech_root", lambda *a, **k: tmp_path
+    )
+    assert main(["check", "--mech", "traitmech", "--site", str(tmp_path)]) == 2
+    assert "is not a directory" in capsys.readouterr().err
 
 
 def test_the_cli_passes_the_declared_published_root_through(capsys):
