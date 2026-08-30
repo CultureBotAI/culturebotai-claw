@@ -197,7 +197,7 @@ assert manifest.keys == (
 assert default_manifest_path() == module_path.parent / "fleet.yaml"
 assert default_config_path().is_relative_to(unpacked)
 governance = load_governance_manifest(fleet_manifest=manifest)
-assert len(governance.artifacts) == 14
+assert len(governance.artifacts) == 15
 assert governance_main(["list", "--repository", "proteintraitsmech", "--json"]) == 0
 history_schema = Path(_default_schema_path()).resolve()
 assert history_schema.is_relative_to(unpacked)

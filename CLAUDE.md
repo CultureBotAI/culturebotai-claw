@@ -92,6 +92,10 @@ Supported:
   are checked only for non-emptiness and are never emitted or retained.
 - Packaged canonical vendored-artifact manifest and identity-validated,
   dry-run-first synchronization.
+- A claw-governed standalone Mech execution contract for native, explicitly
+  web-enabled Codex calls with schema plus semantic output validation, and
+  non-billing Codex/OpenScientist canaries. It remains separate from
+  `kg_microbe_research`, which does not execute providers.
 - The assertion-based suite under `tests/` and fleet workflows under `.github/`.
 
 Experimental or disabled:
@@ -104,10 +108,11 @@ Experimental or disabled:
 - `openclaw-cli agent run` and `pipeline run` execution without `--dry-run`.
 - Environment-curation apply mode; it raises until an atomic validated writer exists.
 - Unified ingredient-mapping apply mode; it raises until all YAML writes are transactional.
-- Provider command construction and *execution*, including an executable mock
-  provider. `kg_microbe_research` decides whether a call is permitted; it does
-  not make one. None of the Mech runners consults this gate yet. Four
-  runners still execute live by default; ProteinTraitsMech is dry-run-first.
+- Provider command construction and *execution inside `kg_microbe_research`*,
+  including an executable mock provider. The package decides whether a call is
+  permitted; it does not make one. The separately vendored Mech execution
+  contract is supported, but runners must still consult the policy gate before
+  any live provider call.
 - Provider executors, domain adapters, historical-result migrations, and the
   five migrated Mech runners.
 - Legacy root diagnostics, one-off migration scripts, and archived phase workflows.

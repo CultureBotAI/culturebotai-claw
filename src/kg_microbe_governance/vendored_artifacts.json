@@ -151,6 +151,14 @@
       "consumers": "all",
       "sha256": "b01b06f1b9a37db205c26c31ec0fd910690848507c7e1bfb73b424ac0829c52d",
       "mode": "0644"
+    },
+    {
+      "id": "deep_research_contract",
+      "source": "src/kg_microbe_governance/artifacts/scripts/deep_research_contract.py",
+      "target": "scripts/deep_research_contract.py",
+      "consumers": "all",
+      "sha256": "81323d8b96c7001578ead4b0346a1fd266d7305882bd4d44d9b5381dc28d7303",
+      "mode": "0644"
     }
   ]
 }

@@ -8,6 +8,8 @@ This directory contains longer-lived domain and cross-repository guidance:
 - `VALIDATION_STRATEGY.md`
 - `DEEP_RESEARCH_RESULTS.md` — the shared, audit-only research-result schema,
   offline scaffold/validation commands, and evidence-promotion boundary
+- `DEEP_RESEARCH_EXECUTION.md` — the native Codex and OpenScientist execution,
+  credential, canary, and validated-output contract vendored into Mechs
 - `ENVO_TERM_SOURCING_GUIDE.md` and `SOIL_ONTOLOGY_GUIDE.md`
 - `UNMAPPED_CAS_RN_TSV_GUIDE.md`
 - `GITHUB_SETUP.md`
