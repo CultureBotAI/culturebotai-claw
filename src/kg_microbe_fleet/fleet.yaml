@@ -60,6 +60,13 @@ capability_catalogue:
       budgets_path:
         type: string
         required_when_enabled: true
+  site_contract:
+    settings:
+      site_path:
+        type: string
+        required_when_enabled: true
+      allowed_hosts:
+        type: string_list
 
 # Vendored shared-file governance is deliberately modeled separately from
 # fleet membership: claw is the external authority and must never pin itself.
@@ -132,6 +139,14 @@ mechs:
           Generates a site through .github/workflows/generate-pages.yaml but
           declares no size or file-count budgets, so nothing watches it grow.
           Adopting them applies here; the limits are the repository's to set.
+      site_contract:
+        status: disabled
+        reason: >-
+          Publishes a site built in CI, so no directory in the checkout is the
+          output the check would judge; running it on the Jekyll or template
+          sources reports missing .html files that the build creates. Adopting
+          it means running the check on the build product, which applies here
+          and is not yet wired.
       source_catalogue:
         status: disabled
         reason: >-
@@ -207,6 +222,14 @@ mechs:
           Generates a site through .github/workflows/generate-pages.yaml but
           declares no size or file-count budgets, so nothing watches it grow.
           Adopting them applies here; the limits are the repository's to set.
+      site_contract:
+        status: disabled
+        reason: >-
+          Publishes a site built in CI, so no directory in the checkout is the
+          output the check would judge; running it on the Jekyll or template
+          sources reports missing .html files that the build creates. Adopting
+          it means running the check on the build product, which applies here
+          and is not yet wired.
       source_catalogue:
         status: disabled
         reason: >-
@@ -283,6 +306,10 @@ mechs:
           Generates a site through .github/workflows/generate-pages.yaml but
           declares no size or file-count budgets, so nothing watches it grow.
           Adopting them applies here; the limits are the repository's to set.
+      site_contract:
+        status: enabled
+        settings:
+          site_path: docs
       source_catalogue:
         status: disabled
         reason: >-
@@ -354,9 +381,16 @@ mechs:
       page_budgets:
         status: disabled
         reason: >-
-          Generates a site through .github/workflows/generate-pages.yaml but
-          declares no size or file-count budgets, so nothing watches it grow.
+          Serves 490 tracked pages under pages/ straight from main via GitHub
+          Pages -- it has no generate-pages.yaml, unlike the other four -- and
+          declares no size or file-count budgets, so nothing watches them grow.
           Adopting them applies here; the limits are the repository's to set.
+      site_contract:
+        status: enabled
+        settings:
+          site_path: pages
+          allowed_hosts:
+            - cdn.jsdelivr.net
       source_catalogue:
         status: enabled
       unmapped_inventory_input:
@@ -442,6 +476,14 @@ mechs:
         settings:
           site_path: _site
           budgets_path: conf/pages_budgets.json
+      site_contract:
+        status: disabled
+        reason: >-
+          Publishes a site built in CI, so no directory in the checkout is the
+          output the check would judge; running it on the Jekyll or template
+          sources reports missing .html files that the build creates. Adopting
+          it means running the check on the build product, which applies here
+          and is not yet wired.
       source_catalogue:
         status: enabled
       unmapped_inventory_input:

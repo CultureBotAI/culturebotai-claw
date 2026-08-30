@@ -54,6 +54,10 @@ EXPECTED_CAPABILITIES = {
     # Phase 6 item 1: which Mech watches its generated site's size, and why
     # the four that do not have decided rather than forgotten.
     "page_budgets",
+    # Phase 6 item 1: whose published pages are checked for a title, a declared
+    # language, alt text, heading order and references that resolve -- and
+    # which third-party host each of them has deliberately taken on.
+    "site_contract",
     "id_label_validation",
     "curation_history",
     "strict_validation",
