@@ -322,7 +322,11 @@ def test_a_declared_site_still_holds_to_the_contract(mech):
     findings = check_site(
         site, allowed_hosts=list(capability.settings.get("allowed_hosts", ()))
     )
-    baseline = {"communitymech": {"HEADING_LEVEL_SKIPPED"}, "traitmech": set()}[mech]
+    baseline = {
+        "communitymech": {"HEADING_LEVEL_SKIPPED"},
+        "traitmech": set(),
+        "cellstructuremech": set(),
+    }[mech]
     assert {f.code for f in findings} == baseline, [str(f) for f in findings[:5]]
 
 
