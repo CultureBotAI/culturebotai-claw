@@ -228,7 +228,7 @@ def _declared() -> list[tuple[str, tuple[str, ...]]]:
 def test_every_mech_declares_the_fields_its_report_tabulates():
     declared = _declared()
 
-    assert len(declared) == 5
+    assert len(declared) == 6
     for key, fields in declared:
         assert fields, f"{key} enables corpus_statistics without naming fields"
 

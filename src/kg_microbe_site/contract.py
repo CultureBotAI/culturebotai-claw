@@ -19,15 +19,30 @@ Measured on CommunityMech's 330 published pages and TraitMech's 490:
     heading levels skipped          3 and 0
     external asset loads            0 and 353
 
-Ten of TraitMech's references point outside its declared site_path, at pages
-the repository publishes from elsewhere; they are resolved against the checkout
-and happen to be right. #238 covers separating "the pages to check" from "the
-root references resolve against", which TraitMech shows are not the same thing.
+"The pages to check" and "the root references resolve against" are separate
+settings, because TraitMech shows they are not the same thing: it checks pages/
+and serves its whole repository, so ten of its trait pages legitimately link
+../../../app/discussions/. A reference that leaves the published root is neither
+resolved nor broken but REFERENCE_OUTSIDE_SITE -- answering it from the checkout
+would answer a different question, whether a file exists here rather than
+whether the site serves it, and on a Mech whose site is a build directory that
+answers yes to something that 404s (#238).
 
 TraitMech's 353 are one `<script>` per trait page pulling a charting library
 from cdn.jsdelivr.net. That is a real dependency on a third party to render a
 published page, and `allowed_hosts` is how a repository says it is deliberate
 rather than how the check is silenced.
+
+How a reference is resolved is three decisions, each of which was wrong once
+(#239, #240, #241). It is percent-decoded first, because `%20` is the correct way
+to write a space and comparing the encoded form against a filename called a
+working link broken. It is resolved against `<base href>` when the page sets one,
+because that is what the reader's browser does. And each path component is
+matched against its parent's listing rather than handed to `Path.is_file()`,
+because a case-insensitive filesystem answers for `REAL.html` when the file is
+`real.html` -- so the check passed on a laptop while the live Linux page 404s.
+`srcset` is read as the candidate list it is, since a responsive image is
+otherwise invisible to every rule below.
 
 Two things this deliberately does not try to do.
 
@@ -49,9 +64,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Iterable, Sequence
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 __all__ = [
     "ASSET_TAGS",
@@ -85,6 +100,12 @@ LINK_ASSET_RELS = frozenset(
     {"stylesheet", "icon", "shortcut", "apple-touch-icon", "preload", "manifest"}
 )
 
+# `srcset` is a comma-separated candidate list with optional descriptors --
+# "a.png 1x, a@2x.png 2x" -- so it cannot be another ASSET_TAGS entry. Without
+# it a responsive image is invisible to every rule: <picture><source srcset>
+# is the standard pattern, and neither declared corpus happened to use it (#239).
+SRCSET_TAGS = frozenset({"img", "source"})
+
 _NOT_A_FILE = ("mailto:", "data:", "javascript:", "tel:")
 
 # Jinja, Liquid and ERB left in a reference. Reporting these as broken links
@@ -113,6 +134,7 @@ class PageFacts:
     assets: list[tuple[str, str]] = field(default_factory=list)
     links: list[str] = field(default_factory=list)
     images_without_alt: int = 0
+    base: str = ""
 
 
 class _Reader(HTMLParser):
@@ -133,6 +155,16 @@ class _Reader(HTMLParser):
             target = attributes.get("href", "")
             if target:
                 self.facts.links.append(target)
+
+        if tag == "base" and not self.facts.base:
+            # Only the first <base href> counts; later ones are ignored by
+            # browsers, so honouring them would judge references against a
+            # directory the reader's browser never uses.
+            self.facts.base = attributes.get("href", "")
+
+        if tag in SRCSET_TAGS:
+            for candidate in _srcset_candidates(attributes.get("srcset", "")):
+                self.facts.assets.append((tag, candidate))
 
         if tag in ASSET_TAGS and self._is_asset(tag, attributes):
             reference = attributes.get(ASSET_TAGS[tag], "")
@@ -163,6 +195,16 @@ class _Reader(HTMLParser):
     def handle_data(self, data: str) -> None:
         if self._in_title:
             self.facts.title += data
+
+
+def _srcset_candidates(value: str) -> list[str]:
+    """The URLs in a srcset, without their density or width descriptors."""
+    candidates = []
+    for part in value.split(","):
+        url = part.strip().split()[0] if part.strip() else ""
+        if url:
+            candidates.append(url)
+    return candidates
 
 
 def read_page(html: str) -> PageFacts:
@@ -264,16 +306,102 @@ def check_page(
     return _check_facts(read_page(html), page, allowed_hosts)
 
 
-def _resolves(root: Path, page: Path, reference: str) -> bool:
+def _exists_case_exactly(root: Path, relative: PurePosixPath) -> Path | None:
+    """Resolve `relative` under `root`, matching each name exactly.
+
+    `Path.is_file()` asks the filesystem, and on macOS the filesystem says yes to
+    `REAL.html` when the file is `real.html`. The site is served from Linux, so
+    that answer is wrong there and the check passes on a laptop while the live
+    page 404s. #240, the same machine-dependence #203 moved off the filesystem
+    for a different check. Walking each component against its parent's listing
+    gives the same verdict everywhere.
+    """
+    current = root
+    # PurePosixPath has already dropped "." and empty components.
+    for part in relative.parts:
+        try:
+            names = {entry.name for entry in current.iterdir()}
+        except (NotADirectoryError, PermissionError, FileNotFoundError):
+            return None
+        if part not in names:
+            return None
+        current = current / part
+    return current
+
+
+def _resolution_base(
+    root: Path, page: Path, facts: PageFacts, reference: str
+) -> Path | None:
+    """The directory a reference is relative to, or None if it is not local.
+
+    `<base href>` redefines that for every relative reference on the page, so
+    ignoring it judges them all against the wrong directory (#241).
+
+    Two details a first pass got wrong, both of which browsers get right:
+
+    A base is a URL, not a directory. `<base href="sub">` makes the document's
+    base `/sub`, and `real.html` beside it resolves to `/real.html` -- the last
+    segment is replaced, not descended into. Only a trailing slash means
+    "inside".
+
+    An external base moves every relative reference on the page to another
+    origin, so none of them is a reference to this site. Resolving them here
+    reported a page's own links as broken; returning None says there is nothing
+    local to check.
+    """
+    if reference.startswith("/"):
+        return root
+    base = facts.base.strip()
+    if not base:
+        return page.parent
+    if _is_external(base):
+        return None
+    start = root if base.startswith("/") else page.parent
+    trimmed = base.lstrip("/")
+    if not trimmed.endswith("/"):
+        # Replace the last segment, the way a relative URL does.
+        trimmed = trimmed.rpartition("/")[0]
+    return start / trimmed
+
+
+class _Outside:
+    """A reference that leaves the published site. Neither resolved nor broken:
+    what is served beyond the declared root is not this check's to know."""
+
+    def __bool__(self) -> bool:
+        return False
+
+
+_OUTSIDE = _Outside()
+
+
+def _resolves(
+    root: Path, page: Path, facts: PageFacts, reference: str
+) -> bool | _Outside:
     # A leading "/" is site-absolute, not filesystem-absolute. Resolving it
     # against the filesystem would look outside the site and, on a machine that
     # happens to have /assets, wrongly pass.
-    base = root if reference.startswith("/") else page.parent
-    target = (base / reference.lstrip("/")).resolve()
-    if target.is_file():
+    base = _resolution_base(root, page, facts, reference)
+    if base is None:
+        # The page is based at another origin; this is not a local reference.
+        return True
+    combined = (base / unquote(reference).lstrip("/")).resolve()
+    try:
+        relative = PurePosixPath(combined.relative_to(root.resolve()).as_posix())
+    except ValueError:
+        # Outside the published root. Asking the checkout would answer a
+        # different question -- whether a file exists here, not whether the site
+        # serves it -- and on a Mech whose site is a build directory it would
+        # answer yes to something that 404s (#238).
+        return _OUTSIDE
+
+    found = _exists_case_exactly(root.resolve(), relative)
+    if found is None:
+        return False
+    if found.is_file():
         return True
     # A directory reference is served as its index.
-    return (target / "index.html").is_file()
+    return _exists_case_exactly(found, PurePosixPath("index.html")) is not None
 
 
 def check_site(
@@ -281,13 +409,23 @@ def check_site(
     *,
     allowed_hosts: Sequence[str] = (),
     pages: Iterable[Path] | None = None,
+    published_root: Path | None = None,
 ) -> list[Finding]:
     """Judge every page, and resolve every internal reference.
 
     Reference resolution needs the whole site, which is why it lives here rather
     than in `check_page`: a page cannot know whether its neighbour exists.
+
+    `root` is the set of pages to check. `published_root` is what a site-absolute
+    reference means and how far a relative one may climb; it defaults to `root`.
+    They are not always the same directory: TraitMech checks `pages/` but serves
+    its whole repository, and ten of its trait pages legitimately link
+    `../../../app/discussions/`. Conflating the two made those references
+    unresolvable inside the site and silently resolved against the checkout
+    instead (#238).
     """
     root = Path(root)
+    published = Path(published_root) if published_root is not None else root
     found = sorted(pages) if pages is not None else sorted(root.rglob("*.html"))
     findings: list[Finding] = []
 
@@ -312,7 +450,17 @@ def check_site(
                     )
                 )
                 continue
-            if not _resolves(root, path, target):
+            verdict = _resolves(published, path, facts, target)
+            if verdict is _OUTSIDE:
+                findings.append(
+                    Finding(
+                        "REFERENCE_OUTSIDE_SITE",
+                        name,
+                        f"{target!r} climbs out of the published site; nothing "
+                        f"here can say whether it is served",
+                    )
+                )
+            elif not verdict:
                 findings.append(
                     Finding(
                         "BROKEN_REFERENCE", name, f"{target!r} resolves to nothing"

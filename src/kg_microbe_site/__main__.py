@@ -43,14 +43,16 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{args.mech} declares no site contract: {reason}")
         return 0
 
-    site = args.site
-    if site is None:
-        try:
-            root = resolve_mech_root(args.mech, claw_root=CLAW_ROOT)
-        except MechRootError as exc:
+    # Both site_path and published_root are repository-relative, so the Mech
+    # root is resolved even when --site overrides where the pages come from.
+    try:
+        root = resolve_mech_root(args.mech, claw_root=CLAW_ROOT)
+    except MechRootError as exc:
+        if args.site is None:
             print(str(exc), file=sys.stderr)
             return 2
-        site = root / capability.settings["site_path"]
+        root = None
+    site = args.site or (root / capability.settings["site_path"])
 
     if not site.is_dir():
         print(f"{args.mech}: no site at {site}", file=sys.stderr)
@@ -60,8 +62,27 @@ def main(argv: list[str] | None = None) -> int:
     # Walked once and passed in, rather than counted again afterwards: #242,
     # the same duplicate-traversal #231 hid in the corpus reader for months
     # because every corpus it was tried on was too small to notice.
+    declared_root = capability.settings.get("published_root")
+    published = None
+    if declared_root:
+        # Relative to the repository, not to the site: TraitMech checks pages/
+        # and publishes the whole checkout, so its published_root is ".".
+        base = root if root is not None else site
+        published = (base / declared_root).resolve()
+        if not published.is_dir():
+            # Otherwise every reference silently becomes REFERENCE_OUTSIDE_SITE,
+            # because nothing can be inside a directory that is not there --
+            # a whole-site failure that reads like a whole-site finding.
+            print(
+                f"{args.mech}: declared published_root {declared_root!r} is not "
+                f"a directory ({published})",
+                file=sys.stderr,
+            )
+            return 2
     pages = sorted(site.rglob("*.html"))
-    findings = check_site(site, allowed_hosts=list(allowed), pages=pages)
+    findings = check_site(
+        site, allowed_hosts=list(allowed), pages=pages, published_root=published
+    )
 
     for finding in findings:
         print(finding, file=sys.stderr)

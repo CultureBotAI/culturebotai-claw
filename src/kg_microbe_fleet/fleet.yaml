@@ -60,11 +60,29 @@ capability_catalogue:
       budgets_path:
         type: string
         required_when_enabled: true
+  writer_audit:
+    settings:
+      search_dirs:
+        type: string_list
+        required_when_enabled: true
+      save_helpers:
+        type: string_list
+      validators:
+        type: string_list
+      curation_markers:
+        type: string_list
+      exclude:
+        type: string_list
   site_contract:
     settings:
       site_path:
         type: string
         required_when_enabled: true
+      # What a site-absolute reference means, and how far a relative one may
+      # climb. Defaults to site_path; they differ when a repository checks part
+      # of what it publishes (#238).
+      published_root:
+        type: string
       allowed_hosts:
         type: string_list
 
@@ -139,6 +157,15 @@ mechs:
           Generates a site through .github/workflows/generate-pages.yaml but
           declares no size or file-count budgets, so nothing watches it grow.
           Adopting them applies here; the limits are the repository's to set.
+        reason_claims:
+          present:
+            - .github/workflows/generate-pages.yaml
+      writer_audit:
+        status: enabled
+        settings:
+          search_dirs: [scripts, src/culturemech]
+          save_helpers: [write_validated_recipe]
+          exclude: [scripts/audit_writers.py]
       site_contract:
         status: disabled
         reason: >-
@@ -150,10 +177,19 @@ mechs:
       source_catalogue:
         status: disabled
         reason: >-
-          Fetches each source from its own script -- fetch_komodo_base_volumes,
-          fetch_mediadive_solution_volumes, fetch_pubmed_abstracts -- with no
-          download.yaml declaring them, so there is no catalogue to validate.
-          Adopting one would apply here; it has not been written.
+          Fetches each source from its own script --
+          scripts/fetch_komodo_base_volumes.py,
+          scripts/fetch_mediadive_solution_volumes.py,
+          scripts/fetch_pubmed_abstracts.py -- with no download.yaml declaring
+          them, so there is no catalogue to validate. Adopting one would apply
+          here; it has not been written.
+        reason_claims:
+          present:
+            - scripts/fetch_komodo_base_volumes.py
+            - scripts/fetch_mediadive_solution_volumes.py
+            - scripts/fetch_pubmed_abstracts.py
+          absent:
+            - download.yaml
       unmapped_inventory_input:
         status: enabled
     serialization:
@@ -222,6 +258,15 @@ mechs:
           Generates a site through .github/workflows/generate-pages.yaml but
           declares no size or file-count budgets, so nothing watches it grow.
           Adopting them applies here; the limits are the repository's to set.
+        reason_claims:
+          present:
+            - .github/workflows/generate-pages.yaml
+      writer_audit:
+        status: enabled
+        settings:
+          search_dirs: [scripts, src/mediaingredientmech]
+          save_helpers: [save_yaml, write_validated_ingredient]
+          exclude: [scripts/audit_writers.py]
       site_contract:
         status: disabled
         reason: >-
@@ -236,6 +281,11 @@ mechs:
           Fetches ontologies through download_ontologies.py rather than a
           declared catalogue, so there is no download.yaml to validate.
           Adopting one would apply here; it has not been written.
+        reason_claims:
+          present:
+            - scripts/download_ontologies.py
+          absent:
+            - download.yaml
       unmapped_inventory_input:
         status: enabled
     serialization:
@@ -306,6 +356,16 @@ mechs:
           Generates a site through .github/workflows/generate-pages.yaml but
           declares no size or file-count budgets, so nothing watches it grow.
           Adopting them applies here; the limits are the repository's to set.
+        reason_claims:
+          present:
+            - .github/workflows/generate-pages.yaml
+      writer_audit:
+        status: enabled
+        settings:
+          search_dirs: [scripts, src/communitymech]
+          save_helpers: [write_validated_community]
+          curation_markers: [record_curation_event]
+          exclude: [scripts/audit_writers.py]
       site_contract:
         status: enabled
         settings:
@@ -316,6 +376,9 @@ mechs:
           Has no download.yaml; its inputs arrive through per-source scripts
           rather than a declared catalogue. Adopting one would apply here;
           it has not been written.
+        reason_claims:
+          absent:
+            - download.yaml
       unmapped_inventory_input:
         status: enabled
     serialization:
@@ -385,10 +448,27 @@ mechs:
           Pages -- it has no generate-pages.yaml, unlike the other four -- and
           declares no size or file-count budgets, so nothing watches them grow.
           Adopting them applies here; the limits are the repository's to set.
+        reason_claims:
+          present:
+            - pages
+          absent:
+            - .github/workflows/generate-pages.yaml
+      writer_audit:
+        status: enabled
+        settings:
+          search_dirs: [scripts, src/traitmech]
+          save_helpers: [write_validated_trait]
+          curation_markers: [record_curation]
+          exclude: [scripts/audit_writers.py]
       site_contract:
         status: enabled
         settings:
           site_path: pages
+          # GitHub Pages serves this repository from main at /, so the whole
+          # checkout is published even though only pages/ is checked. Ten trait
+          # pages link ../../../app/discussions/, which is served and would
+          # otherwise read as climbing out of the site.
+          published_root: .
           allowed_hosts:
             - cdn.jsdelivr.net
       source_catalogue:
@@ -400,6 +480,9 @@ mechs:
           ingredient corpora; TraitMech curates traits and has no
           ingredient records, so scripts/inventory_unmapped_ingredients.py
           defines no loader for it.
+        reason_claims:
+          present:
+            - claw:scripts/inventory_unmapped_ingredients.py
     serialization:
       verified: true
       options:
@@ -476,6 +559,17 @@ mechs:
         settings:
           site_path: _site
           budgets_path: conf/pages_budgets.json
+      writer_audit:
+        status: not_applicable
+        reason: >-
+          Its scripts/audit_writers.py shares the name and nothing else -- a
+          different tool built on registered editors and guard tests, ~600
+          lines apart from the other four. This audit does not describe what
+          that one checks, and consolidating them would mean choosing one
+          model over the other rather than removing a duplicate.
+        reason_claims:
+          present:
+            - scripts/audit_writers.py
       site_contract:
         status: disabled
         reason: >-
@@ -493,9 +587,146 @@ mechs:
           ingredient corpora; ProteinTraitsMech curates protein-trait
           records and has no ingredient corpus, so
           scripts/inventory_unmapped_ingredients.py defines no loader for it.
+        reason_claims:
+          present:
+            - claw:scripts/inventory_unmapped_ingredients.py
     serialization:
       verified: false
       reason: >-
         No PyYAML option set reproduces this corpus, so there is no
         correct value to declare and writing a record back would
         reformat it. Measured in #187.
+
+  cellstructuremech:
+    # Joined 2026-08-30 (CellStructureMech#47). Capability decisions below were
+    # measured against the repository's tracked files at that date; every
+    # disabled/not_applicable status names the issue that would flip it.
+    display_name: CellStructureMech
+    github: CultureBotAI/CellStructureMech
+    environment_variable: CELLSTRUCTUREMECH_ROOT
+    package_path: src/cellstructuremech
+    schema_paths:
+      - src/cellstructuremech/schema/cellstructuremech.yaml
+    record_globs:
+      - data/structures/**/*.yaml
+    vendored_role: consumer
+    capabilities:
+      # Enabled rather than disabled-with-an-absent-claim (#255): both arrive in
+      # CellStructureMech#53, which is open and green, so a claim that the files
+      # are absent is true only until that merges. An enabled declaration carries
+      # no claim to falsify and lets the fleet audit report the real gap, which
+      # is the same choice vendored_sync makes below.
+      id_label_validation:
+        status: enabled
+      curation_history:
+        status: enabled
+      strict_validation:
+        status: enabled
+      schema_sync:
+        status: enabled
+      release_management:
+        status: enabled
+      build_coordination:
+        status: enabled
+      documentation:
+        status: enabled
+      testing:
+        status: enabled
+      refactoring:
+        status: enabled
+      coordination_hooks:
+        status: enabled
+      deep_research:
+        status: disabled
+        reason: >-
+          Research so far is source assessment written by hand under research/
+          with no provider client or research recipe in the justfile; the
+          repository has not decided on a paid research route.
+        reason_claims:
+          present:
+            - research
+      edison_key_discovery:
+        status: not_applicable
+        reason: >-
+          CellStructureMech does not use an Edison research-provider key; it has
+          no research provider integration at all.
+      environment_coverage:
+        status: not_applicable
+        reason: >-
+          Environment coverage currently compares culture media, ingredients,
+          and microbial communities; cell-structure records are not an
+          environment inventory input.
+      knowledge_gap_scan:
+        status: disabled
+        reason: >-
+          Records carry the shared Discussion section, so the scan applies, but
+          the corpus is four records and the repository is not yet in the
+          knowledge-gap-scan workflow matrix; enable once the first tranche of
+          records lands (CellStructureMech#12).
+      # An authoritative consumer must sync; the loader rejects anything else.
+      # CellStructureMech#48 vendors the artifact set and pin that this
+      # declaration obliges; until it lands, the fleet audit reports the gap.
+      vendored_sync:
+        status: enabled
+      corpus_statistics:
+        status: enabled
+        settings:
+          fields:
+            - structure_category
+            - mapping_status
+      page_budgets:
+        status: disabled
+        reason: >-
+          Serves tracked pages under pages/ straight from main via GitHub Pages
+          -- it has no generate-pages.yaml -- and declares no size or
+          file-count budgets, so nothing watches them grow. Adopting them
+          applies here; the limits are the repository's to set.
+        reason_claims:
+          present:
+            - pages
+          absent:
+            - .github/workflows/generate-pages.yaml
+      writer_audit:
+        status: disabled
+        reason: >-
+          Has no scripts/audit_writers.py, so there is no drift to remove yet.
+          Adopting it applies here once the corpus grows; the settings are the
+          repository's to declare.
+        reason_claims:
+          absent:
+            - scripts/audit_writers.py
+      site_contract:
+        status: enabled
+        settings:
+          site_path: pages
+      source_catalogue:
+        status: disabled
+        reason: >-
+          The repository keeps its ranked source list as
+          curation/source_queue.tsv, machine-checked by
+          scripts/check_source_queue.py inside its qc gate, rather than a
+          download.yaml in the fleet's catalogue shape; there is no
+          download.yaml to parse. Converging on one shape is open.
+        reason_claims:
+          present:
+            - curation/source_queue.tsv
+            - scripts/check_source_queue.py
+          absent:
+            - download.yaml
+      unmapped_inventory_input:
+        status: not_applicable
+        reason: >-
+          The unmapped-ingredient inventory reads culture-media and
+          ingredient corpora; CellStructureMech curates cell structures and
+          has no ingredient records, so scripts/inventory_unmapped_ingredients.py
+          defines no loader for it.
+        reason_claims:
+          present:
+            - claw:scripts/inventory_unmapped_ingredients.py
+    serialization:
+      verified: true
+      options:
+        default_flow_style: false
+        sort_keys: false
+        allow_unicode: true
+        width: 80

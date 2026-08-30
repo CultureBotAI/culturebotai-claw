@@ -80,6 +80,11 @@ def _configured_mech_profiles() -> list[tuple[str, Path]]:
     manifest = load_fleet_manifest()
     found = []
     for key, mech in manifest.mechs.items():
+        # A Mech that declares deep_research disabled owns no profile by
+        # design; demanding one of it fails closed on a gap the manifest
+        # already accounts for (#254).
+        if not mech.supports("deep_research"):
+            continue
         root = os.environ.get(mech.environment_variable, "").strip()
         if not root:
             continue
@@ -94,10 +99,15 @@ def _configured_mech_profiles() -> list[tuple[str, Path]]:
 
 
 def test_fixture_inventory_matches_the_exact_manifest_fleet() -> None:
+    """One fixture per Mech that enables deep_research. A Mech that declares
+    the capability disabled (CellStructureMech, which has no provider
+    profile) owns no profile to snapshot; the manifest, not this list, says
+    which is which."""
     manifest = load_fleet_manifest()
-    assert manifest.keys == EXPECTED_MECH_KEYS
-    assert set(_fixture_paths()) == set(manifest.keys)
-    assert set(_provenance()) == set(manifest.keys)
+    researching = tuple(k for k, m in manifest.mechs.items() if m.supports("deep_research"))
+    assert researching == EXPECTED_MECH_KEYS
+    assert set(_fixture_paths()) == set(researching)
+    assert set(_provenance()) == set(researching)
 
 
 @pytest.mark.parametrize("key", EXPECTED_MECH_KEYS)
@@ -175,3 +185,44 @@ def test_an_explicit_but_missing_local_root_fails_closed(
 def test_a_profile_path_that_does_not_exist_raises_profile_error(tmp_path: Path) -> None:
     with pytest.raises(ProfileError):
         load_profile(tmp_path / "conf" / "deep_research_provider.yaml")
+
+
+def test_a_mech_that_declined_deep_research_owes_no_profile(monkeypatch, tmp_path):
+    """The drift audit reads configured checkouts, so it must respect the same
+    declaration the rest of the fleet does. Before this it demanded a profile
+    from every configured Mech regardless: a member with `deep_research`
+    disabled failed for anyone with its root set, and passed in CI, which
+    configures no roots at all -- the #209 shape, inverted.
+
+    The declining Mech is constructed rather than looked up. Every current
+    member enables deep_research, so a test that skipped when none declined
+    would be a guard that cannot fail until the day it is needed.
+    """
+    import dataclasses
+    from types import SimpleNamespace
+
+    manifest = load_fleet_manifest()
+    key = "traitmech"
+    mech = manifest.mechs[key]
+    capability = mech.capabilities["deep_research"]
+    assert capability.is_enabled, "fixture assumes this Mech enables it today"
+
+    declined = dataclasses.replace(
+        capability, status="disabled", reason="constructed for this test"
+    )
+    patched = dataclasses.replace(
+        mech, capabilities=dict(mech.capabilities, deep_research=declined)
+    )
+    doctored = SimpleNamespace(mechs=dict(manifest.mechs, **{key: patched}))
+    # Patch the name this module resolved at import, not a dotted path: tests/
+    # is not a package, so the module's own globals are the reliable target.
+    monkeypatch.setitem(
+        _configured_mech_profiles.__globals__, "load_fleet_manifest", lambda: doctored
+    )
+
+    # A root that exists but carries no profile: the exact shape that used to
+    # raise.
+    monkeypatch.setenv(mech.environment_variable, str(tmp_path))
+    assert not (tmp_path / PROFILE_RELATIVE_PATH).exists()
+
+    assert key not in {name for name, _ in _configured_mech_profiles()}

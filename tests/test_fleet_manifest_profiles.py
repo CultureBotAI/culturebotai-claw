@@ -42,6 +42,11 @@ EXPECTED_PROFILES = {
         ("src/proteintraitsmech/schema/proteintraitsmech.yaml",),
         ("data/traits/**/*.yaml",),
     ),
+    "cellstructuremech": (
+        "src/cellstructuremech",
+        ("src/cellstructuremech/schema/cellstructuremech.yaml",),
+        ("data/structures/**/*.yaml",),
+    ),
 }
 
 EXPECTED_CAPABILITIES = {
@@ -58,6 +63,9 @@ EXPECTED_CAPABILITIES = {
     # language, alt text, heading order and references that resolve -- and
     # which third-party host each of them has deliberately taken on.
     "site_contract",
+    # Phase 7: whose YAML-writing scripts are audited by the shared rule, and
+    # why the two that are not have decided rather than forgotten.
+    "writer_audit",
     "id_label_validation",
     "curation_history",
     "strict_validation",

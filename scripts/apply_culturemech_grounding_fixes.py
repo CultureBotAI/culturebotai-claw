@@ -29,6 +29,8 @@ from pathlib import Path
 
 import yaml
 
+from kg_microbe_corpus.loader import safe_loader
+
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -72,7 +74,7 @@ def edit_file(path: Path, corrections, renames, apply: bool):
         original = path.read_text()
     except Exception:
         return 0, 0, []
-    loader = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
+    loader = safe_loader()
     try:
         doc = yaml.load(original, Loader=loader)
     except Exception:

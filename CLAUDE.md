@@ -39,6 +39,7 @@ manifest when no source checkout is present:
 - TraitMech (`TRAITMECH_ROOT`)
 - ProteinTraitsMech (`PROTEINTRAITSMECH_ROOT`) — note the GitHub slug is
   lowercase `proteintraitsmech`
+- CellStructureMech (`CELLSTRUCTUREMECH_ROOT`)
 
 You do not need every Mech cloned. `openclaw-cli config validate` reports an
 unset root as "not configured locally" rather than a failure; pass
@@ -341,9 +342,19 @@ declared anchor type. These are properties of a graph rather than of a schema,
 so enum membership, evidence and CURIE shapes stay in each Mech. Connectivity is
 undirected -- a mechanism written effect-to-cause is the same mechanism.
 
+`kg-microbe-writers audit` lists every script that writes a YAML record and
+what it declares about doing it. A writer is detected five ways -- `yaml.dump`,
+a dump written to a path, the Mech's own save helper, an in-place edit of a
+globbed YAML, and a write to a path built from a `.yaml` name. Each Mech's
+`audit_writers.py` implements a different subset, which is why they disagree;
+the shared rule is the union, and `--why` reports which technique found a row.
+
 `kg-microbe-site check` judges a built site: a title, a declared language, alt
 text, headings that do not skip a level, references that resolve, and no
-dependency on a third party to render. Run it on build output. On template
+dependency on a third party to render. `site_path` is the set of pages to check
+and `published_root` is what a site-absolute reference means and how far a
+relative one may climb; they differ when a repository checks part of what it
+publishes. Run it on build output. On template
 sources it reports pages the build has not created yet and unrendered
 expressions as dangling references, which is the check being run one step too
 early rather than a defect. A repository declares a deliberate CDN through
