@@ -114,6 +114,7 @@ def test_the_reasons_that_make_checkable_claims_are_the_ones_declared():
         "cellstructuremech.page_budgets",
         "cellstructuremech.source_catalogue",
         "cellstructuremech.unmapped_inventory_input",
+        "cellstructuremech.writer_audit",
         "communitymech.page_budgets",
         "communitymech.source_catalogue",
         "culturemech.page_budgets",
@@ -121,6 +122,7 @@ def test_the_reasons_that_make_checkable_claims_are_the_ones_declared():
         "mediaingredientmech.page_budgets",
         "mediaingredientmech.source_catalogue",
         "proteintraitsmech.unmapped_inventory_input",
+        "proteintraitsmech.writer_audit",
         "traitmech.page_budgets",
         "traitmech.unmapped_inventory_input",
     ]

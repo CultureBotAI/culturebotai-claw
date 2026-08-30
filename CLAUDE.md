@@ -342,6 +342,13 @@ declared anchor type. These are properties of a graph rather than of a schema,
 so enum membership, evidence and CURIE shapes stay in each Mech. Connectivity is
 undirected -- a mechanism written effect-to-cause is the same mechanism.
 
+`kg-microbe-writers audit` lists every script that writes a YAML record and
+what it declares about doing it. A writer is detected five ways -- `yaml.dump`,
+a dump written to a path, the Mech's own save helper, an in-place edit of a
+globbed YAML, and a write to a path built from a `.yaml` name. Each Mech's
+`audit_writers.py` implements a different subset, which is why they disagree;
+the shared rule is the union, and `--why` reports which technique found a row.
+
 `kg-microbe-site check` judges a built site: a title, a declared language, alt
 text, headings that do not skip a level, references that resolve, and no
 dependency on a third party to render. `site_path` is the set of pages to check
