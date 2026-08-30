@@ -30,6 +30,14 @@ from typing import Any, Iterable, Iterator, Sequence
 
 import yaml
 
+# The pure-Python parser, deliberately. `CSafeLoader` is ~16x faster (2,129
+# records a second against 134) and swapping to it passed every test on macOS
+# and failed fourteen of them on Linux CI: every corpus test found zero records,
+# and a ParserError escaped an `except yaml.YAMLError` that catches it here.
+# That difference is unexplained and unreproducible on this machine, and a
+# parser that behaves differently by platform is not something to ship for a
+# speed-up. #233 keeps the measurement and the evidence.
+
 __all__ = [
     "CorpusError",
     "CorpusReport",
@@ -150,7 +158,11 @@ def _paths_by_glob(root: Path, globs: Sequence[str]) -> dict[str, list[Path]]:
 
 
 def iter_records(
-    root: Path, globs: Sequence[str], *, sample: int | None = None
+    root: Path,
+    globs: Sequence[str],
+    *,
+    sample: int | None = None,
+    paths_by_glob: dict[str, list[Path]] | None = None,
 ) -> Iterator[tuple[Path, Any]]:
     """Yield (path, parsed) for each record, in a stable order.
 
@@ -160,7 +172,12 @@ def iter_records(
     the report names it.
     """
     root = Path(root)
-    paths = [p for matches in _paths_by_glob(root, globs).values() for p in matches]
+    # Accepting the caller's listing matters at scale: globbing and sorting
+    # ProteinTraitsMech's 429,271 records takes ~13s, and `collect` needs the
+    # same listing to attribute each file to a glob. Doing it twice was most of
+    # the runtime on that corpus.
+    matched = paths_by_glob if paths_by_glob is not None else _paths_by_glob(root, globs)
+    paths = [p for matches in matched.values() for p in matches]
     if sample is not None:
         paths = paths[:sample]
     for path in paths:
@@ -192,15 +209,16 @@ def collect(
     counters: dict[str, Counter] = {name: Counter() for name in fields}
     populated: dict[str, int] = {name: 0 for name in counters}
 
+    matched = _paths_by_glob(root, globs)
     owner = {
-        path: pattern
-        for pattern, matches in _paths_by_glob(root, globs).items()
-        for path in matches
+        path: pattern for pattern, matches in matched.items() for path in matches
     }
     for pattern in globs:
         report.by_glob[pattern] = 0
 
-    for path, record in iter_records(root, globs, sample=sample):
+    for path, record in iter_records(
+        root, globs, sample=sample, paths_by_glob=matched
+    ):
         relative = path.relative_to(root).as_posix()
         report.bytes += path.stat().st_size
         report.by_glob[owner[path]] += 1

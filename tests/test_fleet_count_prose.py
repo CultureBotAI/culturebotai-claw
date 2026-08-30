@@ -44,6 +44,11 @@ EXCLUDED = ("docs/archive", "docs/reviews", "docs/proposals")
 
 # "one Mech" is not a fleet count ("a change must exist in more than one Mech"),
 # so counting starts at two.
+#
+# Known false positive: a generic comparison -- "two Mechs' reports comparable"
+# -- reads as a count and is not one. Nothing distinguishes it mechanically, so
+# the escape is to reword rather than to widen the basis pattern until it
+# admits everything. That happened once, in kg_microbe_health.
 # "N repos" is the same claim as "N Mechs" and was missed by a pattern that
 # only looked for the word Mech: `unmapped-inventory` said "all four repos"
 # twice while its script read the set from a capability.

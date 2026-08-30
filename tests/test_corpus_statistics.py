@@ -257,3 +257,24 @@ def test_a_declared_field_is_one_the_corpus_actually_carries(mech, fields):
         f"{mech} declares {empty}, which no sampled record carries; either the "
         f"declaration is wrong or the corpus is"
     )
+
+
+def test_the_corpus_is_globbed_once(tmp_path, monkeypatch):
+    """#231. `collect` needs the glob listing to attribute each file, and
+    `iter_records` needs it to walk. Computing it twice cost ~13 s on
+    ProteinTraitsMech's 429,271 records -- invisible on the corpora the other
+    tests use, which are three orders of magnitude smaller."""
+    from kg_microbe_corpus import statistics
+
+    root = _corpus(tmp_path, {"d/a.yaml": {"x": 1}, "d/b.yaml": {"x": 2}})
+    calls = {"n": 0}
+    real = statistics._paths_by_glob
+
+    def counted(*args, **kwargs):
+        calls["n"] += 1
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(statistics, "_paths_by_glob", counted)
+    statistics.collect("m", root, ["d/*.yaml"], ["x"])
+
+    assert calls["n"] == 1
