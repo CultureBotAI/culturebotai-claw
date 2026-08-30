@@ -139,6 +139,9 @@ mechs:
           Generates a site through .github/workflows/generate-pages.yaml but
           declares no size or file-count budgets, so nothing watches it grow.
           Adopting them applies here; the limits are the repository's to set.
+        reason_claims:
+          present:
+            - .github/workflows/generate-pages.yaml
       site_contract:
         status: disabled
         reason: >-
@@ -150,10 +153,19 @@ mechs:
       source_catalogue:
         status: disabled
         reason: >-
-          Fetches each source from its own script -- fetch_komodo_base_volumes,
-          fetch_mediadive_solution_volumes, fetch_pubmed_abstracts -- with no
-          download.yaml declaring them, so there is no catalogue to validate.
-          Adopting one would apply here; it has not been written.
+          Fetches each source from its own script --
+          scripts/fetch_komodo_base_volumes.py,
+          scripts/fetch_mediadive_solution_volumes.py,
+          scripts/fetch_pubmed_abstracts.py -- with no download.yaml declaring
+          them, so there is no catalogue to validate. Adopting one would apply
+          here; it has not been written.
+        reason_claims:
+          present:
+            - scripts/fetch_komodo_base_volumes.py
+            - scripts/fetch_mediadive_solution_volumes.py
+            - scripts/fetch_pubmed_abstracts.py
+          absent:
+            - download.yaml
       unmapped_inventory_input:
         status: enabled
     serialization:
@@ -222,6 +234,9 @@ mechs:
           Generates a site through .github/workflows/generate-pages.yaml but
           declares no size or file-count budgets, so nothing watches it grow.
           Adopting them applies here; the limits are the repository's to set.
+        reason_claims:
+          present:
+            - .github/workflows/generate-pages.yaml
       site_contract:
         status: disabled
         reason: >-
@@ -236,6 +251,11 @@ mechs:
           Fetches ontologies through download_ontologies.py rather than a
           declared catalogue, so there is no download.yaml to validate.
           Adopting one would apply here; it has not been written.
+        reason_claims:
+          present:
+            - scripts/download_ontologies.py
+          absent:
+            - download.yaml
       unmapped_inventory_input:
         status: enabled
     serialization:
@@ -306,6 +326,9 @@ mechs:
           Generates a site through .github/workflows/generate-pages.yaml but
           declares no size or file-count budgets, so nothing watches it grow.
           Adopting them applies here; the limits are the repository's to set.
+        reason_claims:
+          present:
+            - .github/workflows/generate-pages.yaml
       site_contract:
         status: enabled
         settings:
@@ -316,6 +339,9 @@ mechs:
           Has no download.yaml; its inputs arrive through per-source scripts
           rather than a declared catalogue. Adopting one would apply here;
           it has not been written.
+        reason_claims:
+          absent:
+            - download.yaml
       unmapped_inventory_input:
         status: enabled
     serialization:
@@ -385,6 +411,11 @@ mechs:
           Pages -- it has no generate-pages.yaml, unlike the other four -- and
           declares no size or file-count budgets, so nothing watches them grow.
           Adopting them applies here; the limits are the repository's to set.
+        reason_claims:
+          present:
+            - pages
+          absent:
+            - .github/workflows/generate-pages.yaml
       site_contract:
         status: enabled
         settings:
@@ -400,6 +431,9 @@ mechs:
           ingredient corpora; TraitMech curates traits and has no
           ingredient records, so scripts/inventory_unmapped_ingredients.py
           defines no loader for it.
+        reason_claims:
+          present:
+            - claw:scripts/inventory_unmapped_ingredients.py
     serialization:
       verified: true
       options:
@@ -493,6 +527,9 @@ mechs:
           ingredient corpora; ProteinTraitsMech curates protein-trait
           records and has no ingredient corpus, so
           scripts/inventory_unmapped_ingredients.py defines no loader for it.
+        reason_claims:
+          present:
+            - claw:scripts/inventory_unmapped_ingredients.py
     serialization:
       verified: false
       reason: >-

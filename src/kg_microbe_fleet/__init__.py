@@ -29,6 +29,7 @@ __all__ = [
     "CapabilitySettingDefinition",
     "CapabilityDefinition",
     "Capability",
+    "ReasonClaims",
     "MechDefinition",
     "VendoredGovernance",
     "FleetManifest",
@@ -129,6 +130,32 @@ class CapabilityDefinition:
 
 
 @dataclass(frozen=True)
+class ReasonClaims:
+    """The checkable half of a capability's `reason`.
+
+    A reason is prose about another repository -- the file it fetches through,
+    the workflow it builds with, the catalogue it does not keep -- and prose
+    rots silently. #236 found one that named a `generate-pages.yaml` TraitMech
+    does not have; the sentence had been copied from the three Mechs that do.
+
+    Rather than parse the English, a reason declares which paths it is asserting
+    about and in which direction. `absent` matters as much as `present`: half
+    these reasons exist to say a Mech has *no* download.yaml, and a check that
+    only confirmed existence would have nothing to say about them.
+
+    A path is read in the Mech the declaration belongs to unless it carries the
+    `claw:` prefix, for the reasons that name one of this repository's own
+    scripts.
+    """
+
+    present: tuple[str, ...] = ()
+    absent: tuple[str, ...] = ()
+
+    def __bool__(self) -> bool:
+        return bool(self.present or self.absent)
+
+
+@dataclass(frozen=True)
 class Capability:
     """A capability declaration for one repository."""
 
@@ -138,6 +165,7 @@ class Capability:
     settings: Mapping[str, Any] = field(
         default_factory=lambda: MappingProxyType({})
     )
+    reason_claims: ReasonClaims = field(default_factory=ReasonClaims)
 
     @property
     def is_enabled(self) -> bool:
@@ -522,6 +550,7 @@ def _parse_capabilities(
             "status",
             "reason",
             "settings",
+            "reason_claims",
         }
         if unknown_declaration_keys:
             unknown_keys = ", ".join(
@@ -545,6 +574,14 @@ def _parse_capabilities(
         if status in STATUSES_REQUIRING_REASON and not reason:
             raise FleetManifestError(
                 f"{label}.reason is required when status is '{status}'"
+            )
+
+        reason_claims = _parse_reason_claims(
+            declaration_mapping.get("reason_claims"), f"{label}.reason_claims"
+        )
+        if reason_claims and reason is None:
+            raise FleetManifestError(
+                f"{label}.reason_claims has nothing to check: there is no reason"
             )
 
         raw_settings = declaration_mapping.get("settings", {})
@@ -581,9 +618,48 @@ def _parse_capabilities(
             status=status,
             reason=reason,
             settings=MappingProxyType(settings),
+            reason_claims=reason_claims,
         )
 
     return capabilities
+
+
+def _parse_reason_claims(raw: Any, label: str) -> ReasonClaims:
+    if raw is None:
+        return ReasonClaims()
+    mapping = _require_mapping(raw, label)
+    unknown = set(mapping) - {"present", "absent"}
+    if unknown:
+        raise FleetManifestError(
+            f"{label} has unknown keys: " + ", ".join(sorted(str(k) for k in unknown))
+        )
+    parsed: dict[str, tuple[str, ...]] = {}
+    for direction in ("present", "absent"):
+        values = mapping.get(direction, [])
+        if not isinstance(values, list):
+            raise FleetManifestError(f"{label}.{direction} must be a list")
+        paths = []
+        for index, value in enumerate(values):
+            path = _require_nonempty_string(value, f"{label}.{direction}[{index}]")
+            if path.startswith("/") or ".." in Path(path).parts:
+                raise FleetManifestError(
+                    f"{label}.{direction}[{index}] must be a path inside the "
+                    f"repository, not {path!r}"
+                )
+            paths.append(path)
+        duplicates = {p for p in paths if paths.count(p) > 1}
+        if duplicates:
+            raise FleetManifestError(
+                f"{label}.{direction} repeats: " + ", ".join(sorted(duplicates))
+            )
+        parsed[direction] = tuple(paths)
+    both = set(parsed["present"]) & set(parsed["absent"])
+    if both:
+        raise FleetManifestError(
+            f"{label} claims these are both present and absent: "
+            + ", ".join(sorted(both))
+        )
+    return ReasonClaims(**parsed)
 
 
 @dataclass(frozen=True)
