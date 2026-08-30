@@ -16,13 +16,15 @@ Every row declares:
 
 - a stable artifact identifier;
 - its canonical claw path and consumer-relative target path;
-- all-five or capability-scoped applicability;
+- fleet-wide or capability-scoped applicability;
 - a SHA-256 digest; and
 - the Git owner-executable-bit contract and safe write permissions.
 
-The manifest's five consumer identities and package paths are checked against
-`src/kg_microbe_fleet/fleet.yaml`. Edison capture is checked against the
-`edison_key_discovery` capability rather than an independent repository list.
+The manifest's consumer identities and package paths are checked against
+`src/kg_microbe_fleet/fleet.yaml`, which is the authority on how many there
+are. Edison capture is checked against the `edison_key_discovery` capability,
+and the provider-triage contract test against `deep_research`, rather than
+independent repository lists.
 Unsafe paths, duplicate JSON keys, duplicate expanded targets, unknown
 consumers, missing package resources, and checksum drift are rejected.
 
@@ -176,10 +178,11 @@ uv run kg-microbe-governance fleet-audit \
   --target-root mediaingredientmech=/path/to/MediaIngredientMech-worktree \
   --target-root communitymech=/path/to/CommunityMech-worktree \
   --target-root traitmech=/path/to/TraitMech-worktree \
-  --target-root proteintraitsmech=/path/to/ProteinTraitsMech-worktree
+  --target-root proteintraitsmech=/path/to/ProteinTraitsMech-worktree \
+  --target-root cellstructuremech=/path/to/CellStructureMech-worktree
 ```
 
-It requires exactly the five manifest keys, distinct exact Git roots, clean
+It requires exactly the manifest keys, distinct exact Git roots, clean
 trees, `HEAD == refs/remotes/origin/main`, one expected pin, and successful
 checks for every applicable artifact. It reads bytes and executable modes from
 each repository's committed `HEAD`, so ignored files and `skip-worktree` flags

@@ -150,6 +150,28 @@ def _validate_fleet_alignment(
         raise GovernanceError(
             "Edison artifact applicability differs from the fleet capability scope"
         )
+    # The provider-triage contract test imports scripts/deep_research_provider.py
+    # from the consumer, so it applies exactly where deep_research is enabled.
+    # It shipped as `consumers: all` until a Mech without a research provider
+    # joined and the vendored test failed at import (#252). Derived and checked
+    # here, like Edison above, so the list cannot drift from the capability.
+    triage_scope = {
+        key
+        for key, mech in fleet_manifest.mechs.items()
+        if mech.supports("deep_research")
+    }
+    triage = next(
+        (
+            artifact
+            for artifact in manifest.artifacts
+            if artifact.artifact_id == "provider_triage_contract"
+        ),
+        None,
+    )
+    if triage is None or set(triage.consumers) != triage_scope:
+        raise GovernanceError(
+            "Provider-triage artifact applicability differs from the fleet capability scope"
+        )
 
 
 def load_governance_manifest(
