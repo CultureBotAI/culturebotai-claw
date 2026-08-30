@@ -400,11 +400,30 @@ def test_a_site_absolute_base_is_read_against_the_site_root(site: Path):
     assert [f for f in check_site(site) if f.page == "sub/p.html"] == []
 
 
-def test_an_external_base_leaves_resolution_alone(site: Path):
-    """A page based at another origin is not making claims about this site's
-    files, so its relative references stay relative to the page."""
-    write(site, "sub/p.html", '<base href="https://example.org/x/"><a href="index.html">x</a>')
+@pytest.mark.parametrize(
+    "base", ["https://example.org/x/", "//example.org/x/"], ids=["absolute", "protocol-relative"]
+)
+def test_an_external_base_makes_relative_references_not_ours(site: Path, base: str):
+    """A page based at another origin has no relative reference to this site, so
+    there is nothing local to resolve. The first version of this test named a
+    file that happened to exist beside the page, so it passed while the code
+    still resolved locally -- and a page whose neighbour was missing got a
+    BROKEN_REFERENCE for a link that points at another host entirely."""
+    write(site, "sub/p.html", f'<base href="{base}"><a href="nothing-here.html">x</a>')
     assert [f for f in check_site(site) if f.page == "sub/p.html"] == []
+
+
+def test_a_base_without_a_trailing_slash_replaces_its_last_segment(site: Path):
+    """`<base href="sub">` makes the document base `/sub`; a sibling reference
+    resolves beside it, not inside it. Only `sub/` means "inside"."""
+    (site / "beside.html").write_text(PAGE)
+    write(site, "p.html", '<base href="sub"><a href="beside.html">x</a>')
+    assert [f for f in check_site(site) if f.page == "p.html"] == []
+
+    write(site, "q.html", '<base href="sub"><a href="index.html">x</a>')
+    assert codes([f for f in check_site(site) if f.page == "q.html"]) == [
+        "BROKEN_REFERENCE"
+    ]
 
 
 def test_only_the_first_base_counts(site: Path):

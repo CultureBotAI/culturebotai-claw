@@ -325,20 +325,39 @@ def _exists_case_exactly(root: Path, relative: PurePosixPath) -> Path | None:
     return current
 
 
-def _resolution_base(root: Path, page: Path, facts: PageFacts, reference: str) -> Path:
-    """The directory a reference is relative to.
+def _resolution_base(
+    root: Path, page: Path, facts: PageFacts, reference: str
+) -> Path | None:
+    """The directory a reference is relative to, or None if it is not local.
 
     `<base href>` redefines that for every relative reference on the page, so
     ignoring it judges them all against the wrong directory (#241).
+
+    Two details a first pass got wrong, both of which browsers get right:
+
+    A base is a URL, not a directory. `<base href="sub">` makes the document's
+    base `/sub`, and `real.html` beside it resolves to `/real.html` -- the last
+    segment is replaced, not descended into. Only a trailing slash means
+    "inside".
+
+    An external base moves every relative reference on the page to another
+    origin, so none of them is a reference to this site. Resolving them here
+    reported a page's own links as broken; returning None says there is nothing
+    local to check.
     """
     if reference.startswith("/"):
         return root
     base = facts.base.strip()
-    if base and not _is_external(base):
-        if base.startswith("/"):
-            return root / base.lstrip("/")
-        return page.parent / base
-    return page.parent
+    if not base:
+        return page.parent
+    if _is_external(base):
+        return None
+    start = root if base.startswith("/") else page.parent
+    trimmed = base.lstrip("/")
+    if not trimmed.endswith("/"):
+        # Replace the last segment, the way a relative URL does.
+        trimmed = trimmed.rpartition("/")[0]
+    return start / trimmed
 
 
 def _resolves(root: Path, page: Path, facts: PageFacts, reference: str) -> bool:
@@ -346,6 +365,9 @@ def _resolves(root: Path, page: Path, facts: PageFacts, reference: str) -> bool:
     # against the filesystem would look outside the site and, on a machine that
     # happens to have /assets, wrongly pass.
     base = _resolution_base(root, page, facts, reference)
+    if base is None:
+        # The page is based at another origin; this is not a local reference.
+        return True
     combined = (base / unquote(reference).lstrip("/")).resolve()
     try:
         relative = PurePosixPath(combined.relative_to(root.resolve()).as_posix())
