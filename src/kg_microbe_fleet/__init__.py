@@ -30,6 +30,7 @@ __all__ = [
     "CapabilityDefinition",
     "Capability",
     "ReasonClaims",
+    "REASON_CLAIM_SCOPES",
     "MechDefinition",
     "VendoredGovernance",
     "FleetManifest",
@@ -624,6 +625,11 @@ def _parse_capabilities(
     return capabilities
 
 
+# The only scope a claim may name other than the Mech's own checkout. Two
+# reasons describe a claw script rather than anything in the Mech.
+REASON_CLAIM_SCOPES = frozenset({"claw"})
+
+
 def _parse_reason_claims(raw: Any, label: str) -> ReasonClaims:
     if raw is None:
         return ReasonClaims()
@@ -641,10 +647,24 @@ def _parse_reason_claims(raw: Any, label: str) -> ReasonClaims:
         paths = []
         for index, value in enumerate(values):
             path = _require_nonempty_string(value, f"{label}.{direction}[{index}]")
-            if path.startswith("/") or ".." in Path(path).parts:
+            setting_label = f"{label}.{direction}[{index}]"
+            # Split the scope off *before* checking containment. Checking the
+            # raw string first leaves the hole this guard exists to close:
+            # "claw:/etc/passwd" does not start with "/", so it passed, and the
+            # consumer then strips the prefix and resolves an absolute path.
+            scope, _, relative = path.partition(":")
+            if not relative:
+                scope, relative = "", path
+            elif scope not in REASON_CLAIM_SCOPES:
+                allowed = ", ".join(sorted(REASON_CLAIM_SCOPES))
                 raise FleetManifestError(
-                    f"{label}.{direction}[{index}] must be a path inside the "
-                    f"repository, not {path!r}"
+                    f"{setting_label} has unknown scope {scope!r}; allowed: "
+                    f"{allowed} (a path in the Mech itself takes no prefix)"
+                )
+            if relative.startswith("/") or ".." in PurePosixPath(relative).parts:
+                raise FleetManifestError(
+                    f"{setting_label} must be a path inside the repository, "
+                    f"not {path!r}"
                 )
             paths.append(path)
         duplicates = {p for p in paths if paths.count(p) > 1}

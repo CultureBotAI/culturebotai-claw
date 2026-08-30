@@ -47,8 +47,8 @@ _PATH_TOKEN = re.compile(
 CLAW_PREFIX = "claw:"
 
 
-def _declared(claims: ReasonClaims) -> list[str]:
-    return [p for p in (*claims.present, *claims.absent)]
+def _declared(claims: ReasonClaims) -> tuple[str, ...]:
+    return (*claims.present, *claims.absent)
 
 
 def _reasons():
@@ -187,6 +187,12 @@ def _manifest_with(claims_block: str) -> str:
     [
         ("        reason_claims:\n          maybe:\n            - x.yaml\n", "unknown keys"),
         ("        reason_claims:\n          present:\n            - /etc/passwd\n", "inside the"),
+        # The prefixed forms: the scope must be split off before containment is
+        # judged, or "claw:/etc/passwd" passes a startswith("/") check and the
+        # consumer resolves an absolute path out of the repository.
+        ("        reason_claims:\n          present:\n            - claw:/etc/passwd\n", "inside the"),
+        ("        reason_claims:\n          present:\n            - claw:../escape.yaml\n", "inside the"),
+        ("        reason_claims:\n          present:\n            - notascope:x.yaml\n", "unknown scope"),
         ("        reason_claims:\n          present:\n            - ../escape.yaml\n", "inside the"),
         (
             "        reason_claims:\n          present:\n            - a.yaml\n"
@@ -199,7 +205,17 @@ def _manifest_with(claims_block: str) -> str:
         ),
         ("        reason_claims:\n          present: notalist\n", "must be a list"),
     ],
-    ids=["unknown-key", "absolute", "parent-escape", "contradiction", "duplicate", "not-a-list"],
+    ids=[
+        "unknown-key",
+        "absolute",
+        "scoped-absolute",
+        "scoped-parent-escape",
+        "unknown-scope",
+        "parent-escape",
+        "contradiction",
+        "duplicate",
+        "not-a-list",
+    ],
 )
 def test_the_loader_rejects_an_unusable_declaration(block, message):
     with pytest.raises(FleetManifestError, match=message):
