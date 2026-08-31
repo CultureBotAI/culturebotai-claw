@@ -63,10 +63,24 @@ _COUNT = re.compile(
     re.IGNORECASE,
 )
 # A count whose basis is stated nearby is a claim about something real.
+#
+# "manifest" is deliberately NOT a basis. Naming the manifest beside a number
+# is not evidence the number is grounded -- the manifest is the source the
+# number duplicates, so pointing at it is what makes a stale copy look
+# deliberate. `fleet_audit.py` read "Audit exactly the manifest's five Mech
+# roots" while the manifest declared six, and this guard passed it: the word
+# "manifest" in the window was treated as the basis for the count that
+# contradicted it. A full-fleet claim carries no number ("every Mech"), so
+# there is nothing for a manifest-adjacent count to legitimately be.
 _BASIS = re.compile(
-    r"capabilit|declares?\b|not_applicable|input set|manifest|enabled",
+    r"capabilit|declares?\b|not_applicable|input set|enabled",
     re.IGNORECASE,
 )
+# A bare comparison between some Mechs is not a fleet count: "two Mechs have no
+# such option set" says nothing about how many exist. The guard's own docstring
+# recorded this false positive; it is now encoded rather than absorbed by a
+# basis word broad enough to also admit the real defect.
+_COMPARISON = re.compile(r"\b(?:two|three)\s+Mechs?\s+(?:have|has|had|wrote|carry|lack)\b", re.IGNORECASE)
 
 
 def _maintained_files() -> list[Path]:
@@ -91,6 +105,8 @@ def test_maintained_prose_states_the_basis_of_any_mech_count():
         lines = path.read_text(encoding="utf-8").splitlines()
         for number, line in enumerate(lines, start=1):
             if not _COUNT.search(line):
+                continue
+            if _COMPARISON.search(line):
                 continue
             window = "\n".join(lines[max(0, number - 4) : number + 3])
             if not _BASIS.search(window):
