@@ -347,6 +347,15 @@ declared anchor type. These are properties of a graph rather than of a schema,
 so enum membership, evidence and CURIE shapes stay in each Mech. Connectivity is
 undirected -- a mechanism written effect-to-cause is the same mechanism.
 
+`kg-microbe-kgx check` judges an exported KGX graph. Its subject is mostly
+whether a TSV means the same thing to whoever reads it: a bare carriage return,
+a literal newline inside a field, a duplicated column name, or a row count that
+differs between the `csv` module and a line-splitter. Required columns are a
+*subset* -- CommunityMech writes five node columns and kg-microbe's merged graph
+ten, and both are valid KGX -- which is why CommunityMech's own validator, which
+matches its list exactly, cannot check the merged file. CRLF is a line ending
+and not a finding.
+
 `kg-microbe-sssom check` judges a Mech's SSSOM mapping files against the
 contract the fleet already keeps: the eight columns every published file
 carries, a `curie_map` covering the prefixes actually used, columns that are

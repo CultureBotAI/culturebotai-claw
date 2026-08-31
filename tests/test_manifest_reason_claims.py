@@ -117,6 +117,7 @@ def test_the_reasons_that_make_checkable_claims_are_the_ones_declared():
         "cellstructuremech.writer_audit",
         "communitymech.page_budgets",
         "communitymech.source_catalogue",
+        "culturemech.kgx_export",
         "culturemech.page_budgets",
         "culturemech.source_catalogue",
         "mediaingredientmech.page_budgets",
