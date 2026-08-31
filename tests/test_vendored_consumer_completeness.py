@@ -39,9 +39,14 @@ MANIFEST = json.loads(
 # skip: it fails in both directions, so the list can only shrink. When a
 # repository finishes vendoring, this test says so and the entry comes out.
 INCOMPLETE_CONSUMERS = {
-    "cellstructuremech": (
-        "declared a consumer by #247 before CultureBotAI/CellStructureMech#53 "
-        "merged; see #257"
+    # CellStructureMech came out of this list once CultureBotAI/CellStructureMech#53
+    # merged -- which is the ledger working, and what it is for.
+    "culturemech": "has not vendored scripts/deep_research_contract.py; see #270",
+    "mediaingredientmech": (
+        "has not vendored scripts/deep_research_contract.py; see #270"
+    ),
+    "proteintraitsmech": (
+        "has not vendored scripts/deep_research_contract.py; see #270"
     ),
 }
 

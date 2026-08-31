@@ -60,6 +60,13 @@ capability_catalogue:
       budgets_path:
         type: string
         required_when_enabled: true
+  sssom_export:
+    settings:
+      mapping_globs:
+        type: string_list
+        required_when_enabled: true
+      extensions:
+        type: string_list
   writer_audit:
     settings:
       search_dirs:
@@ -166,6 +173,11 @@ mechs:
           search_dirs: [scripts, src/culturemech]
           save_helpers: [write_validated_recipe]
           exclude: [scripts/audit_writers.py]
+      sssom_export:
+        status: enabled
+        settings:
+          mapping_globs: ["output/*.sssom.tsv"]
+          extensions: [mapping_method]
       site_contract:
         status: disabled
         reason: >-
@@ -267,6 +279,11 @@ mechs:
           search_dirs: [scripts, src/mediaingredientmech]
           save_helpers: [save_yaml, write_validated_ingredient]
           exclude: [scripts/audit_writers.py]
+      sssom_export:
+        status: enabled
+        settings:
+          mapping_globs: ["mappings/*.sssom.tsv"]
+          extensions: [source, validation_method]
       site_contract:
         status: disabled
         reason: >-
@@ -366,6 +383,12 @@ mechs:
           save_helpers: [write_validated_community]
           curation_markers: [record_curation_event]
           exclude: [scripts/audit_writers.py]
+      sssom_export:
+        status: not_applicable
+        reason: >-
+          Publishes KGX nodes and edges rather than term mappings; its
+          contribution to kg-microbe is a graph, not a mapping set, so there
+          is no SSSOM file for this contract to judge.
       site_contract:
         status: enabled
         settings:
@@ -460,6 +483,10 @@ mechs:
           save_helpers: [write_validated_trait]
           curation_markers: [record_curation]
           exclude: [scripts/audit_writers.py]
+      sssom_export:
+        status: enabled
+        settings:
+          mapping_globs: ["proposals/*/metpo_proposal_mappings.sssom.tsv"]
       site_contract:
         status: enabled
         settings:
@@ -570,6 +597,12 @@ mechs:
         reason_claims:
           present:
             - scripts/audit_writers.py
+      sssom_export:
+        status: disabled
+        reason: >-
+          Grounds protein traits directly in its own records rather than
+          publishing a mapping set. Adopting one would apply here; none has
+          been written.
       site_contract:
         status: disabled
         reason: >-
@@ -695,6 +728,12 @@ mechs:
         reason_claims:
           absent:
             - scripts/audit_writers.py
+      sssom_export:
+        status: disabled
+        reason: >-
+          Records carry GO cellular-component identifiers inline rather than
+          through a mapping file, and the corpus is four records. Adopting one
+          applies once it grows.
       site_contract:
         status: enabled
         settings:
