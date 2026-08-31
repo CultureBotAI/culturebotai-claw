@@ -86,7 +86,7 @@ triggers an impossible partial rollback. A locked snapshot plus a second Git
 preflight binds preparation to the state used for the apply plan; a target that
 appears after that snapshot is preserved and rejected.
 
-POSIX cannot make fifteen paths simultaneously visible or stop an editor that
+POSIX cannot make sixteen paths simultaneously visible or stop an editor that
 ignores the advisory lock in a final compare/rename interval, including during
 promotion or rollback. Such a writer can win the narrow interval after the last
 observable comparison. Run apply only in the dedicated clean worktrees required
@@ -118,7 +118,7 @@ replace its fetch function with local fixtures, so the test suite is offline and
 no provider, model, credential, or paid API is involved.
 
 Each public fetch has a five-second total deadline and an 8 MiB response cap.
-The largest consumer performs one manifest plus fourteen artifact fetches, so
+The largest consumer performs one manifest plus fifteen artifact fetches, so
 three worst-case attempts plus the existing two five-second retry delays remain
 within a five-minute workflow timeout (235 seconds before runner overhead).
 

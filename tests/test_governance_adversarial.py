@@ -176,7 +176,7 @@ def test_git_dir_and_work_tree_environment_cannot_reroute_repository_checks(
 
     changes = plan_sync("culturemech", intended, REF)
 
-    assert len(changes) == 15
+    assert len(changes) == 16
     assert not (intended / "scripts").exists()
     assert not (attacker / "scripts").exists()
 
@@ -249,7 +249,7 @@ def test_equivalent_origin_fetch_and_push_url_forms_are_accepted(tmp_path: Path)
         "ssh://git@github.com/CultureBotAI/CultureMech.git",
     )
 
-    assert len(plan_sync("culturemech", root, REF)) == 15
+    assert len(plan_sync("culturemech", root, REF)) == 16
 
 
 @pytest.mark.parametrize(
