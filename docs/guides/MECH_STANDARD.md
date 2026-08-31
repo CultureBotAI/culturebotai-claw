@@ -45,7 +45,7 @@ repository that resembles one.
 | 1.8 | Strict closed-schema validation, run in CI on every PR | 5/5 — `validate-strict.yaml` is the **only** workflow filename common to all five |
 | 1.9 | A `tests/` suite run in CI | 5/5 (PTM reaches it through `just test`, not a literal `pytest` line) |
 | 1.10 | `ruff` lint in CI | 5/5 |
-| 1.11 | A `.claude/` directory carrying at least the repository's own skills | 5/5, 14–31 skill files each |
+| 1.11 | A `.claude/` directory carrying at least the repository's own skills | 5/5, 14–27 skill files each |
 | 1.12 | Membership in claw's `src/kg_microbe_fleet/fleet.yaml`, and registration as a consumer in `vendored_artifacts.json` | 5/5 |
 
 **1.12 is the one that makes the rest enforceable.** A Mech absent from the
@@ -124,7 +124,7 @@ and CI can and do diverge. This is the direction claw's Phase 5 thin-caller work
 is independently converging on.
 
 **`persist-credentials: false` on checkout.** Present in 1 of 1 workflows in
-each new Mech; **0 of 46 workflows across all five established Mechs.** Without
+each new Mech; **0 of 48 workflows across all five established Mechs.** Without
 it the job's `.git/config` keeps a credential any later step can read. Filed
 against the fleet as claw#244.
 
@@ -171,7 +171,12 @@ In dependency order, because each step makes the next enforceable:
 ---
 
 *Derived 2026-08-30 from the five established Mechs at their then-current
-`main`. The counts are reproducible: they come from each repository's tracked
-files, `justfile` recipes, `.github/workflows/`, and claw's
-`vendored_artifacts.json`. Re-derive rather than trust this document if the
-fleet has changed shape.*
+`main`, and re-checked 2026-08-31. The counts are reproducible: they come from
+each repository's tracked files, `justfile` recipes, `.github/workflows/`, and
+claw's `vendored_artifacts.json`.*
+
+*They are also prose, and prose about other repositories rots — the one-day
+re-check already moved two of them (workflow count 46 → 48, skill files 14–31 →
+14–27) because MediaIngredientMech gained workflows and lost a skill. Nothing
+checks them, which is the same gap #236 closed for capability reasons and which
+claw#278 proposes closing here. Re-derive rather than trust this document.*
