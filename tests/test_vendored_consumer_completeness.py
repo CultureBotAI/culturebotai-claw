@@ -16,16 +16,31 @@ This asks the cheap half offline: does each consumer's `origin/main` track every
 artifact the manifest says applies to it? Read from git rather than the working
 tree, because a checkout sits on whatever branch its owner is using -- the same
 correction #256 made for capability reasons.
+
+**Where this runs.** Needing a checkout per consumer made every per-consumer
+case skip wherever there are none, which is every CI job: `tests.yaml` sets no
+roots, and the governance audit ran four named test files that did not include
+this one. So the guard written to catch #257 before a merge had never once
+executed its failure path anywhere (#209, #216).
+
+The governance audit already clones every consumer to `fleet/<key>`, so it now
+runs this file with those roots and with FLEET_CONSUMER_ROOTS_REQUIRED set.
+That variable is what makes the difference between a guard and a decoration:
+with it, a consumer whose root will not resolve is a failure rather than a
+silent skip, so the audit cannot pass by checking nothing.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import subprocess
+from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
 
+from kg_microbe_fleet import load_fleet_manifest
 from kg_microbe_fleet.roots import MechRootError, resolve_mech_root
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -68,11 +83,36 @@ def _tracked_on_main(root: Path, relative: str) -> bool:
     )
 
 
+ROOTS_REQUIRED_VAR = "FLEET_CONSUMER_ROOTS_REQUIRED"
+
+
+def roots_are_required(environ: Mapping[str, str] | None = None) -> bool:
+    """Whether an unresolvable consumer root is a failure rather than a skip.
+
+    Set wherever the caller has arranged the checkouts -- the governance audit
+    clones all six. Anywhere else, a developer without roots still gets the
+    offline assertions and skips the rest.
+    """
+    env = os.environ if environ is None else environ
+    return (env.get(ROOTS_REQUIRED_VAR) or "").strip().lower() in {"1", "true", "yes"}
+
+
+def _unavailable(consumer: str, reason: str) -> None:
+    """Skip, or fail if this environment promised the roots would be there."""
+    if roots_are_required(None):
+        pytest.fail(
+            f"{ROOTS_REQUIRED_VAR} is set, so every declared consumer must be "
+            f"resolvable, but {consumer} is not: {reason}. This check exists to "
+            f"stop the audit passing while silently examining nothing."
+        )
+    pytest.skip(f"needs a {consumer} checkout: {reason}")
+
+
 def _missing(consumer: str) -> list[str]:
     try:
         root = resolve_mech_root(consumer, claw_root=ROOT)
     except MechRootError as exc:
-        pytest.skip(f"needs a {consumer} checkout: {exc}")
+        _unavailable(consumer, str(exc))
     if (
         subprocess.run(
             ["git", "-C", str(root), "rev-parse", "--verify", "--quiet", "origin/main"],
@@ -80,7 +120,7 @@ def _missing(consumer: str) -> list[str]:
         ).returncode
         != 0
     ):
-        pytest.skip(f"{consumer} has no origin/main to read")
+        _unavailable(consumer, "no origin/main to read")
     return [t for t in _applicable(consumer) if not _tracked_on_main(root, t)]
 
 
@@ -172,4 +212,29 @@ def test_a_known_incomplete_consumer_is_still_incomplete(consumer):
     assert missing, (
         f"{consumer} now tracks every artifact that applies to it, so remove it "
         f"from INCOMPLETE_CONSUMERS ({INCOMPLETE_CONSUMERS[consumer]})"
+    )
+
+
+def test_each_consumers_env_var_is_the_name_the_audit_derives():
+    """The governance audit exports one root per consumer with a shell
+    uppercase of the manifest key:
+
+        var="$(printf '%s' "$key" | tr '[:lower:]' '[:upper:]')_ROOT"
+
+    which is a second, silent definition of a name the manifest already states.
+    If a future Mech's `environment_variable` does not follow that pattern, the
+    audit exports a name nothing reads. FLEET_CONSUMER_ROOTS_REQUIRED makes that
+    loud rather than silent, but a failing audit is a poor way to learn it --
+    so the coupling is asserted here, where the fix is obvious.
+    """
+    manifest = load_fleet_manifest()
+    mismatched = {
+        key: manifest.mechs[key].environment_variable
+        for key in CONSUMERS
+        if manifest.mechs[key].environment_variable != f"{key.upper()}_ROOT"
+    }
+    assert not mismatched, (
+        "the audit derives <KEY>_ROOT by uppercasing the manifest key, but "
+        f"these declare something else: {mismatched}. Either rename them or "
+        "make the workflow read environment_variable from the manifest."
     )
