@@ -60,6 +60,16 @@ capability_catalogue:
       budgets_path:
         type: string
         required_when_enabled: true
+  kgx_export:
+    settings:
+      nodes_path:
+        type: string
+        required_when_enabled: true
+      edges_path:
+        type: string
+        required_when_enabled: true
+      extra_prefixes:
+        type: string_list
   sssom_export:
     settings:
       mapping_globs:
@@ -178,6 +188,17 @@ mechs:
         settings:
           mapping_globs: ["output/*.sssom.tsv"]
           extensions: [mapping_method]
+      kgx_export:
+        status: disabled
+        reason: >-
+          scripts/export_kgx.py writes to output/kgx but has produced nothing
+          tracked, so there is no graph for this contract to judge. Adopting it
+          means running the exporter first; the check applies here once it does.
+        reason_claims:
+          present:
+            - scripts/export_kgx.py
+          absent:
+            - output/kgx
       site_contract:
         status: disabled
         reason: >-
@@ -284,6 +305,12 @@ mechs:
         settings:
           mapping_globs: ["mappings/*.sssom.tsv"]
           extensions: [source, validation_method]
+      kgx_export:
+        status: disabled
+        reason: >-
+          Publishes term mappings rather than a graph; its contribution to
+          kg-microbe is SSSOM. Adopting KGX would apply here only if it starts
+          emitting nodes and edges.
       site_contract:
         status: disabled
         reason: >-
@@ -389,6 +416,11 @@ mechs:
           Publishes KGX nodes and edges rather than term mappings; its
           contribution to kg-microbe is a graph, not a mapping set, so there
           is no SSSOM file for this contract to judge.
+      kgx_export:
+        status: enabled
+        settings:
+          nodes_path: output/kgx/nodes.tsv
+          edges_path: output/kgx/edges.tsv
       site_contract:
         status: enabled
         settings:
@@ -487,6 +519,10 @@ mechs:
         status: enabled
         settings:
           mapping_globs: ["proposals/*/metpo_proposal_mappings.sssom.tsv"]
+      kgx_export:
+        status: disabled
+        reason: >-
+          Publishes trait records and METPO mapping proposals, not a KGX graph.
       site_contract:
         status: enabled
         settings:
@@ -603,6 +639,10 @@ mechs:
           Grounds protein traits directly in its own records rather than
           publishing a mapping set. Adopting one would apply here; none has
           been written.
+      kgx_export:
+        status: disabled
+        reason: >-
+          Publishes protein-trait records rather than a graph.
       site_contract:
         status: disabled
         reason: >-
@@ -734,6 +774,11 @@ mechs:
           Records carry GO cellular-component identifiers inline rather than
           through a mapping file, and the corpus is four records. Adopting one
           applies once it grows.
+      kgx_export:
+        status: disabled
+        reason: >-
+          Four structure records and no exporter; adopting KGX applies once the
+          corpus grows.
       site_contract:
         status: enabled
         settings:

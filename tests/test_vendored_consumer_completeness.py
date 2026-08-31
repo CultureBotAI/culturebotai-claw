@@ -38,16 +38,12 @@ MANIFEST = json.loads(
 # Consumers known to be mid-adoption, with the reason. A ledger rather than a
 # skip: it fails in both directions, so the list can only shrink. When a
 # repository finishes vendoring, this test says so and the entry comes out.
-INCOMPLETE_CONSUMERS = {
-    # CellStructureMech came out of this list once CultureBotAI/CellStructureMech#53
-    # merged -- which is the ledger working, and what it is for.
-    "culturemech": "has not vendored scripts/deep_research_contract.py; see #270",
-    "mediaingredientmech": (
-        "has not vendored scripts/deep_research_contract.py; see #270"
-    ),
-    "proteintraitsmech": (
-        "has not vendored scripts/deep_research_contract.py; see #270"
-    ),
+INCOMPLETE_CONSUMERS: dict[str, str] = {
+    # Empty, and that is the point: entries leave this list because the test
+    # below fails when a repository becomes complete. CellStructureMech left it
+    # when CultureBotAI/CellStructureMech#53 merged, and CultureMech,
+    # MediaIngredientMech and ProteinTraitsMech left it when they vendored
+    # scripts/deep_research_contract.py (#270).
 }
 
 

@@ -66,6 +66,9 @@ EXPECTED_CAPABILITIES = {
     # Whose term mappings are checked against the shared SSSOM contract, and
     # why the two that publish none have decided rather than forgotten.
     "sssom_export",
+    # Whose exported graph is checked against the shared KGX contract; only
+    # CommunityMech emits one today, and the rest say why not.
+    "kgx_export",
     # Phase 7: whose YAML-writing scripts are audited by the shared rule, and
     # why the two that are not have decided rather than forgotten.
     "writer_audit",
