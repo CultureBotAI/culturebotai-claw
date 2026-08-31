@@ -1217,6 +1217,7 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "pyyaml" },
     { name = "rich" },
+    { name = "sssom-schema" },
     { name = "tabulate" },
     { name = "watchdog" },
 ]
@@ -1246,6 +1247,7 @@ requires-dist = [
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "rich", specifier = ">=14.3.3" },
+    { name = "sssom-schema", specifier = ">=1.0" },
     { name = "tabulate", specifier = ">=0.9" },
     { name = "watchdog", specifier = ">=6.0.0" },
 ]

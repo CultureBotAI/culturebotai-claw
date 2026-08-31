@@ -347,6 +347,15 @@ declared anchor type. These are properties of a graph rather than of a schema,
 so enum membership, evidence and CURIE shapes stay in each Mech. Connectivity is
 undirected -- a mechanism written effect-to-cause is the same mechanism.
 
+`kg-microbe-sssom check` judges a Mech's SSSOM mapping files against the
+contract the fleet already keeps: the eight columns every published file
+carries, a `curie_map` covering the prefixes actually used, columns that are
+either SSSOM slots or declared extensions, confidences in 0..1, and no row
+written twice. Slot names are read from the installed `sssom_schema` rather than
+typed. Two things that look like defects and are not: a row recording no match
+has no object, and two rows asserting the same triple with different
+`mapping_justification` are independent evidence, not a duplicate.
+
 `kg-microbe-writers audit` lists every script that writes a YAML record and
 what it declares about doing it. A writer is detected five ways -- `yaml.dump`,
 a dump written to a path, the Mech's own save helper, an in-place edit of a
