@@ -10,6 +10,7 @@ from pathlib import Path
 from kg_microbe_fleet import load_fleet_manifest
 from kg_microbe_fleet.roots import MechRootError, resolve_mech_root
 from kg_microbe_site.contract import check_site
+from kg_microbe_site.contrast import check_stylesheet
 
 CLAW_ROOT = Path(__file__).resolve().parents[2]
 
@@ -84,12 +85,25 @@ def main(argv: list[str] | None = None) -> int:
         site, allowed_hosts=list(allowed), pages=pages, published_root=published
     )
 
+    # #249: the palette is judged where the text is painted. Every stylesheet
+    # the site ships, not only the one named style.css -- a page that carries
+    # its own is exactly where an unreviewed palette hides.
+    contrast: list = []
+    for sheet in sorted(site.rglob("*.css")):
+        contrast.extend(check_stylesheet(sheet))
+
     for finding in findings:
         print(finding, file=sys.stderr)
+    for entry in contrast:
+        print(entry, file=sys.stderr)
     counts = Counter(finding.code for finding in findings)
+    counts.update(entry.code for entry in contrast)
     summary = ", ".join(f"{code} {n}" for code, n in sorted(counts.items())) or "clean"
-    print(f"{args.mech}: {len(pages)} pages under {site}: {summary}")
-    return 1 if findings else 0
+    print(
+        f"{args.mech}: {len(pages)} pages and "
+        f"{len(sorted(site.rglob('*.css')))} stylesheet(s) under {site}: {summary}"
+    )
+    return 1 if findings or contrast else 0
 
 
 if __name__ == "__main__":  # pragma: no cover - console entry point
