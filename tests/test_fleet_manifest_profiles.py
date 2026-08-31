@@ -69,6 +69,9 @@ EXPECTED_CAPABILITIES = {
     # Whose exported graph is checked against the shared KGX contract; only
     # CommunityMech emits one today, and the rest say why not.
     "kgx_export",
+    # Who keeps a ranked, licence-verified data-source queue, and why the five
+    # that do not have decided rather than forgotten.
+    "source_queue",
     # Phase 7: whose YAML-writing scripts are audited by the shared rule, and
     # why the two that are not have decided rather than forgotten.
     "writer_audit",

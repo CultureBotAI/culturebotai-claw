@@ -70,6 +70,15 @@ capability_catalogue:
         required_when_enabled: true
       extra_prefixes:
         type: string_list
+  source_queue:
+    settings:
+      queue_path:
+        type: string
+        required_when_enabled: true
+      extensions:
+        type: string_list
+      required_when_adopted:
+        type: string_list
   sssom_export:
     settings:
       mapping_globs:
@@ -199,6 +208,16 @@ mechs:
             - scripts/export_kgx.py
           absent:
             - output/kgx
+      source_queue:
+        status: disabled
+        reason: >-
+          Has no curation/source_queue.tsv. AntibioticMech wrote the pattern and
+          CellStructureMech adapted it; adopting it here means ranking this
+          corpus's own candidate sources and verifying their licences, which is
+          curation work rather than a file copy.
+        reason_claims:
+          absent:
+            - curation/source_queue.tsv
       site_contract:
         status: disabled
         reason: >-
@@ -311,6 +330,16 @@ mechs:
           Publishes term mappings rather than a graph; its contribution to
           kg-microbe is SSSOM. Adopting KGX would apply here only if it starts
           emitting nodes and edges.
+      source_queue:
+        status: disabled
+        reason: >-
+          Has no curation/source_queue.tsv. AntibioticMech wrote the pattern and
+          CellStructureMech adapted it; adopting it here means ranking this
+          corpus's own candidate sources and verifying their licences, which is
+          curation work rather than a file copy.
+        reason_claims:
+          absent:
+            - curation/source_queue.tsv
       site_contract:
         status: disabled
         reason: >-
@@ -421,6 +450,16 @@ mechs:
         settings:
           nodes_path: output/kgx/nodes.tsv
           edges_path: output/kgx/edges.tsv
+      source_queue:
+        status: disabled
+        reason: >-
+          Has no curation/source_queue.tsv. AntibioticMech wrote the pattern and
+          CellStructureMech adapted it; adopting it here means ranking this
+          corpus's own candidate sources and verifying their licences, which is
+          curation work rather than a file copy.
+        reason_claims:
+          absent:
+            - curation/source_queue.tsv
       site_contract:
         status: enabled
         settings:
@@ -523,6 +562,16 @@ mechs:
         status: disabled
         reason: >-
           Publishes trait records and METPO mapping proposals, not a KGX graph.
+      source_queue:
+        status: disabled
+        reason: >-
+          Has no curation/source_queue.tsv. AntibioticMech wrote the pattern and
+          CellStructureMech adapted it; adopting it here means ranking this
+          corpus's own candidate sources and verifying their licences, which is
+          curation work rather than a file copy.
+        reason_claims:
+          absent:
+            - curation/source_queue.tsv
       site_contract:
         status: enabled
         settings:
@@ -643,6 +692,16 @@ mechs:
         status: disabled
         reason: >-
           Publishes protein-trait records rather than a graph.
+      source_queue:
+        status: disabled
+        reason: >-
+          Has no curation/source_queue.tsv. AntibioticMech wrote the pattern and
+          CellStructureMech adapted it; adopting it here means ranking this
+          corpus's own candidate sources and verifying their licences, which is
+          curation work rather than a file copy.
+        reason_claims:
+          absent:
+            - curation/source_queue.tsv
       site_contract:
         status: disabled
         reason: >-
@@ -779,6 +838,12 @@ mechs:
         reason: >-
           Four structure records and no exporter; adopting KGX applies once the
           corpus grows.
+      source_queue:
+        status: enabled
+        settings:
+          queue_path: curation/source_queue.tsv
+          extensions: [taxon_link, item_id, script]
+          required_when_adopted: [script]
       site_contract:
         status: enabled
         settings:
