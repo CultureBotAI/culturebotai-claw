@@ -10,7 +10,7 @@ from pathlib import Path
 from kg_microbe_fleet import load_fleet_manifest
 from kg_microbe_fleet.roots import MechRootError, resolve_mech_root
 from kg_microbe_site.contract import check_site
-from kg_microbe_site.contrast import check_stylesheet
+from kg_microbe_site.contrast import ContrastFinding, check_stylesheet
 
 CLAW_ROOT = Path(__file__).resolve().parents[2]
 
@@ -88,8 +88,13 @@ def main(argv: list[str] | None = None) -> int:
     # #249: the palette is judged where the text is painted. Every stylesheet
     # the site ships, not only the one named style.css -- a page that carries
     # its own is exactly where an unreviewed palette hides.
-    contrast: list = []
-    for sheet in sorted(site.rglob("*.css")):
+    # Walked once and reused, for the reason the block above records: #242.
+    # The first version of this walked rglob twice -- once to check and once to
+    # count for the summary line -- which is the same defect, reintroduced
+    # three lines under the comment warning about it.
+    stylesheets = sorted(site.rglob("*.css"))
+    contrast: list[ContrastFinding] = []
+    for sheet in stylesheets:
         contrast.extend(check_stylesheet(sheet))
 
     for finding in findings:
@@ -101,7 +106,7 @@ def main(argv: list[str] | None = None) -> int:
     summary = ", ".join(f"{code} {n}" for code, n in sorted(counts.items())) or "clean"
     print(
         f"{args.mech}: {len(pages)} pages and "
-        f"{len(sorted(site.rglob('*.css')))} stylesheet(s) under {site}: {summary}"
+        f"{len(stylesheets)} stylesheet(s) under {site}: {summary}"
     )
     return 1 if findings or contrast else 0
 

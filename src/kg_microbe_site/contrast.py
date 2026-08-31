@@ -93,19 +93,31 @@ def contrast_ratio(foreground: str, background: str) -> float:
 
 
 def _block(css: str, pattern: str) -> dict[str, str] | None:
-    """The custom properties of the first rule whose selector matches.
+    """The custom properties of *every* rule whose selector matches, merged.
+
+    Merged in document order with the later declaration winning, which is what
+    a browser does. Reading only the first match looks equivalent and is not:
+    AntibioticMech declares two bare `:root` rules, the palette and a separate
+    corpus-map colour set, and the check passed only because the palette
+    happens to come first. Reversed, it would have reported a clean stylesheet
+    by reading a block with no palette in it -- a false green produced by
+    source order.
 
     Returns None when the theme is not declared at all, which is different from
     declaring it with no tokens: a stylesheet that commits to a single look is
     a decision, and reporting it as a failure would be noise.
     """
-    match = re.search(pattern, css)
-    if match is None:
-        return None
-    end = css.find("}", match.end())
-    if end == -1:
-        return None
-    return {k: v.strip() for k, v in _DECL.findall(css[match.end() : end])}
+    merged: dict[str, str] = {}
+    found = False
+    for match in re.finditer(pattern, css):
+        found = True
+        end = css.find("}", match.end())
+        if end == -1:
+            continue
+        merged.update(
+            {k: v.strip() for k, v in _DECL.findall(css[match.end() : end])}
+        )
+    return merged if found else None
 
 
 def resolve(tokens: dict[str, str], name: str, base: dict[str, str]) -> str | None:

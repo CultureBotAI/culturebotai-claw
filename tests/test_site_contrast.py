@@ -155,3 +155,35 @@ def test_raising_the_threshold_finds_more(tmp_path):
 
     assert check_stylesheet(path) == []
     assert check_stylesheet(path, minimum=7.0)  # AAA; 5.26 does not reach it
+
+
+def test_a_second_root_block_does_not_hide_the_palette(tmp_path):
+    """AntibioticMech declares two bare :root rules -- the palette and a
+    separate corpus-map colour set. Reading only the first match passed only
+    because the palette happens to come first in that file; reversed, the check
+    reported a clean stylesheet by reading a block with no palette in it.
+    """
+    palette = ":root { --accent: #96601F; --page: #E4DED3; --card: #ffffff; }\n"
+    map_colours = ":root { --cls0: #3f7fbf; --cls1: #d1651a; }\n"
+
+    first = tmp_path / "first.css"
+    first.write_text(palette + map_colours, encoding="utf-8")
+    second = tmp_path / "second.css"
+    second.write_text(map_colours + palette, encoding="utf-8")
+
+    assert len(check_stylesheet(first)) == 1
+    assert len(check_stylesheet(second)) == 1, "source order changed the verdict"
+
+
+def test_a_later_declaration_wins_as_it_does_in_a_browser(tmp_path):
+    """Merged in document order, not first-match: a stylesheet that redefines a
+    token further down is judged on the value that actually paints.
+    """
+    path = tmp_path / "style.css"
+    path.write_text(
+        ":root { --accent: #96601F; --page: #E4DED3; --card: #ffffff; }\n"
+        ":root { --page: #ffffff; }\n",
+        encoding="utf-8",
+    )
+
+    assert check_stylesheet(path) == []
