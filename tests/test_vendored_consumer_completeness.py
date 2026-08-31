@@ -74,13 +74,30 @@ def _applicable(consumer: str) -> list[str]:
 
 
 def _tracked_on_main(root: Path, relative: str) -> bool:
-    return (
-        subprocess.run(
-            ["git", "-C", str(root), "cat-file", "-e", f"origin/main:{relative}"],
-            capture_output=True,
-        ).returncode
-        == 0
+    """Whether `relative` is a file on the consumer's origin/main.
+
+    Deliberately `ls-tree` rather than `cat-file -e origin/main:<path>`. The
+    audit clones consumers with `--filter=blob:none`, so asking cat-file about
+    a blob makes git lazily fetch it over the network -- 0.487s against 0.017s
+    per artifact here, and roughly 45s across the fleet. Worse than slow: a
+    transient network failure then returns non-zero and is reported as a
+    missing artifact, a false red indistinguishable from the real thing this
+    guard exists to catch. ls-tree reads trees, which a blobless clone already
+    has, so the answer is local and the blob is never downloaded -- and the
+    question was only ever whether the path is tracked, not what is in it.
+
+    Checks the object type too: a directory at the artifact's path is not the
+    file the manifest asked for.
+    """
+    result = subprocess.run(
+        [
+            "git", "-C", str(root), "ls-tree", "-z", "--format=%(objecttype)",
+            "origin/main", "--", relative,
+        ],
+        capture_output=True,
+        check=True,
     )
+    return result.stdout.replace(b"\0", b"").strip() == b"blob"
 
 
 ROOTS_REQUIRED_VAR = "FLEET_CONSUMER_ROOTS_REQUIRED"
