@@ -92,6 +92,10 @@ Supported:
   are checked only for non-emptiness and are never emitted or retained.
 - Packaged canonical vendored-artifact manifest and identity-validated,
   dry-run-first synchronization.
+- A claw-governed standalone Mech execution contract for native, explicitly
+  web-enabled Codex calls with schema plus semantic output validation, and
+  non-billing Codex/OpenScientist canaries. It remains separate from
+  `kg_microbe_research`, which does not execute providers.
 - The assertion-based suite under `tests/` and fleet workflows under `.github/`.
 
 Experimental or disabled:
@@ -104,10 +108,11 @@ Experimental or disabled:
 - `openclaw-cli agent run` and `pipeline run` execution without `--dry-run`.
 - Environment-curation apply mode; it raises until an atomic validated writer exists.
 - Unified ingredient-mapping apply mode; it raises until all YAML writes are transactional.
-- Provider command construction and *execution*, including an executable mock
-  provider. `kg_microbe_research` decides whether a call is permitted; it does
-  not make one. None of the Mech runners consults this gate yet. Four
-  runners still execute live by default; ProteinTraitsMech is dry-run-first.
+- Provider command construction and *execution inside `kg_microbe_research`*,
+  including an executable mock provider. The package decides whether a call is
+  permitted; it does not make one. The separately vendored Mech execution
+  contract is supported, but runners must still consult the policy gate before
+  any live provider call.
 - Provider executors, domain adapters, historical-result migrations, and the
   five migrated Mech runners.
 - Legacy root diagnostics, one-off migration scripts, and archived phase workflows.
@@ -341,6 +346,30 @@ duplicate node ids, orphan nodes, fragmentation, and reachability from a
 declared anchor type. These are properties of a graph rather than of a schema,
 so enum membership, evidence and CURIE shapes stay in each Mech. Connectivity is
 undirected -- a mechanism written effect-to-cause is the same mechanism.
+
+`kg-microbe-source-queue check` judges a Mech's `curation/source_queue.tsv`:
+the eleven columns both existing queues share, one spelling per licence class,
+and the adoption gate -- an `ADOPTED` source must have terms someone checked and
+the date they checked them. A candidate that intends to seed before its licence
+is read is not a finding; that is what verification is for.
+
+`kg-microbe-kgx check` judges an exported KGX graph. Its subject is mostly
+whether a TSV means the same thing to whoever reads it: a bare carriage return,
+a literal newline inside a field, a duplicated column name, or a row count that
+differs between the `csv` module and a line-splitter. Required columns are a
+*subset* -- CommunityMech writes five node columns and kg-microbe's merged graph
+ten, and both are valid KGX -- which is why CommunityMech's own validator, which
+matches its list exactly, cannot check the merged file. CRLF is a line ending
+and not a finding.
+
+`kg-microbe-sssom check` judges a Mech's SSSOM mapping files against the
+contract the fleet already keeps: the eight columns every published file
+carries, a `curie_map` covering the prefixes actually used, columns that are
+either SSSOM slots or declared extensions, confidences in 0..1, and no row
+written twice. Slot names are read from the installed `sssom_schema` rather than
+typed. Two things that look like defects and are not: a row recording no match
+has no object, and two rows asserting the same triple with different
+`mapping_justification` are independent evidence, not a duplicate.
 
 `kg-microbe-writers audit` lists every script that writes a YAML record and
 what it declares about doing it. A writer is detected five ways -- `yaml.dump`,

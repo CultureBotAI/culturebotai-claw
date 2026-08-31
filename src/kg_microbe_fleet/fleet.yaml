@@ -60,6 +60,32 @@ capability_catalogue:
       budgets_path:
         type: string
         required_when_enabled: true
+  kgx_export:
+    settings:
+      nodes_path:
+        type: string
+        required_when_enabled: true
+      edges_path:
+        type: string
+        required_when_enabled: true
+      extra_prefixes:
+        type: string_list
+  source_queue:
+    settings:
+      queue_path:
+        type: string
+        required_when_enabled: true
+      extensions:
+        type: string_list
+      required_when_adopted:
+        type: string_list
+  sssom_export:
+    settings:
+      mapping_globs:
+        type: string_list
+        required_when_enabled: true
+      extensions:
+        type: string_list
   writer_audit:
     settings:
       search_dirs:
@@ -166,6 +192,32 @@ mechs:
           search_dirs: [scripts, src/culturemech]
           save_helpers: [write_validated_recipe]
           exclude: [scripts/audit_writers.py]
+      sssom_export:
+        status: enabled
+        settings:
+          mapping_globs: ["output/*.sssom.tsv"]
+          extensions: [mapping_method]
+      kgx_export:
+        status: disabled
+        reason: >-
+          scripts/export_kgx.py writes to output/kgx but has produced nothing
+          tracked, so there is no graph for this contract to judge. Adopting it
+          means running the exporter first; the check applies here once it does.
+        reason_claims:
+          present:
+            - scripts/export_kgx.py
+          absent:
+            - output/kgx
+      source_queue:
+        status: disabled
+        reason: >-
+          Has no curation/source_queue.tsv. AntibioticMech wrote the pattern and
+          CellStructureMech adapted it; adopting it here means ranking this
+          corpus's own candidate sources and verifying their licences, which is
+          curation work rather than a file copy.
+        reason_claims:
+          absent:
+            - curation/source_queue.tsv
       site_contract:
         status: disabled
         reason: >-
@@ -267,6 +319,27 @@ mechs:
           search_dirs: [scripts, src/mediaingredientmech]
           save_helpers: [save_yaml, write_validated_ingredient]
           exclude: [scripts/audit_writers.py]
+      sssom_export:
+        status: enabled
+        settings:
+          mapping_globs: ["mappings/*.sssom.tsv"]
+          extensions: [source, validation_method]
+      kgx_export:
+        status: disabled
+        reason: >-
+          Publishes term mappings rather than a graph; its contribution to
+          kg-microbe is SSSOM. Adopting KGX would apply here only if it starts
+          emitting nodes and edges.
+      source_queue:
+        status: disabled
+        reason: >-
+          Has no curation/source_queue.tsv. AntibioticMech wrote the pattern and
+          CellStructureMech adapted it; adopting it here means ranking this
+          corpus's own candidate sources and verifying their licences, which is
+          curation work rather than a file copy.
+        reason_claims:
+          absent:
+            - curation/source_queue.tsv
       site_contract:
         status: disabled
         reason: >-
@@ -366,6 +439,27 @@ mechs:
           save_helpers: [write_validated_community]
           curation_markers: [record_curation_event]
           exclude: [scripts/audit_writers.py]
+      sssom_export:
+        status: not_applicable
+        reason: >-
+          Publishes KGX nodes and edges rather than term mappings; its
+          contribution to kg-microbe is a graph, not a mapping set, so there
+          is no SSSOM file for this contract to judge.
+      kgx_export:
+        status: enabled
+        settings:
+          nodes_path: output/kgx/nodes.tsv
+          edges_path: output/kgx/edges.tsv
+      source_queue:
+        status: disabled
+        reason: >-
+          Has no curation/source_queue.tsv. AntibioticMech wrote the pattern and
+          CellStructureMech adapted it; adopting it here means ranking this
+          corpus's own candidate sources and verifying their licences, which is
+          curation work rather than a file copy.
+        reason_claims:
+          absent:
+            - curation/source_queue.tsv
       site_contract:
         status: enabled
         settings:
@@ -460,6 +554,24 @@ mechs:
           save_helpers: [write_validated_trait]
           curation_markers: [record_curation]
           exclude: [scripts/audit_writers.py]
+      sssom_export:
+        status: enabled
+        settings:
+          mapping_globs: ["proposals/*/metpo_proposal_mappings.sssom.tsv"]
+      kgx_export:
+        status: disabled
+        reason: >-
+          Publishes trait records and METPO mapping proposals, not a KGX graph.
+      source_queue:
+        status: disabled
+        reason: >-
+          Has no curation/source_queue.tsv. AntibioticMech wrote the pattern and
+          CellStructureMech adapted it; adopting it here means ranking this
+          corpus's own candidate sources and verifying their licences, which is
+          curation work rather than a file copy.
+        reason_claims:
+          absent:
+            - curation/source_queue.tsv
       site_contract:
         status: enabled
         settings:
@@ -570,6 +682,26 @@ mechs:
         reason_claims:
           present:
             - scripts/audit_writers.py
+      sssom_export:
+        status: disabled
+        reason: >-
+          Grounds protein traits directly in its own records rather than
+          publishing a mapping set. Adopting one would apply here; none has
+          been written.
+      kgx_export:
+        status: disabled
+        reason: >-
+          Publishes protein-trait records rather than a graph.
+      source_queue:
+        status: disabled
+        reason: >-
+          Has no curation/source_queue.tsv. AntibioticMech wrote the pattern and
+          CellStructureMech adapted it; adopting it here means ranking this
+          corpus's own candidate sources and verifying their licences, which is
+          curation work rather than a file copy.
+        reason_claims:
+          absent:
+            - curation/source_queue.tsv
       site_contract:
         status: disabled
         reason: >-
@@ -695,6 +827,23 @@ mechs:
         reason_claims:
           absent:
             - scripts/audit_writers.py
+      sssom_export:
+        status: disabled
+        reason: >-
+          Records carry GO cellular-component identifiers inline rather than
+          through a mapping file, and the corpus is four records. Adopting one
+          applies once it grows.
+      kgx_export:
+        status: disabled
+        reason: >-
+          Four structure records and no exporter; adopting KGX applies once the
+          corpus grows.
+      source_queue:
+        status: enabled
+        settings:
+          queue_path: curation/source_queue.tsv
+          extensions: [taxon_link, item_id, script]
+          required_when_adopted: [script]
       site_contract:
         status: enabled
         settings:

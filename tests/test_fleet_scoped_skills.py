@@ -285,7 +285,10 @@ def test_fleet_pr_review_uses_only_declared_repository_identities():
 # A `fleet` skill that resolves scope through a script rather than an inline
 # call. The claim is still checkable -- the script it names must itself read
 # the manifest -- so this is a redirection, not an exemption.
-RESOLVES_THROUGH_A_SCRIPT = {"fleet-pr-status": "scripts/fleet_pr_status.py"}
+RESOLVES_THROUGH_A_SCRIPT = {
+    "fleet-pr-status": "scripts/fleet_pr_status.py",
+    "github-pages-status": "scripts/fleet_pages_status.py",
+}
 
 
 @pytest.mark.parametrize("name", sorted(GENERAL_FLEET_SKILLS))

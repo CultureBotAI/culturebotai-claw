@@ -58,6 +58,12 @@ skills:
   fleet-pr-status:
     scope: fleet
     reason: Answers "what is open" across claw and the manifest-defined Mechs.
+  github-pages-status:
+    scope: fleet
+    reason: >-
+      Answers whether every Mech's published site is current, discovering
+      repositories from the org rather than the manifest so a Mech that has
+      not joined yet is still checked.
   ingredient-mapping:
     scope: domain
     reason: Imports a new ingredient source into MIM with provenance.

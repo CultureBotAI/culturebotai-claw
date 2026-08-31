@@ -103,6 +103,9 @@ See [`docs/guides/VENDORED_GOVERNANCE.md`](docs/guides/VENDORED_GOVERNANCE.md).
 The deep-research result contract and provider-free scaffold/validation flow are
 documented in
 [`docs/guides/DEEP_RESEARCH_RESULTS.md`](docs/guides/DEEP_RESEARCH_RESULTS.md).
+The separately governed provider execution and non-billing canary boundary is
+documented in
+[`docs/guides/DEEP_RESEARCH_EXECUTION.md`](docs/guides/DEEP_RESEARCH_EXECUTION.md).
 
 ## Safety model
 

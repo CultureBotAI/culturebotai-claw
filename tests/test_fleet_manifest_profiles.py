@@ -63,6 +63,15 @@ EXPECTED_CAPABILITIES = {
     # language, alt text, heading order and references that resolve -- and
     # which third-party host each of them has deliberately taken on.
     "site_contract",
+    # Whose term mappings are checked against the shared SSSOM contract, and
+    # why the two that publish none have decided rather than forgotten.
+    "sssom_export",
+    # Whose exported graph is checked against the shared KGX contract; only
+    # CommunityMech emits one today, and the rest say why not.
+    "kgx_export",
+    # Who keeps a ranked, licence-verified data-source queue, and why the five
+    # that do not have decided rather than forgotten.
+    "source_queue",
     # Phase 7: whose YAML-writing scripts are audited by the shared rule, and
     # why the two that are not have decided rather than forgotten.
     "writer_audit",
