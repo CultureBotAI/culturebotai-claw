@@ -347,6 +347,12 @@ declared anchor type. These are properties of a graph rather than of a schema,
 so enum membership, evidence and CURIE shapes stay in each Mech. Connectivity is
 undirected -- a mechanism written effect-to-cause is the same mechanism.
 
+`kg-microbe-source-queue check` judges a Mech's `curation/source_queue.tsv`:
+the eleven columns both existing queues share, one spelling per licence class,
+and the adoption gate -- an `ADOPTED` source must have terms someone checked and
+the date they checked them. A candidate that intends to seed before its licence
+is read is not a finding; that is what verification is for.
+
 `kg-microbe-kgx check` judges an exported KGX graph. Its subject is mostly
 whether a TSV means the same thing to whoever reads it: a bare carriage return,
 a literal newline inside a field, a duplicated column name, or a row count that
