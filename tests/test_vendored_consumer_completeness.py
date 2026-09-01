@@ -255,3 +255,95 @@ def test_each_consumers_env_var_is_the_name_the_audit_derives():
         f"these declare something else: {mismatched}. Either rename them or "
         "make the workflow read environment_variable from the manifest."
     )
+
+
+@pytest.mark.parametrize(
+    ("value", "required"),
+    [
+        ("1", True), ("true", True), ("TRUE", True), ("Yes", True), (" 1 ", True),
+        ("0", False), ("false", False), ("no", False), ("", False), ("  ", False),
+    ],
+    ids=lambda v: repr(v),
+)
+def test_the_switch_reads_the_values_the_audit_can_set(value, required):
+    """#284. This function decides whether the guard fails or skips, and was
+    the only new logic in #280 with no test. If it ever returned False while
+    the audit set the variable, every per-consumer case would go back to
+    skipping and the step would pass having examined nothing -- the state the
+    PR exists to end, restored silently.
+    """
+    assert roots_are_required({ROOTS_REQUIRED_VAR: value}) is required
+
+
+def test_an_unset_variable_does_not_require_roots():
+    """A developer without checkouts still gets the offline assertions."""
+    assert roots_are_required({}) is False
+
+
+def test_the_switch_reads_the_mapping_it_is_given(monkeypatch):
+    """The `environ` parameter exists so the rule can be driven without
+    touching the process environment -- the injection shape `resolve_mech_root`
+    uses. Untested, the parameter's reason for existing is unverified.
+    """
+    monkeypatch.setenv(ROOTS_REQUIRED_VAR, "1")
+
+    assert roots_are_required({}) is False, "the injected mapping was ignored"
+    assert roots_are_required() is True
+
+
+# --------------------------------------------------------------------------
+# #284: the wiring, so deleting the step cannot quietly return the guard to
+# running nowhere. Reads the workflow the way test_id_label_workflow.py does.
+
+AUDIT_WORKFLOW = ROOT / ".github/workflows/governance-fleet-audit.yaml"
+
+
+def _completeness_step() -> dict:
+    """The audit step that runs this file, parsed rather than grepped.
+
+    The first version of these three tests asserted substrings against the
+    whole file. All three passed while the step was broken: deleting the env
+    entry left the variable's name in the comment above it, and deleting the
+    export loop left `fleet/$key` in an unrelated --target-root line further
+    up. Two guards that could not fail, written to guard against guards that
+    cannot fail. Parsing makes the assertions land on the step itself.
+    """
+    import yaml
+
+    workflow = yaml.safe_load(AUDIT_WORKFLOW.read_text(encoding="utf-8"))
+    steps = [step for job in workflow["jobs"].values() for step in job.get("steps", [])]
+    named = [s for s in steps if Path(__file__).name in (s.get("run") or "")]
+    assert len(named) == 1, (
+        f"expected exactly one audit step running {Path(__file__).name}, "
+        f"found {len(named)} -- the guard runs nowhere again (#280, #284)"
+    )
+    return named[0]
+
+
+def test_the_audit_still_runs_this_file():
+    assert _completeness_step()["run"].strip()
+
+
+def test_the_audit_arms_the_switch_on_that_step():
+    """On the step, not merely somewhere in the file: the variable's name also
+    appears in the comment explaining it, which is what let the first version
+    of this test pass with the env entry deleted."""
+    step = _completeness_step()
+
+    assert (step.get("env") or {}).get(ROOTS_REQUIRED_VAR) in ("1", 1, "true", "yes"), (
+        f"{ROOTS_REQUIRED_VAR} is not set on the step that runs this file, so a "
+        f"consumer whose root fails to resolve is skipped and the step passes "
+        f"having checked nothing"
+    )
+
+
+def test_the_audit_exports_a_root_per_consumer_on_that_step():
+    """Also on the step. `fleet/$key` appears in an earlier --target-root line,
+    which made the whole-file version of this assertion unfalsifiable."""
+    run = _completeness_step()["run"]
+
+    assert "_ROOT" in run, "the step no longer derives a <KEY>_ROOT name"
+    assert "fleet/$key" in run, (
+        "the step no longer points each root at the consumer's clone"
+    )
+    assert "export" in run, "the derived names are never exported"
