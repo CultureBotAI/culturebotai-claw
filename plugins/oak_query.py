@@ -14,6 +14,10 @@ from pathlib import Path
 from threading import Lock
 from typing import Any, Dict, List, Optional
 
+from kg_microbe_fleet.roots import resolve_mech_root
+
+CLAW_ROOT = Path(__file__).resolve().parents[1]
+
 logger = logging.getLogger(__name__)
 
 
@@ -49,16 +53,29 @@ class OAKQueryPlugin:
                    f"cache_dir={self.cache_dir}, ontologies={self.enabled_ontologies}")
 
     def _get_client(self):
-        """Lazily load the MediaIngredientMech OntologyClient."""
-        if self._client is None:
-            try:
-                # Import from MediaIngredientMech
-                import sys
-                mediaingredient_root = os.getenv("MEDIAINGREDIENTMECH_ROOT")
-                if not mediaingredient_root:
-                    raise ValueError("MEDIAINGREDIENTMECH_ROOT not set in environment")
+        """Lazily load the MediaIngredientMech OntologyClient.
 
-                src_path = Path(mediaingredient_root) / "src"
+        The root is resolved through `resolve_mech_root`, not read from the
+        environment here (#283). Checking only that the variable is *set* let an
+        unverified path reach `sys.path` and be imported from, so a stale or
+        wrong value ran code out of the wrong tree. A configuration error is
+        raised rather than degraded: it is not an OAK incompatibility, and
+        reporting it as one is how a misconfigured deployment looks identical
+        to a working one in the logs.
+
+        Only ImportError degrades to delegation, which is what the original
+        handler was written for. It previously caught everything -- an unset
+        variable, a missing directory, a typo in this file -- and reported them
+        all as "OAK compatibility issue".
+        """
+        if self._client is None:
+            # Raises MechRootError if the root is unset, missing, or is not
+            # MediaIngredientMech. Deliberately not caught below.
+            root = resolve_mech_root("mediaingredientmech", claw_root=CLAW_ROOT)
+            try:
+                import sys
+
+                src_path = root / "src"
                 if str(src_path) not in sys.path:
                     sys.path.insert(0, str(src_path))
 
@@ -67,7 +84,7 @@ class OAKQueryPlugin:
                 self._client = OntologyClient(sources=self.enabled_ontologies)
                 logger.info("OntologyClient loaded successfully")
 
-            except Exception as e:
+            except ImportError as e:
                 logger.warning(f"OntologyClient unavailable (OAK compatibility issue): {e}")
                 logger.info("Will use delegation to existing MediaIngredientMech code")
                 # Return None to signal that delegation should be used
