@@ -29,6 +29,15 @@ def plugin(tmp_path):
     return OAKQueryPlugin({"cache_dir": str(tmp_path / "ws")})
 
 
+def _checkout(tmp_path):
+    """A directory that looks like MediaIngredientMech: it carries the package
+    the manifest names. `src/` alone is not enough, which is the point of the
+    identity check -- an empty src/ is exactly what a wrong checkout has."""
+    root = tmp_path / "MediaIngredientMech"
+    (root / "src" / "mediaingredientmech").mkdir(parents=True)
+    return root
+
+
 def test_an_unset_root_raises_rather_than_reporting_an_oak_problem(plugin, monkeypatch):
     """It is a configuration error. Calling it an OAK incompatibility is how a
     misconfigured deployment looks identical to a working one."""
@@ -66,8 +75,7 @@ def test_a_directory_that_is_not_the_mech_is_refused(plugin, tmp_path, monkeypat
 def test_an_import_failure_still_degrades_to_delegation(plugin, tmp_path, monkeypatch):
     """The one case the handler was written for. A real OAK incompatibility
     should not take the pipeline down."""
-    root = tmp_path / "MediaIngredientMech"
-    (root / "src").mkdir(parents=True)
+    root = _checkout(tmp_path)
     monkeypatch.setenv("MEDIAINGREDIENTMECH_ROOT", str(root))
 
     # Nothing to import from the staged src/, so the import raises ImportError.
@@ -77,8 +85,7 @@ def test_an_import_failure_still_degrades_to_delegation(plugin, tmp_path, monkey
 
 def test_a_resolved_root_reaches_sys_path(plugin, tmp_path, monkeypatch):
     """The resolver's answer is what gets imported from, not the raw variable."""
-    root = tmp_path / "MediaIngredientMech"
-    (root / "src").mkdir(parents=True)
+    root = _checkout(tmp_path)
     monkeypatch.setenv("MEDIAINGREDIENTMECH_ROOT", str(root))
 
     plugin._get_client()
@@ -91,8 +98,7 @@ def test_a_non_import_failure_is_not_reported_as_an_oak_problem(
 ):
     """Construction failing is a real fault. Swallowing it into the same
     sentinel as an import failure is what made every fault look alike."""
-    root = tmp_path / "MediaIngredientMech"
-    (root / "src").mkdir(parents=True)
+    root = _checkout(tmp_path)
     monkeypatch.setenv("MEDIAINGREDIENTMECH_ROOT", str(root))
 
     def explode(*args, **kwargs):
@@ -106,3 +112,23 @@ def test_a_non_import_failure_is_not_reported_as_an_oak_problem(
 
     with pytest.raises(RuntimeError, match="refused the connection"):
         plugin._get_client()
+
+
+def test_an_explicit_variable_pointing_at_the_wrong_checkout_is_refused(
+    plugin, tmp_path, monkeypatch
+):
+    """`resolve_mech_root` trusts an explicitly configured path once it exists,
+    which is right for a script reading data and not enough here: this path is
+    inserted into sys.path and imported from, so the wrong checkout means the
+    wrong code runs. Found reviewing #285 -- the first version of that PR
+    claimed the resolver checked identity, and for an explicit variable it
+    does not.
+    """
+    stranger = tmp_path / "some-other-repo"
+    (stranger / "src").mkdir(parents=True)
+    monkeypatch.setenv("MEDIAINGREDIENTMECH_ROOT", str(stranger))
+
+    with pytest.raises(MechRootError, match="does not look like MediaIngredientMech"):
+        plugin._get_client()
+
+    assert str(stranger / "src") not in sys.path

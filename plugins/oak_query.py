@@ -14,7 +14,8 @@ from pathlib import Path
 from threading import Lock
 from typing import Any, Dict, List, Optional
 
-from kg_microbe_fleet.roots import resolve_mech_root
+from kg_microbe_fleet import load_fleet_manifest
+from kg_microbe_fleet.roots import MechRootError, looks_like, resolve_mech_root
 
 CLAW_ROOT = Path(__file__).resolve().parents[1]
 
@@ -63,6 +64,15 @@ class OAKQueryPlugin:
         reporting it as one is how a misconfigured deployment looks identical
         to a working one in the logs.
 
+        The identity check is then repeated here, deliberately.
+        `resolve_mech_root` trusts an explicitly configured variable once the
+        directory exists -- an operator naming a path has made a decision, and
+        second-guessing it would break legitimate layouts. That is right for a
+        script that reads data. It is not enough here, because this path is
+        inserted into `sys.path` and *imported from*: pointing the variable at
+        the wrong checkout executes that checkout's code. So the package the
+        manifest names must actually be there.
+
         Only ImportError degrades to delegation, which is what the original
         handler was written for. It previously caught everything -- an unset
         variable, a missing directory, a typo in this file -- and reported them
@@ -72,6 +82,12 @@ class OAKQueryPlugin:
             # Raises MechRootError if the root is unset, missing, or is not
             # MediaIngredientMech. Deliberately not caught below.
             root = resolve_mech_root("mediaingredientmech", claw_root=CLAW_ROOT)
+            package = load_fleet_manifest().mechs["mediaingredientmech"].package_path
+            if not looks_like(root, package):
+                raise MechRootError(
+                    f"{root} does not look like MediaIngredientMech: it has no "
+                    f"{package}/. Refusing to import from it."
+                )
             try:
                 import sys
 
