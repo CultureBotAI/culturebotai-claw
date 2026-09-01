@@ -345,10 +345,10 @@ def audit_fleet_pins(
     *,
     fetch: Optional[Callable[[str], bytes]] = None,
 ) -> FleetAuditResult:
-    """Audit exactly the manifest's five Mech roots without mutating them.
+    """Audit exactly the Mech roots the manifest declares, without mutating them.
 
-    ``expected_ref`` is mandatory so five consistently stale pins cannot pass a
-    coordinated rollout audit.  The optional fetch callable exists solely for
+    ``expected_ref`` is mandatory so a fleet of consistently stale pins cannot
+    pass a coordinated rollout audit.  The optional fetch callable exists solely for
     deterministic offline use; production calls use the standalone checker's
     bounded HTTPS fetcher.
 

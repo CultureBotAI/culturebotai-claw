@@ -20,6 +20,8 @@ from pathlib import Path
 
 import pytest
 
+from kg_microbe_fleet import load_fleet_manifest
+
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"
 
@@ -27,12 +29,14 @@ SCRIPTS = ROOT / "scripts"
 # because a partial inventory is a real answer there (#161).
 EXEMPT = {"inventory_unmapped_ingredients.py"}
 
-MECH_VARIABLES = (
-    "MEDIAINGREDIENTMECH_ROOT",
-    "CULTUREMECH_ROOT",
-    "COMMUNITYMECH_ROOT",
-    "TRAITMECH_ROOT",
-    "PROTEINTRAITSMECH_ROOT",
+# Read from the manifest, not restated here. This list is what decides which
+# scripts the guard below even looks at, so a Mech missing from it is a Mech
+# whose guessed roots nothing checks. It was written as a literal five while the
+# fleet had five, and CellStructureMech's admission silently made it four-fifths
+# of the answer -- the exact drift #131 exists to remove, in the test enforcing
+# #131.
+MECH_VARIABLES = tuple(
+    sorted(mech.environment_variable for mech in load_fleet_manifest().mechs.values())
 )
 
 
@@ -164,3 +168,20 @@ def test_verification_happens_after_argument_parsing(path):
         f"{path.name} verifies at line {min(verify_lines)}, before arguments are "
         f"parsed at line {max(parse_lines)}; --help would fail without a checkout"
     )
+
+
+def test_the_variable_list_is_the_manifest_and_not_a_copy_of_it():
+    """The guard's own coverage is derived, so admitting a Mech extends it.
+
+    Asserting the derivation rather than the values: a literal list here would
+    reintroduce exactly the drift this checks for. The failure it prevents is
+    quiet -- a script guessing a root for an undeclared Mech is not reported as
+    unverified, it is simply never examined.
+    """
+    manifest = load_fleet_manifest()
+    assert set(MECH_VARIABLES) == {
+        mech.environment_variable for mech in manifest.mechs.values()
+    }
+    assert len(MECH_VARIABLES) == len(manifest.mechs)
+    # The value the old literal omitted, named so the regression is legible.
+    assert "CELLSTRUCTUREMECH_ROOT" in MECH_VARIABLES
