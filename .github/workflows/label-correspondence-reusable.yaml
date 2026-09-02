@@ -108,11 +108,38 @@ jobs:
       # The gate resolves `sqlite:obo:` through OAK, which downloads CHEBI, GO,
       # ENVO, PATO and RO. Caching them is the difference between ~2 minutes and
       # a multi-gigabyte download per run.
+      # The month stamp is the whole point (#302, CommunityMech#707). With a
+      # fixed key the post-step reports "Cache hit occurred on the primary key
+      # ..., not saving cache" in every run, so whatever was stored first is
+      # frozen for good and no later download can ever reach the cache. A gate
+      # that resolves terms through OAK then answers from a snapshot nobody can
+      # refresh.
+      #
+      # A rotating primary key with a prefix restore-key keeps the hit rate --
+      # each month restores the previous month's copy as its base -- while
+      # letting the entry be re-saved with anything newly fetched.
+      - name: Ontology cache stamp
+        id: oak-cache-stamp
+        run: echo "month=$(date -u +%Y-%m)" >> "$GITHUB_OUTPUT"
+
       - name: Cache OAK ontologies
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.data/oaklib
-          key: oaklib-${{ runner.os }}-${{ inputs.oak-cache-key }}
+          # oak-cache-key stays the manual bust: it is a component of the key
+          # rather than the whole of it, so bumping it still discards a
+          # poisoned cache.
+          key: >-
+            oaklib-${{ runner.os }}-${{ inputs.oak-cache-key }}-${{
+            steps.oak-cache-stamp.outputs.month }}
+          # Exactly one restore-key, and it carries the bust. A broader
+          # `oaklib-${{ runner.os }}-` fallback would look right and defeat the
+          # bust: restore-keys are tried in order, so a bumped oak-cache-key
+          # would miss its own prefix and then match the very entry it was
+          # bumped to escape. Rotation still gets a warm start from this one --
+          # last month's key shares the prefix.
+          restore-keys: |
+            oaklib-${{ runner.os }}-${{ inputs.oak-cache-key }}-
 
       - name: Build the product the gate reads
         if: inputs.prepare-recipe != ''
