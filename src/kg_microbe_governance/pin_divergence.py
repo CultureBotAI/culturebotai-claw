@@ -58,16 +58,22 @@ def classify_pin_divergence(
     joined = ", ".join(missing)
     if kind == "converged":
         shared = next(iter(set(pins.values())), "")
-        target = (
-            f"Every pinned consumer agrees on {shared[:8]}, so pin {joined} to "
-            f"that." if shared else "No consumer has pinned yet."
+        # Deliberately NOT "pin to the ref they all share". A consumer is
+        # unpinned precisely because that ref does not declare it, so pinning
+        # there asserts an artifact set that predates its membership -- the
+        # bytes can be identical while the scoping is not. The target is the
+        # commit that declared it, and everyone else advances to that (#314).
+        others = (
+            f"then advance the {len(pins)} consumer(s) now at {shared[:8]} to "
+            f"the same commit" if shared else "which is the fleet's first pin"
         )
         return "rollout", (
             f"fleet rollout in progress, not drift: {joined} has no committed "
             f"claw pin yet, which is the state a Mech is in between claw "
-            f"declaring it a consumer and it vendoring. {target}"
+            f"declaring it a consumer and it vendoring. Pin {joined} to the "
+            f"claw commit that declares it, {others}"
         )
-    return kind, f"{message}. Also not yet pinned: {joined}"
+    return kind, f"{message}; also not yet pinned: {joined}"
 
 
 def _classify_pinned(
