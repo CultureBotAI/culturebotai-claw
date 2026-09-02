@@ -205,10 +205,10 @@ jobs:
       # everywhere without one it skipped every per-consumer case -- which was
       # everywhere, including this workflow, which ran the four files above and
       # not this one. It had never executed its failure path (#209, #216).
-      # This job already clones all six consumers, so it is the one place the
-      # guard can actually run. FLEET_CONSUMER_ROOTS_REQUIRED turns an
-      # unresolvable root from a silent skip into a failure, so the step cannot
-      # pass by examining nothing.
+      # This job already clones every manifest-declared consumer, so it is the
+      # one place the guard can actually run. FLEET_CONSUMER_ROOTS_REQUIRED
+      # turns an unresolvable root from a silent skip into a failure, so the
+      # step cannot pass by examining nothing.
       - name: Check every declared consumer carries what the manifest says
         shell: bash
         env:

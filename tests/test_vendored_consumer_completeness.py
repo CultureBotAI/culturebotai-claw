@@ -54,11 +54,20 @@ MANIFEST = json.loads(
 # skip: it fails in both directions, so the list can only shrink. When a
 # repository finishes vendoring, this test says so and the entry comes out.
 INCOMPLETE_CONSUMERS: dict[str, str] = {
-    # Empty, and that is the point: entries leave this list because the test
-    # below fails when a repository becomes complete. CellStructureMech left it
-    # when CultureBotAI/CellStructureMech#53 merged, and CultureMech,
+    # Entries leave this list because the test below fails when a repository
+    # becomes complete. CellStructureMech left it when
+    # CultureBotAI/CellStructureMech#53 merged, and CultureMech,
     # MediaIngredientMech and ProteinTraitsMech left it when they vendored
     # scripts/deep_research_contract.py (#270).
+    "antibioticmech": (
+        "#279 step 1 of 3. Declaring the consumer is what advances the canonical "
+        "ref, and AntibioticMech cannot vendor against a ref that does not yet "
+        "name it -- sync refuses when the pinned manifest does not match the "
+        "installed one. It tracks 2 of its 13 artifacts and has no "
+        "scripts/.vendored_canon_ref at all. CultureBotAI/AntibioticMech#29 "
+        "vendors the remaining 11 and pins the new ref, which is what takes this "
+        "entry back out."
+    ),
 }
 
 
