@@ -132,3 +132,35 @@ def test_an_explicit_variable_pointing_at_the_wrong_checkout_is_refused(
         plugin._get_client()
 
     assert str(stranger / "src") not in sys.path
+
+
+def test_the_imported_directory_is_derived_from_the_manifest(plugin, tmp_path, monkeypatch):
+    """The path added to sys.path comes from the same package_path the identity
+    check used, not a hardcoded "src".
+
+    Driven by a manifest whose package_path is NOT under src/, because with the
+    real one the two are identical and the assertion cannot fail. The first
+    version of this test used the real manifest, asserted the derived path, and
+    passed with `root / "src"` hardcoded -- a test for a distinction that its
+    own fixture made invisible.
+    """
+    package = "packages/mediaingredientmech"
+    root = tmp_path / "MediaIngredientMech"
+    (root / package).mkdir(parents=True)
+    monkeypatch.setenv("MEDIAINGREDIENTMECH_ROOT", str(root))
+
+    class _Mech:
+        package_path = package
+
+    class _Manifest:
+        mechs = {"mediaingredientmech": _Mech()}
+
+    monkeypatch.setattr("plugins.oak_query.load_fleet_manifest", lambda: _Manifest())
+
+    plugin._get_client()
+
+    assert str(root.resolve() / "packages") in sys.path
+    assert str(root.resolve() / "src") not in sys.path, (
+        'the directory added to sys.path is a hardcoded "src", not the parent '
+        "of the package the manifest names"
+    )

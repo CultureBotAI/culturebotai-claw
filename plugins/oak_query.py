@@ -71,7 +71,9 @@ class OAKQueryPlugin:
         script that reads data. It is not enough here, because this path is
         inserted into `sys.path` and *imported from*: pointing the variable at
         the wrong checkout executes that checkout's code. So the package the
-        manifest names must actually be there.
+        manifest names must actually be there, and the directory added to
+        `sys.path` is derived from that same manifest value rather than a
+        hardcoded "src".
 
         Only ImportError degrades to delegation, which is what the original
         handler was written for. It previously caught everything -- an unset
@@ -91,7 +93,11 @@ class OAKQueryPlugin:
             try:
                 import sys
 
-                src_path = root / "src"
+                # The directory the package sits in, derived from the same
+                # manifest value the check above used, so the path that gets
+                # imported and the path that was verified cannot drift apart.
+                # Hardcoding "src" would keep working while looks_like moved.
+                src_path = root / Path(package).parent
                 if str(src_path) not in sys.path:
                     sys.path.insert(0, str(src_path))
 
