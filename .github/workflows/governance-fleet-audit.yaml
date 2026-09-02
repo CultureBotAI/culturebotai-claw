@@ -122,9 +122,21 @@ jobs:
               encoding="utf-8"
           ).splitlines()
           pins: dict[str, str] = {}
+          unpinned: list[str] = []
           for row in rows:
               key, _github, _package_path, pin_path = row.split("\t")
               root = workspace / "fleet" / key
+              # A consumer claw has declared but which has not vendored yet has
+              # no pin file. Reading it with check=True turned that state into a
+              # CalledProcessError, replacing the rollout message with a
+              # traceback on the first Mech to reach it (#309).
+              exists = subprocess.run(
+                  ["git", "-C", str(root), "cat-file", "-e", f"HEAD:{pin_path}"],
+                  capture_output=True,
+              )
+              if exists.returncode != 0:
+                  unpinned.append(key)
+                  continue
               content = subprocess.run(
                   ["git", "-C", str(root), "show", f"HEAD:{pin_path}"],
                   check=True,
@@ -152,7 +164,7 @@ jobs:
                   capture_output=True,
               ).returncode == 0
 
-          kind, message = classify_pin_divergence(pins, is_ancestor)
+          kind, message = classify_pin_divergence(pins, is_ancestor, unpinned)
           if kind != "converged":
               raise SystemExit(f"{message}. Pins: {dict(sorted(pins.items()))}")
           ref = set(pins.values()).pop()
@@ -205,10 +217,10 @@ jobs:
       # everywhere without one it skipped every per-consumer case -- which was
       # everywhere, including this workflow, which ran the four files above and
       # not this one. It had never executed its failure path (#209, #216).
-      # This job already clones all six consumers, so it is the one place the
-      # guard can actually run. FLEET_CONSUMER_ROOTS_REQUIRED turns an
-      # unresolvable root from a silent skip into a failure, so the step cannot
-      # pass by examining nothing.
+      # This job already clones every manifest-declared consumer, so it is the
+      # one place the guard can actually run. FLEET_CONSUMER_ROOTS_REQUIRED
+      # turns an unresolvable root from a silent skip into a failure, so the
+      # step cannot pass by examining nothing.
       - name: Check every declared consumer carries what the manifest says
         shell: bash
         env:

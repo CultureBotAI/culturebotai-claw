@@ -26,6 +26,10 @@
     "cellstructuremech": {
       "github": "CultureBotAI/CellStructureMech",
       "package_path": "src/cellstructuremech"
+    },
+    "antibioticmech": {
+      "github": "CultureBotAI/AntibioticMech",
+      "package_path": "src/antibioticmech"
     }
   },
   "artifacts": [

@@ -192,6 +192,7 @@ assert manifest.keys == (
     "communitymech",
     "traitmech",
     "proteintraitsmech",
+    "antibioticmech",
     "cellstructuremech",
 )
 assert default_manifest_path() == module_path.parent / "fleet.yaml"

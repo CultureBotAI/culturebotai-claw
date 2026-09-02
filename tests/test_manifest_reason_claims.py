@@ -110,6 +110,9 @@ def test_the_reasons_that_make_checkable_claims_are_the_ones_declared():
         f"{m}.{c}" for m, c, _, cap in _ALL if cap.reason_claims
     )
     assert declared == [
+        "antibioticmech.deep_research",
+        "antibioticmech.page_budgets",
+        "antibioticmech.writer_audit",
         "cellstructuremech.deep_research",
         "cellstructuremech.page_budgets",
         "cellstructuremech.source_catalogue",

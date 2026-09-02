@@ -28,6 +28,7 @@ EXPECTED_MECHS = (
     "communitymech",
     "traitmech",
     "proteintraitsmech",
+    "antibioticmech",
     "cellstructuremech",
 )
 

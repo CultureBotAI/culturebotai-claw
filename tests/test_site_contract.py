@@ -531,12 +531,22 @@ def test_every_mech_decides_about_the_site_contract():
 
 
 def test_the_measured_corpora_are_the_ones_declared():
-    """The docstring's numbers come from these three: CommunityMech and
-    TraitMech as measured for the contract, and CellStructureMech measured on
-    joining (10 pages, no findings; CellStructureMech#50). If a fourth is
-    enabled the numbers stop describing what the check runs on until it is
-    re-measured."""
-    assert _ENABLED == ["cellstructuremech", "communitymech", "traitmech"]
+    """The docstring's numbers come from these four: CommunityMech and
+    TraitMech as measured for the contract, CellStructureMech measured on
+    joining (10 pages, no findings; CellStructureMech#50), and AntibioticMech
+    measured on joining (#279): 2,927 pages and one stylesheet, reporting three
+    UNEXAMINED_FOREGROUND -- --masthead-nav, --masthead-nav-hover and
+    --tooltip-fg, whose grounds are a gradient and a translucent fill that the
+    contrast check declines to guess at (AntibioticMech#171).
+
+    If a fifth is enabled the numbers stop describing what the check runs on
+    until it is re-measured."""
+    assert _ENABLED == [
+        "antibioticmech",
+        "cellstructuremech",
+        "communitymech",
+        "traitmech",
+    ]
 
 
 @pytest.mark.parametrize("mech", _ENABLED)
