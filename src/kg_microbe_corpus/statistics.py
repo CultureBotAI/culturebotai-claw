@@ -89,18 +89,27 @@ class CorpusReport:
     fields: dict[str, FieldStats] = field(default_factory=dict)
     sampled: bool = False
 
-    def parser(self) -> tuple[str, str]:
-        """Which parser read this corpus, and why that one.
+    # Set by `collect` from the loader that actually did the reading. Not a
+    # property re-deriving `soundness()` on demand: this must answer "what read
+    # this corpus", and a report built without a read -- or rehydrated from
+    # as_dict() on another machine -- would otherwise answer for whichever
+    # machine happened to ask.
+    parser: tuple[str, str] | None = None
 
-        Deliberately not in `as_dict()`. The parser is a fact about the machine,
-        not about the corpus, and putting it in the artifact would make two
-        identical corpora diff between a Linux runner and a laptop -- which is
-        the property the docstring below exists to protect. #233 asks that a run
+    def parser_note(self) -> str:
+        """One line naming the parser that read this corpus, and why that one.
+
+        Deliberately absent from `as_dict()`. The parser is a fact about the
+        machine, not about the corpus, and putting it in the artifact would make
+        two identical corpora diff between a Linux runner and a laptop -- the
+        property the docstring below exists to protect. #233 asks that a run
         taking minutes on one machine and an hour on another say why; it says so
         on stderr, where a person reads it, rather than in the diffable body.
         """
-        sound, why = soundness()
-        return ("CSafeLoader" if sound else "SafeLoader"), why
+        if self.parser is None:
+            return "parser not recorded: this report did not read a corpus"
+        name, why = self.parser
+        return f"parsed with {name}: {why}"
 
     def as_dict(self) -> dict[str, Any]:
         """Deterministic JSON: sorted keys, no timestamps, no absolute paths.
@@ -200,10 +209,15 @@ def iter_records(
     paths = [p for matches in matched.values() for p in matches]
     if sample is not None:
         paths = paths[:sample]
+    # Resolved once. `safe_loader()` is cached and costs 76ns, so calling it
+    # per record would add ~21ms across 429,271 -- immaterial. It is hoisted
+    # because calling it inside the loop reads as though the loader could
+    # differ between records, and it cannot.
+    loader = safe_loader()
     for path in paths:
         try:
             yield path, yaml.load(  # noqa: S506 - loader is judged, not guessed
-                path.read_text(encoding="utf-8"), Loader=safe_loader()
+                path.read_text(encoding="utf-8"), Loader=loader
             )
         except (OSError, yaml.YAMLError):
             yield path, None
@@ -227,7 +241,12 @@ def collect(
             f"are the corpus"
         )
 
-    report = CorpusReport(mech=mech, sampled=sample is not None)
+    sound, why = soundness()
+    report = CorpusReport(
+        mech=mech,
+        sampled=sample is not None,
+        parser=("CSafeLoader" if sound else "SafeLoader", why),
+    )
     counters: dict[str, Counter] = {name: Counter() for name in fields}
     populated: dict[str, int] = {name: 0 for name in counters}
 

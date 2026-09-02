@@ -59,8 +59,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # stderr, so stdout stays pure JSON for piping, and the artifact stays
     # machine-independent while a slow run still explains itself (#233).
-    parser, why = report.parser()
-    print(f"parsed with {parser}: {why}", file=sys.stderr)
+    print(report.parser_note(), file=sys.stderr)
     print(report.to_json(), end="")
     # An unreadable record is a finding, not a footnote: it is excluded from
     # every count above, so a report that stayed silent about it would

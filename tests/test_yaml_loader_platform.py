@@ -101,13 +101,20 @@ def test_the_corpus_report_says_which_parser_read_it():
     parser is a fact about the machine, not the corpus, and two identical
     corpora must not diff between a Linux runner and a laptop.
     """
-    from kg_microbe_corpus.statistics import CorpusReport
+    from kg_microbe_corpus.statistics import CorpusReport, collect
 
-    report = CorpusReport(mech="probe")
-    parser, why = report.parser()
+    # A report that did not read anything says so, rather than answering for
+    # whichever machine happens to ask (found reviewing #291).
+    assert CorpusReport(mech="probe").parser_note() == (
+        "parser not recorded: this report did not read a corpus"
+    )
+    assert "parser" not in CorpusReport(mech="probe").as_dict()
 
-    assert parser in {"CSafeLoader", "SafeLoader"}
-    assert why
+    root = Path(__file__).resolve().parents[1]
+    report = collect("probe", root / "tests", ["*.py"], sample=1)
+    name, why = report.parser
+    assert name in {"CSafeLoader", "SafeLoader"} and why
+    assert report.parser_note().startswith(f"parsed with {name}: ")
     assert "parser" not in report.as_dict()
 
 
