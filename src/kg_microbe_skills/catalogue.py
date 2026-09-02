@@ -307,10 +307,25 @@ def _splice_regions(rendered: str, existing: str, mech_key: str) -> str:
     missing = sorted(set(canonical) - set(local))
     extra = sorted(set(local) - set(canonical))
     if missing or extra:
+        # An adapter with no markers at all is the first-adoption case, not a
+        # drift case, and the two want different advice. There is deliberately
+        # no automatic adoption: inserting markers means deciding which of a
+        # Mech's existing prose is the shared skeleton and which is its own,
+        # and a matcher guessing that would silently reclassify local knowledge
+        # as claw's -- the exact loss this mechanism exists to prevent.
+        hint = (
+            " -- this adapter declares no managed regions at all, so it has not"
+            " adopted the canonical skill yet. Render without `existing` to see"
+            " the template, then add the markers to the adapter around the"
+            " sections claw should own, keeping everything else outside them."
+            if not local
+            else ""
+        )
         raise CatalogueError(
             f"{mech_key}: managed regions differ from the template"
             + (f"; absent from the adapter: {', '.join(missing)}" if missing else "")
             + (f"; absent from the template: {', '.join(extra)}" if extra else "")
+            + hint
         )
     out = existing
     for name, block in canonical.items():

@@ -495,3 +495,35 @@ def test_a_repeated_region_name_is_refused():
 
     with pytest.raises(CatalogueError, match="declared more than once"):
         render_adapter(twice, "culturemech", existing=twice)
+
+
+def test_an_adapter_that_has_never_adopted_is_told_how_to():
+    """First adoption and later drift are different situations wanting
+    different advice, and the message said only "absent from the adapter".
+
+    There is deliberately no automatic adoption: inserting markers means
+    deciding which of a Mech's prose is the shared skeleton, and a matcher
+    guessing that would reclassify local knowledge as claw's -- the loss this
+    mechanism exists to prevent.
+    """
+    template = "<!-- canonical:begin w -->\nshared\n<!-- canonical:end w -->\n"
+    unmarked = "# next-tasks\n\nCultureMech's own traps, never marked up.\n"
+
+    with pytest.raises(CatalogueError, match="has not adopted the canonical skill yet"):
+        render_adapter(template, "culturemech", existing=unmarked)
+
+
+def test_a_drifted_adapter_is_not_told_it_never_adopted():
+    """An adapter that carries some regions has adopted; it has drifted. The
+    adoption hint would be actively wrong advice there."""
+    template = (
+        "<!-- canonical:begin w -->\nshared\n<!-- canonical:end w -->\n"
+        "<!-- canonical:begin r -->\nnew section\n<!-- canonical:end r -->\n"
+    )
+    adopted = "<!-- canonical:begin w -->\nold\n<!-- canonical:end w -->\nlocal\n"
+
+    with pytest.raises(CatalogueError) as caught:
+        render_adapter(template, "culturemech", existing=adopted)
+
+    assert "absent from the adapter: r" in str(caught.value)
+    assert "has not adopted" not in str(caught.value)
