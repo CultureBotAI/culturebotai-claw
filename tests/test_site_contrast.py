@@ -187,3 +187,80 @@ def test_a_later_declaration_wins_as_it_does_in_a_browser(tmp_path):
     )
 
     assert check_stylesheet(path) == []
+
+
+def test_a_colour_token_no_pairing_names_is_reported(tmp_path):
+    """#288. The pairing table is hand-written, so it is only as complete as
+    whoever last edited it -- and a token it never names is not judged, which
+    reads exactly like a pass. AntibioticMech sets four tokens as `color:` that
+    the original six pairings did not cover.
+    """
+    path = tmp_path / "style.css"
+    path.write_text(
+        ":root { --accent: #245a8d; --page: #ffffff; --card: #ffffff;\n"
+        "        --invented: #767676; }\n"
+        ".thing { color: var(--invented); }\n",
+        encoding="utf-8",
+    )
+
+    findings = check_stylesheet(path)
+
+    assert [f.code for f in findings] == ["UNEXAMINED_FOREGROUND"]
+    assert "--invented" in findings[0].detail
+
+
+def test_a_token_the_table_names_is_not_reported_as_unexamined(tmp_path):
+    path = tmp_path / "style.css"
+    path.write_text(
+        ":root { --accent: #245a8d; --page: #ffffff; --card: #ffffff; }\n"
+        "a { color: var(--accent); }\n",
+        encoding="utf-8",
+    )
+
+    assert check_stylesheet(path) == []
+
+
+def test_a_token_carrying_its_own_ground_is_judged_against_that_ground(tmp_path):
+    """--warn is set beside `background: var(--warn-soft)` in every rule that
+    uses it. Judging it against --page would report a failure on a surface it
+    never sits on -- the mirror of the defect this module exists for, and a
+    mistake I made by hand while reviewing AntibioticMech#147.
+    """
+    path = tmp_path / "style.css"
+    path.write_text(
+        ":root { --accent: #245a8d; --page: #E4DED3; --card: #ffffff;\n"
+        # 4.43:1 on --page, which would fail; 5.43:1 on --warn-soft, which is
+        # where it is actually painted.
+        "        --warn: #8a5a00; --warn-soft: #fdf4e3; }\n"
+        ".pill.warn { background: var(--warn-soft); color: var(--warn); }\n",
+        encoding="utf-8",
+    )
+
+    assert check_stylesheet(path) == []
+
+
+def test_the_alias_spellings_are_judged_on_every_surface(tmp_path):
+    """A Mech's token vocabulary is its own: CellStructureMech writes --ink
+    where AntibioticMech writes --fg. A table naming only one spelling examines
+    nothing on the other half of the fleet.
+
+    --page and --card differ here on purpose. An earlier version of this test
+    set both to white, so --ink passed on either and dropping the --ink/--page
+    pairing changed nothing -- a fixture that erased the distinction it was
+    asserting, which is #286 for the third time.
+    """
+    path = tmp_path / "style.css"
+    path.write_text(
+        # --ink clears AA on the white card (7.00) and fails on the mid-grey
+        # ground (1.62), so the --page pairing is the only thing that sees it.
+        ":root { --accent: #000000; --page: #7a7a7a; --card: #ffffff;\n"
+        "        --ink: #595959; --bg: #ffffff; }\n"
+        "body { color: var(--ink); }\n"
+        ".btn { background: var(--accent); color: var(--bg); }\n",
+        encoding="utf-8",
+    )
+
+    findings = check_stylesheet(path)
+
+    assert [f.code for f in findings] == ["BELOW_AA"]
+    assert "--ink" in findings[0].detail and "--page" in findings[0].detail

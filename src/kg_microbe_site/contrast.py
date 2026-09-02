@@ -45,9 +45,30 @@ PAIRINGS: tuple[tuple[str, str, str], ...] = (
     ("--accent", "--card", "link or button label on a card"),
     ("--fg", "--page", "body text on the page ground"),
     ("--fg", "--card", "body text on a card"),
+    ("--muted", "--page", "secondary text on the page ground"),
     ("--muted", "--card", "secondary text on a card"),
     ("--card", "--accent", "label reversed out of an accent fill"),
+    # Aliases. A Mech's token vocabulary is its own: CellStructureMech writes
+    # --ink where AntibioticMech writes --fg, and AntibioticMech reverses --bg
+    # rather than --card out of an accent fill. Naming both spellings is what
+    # keeps the table from silently examining nothing on half the fleet.
+    ("--ink", "--page", "body text on the page ground"),
+    ("--ink", "--card", "body text on a card"),
+    ("--bg", "--accent", "label reversed out of an accent fill"),
+    # Tokens that carry their own ground. Each is set beside an explicit
+    # background in every rule that uses it, so judging it against --page would
+    # report a failure on a surface it never sits on -- the mirror of the
+    # defect this module exists for (#288).
+    ("--warn", "--warn-soft", "warning text on its own ground"),
+    ("--danger", "--page", "error text on the page ground"),
+    ("--danger", "--card", "error text on a card"),
+    ("--tooltip-fg", "--tooltip-bg", "tooltip text on its own ground"),
 )
+
+# Foregrounds the table knows about, derived rather than restated.
+_EXAMINED_FOREGROUNDS = frozenset(foreground for foreground, _bg, _why in PAIRINGS)
+
+_COLOUR_DECLARATION = re.compile(r"(?<![\w-])color\s*:\s*var\(\s*(--[\w-]+)")
 
 # Where a stylesheet states each theme. The dark values are declared twice by
 # design -- once for the OS preference, once for the toggle -- so both are
@@ -151,6 +172,23 @@ def check_stylesheet(
         ]
 
     findings: list[ContrastFinding] = []
+
+    # A token set as `color:` that no pairing names is not judged at all, and
+    # silence reads exactly like a pass. The table is hand-written, so it can
+    # only be as complete as whoever last edited it -- this reports the gap
+    # rather than leaving it to be noticed (#288).
+    unexamined = sorted(
+        set(_COLOUR_DECLARATION.findall(css)) - _EXAMINED_FOREGROUNDS
+    )
+    findings.extend(
+        ContrastFinding(
+            "UNEXAMINED_FOREGROUND", path.name, "any",
+            f"{token} is set as `color:` but no pairing says what it sits on, "
+            f"so its contrast is never judged",
+        )
+        for token in unexamined
+    )
+
     for theme, pattern in THEMES:
         tokens = light if theme == "light" else _block(css, pattern)
         if tokens is None:
