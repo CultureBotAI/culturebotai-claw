@@ -59,6 +59,23 @@ on:
         required: false
         default: ""
         type: string
+      extra-enforce-recipes:
+        description: >-
+          Newline-separated just recipes run after the main enforce, in order,
+          each failing the build on its own. For domain gates that belong to
+          this job rather than to every Mech: CommunityMech runs
+          `validate-terms-taxa` and `validate-terms-all`, Engine A over record
+          sets whose roots are not the schema tree_root.
+
+          They cannot live in the caller. A job that calls a reusable workflow
+          is `uses:` plus `with:` and cannot carry `steps:`, so without this
+          they would have to be dropped -- which that repository's own comment
+          records having happened once already, silently, for months -- or
+          split into a second job that re-installs uv and re-downloads every
+          ontology the first job just cached (#303).
+        required: false
+        default: ""
+        type: string
       report-when:
         description: >-
           When to generate and upload the drift report. `always` reports before
@@ -167,6 +184,23 @@ jobs:
 
       - name: Enforce id-label correspondence
         run: just ${{ inputs.enforce-recipe }}
+
+      # After the main gate, in the order given, each failing on its own. `set
+      # -e` is the point: a loop that swallowed a non-zero exit would report a
+      # domain gate as passing, which is exactly the silence these steps were
+      # restored from.
+      - name: Enforce domain-specific id-label gates
+        if: inputs.extra-enforce-recipes != ''
+        run: |
+          set -euo pipefail
+          printf '%s\n' "${EXTRA_RECIPES}" | while IFS= read -r recipe; do
+            [ -n "$recipe" ] || continue
+            echo "::group::just $recipe"
+            just $recipe
+            echo "::endgroup::"
+          done
+        env:
+          EXTRA_RECIPES: ${{ inputs.extra-enforce-recipes }}
 
       # Only reached when the gate failed, and only when the caller asked to
       # pay for the second pass just then rather than on every run.
