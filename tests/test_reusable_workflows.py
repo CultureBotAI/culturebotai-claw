@@ -77,11 +77,20 @@ def test_the_prepare_step_is_skipped_when_no_recipe_is_given(workflow):
 
 def test_the_drift_report_is_uploaded_even_when_the_gate_fails(workflow):
     """The artifact is triage material. Uploading it only on success would
-    withhold it from exactly the runs that need it -- the same shape as #164."""
+    withhold it from exactly the runs that need it -- the same shape as #164.
+
+    Asserts the requirement rather than the literal condition. #299 added
+    `&& inputs.report-when == 'always'`, which narrows *which mode* this step
+    belongs to without weakening the guarantee inside that mode: `always()` is
+    still what makes it survive a failing gate. Pinning the exact string would
+    have failed on a change that keeps the property intact.
+    """
     steps = workflow["jobs"]["label-correspondence"]["steps"]
     upload = next(s for s in steps if s.get("name") == "Upload drift report")
 
-    assert upload["if"] == "always()"
+    assert upload["if"].startswith("always()"), (
+        "the upload no longer survives a failing gate"
+    )
 
 
 def test_the_report_is_generated_before_the_gate_runs(workflow):
@@ -144,3 +153,72 @@ def test_a_caller_can_keep_its_frozen_lockfile(workflow):
     steps = workflow["jobs"]["label-correspondence"]["steps"]
     install = next(s for s in steps if s.get("name") == "Install dependencies")
     assert install["run"] == "uv sync ${{ inputs.uv-sync-args }}"
+
+
+# --------------------------------------------------------------------------
+# #299: report-when preserves a recorded per-Mech cost decision.
+
+REUSABLE = ROOT / ".github/workflows/label-correspondence-reusable.yaml"
+
+
+def _reusable() -> dict:
+    import yaml
+
+    document = yaml.safe_load(REUSABLE.read_text(encoding="utf-8"))
+    # PyYAML parses the bare `on:` key as the boolean True.
+    return document[True] if True in document else document["on"]
+
+
+def _reusable_steps() -> list[dict]:
+    import yaml
+
+    document = yaml.safe_load(REUSABLE.read_text(encoding="utf-8"))
+    return document["jobs"]["label-correspondence"]["steps"]
+
+
+def test_report_when_defaults_to_always():
+    """TraitMech and MediaIngredientMech report unconditionally today. A
+    default of `failure` would silently take their passing-run baseline away."""
+    inputs = _reusable()["workflow_call"]["inputs"]
+
+    assert inputs["report-when"]["default"] == "always"
+    assert inputs["report-when"]["required"] is False
+
+
+def test_both_orderings_exist_because_a_condition_cannot_reorder_steps():
+    """`always` reports before the gate; `failure` reports after it. That is a
+    difference in order, not in condition, so the workflow carries both and
+    skips one. A single guarded step could not express it."""
+    names = [step.get("name", "") for step in _reusable_steps()]
+
+    before = names.index("Generate id-label drift report")
+    gate = names.index("Enforce id-label correspondence")
+    after = names.index("Generate id-label drift report (on failure)")
+
+    assert before < gate < after
+
+
+def test_each_report_path_is_guarded_by_the_mode_it_belongs_to():
+    """Without the mode guard, `failure` mode would still pay the second
+    validator pass on every green run -- the ~6 minutes #299 is about -- while
+    appearing to have adopted the cheaper behaviour."""
+    steps = {step.get("name", ""): step for step in _reusable_steps()}
+
+    assert steps["Generate id-label drift report"]["if"] == (
+        "inputs.report-when == 'always'"
+    )
+    assert "inputs.report-when == 'always'" in steps["Upload drift report"]["if"]
+
+    on_failure = steps["Generate id-label drift report (on failure)"]["if"]
+    assert "failure()" in on_failure and "inputs.report-when == 'failure'" in on_failure
+
+
+def test_the_failure_upload_cannot_run_on_a_green_run():
+    """`always()` on this one would upload a report the failure path never
+    generated, and report success doing it."""
+    steps = {step.get("name", ""): step for step in _reusable_steps()}
+
+    condition = steps["Upload drift report (on failure)"]["if"]
+
+    assert condition.startswith("failure()")
+    assert "always()" not in condition

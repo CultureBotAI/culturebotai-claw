@@ -59,6 +59,21 @@ on:
         required: false
         default: ""
         type: string
+      report-when:
+        description: >-
+          When to generate and upload the drift report. `always` reports before
+          enforcing, so a passing run leaves the baseline a reader compares
+          against -- what TraitMech and MediaIngredientMech do.
+
+          `failure` enforces first and reports only if the gate fails.
+          `report-label-drift` is a SECOND full validator pass over the same
+          corpus: on CultureMech the enforce step alone is 6m14s of an ~11m50s
+          run, so reporting unconditionally there adds about half again to
+          every green PR. That repository recorded the trade deliberately, and
+          consolidation must not reverse it silently (#299).
+        required: false
+        default: "always"
+        type: string
       oak-cache-key:
         description: >-
           Cache key for the OAK sqlite ontologies. Bump the suffix to discard a
@@ -107,11 +122,16 @@ jobs:
       # on exactly the runs that need it -- the failing ones. CultureMech had
       # this the other way round, generating the report only on failure, which
       # loses the passing-run baseline a reader compares against.
+      # The two report-when behaviours differ in ORDER, not just in condition,
+      # so both orderings live here and one is skipped. A single step with an
+      # `if:` cannot express "run after the gate" and "run before it".
+
       - name: Generate id-label drift report
+        if: inputs.report-when == 'always'
         run: just ${{ inputs.drift-report-recipe }}
 
       - name: Upload drift report
-        if: always()
+        if: always() && inputs.report-when == 'always'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: label-drift-report-${{ github.run_id }}
@@ -120,3 +140,17 @@ jobs:
 
       - name: Enforce id-label correspondence
         run: just ${{ inputs.enforce-recipe }}
+
+      # Only reached when the gate failed, and only when the caller asked to
+      # pay for the second pass just then rather than on every run.
+      - name: Generate id-label drift report (on failure)
+        if: failure() && inputs.report-when == 'failure'
+        run: just ${{ inputs.drift-report-recipe }}
+
+      - name: Upload drift report (on failure)
+        if: failure() && inputs.report-when == 'failure'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: label-drift-report-${{ github.run_id }}
+          path: ${{ inputs.drift-report-path }}
+          if-no-files-found: warn
