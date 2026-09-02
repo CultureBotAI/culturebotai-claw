@@ -537,7 +537,7 @@ def test_the_measured_corpora_are_the_ones_declared():
     measured on joining (#279): 2,927 pages and one stylesheet, reporting three
     UNEXAMINED_FOREGROUND -- --masthead-nav, --masthead-nav-hover and
     --tooltip-fg, whose grounds are a gradient and a translucent fill that the
-    contrast check declines to guess at (AntibioticMech#149).
+    contrast check declines to guess at (AntibioticMech#171).
 
     If a fifth is enabled the numbers stop describing what the check runs on
     until it is re-measured."""
