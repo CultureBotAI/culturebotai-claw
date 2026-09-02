@@ -217,3 +217,34 @@ def test_the_rollout_message_does_not_send_a_newcomer_to_the_shared_ref():
     assert "claw commit that declares it" in message
     assert f"so pin antibioticmech to {OLD[:8]}" not in message
     assert "advance" in message
+
+
+def test_two_unpinned_consumers_read_as_plural():
+    """Operator-facing text, and legibility is the whole purpose of these
+    messages -- "x, y has no committed claw pin" reads as a bug in the tool."""
+    _kind, message = classify_pin_divergence({"a": OLD}, linear, ["y", "x"])
+
+    assert "x, y have no committed claw pin" in message
+
+
+def test_a_consumer_named_twice_is_named_once():
+    _kind, message = classify_pin_divergence({"a": OLD}, linear, ["y", "y"])
+
+    assert "y, y" not in message
+    assert "y has no committed claw pin" in message
+
+
+def test_a_consumer_that_has_a_pin_is_not_also_reported_as_unpinned():
+    """A caller passing the same name both ways is contradicting itself. The
+    pin is the evidence, so it wins: reporting "x has no pin" while x is in
+    the pin map would send someone to look for a file that is there."""
+    _kind, message = classify_pin_divergence({"x": OLD, "y": OLD}, linear, ["x"])
+
+    assert "no committed claw pin" not in message
+    assert message == ""
+
+
+def test_one_other_consumer_is_not_pluralised():
+    _kind, message = classify_pin_divergence({"a": OLD}, linear, ["z"])
+
+    assert "the 1 consumer now at" in message

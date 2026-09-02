@@ -52,10 +52,11 @@ def classify_pin_divergence(
     seen the fleet's real pins is one whose branches have never run.
     """
     kind, message = _classify_pinned(pins, is_ancestor)
-    missing = sorted(unpinned)
+    missing = sorted(set(unpinned) - set(pins))
     if not missing:
         return kind, message
     joined = ", ".join(missing)
+    verb = "has" if len(missing) == 1 else "have"
     if kind == "converged":
         shared = next(iter(set(pins.values())), "")
         # Deliberately NOT "pin to the ref they all share". A consumer is
@@ -63,15 +64,16 @@ def classify_pin_divergence(
         # there asserts an artifact set that predates its membership -- the
         # bytes can be identical while the scoping is not. The target is the
         # commit that declared it, and everyone else advances to that (#314).
+        noun = "consumer" if len(pins) == 1 else "consumers"
         others = (
-            f"then advance the {len(pins)} consumer(s) now at {shared[:8]} to "
-            f"the same commit" if shared else "which is the fleet's first pin"
+            f"then advance the {len(pins)} {noun} now at {shared[:8]} to the "
+            f"same commit" if shared else "which is the fleet's first pin"
         )
         return "rollout", (
-            f"fleet rollout in progress, not drift: {joined} has no committed "
-            f"claw pin yet, which is the state a Mech is in between claw "
-            f"declaring it a consumer and it vendoring. Pin {joined} to the "
-            f"claw commit that declares it, {others}"
+            f"fleet rollout in progress, not drift: {joined} {verb} no "
+            f"committed claw pin yet, which is the state a Mech is in between "
+            f"claw declaring it a consumer and it vendoring. Pin {joined} to "
+            f"the claw commit that declares it, {others}"
         )
     return kind, f"{message}; also not yet pinned: {joined}"
 
