@@ -30,6 +30,7 @@ from kg_microbe_skills.catalogue import (
     SCOPES,
     CatalogueError,
     applicable_mechs,
+    canonical_regions,
     canonical_text,
     load_canonical,
     load_catalogue,
@@ -476,3 +477,21 @@ def test_placeholders_inside_a_region_are_still_filled():
 
     assert "TraitMech" in out and "CultureBotAI/TraitMech" in out
     assert "{{" not in out
+
+
+def test_a_repeated_region_name_is_refused():
+    """Keyed by name, a second region with the same name overwrites the first,
+    and splicing then updates one copy and leaves the other stale -- a file
+    that looks managed and is half managed. Found reviewing #294; before the
+    fix this rendered an adapter whose first block still read `old one`.
+    """
+    twice = (
+        "<!-- canonical:begin s -->\nA\n<!-- canonical:end s -->\n"
+        "<!-- canonical:begin s -->\nB\n<!-- canonical:end s -->\n"
+    )
+
+    with pytest.raises(CatalogueError, match="declared more than once"):
+        canonical_regions(twice)
+
+    with pytest.raises(CatalogueError, match="declared more than once"):
+        render_adapter(twice, "culturemech", existing=twice)

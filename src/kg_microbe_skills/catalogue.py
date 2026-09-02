@@ -268,8 +268,23 @@ def canonical_regions(text: str) -> dict[str, str]:
     A region whose end marker is missing is simply not matched, which would
     silently drop it. `_splice_regions` compares the name sets rather than
     trusting either file, so an unbalanced marker surfaces as a mismatch.
+
+    A repeated name raises. Keyed by name, a second region with the same name
+    would overwrite the first, and splicing then replaces one occurrence and
+    leaves the other stale -- a file that looks managed and is half managed,
+    which is the failure this whole mechanism exists to prevent.
     """
-    return {m.group(1): m.group(0) for m in _REGION.finditer(text)}
+    regions: dict[str, str] = {}
+    for match in _REGION.finditer(text):
+        name = match.group(1)
+        if name in regions:
+            raise CatalogueError(
+                f"canonical region {name!r} is declared more than once; a "
+                f"region name must be unique within a file, or splicing "
+                f"updates one copy and leaves the rest stale"
+            )
+        regions[name] = match.group(0)
+    return regions
 
 
 def _splice_regions(rendered: str, existing: str, mech_key: str) -> str:
