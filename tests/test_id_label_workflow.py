@@ -157,7 +157,15 @@ def test_fleet_audit_authenticates_unanimous_committed_pins_before_audit() -> No
     assert 'f"HEAD:{pin_path}"' in pin_run
     assert 'rb"[0-9a-f]{40}\\n?"' in pin_run
     assert "set(pins.values())" in pin_run
-    assert "len(unique) != 1" in pin_run
+    # The requirement is that a non-unanimous fleet stops here, before the
+    # audit runs. #267 moved the comparison into classify_pin_divergence so it
+    # could say WHICH kind of disagreement, and both kinds are still failures.
+    # Pinning the old `len(unique) != 1` spelling would have failed on a change
+    # that keeps the property exactly -- the same lesson as the `always()`
+    # literal in #300.
+    assert "classify_pin_divergence" in pin_run
+    assert 'kind != "converged"' in pin_run
+    assert "raise SystemExit" in pin_run
     assert "GITHUB_OUTPUT" in pin_run
     auth_run = auth_step["run"]
     assert "fleet/trusted-claw cat-file" in auth_run

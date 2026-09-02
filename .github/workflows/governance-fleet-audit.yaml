@@ -98,7 +98,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python - <<'PY'
+          # PYTHONPATH is the CANDIDATE checkout, not fleet/trusted-claw.
+          # trusted-claw is the PR's base commit by design, so a function added
+          # by this PR does not exist there -- importing it from trusted-claw
+          # fails on the very PR that adds it, and always would.
+          #
+          # Reading it from `control` is not a weakening: for a pull_request the
+          # workflow file itself is the candidate's, so this step's logic was
+          # already candidate-controlled. What the trusted checkout protects is
+          # the audit and install code a downstream pin selects, and the
+          # classifier is neither. It imports only the standard library, so no
+          # sync is needed before the pin comparison runs.
+          PYTHONPATH=control/src python - <<'PY'
           from __future__ import annotations
 
           import os
@@ -123,10 +134,28 @@ jobs:
                   raise SystemExit(f"{key} has an invalid committed claw pin")
               pins[key] = content.decode("ascii").strip()
 
-          unique = set(pins.values())
-          if len(unique) != 1:
-              raise SystemExit(f"fleet claw pins differ: {pins}")
-          ref = unique.pop()
+          # Classified by the trusted package, not inline here: logic in a
+          # workflow cannot be tested, which is how #284 shipped two guards
+          # that could not fail. Both outcomes are still failures -- the
+          # contract is one shared pin -- but the message now says whether the
+          # fleet is mid-rollout or genuinely drifted (#267).
+          from kg_microbe_governance.pin_divergence import classify_pin_divergence
+
+          trusted = workspace / "fleet/trusted-claw"
+
+          def is_ancestor(older: str, newer: str) -> bool:
+              if older == newer:
+                  return True
+              return subprocess.run(
+                  ["git", "-C", str(trusted), "merge-base", "--is-ancestor",
+                   older, newer],
+                  capture_output=True,
+              ).returncode == 0
+
+          kind, message = classify_pin_divergence(pins, is_ancestor)
+          if kind != "converged":
+              raise SystemExit(f"{message}. Pins: {dict(sorted(pins.items()))}")
+          ref = set(pins.values()).pop()
           with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as stream:
               stream.write(f"ref={ref}\n")
           PY
