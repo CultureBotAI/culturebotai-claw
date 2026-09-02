@@ -16,12 +16,13 @@ audit environment exists.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Collection, Mapping
 
 
 def classify_pin_divergence(
     pins: Mapping[str, str],
     is_ancestor: Callable[[str, str], bool],
+    unpinned: Collection[str] = (),
 ) -> tuple[str, str]:
     """Say which kind of pin disagreement this is, without excusing it.
 
@@ -37,10 +38,43 @@ def classify_pin_divergence(
     * **drift** -- pins on unrelated commits, or more than one candidate
       leader. Someone has to decide which is right.
 
+    `unpinned` names consumers that committed no pin at all. That is not a
+    third kind of disagreement -- it is the *first* half of a rollout, and the
+    only state a Mech can be in between claw declaring it a consumer and it
+    vendoring, because it cannot pin a ref that does not yet name it. Before
+    #309 it was not representable here: the audit read every pin with
+    `check=True` and a consumer without one crashed the step with a
+    CalledProcessError, so the first Mech to reach this state would have
+    replaced the message this function exists to produce with a traceback.
+
     `is_ancestor` is injected rather than shelling out here so the rule can be
     exercised against constructed histories; a classifier that has only ever
     seen the fleet's real pins is one whose branches have never run.
     """
+    kind, message = _classify_pinned(pins, is_ancestor)
+    missing = sorted(unpinned)
+    if not missing:
+        return kind, message
+    joined = ", ".join(missing)
+    if kind == "converged":
+        shared = next(iter(set(pins.values())), "")
+        target = (
+            f"Every pinned consumer agrees on {shared[:8]}, so pin {joined} to "
+            f"that." if shared else "No consumer has pinned yet."
+        )
+        return "rollout", (
+            f"fleet rollout in progress, not drift: {joined} has no committed "
+            f"claw pin yet, which is the state a Mech is in between claw "
+            f"declaring it a consumer and it vendoring. {target}"
+        )
+    return kind, f"{message}. Also not yet pinned: {joined}"
+
+
+def _classify_pinned(
+    pins: Mapping[str, str],
+    is_ancestor: Callable[[str, str], bool],
+) -> tuple[str, str]:
+    """The original rule, over consumers that actually committed a pin."""
     unique = set(pins.values())
     if len(unique) <= 1:
         return "converged", ""

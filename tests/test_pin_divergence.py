@@ -112,3 +112,71 @@ def test_the_pin_step_reads_the_classifier_from_the_candidate_checkout():
         "the PR base commit, so a function this PR adds is not there"
     )
     assert "uv run --project fleet/trusted-claw python -" not in run
+
+
+def test_a_consumer_with_no_pin_at_all_is_a_rollout_not_a_crash():
+    """#309, AntibioticMech's admission. Between claw declaring a consumer and
+    that Mech vendoring, it has committed no pin file -- it cannot pin a ref
+    that does not yet name it. The audit used to read every pin with
+    `check=True`, so this state raised CalledProcessError and the operator saw
+    a traceback instead of the message #267 exists to give."""
+    pins = {"culturemech": OLD, "traitmech": OLD}
+
+    kind, message = classify_pin_divergence(pins, linear, ["antibioticmech"])
+
+    assert kind == "rollout"
+    assert "antibioticmech" in message
+    assert "no committed claw pin yet" in message
+    assert OLD[:8] in message
+
+
+def test_an_unpinned_consumer_does_not_hide_real_drift():
+    """The distinction that matters: unpinned is the benign half of a rollout,
+    but it must not downgrade a genuine disagreement among the pins that exist.
+    Both facts are reported."""
+    pins = {"culturemech": OLD, "traitmech": UNRELATED}
+
+    kind, message = classify_pin_divergence(pins, linear, ["antibioticmech"])
+
+    assert kind == "drift"
+    assert "antibioticmech" in message
+    assert "differ" in message
+
+
+def test_the_first_consumer_of_all_has_nothing_to_pin_to():
+    """No pinned consumer to name a target, so the message must not offer a
+    truncated empty string as the ref to advance to."""
+    kind, message = classify_pin_divergence({}, linear, ["antibioticmech"])
+
+    assert kind == "rollout"
+    assert "No consumer has pinned yet" in message
+
+
+def test_no_unpinned_consumers_leaves_the_original_rule_untouched():
+    """The default keeps every existing caller and outcome identical."""
+    pins = {"culturemech": OLD, "cellstructuremech": NEW}
+
+    assert classify_pin_divergence(pins, linear) == classify_pin_divergence(
+        pins, linear, []
+    )
+
+
+def test_the_pin_step_hands_the_unpinned_consumers_to_the_classifier():
+    """The classifier can only report what the step passes it. Asserted on the
+    call itself rather than on the word appearing somewhere in the step, since
+    the step also explains the case in a comment -- a substring match would
+    pass on the explanation alone."""
+    run = _pin_step()["run"]
+
+    assert "classify_pin_divergence(pins, is_ancestor, unpinned)" in run
+
+
+def test_the_pin_step_does_not_read_a_missing_pin_with_check_true():
+    """A consumer that has not vendored yet has no pin file. `git show` on it
+    exits nonzero, so reading it with check=True raises before the classifier
+    is reached. The step must test existence first."""
+    run = _pin_step()["run"]
+    probe = 'cat-file", "-e", f"HEAD:{pin_path}"'
+
+    assert probe in run, "the step must probe for the pin before reading it"
+    assert run.index(probe) < run.index('"show", f"HEAD:{pin_path}"')
