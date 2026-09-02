@@ -30,13 +30,20 @@ from typing import Any, Iterable, Iterator, Sequence
 
 import yaml
 
-# The pure-Python parser, deliberately. `CSafeLoader` is ~16x faster (2,129
-# records a second against 134) and swapping to it passed every test on macOS
-# and failed fourteen of them on Linux CI: every corpus test found zero records,
-# and a ParserError escaped an `except yaml.YAMLError` that catches it here.
-# That difference is unexplained and unreproducible on this machine, and a
-# parser that behaves differently by platform is not something to ship for a
-# speed-up. #233 keeps the measurement and the evidence.
+from kg_microbe_corpus.loader import safe_loader, soundness
+
+# The fastest parser that behaves correctly *here*, decided by trying it once at
+# import (#233, #263). CSafeLoader is ~16x faster -- 2,129 records a second
+# against 134, roughly 77 minutes down to 7 across ProteinTraitsMech's corpus --
+# and on some Linux builds it is broken two ways at once: a valid document
+# raises ConstructorError, and a parse error is raised with a class named
+# YAMLError that `except yaml.YAMLError` does not catch.
+#
+# #233 declined to ship the speed-up because that difference was unexplained.
+# #263 explained it and reproduced it, and `loader.judge` now probes both
+# failure modes at import, so the choice is made per platform rather than
+# assumed. The `except yaml.YAMLError` below stays correct precisely because
+# judge's second probe refuses any loader whose parse errors escape it.
 
 __all__ = [
     "CorpusError",
@@ -81,6 +88,19 @@ class CorpusReport:
     by_glob: dict[str, int] = field(default_factory=dict)
     fields: dict[str, FieldStats] = field(default_factory=dict)
     sampled: bool = False
+
+    def parser(self) -> tuple[str, str]:
+        """Which parser read this corpus, and why that one.
+
+        Deliberately not in `as_dict()`. The parser is a fact about the machine,
+        not about the corpus, and putting it in the artifact would make two
+        identical corpora diff between a Linux runner and a laptop -- which is
+        the property the docstring below exists to protect. #233 asks that a run
+        taking minutes on one machine and an hour on another say why; it says so
+        on stderr, where a person reads it, rather than in the diffable body.
+        """
+        sound, why = soundness()
+        return ("CSafeLoader" if sound else "SafeLoader"), why
 
     def as_dict(self) -> dict[str, Any]:
         """Deterministic JSON: sorted keys, no timestamps, no absolute paths.
@@ -182,7 +202,9 @@ def iter_records(
         paths = paths[:sample]
     for path in paths:
         try:
-            yield path, yaml.safe_load(path.read_text(encoding="utf-8"))
+            yield path, yaml.load(  # noqa: S506 - loader is judged, not guessed
+                path.read_text(encoding="utf-8"), Loader=safe_loader()
+            )
         except (OSError, yaml.YAMLError):
             yield path, None
 
