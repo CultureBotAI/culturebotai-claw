@@ -111,6 +111,20 @@ skills:
 # Mechs those are -- from the manifest, so the set cannot drift the way a list
 # written here would the moment a Mech gained or lost the capability.
 canonical:
+  next-tasks:
+    capability: testing
+    reason: >-
+      Four of the five Mechs that carry this skill have byte-identical
+      reconcile commands and byte-identical convention bullets; CommunityMech
+      has drifted one bullet. Those two blocks are the shared part, and they
+      are what the canonical regions cover.
+
+      Everything else in this skill is deliberately NOT canonical. The traps
+      section is the reason anyone reads it -- CultureMech's two data surfaces,
+      TraitMech's upstream-blocked default -- and a template that rendered over
+      them would leave five adapters that look unified and have lost the only
+      content worth having (#293). So the template marks two regions and leaves
+      the rest to the Mech, which is what canonical:begin/end is for.
   review-open-issues:
     capability: testing
     reason: >-
