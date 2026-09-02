@@ -527,3 +527,77 @@ def test_a_drifted_adapter_is_not_told_it_never_adopted():
 
     assert "absent from the adapter: r" in str(caught.value)
     assert "has not adopted" not in str(caught.value)
+
+
+# --------------------------------------------------------------------------
+# #293 / Phase 4: next-tasks is the first PARTLY canonical skill.
+
+NEXT_TASKS_DRIFTED = """---
+name: next-tasks
+---
+# Next Tasks (backlog assessment + maintenance)
+
+## What it does
+
+CommunityMech's own framing, which no other Mech has.
+
+### Step 1 — Reconcile
+
+<!-- canonical:begin reconcile-commands -->
+```bash
+# Read the backlog, then check it against what shipped.
+sed -n '1,400p' NEXT_TASKS.md
+```
+<!-- canonical:end reconcile-commands -->
+
+Traps that only bite here: the KGX export is generated, so a glob over it
+matches nothing in a fresh checkout (#686).
+
+## Conventions this skill enforces
+
+<!-- canonical:begin conventions -->
+- **Honest classification**: don't hide upstream-blocked items either — they
+  explain gaps.
+<!-- canonical:end conventions -->
+
+## Related files
+"""
+
+
+def test_next_tasks_is_declared_canonical():
+    assert "next-tasks" in load_canonical()
+
+
+def test_the_canonical_next_tasks_marks_only_what_is_shared():
+    """Four of the five Mechs carrying this skill have byte-identical reconcile
+    commands and convention bullets. Everything else -- the traps, the CI
+    gates, what to use instead -- is per-Mech and must stay outside the
+    regions, or unifying the skill would delete the reason to read it."""
+    text = canonical_text("next-tasks")
+
+    assert set(canonical_regions(text)) == {"reconcile-commands", "conventions"}
+
+
+def test_splicing_updates_the_regions_and_leaves_everything_else(tmp_path):
+    """Driven by an adapter whose regions have DRIFTED from the canonical, not
+    one that already matches.
+
+    TraitMech's real file is byte-identical to the canonical in both regions,
+    so splicing into it is a no-op -- and a no-op proves nothing about whether
+    the regions would update. The fixture below carries CommunityMech's actual
+    drift: an extra comment in the command block and a reworded bullet.
+    """
+    out = render_adapter(
+        canonical_text("next-tasks"), "communitymech", existing=NEXT_TASKS_DRIFTED
+    )
+
+    # The regions converge on the canonical.
+    assert "# Read the backlog, then check it against what shipped." not in out
+    assert "they\n  explain gaps" not in out
+    assert "git log --oneline -20" in out
+
+    # Everything outside them is untouched.
+    assert "CommunityMech's own framing, which no other Mech has." in out
+    assert "a glob over it\nmatches nothing in a fresh checkout (#686)" in out
+    assert "## What it does" in out
+    assert "{{" not in out
