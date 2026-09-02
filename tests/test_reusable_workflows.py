@@ -361,3 +361,22 @@ def test_the_recipe_list_arrives_by_environment_not_interpolation():
 
     assert step["env"]["EXTRA_RECIPES"] == "${{ inputs.extra-enforce-recipes }}"
     assert "${{ inputs.extra-enforce-recipes }}" not in step["run"]
+
+
+def test_uv_version_defaults_to_empty_which_is_setup_uvs_own_default():
+    """#306. CommunityMech pins uv 0.12.5 in all six of its workflows; the
+    three current callers let it float.
+
+    Empty is setup-uv's own default for `version` -- its action.yml declares
+    `default: ""`, documented as "the version in pyproject.toml or latest" --
+    so passing "" is identical to omitting the input, and the current callers
+    cannot be affected by this. Asserted rather than assumed, because a
+    non-empty default here would silently repin three repositories.
+    """
+    inputs = _reusable()["workflow_call"]["inputs"]
+
+    assert inputs["uv-version"]["default"] == ""
+    assert inputs["uv-version"]["required"] is False
+
+    install = {s.get("name", ""): s for s in _reusable_steps()}["Install uv"]
+    assert install["with"]["version"] == "${{ inputs.uv-version }}"
