@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 
+
 def classify_pin_divergence(
     pins: Mapping[str, str],
     is_ancestor: Callable[[str, str], bool],
