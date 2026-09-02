@@ -12,7 +12,7 @@ made, which is what happened in #257.
 
 from __future__ import annotations
 
-from kg_microbe_governance.fleet_audit import classify_pin_divergence
+from kg_microbe_governance.pin_divergence import classify_pin_divergence
 
 # A linear history: OLD -> MID -> NEW.
 OLD, MID, NEW = "a" * 40, "b" * 40, "c" * 40
@@ -101,10 +101,14 @@ def test_the_audit_classifies_rather_than_comparing_pins_itself():
     assert "classify_pin_divergence" in _pin_step()["run"]
 
 
-def test_the_pin_step_runs_under_the_trusted_project_interpreter():
-    """It imports the governance package now. A bare `python` would raise
-    ImportError at the moment the audit decides whether the fleet is
-    converged -- caught before pushing, not after."""
+def test_the_pin_step_reads_the_classifier_from_the_candidate_checkout():
+    """fleet/trusted-claw is the PR base commit by design, so a function this
+    PR adds does not exist there. Importing from it failed on the very PR that
+    added it -- and always would have. Caught by CI, not by me."""
     run = _pin_step()["run"]
 
-    assert "uv run --project fleet/trusted-claw python -" in run
+    assert "PYTHONPATH=control/src python -" in run, (
+        "the classifier must come from the candidate checkout; trusted-claw is "
+        "the PR base commit, so a function this PR adds is not there"
+    )
+    assert "uv run --project fleet/trusted-claw python -" not in run

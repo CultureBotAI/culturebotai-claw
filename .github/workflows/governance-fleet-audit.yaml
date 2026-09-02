@@ -98,11 +98,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # The trusted package's interpreter, not a bare python: this step now
-          # imports classify_pin_divergence from it. A bare python would raise
-          # ImportError at the point the audit is deciding whether the fleet is
-          # converged, which is the worst possible place for a surprise.
-          uv run --project fleet/trusted-claw python - <<'PY'
+          # PYTHONPATH is the CANDIDATE checkout, not fleet/trusted-claw.
+          # trusted-claw is the PR's base commit by design, so a function added
+          # by this PR does not exist there -- importing it from trusted-claw
+          # fails on the very PR that adds it, and always would.
+          #
+          # Reading it from `control` is not a weakening: for a pull_request the
+          # workflow file itself is the candidate's, so this step's logic was
+          # already candidate-controlled. What the trusted checkout protects is
+          # the audit and install code a downstream pin selects, and the
+          # classifier is neither. It imports only the standard library, so no
+          # sync is needed before the pin comparison runs.
+          PYTHONPATH=control/src python - <<'PY'
           from __future__ import annotations
 
           import os
@@ -132,7 +139,7 @@ jobs:
           # that could not fail. Both outcomes are still failures -- the
           # contract is one shared pin -- but the message now says whether the
           # fleet is mid-rollout or genuinely drifted (#267).
-          from kg_microbe_governance.fleet_audit import classify_pin_divergence
+          from kg_microbe_governance.pin_divergence import classify_pin_divergence
 
           trusted = workspace / "fleet/trusted-claw"
 
