@@ -131,7 +131,7 @@ def test_the_fleet_size_the_prose_describes_is_the_manifest_size():
     """Pins the number the accurate prose uses to the manifest, so a Mech added
     or removed makes the documentation demonstrably wrong rather than quietly
     so."""
-    assert len(load_fleet_manifest().mechs) == 6
+    assert len(load_fleet_manifest().mechs) == 7
 
 
 def test_no_module_hardcodes_the_fleet_size_as_a_constant():

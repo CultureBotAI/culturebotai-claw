@@ -40,6 +40,13 @@ repositories:
     task_runner: just
     description: "Ontology-derived protein-trait corpus"
 
+  antibioticmech:
+    path: ${ANTIBIOTICMECH_ROOT}
+    type: python
+    package_manager: uv
+    task_runner: just
+    description: "Antimicrobial compounds: mechanisms, resistance, chemical structure"
+
   cellstructuremech:
     path: ${CELLSTRUCTUREMECH_ROOT}
     type: python

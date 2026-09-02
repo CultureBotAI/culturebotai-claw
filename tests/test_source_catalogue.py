@@ -328,7 +328,7 @@ def test_the_capability_declares_who_has_a_catalogue():
     manifest = load_fleet_manifest()
     enabled = set(manifest.with_capability("source_catalogue"))
 
-    assert enabled == {"traitmech", "proteintraitsmech"}
+    assert enabled == {"traitmech", "proteintraitsmech", "antibioticmech"}
     for key, mech in manifest.mechs.items():
         capability = mech.capabilities["source_catalogue"]
         if key not in enabled:

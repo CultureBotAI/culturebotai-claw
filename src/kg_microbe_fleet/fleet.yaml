@@ -729,6 +729,140 @@ mechs:
         correct value to declare and writing a record back would
         reformat it. Measured in #187.
 
+  antibioticmech:
+    # Joined 2026-09-02 (#279, AntibioticMech#29). Every capability decision
+    # below was measured against this repository's tracked files on origin/main
+    # at that date; each disabled/not_applicable status names what would flip it.
+    display_name: AntibioticMech
+    github: CultureBotAI/AntibioticMech
+    environment_variable: ANTIBIOTICMECH_ROOT
+    package_path: src/antibioticmech
+    schema_paths:
+      - src/antibioticmech/schema/antibioticmech.yaml
+    record_globs:
+      - data/antibiotics/**/*.yaml
+    vendored_role: consumer
+    capabilities:
+      # These arrive with the vendoring PR this declaration obliges
+      # (AntibioticMech#29). Enabled rather than disabled-with-an-absent-claim
+      # (#255): a claim that the files are absent is true only until that lands,
+      # and the fleet audit reports the real gap either way.
+      id_label_validation:
+        status: enabled
+      curation_history:
+        status: enabled
+      vendored_sync:
+        status: enabled
+      # `validate-strict`, `test`, `lint`, `gen-schema` and `qc` are all
+      # recipes in this repository's justfile, and main.yaml runs qc on 3.10
+      # and 3.12.
+      strict_validation:
+        status: enabled
+      schema_sync:
+        status: enabled
+      testing:
+        status: enabled
+      documentation:
+        status: enabled
+      release_management:
+        status: enabled
+      build_coordination:
+        status: enabled
+      refactoring:
+        status: enabled
+      coordination_hooks:
+        status: enabled
+      deep_research:
+        status: disabled
+        reason: >-
+          Has research-antibiotic, research-entity and deep-research-canary
+          recipes and a research/ tree, but no conf/deep_research_provider.yaml
+          -- the profile every deep-research Mech declares and the contract
+          resolves. Enabled on the recipes alone this would assert a profile
+          that does not exist; the recipes are a research route, not the
+          declared provider contract.
+        reason_claims:
+          present:
+            - research
+          absent:
+            - conf/deep_research_provider.yaml
+      edison_key_discovery:
+        status: not_applicable
+        reason: >-
+          Research runs through this repository's own research-antibiotic and
+          research-entity recipes; it uses no Edison provider key.
+      environment_coverage:
+        status: not_applicable
+        reason: >-
+          Environment coverage compares culture media, ingredients and
+          microbial communities. An antimicrobial-compound corpus is not an
+          environment inventory input.
+      unmapped_inventory_input:
+        status: not_applicable
+        reason: >-
+          The unmapped inventory reconciles ingredient names across media
+          corpora; antimicrobial compounds are not one of its sources.
+      knowledge_gap_scan:
+        status: disabled
+        reason: >-
+          Records do not carry the shared Discussion section the scan reads,
+          and this repository is not in the knowledge-gap-scan workflow matrix.
+          Enable once records carry it.
+      source_catalogue:
+        status: enabled
+      corpus_statistics:
+        status: enabled
+        settings:
+          fields:
+            - antimicrobial_class
+            - grounding_status
+      source_queue:
+        status: enabled
+        settings:
+          queue_path: curation/source_queue.tsv
+      site_contract:
+        status: enabled
+        settings:
+          site_path: pages
+      page_budgets:
+        status: disabled
+        reason: >-
+          Serves tracked pages under pages/ from main via GitHub Pages and
+          declares no size or file-count budgets, so nothing watches them grow
+          -- 2,956 files and 30.1 MB measured at admission (#230). Adopting them
+          applies here; the limits are this repository's to set.
+        reason_claims:
+          present:
+            - pages
+      writer_audit:
+        status: disabled
+        reason: >-
+          Has no scripts/audit_writers.py, so there is no drift between writer
+          copies to remove yet. Adopting it applies once more writers exist.
+        reason_claims:
+          absent:
+            - scripts/audit_writers.py
+      sssom_export:
+        status: disabled
+        reason: >-
+          Records carry ChEBI and ARO identifiers inline rather than through a
+          mapping file. Adopting SSSOM applies once a mapping product exists.
+      kgx_export:
+        status: disabled
+        reason: >-
+          No exporter and no graph product yet; adopting KGX applies once the
+          corpus is consumed as a graph.
+    # Measured, not copied (#187): PyYAML's default width round-trips this
+    # corpus byte-for-byte over ALL 2,909 records, not a sample. Widths 100,
+    # 120 and 4096 score 8%, 8% and 7%, so the value is the corpus's, not a
+    # convention borrowed from a sibling.
+    serialization:
+      verified: true
+      options:
+        default_flow_style: false
+        sort_keys: false
+        allow_unicode: true
+        width: 80
   cellstructuremech:
     # Joined 2026-08-30 (CellStructureMech#47). Capability decisions below were
     # measured against the repository's tracked files at that date; every
