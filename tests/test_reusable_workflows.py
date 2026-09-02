@@ -290,3 +290,74 @@ def test_the_manual_bust_still_works():
         "the first restore-key must include the bust, or bumping it restores "
         "the cache it was bumped to escape"
     )
+
+
+# --------------------------------------------------------------------------
+# #303: domain gates that belong to one Mech's job, not to every Mech.
+
+def test_extra_enforce_recipes_defaults_to_nothing():
+    """Three Mechs call this workflow with no domain gates. A non-empty default
+    would invent a recipe none of them has."""
+    inputs = _reusable()["workflow_call"]["inputs"]
+
+    assert inputs["extra-enforce-recipes"]["default"] == ""
+    assert inputs["extra-enforce-recipes"]["required"] is False
+
+
+def test_the_domain_gates_run_after_the_main_one():
+    """`validate-products` is the shared contract; the Engine A gates are
+    narrower and only meaningful once it holds."""
+    names = [s.get("name", "") for s in _reusable_steps()]
+
+    assert names.index("Enforce id-label correspondence") < names.index(
+        "Enforce domain-specific id-label gates"
+    )
+
+
+def test_the_domain_step_is_skipped_when_no_recipes_are_given():
+    """Otherwise every caller pays a step that iterates an empty string."""
+    step = {s.get("name", ""): s for s in _reusable_steps()}[
+        "Enforce domain-specific id-label gates"
+    ]
+
+    assert step["if"] == "inputs.extra-enforce-recipes != ''"
+
+
+def test_a_failing_domain_gate_fails_the_build():
+    """The whole point. A loop that swallowed a non-zero exit would report a
+    domain gate as passing -- which is the silence CommunityMech's own comment
+    records these steps having been lost to once already, for months.
+
+    `set -euo pipefail` is what makes the pipeline propagate it; verified
+    against a command returning non-zero, not an explicit `exit`.
+    """
+    run = {s.get("name", ""): s for s in _reusable_steps()}[
+        "Enforce domain-specific id-label gates"
+    ]["run"]
+
+    assert "set -euo pipefail" in run
+
+    # The property is that the RECIPE INVOCATION has no fallback -- not that
+    # the script contains no `||` anywhere. The first version of this asserted
+    # the latter and failed on `[ -n "$recipe" ] || continue`, which skips
+    # blank lines and swallows nothing. Asserting the character sequence
+    # instead of the behaviour is the same adjacent-check this file keeps
+    # finding elsewhere.
+    invocation = [line.strip() for line in run.splitlines() if line.strip().startswith("just ")]
+    assert invocation, "no `just` invocation in the step"
+    for line in invocation:
+        assert "||" not in line, f"a fallback would swallow the failure: {line}"
+        assert not line.endswith("|| true"), line
+
+    assert "continue" in run, "blank lines must be skipped, not run as a recipe"
+
+
+def test_the_recipe_list_arrives_by_environment_not_interpolation():
+    """`just ${{ inputs.extra-enforce-recipes }}` inline would let a caller's
+    input be parsed as shell. It is passed through env: instead."""
+    step = {s.get("name", ""): s for s in _reusable_steps()}[
+        "Enforce domain-specific id-label gates"
+    ]
+
+    assert step["env"]["EXTRA_RECIPES"] == "${{ inputs.extra-enforce-recipes }}"
+    assert "${{ inputs.extra-enforce-recipes }}" not in step["run"]
