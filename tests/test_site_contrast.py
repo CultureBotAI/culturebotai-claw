@@ -121,9 +121,15 @@ def test_both_dark_declarations_are_judged_independently(tmp_path):
     assert "dark (data-theme)" not in themes
 
 
-def test_a_non_literal_token_is_skipped_rather_than_crashing(tmp_path):
-    """`--line: rgba(0,0,0,.12)` is real and shipped. A rule that raises on it
-    would be disabled the first time it met a live stylesheet."""
+def test_a_non_literal_token_is_reported_rather_than_crashing_or_skipped(tmp_path):
+    """`--line: rgba(0,0,0,.12)` is real and shipped, so a rule that raises on a
+    non-literal would be disabled the first time it met a live stylesheet.
+
+    It must not be silently skipped either. This test previously asserted the
+    silence -- that a non-literal produced no finding at all -- which is the
+    behaviour #288 removed: a pairing named in the table and then skipped looks
+    examined and is not.
+    """
     light = {
         "--accent": "rgba(0,0,0,.5)",
         "--page": "#E4DED3",
@@ -131,7 +137,10 @@ def test_a_non_literal_token_is_skipped_rather_than_crashing(tmp_path):
         "--fg": "#1a1d21",
     }
 
-    assert [f.detail for f in check_stylesheet(_stylesheet(tmp_path, light))] == []
+    findings = check_stylesheet(_stylesheet(tmp_path, light))
+
+    assert {f.code for f in findings} == {"UNJUDGEABLE_VALUE"}
+    assert all("--accent" in f.detail for f in findings)
 
 
 def test_a_stylesheet_with_no_root_block_says_so(tmp_path):
@@ -187,3 +196,161 @@ def test_a_later_declaration_wins_as_it_does_in_a_browser(tmp_path):
     )
 
     assert check_stylesheet(path) == []
+
+
+def test_a_colour_token_no_pairing_names_is_reported(tmp_path):
+    """#288. The pairing table is hand-written, so it is only as complete as
+    whoever last edited it -- and a token it never names is not judged, which
+    reads exactly like a pass. AntibioticMech sets four tokens as `color:` that
+    the original six pairings did not cover.
+    """
+    path = tmp_path / "style.css"
+    path.write_text(
+        ":root { --accent: #245a8d; --page: #ffffff; --card: #ffffff;\n"
+        "        --invented: #767676; }\n"
+        ".thing { color: var(--invented); }\n",
+        encoding="utf-8",
+    )
+
+    findings = check_stylesheet(path)
+
+    assert [f.code for f in findings] == ["UNEXAMINED_FOREGROUND"]
+    assert "--invented" in findings[0].detail
+
+
+def test_a_token_the_table_names_is_not_reported_as_unexamined(tmp_path):
+    path = tmp_path / "style.css"
+    path.write_text(
+        ":root { --accent: #245a8d; --page: #ffffff; --card: #ffffff; }\n"
+        "a { color: var(--accent); }\n",
+        encoding="utf-8",
+    )
+
+    assert check_stylesheet(path) == []
+
+
+def test_a_token_carrying_its_own_ground_is_judged_against_that_ground(tmp_path):
+    """--warn is set beside `background: var(--warn-soft)` in every rule that
+    uses it. Judging it against --page would report a failure on a surface it
+    never sits on -- the mirror of the defect this module exists for, and a
+    mistake I made by hand while reviewing AntibioticMech#147.
+    """
+    path = tmp_path / "style.css"
+    path.write_text(
+        ":root { --accent: #245a8d; --page: #E4DED3; --card: #ffffff;\n"
+        # 4.43:1 on --page, which would fail; 5.43:1 on --warn-soft, which is
+        # where it is actually painted.
+        "        --warn: #8a5a00; --warn-soft: #fdf4e3; }\n"
+        ".pill.warn { background: var(--warn-soft); color: var(--warn); }\n",
+        encoding="utf-8",
+    )
+
+    assert check_stylesheet(path) == []
+
+
+def test_the_alias_spellings_are_judged_on_every_surface(tmp_path):
+    """A Mech's token vocabulary is its own: CellStructureMech writes --ink
+    where AntibioticMech writes --fg. A table naming only one spelling examines
+    nothing on the other half of the fleet.
+
+    --page and --card differ here on purpose. An earlier version of this test
+    set both to white, so --ink passed on either and dropping the --ink/--page
+    pairing changed nothing -- a fixture that erased the distinction it was
+    asserting, which is #286 for the third time.
+    """
+    path = tmp_path / "style.css"
+    path.write_text(
+        # --ink clears AA on the white card (7.00) and fails on the mid-grey
+        # ground (1.62), so the --page pairing is the only thing that sees it.
+        ":root { --accent: #000000; --page: #7a7a7a; --card: #ffffff;\n"
+        "        --ink: #595959; --bg: #ffffff; }\n"
+        "body { color: var(--ink); }\n"
+        ".btn { background: var(--accent); color: var(--bg); }\n",
+        encoding="utf-8",
+    )
+
+    findings = check_stylesheet(path)
+
+    assert [f.code for f in findings] == ["BELOW_AA"]
+    assert "--ink" in findings[0].detail and "--page" in findings[0].detail
+
+
+def test_a_token_that_aliases_another_is_followed(tmp_path):
+    """CellStructureMech declares `--fg: var(--ink)`. A resolver reading only
+    literals judged neither pairing and reported the stylesheet clean by
+    examining nothing -- the silence this module exists to break.
+
+    Asserts the specific finding rather than the whole list: a minimal palette
+    trips other pairings too, and pinning the list would make this test about
+    the fixture instead of about alias-following.
+    """
+    path = tmp_path / "style.css"
+    path.write_text(
+        ":root { --ink: #767676; --fg: var(--ink);\n"
+        "        --page: #ffffff; --card: #8a8a8a; --accent: #245a8d; }\n",
+        encoding="utf-8",
+    )
+
+    details = [f.detail for f in check_stylesheet(path)]
+
+    # #767676 on #8a8a8a is 1.34:1, reachable only by following --fg -> --ink.
+    assert any("--fg #767676 on --card #8a8a8a" in d for d in details), details
+
+
+def test_an_alias_cycle_terminates_instead_of_hanging(tmp_path):
+    """A cycle must end. It cannot be judged, so it is reported as such rather
+    than silently skipped."""
+    path = tmp_path / "style.css"
+    path.write_text(
+        ":root { --fg: var(--ink); --ink: var(--fg);\n"
+        "        --page: #ffffff; --card: #ffffff; --accent: #245a8d; }\n",
+        encoding="utf-8",
+    )
+
+    codes = {f.code for f in check_stylesheet(path)}
+
+    assert codes == {"UNJUDGEABLE_VALUE"}
+
+
+def test_a_declared_pairing_that_cannot_be_judged_says_so(tmp_path):
+    """A pairing named in the table but skipped because a value is not a
+    literal looks examined and is not. `rgb(23 32 42 / .94)` cannot be judged
+    without the backdrop it is composited over (AntibioticMech#148)."""
+    path = tmp_path / "style.css"
+    path.write_text(
+        ":root { --accent: #245a8d; --page: #ffffff;\n"
+        "        --card: rgb(23 32 42 / .94); }\n",
+        encoding="utf-8",
+    )
+
+    codes = {f.code for f in check_stylesheet(path)}
+
+    assert "UNJUDGEABLE_VALUE" in codes
+
+
+def test_an_absent_token_is_not_reported_as_unjudgeable(tmp_path):
+    """Absence differs from a value that cannot be read. A Mech that declares
+    no --page has not failed to state one readably."""
+    path = tmp_path / "style.css"
+    path.write_text(
+        ":root { --accent: #245a8d; --card: #ffffff; }\n",
+        encoding="utf-8",
+    )
+
+    assert check_stylesheet(path) == []
+
+
+def test_the_page_ground_is_found_under_either_spelling(tmp_path):
+    """CellStructureMech paints `body{background:var(--pastel-b)}` and declares
+    no --page at all, so every page-ground pairing resolved to nothing there --
+    and the stylesheet was reported clean without its body ground examined."""
+    path = tmp_path / "style.css"
+    path.write_text(
+        ":root { --ink: #767676; --pastel-b: #8a8a8a;\n"
+        "        --card: #ffffff; --accent: #245a8d; }\n",
+        encoding="utf-8",
+    )
+
+    details = [f.detail for f in check_stylesheet(path)]
+
+    assert any("--ink #767676 on --pastel-b #8a8a8a" in d for d in details), details

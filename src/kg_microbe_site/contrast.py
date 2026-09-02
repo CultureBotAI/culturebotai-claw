@@ -45,9 +45,44 @@ PAIRINGS: tuple[tuple[str, str, str], ...] = (
     ("--accent", "--card", "link or button label on a card"),
     ("--fg", "--page", "body text on the page ground"),
     ("--fg", "--card", "body text on a card"),
+    ("--muted", "--page", "secondary text on the page ground"),
     ("--muted", "--card", "secondary text on a card"),
     ("--card", "--accent", "label reversed out of an accent fill"),
+    # Aliases. A Mech's token vocabulary is its own: CellStructureMech writes
+    # --ink where AntibioticMech writes --fg, and AntibioticMech reverses --bg
+    # rather than --card out of an accent fill. Naming both spellings is what
+    # keeps the table from silently examining nothing on half the fleet.
+    ("--ink", "--page", "body text on the page ground"),
+    ("--ink", "--card", "body text on a card"),
+    ("--bg", "--accent", "label reversed out of an accent fill"),
+    # CellStructureMech has no --page: it paints `body{background:var(--pastel-b)}`
+    # directly. Every page-ground pairing above silently resolved to nothing
+    # there, so the check reported that stylesheet clean while never examining
+    # the surface its body text actually sits on.
+    ("--accent", "--pastel-b", "link or button label on the page ground"),
+    ("--fg", "--pastel-b", "body text on the page ground"),
+    ("--ink", "--pastel-b", "body text on the page ground"),
+    ("--muted", "--pastel-b", "secondary text on the page ground"),
+    # Tokens that carry their own ground. Each is set beside an explicit
+    # background in every rule that uses it, so judging it against --page would
+    # report a failure on a surface it never sits on -- the mirror of the
+    # defect this module exists for (#288).
+    ("--warn", "--warn-soft", "warning text on its own ground"),
+    ("--danger", "--page", "error text on the page ground"),
+    ("--danger", "--card", "error text on a card"),
+    # Deliberately NOT here: --tooltip-fg on --tooltip-bg, which
+    # AntibioticMech#148 introduces. Its ground is `rgb(23 32 42 / .94)`, and a
+    # contrast ratio against a translucent colour is undefined without knowing
+    # what is behind it. Naming the pairing would mark the token covered while
+    # resolve() silently skipped it -- worse than leaving it reported as
+    # unexamined, which is what happens now and is the honest answer until
+    # either the token becomes opaque or this module composites properly.
 )
+
+# Foregrounds the table knows about, derived rather than restated.
+_EXAMINED_FOREGROUNDS = frozenset(foreground for foreground, _bg, _why in PAIRINGS)
+
+_COLOUR_DECLARATION = re.compile(r"(?<![\w-])color\s*:\s*var\(\s*(--[\w-]+)")
 
 # Where a stylesheet states each theme. The dark values are declared twice by
 # design -- once for the OS preference, once for the toggle -- so both are
@@ -120,17 +155,44 @@ def _block(css: str, pattern: str) -> dict[str, str] | None:
     return merged if found else None
 
 
+_ALIAS = re.compile(r"^var\(\s*(--[\w-]+)\s*\)$")
+
+# A token may alias another rather than state a colour. CellStructureMech
+# declares `--fg: var(--ink)` and `--bg: var(--card)`, so a resolver that reads
+# only literals judged neither -- and reported the stylesheet clean by
+# examining nothing, which is the silence this module exists to break.
+_MAX_ALIAS_DEPTH = 8
+
+
 def resolve(tokens: dict[str, str], name: str, base: dict[str, str]) -> str | None:
-    """A token's literal colour, falling back to the light block.
+    """A token's literal colour, following aliases and falling back to light.
 
     A dark block redefines only what changes, so an unredefined token keeps its
     light value -- reading the dark block alone would report tokens as missing
     that are simply inherited.
+
+    `var(--other)` indirection is followed, bounded so a cycle terminates rather
+    than hanging. Anything that is not ultimately a hex literal -- an `rgb()`
+    with alpha, a colour function -- returns None, because a ratio against a
+    translucent value is undefined without the backdrop.
     """
-    value = tokens.get(name) or base.get(name)
-    if value is None or not _HEX.match(value):
-        return None
-    return value
+    seen: set[str] = set()
+    current = name
+    for _ in range(_MAX_ALIAS_DEPTH):
+        if current in seen:
+            return None
+        seen.add(current)
+        value = tokens.get(current) or base.get(current)
+        if value is None:
+            return None
+        value = value.strip()
+        if _HEX.match(value):
+            return value
+        alias = _ALIAS.match(value)
+        if alias is None:
+            return None
+        current = alias.group(1)
+    return None
 
 
 def check_stylesheet(
@@ -151,6 +213,23 @@ def check_stylesheet(
         ]
 
     findings: list[ContrastFinding] = []
+
+    # A token set as `color:` that no pairing names is not judged at all, and
+    # silence reads exactly like a pass. The table is hand-written, so it can
+    # only be as complete as whoever last edited it -- this reports the gap
+    # rather than leaving it to be noticed (#288).
+    unexamined = sorted(
+        set(_COLOUR_DECLARATION.findall(css)) - _EXAMINED_FOREGROUNDS
+    )
+    findings.extend(
+        ContrastFinding(
+            "UNEXAMINED_FOREGROUND", path.name, "any",
+            f"{token} is set as `color:` but no pairing says what it sits on, "
+            f"so its contrast is never judged",
+        )
+        for token in unexamined
+    )
+
     for theme, pattern in THEMES:
         tokens = light if theme == "light" else _block(css, pattern)
         if tokens is None:
@@ -159,6 +238,26 @@ def check_stylesheet(
             fg = resolve(tokens, fg_name, light)
             bg = resolve(tokens, bg_name, light)
             if fg is None or bg is None:
+                # Declared in the table and skipped anyway, because a value is
+                # absent or is not a literal colour -- `rgb(23 32 42 / .94)`
+                # cannot be judged without the backdrop it is composited over.
+                # Silently continuing here would let a named pairing look
+                # examined while never running, which is the same silence
+                # UNEXAMINED_FOREGROUND exists to break.
+                declared = [
+                    name
+                    for name, value in ((fg_name, fg), (bg_name, bg))
+                    if value is None and (tokens.get(name) or light.get(name))
+                ]
+                if declared:
+                    findings.append(
+                        ContrastFinding(
+                            "UNJUDGEABLE_VALUE", path.name, theme,
+                            f"{description}: {', '.join(declared)} is declared "
+                            f"but is not a literal colour, so this pairing is "
+                            f"never judged",
+                        )
+                    )
                 continue
             ratio = contrast_ratio(fg, bg)
             if ratio < minimum:
