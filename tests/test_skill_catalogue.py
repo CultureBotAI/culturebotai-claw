@@ -30,6 +30,7 @@ from kg_microbe_skills.catalogue import (
     SCOPES,
     CatalogueError,
     applicable_mechs,
+    canonical_regions,
     canonical_text,
     load_canonical,
     load_catalogue,
@@ -383,3 +384,114 @@ def test_the_catalogue_and_templates_are_declared_as_package_data():
         "skills.yaml",
         "canonical/*.md",
     }
+
+# --------------------------------------------------------------------------
+# #293: a skill can be partly canonical. claw owns the marked regions; the
+# rest of the adapter is the Mech's and rendering never touches it.
+
+TEMPLATE = """---
+name: next-tasks
+---
+<!-- canonical:begin workflow -->
+Reconcile the backlog for {{ display_name }} against `{{ github }}`.
+<!-- canonical:end workflow -->
+
+## Traps
+"""
+
+ADAPTER = """---
+name: next-tasks
+---
+<!-- canonical:begin workflow -->
+An older shared workflow.
+<!-- canonical:end workflow -->
+
+## Traps
+Two data surfaces: `data/merge_yaml/**` and `data/normalized_yaml/**`. A fix to
+one is not applied to the other -- PR #98 corrected 1,617 records and #99 was
+needed for the other 1,628.
+"""
+
+
+def test_the_managed_region_is_replaced_and_the_rest_is_not():
+    """The whole point. A template of only manifest values would strip the trap
+    below, which is the reason anyone reads that skill."""
+    out = render_adapter(TEMPLATE, "culturemech", existing=ADAPTER)
+
+    assert "Reconcile the backlog for CultureMech" in out
+    assert "An older shared workflow" not in out
+    assert "PR #98 corrected 1,617 records" in out, "the Mech's own knowledge was lost"
+
+
+def test_rendering_without_an_existing_adapter_emits_the_whole_template():
+    out = render_adapter(TEMPLATE, "culturemech")
+
+    assert "Reconcile the backlog for CultureMech" in out
+    assert "PR #98" not in out
+
+
+def test_a_region_the_adapter_has_never_seen_is_refused():
+    """A template that grew a region cannot be applied without a human deciding
+    where it goes: splicing it in silently would put shared text at whatever
+    position the file happens to allow."""
+    grown = TEMPLATE.replace(
+        "## Traps",
+        "<!-- canonical:begin reporting -->\nNew shared section.\n"
+        "<!-- canonical:end reporting -->\n\n## Traps",
+    )
+
+    with pytest.raises(CatalogueError, match="absent from the adapter: reporting"):
+        render_adapter(grown, "culturemech", existing=ADAPTER)
+
+
+def test_a_region_the_template_dropped_is_refused():
+    """Otherwise the adapter keeps shared text nobody owns any more."""
+    stale = ADAPTER.replace(
+        "## Traps",
+        "<!-- canonical:begin retired -->\nText the template no longer has.\n"
+        "<!-- canonical:end retired -->\n\n## Traps",
+    )
+
+    with pytest.raises(CatalogueError, match="absent from the template: retired"):
+        render_adapter(TEMPLATE, "culturemech", existing=stale)
+
+
+def test_a_template_with_no_regions_refuses_to_splice():
+    """Splicing nothing would return the adapter unchanged and report success."""
+    with pytest.raises(CatalogueError, match="declares no canonical:begin"):
+        render_adapter("# plain\n{{ display_name }}\n", "culturemech", existing=ADAPTER)
+
+
+def test_an_unbalanced_marker_is_caught_rather_than_dropped():
+    """An end marker whose name does not match its begin leaves the region
+    unmatched. Comparing name sets is what turns that into an error instead of
+    a silently unmanaged block."""
+    broken = TEMPLATE.replace("canonical:end workflow", "canonical:end wrokflow")
+
+    with pytest.raises(CatalogueError):
+        render_adapter(broken, "culturemech", existing=ADAPTER)
+
+
+def test_placeholders_inside_a_region_are_still_filled():
+    out = render_adapter(TEMPLATE, "traitmech", existing=ADAPTER)
+
+    assert "TraitMech" in out and "CultureBotAI/TraitMech" in out
+    assert "{{" not in out
+
+
+def test_a_repeated_region_name_is_refused():
+    """Keyed by name, a second region with the same name overwrites the first,
+    and splicing then updates one copy and leaves the other stale -- a file
+    that looks managed and is half managed. Found reviewing #294; before the
+    fix this rendered an adapter whose first block still read `old one`.
+    """
+    twice = (
+        "<!-- canonical:begin s -->\nA\n<!-- canonical:end s -->\n"
+        "<!-- canonical:begin s -->\nB\n<!-- canonical:end s -->\n"
+    )
+
+    with pytest.raises(CatalogueError, match="declared more than once"):
+        canonical_regions(twice)
+
+    with pytest.raises(CatalogueError, match="declared more than once"):
+        render_adapter(twice, "culturemech", existing=twice)

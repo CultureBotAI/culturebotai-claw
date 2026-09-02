@@ -48,6 +48,25 @@ SCOPES = ("claw", "fleet", "domain")
 
 _PLACEHOLDER = re.compile(r"\{\{\s*([a-z_]+)\s*\}\}")
 
+# A canonical skill owns the text between these markers and nothing else.
+#
+# #293. The renderer can fill seven values, all repository identity. That was
+# enough for `review-open-issues`, whose only per-Mech content IS identity, and
+# it is not enough for anything else: every Mech declaring `next-tasks` has the
+# same four-step skeleton and per-Mech traps that are the reason to read it --
+# CultureMech's two data surfaces, TraitMech's upstream-blocked default. A
+# template of only manifest values would render five adapters with every trap
+# stripped, which is worse than five divergent copies because it looks unified.
+#
+# So a skill can be PARTLY canonical. claw owns the marked regions; everything
+# outside them belongs to the Mech and is never touched.
+_REGION = re.compile(
+    r"<!--\s*canonical:begin\s+([a-z0-9-]+)\s*-->"
+    r"(.*?)"
+    r"<!--\s*canonical:end\s+\1\s*-->",
+    re.S,
+)
+
 
 class CatalogueError(RuntimeError):
     """The catalogue and the skills on disk disagree, or an entry is malformed."""
@@ -197,13 +216,21 @@ def skill_placeholders(text: str) -> set[str]:
 
 
 def render_adapter(
-    text: str, mech_key: str, manifest: FleetManifest | None = None
+    text: str,
+    mech_key: str,
+    manifest: FleetManifest | None = None,
+    *,
+    existing: str | None = None,
 ) -> str:
     """Fill a canonical skill's placeholders from one Mech's manifest entry.
 
     An unknown placeholder raises rather than being left in the output: an
     adapter shipped with a literal `{{ typo }}` in it reads as a rendering that
     worked, and the reader has no way to tell it did not.
+
+    With `existing`, only the `canonical:begin/end` regions are replaced and the
+    rest of that adapter is preserved -- the Mech keeps its own knowledge, claw
+    owns the shared skeleton (#293).
     """
     manifest = manifest or load_fleet_manifest()
     if mech_key not in manifest.mechs:
@@ -229,4 +256,63 @@ def render_adapter(
             f"{mech_key}: no manifest value for {', '.join(sorted(unknown))}; "
             f"available: {', '.join(sorted(values))}"
         )
-    return _PLACEHOLDER.sub(lambda m: values[m.group(1).strip()], text)
+    rendered = _PLACEHOLDER.sub(lambda m: values[m.group(1).strip()], text)
+    if existing is None:
+        return rendered
+    return _splice_regions(rendered, existing, mech_key)
+
+
+def canonical_regions(text: str) -> dict[str, str]:
+    """Every `canonical:begin/end` region in `text`, by name.
+
+    A region whose end marker is missing is simply not matched, which would
+    silently drop it. `_splice_regions` compares the name sets rather than
+    trusting either file, so an unbalanced marker surfaces as a mismatch.
+
+    A repeated name raises. Keyed by name, a second region with the same name
+    would overwrite the first, and splicing then replaces one occurrence and
+    leaves the other stale -- a file that looks managed and is half managed,
+    which is the failure this whole mechanism exists to prevent.
+    """
+    regions: dict[str, str] = {}
+    for match in _REGION.finditer(text):
+        name = match.group(1)
+        if name in regions:
+            raise CatalogueError(
+                f"canonical region {name!r} is declared more than once; a "
+                f"region name must be unique within a file, or splicing "
+                f"updates one copy and leaves the rest stale"
+            )
+        regions[name] = match.group(0)
+    return regions
+
+
+def _splice_regions(rendered: str, existing: str, mech_key: str) -> str:
+    """Replace the managed regions of `existing` with those from `rendered`.
+
+    Everything outside a marked region is the Mech's and is returned untouched.
+    Both sides must declare the same regions: a template that grew a region the
+    adapter has never seen cannot be applied without a human deciding where it
+    goes, and an adapter carrying a region the template dropped would keep text
+    nobody owns.
+    """
+    canonical = canonical_regions(rendered)
+    local = canonical_regions(existing)
+    if not canonical:
+        raise CatalogueError(
+            "the canonical text declares no canonical:begin regions, so "
+            "splicing would replace nothing; render without `existing` to "
+            "emit a whole adapter"
+        )
+    missing = sorted(set(canonical) - set(local))
+    extra = sorted(set(local) - set(canonical))
+    if missing or extra:
+        raise CatalogueError(
+            f"{mech_key}: managed regions differ from the template"
+            + (f"; absent from the adapter: {', '.join(missing)}" if missing else "")
+            + (f"; absent from the template: {', '.join(extra)}" if extra else "")
+        )
+    out = existing
+    for name, block in canonical.items():
+        out = out.replace(local[name], block, 1)
+    return out
