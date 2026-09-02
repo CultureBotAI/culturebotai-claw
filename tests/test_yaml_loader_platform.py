@@ -62,26 +62,60 @@ needs_sound = pytest.mark.skipif(not SOUND, reason=f"{WHY}; {FACTS}")
 # -- the property that holds everywhere -------------------------------------
 
 
-def test_the_corpus_reader_does_not_use_libyaml():
-    """The gate. `kg_microbe_corpus` reads corpora whose statistics feed reports
-    people act on, so it stays on `yaml.safe_load` until CSafeLoader is sound on
-    every platform the fleet runs -- which, as of this test, it is not on Linux.
+def test_the_corpus_reader_chooses_its_loader_rather_than_naming_one():
+    """The gate, restated. `kg_microbe_corpus` reads corpora whose statistics
+    feed reports people act on.
+
+    It used to require `yaml.safe_load` outright, because CSafeLoader was broken
+    on Linux in a way nobody had explained (#233). #263 explained and reproduced
+    it, and `loader.judge` now probes both failure modes at import -- so the
+    requirement is no longer "never use the fast parser" but "never *assume* a
+    parser". A direct `yaml.CSafeLoader`, or the
+    `getattr(yaml, "CSafeLoader", ...)` shape, asks whether the name exists
+    rather than whether it works; `safe_loader()` asks the second question.
     """
     module = Path(__file__).resolve().parents[1] / "src/kg_microbe_corpus/statistics.py"
     tree = ast.parse(module.read_text(encoding="utf-8"))
-    # From the syntax tree, not the text: that module's docstring explains this
-    # very decision and names CSafeLoader while not using it. Matching prose
-    # would fail on a file that is doing exactly the right thing.
+    # From the syntax tree, not the text: that module's comment explains this
+    # very decision and names CSafeLoader while not reaching for it. Matching
+    # prose would fail on a file that is doing exactly the right thing.
     names = {
         node.attr if isinstance(node, ast.Attribute) else node.id
         for node in ast.walk(tree)
         if isinstance(node, (ast.Attribute, ast.Name))
     }
+
     assert "CSafeLoader" not in names, (
-        "kg_microbe_corpus adopted CSafeLoader; #233 requires it to be sound on "
-        f"Linux first, and here it is: {WHY}"
+        "kg_microbe_corpus names CSafeLoader directly; it must go through "
+        f"safe_loader(), which judges it on this platform first -- {WHY}"
     )
-    assert "safe_load" in names
+    assert "safe_loader" in names, (
+        "kg_microbe_corpus no longer chooses its loader through safe_loader(); "
+        "a parser that is assumed rather than probed is what #233 refused"
+    )
+
+
+def test_the_corpus_report_says_which_parser_read_it():
+    """#233's third requirement: a run that takes minutes on one machine and an
+    hour on another should say why. Kept out of `as_dict()` on purpose -- the
+    parser is a fact about the machine, not the corpus, and two identical
+    corpora must not diff between a Linux runner and a laptop.
+    """
+    from kg_microbe_corpus.statistics import CorpusReport, collect
+
+    # A report that did not read anything says so, rather than answering for
+    # whichever machine happens to ask (found reviewing #291).
+    assert CorpusReport(mech="probe").parser_note() == (
+        "parser not recorded: this report did not read a corpus"
+    )
+    assert "parser" not in CorpusReport(mech="probe").as_dict()
+
+    root = Path(__file__).resolve().parents[1]
+    report = collect("probe", root / "tests", ["*.py"], sample=1)
+    name, why = report.parser
+    assert name in {"CSafeLoader", "SafeLoader"} and why
+    assert report.parser_note().startswith(f"parsed with {name}: ")
+    assert "parser" not in report.as_dict()
 
 
 def test_this_platform_records_an_answer():
