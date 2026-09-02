@@ -12,6 +12,8 @@ made, which is what happened in #257.
 
 from __future__ import annotations
 
+import pytest
+
 from kg_microbe_governance.pin_divergence import classify_pin_divergence
 
 # A linear history: OLD -> MID -> NEW.
@@ -149,7 +151,8 @@ def test_the_first_consumer_of_all_has_nothing_to_pin_to():
     kind, message = classify_pin_divergence({}, linear, ["antibioticmech"])
 
     assert kind == "rollout"
-    assert "No consumer has pinned yet" in message
+    assert "the fleet's first pin" in message
+    assert "advance the 0 consumer" not in message
 
 
 def test_no_unpinned_consumers_leaves_the_original_rule_untouched():
@@ -180,3 +183,68 @@ def test_the_pin_step_does_not_read_a_missing_pin_with_check_true():
 
     assert probe in run, "the step must probe for the pin before reading it"
     assert run.index(probe) < run.index('"show", f"HEAD:{pin_path}"')
+
+
+@pytest.mark.parametrize(
+    "pins,unpinned",
+    [
+        ({"a": OLD, "b": NEW}, []),
+        ({"a": OLD, "b": UNRELATED}, []),
+        ({"a": OLD, "b": OLD}, ["c"]),
+        ({"a": OLD, "b": UNRELATED}, ["c"]),
+        ({}, ["c"]),
+    ],
+)
+def test_no_message_ends_with_a_period(pins, unpinned):
+    """The audit appends ". Pins: {...}" to whatever this returns, so a message
+    ending in a period renders as "that.. Pins:". Asserted here rather than
+    patched at the call site because logic in a workflow cannot be tested."""
+    _kind, message = classify_pin_divergence(pins, linear, unpinned)
+
+    assert not message.endswith("."), message
+
+
+def test_the_rollout_message_does_not_send_a_newcomer_to_the_shared_ref():
+    """#314. The advice matters more than the classification. A consumer is
+    unpinned because the ref the others share does not declare it -- pinning
+    there asserts an artifact set predating its membership, which is a trap I
+    have already fallen into once: identical artifact bytes, different scoping.
+    The target is the commit that declared it."""
+    pins = {"culturemech": OLD, "traitmech": OLD}
+
+    _kind, message = classify_pin_divergence(pins, linear, ["antibioticmech"])
+
+    assert "claw commit that declares it" in message
+    assert f"so pin antibioticmech to {OLD[:8]}" not in message
+    assert "advance" in message
+
+
+def test_two_unpinned_consumers_read_as_plural():
+    """Operator-facing text, and legibility is the whole purpose of these
+    messages -- "x, y has no committed claw pin" reads as a bug in the tool."""
+    _kind, message = classify_pin_divergence({"a": OLD}, linear, ["y", "x"])
+
+    assert "x, y have no committed claw pin" in message
+
+
+def test_a_consumer_named_twice_is_named_once():
+    _kind, message = classify_pin_divergence({"a": OLD}, linear, ["y", "y"])
+
+    assert "y, y" not in message
+    assert "y has no committed claw pin" in message
+
+
+def test_a_consumer_that_has_a_pin_is_not_also_reported_as_unpinned():
+    """A caller passing the same name both ways is contradicting itself. The
+    pin is the evidence, so it wins: reporting "x has no pin" while x is in
+    the pin map would send someone to look for a file that is there."""
+    _kind, message = classify_pin_divergence({"x": OLD, "y": OLD}, linear, ["x"])
+
+    assert "no committed claw pin" not in message
+    assert message == ""
+
+
+def test_one_other_consumer_is_not_pluralised():
+    _kind, message = classify_pin_divergence({"a": OLD}, linear, ["z"])
+
+    assert "the 1 consumer now at" in message
