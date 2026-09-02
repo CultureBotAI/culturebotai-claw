@@ -413,6 +413,18 @@ because they carry literal data the path rules would misread.
 ## Change conventions
 
 - Add regression tests under `tests/` for every repaired failure mode.
+- **A test for a distinction must be driven by an input where the two sides
+  differ, and mutation is how you find out.** Revert the fix and confirm the
+  test goes red. Reading it tells you what it intends to assert, not what it
+  does, and the gap between those is where this repository's defects have lived
+  (#286): a fixture built from the situation that already holds makes the
+  property invisible, so the test passes either way. Five instances in one
+  session, in unrelated files -- substrings matched against a whole workflow
+  file when the name also appears in a comment; every contrast fixture
+  declaring a single `:root`, so first-match and merge-all behaved alike; a
+  manifest whose real `package_path` made a derived path identical to the
+  hardcoded one; `--page` and `--card` both white; a token that resolved to
+  nothing. Each ran, went green, and was consulted. None was caught by reading.
 - Return nonzero from CLI failures; printing an error is not sufficient.
 - Do not swallow partial failures into a successful report.
 - Use timezone-aware UTC timestamps.
