@@ -50,6 +50,17 @@ on:
         required: false
         default: "reports/label_drift.tsv"
         type: string
+      uv-version:
+        description: >-
+          Pin uv itself, not just the setup action. Empty lets it float, which
+          is what TraitMech, MediaIngredientMech and CultureMech do today.
+
+          CommunityMech pins 0.12.5 in all six of its workflows; adopting this
+          one without the pin would leave it the only floating workflow in that
+          repository, with nothing in the caller to say so (#306).
+        required: false
+        default: ""
+        type: string
       uv-sync-args:
         description: >-
           Extra arguments for `uv sync`. CultureMech and MediaIngredientMech
@@ -117,6 +128,13 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
+          # Empty is setup-uv's OWN default for this input, so passing "" is
+          # identical to omitting it -- verified in that action's action.yml,
+          # where the default is "" and the documented behaviour is "the
+          # version in pyproject.toml or latest". The three current callers are
+          # therefore provably unaffected, and one step covers both a pinned and
+          # a floating caller.
+          version: ${{ inputs.uv-version }}
           enable-cache: true
 
       - name: Install dependencies
