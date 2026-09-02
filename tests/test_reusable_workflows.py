@@ -222,3 +222,71 @@ def test_the_failure_upload_cannot_run_on_a_green_run():
 
     assert condition.startswith("failure()")
     assert "always()" not in condition
+
+
+# --------------------------------------------------------------------------
+# #302: a fixed cache key freezes the ontology snapshot forever.
+
+def test_the_oak_cache_key_rotates():
+    """CommunityMech#707: with a fixed key the post-step reports "Cache hit
+    occurred on the primary key ..., not saving cache" in every run, so
+    whatever was stored first can never be replaced. A gate that resolves terms
+    through OAK then answers from a snapshot nobody can refresh."""
+    steps = {step.get("name", ""): step for step in _reusable_steps()}
+
+    assert "Ontology cache stamp" in steps, "nothing rotates the key"
+    key = steps["Cache OAK ontologies"]["with"]["key"]
+
+    assert "oak-cache-stamp" in key, f"the cache key does not rotate: {key}"
+
+
+def test_the_cache_falls_back_to_the_previous_period():
+    """Rotation without a prefix restore-key would miss on the first run of
+    every month and re-download every ontology."""
+    cache = {s.get("name", ""): s for s in _reusable_steps()}["Cache OAK ontologies"]
+
+    restore = [line.strip() for line in cache["with"]["restore-keys"].splitlines() if line.strip()]
+
+    assert restore, "no restore-key: every month starts cold"
+    assert restore[0].startswith("oaklib-${{ runner.os }}-")
+
+
+def test_no_restore_key_can_defeat_the_manual_bust():
+    """Found verifying #302 by hand, against my own first version.
+
+    restore-keys are tried in order. A broader `oaklib-<os>-` fallback looks
+    like a harmless extra safety net and is not: bumping oak-cache-key to v2
+    misses `oaklib-<os>-v2-` and then matches the v1 entry it was bumped to
+    escape, so the bust silently does nothing.
+
+    Every restore-key must therefore carry the bust. The earlier test asserted
+    only that the *first* one did, which is the adjacent question.
+    """
+    cache = {s.get("name", ""): s for s in _reusable_steps()}["Cache OAK ontologies"]
+
+    restore = [line.strip() for line in cache["with"]["restore-keys"].splitlines() if line.strip()]
+
+    bustless = [key for key in restore if "inputs.oak-cache-key" not in key]
+    assert not bustless, (
+        f"these restore-keys would match a cache the bust was meant to "
+        f"discard: {bustless}"
+    )
+
+
+def test_the_manual_bust_still_works():
+    """`oak-cache-key` becomes a component rather than the whole key, so
+    bumping it must still discard a poisoned cache -- which means it has to
+    appear in the primary key AND in the narrower restore-key, or a bumped
+    value would restore the very entry it was bumped to escape."""
+    cache = {s.get("name", ""): s for s in _reusable_steps()}["Cache OAK ontologies"]
+
+    assert "inputs.oak-cache-key" in cache["with"]["key"]
+    narrower = [
+        line.strip()
+        for line in cache["with"]["restore-keys"].splitlines()
+        if line.strip()
+    ][0]
+    assert "inputs.oak-cache-key" in narrower, (
+        "the first restore-key must include the bust, or bumping it restores "
+        "the cache it was bumped to escape"
+    )
