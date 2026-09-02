@@ -14,6 +14,11 @@ from pathlib import Path
 from threading import Lock
 from typing import Any, Dict, List, Optional
 
+from kg_microbe_fleet import load_fleet_manifest
+from kg_microbe_fleet.roots import MechRootError, looks_like, resolve_mech_root
+
+CLAW_ROOT = Path(__file__).resolve().parents[1]
+
 logger = logging.getLogger(__name__)
 
 
@@ -49,16 +54,50 @@ class OAKQueryPlugin:
                    f"cache_dir={self.cache_dir}, ontologies={self.enabled_ontologies}")
 
     def _get_client(self):
-        """Lazily load the MediaIngredientMech OntologyClient."""
-        if self._client is None:
-            try:
-                # Import from MediaIngredientMech
-                import sys
-                mediaingredient_root = os.getenv("MEDIAINGREDIENTMECH_ROOT")
-                if not mediaingredient_root:
-                    raise ValueError("MEDIAINGREDIENTMECH_ROOT not set in environment")
+        """Lazily load the MediaIngredientMech OntologyClient.
 
-                src_path = Path(mediaingredient_root) / "src"
+        The root is resolved through `resolve_mech_root`, not read from the
+        environment here (#283). Checking only that the variable is *set* let an
+        unverified path reach `sys.path` and be imported from, so a stale or
+        wrong value ran code out of the wrong tree. A configuration error is
+        raised rather than degraded: it is not an OAK incompatibility, and
+        reporting it as one is how a misconfigured deployment looks identical
+        to a working one in the logs.
+
+        The identity check is then repeated here, deliberately.
+        `resolve_mech_root` trusts an explicitly configured variable once the
+        directory exists -- an operator naming a path has made a decision, and
+        second-guessing it would break legitimate layouts. That is right for a
+        script that reads data. It is not enough here, because this path is
+        inserted into `sys.path` and *imported from*: pointing the variable at
+        the wrong checkout executes that checkout's code. So the package the
+        manifest names must actually be there, and the directory added to
+        `sys.path` is derived from that same manifest value rather than a
+        hardcoded "src".
+
+        Only ImportError degrades to delegation, which is what the original
+        handler was written for. It previously caught everything -- an unset
+        variable, a missing directory, a typo in this file -- and reported them
+        all as "OAK compatibility issue".
+        """
+        if self._client is None:
+            # Raises MechRootError if the root is unset, missing, or is not
+            # MediaIngredientMech. Deliberately not caught below.
+            root = resolve_mech_root("mediaingredientmech", claw_root=CLAW_ROOT)
+            package = load_fleet_manifest().mechs["mediaingredientmech"].package_path
+            if not looks_like(root, package):
+                raise MechRootError(
+                    f"{root} does not look like MediaIngredientMech: it has no "
+                    f"{package}/. Refusing to import from it."
+                )
+            try:
+                import sys
+
+                # The directory the package sits in, derived from the same
+                # manifest value the check above used, so the path that gets
+                # imported and the path that was verified cannot drift apart.
+                # Hardcoding "src" would keep working while looks_like moved.
+                src_path = root / Path(package).parent
                 if str(src_path) not in sys.path:
                     sys.path.insert(0, str(src_path))
 
@@ -67,7 +106,7 @@ class OAKQueryPlugin:
                 self._client = OntologyClient(sources=self.enabled_ontologies)
                 logger.info("OntologyClient loaded successfully")
 
-            except Exception as e:
+            except ImportError as e:
                 logger.warning(f"OntologyClient unavailable (OAK compatibility issue): {e}")
                 logger.info("Will use delegation to existing MediaIngredientMech code")
                 # Return None to signal that delegation should be used
