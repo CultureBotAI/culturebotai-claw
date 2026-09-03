@@ -125,6 +125,29 @@ canonical:
       them would leave five adapters that look unified and have lost the only
       content worth having (#293). So the template marks two regions and leaves
       the rest to the Mech, which is what canonical:begin/end is for.
+  fetch-source:
+    capability: testing
+    reason: >-
+      Five Mechs carry this skill and three of those five are byte-identical --
+      copy-paste propagation, not agreement. ProteinTraitsMech's is a
+      generation ahead: it routes through a helper that validates before it
+      promotes and replaces atomically. The other four teach a *hardened*
+      `curl` -- retries and timeouts, writing straight to the destination --
+      which reads as the solved version and is not: curl's --retry does not
+      cover the early-close and reset exits, and -f does not catch a 200
+      carrying an HTML error page. So this template is not a merge of five
+      equals; it
+      carries the one version that is right and leaves each Mech its own route
+      and worked example.
+
+      The capability is a stand-in and should be read as one. No declared
+      capability means "ingests external source releases", which is what
+      actually decides who needs this -- every Mech does, including the three
+      that have no such skill today. `source_catalogue` is deliberately NOT the
+      gate: it selects three Mechs, while five already carry the skill and four
+      of those five declare it disabled. It describes owning a download.yaml
+      catalogue, not fetching. Filed as #316.
+
   review-open-issues:
     capability: testing
     reason: >-
