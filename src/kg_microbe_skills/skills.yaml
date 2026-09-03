@@ -147,6 +147,33 @@ canonical:
       gate: it selects three Mechs, while five already carry the skill and four
       of those five declare it disabled. It describes owning a download.yaml
       catalogue, not fetching. Filed as #316.
+  id-label-correspondence:
+    capability: id_label_validation
+    reason: >-
+      Three Mechs carry this and the three agree on everything that matters:
+      the invariant, the hybrid policy, the two engines, the report-then-
+      enforce order, and the wrong-label-vs-wrong-id triage. What differs is
+      the part that should -- which slots carry a label, which products are
+      published, which prefixes have no adapter, and the example CURIE. That
+      is the shape canonical:begin/end exists for.
+
+      The judgement worth keeping is the one all three state and none
+      explains: a wrong label is mostly interesting as evidence the *ID* is
+      wrong. The template says so, because a reader who thinks this is a
+      tidiness check will fix labels and leave the serious defect in place.
+
+      Engine A is a property of the schema, and only three of the seven Mechs
+      declare the binding it needs -- the same three that already carry the
+      skill. So the template states it as what adoption requires rather than as
+      what is already true, and says a clean run on a Mech without the binding
+      means nothing (#331). Written the other way it would have asserted
+      something false about four repositories, in a region claw owns and they
+      cannot edit.
+
+      Engine B is a vendored byte-identical script governed from claw, so the
+      template says to change it there. A Mech that edits its copy loses the
+      edit at the next synchronization and, in the meantime, disagrees with the
+      rest of the fleet about what counts as a mismatch.
 
   review-open-issues:
     capability: testing
