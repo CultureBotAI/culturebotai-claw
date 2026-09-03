@@ -185,3 +185,23 @@ def test_no_sibling_at_all_resolves_to_nothing(tmp_path):
     claw.mkdir()
 
     assert resolve_kg_microbe_root(claw_root=claw, environ={}) is None
+
+
+def test_a_guessed_sibling_comes_back_resolved(tmp_path):
+    """#330. resolve_mech_root resolves its guess, so this must too.
+
+    The parent components are already resolved by construction, so only a
+    symlinked final component can tell the two behaviours apart -- which is why
+    the fixture builds one. Without it both versions return the same path and
+    the assertion is about nothing.
+    """
+    claw = tmp_path / "claw"
+    claw.mkdir()
+    real = tmp_path / "kg-microbe-real"
+    (real / "kg_microbe").mkdir(parents=True)
+    link = tmp_path / "kg-microbe"
+    link.symlink_to(real, target_is_directory=True)
+
+    resolved = resolve_kg_microbe_root(claw_root=claw, environ={})
+    assert resolved == real.resolve()
+    assert resolved != link

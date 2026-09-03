@@ -84,7 +84,14 @@ def resolve_kg_microbe_root(
         return root.resolve() if root.is_dir() else None
 
     guess = Path(claw_root).resolve().parent / KG_MICROBE_DIRECTORY
-    return guess if (guess / KG_MICROBE_PACKAGE).is_dir() else None
+    if not (guess / KG_MICROBE_PACKAGE).is_dir():
+        return None
+    # .resolve() to match resolve_mech_root, which resolves its guess too. The
+    # parent components are already resolved; this is the final `kg-microbe`
+    # component, which can be a symlink -- and two functions of the same shape
+    # handing back different paths for one checkout is how a caller ends up
+    # with two roots where there is one (#330).
+    return guess.resolve()
 
 
 def resolve_mech_root(
