@@ -520,6 +520,15 @@ _ENABLED = sorted(
     if (c := mech.capabilities.get("site_contract")) is not None and c.is_enabled
 )
 
+# What each enabled corpus actually reports, measured. A row here is the claim
+# that someone looked; an empty set is a measurement, not a default.
+BASELINES = {
+    "communitymech": {"HEADING_LEVEL_SKIPPED"},
+    "traitmech": set(),
+    "cellstructuremech": set(),
+    "antibioticmech": set(),
+}
+
 
 def test_every_mech_decides_about_the_site_contract():
     """Absence must be a declared decision with a reason, never an omission."""
@@ -530,17 +539,38 @@ def test_every_mech_decides_about_the_site_contract():
             assert capability.reason.strip(), f"{name} disables it without a reason"
 
 
-def test_the_measured_corpora_are_the_ones_declared():
-    """The docstring's numbers come from these four: CommunityMech and
-    TraitMech as measured for the contract, CellStructureMech measured on
-    joining (10 pages, no findings; CellStructureMech#50), and AntibioticMech
-    measured on joining (#279): 2,927 pages and one stylesheet, reporting three
-    UNEXAMINED_FOREGROUND -- --masthead-nav, --masthead-nav-hover and
-    --tooltip-fg, whose grounds are a gradient and a translucent fill that the
-    contrast check declines to guess at (AntibioticMech#171).
+def test_every_enabled_corpus_has_a_measured_baseline():
+    """The completeness guard that #309 needed and did not have (#318).
 
-    If a fifth is enabled the numbers stop describing what the check runs on
-    until it is re-measured."""
+    BASELINES has to cover everything the manifest enables, and this reads only
+    the manifest -- so it fails in CI, where no Mech checkout exists and the
+    parametrized contract test skips every case. Enabling site_contract for a
+    Mech without recording what its site reports is the failure this catches."""
+    missing = sorted(set(_ENABLED) - set(BASELINES))
+    assert not missing, (
+        f"{', '.join(missing)} declares site_contract but has no measured "
+        "baseline; run the check against its site and record what it reports"
+    )
+    assert not sorted(set(BASELINES) - set(_ENABLED))
+
+
+def test_the_measured_corpora_are_the_ones_declared():
+    """A ledger of what each corpus looked like when it was admitted, and of
+    nothing since -- corpora grow, and these numbers are not re-measured (#319).
+
+    CommunityMech and TraitMech as measured for the contract. CellStructureMech
+    on joining: 10 pages, no findings (CellStructureMech#50); as of 2026-09-03
+    it is 36 pages and one stylesheet, and it needs a published_root
+    declaration it did not need then, because the micrographs its structure
+    pages embed live outside pages/. AntibioticMech on joining (#279): 2,927
+    pages and one stylesheet, reporting three UNEXAMINED_FOREGROUND --
+    --masthead-nav, --masthead-nav-hover and --tooltip-fg, whose grounds are a
+    gradient and a translucent fill that the contrast check declines to guess
+    at (AntibioticMech#171).
+
+    What is asserted is the membership, not the numbers. If a fifth is enabled
+    the prose above stops describing what the check runs on until someone
+    re-measures it."""
     assert _ENABLED == [
         "antibioticmech",
         "cellstructuremech",
@@ -569,18 +599,7 @@ def test_a_declared_site_still_holds_to_the_contract(mech):
         allowed_hosts=list(capability.settings.get("allowed_hosts", ())),
         published_root=(root / declared).resolve() if declared else None,
     )
-    baselines = {
-        "communitymech": {"HEADING_LEVEL_SKIPPED"},
-        "traitmech": set(),
-        "cellstructuremech": set(),
-        "antibioticmech": set(),
-    }
-    assert mech in baselines, (
-        f"{mech} newly declares site_contract but has no recorded baseline here; "
-        "measure its site and record what it actually reports, rather than "
-        "letting this test disappear into a KeyError"
-    )
-    assert {f.code for f in findings} == baselines[mech], [
+    assert {f.code for f in findings} == BASELINES[mech], [
         str(f) for f in findings[:5]
     ]
 
