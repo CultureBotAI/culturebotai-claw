@@ -20,6 +20,12 @@ from kg_microbe_skills.catalogue import (
     load_catalogue,
     render_adapter,
 )
+from kg_microbe_skills.inventory import (
+    UnreadableSkill,
+    build_inventory,
+    format_inventory,
+    repositories_without_skills,
+)
 from kg_microbe_skills.references import check, format_report
 
 
@@ -93,6 +99,30 @@ def _print_catalogue() -> int:
     return 0
 
 
+def _inventory(claw_root: Path) -> tuple[int, list[str]]:
+    """What every resolvable checkout carries, grouped by skill name.
+
+    Claw is deliberately not in the inventory. Its skills are the control
+    plane's own and are already answered by `catalogue`; folding them in would
+    make a claw-only skill look like a Mech that has fallen behind.
+    """
+    downstream, absent, _known, _labels = _downstream(claw_root)
+    repositories = {
+        label: root
+        for label, root in downstream.items()
+        if label != "culturebotai-claw"
+    }
+    try:
+        groups = build_inventory(repositories, load_canonical())
+    except UnreadableSkill as exc:
+        # Nonzero, not a partial report: every count below a skill that could
+        # not be read is missing an input rather than measuring one (#332).
+        print(str(exc), file=sys.stderr)
+        return 1, absent
+    print(format_inventory(groups, repositories_without_skills(repositories)))
+    return 0, absent
+
+
 def _render(skill: str | None, mech: str | None) -> int:
     """Print one adapter. Printing, not installing: writing it into a Mech is a
     downstream mutation and goes through the cross-repository checklist."""
@@ -117,10 +147,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "command",
-        choices=["check", "catalogue", "render"],
+        choices=["check", "catalogue", "inventory", "render"],
         help=(
-            "check: validate every reference; catalogue: list every skill and "
-            "its scope; render: print one Mech's adapter for a canonical skill"
+            "check: validate every reference; catalogue: list every skill "
+            "claw owns and its scope; inventory: list what each Mech carries "
+            "independently; render: print one Mech's adapter for a canonical "
+            "skill"
         ),
     )
     parser.add_argument(
@@ -146,6 +178,18 @@ def main(argv: list[str] | None = None) -> int:
         return _render(args.skill, args.mech)
 
     claw_root = find_claw_root()
+    if args.command == "inventory":
+        status, absent = _inventory(claw_root)
+        if absent:
+            print(
+                f"\n{len(absent)} checkout(s) not resolvable, so what they "
+                f"carry is unknown here: {', '.join(absent)}"
+            )
+        if args.require_sources and absent:
+            print("\n--require-sources: refusing to report a partial answer.")
+            return 2
+        return status
+
     downstream, absent, known, mech_labels = _downstream(claw_root)
     findings = check(
         claw_root, downstream, repositories=known, mech_labels=mech_labels
