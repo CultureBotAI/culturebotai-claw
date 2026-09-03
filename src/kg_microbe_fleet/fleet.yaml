@@ -982,6 +982,12 @@ mechs:
         status: enabled
         settings:
           site_path: pages
+          # GitHub Pages serves this repository from main at /, so the whole
+          # checkout is published even though only pages/ is checked. Five
+          # structure pages embed micrographs from ../../../data/images/,
+          # which are tracked and served and would otherwise read as climbing
+          # out of the site.
+          published_root: .
       source_catalogue:
         status: disabled
         reason: >-
