@@ -50,6 +50,43 @@ def looks_like(root: Path, package_path: str) -> bool:
     return (Path(root) / package_path).is_dir()
 
 
+# kg-microbe is a corpus this fleet reads, not a Mech, so the manifest has no
+# row for it and `resolve_mech_root` cannot answer for it. The resolution is
+# the same shape, so it lives here rather than being re-implemented by each
+# caller (#131).
+KG_MICROBE_VARIABLE = "KGMICROBE_ROOT"
+KG_MICROBE_DIRECTORY = "kg-microbe"
+KG_MICROBE_PACKAGE = "kg_microbe"
+
+
+def resolve_kg_microbe_root(
+    *,
+    claw_root: Path,
+    environ: Mapping[str, str] | None = None,
+) -> Path | None:
+    """kg-microbe's checkout, or None when it cannot be resolved.
+
+    Returns rather than raises: every caller so far treats an absent corpus as
+    something to report, not as a reason to stop.
+
+    An explicit KGMICROBE_ROOT is trusted, as `resolve_mech_root` trusts a
+    configured variable -- an operator naming a path has made a decision. The
+    conventional sibling path is a *guess*, and is accepted only if it carries
+    the `kg_microbe` package: the same check `looks_like` makes for a Mech.
+    Without it, any directory sitting at ../kg-microbe was treated as the
+    corpus, and anything checked against it got a verdict about the wrong
+    repository.
+    """
+    env = os.environ if environ is None else environ
+    configured = (env.get(KG_MICROBE_VARIABLE) or "").strip()
+    if configured:
+        root = Path(configured).expanduser()
+        return root.resolve() if root.is_dir() else None
+
+    guess = Path(claw_root).resolve().parent / KG_MICROBE_DIRECTORY
+    return guess if (guess / KG_MICROBE_PACKAGE).is_dir() else None
+
+
 def resolve_mech_root(
     key: str,
     *,

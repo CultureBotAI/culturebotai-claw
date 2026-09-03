@@ -16,6 +16,7 @@ from kg_microbe_fleet import (
     MechRootError,
     load_fleet_manifest,
     looks_like,
+    resolve_kg_microbe_root,
     resolve_mech_root,
     sibling_default,
 )
@@ -123,3 +124,64 @@ def test_looks_like_accepts_the_declared_package(tmp_path):
     root = _checkout(tmp_path, "mim")
 
     assert looks_like(root, PACKAGE) is True
+
+
+# -- kg-microbe, which is a corpus and not a Mech ----------------------------
+
+
+def _kg_microbe(parent: Path, *, with_package: bool = True) -> Path:
+    """A sibling checkout at the conventional path."""
+    root = parent / "kg-microbe"
+    (root / "kg_microbe" if with_package else root / "docs").mkdir(parents=True)
+    return root
+
+
+def test_a_configured_kg_microbe_root_is_trusted(tmp_path):
+    """An operator naming a path has made a decision, and it is not
+    second-guessed -- the package check is for guesses only. This directory
+    deliberately carries no kg_microbe package, so trusting it and checking it
+    give different answers."""
+    named = tmp_path / "elsewhere"
+    named.mkdir()
+    claw = tmp_path / "claw"
+    claw.mkdir()
+
+    assert resolve_kg_microbe_root(
+        claw_root=claw, environ={"KGMICROBE_ROOT": str(named)}
+    ) == named.resolve()
+
+
+def test_a_configured_root_that_is_not_a_directory_resolves_to_nothing(tmp_path):
+    claw = tmp_path / "claw"
+    claw.mkdir()
+
+    assert (
+        resolve_kg_microbe_root(
+            claw_root=claw, environ={"KGMICROBE_ROOT": str(tmp_path / "absent")}
+        )
+        is None
+    )
+
+
+def test_a_guessed_sibling_is_accepted_only_when_it_carries_the_package(tmp_path):
+    """The distinction. Both directories sit at exactly the conventional path;
+    only one is kg-microbe, and before this check both were believed."""
+    claw = tmp_path / "claw"
+    claw.mkdir()
+
+    real = _kg_microbe(tmp_path)
+    assert resolve_kg_microbe_root(claw_root=claw, environ={}) == real
+
+    import shutil
+
+    shutil.rmtree(real)
+    imposter = _kg_microbe(tmp_path, with_package=False)
+    assert imposter.is_dir()
+    assert resolve_kg_microbe_root(claw_root=claw, environ={}) is None
+
+
+def test_no_sibling_at_all_resolves_to_nothing(tmp_path):
+    claw = tmp_path / "claw"
+    claw.mkdir()
+
+    assert resolve_kg_microbe_root(claw_root=claw, environ={}) is None
