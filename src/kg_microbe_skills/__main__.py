@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from pathlib import Path
 
 from kg_microbe_fleet import load_fleet_manifest
-from kg_microbe_fleet.roots import MechRootError, resolve_mech_root
+from kg_microbe_fleet.roots import (
+    MechRootError,
+    resolve_kg_microbe_root,
+    resolve_mech_root,
+)
 from kg_microbe_skills.catalogue import (
     CatalogueError,
     applicable_mechs,
@@ -18,10 +21,6 @@ from kg_microbe_skills.catalogue import (
     render_adapter,
 )
 from kg_microbe_skills.references import check, format_report
-
-# kg-microbe is not a Mech, so the manifest does not describe it; the
-# env-then-sibling shape matches `sync_kgm_dependencies.py`.
-_KGM_VARIABLE = "KGMICROBE_ROOT"
 
 
 def find_claw_root(start: Path | None = None) -> Path:
@@ -69,9 +68,8 @@ def _downstream(
         except MechRootError:
             absent.append(display)
 
-    configured = (os.environ.get(_KGM_VARIABLE) or "").strip()
-    kgm = Path(configured) if configured else claw_root.parent / "kg-microbe"
-    if kgm.is_dir():
+    kgm = resolve_kg_microbe_root(claw_root=claw_root)
+    if kgm is not None:
         resolved["kg-microbe"] = kgm
     else:
         absent.append("kg-microbe")

@@ -1092,6 +1092,7 @@ def __getattr__(name: str):
     if name in {
         "MechRootError",
         "resolve_mech_root",
+        "resolve_kg_microbe_root",
         "require_mech_roots",
         "sibling_default",
         "looks_like",
