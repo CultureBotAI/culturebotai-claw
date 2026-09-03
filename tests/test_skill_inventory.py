@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 from kg_microbe_skills.inventory import (
+    UnreadableSkill,
     build_inventory,
     format_inventory,
     read_repository,
@@ -159,3 +160,28 @@ def test_the_report_separates_shared_from_single_and_names_the_empty(fleet, tmp_
     assert "shared across repositories (3)" in report
     assert "carried by one repository (1)" in report
     assert "carry no tracked skill at all: e" in report
+
+
+def test_a_tracked_skill_that_cannot_be_read_is_fatal(tmp_path):
+    """#332. Git says the repository carries it, so reporting it as absent
+    would put a wrong number in every count above it -- a `duplicated` verdict
+    becomes `divergent` with nothing saying an input went missing.
+
+    The fixture makes the file genuinely unreadable rather than deleting it,
+    because a deleted file and an unreadable one are different states and only
+    one of them is this error.
+    """
+    root = _repo(tmp_path / "r", {"one": "a\n", "two": "b\n"})
+    unreadable = root / ".claude/skills/one/SKILL.md"
+    unreadable.chmod(0o000)
+    try:
+        with pytest.raises(UnreadableSkill) as caught:
+            read_repository(root)
+        assert ".claude/skills/one/SKILL.md" in str(caught.value)
+        assert "one" in str(caught.value)
+    finally:
+        unreadable.chmod(0o644)
+
+    # Readable again, and the skill is back: the error was about the read, not
+    # about the repository's contents.
+    assert sorted(read_repository(root)) == ["one", "two"]

@@ -18,6 +18,7 @@ from kg_microbe_skills.catalogue import (
     render_adapter,
 )
 from kg_microbe_skills.inventory import (
+    UnreadableSkill,
     build_inventory,
     format_inventory,
     repositories_without_skills,
@@ -113,7 +114,13 @@ def _inventory(claw_root: Path) -> tuple[int, list[str]]:
         for label, root in downstream.items()
         if label != "culturebotai-claw"
     }
-    groups = build_inventory(repositories, load_canonical())
+    try:
+        groups = build_inventory(repositories, load_canonical())
+    except UnreadableSkill as exc:
+        # Nonzero, not a partial report: every count below a skill that could
+        # not be read is missing an input rather than measuring one (#332).
+        print(str(exc), file=sys.stderr)
+        return 1, absent
     print(format_inventory(groups, repositories_without_skills(repositories)))
     return 0, absent
 

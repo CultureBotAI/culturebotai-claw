@@ -28,6 +28,18 @@ SKILLS_DIR = ".claude/skills"
 SKILL_FILE = "SKILL.md"
 
 
+class UnreadableSkill(RuntimeError):
+    """Git tracks the file and it could not be read.
+
+    Distinct from both absences this module models on purpose -- a checkout
+    that would not resolve, and a repository read and genuinely carrying
+    nothing. Here the repository *does* carry the skill and the run cannot say
+    what it contains, so the count above it is missing an input rather than
+    measuring one. Reported and fatal, matching `kg-microbe-corpus report`
+    rather than swallowing a partial failure into a clean answer (#332).
+    """
+
+
 @dataclass(frozen=True)
 class SkillCopy:
     """One repository's copy of one skill."""
@@ -100,9 +112,10 @@ def _tracked_skill_files(root: Path) -> set[str]:
 def read_repository(root: Path) -> dict[str, SkillCopy]:
     """Every tracked skill in one checkout, by skill name.
 
-    A tracked path whose file is missing from the working tree is skipped
-    rather than guessed at: the digest is the point, and there is nothing to
-    digest.
+    Raises `UnreadableSkill` when git tracks a skill whose bytes cannot be
+    read. The digest is the point, so there is nothing to fall back to, and a
+    skill silently missing from one column turns a `duplicated` verdict into a
+    `divergent` one with no sign that a number is missing an input.
     """
     found: dict[str, SkillCopy] = {}
     for relative in _tracked_skill_files(root):
@@ -110,8 +123,12 @@ def read_repository(root: Path) -> dict[str, SkillCopy]:
         path = root / relative
         try:
             raw = path.read_bytes()
-        except OSError:
-            continue
+        except OSError as exc:
+            raise UnreadableSkill(
+                f"{root}: git tracks {relative} but it could not be read "
+                f"({exc}); the inventory would report {name} as absent from "
+                f"this repository, which is not what was measured"
+            ) from exc
         found[name] = SkillCopy(
             repository="",
             digest=hashlib.sha256(raw).hexdigest()[:12],
