@@ -569,12 +569,20 @@ def test_a_declared_site_still_holds_to_the_contract(mech):
         allowed_hosts=list(capability.settings.get("allowed_hosts", ())),
         published_root=(root / declared).resolve() if declared else None,
     )
-    baseline = {
+    baselines = {
         "communitymech": {"HEADING_LEVEL_SKIPPED"},
         "traitmech": set(),
         "cellstructuremech": set(),
-    }[mech]
-    assert {f.code for f in findings} == baseline, [str(f) for f in findings[:5]]
+        "antibioticmech": set(),
+    }
+    assert mech in baselines, (
+        f"{mech} newly declares site_contract but has no recorded baseline here; "
+        "measure its site and record what it actually reports, rather than "
+        "letting this test disappear into a KeyError"
+    )
+    assert {f.code for f in findings} == baselines[mech], [
+        str(f) for f in findings[:5]
+    ]
 
 
 def test_traitmech_needs_its_published_root_to_come_out_clean():
@@ -599,11 +607,32 @@ def test_traitmech_needs_its_published_root_to_come_out_clean():
     assert check_site(site, allowed_hosts=hosts, published_root=root) == []
 
 
-def test_the_declared_published_root_is_the_one_traitmech_needs():
+def test_cellstructuremech_needs_its_published_root_to_come_out_clean():
+    """The same declaration, on a second corpus that needs it for a different
+    reason. Five structure pages embed micrographs from ../../../data/images/,
+    which CellStructureMech publishes (Pages serves main at /) but which sit
+    outside the pages/ directory being checked."""
+    try:
+        root = resolve_mech_root("cellstructuremech", claw_root=CLAW_ROOT)
+    except MechRootError as exc:
+        pytest.skip(f"needs a cellstructuremech checkout: {exc}")
+    site = root / "pages"
+    if not site.is_dir():
+        pytest.skip("cellstructuremech has no pages/ here")
+
+    without = check_site(site)
+    assert {f.code for f in without} == {"REFERENCE_OUTSIDE_SITE"}
+    assert len(without) == 5
+
+    assert check_site(site, published_root=root) == []
+
+
+def test_the_declared_published_roots_are_the_ones_those_mechs_need():
     """A ledger: if the manifest stops declaring it, the test above stops being
     about anything."""
-    settings = MANIFEST.mechs["traitmech"].capabilities["site_contract"].settings
-    assert settings["published_root"] == "."
+    for mech in ("traitmech", "cellstructuremech"):
+        settings = MANIFEST.mechs[mech].capabilities["site_contract"].settings
+        assert settings["published_root"] == "."
     assert "published_root" not in (
         MANIFEST.mechs["communitymech"].capabilities["site_contract"].settings
     )
