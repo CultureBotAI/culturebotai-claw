@@ -162,6 +162,14 @@ canonical:
       wrong. The template says so, because a reader who thinks this is a
       tidiness check will fix labels and leave the serious defect in place.
 
+      Engine A is a property of the schema, and only three of the seven Mechs
+      declare the binding it needs -- the same three that already carry the
+      skill. So the template states it as what adoption requires rather than as
+      what is already true, and says a clean run on a Mech without the binding
+      means nothing (#331). Written the other way it would have asserted
+      something false about four repositories, in a region claw owns and they
+      cannot edit.
+
       Engine B is a vendored byte-identical script governed from claw, so the
       template says to change it there. A Mech that edits its copy loses the
       edit at the next synchronization and, in the meantime, disagrees with the

@@ -57,13 +57,20 @@ name for that ID fails in both places.
 ## The two engines
 
 <!-- canonical:begin the-two-engines -->
-**Engine A — LinkML-native, for record YAML.** The schema marks each label slot
-`slot_uri: rdfs:label` and gives the term-bearing slot a range-less `binding`
-(`binds_value_of: <id_field>`). `linkml-term-validator validate-data --labels`
-then resolves the id's canonical label through OAK and fails where the asserted
-label differs. The check lives in the schema, so it holds for anything that
-validates against the schema rather than only for what a script remembered to
-walk.
+**Engine A — LinkML-native, for record YAML.** This one is a property of the
+schema, so it applies only where the schema has been given it: each label slot
+marked `slot_uri: rdfs:label`, and the term-bearing slot given a range-less
+`binding` (`binds_value_of: <id_field>`). Where that holds,
+`linkml-term-validator validate-data --labels` resolves the id's canonical
+label through OAK and fails where the asserted label differs, and the check
+holds for anything that validates against the schema rather than only for what
+a script remembered to walk.
+
+**Check before relying on it.** As of 2026-09-03 three of the seven Mechs
+declare the binding and four do not, so for those four this engine is not
+switched off — it was never wired up, and a clean run of it means nothing. A
+repository without the binding either adds one or records below why record-level
+validation does not apply to it. Do not read Engine A's silence as agreement.
 
 **Engine B — the shared OAK validator, for products.** A vendored script walks
 the surfaces the repository declares, resolves canonical label plus synonyms
