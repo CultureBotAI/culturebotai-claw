@@ -178,7 +178,7 @@ interface rather than an overlap.
 | `sssom_export` | enabled | UBERON body sites, MONDO disease terms, NCBITaxon hosts |
 | `kgx_export` | enabled | the edges are the product |
 | `source_catalogue` + `source_queue` | enabled | Disbiome and CTD carry real licence constraints; CTD's terms need reading before adoption |
-| `environment_coverage` | **enabled** | host body site is an environment; `record_globs` required |
+| `environment_coverage` | **open decision** | not asserted here (#337). The capability's pipeline is ENVO term validation over an isolate/media corpus; this Mech grounds in UBERON body site, NCBITaxon host and MONDO disease. ENVO does model host association (`ENVO:01001002`), so it *may* carry that axis — but "may, if it chooses" is a different declaration from `enabled` |
 | `corpus_statistics` | enabled | `fields`: host taxon, body site, association direction |
 | `site_contract` | enabled | on admission |
 
