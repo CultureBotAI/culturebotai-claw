@@ -40,6 +40,13 @@ target in the list.
 Read all of them, in full. The four traps below were all found this way, and
 none is visible from the inventory.
 
+**Read the longest one first.** It is the copy you will skip, and it is the most
+likely to carry accumulated hard-won content — which is exactly what a template
+must not flatten. Writing the `manage-identifiers` template, the 668-line copy
+was skipped as too long; it held both the origin of the sibling rot the template
+documents and the best retirement mechanism in the fleet, and both had to be
+retrofitted after review (#340, #341).
+
 **The majority can be wrong.** Of the five repositories carrying `fetch-source`,
 three held byte-identical copies and a fourth a near-variant; all four taught a
 hardened `curl` writing straight to the destination. The fifth, ProteinTraitsMech, routed through a
@@ -133,8 +140,23 @@ and a declaration read off a capability's name rather than its machinery is how
 uv run kg-microbe-skills catalogue                       # template appears, targets right
 uv run kg-microbe-skills render --skill <name> --mech X  # for every target
 uv run kg-microbe-skills check                           # references resolve
-uv run --extra dev python -m pytest tests/test_skill_catalogue.py -q
+uv run --extra dev python -m pytest tests/ -q            # the suite, not one module
 ```
+
+**Run the suite, not `test_skill_catalogue.py` alone.** That module cannot see
+the two gates that most often reject a new skill, and both live elsewhere:
+
+- `test_maintained_prose_states_the_basis_of_any_mech_count` rejects a Mech
+  count with no stated basis nearby — say which capability or input set it
+  describes. A number that counts *copies of a skill* is not a fleet count, and
+  saying so is both accurate and the fix.
+- `test_a_fleet_skill_actually_resolves_the_fleet_from_the_manifest` rejects a
+  `fleet` scope that is merely asserted. The skill must actually name
+  `load_fleet_manifest` or an equivalent, not enumerate repositories in prose
+  (#214).
+
+This skill's own first version passed the single module and failed both gates in
+CI (#341). Five minutes of suite is cheaper than the round trip.
 
 Then check the splice refuses. Rendering against a Mech's existing adapter must
 raise a `CatalogueError` naming the absent regions, not silently overwrite:
