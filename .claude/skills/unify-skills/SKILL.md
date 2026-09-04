@@ -40,15 +40,15 @@ target in the list.
 Read all of them, in full. The four traps below were all found this way, and
 none is visible from the inventory.
 
-**The majority can be wrong.** `fetch-source` was byte-identical in three Mechs
-and near-identical in a fourth; all four taught a hardened `curl` writing
-straight to the destination. The fifth, ProteinTraitsMech, routed through a
+**The majority can be wrong.** Of the five repositories carrying `fetch-source`,
+three held byte-identical copies and a fourth a near-variant; all four taught a
+hardened `curl` writing straight to the destination. The fifth, ProteinTraitsMech, routed through a
 validating helper — and was the only correct one. Canonicalising the majority
 would have propagated a defect to seven repositories with claw's authority behind
 it. **Ask which copy is right, not which is common.**
 
-**Disagreement is sometimes correct.** `manage-identifiers` is carried by four
-Mechs using three different schemes — minted sequential, upstream-first, external
+**Disagreement is sometimes correct.** The four copies of `manage-identifiers`
+use three different schemes — minted sequential, upstream-first, external
 CURIE with placeholder — and each is right for its corpus. The template
 canonicalised the *invariants and the choice*, not the policy. If the copies
 differ because the corpora differ, unify the layer underneath and leave the
@@ -56,14 +56,14 @@ policy alone.
 
 **Do not assert what only some Mechs have.** The `id-label-correspondence`
 template first described a LinkML schema binding in the present indicative,
-generalised from the three adapters that had it. Four of the seven targets did
-not, and claw *owns* that region — so four repositories would have been told
+generalised from the three adapters that had it. Most repositories the
+capability selected did not have it, and claw *owns* that region — so four repositories would have been told
 their schema does something it does not, with nowhere sanctioned to say
 otherwise. Check every claim against every target, not against the copies you
 read it in.
 
-**A copy is right about itself and wrong about its neighbours.** Two of four
-`manage-identifiers` copies asserted false things about siblings: that MIM mints
+**A copy is right about itself and wrong about its neighbours.** Two of the four `manage-identifiers`
+copies asserted false things about siblings: that MIM mints
 sequential ids (it has zero, deliberately) and that MIM is a single-file
 collection (it is 2,952 files). Both were once true. Nothing checks a sentence
 about another repository, so never write one — cite the check instead.
@@ -105,9 +105,27 @@ Add an entry to `src/kg_microbe_skills/skills.yaml` under `canonical:`, with a
 measurement and the judgement — what the copies actually were, which one was
 right, and what was deliberately left un-unified.
 
+Check which repositories a capability actually selects **before** committing to
+it, rather than after rendering:
+
+```python
+from kg_microbe_fleet import load_fleet_manifest
+
+manifest = load_fleet_manifest()
+selected = [
+    key for key, mech in manifest.mechs.items()
+    if (c := mech.capabilities.get("<capability>")) and c.is_enabled
+]
+```
+
+That list is the template's audience. If it does not match the repositories that
+actually need the skill, the capability is wrong.
+
 If no capability expresses what really decides who needs the skill, use a
 stand-in and **say so in the reason**, referencing #316. Several already do.
-Choosing a capability that merely sounds right selects the wrong Mechs.
+Choosing a capability that merely sounds right selects the wrong repositories --
+and a declaration read off a capability's name rather than its machinery is how
+#337 happened.
 
 ## 6. Verify
 
