@@ -52,10 +52,32 @@ Every Mech keys on a taxon. kg-microbe ingests **three** nomenclature sources
 that disagree with each other — `gtdb`, `lpsn`, `lpsn_api` — alongside
 NCBITaxon, and carries a `kgmicrobe.strain` prefix of its own.
 
-Reclassification is the silent-corruption case this leaves open.
-*Clostridium difficile* and *Clostridioides difficile* are one organism; no
-fleet check can currently tell, because no repository owns the assertion that
-they are the same. The family already feels this as a shape without an owner:
+### What already exists, and what it cannot do
+
+kg-microbe's LPSN transform (`transform_utils/lpsn/lpsn.py`) already reconciles
+names automatically: it emits `close_match` edges to `NCBITaxon:*` for every row
+whose scientific name "resolves to exactly one NCBITaxon", pre-loading NCBITaxon
+labels and exact synonyms by BFS from `NCBITaxon:2` and `NCBITaxon:2157`.
+
+That qualifier is the whole point. A name resolving to zero or to several
+produces **no edge at all**, and the residue is invisible — the same shape as
+kg-microbe#373, where unmapped terms are silently dropped rather than emitted.
+Four things a transform structurally cannot do:
+
+- **Decide an ambiguous match.** That needs evidence and a curator.
+- **Record reclassification history.** A `close_match` says nothing about
+  basonyms, which name superseded which, or when — the information that makes a
+  decade-old record readable. *Clostridium difficile* and *Clostridioides
+  difficile* are one organism, and no fleet check can currently tell.
+- **Assert equivalence across GTDB and LPSN**, the pair that disagrees most.
+- **Carry evidence.** An edge from string matching is a computed assertion with
+  no provenance a curator can inspect or dispute.
+
+So the scope is not "build reconciliation" — it is **own what automated matching
+leaves unresolved, plus the history automation cannot infer**. The transform
+produces the easy edges and the residue; the Mech curates the residue. (#336)
+
+The family already feels the identity gap as a shape without an owner:
 `manage-identifiers` and `id-label-correspondence` are carried by three and
 four Mechs respectively, each with its own copy.
 
@@ -200,6 +222,11 @@ Two costs are known in advance rather than discoverable:
 1. Is TaxonMech a Mech or a claw package? It is reference reconciliation rather
    than domain curation, and claw already owns identity tooling. Against that:
    it has a corpus, and corpora live in Mechs.
-2. Does MobilomeMech absorb AntibioticMech's MIBiG data, or read it?
-3. Does HostAssociationMech's boundary with DisMech hold in practice, or does
+2. Does the residue justify a repository? kg-microbe's LPSN transform already
+   emits the unambiguous edges, so TaxonMech's corpus is whatever that leaves
+   over — and nobody has measured how large it is, because the transform does
+   not emit its own misses (kg-microbe#373). **Measuring that residue is the
+   cheapest next step, and it decides this recommendation.**
+3. Does MobilomeMech absorb AntibioticMech's MIBiG data, or read it?
+4. Does HostAssociationMech's boundary with DisMech hold in practice, or does
    one of them end up curating the other's records?
