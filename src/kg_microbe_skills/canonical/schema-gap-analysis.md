@@ -45,6 +45,27 @@ lands differently on each:
 Misclassification is expensive in one direction especially. A process defect
 filed as an instance defect gets a migration that works once and silently rots.
 Ask which side a *new* record written today would land on.
+
+### How to tell which axis
+
+The definitions are easy and the classification is not. These are the signs that
+actually decide it:
+
+**Schema** — hundreds to thousands of records fail the same way, which means the
+data is consistent and the declaration is not. The field name in the error is
+one you can see in real records and recognise as canonical. The pattern being
+violated is older than the design discussion that superseded it.
+
+**Instances** — a small number fail and most do not. The field name is
+suspicious: a typo, or an abandoned experimental key. The value is malformed in
+a way that suggests human entry rather than tooling — one bad timestamp among
+thousands of well-formed ones.
+
+**Process** — the errors cluster by *source tool*: every record from one
+importer, every event from one helper. A field that is otherwise correct is
+consistently in the wrong shape — naive versus timezone-aware timestamps,
+lowercase versus SCREAMING_SNAKE_CASE. Blame on the offending generator line
+lands on a single commit.
 <!-- canonical:end the-three-axes -->
 
 ## Quick pass and deep pass
@@ -109,6 +130,10 @@ today* is a claim with a short half-life.
   quietly corrupted.
 - **Do not hand-edit generated audit output.** Re-run its producer. An edited
   report is a report nobody can reproduce.
+- **Do not histogram only one surface.** Run against every collection and record
+  source this repository publishes. A gap living only in the surface you did not
+  check is silently dropped, and the run reports clean — which is worse than not
+  running it, because now there is evidence of health.
 <!-- canonical:end anti-patterns -->
 
 ## How this repository runs it
@@ -133,4 +158,8 @@ belongs to. Do not record how many there are — the section above says why.
   schema and still assert the wrong identity.
 - claw publishes the fleet-wide version of this method, which resolves the
   applicable repositories and their schema and record locations from the
-  manifest rather than from a list in any skill.
+  manifest rather than from a list in any skill. It asks Mechs not to copy or
+  redefine the general method, and this adapter does not: the managed regions
+  above *are* that method, arriving through a channel that keeps them in step.
+  Everything outside them is this repository's, and editing a managed region
+  here loses the edit at the next render — change it in claw instead.
