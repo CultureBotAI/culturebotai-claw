@@ -100,6 +100,13 @@ skills:
   team-review-sssom:
     scope: domain
     reason: Parallel agent review of MIM's SSSOM product.
+  unify-skills:
+    scope: fleet
+    reason: >-
+      Drives the canonicalisation loop, reading what every manifest-declared
+      Mech carries rather than a list in the skill. Its product is a template
+      in claw; it installs nothing, because writing an adapter into a Mech is a
+      downstream mutation under the cross-repository checklist.
   unmapped-inventory:
     scope: fleet
     reason: >-
