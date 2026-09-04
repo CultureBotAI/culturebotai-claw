@@ -111,6 +111,34 @@ skills:
 # Mechs those are -- from the manifest, so the set cannot drift the way a list
 # written here would the moment a Mech gained or lost the capability.
 canonical:
+  manage-identifiers:
+    capability: testing
+    reason: >-
+      Four Mechs carry this and they genuinely disagree, correctly. Measured
+      2026-09-04: CultureMech mints 6,286 sequential `CultureMech:*`,
+      CommunityMech 325 `CommunityMech:*`, TraitMech is upstream-first with 357
+      METPO against 120 minted `traitmech:*`, and MediaIngredientMech uses
+      whichever external CURIE denotes the thing -- 1,868 CHEBI, 255 cas, 191
+      kgmicrobe.ingredient -- with 270 UNMAPPED_ placeholders. Three schemes,
+      each right for its corpus.
+
+      So this template deliberately does NOT unify the policy. What is shared
+      is the layer underneath: the invariants that hold whatever the scheme,
+      the three shapes and how to pick one, and the hygiene checks. Each Mech
+      keeps its own scheme, prefixes, minting command and worked example.
+
+      It also carries a rule the fleet paid for. Two of the four copies assert
+      false things about siblings -- one says MIM mints sequential ids, which
+      it has zero of and deliberately removed; another calls MIM a single-file
+      collection, and it is 2,952 files. Both were true once. A skill that
+      describes a sibling's policy has no check on it and rots, so the template
+      says to cite the check instead of copying the fact.
+
+      The capability is a stand-in, as it is for fetch-source. Nothing declares
+      "mints and maintains record identifiers", which every Mech does.
+      id_label_validation is adjacent and not the same question: identity and
+      labelling fail separately. Same gap as #316.
+
   next-tasks:
     capability: testing
     reason: >-
