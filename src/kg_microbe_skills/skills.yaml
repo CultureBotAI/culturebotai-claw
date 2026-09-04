@@ -220,6 +220,37 @@ canonical:
       edit at the next synchronization and, in the meantime, disagrees with the
       rest of the fleet about what counts as a mismatch.
 
+  schema-gap-analysis:
+    capability: schema_sync
+    reason: >-
+      Seven copies across two colliding names -- schema-gap-analysis in claw and
+      three Mechs, audit-schema-gaps in two of those three. Not a stand-in
+      capability this time: claw's own copy already resolves its audience with
+      `--capability schema_sync`, and that selects all seven Mechs, which is the
+      right audience.
+
+      The three Mech copies share one skeleton -- validate, histogram,
+      cross-check generator drift, re-validate -- and defer to claw's three-axis
+      vocabulary rather than redefining it. So the method was already
+      canonicalised in intent; what was missing is managed regions, which is why
+      the shared skeleton is duplicated three times and drifts.
+
+      The collision is real and both resolutions are valid. CultureMech keeps
+      two skills and documents which to use when; TraitMech keeps one and leaves
+      a 29-line alias that routes to it, deliberately carrying no duplicate
+      audit logic. The template says the question exists, names both answers,
+      and refuses only the third: two skills each claiming to be the complete
+      procedure, because then neither is maintained.
+
+      The strongest content came from the shortest copy. TraitMech's alias
+      carries the anti-pattern "do not present a snapshot count as current
+      repository state", and two siblings violate it. Measured 2026-09-04:
+      CultureMech's "current state" table claims 2,943 errors across 4,289
+      records led by 1,195 date-to-timestamp failures; the corpus now holds
+      6,286 records, zero carry the old key and all 6,286 carry the new one.
+      Every number was wrong and nothing flagged it, because prose has no test.
+      That rule is now a managed region with the measurement behind it.
+
   review-open-issues:
     capability: testing
     reason: >-
