@@ -65,18 +65,23 @@ from the corpus: does something upstream already name these things?
 how another Mech mints ids has no check on it, and the sibling will change
 without telling you.
 
-This is not hypothetical. Measured across the fleet on 2026-09-04, two of the
-four existing copies of this skill carried false claims about siblings:
+This is not hypothetical. Measured on 2026-09-04, **three of the four** existing
+copies carried false claims about their neighbours:
 
 - one asserted that MediaIngredientMech "mints its own `<RepoName>:NNNNNN`
   sequential IDs" — MIM has **zero** such identifiers, and its own skill records
   that the legacy sequential id was deliberately removed;
 - another described MediaIngredientMech as a "single-file collection" — it is
-  2,952 separate YAML files.
+  2,952 separate YAML files;
+- the third, and the origin of the pattern, is a document titled "Identifier
+  Management for X-Mech Repositories" that lives inside a single Mech, declares
+  its scope to be "all X-Mech repositories", and works its examples in
+  `MediaIngredientMech:000001`.
 
-Both statements were accurate about some earlier state and rotted in place. Each
-skill is right about itself and wrong about its neighbours, which is the
-predictable result of writing down something nothing verifies.
+All three were accurate about some earlier state and rotted in place. Each copy
+is right about itself and wrong about its neighbours — the predictable result of
+writing down something nothing verifies. The generic one rotted worst, because
+breadth is exactly what nothing checks.
 
 If a cross-repository fact matters, cite the check that establishes it rather
 than the fact: `kg-microbe-skills check` for references, the sibling's own
@@ -102,6 +107,20 @@ before a batch lands:
 
 A gap in a sequence is **not** a defect. Retirement leaves holes, and a run that
 closes them has renumbered records, which violates the first invariant.
+
+**Record the retirement rather than merely permitting it.** A retired id that is
+simply absent makes every citation to it fail silently; a recorded one resolves
+to a retirement a reader can act on. The shape that works, which one Mech in the
+fleet already operates:
+
+- retirement is written down, not implied by absence;
+- a successor claim requires an *established* successor — one for a merge, two
+  or more for a split;
+- when no successor is established, say so and **do not guess a redirect**. A
+  wrong redirect is worse than an honest dead end, because it resolves.
+
+Where that record lives and what columns it has is this repository's business;
+that it exists is not.
 <!-- canonical:end hygiene -->
 
 ## This repository's scheme

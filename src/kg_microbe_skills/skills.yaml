@@ -127,12 +127,22 @@ canonical:
       the three shapes and how to pick one, and the hygiene checks. Each Mech
       keeps its own scheme, prefixes, minting command and worked example.
 
-      It also carries a rule the fleet paid for. Two of the four copies assert
-      false things about siblings -- one says MIM mints sequential ids, which
-      it has zero of and deliberately removed; another calls MIM a single-file
-      collection, and it is 2,952 files. Both were true once. A skill that
-      describes a sibling's policy has no check on it and rots, so the template
-      says to cite the check instead of copying the fact.
+      It also carries a rule the fleet paid for. Three of the four copies
+      assert false things about siblings -- one says MIM mints sequential ids,
+      which it has zero of and deliberately removed; another calls MIM a
+      single-file collection, and it is 2,952 files; the third is a generic
+      "X-Mech Repositories" document living inside one Mech, claiming scope
+      over all of them and working its examples in MediaIngredientMech:000001.
+      All were true once. The generic one rotted worst, because breadth is what
+      nothing checks. So the template says to cite the check instead of copying
+      the fact.
+
+      The hygiene region also carries the retirement shape rather than only the
+      rule, after review found the strongest mechanism in the fleet sitting in
+      one repository: retirement recorded rather than implied by absence, a
+      successor claim requiring an established successor, and a refusal to
+      guess a redirect when none is (#340). Flattening that would have lost the
+      part worth having, which is what managed regions exist to prevent (#293).
 
       The capability is a stand-in, as it is for fetch-source. Nothing declares
       "mints and maintains record identifiers", which every Mech does.
