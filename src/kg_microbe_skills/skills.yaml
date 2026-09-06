@@ -170,6 +170,48 @@ canonical:
       them would leave five adapters that look unified and have lost the only
       content worth having (#293). So the template marks two regions and leaves
       the rest to the Mech, which is what canonical:begin/end is for.
+  curate-yaml-record:
+    capability: curation_history
+    reason: >-
+      Seven copies landed as one batch on 2026-09-02, one per Mech, and
+      claw#346 called them a shared verbatim skeleton. Measured at the sentence
+      level they are not: the seven share headings and not one Boundaries
+      bullet is verbatim across even six of them. Every copy is an adaptation,
+      which means this template could not lift text from any of them -- it
+      states the principles fresh, at the level where all seven agree.
+
+      What all seven agree on: one target, disambiguated before anything is
+      touched; audit is read-only and curation authorises the named record
+      only; search results are leads and only an inspected source is evidence;
+      a generated artifact is never the fix; no outbound action on the strength
+      of a curation request; absence is not falsity and coverage is not a goal;
+      write through the path that records history; never attribute agent
+      judgement to the user. Those are the managed regions.
+
+      What is deliberately not unified: how a record is written back. Five
+      Mechs use a direct guarded write through record_curation_event plus a
+      write_validated_* function; ProteinTraitsMech has no generic writer on
+      purpose and requires a registered, tested editor; HabitatMech's records
+      are build products, so the fix goes into a decision row or overlay and
+      the record regenerates. Three shapes, each correct for its corpus, named
+      in the template and chosen by the Mech -- the manage-identifiers lesson.
+
+      Two things came from single copies and are now fleet-wide. HabitatMech
+      alone required an ignore-independent search before declaring anything
+      absent, which is the global rule every Mech is under. The evidence
+      standard -- narrowest claim, verbatim snippet, association is not
+      mechanism, a bounded miss is a result -- lives in seven review
+      checklists that share two headings and no text, and is now one region.
+
+      The capability is exact, not a stand-in: the write step's whole point is
+      appending a curation event, and curation_history is enabled on all
+      seven. HabitatMech carries the skill and is not a manifest member
+      (#321), so it cannot be a target until it is admitted.
+
+      The per-Mech references/review-checklist.md is a second file the
+      template system cannot render, so its field table stays entirely the
+      Mech's and the template points at it.
+
   fetch-source:
     capability: testing
     reason: >-
