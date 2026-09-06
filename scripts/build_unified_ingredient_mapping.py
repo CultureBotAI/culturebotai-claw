@@ -248,6 +248,76 @@ def resolve_mim_record(
     return None
 
 
+def _prefix(curie: str) -> str:
+    return curie.split(':', 1)[0] if ':' in curie else ''
+
+
+def _published_ids(term_id: str, mim: dict | None) -> tuple[str, str]:
+    """The (chebi_id, culturemech_term_id) a row publishes, MIM's ruling first.
+
+    This file is the source of truth for kg-microbe's ingredient groundings
+    (priority 11 in its consolidator), and that consumer selects a row's
+    primary with ``best_primary([chebi_id, culturemech_term_id, mim_id,
+    kg_microbe_node_id, cas_rn])``: equal-tier candidates tie, and the tie
+    goes to the earlier column. So a MIM correction written to ``mim_id`` lost
+    to a superseded CultureMech id republished in ``chebi_id`` or
+    ``culturemech_term_id`` -- every rebuild re-asserted the stale grounding
+    and demoted MIM's to an xref. kg-microbe declined to reorder, since that
+    would also move disagreements nobody has reviewed (kg-microbe#723). The
+    only lever left is what this file publishes (MediaIngredientMech#138).
+
+    Rules, deliberately narrow:
+
+    - MIM MAPPED to a CURIE: ``chebi_id`` is MIM's CHEBI id (CultureMech's only
+      as fallback when MIM's identity is not CHEBI). ``culturemech_term_id`` is
+      withheld only when it would tie MIM's id downstream -- same prefix,
+      different value. A different-prefix disagreement is left as today: the
+      consumer's tier ranking already decides it, and blanking would only
+      erase provenance the curation queue (CultureMech#256) still needs.
+    - MIM deliberately UNMAPPED: MIM's ruling is "no identity". A raw column
+      asserting one contradicts that and would win by default, since there is
+      no corrected candidate at all. Both columns are withheld.
+    - No MIM record: unchanged. CultureMech's term is the only opinion.
+
+    A REJECTED record counts as a ruling too. The index prefers a live record,
+    so a tombstone is only ever resolved when it is the sole match for the
+    label -- and MIM gives a merged loser the winner's identifier precisely so
+    that lookups on the loser still resolve (MediaIngredientMech#358). This
+    builder already publishes that identifier as the row's ``mim_id``; letting
+    a stale CultureMech id outrank it while trusting it as the identity would
+    be incoherent. On the 2026-09-06 baseline the MAPPED/UNMAPPED rules alone
+    left 5 of 28 defective rows, all tombstones, Ca-pantothenate (137
+    occurrences) among them.
+    """
+    term_id = term_id or ''
+    mim_id = (mim or {}).get('mim_id') or ''
+    status = (mim or {}).get('mapping_status') or ''
+    ruled = (
+        bool(mim)
+        and status in ('MAPPED', 'REJECTED')
+        and ':' in mim_id
+        and not mim_id.startswith('UNMAPPED')
+    )
+    refused = bool(mim) and mim_id.startswith('UNMAPPED')
+
+    if refused:
+        return '', ''
+
+    if ruled and mim['chebi_id']:
+        chebi_id = mim['chebi_id']
+    elif term_id.startswith('CHEBI:'):
+        chebi_id = term_id
+    elif mim and mim['chebi_id']:
+        chebi_id = mim['chebi_id']
+    else:
+        chebi_id = ''
+
+    cm_term_id = term_id
+    if ruled and term_id and term_id != mim_id and _prefix(term_id) == _prefix(mim_id):
+        cm_term_id = ''
+    return chebi_id, cm_term_id
+
+
 def build_unified_rows(
     occurrences: dict,
     name_index: dict,
@@ -272,16 +342,11 @@ def build_unified_rows(
         term_id = info['term_id']
         mim = resolve_mim_record(name, term_id, name_index, chebi_index, ontology_index)
 
-        # CHEBI priority: CultureMech term.id first, MIM as fallback
-        chebi_id = ''
-        if term_id.startswith('CHEBI:'):
-            chebi_id = term_id
-        elif mim and mim['chebi_id']:
-            chebi_id = mim['chebi_id']
+        chebi_id, cm_term_id = _published_ids(term_id, mim)
 
         row = {
             'ingredient_name': name,
-            'culturemech_term_id': term_id,
+            'culturemech_term_id': cm_term_id,
             'occurrence_count': info['count'],
             'chebi_id': chebi_id,
             'mim_id': mim['mim_id'] if mim else '',
