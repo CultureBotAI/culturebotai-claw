@@ -486,18 +486,35 @@ def _last_curator(history: list[dict]) -> str:
 
 
 def _mapping_date(path: Path, history: list[dict]) -> str:
-    """Prefer the most recent curation_history timestamp; fall back to the
-    filesystem mtime. Always emit `YYYY-MM-DD`."""
-    if history:
-        ts = history[-1].get("timestamp") or ""
-        m = re.match(r"^(\d{4}-\d{2}-\d{2})", ts)
-        if m:
-            return m.group(1)
-    try:
-        mtime = path.stat().st_mtime
-        return datetime.fromtimestamp(mtime, tz=timezone.utc).strftime("%Y-%m-%d")
-    except OSError:
-        return datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
+    """The latest curation_history date, as `YYYY-MM-DD`; empty when unknown.
+
+    Takes the maximum over parseable timestamps rather than `history[-1]`. The
+    two coincide only while history stays append-ordered, and the published date
+    should not depend on that holding.
+
+    There is deliberately no filesystem fallback. Git does not preserve mtimes,
+    so a record reaching one would be stamped with whenever the machine happened
+    to clone -- a value that differs per checkout and means nothing, published
+    into an artifact that is supposed to be reproducible. While such a fallback
+    was in place it silently mis-stamped three rows, and only a backward-moving
+    date in a rebuild diff exposed them (MediaIngredientMech#542).
+
+    An empty date is honest and visible. A record without a parseable timestamp
+    is a curation defect -- `CLAUDE.md` requires a `curation_history` event on
+    every material change -- and belongs in the QC report, not papered over here.
+    """
+    dates = [
+        m.group(1)
+        for event in history or []
+        if (m := re.match(r"^(\d{4}-\d{2}-\d{2})", str(event.get("timestamp") or "")))
+    ]
+    if dates:
+        return max(dates)
+    print(
+        f"  WARNING: no parseable curation_history timestamp in {path.name}; "
+        "emitting an empty mapping_date (#542)"
+    )
+    return ""
 
 
 def _cas_token(data: dict) -> str:
