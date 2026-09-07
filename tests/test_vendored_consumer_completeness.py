@@ -60,17 +60,10 @@ INCOMPLETE_CONSUMERS: dict[str, str] = {
     # and ProteinTraitsMech left it when they vendored
     # scripts/deep_research_contract.py (#270); and AntibioticMech left it when
     # CultureBotAI/AntibioticMech#177 vendored all 13 artifacts that apply to it
-    # and pinned 0a3252d4, the claw commit that declares it (#279 step 2 of 3).
-    "habitatmech": (
-        "Step 1 of 3 of admitting HabitatMech. Declaring the consumer is what "
-        "advances the canonical ref, and HabitatMech cannot vendor against a "
-        "ref that does not yet name it -- sync refuses when the pinned manifest "
-        "does not match the installed one. It tracks 2 of its 13 artifacts "
-        "(mech_shared.yaml and deep_research_contract.py) and has no "
-        "scripts/.vendored_canon_ref at all. The HabitatMech vendoring PR "
-        "vendors the remaining 11 and pins the new ref, which is what takes "
-        "this entry back out."
-    ),
+    # and pinned 0a3252d4, the claw commit that declares it (#279 step 2 of 3);
+    # HabitatMech left it when CultureBotAI/HabitatMech#255 vendored all 13
+    # artifacts that apply to it and pinned 69c3abb7, the commit of #360 that
+    # declares it.
 }
 
 
