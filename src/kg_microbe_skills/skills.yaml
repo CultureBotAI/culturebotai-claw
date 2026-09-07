@@ -249,7 +249,7 @@ canonical:
       wrong. The template says so, because a reader who thinks this is a
       tidiness check will fix labels and leave the serious defect in place.
 
-      Engine A is a property of the schema, and only three of the seven Mechs
+      Engine A is a property of the schema, and only three of the eight Mechs
       declare the binding it needs -- the same three that already carry the
       skill. So the template states it as what adoption requires rather than as
       what is already true, and says a clean run on a Mech without the binding

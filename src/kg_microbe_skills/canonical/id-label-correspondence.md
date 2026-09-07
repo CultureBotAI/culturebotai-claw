@@ -66,7 +66,7 @@ label through OAK and fails where the asserted label differs, and the check
 holds for anything that validates against the schema rather than only for what
 a script remembered to walk.
 
-**Check before relying on it.** As of 2026-09-03 three of the seven Mechs
+**Check before relying on it.** As of 2026-09-07 three of the eight Mechs
 declare the binding and four do not, so for those four this engine is not
 switched off — it was never wired up, and a clean run of it means nothing. A
 repository without the binding either adds one or records below why record-level
