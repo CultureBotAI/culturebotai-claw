@@ -40,6 +40,7 @@ manifest when no source checkout is present:
 - ProteinTraitsMech (`PROTEINTRAITSMECH_ROOT`) — note the GitHub slug is
   lowercase `proteintraitsmech`
 - CellStructureMech (`CELLSTRUCTUREMECH_ROOT`)
+- HabitatMech (`HABITATMECH_ROOT`)
 
 You do not need every Mech cloned. `openclaw-cli config validate` reports an
 unset root as "not configured locally" rather than a failure; pass

@@ -70,7 +70,8 @@ def test_the_sweep_queries_exactly_the_manifest_fleet():
 
 
 def test_an_org_repo_not_in_the_manifest_is_not_swept():
-    assert "CultureBotAI/HabitatMech" not in fleet_repository_identities()
+    # The website repository lives in the org but is not a Mech.
+    assert "CultureBotAI/CultureBotAI.github.io" not in fleet_repository_identities()
 
 
 def test_adding_a_mech_to_the_manifest_adds_it_to_the_sweep():

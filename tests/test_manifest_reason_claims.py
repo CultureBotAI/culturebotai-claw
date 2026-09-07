@@ -125,6 +125,16 @@ def test_the_reasons_that_make_checkable_claims_are_the_ones_declared():
         "culturemech.page_budgets",
         "culturemech.source_catalogue",
         "culturemech.source_queue",
+        "habitatmech.deep_research",
+        "habitatmech.environment_coverage",
+        "habitatmech.kgx_export",
+        "habitatmech.page_budgets",
+        "habitatmech.site_contract",
+        "habitatmech.source_catalogue",
+        "habitatmech.source_queue",
+        "habitatmech.sssom_export",
+        "habitatmech.unmapped_inventory_input",
+        "habitatmech.writer_audit",
         "mediaingredientmech.page_budgets",
         "mediaingredientmech.source_catalogue",
         "mediaingredientmech.source_queue",
@@ -205,9 +215,11 @@ def test_a_declared_claim_holds_against_the_repository(mech, cap, reason, capabi
 
 
 def test_the_claw_prefixed_claims_are_checked_even_with_no_mech_checkout():
-    """`claw:` paths live in this repository, so they never skip. All three
-    unmapped_inventory_input reasons name a claw script; if that check could
-    skip, the only always-runnable case would be the one that never runs."""
+    """`claw:` paths live in this repository, so they never skip. All four
+    unmapped_inventory_input reasons name a claw script, and HabitatMech's
+    environment_coverage reason names the dashboard that lacks a loader for it;
+    if that check could skip, the only always-runnable case would be the one
+    that never runs."""
     checked = 0
     for mech, cap, _, capability in _ALL:
         for path in capability.reason_claims.present:
@@ -216,7 +228,7 @@ def test_the_claw_prefixed_claims_are_checked_even_with_no_mech_checkout():
                     f"{mech}.{cap} names a claw path that does not exist"
                 )
                 checked += 1
-    assert checked == 3
+    assert checked == 5
 
 
 # -- what the loader rejects ------------------------------------------------

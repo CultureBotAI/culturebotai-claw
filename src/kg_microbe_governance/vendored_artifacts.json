@@ -30,6 +30,10 @@
     "antibioticmech": {
       "github": "CultureBotAI/AntibioticMech",
       "package_path": "src/antibioticmech"
+    },
+    "habitatmech": {
+      "github": "CultureBotAI/HabitatMech",
+      "package_path": "src/habitatmech"
     }
   },
   "artifacts": [
