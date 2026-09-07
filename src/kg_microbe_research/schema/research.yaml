@@ -78,6 +78,7 @@ enums:
       ProteinTraitsMech:
       AntibioticMech:
       CellStructureMech:
+      HabitatMech:
 
   ProviderEnum:
     description: >-

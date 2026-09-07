@@ -47,6 +47,11 @@ EXPECTED_PROFILES = {
         ("src/cellstructuremech/schema/cellstructuremech.yaml",),
         ("data/structures/**/*.yaml",),
     ),
+    "habitatmech": (
+        "src/habitatmech",
+        ("src/habitatmech/schema/habitatmech.yaml",),
+        ("data/habitats/**/*.yaml",),
+    ),
 }
 
 EXPECTED_CAPABILITIES = {

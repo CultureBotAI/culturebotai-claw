@@ -104,8 +104,9 @@ Because the ad-hoc version has produced wrong answers here, and every one was a
   pr list …; done` prints nothing for a repo that 502s, which reads identically
   to "nothing open". The script names it, and marks the total a lower bound.
 - **Filesystem and suffix discovery disagree with governance.** A missing clone
-  used to hide a Mech, while suffix matching later absorbed HabitatMech without
-  a fleet decision. The script reads the canonical manifest and no working tree.
+  used to hide a Mech, while suffix matching later absorbed HabitatMech before
+  the fleet had decided to admit it. The script reads the canonical manifest
+  and no working tree.
 - **A repo with zero open PRs must still appear.** Otherwise "checked, nothing
   there" is indistinguishable from "not checked".
 

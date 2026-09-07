@@ -7,7 +7,7 @@ The report is deliberately based on GitHub's remote state, not local clones:
   organization is *also* listed, and any Mech-named repository publishing a site
   without being a manifest member is reported as such rather than quietly folded
   in -- that gap is a finding, not a detail. AntibioticMech and HabitatMech were
-  both in it when this was written;
+  both in it when this was written; both have since been admitted;
 * the published revision comes from the newest successful ``github-pages``
   deployment;
 * freshness compares that revision with the current default-branch head; and

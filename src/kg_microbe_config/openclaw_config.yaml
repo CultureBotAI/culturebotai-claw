@@ -54,6 +54,13 @@ repositories:
     task_runner: just
     description: "Microbial cell structures: organelles, envelope layers, appendages, complexes"
 
+  habitatmech:
+    path: ${HABITATMECH_ROOT}
+    type: python
+    package_manager: uv
+    task_runner: just
+    description: "Microbial habitats: GOLD, BacDive, PREGO and Madin et al. harmonized to ENVO"
+
 agents:
   discovery_paths:
     - kg_microbe_agents/definitions
