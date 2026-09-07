@@ -21,16 +21,27 @@ import csv
 import sys
 import yaml
 import argparse
+import os
 from pathlib import Path
 from collections import defaultdict
 from typing import Dict, Optional
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+CULTUREMECH_ROOT = Path(
+    os.environ.get("CULTUREMECH_ROOT", REPO_ROOT.parent / "CultureMech")
+)
+MIM_ROOT = Path(
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
+)
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from plugins.ingredient_name_normalizer import canonicalize_hydrate
+from plugins.ingredient_name_normalizer import canonicalize_hydrate  # noqa: E402
 
 
-CULTUREMECH_ROOT = Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech'
-MIM_ROOT = Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech'
 DEFAULT_OUTPUT = Path('workspace/unified_ingredient_mapping.tsv')
 
 
@@ -478,6 +489,7 @@ def main():
                         help='Output format (default: both TSV and YAML summary)')
 
     args = parser.parse_args()
+    require_mech_roots("culturemech", "mediaingredientmech", claw_root=REPO_ROOT)
 
     if not args.culturemech.exists():
         print(f"Error: CultureMech not found: {args.culturemech}")

@@ -9,12 +9,23 @@ but no ontology term ID, then updates CultureMech media files.
 import yaml
 import requests
 import time
+import os
+import sys
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, Dict, List
 import argparse
 from xml.etree import ElementTree as ET
 
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+CULTUREMECH_ROOT_PATH = Path(
+    os.environ.get("CULTUREMECH_ROOT", REPO_ROOT.parent / "CultureMech")
+)
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
 
 class ChEBIEnricher:
     """Enriches ingredient ontology mappings via ChEBI API."""
@@ -398,11 +409,12 @@ def main():
     parser.add_argument(
         '--culturemech',
         type=Path,
-        default=Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech',
+        default=CULTUREMECH_ROOT_PATH,
         help='Path to CultureMech repository (for extracting CAS-RN from media notes)'
     )
 
     args = parser.parse_args()
+    require_mech_roots("culturemech", claw_root=REPO_ROOT)
 
     print("Extracting ingredients with CAS-RN but no ontology ID...")
 

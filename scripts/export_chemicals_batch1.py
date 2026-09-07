@@ -13,7 +13,18 @@ Total: 34 items
 
 import sys
 import yaml
+import os
+import argparse
 from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+MIM_ROOT_PATH = Path(
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
+)
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
 
 # Batch 1 target ingredients
 BATCH_1_CHEMICALS = [
@@ -64,7 +75,9 @@ BATCH_1_CHEMICALS = [
 
 def main():
     # Load unmapped ingredients
-    mim_root = Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech'
+    argparse.ArgumentParser(description=__doc__).parse_args()
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
+    mim_root = MIM_ROOT_PATH
     unmapped_file = mim_root / 'data/curated/unmapped_ingredients.yaml'
 
     with open(unmapped_file) as f:

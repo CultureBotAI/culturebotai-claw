@@ -7,10 +7,21 @@ and provides detailed statistics on coverage.
 """
 
 import yaml
+import os
+import sys
 from pathlib import Path
 from collections import defaultdict, Counter
 import argparse
 
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+CULTUREMECH_ROOT_PATH = Path(
+    os.environ.get("CULTUREMECH_ROOT", REPO_ROOT.parent / "CultureMech")
+)
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
 
 class FEBAOntologyAnalyzer:
     """Analyzes ontology term coverage for FEBA ingredients."""
@@ -186,7 +197,7 @@ def main():
     parser.add_argument(
         '--culturemech',
         type=Path,
-        default=Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech',
+        default=CULTUREMECH_ROOT_PATH,
         help='Path to CultureMech repository'
     )
     parser.add_argument(
@@ -203,6 +214,7 @@ def main():
     )
 
     args = parser.parse_args()
+    require_mech_roots("culturemech", claw_root=REPO_ROOT)
 
     analyzer = FEBAOntologyAnalyzer(args.culturemech)
 

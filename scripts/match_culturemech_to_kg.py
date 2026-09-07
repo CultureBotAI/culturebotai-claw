@@ -13,10 +13,23 @@ import csv
 import yaml
 import argparse
 import sys
+import os
 from pathlib import Path
 from collections import defaultdict
 from datetime import datetime
 from typing import Dict, FrozenSet, Optional, Set
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+CULTUREMECH_ROOT_PATH = Path(
+    os.environ.get("CULTUREMECH_ROOT", REPO_ROOT.parent / "CultureMech")
+)
+KG_MICROBE_ROOT_PATH = Path(
+    os.environ.get("KGMICROBE_ROOT", REPO_ROOT.parent / "kg-microbe")
+)
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
 
 
 def build_kg_chebi_index(edges_file: Path) -> Dict[FrozenSet[str], list]:
@@ -168,13 +181,13 @@ def main():
     parser.add_argument(
         '--culturemech',
         type=Path,
-        default=Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech',
+        default=CULTUREMECH_ROOT_PATH,
         help='Path to CultureMech repository'
     )
     parser.add_argument(
         '--kg-microbe',
         type=Path,
-        default=Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe',
+        default=KG_MICROBE_ROOT_PATH,
         help='Path to kg-microbe repository'
     )
     parser.add_argument(
@@ -184,6 +197,7 @@ def main():
     )
 
     args = parser.parse_args()
+    require_mech_roots("culturemech", claw_root=REPO_ROOT)
 
     edges_file = args.kg_microbe / 'data/transformed_last9/mediadive/edges.tsv'
 

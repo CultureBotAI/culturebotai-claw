@@ -7,9 +7,20 @@ only contain single chemical/biological ingredients.
 """
 
 import yaml
+import os
+import sys
 from pathlib import Path
 from datetime import datetime
 
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+MIM_ROOT_PATH = Path(
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
+)
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
 def remove_complex_from_mim(mim_root: Path, dry_run: bool = True):
     """Remove COMPLEX entries from MediaIngredientMech mapped_ingredients.yaml."""
     mapped_file = mim_root / 'data/curated/mapped_ingredients.yaml'
@@ -129,11 +140,12 @@ def main():
                        help='Actually modify files')
 
     args = parser.parse_args()
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
 
     dry_run = not args.production
 
     # Paths
-    mim_root = Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech'
+    mim_root = MIM_ROOT_PATH
     workspace = Path('workspace')
 
     print("="*80)

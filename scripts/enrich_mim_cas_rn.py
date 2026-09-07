@@ -21,13 +21,24 @@ import argparse
 import urllib.request
 import urllib.error
 import json
+import os
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+MIM_ROOT = Path(
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
+)
+CULTUREBOT_ROOT = Path(
+    os.environ.get("CULTUREBOTHT_ROOT", REPO_ROOT.parent / "CultureBotHT")
+) / "CultureBotHT"
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
 
-MIM_ROOT = Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech'
-CULTUREBOT_ROOT = Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureBotHT/CultureBotHT'
+
 PUBCHEM_BASE = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug'
 
 
@@ -306,6 +317,7 @@ def main():
     )
 
     args = parser.parse_args()
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
 
     if not args.mim.exists():
         print(f"Error: MIM not found: {args.mim}")

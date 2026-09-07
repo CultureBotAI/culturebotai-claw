@@ -2,11 +2,25 @@
 """Import complex formulation entries into MediaIngredientMech."""
 
 import yaml
+import os
+import sys
+import argparse
 from pathlib import Path
 
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+MIM_ROOT_PATH = Path(
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
+)
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
 def main():
+    argparse.ArgumentParser(description=__doc__).parse_args()
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
     workspace = Path('workspace')
-    mim_root = Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech'
+    mim_root = MIM_ROOT_PATH
 
     # Load complex formulation entries
     entries_file = workspace / 'curation/complex_formulations_mim_entries.yaml'

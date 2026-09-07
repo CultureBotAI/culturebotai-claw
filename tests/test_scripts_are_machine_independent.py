@@ -15,11 +15,20 @@ environment variables as overrides, and all 54 shebangs name `python3` rather
 than one Homebrew install. They stay in the file as the mechanism that keeps
 them empty -- a new script cannot be added to either without a deliberate edit
 here, and the tests fail in both directions.
+
+#365. The ledger was empty and wrong. The guard matched the literal it was
+written against -- `/Users/` -- and 45 scripts satisfied it with
+`Path.home() / 'Documents/VIMSS/ontology/...'`, which names the same laptop one
+token to the right. That is the #286 shape: a test driven by the situation that
+already held, so it passed either way. The guard now also refuses a home
+directory joined to a literal path, and any `Documents/` segment, which is what
+the 45 had in common and no portable script needs.
 """
 
 from __future__ import annotations
 
 import ast
+import re
 from pathlib import Path
 
 import pytest
@@ -35,6 +44,13 @@ HARDCODED_PATHS: set[str] = set()
 # with Homebrew and that exact Python.
 ABSOLUTE_INTERPRETER: set[str] = set()
 
+# `Path.home() / "Documents/..."` and `expanduser("~/Documents/...")` are a
+# home-directory path with the `/Users/` cut off. A dot-directory under home
+# (`~/.data/oaklib`) is a tool cache, not a checkout, and stays allowed.
+_HOME_JOINED_TO_LITERAL = re.compile(
+    r"""(Path\.home\(\)\s*/\s*['"](?!\.)|expanduser\(\s*['"]~/(?!\.))"""
+)
+
 
 def _scripts():
     return sorted(SCRIPTS.glob("*.py"))
@@ -42,7 +58,12 @@ def _scripts():
 
 def _has_home_path(path: Path) -> bool:
     source = path.read_text(encoding="utf-8")
-    return "/Users/" in source or "/home/" in source
+    return (
+        "/Users/" in source
+        or "/home/" in source
+        or "Documents/" in source
+        or _HOME_JOINED_TO_LITERAL.search(source) is not None
+    )
 
 
 def test_there_are_scripts_to_check():

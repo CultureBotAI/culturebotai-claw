@@ -7,12 +7,23 @@ by unmappability reason for prioritization and manual lookup.
 """
 
 import yaml
+import os
+import sys
 from pathlib import Path
 from typing import Dict, List
 import argparse
 import re
 import csv
 
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+MIM_ROOT_PATH = Path(
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
+)
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
 
 class UnmappedCASExporter:
     """Exports unmapped CAS-RN ingredients to TSV format."""
@@ -235,7 +246,7 @@ def main():
     parser.add_argument(
         '--mim',
         type=Path,
-        default=Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech',
+        default=MIM_ROOT_PATH,
         help='Path to MediaIngredientMech repository'
     )
     parser.add_argument(
@@ -246,6 +257,7 @@ def main():
     )
 
     args = parser.parse_args()
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
 
     exporter = UnmappedCASExporter(args.mim)
 
