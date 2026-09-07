@@ -1086,9 +1086,11 @@ mechs:
       knowledge_gap_scan:
         status: disabled
         reason: >-
-          Records carry the shared Discussion section, so the scan applies,
-          but the repository is not yet in the knowledge-gap-scan workflow
-          matrix; enable once it is added there.
+          Records carry the shared Discussion section, so the scan applies.
+          The workflow matrix is generated from this manifest, so enabling
+          the capability here with a settings.window is what adds the
+          repository to it. Left disabled until HabitatMech has run the scan
+          once locally and chosen its window.
       vendored_sync:
         status: enabled
       corpus_statistics:
@@ -1101,8 +1103,8 @@ mechs:
       page_budgets:
         status: disabled
         reason: >-
-          Serves 3,404 tracked pages under pages/ straight from main via
-          GitHub Pages -- it has no generate-pages.yaml -- and declares no
+          Serves 3,404 published HTML pages under pages/ straight from main
+          via GitHub Pages -- it has no generate-pages.yaml -- and declares no
           size or file-count budgets, so nothing watches them grow. Adopting
           them applies here; the limits are the repository's to set.
         reason_claims:
@@ -1143,7 +1145,7 @@ mechs:
       source_queue:
         status: disabled
         reason: >-
-          Has no curation/source_queue.tsv; its four sources are declared in
+          Has no curation/source_queue.tsv; its sources are declared in
           conf/sources.yaml and the raw payloads in data/raw/MANIFEST.yaml.
           AntibioticMech wrote the pattern and CellStructureMech adapted it;
           adopting it here means ranking candidate habitat sources and
@@ -1158,7 +1160,7 @@ mechs:
       site_contract:
         status: disabled
         reason: >-
-          Publishes 3,404 tracked pages under pages/ straight from main, so
+          Publishes 3,404 HTML pages under pages/ straight from main, so
           the check has a directory to judge, but it has not been measured on
           this site yet. Enable after measuring on joining, as AntibioticMech
           did, so the contract's numbers keep describing what it runs on.
