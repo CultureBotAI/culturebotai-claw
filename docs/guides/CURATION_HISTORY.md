@@ -56,9 +56,10 @@ Where validity is checked differs on purpose. A repository whose qc runner is
 the single authoritative gate puts it there; one that already separates
 provenance from testing keeps a workflow. Either way it blocks.
 
-The *presence* check is the half this model leaves advisory, and four Mechs
-implement one: CultureMech, MediaIngredientMech and CommunityMech warn without
-failing, and TraitMech made its check blocking in TraitMech#325. A repository
+The *presence* check is the half this model leaves advisory, and it exists where
+a repository chose to write one: CultureMech, MediaIngredientMech and
+CommunityMech warn without failing, and TraitMech made its check blocking in
+TraitMech#325. A repository
 is free to tighten it; what the model asks is that nobody be blocked by a
 missing history record before the layer is worth relying on.
 
