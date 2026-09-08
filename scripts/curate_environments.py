@@ -354,7 +354,14 @@ def main():
     )
 
     args = parser.parse_args()
-    require_mech_roots("culturemech", claw_root=REPO_ROOT)
+    # Verify the path this run will actually use, not the default it will
+    # not: --culturemech-root naming a real checkout was refused whenever
+    # the default location happened to be absent (#368).
+    require_mech_roots(
+        "culturemech",
+        claw_root=REPO_ROOT,
+        explicit={"culturemech": getattr(args, "culturemech_root", None)},
+    )
 
 
     # Default to curate if no command specified

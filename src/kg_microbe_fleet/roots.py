@@ -25,7 +25,10 @@ from __future__ import annotations
 
 import os
 from collections.abc import Mapping
+from io import StringIO
 from pathlib import Path
+
+from dotenv import dotenv_values  # type: ignore[import-untyped]
 
 from . import FleetManifest, load_fleet_manifest
 
@@ -35,8 +38,48 @@ class MechRootError(RuntimeError):
 
 
 def sibling_default(mech_display_name: str, claw_root: Path) -> Path:
-    """The conventional sibling checkout path this fleet has always used."""
+    """The conventional sibling checkout path, as a last-resort guess.
+
+    It was the layout every script assumed, and it is no longer the layout on
+    the machine this fleet is developed on: the Mech checkouts moved out from
+    beside claw on 2026-09-07 (#364). The guess is kept because it costs
+    nothing -- `looks_like` refuses a directory that is not that Mech, so a
+    stale convention produces a refusal rather than work on the wrong tree --
+    but it is a guess, not the convention, and the configured variable or
+    claw's own `.env` should answer first.
+    """
     return Path(claw_root).resolve().parent / mech_display_name
+
+
+def dotenv_variable(claw_root: Path, variable: str) -> str:
+    """One repository-root variable from claw's own `.env`, or "".
+
+    `openclaw-cli` reads `.env` through `RepositorySettings`; every
+    `kg-microbe-*` console script read the bare process environment, so a
+    fleet configured exactly as CLAUDE.md prescribes still refused every
+    command that did not separately export it (#364). This reads the same
+    file for the one variable being resolved.
+
+    Interpolation is off for the reason `merged_repository_environment` gives:
+    letting python-dotenv expand turns an unknown variable into an empty
+    string, so `${MISSING}/repo` silently becomes `/repo` -- a path that could
+    redirect an operation to an unintended checkout. A malformed or
+    unreadable file yields "" and the caller falls through to the guess, which
+    is validated; it can never yield a root that was not checked.
+    """
+    path = Path(claw_root) / ".env"
+    try:
+        if path.is_symlink() or not path.is_file():
+            return ""
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return ""
+    try:
+        loaded = dotenv_values(stream=StringIO(text), verbose=False, interpolate=False)
+    except Exception:  # pragma: no cover - python-dotenv is lenient by design
+        return ""
+    value = loaded.get(variable)
+    return value.strip() if isinstance(value, str) else ""
 
 
 def looks_like(root: Path, package_path: str) -> bool:
@@ -100,13 +143,23 @@ def resolve_mech_root(
     claw_root: Path,
     environ: Mapping[str, str] | None = None,
     manifest: FleetManifest | None = None,
+    explicit: Path | str | None = None,
 ) -> Path:
     """The checkout root for Mech `key`, or a clear refusal.
 
-    Order: the manifest's environment variable, then the conventional sibling
-    path *if it looks like that Mech*. A guess that fails the check raises
-    rather than being used, because operating on the wrong tree is worse than
-    stopping.
+    Order: a path the caller was given explicitly, then the manifest's
+    environment variable, then that variable in claw's own `.env`, then the
+    conventional sibling path *if it looks like that Mech*. A guess that fails
+    the check raises rather than being used, because operating on the wrong
+    tree is worse than stopping.
+
+    `explicit` is what the command actually parsed -- the value behind its own
+    `--...-root` flag. Without it this verified the *default* location and
+    refused whenever that was absent, even though the caller had named a real
+    checkout on the command line and the work would never have touched the
+    path being checked (#368). A caller passes it so the check covers the path
+    the work will use. It is trusted exactly as a configured variable is:
+    someone naming a path has made a decision, but it must exist.
     """
     manifest = manifest or load_fleet_manifest()
     if key not in manifest.mechs:
@@ -117,14 +170,24 @@ def resolve_mech_root(
     mech = manifest.mechs[key]
     env = os.environ if environ is None else environ
 
+    if explicit is not None and str(explicit).strip():
+        root = Path(str(explicit)).expanduser()
+        if not root.is_dir():
+            raise MechRootError(
+                f"the {mech.display_name} path given on the command line is not "
+                f"a directory: {root}"
+            )
+        return root.resolve()
+
     configured = (env.get(mech.environment_variable) or "").strip()
+    source = f"{mech.environment_variable} is set to"
+    if not configured:
+        configured = dotenv_variable(claw_root, mech.environment_variable)
+        source = f"{mech.environment_variable} in {claw_root}/.env is"
     if configured:
         root = Path(configured).expanduser()
         if not root.is_dir():
-            raise MechRootError(
-                f"{mech.environment_variable} is set to {root}, which is not a "
-                f"directory"
-            )
+            raise MechRootError(f"{source} {root}, which is not a directory")
         return root.resolve()
 
     guess = sibling_default(mech.display_name, claw_root)
@@ -148,6 +211,7 @@ def require_mech_roots(
     claw_root: Path,
     environ: Mapping[str, str] | None = None,
     manifest: FleetManifest | None = None,
+    explicit: Mapping[str, Path | str | None] | None = None,
 ) -> dict[str, Path]:
     """Verify each Mech checkout before work begins, raising on the first bad one.
 
@@ -160,10 +224,27 @@ def require_mech_roots(
     A command that legitimately tolerates an absent root must NOT call this:
     `inventory_unmapped_ingredients` reports per-source coverage instead,
     because a partial inventory is a real answer there (#161).
+
+    `explicit` maps a Mech key to the path the command parsed from its own
+    flag, so the check covers the path the work will use rather than the
+    default it will not (#368). A key absent from the mapping, or mapped to
+    None, resolves the usual way.
     """
+    given = explicit or {}
+    unknown = sorted(set(given) - set(keys))
+    if unknown:
+        raise MechRootError(
+            f"explicit paths given for {unknown}, which "
+            f"{'is' if len(unknown) == 1 else 'are'} not being verified; "
+            f"pass the same keys to require_mech_roots"
+        )
     resolved: dict[str, Path] = {}
     for key in keys:
         resolved[key] = resolve_mech_root(
-            key, claw_root=claw_root, environ=environ, manifest=manifest
+            key,
+            claw_root=claw_root,
+            environ=environ,
+            manifest=manifest,
+            explicit=given.get(key),
         )
     return resolved
