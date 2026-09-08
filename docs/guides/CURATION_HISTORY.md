@@ -31,28 +31,38 @@ source-tree fallback. Pass `--schema` only when deliberately validating a
 Mech's governed copy or another compatible `HistoryRecord` schema.
 
 To change the shared schema, update the canonical artifact and manifest in claw,
-merge a reviewed claw commit, and coordinate that immutable pin across all five
+merge a reviewed claw commit, and coordinate that immutable pin across all eight
 Mechs. See [Vendored governance](VENDORED_GOVERNANCE.md) for synchronization,
 audit, and rollback.
 
 ## Fleet adoption
 
-Every Mech carries the governed schema and repository-local history workflow:
+Every Mech vendors the governed schema. Seven of the eight also carry the
+repository-local workflow that makes it usable; AntibioticMech is the exception
+and has the schema alone.
 
-| Repo | Governed schema | Recipes | Advisory CI |
-|---|:--:|:--:|:--:|
-| CultureMech | yes | yes | yes — `curation-history.yaml` |
-| TraitMech | yes | yes | yes — `curation-history.yaml` |
-| MediaIngredientMech | yes | yes | yes — `curation-history.yaml` |
-| CommunityMech | yes | yes | yes — `curation-history.yaml` |
-| ProteinTraitsMech | yes | yes | yes — combined history/governance workflow |
+| Repo | Governed schema | Recipes | Validity checked in |
+|---|:--:|:--:|---|
+| CultureMech | yes | yes | `curation-history.yaml` |
+| TraitMech | yes | yes | `curation-history.yaml` |
+| MediaIngredientMech | yes | yes | `curation-history.yaml` |
+| CommunityMech | yes | yes | `curation-history.yaml` |
+| ProteinTraitsMech | yes | yes | `history-and-vendored.yaml`, combined with the vendored-sync guard |
+| CellStructureMech | yes | yes | the qc runner, `scripts/run_qc.py` |
+| HabitatMech | yes | yes | the qc runner, `scripts/run_qc.py` |
+| AntibioticMech | yes | no | nothing yet — CultureBotAI/AntibioticMech#205 |
+
+Where validity is checked differs on purpose. A repository whose qc runner is
+the single authoritative gate puts it there; one that already separates
+provenance from testing keeps a workflow. Both are blocking. Only the
+*presence* check is advisory, and only CommunityMech implements one today.
 
 ## Enforcement model
 
 The DisMech-derived model is deliberately asymmetric:
 
-- **Presence is advisory.** CI warns when a data record changes without a
-  history record and still passes. A hard provenance-presence gate blocks
+- **Presence is advisory.** Where it is implemented, CI warns when a data record
+  changes without a history record and still passes. A hard provenance-presence gate blocks
   legitimate work at inconvenient moments and trains contributors to route
   around it.
 - **Validity is blocking.** Once a history record exists, it must be structurally
