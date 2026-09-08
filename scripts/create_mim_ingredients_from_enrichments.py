@@ -7,12 +7,25 @@ ingredients that don't yet exist in MediaIngredientMech.
 """
 
 import yaml
+import os
 from pathlib import Path
 from datetime import datetime
 import argparse
 from typing import Dict, List
 import sys
 import re
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+CULTUREMECH_ROOT_PATH = Path(
+    os.environ.get("CULTUREMECH_ROOT", REPO_ROOT.parent / "CultureMech")
+)
+MIM_ROOT_PATH = Path(
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
+)
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
 
 
 class MIMIngredientCreator:
@@ -260,7 +273,7 @@ def main():
     parser.add_argument(
         '--mim',
         type=Path,
-        default=Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech',
+        default=MIM_ROOT_PATH,
         help='Path to MediaIngredientMech repository'
     )
     parser.add_argument(
@@ -272,7 +285,7 @@ def main():
     parser.add_argument(
         '--culturemech',
         type=Path,
-        default=Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech',
+        default=CULTUREMECH_ROOT_PATH,
         help='Path to CultureMech repository (for usage statistics)'
     )
     parser.add_argument(
@@ -282,6 +295,7 @@ def main():
     )
 
     args = parser.parse_args()
+    require_mech_roots("culturemech", "mediaingredientmech", claw_root=REPO_ROOT)
 
     if not args.mim.exists():
         print(f"Error: MediaIngredientMech directory not found: {args.mim}")

@@ -42,10 +42,22 @@ from datetime import datetime
 import sys
 import os
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+CULTUREMECH_ROOT_PATH = Path(
+    os.environ.get("CULTUREMECH_ROOT", REPO_ROOT.parent / "CultureMech")
+)
+MIM_ROOT_PATH = Path(
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
+)
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+
 # Add project root to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from plugins.lock_manager import LockManager
+from plugins.lock_manager import LockManager  # noqa: E402
 
 
 # Stage definitions
@@ -169,7 +181,7 @@ def run_extract_stage(checkpoint: Dict) -> bool:
     # Get MediaIngredientMech root from environment or use default
     mim_root = os.getenv(
         'MEDIAINGREDIENTMECH_ROOT',
-        str(Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech')
+        str(MIM_ROOT_PATH)
     )
 
     # Prepare extract command
@@ -216,7 +228,7 @@ def run_curate_stage(checkpoint: Dict, dry_run: bool) -> bool:
     # Get MediaIngredientMech root
     mim_root = os.getenv(
         'MEDIAINGREDIENTMECH_ROOT',
-        str(Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech')
+        str(MIM_ROOT_PATH)
     )
 
     # Prepare curate command (NOTE: This calls MediaIngredientMech's batch_curate.py)
@@ -293,7 +305,7 @@ def run_expand_stage(checkpoint: Dict, dry_run: bool) -> bool:
     # Get CultureMech root
     cm_root = os.getenv(
         'CULTUREMECH_ROOT',
-        str(Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech')
+        str(CULTUREMECH_ROOT_PATH)
     )
 
     # Prepare expand command
@@ -444,6 +456,7 @@ def main():
     )
 
     args = parser.parse_args()
+    require_mech_roots("culturemech", "mediaingredientmech", claw_root=REPO_ROOT)
 
     if args.dry_run:
         print("⚠️  DRY RUN MODE - No permanent changes will be made\n")

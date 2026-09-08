@@ -7,9 +7,20 @@ update them with appropriate flags and notes indicating data unavailability.
 
 import argparse
 import yaml
+import os
+import sys
 from pathlib import Path
 from datetime import datetime
 
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+CULTUREMECH_ROOT_PATH = Path(
+    os.environ.get("CULTUREMECH_ROOT", REPO_ROOT.parent / "CultureMech")
+)
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
 
 def mark_unavailable_media(media_list: list, cm_root: Path, dry_run: bool = True) -> dict:
     """Mark media as having unavailable source information."""
@@ -97,7 +108,7 @@ def main():
     parser.add_argument(
         '--cm-root',
         type=Path,
-        default=Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech',
+        default=CULTUREMECH_ROOT_PATH,
         help='Path to CultureMech repository'
     )
     parser.add_argument(
@@ -107,6 +118,7 @@ def main():
     )
 
     args = parser.parse_args()
+    require_mech_roots("culturemech", claw_root=REPO_ROOT)
 
     if args.dry_run:
         print("⚠️  DRY RUN MODE - No files will be modified\n")

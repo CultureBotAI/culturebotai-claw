@@ -11,11 +11,22 @@ Output: Priority list for commercial expansion research
 """
 
 import yaml
+import os
+import sys
 from pathlib import Path
 from collections import defaultdict
 from typing import Dict, List, Optional
 import re
 
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+CULTUREMECH_ROOT_PATH = Path(
+    os.environ.get("CULTUREMECH_ROOT", REPO_ROOT.parent / "CultureMech")
+)
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
 def extract_supplier_from_notes(notes: str) -> Optional[str]:
     """Extract supplier name from notes field."""
     if not notes:
@@ -250,9 +261,10 @@ def main():
                        help='Output YAML file for results')
 
     args = parser.parse_args()
+    require_mech_roots("culturemech", claw_root=REPO_ROOT)
 
     # Paths
-    cm_root = Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech'
+    cm_root = CULTUREMECH_ROOT_PATH
     output_file = Path(args.output)
 
     # Scan CultureMech

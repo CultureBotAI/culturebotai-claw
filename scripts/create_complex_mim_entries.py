@@ -2,9 +2,24 @@
 """Create MediaIngredientMech entries for complex formulations."""
 
 import yaml
+import os
+import sys
+import argparse
 from pathlib import Path
 from datetime import datetime
 
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+CULTUREMECH_ROOT_PATH = Path(
+    os.environ.get("CULTUREMECH_ROOT", REPO_ROOT.parent / "CultureMech")
+)
+MIM_ROOT_PATH = Path(
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
+)
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
 def search_culturemech_id(cm_root: Path, search_name: str) -> str:
     """Search for CultureMech ID by media name."""
     # Simple search - look for files with matching names
@@ -23,9 +38,11 @@ def search_culturemech_id(cm_root: Path, search_name: str) -> str:
     return None, None
 
 def main():
+    argparse.ArgumentParser(description=__doc__).parse_args()
+    require_mech_roots("culturemech", "mediaingredientmech", claw_root=REPO_ROOT)
     workspace = Path('workspace')
-    cm_root = Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech'
-    mim_root = Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech'
+    cm_root = CULTUREMECH_ROOT_PATH
+    mim_root = MIM_ROOT_PATH
 
     # Load complex formulations
     with open('reference/complex_formulations.yaml') as f:

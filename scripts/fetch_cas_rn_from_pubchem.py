@@ -9,12 +9,23 @@ to retrieve CAS Registry Numbers for ingredients lacking CAS-RN.
 import yaml
 import requests
 import time
+import os
+import sys
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Optional, List
 import argparse
 import json
 
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+MIM_ROOT_PATH = Path(
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
+)
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
 
 class PubChemCASFetcher:
     """Fetches CAS-RN from PubChem API for ingredients using compound names."""
@@ -260,7 +271,7 @@ def main():
     parser.add_argument(
         '--mim',
         type=Path,
-        default=Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech',
+        default=MIM_ROOT_PATH,
         help='Path to MediaIngredientMech repository'
     )
     parser.add_argument(
@@ -280,6 +291,7 @@ def main():
     )
 
     args = parser.parse_args()
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
 
     if args.dry_run:
         print("⚠️  DRY RUN MODE - No files will be modified\n")

@@ -11,15 +11,29 @@ Usage:
 
 import sys
 import yaml
+import os
+import argparse
 from pathlib import Path
 from dotenv import load_dotenv
 import click
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+CULTUREMECH_ROOT_PATH = Path(
+    os.environ.get("CULTUREMECH_ROOT", REPO_ROOT.parent / "CultureMech")
+)
+MIM_ROOT_PATH = Path(
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
+)
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 load_dotenv()
 
-from plugins.lock_manager import LockManager
-from plugins.ingredient_deduplicator import IngredientDeduplicator
+from plugins.lock_manager import LockManager  # noqa: E402
+from plugins.ingredient_deduplicator import IngredientDeduplicator  # noqa: E402
 
 
 @click.command()
@@ -30,9 +44,11 @@ def main(batch_size, min_occurrences, output):
     """Export ingredients for Claude Code curation."""
 
     # Setup paths
+    argparse.ArgumentParser(description=__doc__).parse_args()
+    require_mech_roots("culturemech", "mediaingredientmech", claw_root=REPO_ROOT)
     workspace = Path('workspace')
-    culturemech_root = Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech'
-    mim_root = Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech'
+    culturemech_root = CULTUREMECH_ROOT_PATH
+    mim_root = MIM_ROOT_PATH
 
     output_file = Path(output)
     output_file.parent.mkdir(parents=True, exist_ok=True)

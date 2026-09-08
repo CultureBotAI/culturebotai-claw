@@ -10,10 +10,21 @@ This script:
 """
 
 import yaml
+import os
+import sys
 from pathlib import Path
 from datetime import datetime
 from collections import defaultdict
 
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+CULTUREMECH_ROOT_PATH = Path(
+    os.environ.get("CULTUREMECH_ROOT", REPO_ROOT.parent / "CultureMech")
+)
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
 def load_complex_mappings(workspace: Path) -> dict:
     """Load COMPLEX entries and build mapping to CultureMech IDs."""
     complex_file = workspace / 'curation/complex_formulations_mim_entries.yaml'
@@ -185,12 +196,13 @@ def main():
                        help='Actually modify files')
 
     args = parser.parse_args()
+    require_mech_roots("culturemech", claw_root=REPO_ROOT)
 
     dry_run = not args.production
 
     # Paths
     workspace = Path('workspace')
-    cm_root = Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech'
+    cm_root = CULTUREMECH_ROOT_PATH
 
     # Load COMPLEX mappings
     complex_mapping = load_complex_mappings(workspace)

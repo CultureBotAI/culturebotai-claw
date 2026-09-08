@@ -8,11 +8,25 @@ in both CultureMech media files and MediaIngredientMech database.
 
 import yaml
 import re
+import os
+import sys
 from pathlib import Path
 from typing import Set, Dict
 from collections import defaultdict
 import argparse
 
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+CULTUREMECH_ROOT_PATH = Path(
+    os.environ.get("CULTUREMECH_ROOT", REPO_ROOT.parent / "CultureMech")
+)
+MIM_ROOT_PATH = Path(
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
+)
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
 
 class FEBAUncoveredExtractor:
     """Extracts FEBA ingredients without CAS-RN."""
@@ -229,13 +243,13 @@ def main():
     parser.add_argument(
         '--culturemech',
         type=Path,
-        default=Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech',
+        default=CULTUREMECH_ROOT_PATH,
         help='Path to CultureMech repository'
     )
     parser.add_argument(
         '--mim',
         type=Path,
-        default=Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech',
+        default=MIM_ROOT_PATH,
         help='Path to MediaIngredientMech repository'
     )
     parser.add_argument(
@@ -252,6 +266,7 @@ def main():
     )
 
     args = parser.parse_args()
+    require_mech_roots("culturemech", "mediaingredientmech", claw_root=REPO_ROOT)
 
     extractor = FEBAUncoveredExtractor(args.culturemech, args.mim)
 

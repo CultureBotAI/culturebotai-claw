@@ -2,9 +2,21 @@
 """Create complex formulations database and clean up unmapped list."""
 
 import yaml
+import os
+import sys
+import argparse
 from pathlib import Path
 from datetime import datetime
 
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+MIM_ROOT_PATH = Path(
+    os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
+)
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
 # Items to remove from unmapped (media, solutions, and metadata)
 ITEMS_TO_REMOVE = [
     # Metadata placeholders
@@ -631,8 +643,10 @@ FORMULATIONS = {
 }
 
 def main():
+    argparse.ArgumentParser(description=__doc__).parse_args()
+    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
     workspace = Path('workspace')
-    mim_root = Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/MediaIngredientMech'
+    mim_root = MIM_ROOT_PATH
 
     # Create complex formulations file
     formulations_file = workspace / 'reference/complex_formulations.yaml'

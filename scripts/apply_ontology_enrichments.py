@@ -6,11 +6,21 @@ Updates FEBA media YAML files with newly discovered ontology term IDs.
 """
 
 import yaml
+import os
 from pathlib import Path
 from collections import defaultdict
 import argparse
 from typing import Dict, List, Set
 import sys
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+# Module level stays plain paths so importing this file never requires a
+# checkout; `require_mech_roots` in main() is what verifies one (#176).
+CULTUREMECH_ROOT_PATH = Path(
+    os.environ.get("CULTUREMECH_ROOT", REPO_ROOT.parent / "CultureMech")
+)
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_fleet import require_mech_roots  # noqa: E402
 
 
 class OntologyEnrichmentApplicator:
@@ -205,7 +215,7 @@ def main():
     parser.add_argument(
         '--culturemech',
         type=Path,
-        default=Path.home() / 'Documents/VIMSS/ontology/KG-Hub/KG-Microbe/CultureMech',
+        default=CULTUREMECH_ROOT_PATH,
         help='Path to CultureMech repository'
     )
     parser.add_argument(
@@ -226,6 +236,7 @@ def main():
     )
 
     args = parser.parse_args()
+    require_mech_roots("culturemech", claw_root=REPO_ROOT)
 
     if not args.culturemech.exists():
         print(f"Error: CultureMech directory not found: {args.culturemech}")
