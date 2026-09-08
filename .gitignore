@@ -22,6 +22,11 @@ tasks/
 # Environment variables (contains API keys)
 .env
 .env.local
+# Any other local env file, including the backups a directory move leaves
+# behind. One of those reached a commit on a public branch; the example file
+# stays tracked because it holds no secret.
+.env.*
+!.env.example
 
 # Backup files
 *.backup
