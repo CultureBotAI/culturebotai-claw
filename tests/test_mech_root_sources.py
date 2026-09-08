@@ -28,9 +28,13 @@ import pytest
 
 from kg_microbe_fleet import load_fleet_manifest
 from kg_microbe_fleet.roots import (
+    KG_MICROBE_DIRECTORY,
+    KG_MICROBE_PACKAGE,
+    KG_MICROBE_VARIABLE,
     MechRootError,
-    dotenv_variable,
+    dotenv_value,
     require_mech_roots,
+    resolve_kg_microbe_root,
     resolve_mech_root,
 )
 
@@ -239,11 +243,11 @@ def test_a_symlinked_dotenv_is_ignored(tmp_path):
     real.write_text(f"{VARIABLE}={root}\n", encoding="utf-8")
     (claw / ".env").symlink_to(real)
 
-    assert dotenv_variable(claw, VARIABLE) == ""
+    assert dotenv_value(claw, VARIABLE) == ""
 
 
 def test_a_missing_dotenv_is_not_an_error(tmp_path):
-    assert dotenv_variable(tmp_path, VARIABLE) == ""
+    assert dotenv_value(tmp_path, VARIABLE) == ""
 
 
 def test_the_dotenv_reader_returns_only_the_variable_asked_for(tmp_path):
@@ -251,8 +255,87 @@ def test_the_dotenv_reader_returns_only_the_variable_asked_for(tmp_path):
     root should not pick up an unrelated credential from the same file."""
     claw = tmp_path / "claw"
     write_dotenv(claw, f"{VARIABLE}=/somewhere\nOPENAI_API_KEY=secret\n")
-    assert dotenv_variable(claw, VARIABLE) == "/somewhere"
-    assert dotenv_variable(claw, "OPENAI_API_KEY") == "secret"
+    assert dotenv_value(claw, VARIABLE) == "/somewhere"
+    assert dotenv_value(claw, "OPENAI_API_KEY") == "secret"
     # ...but resolving a root never consults an unrelated key.
     with pytest.raises(MechRootError):
         resolve_mech_root(MECH, claw_root=claw, environ={})
+
+
+# --------------------------------------------------------------------------
+# #373: the corpus resolver reads the same file
+# --------------------------------------------------------------------------
+
+
+def test_kg_microbe_is_resolved_from_claws_dotenv_when_not_exported(tmp_path):
+    """`resolve_kg_microbe_root` returns None rather than raising, so a
+    resolver that skipped the file would report the corpus *absent* -- a
+    quieter wrong answer than a refusal. Nothing sits at the sibling path, so
+    only the file can answer."""
+    claw = tmp_path / "claw"
+    corpus = tmp_path / "far" / "kg-microbe"
+    (corpus / KG_MICROBE_PACKAGE).mkdir(parents=True)
+    write_dotenv(claw, f"{KG_MICROBE_VARIABLE}={corpus}\n")
+
+    assert not (claw.parent / KG_MICROBE_DIRECTORY).exists()
+    assert (
+        resolve_kg_microbe_root(claw_root=claw, environ={}) == corpus.resolve()
+    )
+
+
+def test_an_exported_kg_microbe_root_wins_over_the_dotenv_file(tmp_path):
+    claw = tmp_path / "claw"
+    claw.mkdir()
+    exported = tmp_path / "exported"
+    from_file = tmp_path / "from-file"
+    for d in (exported, from_file):
+        (d / KG_MICROBE_PACKAGE).mkdir(parents=True)
+    write_dotenv(claw, f"{KG_MICROBE_VARIABLE}={from_file}\n")
+
+    assert exported != from_file
+    assert (
+        resolve_kg_microbe_root(
+            claw_root=claw, environ={KG_MICROBE_VARIABLE: str(exported)}
+        )
+        == exported.resolve()
+    )
+
+
+# --------------------------------------------------------------------------
+# #374: the template and the readers must name the same variable
+# --------------------------------------------------------------------------
+
+
+def test_the_env_template_declares_exactly_the_root_variables_that_are_read():
+    """`.env.example` said KG_MICROBE_ROOT while every reader used
+    KGMICROBE_ROOT, so a checkout set up the way CLAUDE.md prescribes
+    configured a variable nothing read. Neither side parsed the other, so
+    nothing noticed. Asserting the two sets against each other is what makes
+    a future rename fail here rather than in someone's setup.
+    """
+    template = Path(__file__).resolve().parents[1] / ".env.example"
+    declared = {
+        line.split("=", 1)[0].strip()
+        for line in template.read_text(encoding="utf-8").splitlines()
+        if "=" in line and not line.lstrip().startswith("#")
+    }
+    root_variables = {
+        mech.environment_variable for mech in MANIFEST.mechs.values()
+    } | {KG_MICROBE_VARIABLE}
+
+    missing = sorted(root_variables - declared)
+    assert not missing, (
+        f".env.example does not declare {missing}, so a checkout following "
+        f"CLAUDE.md cannot configure {'it' if len(missing) == 1 else 'them'}"
+    )
+    stale = sorted(
+        name
+        for name in declared
+        if name.endswith("_ROOT")
+        and name not in root_variables
+        and name != "OPENCLAW_ORCHESTRATION_ROOT"
+    )
+    assert not stale, (
+        f".env.example declares {stale}, which no resolver reads; a value put "
+        f"there looks configured and is not"
+    )

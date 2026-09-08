@@ -51,8 +51,13 @@ def sibling_default(mech_display_name: str, claw_root: Path) -> Path:
     return Path(claw_root).resolve().parent / mech_display_name
 
 
-def dotenv_variable(claw_root: Path, variable: str) -> str:
-    """One repository-root variable from claw's own `.env`, or "".
+def dotenv_value(claw_root: Path, variable: str) -> str:
+    """One named variable from claw's own `.env`, or "".
+
+    General by construction -- it returns whatever key it is asked for -- but
+    the resolvers here only ever ask for a root variable the manifest or this
+    module declares. It is not a way to load `.env` into the environment, and
+    nothing here mutates `os.environ`.
 
     `openclaw-cli` reads `.env` through `RepositorySettings`; every
     `kg-microbe-*` console script read the bare process environment, so a
@@ -122,6 +127,12 @@ def resolve_kg_microbe_root(
     """
     env = os.environ if environ is None else environ
     configured = (env.get(KG_MICROBE_VARIABLE) or "").strip()
+    if not configured:
+        # The same reason `resolve_mech_root` reads it (#364, #373): a fleet
+        # configured in claw's `.env` is invisible to every console script
+        # that reads only the process environment, and this resolver returns
+        # None rather than raising, so the corpus would be reported absent.
+        configured = dotenv_value(claw_root, KG_MICROBE_VARIABLE)
     if configured:
         root = Path(configured).expanduser()
         return root.resolve() if root.is_dir() else None
@@ -182,7 +193,7 @@ def resolve_mech_root(
     configured = (env.get(mech.environment_variable) or "").strip()
     source = f"{mech.environment_variable} is set to"
     if not configured:
-        configured = dotenv_variable(claw_root, mech.environment_variable)
+        configured = dotenv_value(claw_root, mech.environment_variable)
         source = f"{mech.environment_variable} in {claw_root}/.env is"
     if configured:
         root = Path(configured).expanduser()

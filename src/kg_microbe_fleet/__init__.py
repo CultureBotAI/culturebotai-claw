@@ -1096,7 +1096,7 @@ def __getattr__(name: str):
         "require_mech_roots",
         "sibling_default",
         "looks_like",
-        "dotenv_variable",
+        "dotenv_value",
     }:
         from . import roots
 
