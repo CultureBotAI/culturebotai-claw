@@ -58,7 +58,7 @@
       "source": "src/kg_microbe_governance/artifacts/scripts/validate_id_label_correspondence.py",
       "target": "scripts/validate_id_label_correspondence.py",
       "consumers": "all",
-      "sha256": "35dfe340f0e4aab222d52c7813956766be10cfdc00e38ec869b1312abed71a77",
+      "sha256": "3afce63558997f924a2956e52aa2a47e1766090bb4f64b3da7e11ce1c64af9a6",
       "mode": "0644"
     },
     {

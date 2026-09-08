@@ -767,28 +767,44 @@ TARGET_KEYS = frozenset(
 
 
 def is_unread_block(key: str) -> bool:
-    """Whether a key is declared as one this validator is not meant to read.
+    """Whether a top-level key is declared as one this validator is not to read.
 
     YAML has no other way to park a reusable block: a config that shares one
     exception list across four targets defines it once under a top-level key,
     anchors it, and aliases it in. That key is not dead config, but it is also
     not something this file reads, so it cannot be in the allow-lists either.
-    A leading ``x-`` or ``_`` says so out loud, the way an extension field does
+    A leading ``x-`` says so out loud, the way an extension field does
     elsewhere, and keeps every other unknown key an error.
+
+    Only ``x-``. A leading underscore is ordinary Python and YAML convention for
+    "private", so ``_exclude_keys`` would read as a typo to everyone except this
+    function, which is the failure it exists to prevent.
     """
-    return key.startswith("x-") or key.startswith("_")
+    return key.startswith("x-")
 
 
-def reject_unknown_keys(where: str, mapping: dict[str, Any], allowed: frozenset[str]) -> None:
+def reject_unknown_keys(
+    where: str,
+    mapping: dict[str, Any],
+    allowed: frozenset[str],
+    allow_unread_blocks: bool = False,
+) -> None:
     unknown = sorted(
-        str(key) for key in mapping if key not in allowed and not is_unread_block(str(key))
+        str(key)
+        for key in mapping
+        if key not in allowed
+        and not (allow_unread_blocks and is_unread_block(str(key)))
     )
     if unknown:
+        hint = (
+            " Prefix a deliberately unread block, such as a YAML anchor holder, with 'x-'."
+            if allow_unread_blocks
+            else " An anchor holder belongs at the top level, not inside a target."
+        )
         raise SystemExit(
             f"{where}: unknown key(s): {', '.join(unknown)}. "
             f"Known keys: {', '.join(sorted(allowed))}. "
-            "A key this validator does not read would be a check that never runs; "
-            "prefix a deliberately unread block (a YAML anchor holder) with 'x-' or '_'."
+            f"A key this validator does not read would be a check that never runs.{hint}"
         )
 
 
@@ -796,7 +812,7 @@ def load_config(config_path: Path) -> dict[str, Any]:
     cfg = yaml.safe_load(config_path.read_text())
     if not isinstance(cfg, dict):
         raise SystemExit(f"Config is not a mapping: {config_path}")
-    reject_unknown_keys(str(config_path), cfg, CONFIG_KEYS)
+    reject_unknown_keys(str(config_path), cfg, CONFIG_KEYS, allow_unread_blocks=True)
     targets = cfg.get("targets") or []
     if not isinstance(targets, list):
         raise SystemExit(f"{config_path}: targets must be a list")

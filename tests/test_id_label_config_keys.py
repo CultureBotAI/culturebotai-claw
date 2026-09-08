@@ -8,7 +8,8 @@ data, so the config itself is now validated (#367).
 The one exception is a deliberately unread block. A config that shares an
 exception list across several targets has nowhere to put it but a top-level key,
 anchored and aliased in; MediaIngredientMech does exactly that. Such a key
-declares itself with an `x-` or `_` prefix.
+declares itself with an `x-` prefix, and only at the top level; an underscore
+is ordinary "private" convention and would mask a typo.
 """
 
 from __future__ import annotations
@@ -113,11 +114,30 @@ def test_an_unknown_target_key_is_refused(tmp_path: Path) -> None:
     assert "exclude_key" in message and "records" in message
 
 
-@pytest.mark.parametrize("key", ["x-shared-exceptions", "_shared_exceptions"])
-def test_a_declared_unread_block_is_allowed(tmp_path: Path, key: str) -> None:
+def test_a_declared_unread_block_is_allowed(tmp_path: Path) -> None:
     document = dict(MINIMAL)
-    document[key] = [{"id": "ENVO:1", "label": "x"}]
+    document["x-shared-exceptions"] = [{"id": "ENVO:1", "label": "x"}]
     assert MODULE.load_config(_write(tmp_path, document))
+
+
+def test_an_underscore_prefix_is_not_an_escape_hatch(tmp_path: Path) -> None:
+    """`_private` is ordinary convention, so `_exclude_keys` must read as a typo."""
+    document = dict(MINIMAL)
+    document["_exclude_keys"] = ["evidence"]
+    with pytest.raises(SystemExit) as caught:
+        MODULE.load_config(_write(tmp_path, document))
+    assert "_exclude_keys" in str(caught.value)
+
+
+def test_a_target_cannot_declare_an_unread_block(tmp_path: Path) -> None:
+    """An anchor holder has no reason to live inside a target."""
+    document = {
+        "adapters": MINIMAL["adapters"],
+        "targets": [dict(MINIMAL["targets"][0], **{"x-notes": "parked"})],
+    }
+    with pytest.raises(SystemExit) as caught:
+        MODULE.load_config(_write(tmp_path, document))
+    assert "x-notes" in str(caught.value)
 
 
 def test_targets_must_be_a_list_of_mappings(tmp_path: Path) -> None:
