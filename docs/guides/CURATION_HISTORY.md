@@ -54,15 +54,21 @@ and has the schema alone.
 
 Where validity is checked differs on purpose. A repository whose qc runner is
 the single authoritative gate puts it there; one that already separates
-provenance from testing keeps a workflow. Both are blocking. Only the
-*presence* check is advisory, and only CommunityMech implements one today.
+provenance from testing keeps a workflow. Either way it blocks.
+
+The *presence* check is the half this model leaves advisory, and four Mechs
+implement one: CultureMech, MediaIngredientMech and CommunityMech warn without
+failing, and TraitMech made its check blocking in TraitMech#325. A repository
+is free to tighten it; what the model asks is that nobody be blocked by a
+missing history record before the layer is worth relying on.
 
 ## Enforcement model
 
 The DisMech-derived model is deliberately asymmetric:
 
-- **Presence is advisory.** Where it is implemented, CI warns when a data record
-  changes without a history record and still passes. A hard provenance-presence gate blocks
+- **Presence is advisory by default.** Where it is implemented, CI warns when a
+  data record changes without a history record and still passes. TraitMech has
+  since chosen to fail instead (TraitMech#325). A hard provenance-presence gate blocks
   legitimate work at inconvenient moments and trains contributors to route
   around it.
 - **Validity is blocking.** Once a history record exists, it must be structurally
