@@ -84,15 +84,27 @@ def fleet_repository_identities(
     )
 
 
-def open_prs(repository: str, pr_limit: int) -> list[dict]:
+def open_prs(repository: str, pr_limit: int) -> tuple[list[dict], bool]:
+    """The open PRs, capped at `pr_limit`, and whether more were left behind.
+
+    Asks for one more than the cap. `gh pr list` returns a plain list with no
+    more-pages indicator, so `len(prs) == pr_limit` cannot say whether the
+    listing merely landed on the limit or was cut short by it -- and reporting
+    the first as truncation prints INCOMPLETE over a complete run, which
+    teaches a reader to discount the word before a real truncation arrives
+    (#379). The extra row costs one PR's worth of JSON and removes the
+    ambiguity: it comes back only if something would have been dropped.
+    """
     raw = _gh([
         "pr", "list", "--repo", repository, "--state", "open",
-        "--limit", str(pr_limit), "--json", PR_FIELDS,
+        "--limit", str(pr_limit + 1), "--json", PR_FIELDS,
     ])
     prs = json.loads(raw)
+    truncated = len(prs) > pr_limit
     # Newest first: the fleet reads its backlog that way, and a stable sort
-    # keeps two runs diffable.
-    return sorted(prs, key=lambda p: -p["number"])
+    # keeps two runs diffable. Slice after sorting, so the probe row that is
+    # dropped is the oldest rather than whichever gh happened to return last.
+    return sorted(prs, key=lambda p: -p["number"])[:pr_limit], truncated
 
 
 def collect(pr_limit: int, manifest: FleetManifest | None = None) -> dict:
@@ -112,12 +124,12 @@ def collect(pr_limit: int, manifest: FleetManifest | None = None) -> dict:
     }
     for repo, identity in zip(repositories, identities):
         try:
-            prs = open_prs(identity, pr_limit)
+            prs, truncated = open_prs(identity, pr_limit)
         except (GhError, subprocess.TimeoutExpired, json.JSONDecodeError) as exc:
             result["errors"][repo] = str(exc)[:200]
             continue
         result["prs"][repo] = prs
-        if len(prs) >= pr_limit:
+        if truncated:
             result["pr_listing_truncated"].append(repo)
     return result
 
