@@ -52,6 +52,11 @@ skills:
   feba-integration:
     scope: domain
     reason: FEBA functional-enrichment import into MIM.
+  fleet-branch-status:
+    scope: fleet
+    reason: >-
+      Catalogues every branch across claw and the manifest-defined Mechs,
+      reading membership from the manifest rather than a list in the skill.
   fleet-pr-review:
     scope: fleet
     reason: Reviews open PRs across the manifest-defined control plane.
