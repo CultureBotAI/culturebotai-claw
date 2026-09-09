@@ -213,6 +213,66 @@ def test_reaching_the_ref_limit_is_recorded(monkeypatch):
     assert not fbs.snapshot_is_complete(data)
 
 
+def _paged_gh(pages):
+    """Serve `pages` in order, so pagination and its limit can be exercised."""
+    calls = {"n": 0}
+
+    def run(args, timeout=60):
+        index = min(calls["n"], len(pages) - 1)
+        calls["n"] += 1
+        return json.dumps({"data": {"repository": {
+            "defaultBranchRef": {"name": "main"}, "refs": pages[index],
+        }}})
+
+    return run
+
+
+def _page(names, *, has_next=False, cursor=None):
+    return {
+        "pageInfo": {"hasNextPage": has_next, "endCursor": cursor},
+        "nodes": [_ref(name) for name in names],
+    }
+
+
+def test_landing_exactly_on_the_ref_limit_is_not_truncation(monkeypatch):
+    """#379. `len(nodes) >= limit` is true when rows were dropped and also
+    when the count merely equals the limit with nothing left. Reporting the
+    second as truncation prints INCOMPLETE over a complete run, and a reader
+    who sees that once stops believing the word.
+
+    Driven by the exact-limit case with `hasNextPage` false, which is the only
+    input where the two rules disagree.
+    """
+    monkeypatch.setattr(
+        fbs, "_gh", _paged_gh([_page(["b0", "b1", "b2"], has_next=False)])
+    )
+    _nodes, _default, truncated = fbs.branches("O/R", 3)
+    assert truncated is False
+
+
+def test_landing_exactly_on_the_ref_limit_with_more_to_fetch_is_truncation(
+    monkeypatch,
+):
+    """The other half: same count, same limit, one more page. The fix must not
+    have turned the detection off."""
+    monkeypatch.setattr(
+        fbs, "_gh",
+        _paged_gh([_page(["b0", "b1", "b2"], has_next=True, cursor="C1")]),
+    )
+    _nodes, _default, truncated = fbs.branches("O/R", 3)
+    assert truncated is True
+
+
+def test_pagination_follows_the_cursor_until_the_last_page(monkeypatch):
+    monkeypatch.setattr(fbs, "_gh", _paged_gh([
+        _page(["a", "b"], has_next=True, cursor="C1"),
+        _page(["c"], has_next=False),
+    ]))
+    nodes, _default, truncated = fbs.branches("O/R", 500)
+    assert [node["name"] for node in nodes] == ["a", "b", "c"]
+    assert truncated is False
+
+
 def test_a_failed_comparison_leaves_ahead_unknown_rather_than_zero(monkeypatch):
     """`None` and `0` mean opposite things: one is "not measured", the other
     is "contains nothing new". Defaulting to 0 would mark branches deletable

@@ -137,11 +137,15 @@ def branches(repository: str, ref_limit: int) -> tuple[list[dict], str, bool]:
         default = ((repo.get("defaultBranchRef") or {}).get("name")) or default
         refs = repo.get("refs") or {}
         nodes.extend(refs.get("nodes") or [])
-        if len(nodes) >= ref_limit:
-            nodes = nodes[:ref_limit]
-            truncated = True
-            break
         page = refs.get("pageInfo") or {}
+        if len(nodes) >= ref_limit:
+            # Landing exactly on the limit is only truncation if something is
+            # left. Reporting it either way would print INCOMPLETE over a
+            # complete run, and a reader who sees that once stops believing
+            # the word when it matters (#379).
+            truncated = len(nodes) > ref_limit or bool(page.get("hasNextPage"))
+            nodes = nodes[:ref_limit]
+            break
         if not page.get("hasNextPage"):
             break
         cursor = page.get("endCursor")
