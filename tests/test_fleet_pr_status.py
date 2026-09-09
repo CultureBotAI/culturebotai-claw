@@ -243,25 +243,77 @@ import fleet_pr_status as fps  # noqa: E402
 
 
 def _fake_gh(prs_by_repo: dict[str, int]):
+    """Stand in for `gh pr list`, honouring --limit as the real one does.
+
+    The old fake ignored it and returned every PR the fixture declared, so it
+    could not express the distinction #379 is about: a repository holding more
+    PRs than were asked for looked identical to one holding exactly that many.
+    """
     def _gh(args, timeout=60):
         repo = args[args.index("--repo") + 1].split("/")[1]
-        n = prs_by_repo.get(repo, 0)
+        limit = int(args[args.index("--limit") + 1])
+        total = prs_by_repo.get(repo, 0)
+        # `gh pr list` returns the NEWEST first, so a cap drops the oldest.
+        # A fake that dropped the newest instead would let a slice-before-sort
+        # bug pass, which is what the first version of this did.
+        numbers = sorted(range(1, total + 1), reverse=True)[:limit]
         return _json.dumps([
             {"number": i, "title": f"t{i}", "isDraft": False,
              "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN",
              "additions": 1, "deletions": 0, "changedFiles": 1}
-            for i in range(1, n + 1)
+            for i in numbers
         ])
     return _gh
 
 
 def test_collect_records_pr_truncation_per_repo(monkeypatch):
+    """TraitMech holds more than the cap, CultureMech fewer. The fixture that
+    used to sit here gave TraitMech exactly the cap, which is the case #379
+    showed is not truncation at all."""
     monkeypatch.setattr(
         fps, "_gh",
-        _fake_gh({"TraitMech": 3, "CultureMech": 1}),
+        _fake_gh({"TraitMech": 4, "CultureMech": 1}),
     )
     data = fps.collect(pr_limit=3)
     assert data["pr_listing_truncated"] == ["TraitMech"]
+    assert len(data["prs"]["TraitMech"]) == 3, "the cap must still be honoured"
+
+
+def test_exactly_the_limit_is_not_truncation(monkeypatch):
+    """#379. Three PRs and a cap of three: nothing was dropped, so reporting
+    INCOMPLETE here is a false alarm on the signal this report exists to make
+    trustworthy. This is the one input where the old rule and the new one
+    disagree, which is why the fixture sits exactly on the boundary.
+    """
+    monkeypatch.setattr(fps, "_gh", _fake_gh({"TraitMech": 3}))
+    data = fps.collect(pr_limit=3)
+
+    assert data["pr_listing_truncated"] == []
+    assert len(data["prs"]["TraitMech"]) == 3
+    assert fps.snapshot_is_complete(data)
+
+
+def test_one_over_the_limit_is_truncation(monkeypatch):
+    """The other half of the boundary: the fix must not have turned detection
+    off, only narrowed it."""
+    monkeypatch.setattr(fps, "_gh", _fake_gh({"TraitMech": 4}))
+    data = fps.collect(pr_limit=3)
+
+    assert data["pr_listing_truncated"] == ["TraitMech"]
+    assert not fps.snapshot_is_complete(data)
+
+
+def test_the_probe_row_is_never_reported_as_an_open_pr(monkeypatch):
+    """The extra row exists to answer a question, not to be counted. Leaking
+    it would overstate every truncated repository by one."""
+    monkeypatch.setattr(fps, "_gh", _fake_gh({"TraitMech": 10}))
+    data = fps.collect(pr_limit=3)
+
+    prs = data["prs"]["TraitMech"]
+    assert len(prs) == 3
+    # Sorted newest-first and sliced after sorting, so the cap keeps the
+    # highest numbers rather than whichever gh returned first.
+    assert [pr["number"] for pr in prs] == [10, 9, 8]
 
 
 def test_collect_records_nothing_truncated_on_a_roomy_run(monkeypatch):
@@ -269,6 +321,32 @@ def test_collect_records_nothing_truncated_on_a_roomy_run(monkeypatch):
     data = fps.collect(pr_limit=50)
     assert data["pr_listing_truncated"] == []
     assert len(data["prs"]["TraitMech"]) == 2
+
+
+def test_the_cap_keeps_the_newest_even_if_gh_returns_them_unordered(monkeypatch):
+    """Sorting happens before the slice, so which rows survive the cap does not
+    depend on the order `gh` happened to emit.
+
+    `gh pr list` returns newest-first today, which is exactly why this needs a
+    fixture that does not: with an already-sorted fake, slicing before sorting
+    gives the same answer and the property is untested. That ordering is not a
+    documented guarantee, and a flag or a future release could change it.
+    """
+    def _unordered_gh(args, timeout=60):
+        limit = int(args[args.index("--limit") + 1])
+        numbers = [3, 9, 1, 7, 5][:limit]
+        return _json.dumps([
+            {"number": i, "title": f"t{i}", "isDraft": False,
+             "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN",
+             "additions": 1, "deletions": 0, "changedFiles": 1}
+            for i in numbers
+        ])
+
+    monkeypatch.setattr(fps, "_gh", _unordered_gh)
+    prs, truncated = fps.open_prs("CultureBotAI/TraitMech", 3)
+
+    assert [pr["number"] for pr in prs] == [9, 7, 3]
+    assert truncated is True
 
 
 def test_collect_captures_a_failing_repo_instead_of_dropping_it(monkeypatch):
