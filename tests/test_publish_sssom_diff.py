@@ -26,8 +26,13 @@ diff_rows = publish_sssom.diff_rows
 _spelling_key = publish_sssom._spelling_key
 
 
-def row(subject, obj, predicate="skos:exactMatch"):
-    return {"subject_id": subject, "object_id": obj, "predicate_id": predicate}
+def row(subject, obj, predicate="skos:exactMatch", other=""):
+    return {
+        "subject_id": subject,
+        "object_id": obj,
+        "predicate_id": predicate,
+        "other": other,
+    }
 
 
 def test_identical_row_sets_produce_an_empty_diff():
@@ -342,6 +347,43 @@ def test_a_column_present_on_only_one_side_counts_as_changed():
     assert diff_rows(prev, new).column_changes == {"confidence": 1}
 
 
+def test_other_token_changes_are_counted_by_direction():
+    """#520: a row-count-clean rebuild can still empty KGX synonyms."""
+    diff = diff_rows(
+        [
+            row(
+                "MIM:Lactate",
+                "CHEBI:16004",
+                other="D-lactate|D-2-hydroxypropanoate|CAS:10326-41-7",
+            )
+        ],
+        [row("MIM:Lactate", "CHEBI:16004", other="D-lactate|D-2-hydroxypropionate")],
+    )
+
+    assert diff.column_changes == {"other": 1}
+    assert diff.other_tokens_lost == 2
+    assert diff.other_tokens_gained == 1
+    assert diff.other_net_loss == 1
+    assert diff.other_token_deltas[0].lost == (
+        "CAS:10326-41-7",
+        "D-2-hydroxypropanoate",
+    )
+    assert diff.other_token_deltas[0].gained == ("D-2-hydroxypropionate",)
+
+
+def test_respelled_rows_still_count_other_token_loss():
+    """A subject respelling is neutral for rows, but not for `other` tokens."""
+    diff = diff_rows(
+        [row("MIM:(R)-lactate", "CHEBI:16004", other="D-lactate|D-2-hydroxypropanoate")],
+        [row("MIM:~28R~29-lactate", "CHEBI:16004", other="D-lactate")],
+    )
+
+    assert diff.removed == []
+    assert diff.respelled == [("MIM:(R)-lactate", "MIM:~28R~29-lactate", "CHEBI:16004")]
+    assert diff.other_tokens_lost == 1
+    assert diff.other_net_loss == 1
+
+
 def test_diff_report_is_written_with_every_entry(tmp_path):
     """#116: stdout shows EXAMPLES_SHOWN per category; the rest must be readable
     somewhere on a dry run, not only in the apply-path audit log."""
@@ -354,6 +396,34 @@ def test_diff_report_is_written_with_every_entry(tmp_path):
     assert len(payload["removed"]) == 30 > publish_sssom.EXAMPLES_SHOWN
     assert payload["same_key_and_predicate"] == 0
     assert "column_changes" in payload
+
+
+def test_diff_report_persists_other_token_deltas(tmp_path):
+    diff = diff_rows(
+        [row("MIM:Lactate", "CHEBI:16004", other="D-lactate|D-2-hydroxypropanoate")],
+        [row("MIM:Lactate", "CHEBI:16004", other="D-lactate")],
+    )
+
+    out = publish_sssom._write_diff_report(diff, tmp_path / "d.json")
+    payload = json.loads(out.read_text())
+
+    assert payload["other_tokens"] == {
+        "rows_changed": 1,
+        "gained": 0,
+        "lost": 1,
+        "net_loss": 1,
+        "rows": [
+            {
+                "old_subject_id": "MIM:Lactate",
+                "new_subject_id": "MIM:Lactate",
+                "object_id": "CHEBI:16004",
+                "old_predicate_id": "skos:exactMatch",
+                "new_predicate_id": "skos:exactMatch",
+                "lost": ["D-2-hydroxypropanoate"],
+                "gained": [],
+            }
+        ],
+    }
 
 
 def test_read_rows_skips_the_yaml_preamble(tmp_path):
@@ -383,10 +453,16 @@ def test_read_rows_on_a_missing_file_is_empty_not_an_error(tmp_path):
 def _write_sssom_tsv(path, rows):
     """Minimal SSSOM TSV (header + rows) for main()-level tests.
 
-    rows: iterable of (subject_id, predicate_id, object_id).
+    rows: iterable of (subject_id, predicate_id, object_id[, other]).
     """
-    lines = ["subject_id\tpredicate_id\tobject_id\n"]
-    lines += [f"{s}\t{p}\t{o}\n" for s, p, o in rows]
+    lines = ["subject_id\tpredicate_id\tobject_id\tother\n"]
+    for values in rows:
+        if len(values) == 3:
+            s, p, o = values
+            other = ""
+        else:
+            s, p, o, other = values
+        lines.append(f"{s}\t{p}\t{o}\t{other}\n")
     path.write_text("".join(lines))
 
 
@@ -470,6 +546,10 @@ def test_main_apply_writes_a_pointer_and_counts_not_the_full_diff(tmp_path, monk
     assert entry["diff_counts"] == {
         "added": 1, "removed": 0, "respelled": 0, "flipped": 0,
         "widening_flipped": 0, "respelled_widening": 0, "total_widening": 0,
+        "other_tokens_lost": 0,
+        "other_tokens_gained": 0,
+        "other_net_loss": 0,
+        "other_rows_changed": 0,
     }
     diff_file = Path(entry["diff_file"])
     assert diff_file.exists(), "diff_file must point at a file that actually exists"
@@ -532,6 +612,59 @@ def test_main_proceeds_past_the_widening_gate_when_explicitly_overridden(tmp_pat
     )
 
     publish_sssom.main()  # must not raise SystemExit -- 1 widening flip, limit 1
+
+
+def test_main_refuses_large_other_net_loss_by_default(tmp_path, monkeypatch, capsys):
+    """#520 end-to-end: same rows, same predicates, `other` hollowed out."""
+    working_copy = tmp_path / "working.sssom.tsv"
+    published = tmp_path / "published.sssom.tsv"
+    dropped = "|".join(
+        f"alias-{i}" for i in range(publish_sssom.OTHER_NET_LOSS_LIMIT + 1)
+    )
+    row_key = ("MIM:Lactate", "skos:exactMatch", "CHEBI:16004")
+    _write_sssom_tsv(published, [(*row_key, dropped)])
+    _write_sssom_tsv(working_copy, [row_key])
+
+    monkeypatch.setattr(publish_sssom, "WORKING_COPY", working_copy)
+    monkeypatch.setattr(publish_sssom, "PUBLISHED", published)
+    _stub_root_verification(monkeypatch)
+    _patch_diff_report_default(monkeypatch, tmp_path)
+    monkeypatch.setattr(sys, "argv", ["publish_sssom.py", "--dry-run"])
+
+    with pytest.raises(SystemExit) as excinfo:
+        publish_sssom.main()
+
+    assert excinfo.value.code == 2
+    stderr = capsys.readouterr().err
+    assert f"lose {publish_sssom.OTHER_NET_LOSS_LIMIT + 1}" in stderr
+    assert "gain 0" in stderr
+
+
+def test_main_proceeds_past_other_net_loss_when_explicitly_overridden(
+    tmp_path,
+    monkeypatch,
+):
+    working_copy = tmp_path / "working.sssom.tsv"
+    published = tmp_path / "published.sssom.tsv"
+    dropped = "|".join(
+        f"alias-{i}" for i in range(publish_sssom.OTHER_NET_LOSS_LIMIT + 1)
+    )
+    row_key = ("MIM:Lactate", "skos:exactMatch", "CHEBI:16004")
+    _write_sssom_tsv(published, [(*row_key, dropped)])
+    _write_sssom_tsv(working_copy, [row_key])
+
+    monkeypatch.setattr(publish_sssom, "WORKING_COPY", working_copy)
+    monkeypatch.setattr(publish_sssom, "PUBLISHED", published)
+    monkeypatch.setattr(publish_sssom, "_validate", lambda path: [])
+    _stub_root_verification(monkeypatch)
+    _patch_diff_report_default(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["publish_sssom.py", "--dry-run", "--allow-other-net-loss", "101"],
+    )
+
+    publish_sssom.main()  # must not raise SystemExit -- the override is exact
 
 
 def test_main_apply_surfaces_a_partial_failure_after_published_is_already_committed(
