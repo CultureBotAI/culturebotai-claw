@@ -79,6 +79,13 @@ capability_catalogue:
         type: string_list
       required_when_adopted:
         type: string_list
+  metpo_proposal:
+    settings:
+      class_glob:
+        type: string
+        required_when_enabled: true
+      property_glob:
+        type: string
   sssom_export:
     settings:
       mapping_globs:
@@ -197,6 +204,15 @@ mechs:
         settings:
           mapping_globs: ["output/*.sssom.tsv"]
           extensions: [mapping_method]
+      metpo_proposal:
+        status: disabled
+        reason: >-
+          Carries .claude/commands/ground-or-propose-metpo.md, so the grounding
+          half is present, but has no proposals/ directory and has never minted
+          a METPO id. Adopting applies once a CultureMech term needs one.
+        reason_claims:
+          absent: ["proposals"]
+          present: [".claude/commands/ground-or-propose-metpo.md"]
       kgx_export:
         status: disabled
         reason: >-
@@ -324,6 +340,12 @@ mechs:
         settings:
           mapping_globs: ["mappings/*.sssom.tsv"]
           extensions: [source, validation_method]
+      metpo_proposal:
+        status: not_applicable
+        reason: >-
+          MIM grounds ingredients in ChEBI and FOODON and publishes SSSOM
+          mappings; METPO models microbial phenotypes and processes, which is
+          not the axis this corpus curates.
       kgx_export:
         status: disabled
         reason: >-
@@ -445,6 +467,11 @@ mechs:
           Publishes KGX nodes and edges rather than term mappings; its
           contribution to kg-microbe is a graph, not a mapping set, so there
           is no SSSOM file for this contract to judge.
+      metpo_proposal:
+        status: enabled
+        settings:
+          class_glob: "proposals/*/metpo_proposal_classes_robot.tsv"
+          property_glob: "proposals/*/metpo_proposal_properties_robot.tsv"
       kgx_export:
         status: enabled
         settings:
@@ -558,6 +585,11 @@ mechs:
         status: enabled
         settings:
           mapping_globs: ["proposals/*/metpo_proposal_mappings.sssom.tsv"]
+      metpo_proposal:
+        status: enabled
+        settings:
+          class_glob: "proposals/*/metpo_proposal_classes_robot.tsv"
+          property_glob: "proposals/*/metpo_proposal_properties_robot.tsv"
       kgx_export:
         status: disabled
         reason: >-
@@ -688,6 +720,15 @@ mechs:
           Grounds protein traits directly in its own records rather than
           publishing a mapping set. Adopting one would apply here; none has
           been written.
+      metpo_proposal:
+        status: disabled
+        reason: >-
+          Carries METPO-grounded records under data/traits/**/metpo/, so it
+          consumes METPO, but proposes no new terms and has no proposals/
+          directory. Adopting applies once a protein trait needs a term METPO
+          lacks.
+        reason_claims:
+          absent: ["proposals"]
       kgx_export:
         status: disabled
         reason: >-
@@ -847,6 +888,14 @@ mechs:
         reason: >-
           Records carry ChEBI and ARO identifiers inline rather than through a
           mapping file. Adopting SSSOM applies once a mapping product exists.
+      metpo_proposal:
+        status: disabled
+        reason: >-
+          No proposals/ directory and no METPO grounding. Antimicrobial
+          compounds are grounded in ChEBI and ARO inline; adopting applies once
+          a resistance or activity phenotype needs a METPO term.
+        reason_claims:
+          absent: ["proposals"]
       kgx_export:
         status: disabled
         reason: >-
@@ -967,6 +1016,14 @@ mechs:
           Records carry GO cellular-component identifiers inline rather than
           through a mapping file, and the corpus is four records. Adopting one
           applies once it grows.
+      metpo_proposal:
+        status: disabled
+        reason: >-
+          Structures are grounded in GO cellular-component terms inline and
+          there is no proposals/ directory. Adopting applies once a structure
+          phenotype needs a METPO term GO does not carry.
+        reason_claims:
+          absent: ["proposals"]
       kgx_export:
         status: disabled
         reason: >-
@@ -1132,6 +1189,15 @@ mechs:
         reason_claims:
           present:
             - curation/term_requests.tsv
+      metpo_proposal:
+        status: disabled
+        reason: >-
+          Habitats are grounded in ENVO and the repository raises its gaps
+          through term requests rather than METPO cohorts, so it has no
+          proposals directory. Adopting applies once a habitat-associated
+          phenotype needs a METPO term.
+        reason_claims:
+          absent: ["proposals"]
       kgx_export:
         status: disabled
         reason: >-

@@ -74,6 +74,10 @@ EXPECTED_CAPABILITIES = {
     # Whose exported graph is checked against the shared KGX contract; only
     # CommunityMech emits one today, and the rest say why not.
     "kgx_export",
+    # Who mints METPO terms. Two Mechs propose into one shared numeric ID
+    # space from separate repositories, and the aggregate that finally reads
+    # them together found eight identifiers already carrying two meanings.
+    "metpo_proposal",
     # Who keeps a ranked, licence-verified data-source queue, and why the five
     # that do not have decided rather than forgotten.
     "source_queue",
