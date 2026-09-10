@@ -287,6 +287,7 @@ def test_fleet_pr_review_uses_only_declared_repository_identities():
 # the manifest -- so this is a redirection, not an exemption.
 RESOLVES_THROUGH_A_SCRIPT = {
     "fleet-branch-status": "scripts/fleet_branch_status.py",
+    "metpo-aggregate": "scripts/fleet_metpo_aggregate.py",
     "fleet-pr-status": "scripts/fleet_pr_status.py",
     "github-pages-status": "scripts/fleet_pages_status.py",
 }

@@ -63,6 +63,12 @@ skills:
   fleet-pr-status:
     scope: fleet
     reason: Answers "what is open" across claw and the manifest-defined Mechs.
+  metpo-aggregate:
+    scope: fleet
+    reason: >-
+      Merges every proposing Mech's METPO cohorts, resolving which Mechs
+      propose from the manifest's metpo_proposal capability rather than a list
+      in the skill.
   github-pages-status:
     scope: fleet
     reason: >-
