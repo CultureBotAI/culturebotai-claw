@@ -16,7 +16,10 @@ Safety:
   be genuinely removed (guards against truncation), or if any row would flip
   from `skos:exactMatch` to a weaker predicate -- whether as a same-subject
   flip or riding along with a subject re-spelling (guards against a rebuild
-  quietly downgrading identity claims -- MediaIngredientMech#409).
+  quietly downgrading identity claims -- MediaIngredientMech#409), or if
+  surviving rows would lose too many `other` tokens (guards against a rebuild
+  dropping thousands of ontology synonyms with an otherwise clean row diff --
+  MediaIngredientMech#520).
 - Appends an audit entry (pointer + counts, not the full diff -- see below)
   to workspace/status/sssom_promotions.jsonl.
 
@@ -54,7 +57,6 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 # Module level stays plain paths so importing this file never requires a
 # checkout; `require_mech_roots` in main() is what verifies one (#176).
@@ -64,6 +66,7 @@ MIM_ROOT = Path(
 
 sys.path.insert(0, str(REPO_ROOT / "src"))
 from kg_microbe_fleet import require_mech_roots  # noqa: E402
+
 CLAW_ROOT = REPO_ROOT
 MIM_ROOT = MIM_ROOT
 WORKING_COPY = CLAW_ROOT / "workspace" / "reports" / "mim_ingredient_mappings.sssom.tsv"
@@ -86,6 +89,7 @@ AUDIT_LOG = CLAW_ROOT / "workspace" / "status" / "sssom_promotions.jsonl"
 DIFF_REPORT = CLAW_ROOT / "workspace" / "reports" / "sssom_promotion_diff.json"
 LOCKS_DIR = CLAW_ROOT / "workspace" / "locks"
 ROW_COUNT_DROP_LIMIT = 5
+OTHER_NET_LOSS_LIMIT = 100
 
 SSSOM_BIN = "sssom"
 
@@ -187,6 +191,19 @@ def _spelling_key(subject: str) -> str:
 _EXACT_PREDICATES = frozenset({"skos:exactMatch"})
 
 
+@dataclass(frozen=True)
+class OtherTokenDelta:
+    """The `other` token change on one row that survived the row-set diff."""
+
+    old_subject_id: str
+    new_subject_id: str
+    object_id: str
+    old_predicate_id: str
+    new_predicate_id: str
+    lost: tuple[str, ...]
+    gained: tuple[str, ...]
+
+
 @dataclass
 class SssomDiff:
     """A `(subject_id, object_id)`-keyed comparison of two SSSOM row sets."""
@@ -227,6 +244,11 @@ class SssomDiff:
     # (subject, object, predicate) alone would let a rebuild rewrite every
     # object_label and still report "unchanged".
     column_changes: dict[str, int] = field(default_factory=dict)
+    # Per-row `other` token changes on rows that survived either under the same
+    # (subject, object) key or as a conservative subject respelling. Added and
+    # removed rows are accounted for by the row-set guard instead.
+    other_token_deltas: list[OtherTokenDelta] = field(default_factory=list)
+
     # Rows sharing a (subject_id, object_id) with an earlier row, and therefore
     # absent from this comparison. Non-zero means the diff does not account for
     # every row in the file and its numbers should not be trusted.
@@ -262,6 +284,57 @@ class SssomDiff:
         they stay separate lists; this just unions them for gating/reporting.
         """
         return [*self.widening_flips, *self.respelled_widening]
+
+    @property
+    def other_tokens_lost(self) -> int:
+        """Pipe-delimited `other` tokens present only in the published file."""
+        return sum(len(delta.lost) for delta in self.other_token_deltas)
+
+    @property
+    def other_tokens_gained(self) -> int:
+        """Pipe-delimited `other` tokens present only in the working copy."""
+        return sum(len(delta.gained) for delta in self.other_token_deltas)
+
+    @property
+    def other_net_loss(self) -> int:
+        """Net loss from changed surviving rows; gains offset losses."""
+        return max(0, self.other_tokens_lost - self.other_tokens_gained)
+
+
+def _other_tokens(row: dict[str, str]) -> set[str]:
+    return {
+        token.strip()
+        for token in (row.get("other") or "").split("|")
+        if token.strip()
+    }
+
+
+def _sorted_tokens(tokens: set[str]) -> tuple[str, ...]:
+    return tuple(sorted(tokens, key=lambda token: (token.casefold(), token)))
+
+
+def _record_other_delta(
+    diff: SssomDiff,
+    old_row: dict[str, str],
+    new_row: dict[str, str],
+) -> None:
+    old_tokens = _other_tokens(old_row)
+    new_tokens = _other_tokens(new_row)
+    lost = _sorted_tokens(old_tokens - new_tokens)
+    gained = _sorted_tokens(new_tokens - old_tokens)
+    if not lost and not gained:
+        return
+    diff.other_token_deltas.append(
+        OtherTokenDelta(
+            old_subject_id=old_row.get("subject_id") or "",
+            new_subject_id=new_row.get("subject_id") or "",
+            object_id=old_row.get("object_id") or new_row.get("object_id") or "",
+            old_predicate_id=old_row.get("predicate_id") or "",
+            new_predicate_id=new_row.get("predicate_id") or "",
+            lost=lost,
+            gained=gained,
+        )
+    )
 
 
 def diff_rows(prev: list[dict[str, str]], new: list[dict[str, str]]) -> SssomDiff:
@@ -302,6 +375,7 @@ def diff_rows(prev: list[dict[str, str]], new: list[dict[str, str]]) -> SssomDif
                 continue
             if old_row.get(col) != new_row.get(col):
                 column_changes[col] += 1
+        _record_other_delta(diff, old_row, new_row)
     diff.column_changes = dict(column_changes.most_common())
 
     only_prev = prev_by_key.keys() - new_by_key.keys()
@@ -321,13 +395,16 @@ def diff_rows(prev: list[dict[str, str]], new: list[dict[str, str]]) -> SssomDif
         if candidates:
             new_subject, _ = candidates.pop()
             diff.respelled.append((subject, new_subject, obj))
+            old_row = prev_by_key[(subject, obj)]
+            new_row = new_by_key[(new_subject, obj)]
             # A respelling changes the (subject, object) key, so this pair
             # never appears in `shared` above -- a predicate downgrade riding
             # along with the respelling would otherwise be invisible.
-            old_pred = prev_by_key[(subject, obj)].get("predicate_id", "")
-            new_pred = new_by_key[(new_subject, obj)].get("predicate_id", "")
+            old_pred = old_row.get("predicate_id", "")
+            new_pred = new_row.get("predicate_id", "")
             if old_pred in _EXACT_PREDICATES and new_pred not in _EXACT_PREDICATES:
                 diff.respelled_widening.append((subject, new_subject, obj, old_pred, new_pred))
+            _record_other_delta(diff, old_row, new_row)
         else:
             diff.removed.append((subject, obj))
 
@@ -373,6 +450,14 @@ def _print_diff(diff: SssomDiff) -> None:
                 "      registry-prefix labels reach publication unverified. Read them "
                 "before promoting."
             )
+
+    if diff.other_token_deltas:
+        net = diff.other_tokens_gained - diff.other_tokens_lost
+        print("\n  `other` token changes on surviving rows:")
+        print(f"    rows changed      {len(diff.other_token_deltas)}")
+        print(f"    tokens gained     {diff.other_tokens_gained}")
+        print(f"    tokens lost       {diff.other_tokens_lost}")
+        print(f"    net               {net:+d}")
 
     if diff.collapsed_prev or diff.collapsed_new:
         print(
@@ -423,6 +508,24 @@ def _diff_payload(diff: SssomDiff) -> dict:
     return {
         "same_key_and_predicate": diff.same_key_and_predicate,
         "column_changes": diff.column_changes,
+        "other_tokens": {
+            "rows_changed": len(diff.other_token_deltas),
+            "gained": diff.other_tokens_gained,
+            "lost": diff.other_tokens_lost,
+            "net_loss": diff.other_net_loss,
+            "rows": [
+                {
+                    "old_subject_id": delta.old_subject_id,
+                    "new_subject_id": delta.new_subject_id,
+                    "object_id": delta.object_id,
+                    "old_predicate_id": delta.old_predicate_id,
+                    "new_predicate_id": delta.new_predicate_id,
+                    "lost": list(delta.lost),
+                    "gained": list(delta.gained),
+                }
+                for delta in diff.other_token_deltas
+            ],
+        },
         "collapsed_prev": diff.collapsed_prev,
         "collapsed_new": diff.collapsed_new,
         "added": [list(r) for r in diff.added],
@@ -496,6 +599,13 @@ def main():
                          "should always be a deliberate curation decision, not rebuild "
                          "noise (MediaIngredientMech#409). Set explicitly (with "
                          "justification) when intentionally relaxing a mapping.")
+    ap.add_argument("--allow-other-net-loss", type=int, default=OTHER_NET_LOSS_LIMIT,
+                    help="Max net number of pipe-delimited `other` tokens the new file "
+                         "may lose on surviving rows. Added and removed rows are "
+                         "covered by the row-set guard; this catches a rebuild that "
+                         "keeps every row but drops ontology/KGX synonyms. Default: "
+                         "%(default)s. Set explicitly (with justification) when "
+                         "intentionally retiring a large synonym set.")
     args = ap.parse_args()
     require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
 
@@ -557,6 +667,21 @@ def main():
         print(
             "Adjudicate the flips listed above, or override with "
             "--allow-widening-flips <N>.",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+
+    if diff.other_net_loss > args.allow_other_net_loss:
+        print(
+            f"\nRefusing to promote: `other` would lose {diff.other_tokens_lost} "
+            f"token(s) and gain {diff.other_tokens_gained} token(s) on surviving "
+            f"rows (net loss: {diff.other_net_loss}; "
+            f"limit: {args.allow_other_net_loss}).",
+            file=sys.stderr,
+        )
+        print(
+            "Adjudicate the `other` losses in the full diff report above, or "
+            "override with --allow-other-net-loss <N>.",
             file=sys.stderr,
         )
         sys.exit(2)
@@ -650,6 +775,10 @@ def main():
                     "widening_flipped": len(diff.widening_flips),
                     "respelled_widening": len(diff.respelled_widening),
                     "total_widening": len(diff.all_widening),
+                    "other_tokens_lost": diff.other_tokens_lost,
+                    "other_tokens_gained": diff.other_tokens_gained,
+                    "other_net_loss": diff.other_net_loss,
+                    "other_rows_changed": len(diff.other_token_deltas),
                 },
             }
             with AUDIT_LOG.open("a") as f:
