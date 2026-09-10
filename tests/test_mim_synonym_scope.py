@@ -73,6 +73,21 @@ def test_builder_honors_mim_rejected_label_for_every_input_source(tmp_path):
                         "synonym_type": "EXACT_SYNONYM",
                         "source": "curator review",
                     },
+                    {
+                        "synonym_text": "(for solid medium)",
+                        "synonym_type": "RAW_TEXT",
+                        "source": "curator review",
+                    },
+                    {
+                        "synonym_text": "Original amount: X",
+                        "synonym_type": "RAW_TEXT",
+                        "source": "curator review",
+                    },
+                    {
+                        "synonym_text": "MOPS buffer (SIGMA)",
+                        "synonym_type": "RAW_TEXT",
+                        "source": "curator review",
+                    },
                 ],
             },
             sort_keys=False,
@@ -95,5 +110,8 @@ def test_builder_honors_mim_rejected_label_for_every_input_source(tmp_path):
 
     assert "Upstream bad label" not in published
     assert "UPSTREAM BAD LABEL" not in published
+    assert "(for solid medium)" not in published
+    assert "Original amount: X" not in published
     assert "Accepted local alias" in published
     assert "Accepted upstream alias" in published
+    assert "MOPS buffer (SIGMA)" in published
