@@ -17,14 +17,14 @@ Usage:
     python scripts/build_unified_ingredient_mapping.py [--output PATH] [--format tsv|yaml]
 """
 
-import csv
-import sys
-import yaml
 import argparse
+import csv
 import os
+import sys
 from pathlib import Path
-from collections import defaultdict
 from typing import Dict, Optional
+
+import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 # Module level stays plain paths so importing this file never requires a
@@ -41,8 +41,33 @@ from kg_microbe_fleet import require_mech_roots  # noqa: E402
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from plugins.ingredient_name_normalizer import canonicalize_hydrate  # noqa: E402
 
-
 DEFAULT_OUTPUT = Path('workspace/unified_ingredient_mapping.tsv')
+NON_PUBLISHABLE_MIM_SYNONYM_TYPES = {"REJECTED_LABEL"}
+STRUCTURED_MIM_SYNONYM_MARKERS = (
+    'cross-references:',
+    'role:',
+    'properties:',
+    'synonym source:',
+)
+
+
+def _synonym_text(syn: object) -> str:
+    if isinstance(syn, dict):
+        return (syn.get('synonym_text') or '').strip()
+    if isinstance(syn, str):
+        return syn.strip()
+    return ''
+
+
+def _is_publishable_mim_synonym(syn: object) -> bool:
+    if (
+        isinstance(syn, dict)
+        and (syn.get('synonym_type') or '').strip().upper()
+        in NON_PUBLISHABLE_MIM_SYNONYM_TYPES
+    ):
+        return False
+    low = _synonym_text(syn).lower()
+    return bool(low) and not any(k in low for k in STRUCTURED_MIM_SYNONYM_MARKERS)
 
 
 # ---------------------------------------------------------------------------
@@ -83,25 +108,15 @@ def load_mim_index(mim_root: Path) -> tuple[dict, dict, dict]:
         ontology_label = ont_mapping.get('ontology_label', '').strip()
 
         # Collect distinct synonym surface forms: preferred_term, ontology_label,
-        # and every synonym_text that isn't a structured-metadata dump.
+        # and every publishable synonym_text.
         syn_set: set[str] = set()
         if ontology_label and ontology_label.lower() != preferred.lower():
             syn_set.add(ontology_label)
         for syn in data.get('synonyms', []) or []:
-            txt = ''
-            if isinstance(syn, dict):
-                txt = (syn.get('synonym_text') or '').strip()
-            elif isinstance(syn, str):
-                txt = syn.strip()
-            if not txt:
+            if not _is_publishable_mim_synonym(syn):
                 continue
-            low = txt.lower()
-            # Skip structured-metadata dumps we already keep out of P4.4
-            if any(k in low for k in (
-                'cross-references:', 'role:', 'properties:', 'synonym source:'
-            )):
-                continue
-            if low == preferred.lower():
+            txt = _synonym_text(syn)
+            if txt.lower() == preferred.lower():
                 continue
             syn_set.add(txt)
 
@@ -122,15 +137,11 @@ def load_mim_index(mim_root: Path) -> tuple[dict, dict, dict]:
 
         # Index synonyms
         for syn in data.get('synonyms', []) or []:
-            syn_text = ''
-            if isinstance(syn, dict):
-                syn_text = syn.get('synonym_text', '').strip()
-            elif isinstance(syn, str):
-                syn_text = syn.strip()
-            if syn_text:
-                norm_syn = _normalize(syn_text)
-                if norm_syn and norm_syn not in name_index:
-                    name_index[norm_syn] = record
+            if not _is_publishable_mim_synonym(syn):
+                continue
+            norm_syn = _normalize(_synonym_text(syn))
+            if norm_syn and norm_syn not in name_index:
+                name_index[norm_syn] = record
 
         # Index by CHEBI (primary) and by any ontology ID (CHEBI, FOODON, ENVO).
         #
@@ -413,7 +424,12 @@ COLUMNS = [
 def write_tsv(rows: list, output: Path) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     with open(output, 'w', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=COLUMNS, delimiter='\t')
+        writer = csv.DictWriter(
+            f,
+            fieldnames=COLUMNS,
+            delimiter='\t',
+            lineterminator='\n',
+        )
         writer.writeheader()
         writer.writerows(rows)
     print(f"\n✅ TSV written to {output}  ({len(rows)} rows)")

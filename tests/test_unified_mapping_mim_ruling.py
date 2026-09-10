@@ -12,6 +12,7 @@ cobalamin's oxidation state, DTT, borax decahydrate.
 
 import importlib.util
 import sys
+import textwrap
 from pathlib import Path
 
 _SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
@@ -89,3 +90,55 @@ def test_rows_are_wired_through(monkeypatch):
     assert rows[0]["chebi_id"] == "CHEBI:31345"
     assert rows[0]["culturemech_term_id"] == ""
     assert rows[0]["mim_id"] == "CHEBI:31345"
+
+
+def test_load_mim_index_excludes_rejected_labels(tmp_path):
+    """REJECTED_LABEL tombstones are provenance, not exported synonyms or lookup names."""
+    mapped = tmp_path / "data" / "ingredients" / "mapped"
+    mapped.mkdir(parents=True)
+    (mapped / "Free.yaml").write_text(textwrap.dedent("""\
+        identifier: CHEBI:17561
+        preferred_term: L-Cysteine
+        ontology_mapping:
+          ontology_id: CHEBI:17561
+          ontology_label: L-cysteine
+        mapping_status: MAPPED
+        synonyms:
+        - synonym_text: Cysteine-HCl∙H2O
+          synonym_type: REJECTED_LABEL
+          source: kg_microbe
+    """))
+    (mapped / "Hydrate.yaml").write_text(textwrap.dedent("""\
+        identifier: CHEBI:91248
+        preferred_term: L-Cysteine HCl x H2O
+        ontology_mapping:
+          ontology_id: CHEBI:91248
+          ontology_label: L-cysteine hydrochloride hydrate
+        mapping_status: MAPPED
+        synonyms:
+        - synonym_text: Cysteine-HCl∙H2O
+          synonym_type: HYDRATE_FORM
+          source: kg_microbe
+    """))
+
+    name_index, _, _ = b.load_mim_index(tmp_path)
+
+    assert "Cysteine-HCl∙H2O" not in name_index[b._normalize("L-Cysteine")]["synonyms"]
+    assert (
+        name_index[b._normalize("Cysteine-HCl∙H2O")]["mim_id"]
+        == "CHEBI:91248"
+    )
+
+
+def test_write_tsv_uses_lf_line_endings(tmp_path):
+    """Generated snapshots must not trip git's whitespace checker."""
+    row = dict.fromkeys(b.COLUMNS, "")
+    row["ingredient_name"] = "L-Cysteine"
+    row["occurrence_count"] = 1
+    output = tmp_path / "unified.tsv"
+
+    b.write_tsv([row], output)
+
+    raw = output.read_bytes()
+    assert b"\r" not in raw
+    assert raw.count(b"\n") == 2
