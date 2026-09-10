@@ -43,7 +43,6 @@ after it passes `sssom validate` + `synonym-review`.
 from __future__ import annotations
 
 import argparse
-import gzip
 import json
 import os
 import re
@@ -53,9 +52,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
-
 from kgm_unified_mappings import load_kgm_labels, load_kgm_source_index
-
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 # Module level stays plain paths so importing this file never requires a
@@ -69,6 +66,7 @@ KGM_ROOT_PATH = Path(
 
 sys.path.insert(0, str(REPO_ROOT / "src"))
 from kg_microbe_fleet import require_mech_roots  # noqa: E402
+
 CLAW_ROOT = REPO_ROOT
 MIM_ROOT = MIM_ROOT
 KGM_ROOT = KGM_ROOT_PATH
@@ -131,6 +129,11 @@ SYMMETRIC_PREDICATES = {"skos:exactMatch", "skos:closeMatch"}
 # comparison case-insensitive so an upstream spelling variant cannot recreate a
 # reviewed rejection.
 NON_PUBLISHABLE_MIM_SYNONYM_TYPES = {"REJECTED_LABEL"}
+_CURATION_NOTE_MIM_SYNONYM_TEXT = re.compile(
+    r"^\s*(?:role|properties|cross-references?|original amount)\s*:",
+    re.IGNORECASE,
+)
+_BARE_PARENTHETICAL_MIM_SYNONYM_TEXT = re.compile(r"^\s*\([^)]*\)\s*$")
 
 JUST_MANUAL = "semapv:ManualMappingCuration"
 JUST_LEXICAL = "semapv:LexicalMatching"
@@ -243,6 +246,27 @@ PREDICATE_STRENGTH: dict[str, int] = {
 # subject+object pairs, none with two predicates) but the loader must not
 # depend on that staying true.
 _AMBIGUOUS = object()
+
+
+def _is_nonresolving_mim_synonym_text(text: str) -> bool:
+    """Return whether a text value is MIM provenance, not a synonym."""
+    return bool(
+        _CURATION_NOTE_MIM_SYNONYM_TEXT.match(text)
+        or _BARE_PARENTHETICAL_MIM_SYNONYM_TEXT.match(text)
+    )
+
+
+def _is_publishable_mim_synonym(synonym: object) -> bool:
+    """Return whether a MIM synonym row may enter SSSOM ``other``."""
+    if not isinstance(synonym, dict):
+        return False
+    text = (synonym.get("synonym_text") or "").strip()
+    if not text:
+        return False
+    synonym_type = (synonym.get("synonym_type") or "").strip().upper()
+    if synonym_type in NON_PUBLISHABLE_MIM_SYNONYM_TYPES:
+        return False
+    return not _is_nonresolving_mim_synonym_text(text)
 
 
 def _strengthens(old_predicate: str, new_predicate: str) -> bool:
@@ -759,8 +783,7 @@ def _row_from_yaml(
     mim_yaml_syns = [
         (s.get("synonym_text") or "").strip()
         for s in mim_synonym_rows
-        if (s.get("synonym_type") or "").strip().upper()
-        not in NON_PUBLISHABLE_MIM_SYNONYM_TYPES
+        if _is_publishable_mim_synonym(s)
     ]
     # `other` carries alternate surface forms that downstream consumers can
     # adopt as synonyms. Order: MIM's original ontology_label (preserved
@@ -775,7 +798,7 @@ def _row_from_yaml(
     candidate_alts = [
         a for a in candidate_alts
         if (a or "").strip().casefold() not in rejected_labels
-        and not re.match(r"^\s*(Role:|Cross-references:|Properties:)", a or "")
+        and not _is_nonresolving_mim_synonym_text(a or "")
     ]
     other = _pipe(candidate_alts, drop=drop, max_entries=MAX_OTHER_ENTRIES)
 
@@ -987,7 +1010,7 @@ def _sssom_validate(path: Path) -> list[str]:
             timeout=180,
         )
     except FileNotFoundError:
-        return [f"sssom CLI not on PATH; skipping validation"]
+        return ["sssom CLI not on PATH; skipping validation"]
     combined = (proc.stdout or "") + "\n" + (proc.stderr or "")
     markers = ("is not well-formed", "is not a valid URI or CURIE", "must be supplied")
     return [ln.strip() for ln in combined.splitlines() if any(m in ln for m in markers)]
