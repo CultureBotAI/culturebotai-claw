@@ -514,3 +514,110 @@ def test_runtime_rejects_scheduled_off_profile(canonical) -> None:
     config["profiles"]["off"]["workflows"]["agent"] = [{"cron": "0 3 * * 1"}]
     config_path.write_text(yaml.safe_dump(config))
     assert cron_profiles.main(["off", "--config", str(config_path)]) == 1
+
+
+@pytest.mark.parametrize("name", ['slow"broken', "slow\nactive: fast", "", "slow profile"])
+def test_invalid_profile_names_fail_before_any_write(canonical, name) -> None:
+    config_path, workflow, manifest = canonical
+    config = cron_profiles.load_config(config_path)
+    config["profiles"][name] = config["profiles"].pop("slow")
+    config_path.write_text(yaml.safe_dump(config))
+    originals = {path: path.read_bytes() for path in canonical}
+    assert cron_profiles.main([name, "--config", str(config_path)]) == 1
+    assert {path: path.read_bytes() for path in canonical} == originals
+
+
+def test_active_scalar_rendering_escapes_special_characters() -> None:
+    name = 'slow"broken\nvalue'
+    rendered = cron_profiles.render_active_profile('active: "off"\n', name)
+    assert yaml.safe_load(rendered)["active"] == name
+
+
+def test_concurrent_profile_edit_is_preserved_and_owned_changes_rolled_back(
+    canonical, monkeypatch, capsys
+) -> None:
+    config_path, workflow, manifest = canonical
+    originals = {path: path.read_bytes() for path in canonical}
+    real_write = cron_profiles._atomic_write
+    concurrent_config = None
+
+    def change_profile_during_apply(path, data):
+        nonlocal concurrent_config
+        real_write(path, data)
+        if path == workflow and concurrent_config is None:
+            config = cron_profiles.load_config(config_path)
+            config["profiles"]["slow"]["workflows"]["agent"] = [{"cron": "0 9 * * *"}]
+            concurrent_config = yaml.safe_dump(config).encode()
+            config_path.write_bytes(concurrent_config)
+
+    monkeypatch.setattr(cron_profiles, "_atomic_write", change_profile_during_apply)
+    assert cron_profiles.main(["slow", "--config", str(config_path)]) == 1
+    assert config_path.read_bytes() == concurrent_config
+    assert workflow.read_bytes() == originals[workflow]
+    assert manifest.read_bytes() == originals[manifest]
+    assert "concurrent change detected" in capsys.readouterr().err
+
+
+def test_active_write_failure_after_promotion_restores_every_file(canonical, monkeypatch) -> None:
+    config_path, workflow, manifest = canonical
+    originals = {path: path.read_bytes() for path in canonical}
+    real_write = cron_profiles._atomic_write
+    injected = False
+
+    def fail_after_active_promotion(path, data):
+        nonlocal injected
+        real_write(path, data)
+        if path == config_path and not injected:
+            injected = True
+            raise OSError("injected failure after active replacement")
+
+    monkeypatch.setattr(cron_profiles, "_atomic_write", fail_after_active_promotion)
+    assert cron_profiles.main(["slow", "--config", str(config_path)]) == 1
+    assert injected
+    assert {path: path.read_bytes() for path in canonical} == originals
+
+
+def test_rollback_continues_after_one_restore_fails(canonical, monkeypatch, capsys) -> None:
+    config_path, workflow, manifest = canonical
+    originals = {path: path.read_bytes() for path in canonical}
+    real_write = cron_profiles._atomic_write
+
+    def fail_restoring_manifest(path, data):
+        if path == manifest and data == originals[manifest]:
+            raise OSError("injected restoration failure")
+        real_write(path, data)
+
+    monkeypatch.setattr(cron_profiles, "_atomic_write", fail_restoring_manifest)
+    monkeypatch.setattr(cron_profiles, "check_active_profile", lambda config: ["verify failed"])
+    assert cron_profiles.main(["slow", "--config", str(config_path)]) == 1
+    assert config_path.read_bytes() == originals[config_path]
+    assert workflow.read_bytes() == originals[workflow]
+    assert manifest.read_bytes() != originals[manifest]
+    error = capsys.readouterr().err
+    assert "rollback incomplete" in error
+    assert str(manifest) in error
+    assert "injected restoration failure" in error
+
+
+def test_rollback_preserves_intervening_workflow_bytes(canonical, monkeypatch, capsys) -> None:
+    config_path, workflow, manifest = canonical
+    originals = {path: path.read_bytes() for path in canonical}
+    real_write = cron_profiles._atomic_write
+    concurrent_workflow = None
+
+    def edit_workflow_after_manifest_write(path, data):
+        nonlocal concurrent_workflow
+        real_write(path, data)
+        if path == manifest and concurrent_workflow is None:
+            concurrent_workflow = workflow.read_bytes() + b"# independent concurrent edit\n"
+            workflow.write_bytes(concurrent_workflow)
+
+    monkeypatch.setattr(cron_profiles, "_atomic_write", edit_workflow_after_manifest_write)
+    assert cron_profiles.main(["slow", "--config", str(config_path)]) == 1
+    assert workflow.read_bytes() == concurrent_workflow
+    assert manifest.read_bytes() == originals[manifest]
+    assert config_path.read_bytes() == originals[config_path]
+    error = capsys.readouterr().err
+    assert "rollback incomplete" in error
+    assert "intervening bytes preserved" in error
+    assert str(workflow) in error

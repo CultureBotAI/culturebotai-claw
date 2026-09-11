@@ -674,6 +674,12 @@ the committed mains. `active` describes canonical source state; it is not a
 claim that downstream repositories have deployed it. Until the rollout finishes,
 a previously scheduled downstream copy can still run. Keep `off` selected until
 live scheduled execution is explicitly authorized.
+The applier stages configuration with its payloads, rejects observed concurrent
+edits, and verifies the configuration it actually wrote. Recovery attempts every
+changed file and preserves intervening third-party bytes; an incomplete rollback
+names each unresolved path and exits nonzero. Files are replaced atomically one
+at a time, so use an isolated checkout: the process cannot prevent a concurrent
+editor from changing a file between its last comparison and replacement.
 
 One scoping correction worth recording: `knowledge-gap-scan` is deliberately NOT
 managed by the cadence config. It spends no tokens, and an early draft that

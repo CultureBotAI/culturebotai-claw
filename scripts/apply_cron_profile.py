@@ -147,6 +147,8 @@ def load_config(path: Path) -> dict:
     if not data["profiles"]:
         raise ValueError("profiles must not be empty")
     for name, profile in data["profiles"].items():
+        if not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", name):
+            raise ValueError(f"invalid profile name: {name!r}")
         if not isinstance(profile, dict) or not isinstance(profile.get("workflows"), dict):
             raise ValueError(f"{name}: profile must have a workflows mapping")
         for stem, entries in profile["workflows"].items():
@@ -253,9 +255,9 @@ def check_active_profile(config: dict) -> list[str]:
     return problems
 
 
-def write_active_profile(path: Path, profile: str) -> None:
-    """Update only the top-level ``active`` scalar, preserving surrounding prose."""
-    lines = path.read_text(encoding="utf-8").splitlines()
+def render_active_profile(text: str, profile: str) -> bytes:
+    """Stage only the active scalar from the captured configuration bytes."""
+    lines = text.splitlines()
     matches = [i for i, line in enumerate(lines) if line.startswith("active:")]
     if len(matches) != 1:
         raise ValueError(f"expected exactly one top-level active key, found {len(matches)}")
@@ -263,14 +265,8 @@ def write_active_profile(path: Path, profile: str) -> None:
     comment = ""
     if "#" in lines[idx]:
         comment = "  #" + lines[idx].split("#", 1)[1]
-    lines[idx] = f'active: "{profile}"{comment}'
-    rendered = "\n".join(lines) + "\n"
-    tmp = path.with_name(path.name + f".tmp-{secrets.token_hex(4)}")
-    try:
-        tmp.write_text(rendered, encoding="utf-8")
-        os.replace(tmp, path)
-    finally:
-        tmp.unlink(missing_ok=True)
+    lines[idx] = f"active: {json.dumps(profile)}{comment}"
+    return ("\n".join(lines) + "\n").encode("utf-8")
 
 
 def rewrite(text: str, entries: list[dict]) -> tuple[str, str]:
@@ -399,6 +395,7 @@ def main(argv: list[str] | None = None) -> int:
     originals: dict[Path, bytes] = {}
     descriptions = []
     manifest_bytes = MANIFEST_PATH.read_bytes()
+    originals[MANIFEST_PATH] = manifest_bytes
     manifest_data = json.loads(manifest_bytes)
     manifest_artifacts = {artifact["id"]: artifact for artifact in manifest_data["artifacts"]}
     try:
@@ -410,6 +407,7 @@ def main(argv: list[str] | None = None) -> int:
                 continue
             target = targets[stem]
             original = target.path.read_bytes()
+            originals[target.path] = original
             updated, what = rewrite(original.decode("utf-8"), entries)
             if schedule_crons(updated) != [entry["cron"] for entry in entries]:
                 raise ValueError(f"{stem}: rewrite did not produce the requested schedule")
@@ -417,7 +415,6 @@ def main(argv: list[str] | None = None) -> int:
             if updated_bytes == original:
                 descriptions.append(f"  ok    {stem}: {target.artifact.source} unchanged")
                 continue
-            originals[target.path] = original
             edits[target.path] = updated_bytes
             manifest_artifacts[target.artifact.artifact_id]["sha256"] = hashlib.sha256(
                 updated_bytes
@@ -425,43 +422,55 @@ def main(argv: list[str] | None = None) -> int:
             descriptions.append(
                 f"  {'would' if args.dry_run else 'wrote'} {stem}: {what} ({target.artifact.source})"
             )
+        workflow_changes = len(edits)
         if edits:
-            originals[MANIFEST_PATH] = manifest_bytes
             edits[MANIFEST_PATH] = (json.dumps(manifest_data, indent=2) + "\n").encode()
         config_path = Path(args.config)
         originals[config_path] = config_path.read_bytes()
-        # Validate that the active marker can be edited before writing payloads.
-        if len(re.findall(r"^active:", originals[config_path].decode(), re.M)) != 1:
-            raise ValueError("expected exactly one top-level active key")
+        if _yaml(originals[config_path].decode()) != config or resolve_targets(config) != targets:
+            raise ValueError("profile inputs changed during planning")
+        expected_config = {**config, "active": args.profile}
+        rendered_config = render_active_profile(originals[config_path].decode(), args.profile)
+        if _yaml(rendered_config.decode()) != expected_config:
+            raise ValueError("rendered active profile does not match the requested configuration")
+        if rendered_config != originals[config_path]:
+            edits[config_path] = rendered_config
     except (OSError, ValueError) as exc:
         print(f"error: {exc}; no files changed", file=sys.stderr)
         return 1
 
     if not args.dry_run:
-        written = []
+        written: list[Path] = []
         try:
             for path, data in edits.items():
-                _atomic_write(path, data)
+                _check_snapshot(originals, edits, written)
+                # Record an attempted write too: promotion may succeed before a
+                # cleanup failure is raised, so recovery must inspect its bytes.
                 written.append(path)
-            expected_config = {**config, "active": args.profile}
-            problems = check_active_profile(expected_config)
+                _atomic_write(path, data)
+            _check_snapshot(originals, edits, written)
+            actual_config = load_config(config_path)
+            if actual_config != expected_config:
+                raise ValueError("written configuration differs from the requested profile")
+            problems = check_active_profile(actual_config)
             if problems:
                 raise ValueError("post-apply verification failed: " + "; ".join(problems))
-            write_active_profile(config_path, args.profile)
-            written.append(config_path)
         except (OSError, ValueError) as exc:
-            for path in reversed(written):
-                _atomic_write(path, originals[path])
-            print(
-                f"error: {exc}; changed files restored, active profile not updated", file=sys.stderr
-            )
+            recovery_errors = _restore_attempted_writes(written, originals, edits)
+            if recovery_errors:
+                print(
+                    f"error: {exc}; rollback incomplete: " + "; ".join(recovery_errors),
+                    file=sys.stderr,
+                )
+            else:
+                print(f"error: {exc}; this operation's changes restored", file=sys.stderr)
             return 1
     for description in descriptions:
         print(description)
     print(
         f"\nprofile '{args.profile}': {len(targets)} governed, "
         f"{len(wanted) - len(targets)} planned, "
-        f"{sum(path != MANIFEST_PATH for path in edits)} workflow changes"
+        f"{workflow_changes} workflow changes"
     )
     if args.dry_run:
         print("Dry run: workflows, checksums and active profile left unchanged.")
@@ -471,6 +480,33 @@ def main(argv: list[str] | None = None) -> int:
             "deployment requires publishing a reviewed claw revision, fleet re-pin and fleet-audit."
         )
     return 0
+
+
+def _check_snapshot(
+    originals: dict[Path, bytes], edits: dict[Path, bytes], written: list[Path]
+) -> None:
+    """Reject observed concurrent edits before promotion and at verification."""
+    for path, original in originals.items():
+        expected = edits[path] if path in written else original
+        if path.read_bytes() != expected:
+            raise ValueError(f"concurrent change detected; preserving {path}")
+
+
+def _restore_attempted_writes(
+    written: list[Path], originals: dict[Path, bytes], edits: dict[Path, bytes]
+) -> list[str]:
+    errors = []
+    for path in reversed(written):
+        try:
+            current = path.read_bytes()
+            if current == originals[path]:
+                continue
+            if current != edits[path]:
+                raise ValueError("intervening bytes preserved")
+            _atomic_write(path, originals[path])
+        except (OSError, ValueError) as exc:
+            errors.append(f"{path}: {exc}")
+    return errors
 
 
 def _atomic_write(path: Path, data: bytes) -> None:
