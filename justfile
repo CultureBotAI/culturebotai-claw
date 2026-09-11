@@ -553,3 +553,7 @@ cron-profile-check:
 #   just cron-profile slow
 cron-profile name *args:
     uv run python scripts/apply_cron_profile.py {{name}} {{args}}
+
+# Preview reviewed upstream releases for canonical governed workflows; pass --apply to write.
+governed-workflow-pins *args:
+    uv run python scripts/update_governed_workflow_pins.py {{args}}

@@ -203,3 +203,59 @@ that separate coordinated release.
 Rollback means pinning every Mech to the previous reviewed claw commit; do
 not reinstate a Mech authority or use a mutable branch. The canonical bytes
 remain recoverable from every reviewed claw commit.
+
+## Governed workflow action pins
+
+`src/kg_microbe_governance/workflow_pins.json` owns the action SHAs, release
+labels, and exact uv runtime for workflows under `artifacts/workflows/`.
+Every parsed `uses:` reference must match the contract's 40-hex revision and
+release comment; every setup-uv step must also set the contracted `version:`.
+Claw CI checks those values, the workflow registry, and the artifact checksums.
+Per-Mech pin contracts may exempt these governed paths because claw checks them
+centrally. Their remaining, Mech-owned workflows can keep their own versions.
+
+The canonical upgrade command resolves full release tags through the action's
+GitHub repository and previews the contract, workflow, and checksum changes:
+
+```bash
+just governed-workflow-pins --action astral-sh/setup-uv@v10.1.0
+just governed-workflow-pins --action anthropics/claude-code-action@v1.0.221 --apply
+just governed-workflow-pins --verify-upstream
+just governed-workflow-pins --check
+```
+
+`--apply` writes only the canonical claw files. `--verify-upstream` checks that
+recorded labels still resolve to their recorded SHAs; CI's `--check` stays
+offline and does not claim that a reviewed version remains the latest release.
+Use `--uv-version X.Y.Z` for a deliberate runtime upgrade. Without that flag,
+action upgrades retain the approved uv version. Neither the updater nor its
+tests execute an action or a model, enable a schedule, publish a commit, or
+change a Mech checkout. Review and merge the canonical patch, then use the
+ordinary governance synchronizer to roll out that immutable revision together
+with all its other governed artifacts.
+
+A Mech's Dependabot configuration must exclude its governed workflow targets
+from each applicable `github-actions` update block. For `directory: /`, the
+current target is:
+
+```yaml
+exclude-paths:
+  - ".github/workflows/pr-shepherd.yml"
+```
+
+Keep the exclusion list aligned with that consumer's workflow targets in
+`vendored_artifacts.json`; preserve exclusions and update settings owned by the
+Mech. A repository with no Dependabot configuration needs no new scanner solely
+to exclude a path. If it later enables one, add the exclusions at the same time.
+GitHub documents `exclude-paths` relative to each update directory and limits
+GitHub Actions discovery to the root configuration and `.github/workflows`:
+[Dependabot options reference](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference#exclude-paths).
+Canonical payloads under `src/` therefore use the explicit updater above;
+Dependabot in a Mech must not rewrite them.
+
+When an already-open Dependabot PR touches both a governed workflow and a
+Mech-owned workflow, preserve the latter update in a fresh checked patch before
+closing the obsolete PR. A successful vendored-sync run from before the
+workflow became governed does not validate merging that old PR against today's
+main branch. Require checks on the current candidate containing the canonical
+copy and the Mech-owned update.

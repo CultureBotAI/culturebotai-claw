@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "actions": {
+    "actions/checkout": {
+      "sha": "3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "version": "v7.0.1"
+    },
+    "astral-sh/setup-uv": {
+      "sha": "bec219d24cd3e171d82865faccec33120bb574f4",
+      "version": "v10.1.0"
+    },
+    "anthropics/claude-code-action": {
+      "sha": "0a8d3c9443bbff909ab973b6a17a340b913f229f",
+      "version": "v1.0.221"
+    }
+  },
+  "uv_version": "0.12.5"
+}

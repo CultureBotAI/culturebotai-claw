@@ -107,6 +107,7 @@ kg_microbe_research = ["schema/*.yaml"]
 kg_microbe_skills = ["skills.yaml", "canonical/*.md"]
 kg_microbe_governance = [
     "vendored_artifacts.json",
+    "workflow_pins.json",
     "artifacts/**/*.py",
     "artifacts/**/*.sh",
     "artifacts/**/*.yaml",
