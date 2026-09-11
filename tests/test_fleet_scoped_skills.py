@@ -56,7 +56,9 @@ def _frontmatter(path: Path) -> dict:
 
 
 def _tags(path: Path) -> set[str]:
-    return {str(tag) for tag in _frontmatter(path).get("tags") or ()}
+    frontmatter = _frontmatter(path)
+    tags = frontmatter.get("tags") or frontmatter.get("metadata", {}).get("tags") or ()
+    return {str(tag) for tag in tags}
 
 
 def test_general_fleet_skill_catalogue_matches_the_declared_fleet_tag():

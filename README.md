@@ -3,7 +3,7 @@
 CultureBotAI CLAW coordinates validation, curation, and shared tooling across
 the Mech repositories: CultureMech, MediaIngredientMech (MIM),
 CommunityMech, TraitMech, ProteinTraitsMech, AntibioticMech,
-CellStructureMech, HabitatMech, and NaturalProductMech.
+CellStructureMech, HabitatMech, NaturalProductMech, and TaxonMech.
 `src/kg_microbe_fleet/fleet.yaml` is the
 canonical definition of that fleet. It contains repository-aware plugins,
 file-based coordination, curation pipelines, shared Mech utilities, and fleet

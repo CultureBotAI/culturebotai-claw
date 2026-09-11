@@ -26,7 +26,7 @@ between turns and across concurrent sessions.
 
 ## Purpose and boundaries
 
-CultureBotAI CLAW coordinates work across five downstream Mech repositories.
+CultureBotAI CLAW coordinates work across the manifest-defined Mech repositories.
 `src/kg_microbe_fleet/fleet.yaml` is the canonical list; do not re-declare it
 in code. Read it through `kg_microbe_fleet.load_fleet_manifest()`. It lives
 inside the package rather than in `conf/` so installed commands retain the
@@ -42,6 +42,7 @@ manifest when no source checkout is present:
 - CellStructureMech (`CELLSTRUCTUREMECH_ROOT`)
 - HabitatMech (`HABITATMECH_ROOT`)
 - NaturalProductMech (`NATURALPRODUCTMECH_ROOT`)
+- TaxonMech (`TAXONMECH_ROOT`)
 
 You do not need every Mech cloned. `openclaw-cli config validate` reports an
 unset root as "not configured locally" rather than a failure; pass

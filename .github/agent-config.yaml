@@ -3,11 +3,9 @@
 # Single source of truth for which model backs each agent workflow. Bumping a
 # model fleet-wide is an edit here, not a sweep through workflow YAML.
 #
-# NOTHING CONSUMES THIS YET. No workflow in this org invokes an agent — see
-# docs/AUTONOMOUS_LOOPS.md. It ships first, deliberately: the cost dial and the
-# kill switch (.github/cron-profiles.yaml) should exist before the thing they
-# control, not after. Adopted from monarch-initiative/dismech, which routes
-# effort tiers to models exactly this way.
+# The governed pr-shepherd workflow fetches this file at run time. Other entries
+# describe planned consumers; see docs/AUTONOMOUS_LOOPS.md. Cadence is controlled
+# separately by cron-profiles.yaml and governed workflow publication.
 #
 # Resolution order, highest priority first:
 #   1. a per-run override (a workflow_dispatch `model:` input)
@@ -23,11 +21,6 @@ default_model: claude-opus-5
 provider: anthropic
 
 workflows:
-  # Comment-only, dispatch-only, vendored to every Mech (#391). Named here
-  # so the resolver's claim that the model lives in one place is true rather
-  # than an implicit fall-through to default_model.
-  pr-shepherd:
-    model: claude-sonnet-5
   # The worker loop, when it exists. Fans out across effort tiers in parallel,
   # each tier bound to a model and a label selector, so a mechanical issue is not
   # billed at the same rate as a schema change.
@@ -49,8 +42,8 @@ workflows:
         model: claude-opus-5
         selector: "label:agent-ok -label:low_effort -label:medium_effort"
 
-  # Moves existing bot-authored PRs toward merge. It cannot invent work, which is
-  # why the research recommends it as the first agent to enable.
+  # Comment-only and dispatch-only, vendored to the fleet (#391). This remains
+  # the effective value used before the duplicate declaration was removed.
   pr-shepherd:
     model: claude-opus-5
 

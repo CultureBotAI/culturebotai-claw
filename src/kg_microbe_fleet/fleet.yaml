@@ -1415,3 +1415,142 @@ mechs:
         reason: >-
           The unmapped inventory reconciles ingredient names across media
           corpora; natural-product structures are not one of its inputs.
+
+  taxonmech:
+    # Inspected on joining, 2026-09-11, at committed main 42c8e490.
+    # Records are generated from inventories and scope: shared readers may
+    # inspect them, but writes must go through the native seeder/reproduction gate.
+    display_name: TaxonMech
+    github: CultureBotAI/TaxonMech
+    environment_variable: TAXONMECH_ROOT
+    package_path: src/taxonmech
+    schema_paths:
+      - src/taxonmech/schema/taxonmech.yaml
+    record_globs:
+      - data/taxa/**/*.yaml
+    vendored_role: consumer
+    serialization:
+      verified: false
+      reason: >-
+        Taxon records are generated from committed inventories and scope;
+        generic serialization must not bypass the native seeder and corpus
+        reproduction gate.
+    capabilities:
+      id_label_validation:
+        status: enabled
+      curation_history:
+        status: enabled
+      strict_validation:
+        status: enabled
+      schema_sync:
+        status: enabled
+      # These declare eligibility for shared orchestration, as for the other
+      # consumers; they do not assert that local hook copies are installed.
+      release_management:
+        status: enabled
+      build_coordination:
+        status: enabled
+      documentation:
+        status: enabled
+      testing:
+        status: enabled
+      refactoring:
+        status: enabled
+      coordination_hooks:
+        status: enabled
+      deep_research:
+        status: disabled
+        reason: >-
+          Vendors scripts/deep_research_contract.py but has no
+          conf/deep_research_provider.yaml or provider recipe. Enable once a
+          research provider is configured and exercised under the shared contract.
+        reason_claims:
+          present: ["scripts/deep_research_contract.py"]
+          absent: ["conf/deep_research_provider.yaml"]
+      edison_key_discovery:
+        status: not_applicable
+        reason: >-
+          TaxonMech has no Edison integration or Edison research-provider key.
+      environment_coverage:
+        status: not_applicable
+        reason: >-
+          Environment coverage compares culture media, ingredients and
+          microbial communities; taxon identity records are not one of its inputs.
+      knowledge_gap_scan:
+        status: disabled
+        reason: >-
+          The schema supports Discussion but no shared scan window or workflow
+          is configured. Enable after adding a durable curated overlay that the
+          generated-corpus pipeline preserves and wiring the scanner to it.
+      vendored_sync:
+        status: enabled
+      corpus_statistics:
+        status: enabled
+        settings:
+          fields:
+            - taxon_domain
+            - rank
+            - grounding_status
+            - mapping_status
+      page_budgets:
+        status: disabled
+        reason: >-
+          Publishes tracked pages under pages/ but has no
+          conf/pages_budgets.json. Enable once explicit size and file-count
+          budgets are configured and measured.
+        reason_claims:
+          present: ["pages"]
+          absent: ["conf/pages_budgets.json"]
+      writer_audit:
+        status: disabled
+        reason: >-
+          Has no scripts/audit_writers.py. Records use a native seeder and
+          validated writer, but no shared audit profile has been adopted.
+          Enable after configuring the profile and measuring its writer coverage.
+        reason_claims:
+          absent: ["scripts/audit_writers.py"]
+      sssom_export:
+        status: disabled
+        reason: >-
+          Stores taxonomy mappings and cross-references inline; no SSSOM
+          mapping product is emitted. Enable once a validated export exists.
+      metpo_proposal:
+        status: disabled
+        reason: >-
+          The schema references METPO but there is no proposals/ directory or
+          proposal cohort. Enable once the repository produces terms under the
+          shared proposal contract.
+        reason_claims:
+          absent: ["proposals"]
+      kgx_export:
+        status: disabled
+        reason: >-
+          Consumes kg-microbe KGX as an input but does not emit a graph product.
+          Enable when an exporter produces validated nodes and edges.
+      source_queue:
+        status: disabled
+        reason: >-
+          Sources are configured in conf/sources.yaml and inventoried in
+          data/raw/MANIFEST.yaml; no curation/source_queue.tsv ranks candidate
+          sources. Enable once that review queue is adopted.
+        reason_claims:
+          present: ["conf/sources.yaml", "data/raw/MANIFEST.yaml"]
+          absent: ["curation/source_queue.tsv"]
+      site_contract:
+        status: enabled
+        settings:
+          site_path: pages
+      source_catalogue:
+        status: disabled
+        reason: >-
+          Uses conf/sources.yaml and data/raw/MANIFEST.yaml but has no
+          download.yaml in the shared catalogue shape. Enable after adapting
+          the source declarations to that contract.
+        reason_claims:
+          present: ["conf/sources.yaml", "data/raw/MANIFEST.yaml"]
+          absent: ["download.yaml"]
+      unmapped_inventory_input:
+        status: not_applicable
+        reason: >-
+          The unmapped inventory reconciles ingredient names across media
+          corpora; taxon identity records are not one of its inputs.
