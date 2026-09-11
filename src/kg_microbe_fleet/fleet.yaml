@@ -1462,9 +1462,9 @@ mechs:
       deep_research:
         status: disabled
         reason: >-
-          Seeds from committed kg-microbe inventories and has no provider
-          profile. Enable after a provider integration is configured and
-          validated under the shared execution contract.
+          Seeds from committed kg-microbe inventories and has no
+          conf/deep_research_provider.yaml. Enable after a provider integration
+          is configured and validated under the shared execution contract.
         reason_claims:
           absent: ["conf/deep_research_provider.yaml"]
       edison_key_discovery:
@@ -1503,8 +1503,9 @@ mechs:
       page_budgets:
         status: disabled
         reason: >-
-          The generated site has no declared size or file-count budgets.
-          Enable after measuring and recording limits for the taxon pages.
+          The generated site has no conf/pages_budgets.json declaring size or
+          file-count budgets. Enable after measuring and recording limits for
+          the taxon pages.
         reason_claims:
           absent: ["conf/pages_budgets.json"]
       kgx_export:
@@ -1515,8 +1516,9 @@ mechs:
       source_queue:
         status: disabled
         reason: >-
-          Curators select taxa through the seed scope, not a ranked source
-          queue. Enable when new source adoption is tracked in a queue.
+          Curators select taxa through the seed scope and have no
+          curation/source_queue.tsv. Enable when new source adoption is
+          tracked in a ranked queue.
         reason_claims:
           absent: ["curation/source_queue.tsv"]
       metpo_proposal:
@@ -1535,8 +1537,9 @@ mechs:
         status: disabled
         reason: >-
           The seeder writes through a closed-schema gate and corpus
-          reproduction is checked in CI. Enable a shared writer audit when
-          additional curator-owned writers are introduced.
+          reproduction is checked in CI; no scripts/audit_writers.py exists.
+          Enable a shared writer audit when additional curator-owned writers
+          are introduced.
         reason_claims:
           absent: ["scripts/audit_writers.py"]
       site_contract:
