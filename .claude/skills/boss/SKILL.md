@@ -415,16 +415,27 @@ gh pr view -R "$TARGET_GITHUB" "$PR_NUMBER" \
   --json number,url,state,headRefOid,statusCheckRollup
 ```
 
-Mark the task as needing human review, don't tear down until merged. Immediately
-before an approved merge, fail closed if `main` advanced, the pushed head differs
-from the reviewed local head, or GitHub no longer reports a clean PR:
+Preserve any review requirement not already covered by the user's authorization;
+do not tear down until merged. Immediately before an authorized merge, query the
+effective queue rules and verify the reviewed head and PR identity. A native queue
+tests current main plus queued changes; an advanced main alone does not require a
+rebase. Without a queue, retain the main-ancestry and clean-PR guards below.
+See `docs/guides/MERGE_QUEUES.md` for queue configuration and failure handling:
 
 ```bash
+# Query effective rules now; API failure must stop this operation.
+QUEUE_ENABLED="$(gh api "repos/$TARGET_GITHUB/rules/branches/main" \
+  --jq 'any(.[]; .type == "merge_queue")')"
+case "$QUEUE_ENABLED" in
+  true|false) ;;
+  *) echo "Could not determine merge queue policy" >&2; exit 2 ;;
+esac
+
 run_locked_command "refresh-main-$SLUG" 300 \
   git -C "$WORKTREE" fetch origin \
     refs/heads/main:refs/remotes/origin/main
 
-if ! git -C "$WORKTREE" merge-base --is-ancestor origin/main HEAD; then
+if [ "$QUEUE_ENABLED" = false ] && ! git -C "$WORKTREE" merge-base --is-ancestor origin/main HEAD; then
   echo "origin/main advanced; rebase the unique branch and rerun validation/CI" >&2
   exit 2
 fi
@@ -444,14 +455,23 @@ test "$pr_base" = "main"
 test "$pr_branch" = "$BRANCH"
 test "$pr_head" = "$local_head"
 test "$pr_head_repo" = "$TARGET_GITHUB"
-test "$pr_mergeable:$pr_merge_state" = "MERGEABLE:CLEAN"
+if [ "$QUEUE_ENABLED" = true ]; then
+  test "$pr_mergeable" = "MERGEABLE"
+else
+  test "$pr_mergeable:$pr_merge_state" = "MERGEABLE:CLEAN"
+fi
 ```
 
 If any guard fails, do not merge; update only the unique branch, rerun validation
 and CI, and obtain review again as required. The confirmed CLI merge must pin
 the reviewed bytes with
 `gh pr merge "$PR_NUMBER" -R "$TARGET_GITHUB" --match-head-commit "$local_head"`
-(plus the reviewed merge strategy); a web merge cannot provide this SHA guard.
+With `QUEUE_ENABLED=true`, provide no merge strategy and no `--admin` bypass.
+The command may only enqueue the PR or enable auto-merge. Wait for actual
+`MERGED`; neither queued nor auto-merge enabled permits cleanup. If queue checks
+fail, inspect that merge group's logs and fix/review only the owned branch before
+retrying. With `QUEUE_ENABLED=false`, supply the reviewed merge strategy.
+A web merge cannot provide this SHA guard.
 
 ---
 

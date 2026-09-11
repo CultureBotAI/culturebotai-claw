@@ -1,0 +1,200 @@
+{
+  "culturemech": {
+    ".github/workflows/chebi-consistency.yaml": [
+      "consistency"
+    ],
+    ".github/workflows/concentration-plausibility.yaml": [
+      "plausibility"
+    ],
+    ".github/workflows/curation-history.yaml": [
+      "history"
+    ],
+    ".github/workflows/label-correspondence.yaml": [
+      "label-drift-report / label-correspondence"
+    ],
+    ".github/workflows/tests.yaml": [
+      "Changed Python quality + wheel smoke",
+      "Fast tests (Python 3.10)",
+      "Fast tests (Python 3.14)",
+      "Full corpus and integration suite"
+    ],
+    ".github/workflows/validate-strict.yaml": [
+      "validate"
+    ],
+    ".github/workflows/vendored-sync.yaml": [
+      "vendored-sync"
+    ]
+  },
+  "mediaingredientmech": {
+    ".github/workflows/curation-history.yaml": [
+      "history"
+    ],
+    ".github/workflows/instruction-refs.yaml": [
+      "instruction-refs"
+    ],
+    ".github/workflows/label-correspondence.yaml": [
+      "id-label-gate / label-correspondence"
+    ],
+    ".github/workflows/qc-component-partonomy.yaml": [
+      "qc-component-partonomy"
+    ],
+    ".github/workflows/qc-duplicate-ids.yaml": [
+      "qc-duplicate-ids"
+    ],
+    ".github/workflows/qc-evidence.yaml": [
+      "qc-evidence"
+    ],
+    ".github/workflows/qc-flat-coverage.yaml": [
+      "qc-flat-coverage"
+    ],
+    ".github/workflows/qc-roundtrip.yaml": [
+      "roundtrip"
+    ],
+    ".github/workflows/qc-sssom.yaml": [
+      "qc-sssom"
+    ],
+    ".github/workflows/quality.yaml": [
+      "check"
+    ],
+    ".github/workflows/tests.yaml": [
+      "pytest"
+    ],
+    ".github/workflows/validate-strict.yaml": [
+      "validate-strict"
+    ],
+    ".github/workflows/vendored-sync.yaml": [
+      "vendored-sync"
+    ]
+  },
+  "communitymech": {
+    ".github/workflows/curation-history.yaml": [
+      "history"
+    ],
+    ".github/workflows/docs-current.yaml": [
+      "docs-current"
+    ],
+    ".github/workflows/label-correspondence.yaml": [
+      "label-correspondence / label-correspondence"
+    ],
+    ".github/workflows/lint.yaml": [
+      "lint"
+    ],
+    ".github/workflows/network-quality.yml": [
+      "Audit Network Integrity"
+    ],
+    ".github/workflows/validate-strict.yaml": [
+      "validate-strict",
+      "python-compatibility"
+    ],
+    ".github/workflows/vendored-sync.yaml": [
+      "vendored-sync"
+    ]
+  },
+  "claw": {
+    ".github/workflows/tests.yaml": [
+      "pytest",
+      "history-round-trip"
+    ],
+    ".github/workflows/id-label-canon.yaml": [
+      "id-label-contract"
+    ],
+    ".github/workflows/governance-fleet-audit.yaml": [
+      "fleet-audit"
+    ]
+  },
+  "traitmech": {
+    ".github/workflows/pr-sanity.yaml": [
+      "pr-sanity"
+    ],
+    ".github/workflows/vendored-sync.yaml": [
+      "vendored-sync"
+    ],
+    ".github/workflows/qc.yaml": [
+      "qc"
+    ],
+    ".github/workflows/pytest.yaml": [
+      "pytest (Python 3.10)",
+      "pytest (Python 3.11)",
+      "pytest (Python 3.12)",
+      "pytest (Python 3.13)"
+    ],
+    ".github/workflows/validate-strict.yaml": [
+      "validate-strict"
+    ],
+    ".github/workflows/canonical-example-taxonomy.yaml": [
+      "canonical-example-taxonomy"
+    ],
+    ".github/workflows/curation-history.yaml": [
+      "history"
+    ],
+    ".github/workflows/label-correspondence.yaml": [
+      "label-correspondence / label-correspondence"
+    ]
+  },
+  "proteintraitsmech": {
+    ".github/workflows/checks.yml": [
+      "checks"
+    ],
+    ".github/workflows/history-and-vendored.yaml": [
+      "vendored-sync",
+      "validate-history"
+    ],
+    ".github/workflows/validate-strict.yaml": [
+      "validate-strict"
+    ]
+  },
+  "taxonmech": {
+    ".github/workflows/main.yaml": [
+      "qc (3.10)",
+      "qc (3.12)"
+    ],
+    ".github/workflows/vendored-sync.yaml": [
+      "vendored-sync"
+    ]
+  },
+  "antibioticmech": {
+    ".github/workflows/main.yaml": [
+      "qc (3.10)",
+      "qc (3.12)"
+    ],
+    ".github/workflows/vendored-sync.yaml": [
+      "vendored-sync"
+    ]
+  },
+  "cellstructuremech": {
+    ".github/workflows/main.yaml": [
+      "qc (3.10)",
+      "qc (3.12)"
+    ],
+    ".github/workflows/vendored-sync.yaml": [
+      "vendored-sync"
+    ],
+    ".github/workflows/label-correspondence.yaml": [
+      "label-correspondence"
+    ],
+    ".github/workflows/identifier-liveness.yaml": [
+      "identifier-liveness"
+    ]
+  },
+  "habitatmech": {
+    ".github/workflows/main.yaml": [
+      "qc (3.10)",
+      "qc (3.12)"
+    ],
+    ".github/workflows/vendored-sync.yaml": [
+      "vendored-sync"
+    ],
+    ".github/workflows/label-correspondence.yaml": [
+      "label-correspondence"
+    ]
+  },
+  "naturalproductmech": {
+    ".github/workflows/main.yaml": [
+      "qc (3.10)",
+      "qc (3.12)"
+    ],
+    ".github/workflows/label-correspondence.yaml": [
+      "label-correspondence"
+    ]
+  }
+}

@@ -9,6 +9,8 @@ on:
   schedule:
     - cron: "41 6 * * *"
   pull_request:
+  merge_group:
+    types: [checks_requested]
   push:
     branches: [main]
   workflow_dispatch:
@@ -28,13 +30,14 @@ jobs:
           persist-credentials: false
 
       # Pull requests use their exact protected-base commit as the trusted audit
-      # runner, main pushes use their triggering commit, and schedules/manual
+      # runner, merge groups use their exact base SHA, main pushes use their
+      # triggering commit, and schedules/manual
       # runs use main even if workflow_dispatch selected another candidate ref.
       # A downstream pin never selects executable audit or install code.
       - name: Check out trusted claw revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'push' && github.sha || 'main' }}
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'merge_group' && github.event.merge_group.base_sha || github.event_name == 'push' && github.sha || 'main' }}
           path: fleet/trusted-claw
           fetch-depth: 0
           persist-credentials: false

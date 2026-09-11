@@ -178,3 +178,9 @@ workspace/    gitignored runtime locks, tasks, reports, and caches
 
 See the [documentation index](docs/README.md) for longer guides and archived
 project history.
+
+### Merge queues
+
+`uv run kg-microbe-merge-queue check` inspects native queue readiness and policy
+across the manifest fleet and CLAW. The [merge queue guide](docs/guides/MERGE_QUEUES.md)
+covers planning, reviewed application, queue admission and rollout verification.
