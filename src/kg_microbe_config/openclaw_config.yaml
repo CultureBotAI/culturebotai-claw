@@ -68,6 +68,13 @@ repositories:
     task_runner: just
     description: "Natural products: one record per structure with producer, gene cluster and activity"
 
+  taxonmech:
+    path: ${TAXONMECH_ROOT}
+    type: python
+    package_manager: uv
+    task_runner: just
+    description: "Microbial species and strains with NCBI lineage and source taxonomy mappings"
+
 agents:
   discovery_paths:
     - kg_microbe_agents/definitions

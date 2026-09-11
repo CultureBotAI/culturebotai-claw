@@ -196,6 +196,7 @@ assert manifest.keys == (
     "cellstructuremech",
     "habitatmech",
     "naturalproductmech",
+    "taxonmech",
 )
 assert default_manifest_path() == module_path.parent / "fleet.yaml"
 assert default_config_path().is_relative_to(unpacked)

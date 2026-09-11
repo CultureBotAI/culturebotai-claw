@@ -1415,3 +1415,133 @@ mechs:
         reason: >-
           The unmapped inventory reconciles ingredient names across media
           corpora; natural-product structures are not one of its inputs.
+
+  taxonmech:
+    # Admission unblocks TaxonMech#2. Measured on 2026-09-11 against the
+    # reviewed scaffold in TaxonMech#1/#13 at 9441718, not its README-only
+    # origin/main. The downstream stack must re-pin to this admission before
+    # merging; the registration itself changes no canonical payload bytes.
+    display_name: TaxonMech
+    github: CultureBotAI/TaxonMech
+    environment_variable: TAXONMECH_ROOT
+    package_path: src/taxonmech
+    schema_paths:
+      - src/taxonmech/schema/taxonmech.yaml
+    record_globs:
+      - data/taxa/**/*.yaml
+    vendored_role: consumer
+    # All 100 scaffold records round-trip byte-identically with these options.
+    serialization:
+      verified: true
+      options:
+        default_flow_style: false
+        sort_keys: false
+        allow_unicode: true
+        width: 80
+    capabilities:
+      id_label_validation:
+        status: enabled
+      curation_history:
+        status: enabled
+      strict_validation:
+        status: enabled
+      schema_sync:
+        status: enabled
+      release_management:
+        status: enabled
+      build_coordination:
+        status: enabled
+      documentation:
+        status: enabled
+      testing:
+        status: enabled
+      refactoring:
+        status: enabled
+      coordination_hooks:
+        status: enabled
+      deep_research:
+        status: disabled
+        reason: >-
+          Seeds from committed kg-microbe inventories and has no provider
+          profile. Enable after a provider integration is configured and
+          validated under the shared execution contract.
+        reason_claims:
+          absent: ["conf/deep_research_provider.yaml"]
+      edison_key_discovery:
+        status: not_applicable
+        reason: >-
+          The inventory seeder does not use an Edison research-provider key.
+      environment_coverage:
+        status: not_applicable
+        reason: >-
+          Environment coverage compares culture media, ingredients and
+          communities; taxon identity records are not one of those inputs.
+      knowledge_gap_scan:
+        status: disabled
+        reason: >-
+          Seeded records carry source attestations but no curator discussions
+          yet. Enable after discussions are curated and the scan is adopted.
+      vendored_sync:
+        status: enabled
+      unmapped_inventory_input:
+        status: not_applicable
+        reason: >-
+          The unmapped inventory reconciles ingredient names across media
+          corpora; TaxonMech carries taxa and strains rather than ingredients.
+      source_catalogue:
+        status: disabled
+        reason: >-
+          Sources and extraction hashes are recorded in the repository's
+          inventory configuration and manifest. Adopting the shared catalogue
+          requires a download.yaml, which is not present.
+        reason_claims:
+          absent: ["download.yaml"]
+      corpus_statistics:
+        status: enabled
+        settings:
+          fields: ["rank", "taxon_domain", "grounding_status", "mapping_status"]
+      page_budgets:
+        status: disabled
+        reason: >-
+          The generated site has no declared size or file-count budgets.
+          Enable after measuring and recording limits for the taxon pages.
+        reason_claims:
+          absent: ["conf/pages_budgets.json"]
+      kgx_export:
+        status: disabled
+        reason: >-
+          Consumes kg-microbe transforms and emits taxon YAML and HTML.
+          Enable when the repository publishes its own KGX graph.
+      source_queue:
+        status: disabled
+        reason: >-
+          Curators select taxa through the seed scope, not a ranked source
+          queue. Enable when new source adoption is tracked in a queue.
+        reason_claims:
+          absent: ["curation/source_queue.tsv"]
+      metpo_proposal:
+        status: disabled
+        reason: >-
+          Identifies records with NCBI Taxonomy and has no term proposals.
+          Enable if a curator-owned mechanism requires new METPO terms.
+        reason_claims:
+          absent: ["proposals"]
+      sssom_export:
+        status: disabled
+        reason: >-
+          Source mappings are carried on each taxon record. Enable when
+          those mappings are also published as an SSSOM product.
+      writer_audit:
+        status: disabled
+        reason: >-
+          The seeder writes through a closed-schema gate and corpus
+          reproduction is checked in CI. Enable a shared writer audit when
+          additional curator-owned writers are introduced.
+        reason_claims:
+          absent: ["scripts/audit_writers.py"]
+      site_contract:
+        status: disabled
+        reason: >-
+          Local tests check generated-site drift and relative links. Enable
+          the shared site contract after its additional checks are measured
+          against the generated taxon pages.

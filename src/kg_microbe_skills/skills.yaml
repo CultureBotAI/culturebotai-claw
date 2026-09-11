@@ -260,7 +260,7 @@ canonical:
       wrong. The template says so, because a reader who thinks this is a
       tidiness check will fix labels and leave the serious defect in place.
 
-      Engine A is a property of the schema, and only three of the nine Mechs
+      Engine A is a property of the schema, and only three of the declared Mechs
       declare the binding it needs -- the same three that already carry the
       skill. So the template states it as what adoption requires rather than as
       what is already true, and says a clean run on a Mech without the binding
@@ -279,7 +279,7 @@ canonical:
       Seven copies across two colliding names -- schema-gap-analysis in claw and
       three Mechs, audit-schema-gaps in two of those three. Not a stand-in
       capability this time: claw's own copy already resolves its audience with
-      `--capability schema_sync`, and that selects all nine Mechs, which is the
+      `--capability schema_sync`, and that selects every declared Mech, which is the
       right audience.
 
       The three Mech copies share one skeleton -- validate, histogram,

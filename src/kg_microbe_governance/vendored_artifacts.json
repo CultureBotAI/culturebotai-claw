@@ -38,6 +38,10 @@
     "naturalproductmech": {
       "github": "CultureBotAI/NaturalProductMech",
       "package_path": "src/naturalproductmech"
+    },
+    "taxonmech": {
+      "github": "CultureBotAI/TaxonMech",
+      "package_path": "src/taxonmech"
     }
   },
   "artifacts": [
