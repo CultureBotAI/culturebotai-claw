@@ -26,7 +26,7 @@ between turns and across concurrent sessions.
 
 ## Purpose and boundaries
 
-CultureBotAI CLAW coordinates work across five downstream Mech repositories.
+CultureBotAI CLAW coordinates work across the manifest-defined Mech repositories.
 `src/kg_microbe_fleet/fleet.yaml` is the canonical list; do not re-declare it
 in code. Read it through `kg_microbe_fleet.load_fleet_manifest()`. It lives
 inside the package rather than in `conf/` so installed commands retain the

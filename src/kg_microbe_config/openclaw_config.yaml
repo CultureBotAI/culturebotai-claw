@@ -73,7 +73,7 @@ repositories:
     type: python
     package_manager: uv
     task_runner: just
-    description: "Microbial species and strains with NCBI lineage and source taxonomy mappings"
+    description: "Microbial taxon and strain identities, taxonomy mappings and genome links"
 
 agents:
   discovery_paths:

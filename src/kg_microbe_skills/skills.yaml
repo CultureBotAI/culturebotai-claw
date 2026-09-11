@@ -63,6 +63,9 @@ skills:
   fleet-pr-status:
     scope: fleet
     reason: Answers "what is open" across claw and the manifest-defined Mechs.
+  onboard-mech:
+    scope: fleet
+    reason: Registers a verified Mech with complete capability decisions and coordinated governance.
   metpo-aggregate:
     scope: fleet
     reason: >-
