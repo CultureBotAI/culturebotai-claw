@@ -104,7 +104,7 @@ def test_effort_selectors_are_mutually_exclusive() -> None:
 # rewrite() — the part that actually edits workflow files
 # --------------------------------------------------------------------------
 
-WF = '''name: demo
+WF = """name: demo
 
 on:
   schedule:
@@ -117,7 +117,7 @@ permissions:
 jobs:
   a:
     runs-on: ubuntu-latest
-'''
+"""
 
 
 def test_rewrite_removes_schedule_but_keeps_dispatch() -> None:
@@ -131,7 +131,7 @@ def test_rewrite_removes_schedule_but_keeps_dispatch() -> None:
 def test_rewrite_replaces_cron_entries() -> None:
     out, _ = rewrite(WF, [{"cron": "0 3 * * 1", "comment": "weekly"}])
     assert '- cron: "0 3 * * 1"   # weekly' in out
-    assert '0 7 * * *' not in out
+    assert "0 7 * * *" not in out
     assert "workflow_dispatch:" in out
 
 
@@ -163,7 +163,7 @@ def test_rewrite_output_is_valid_yaml() -> None:
 # #39 — the applier must not eat comments it does not own
 # --------------------------------------------------------------------------
 
-WF_TRAILING_COMMENT = '''name: demo
+WF_TRAILING_COMMENT = """name: demo
 
 on:
   schedule:
@@ -175,7 +175,7 @@ on:
 jobs:
   a:
     runs-on: ubuntu-latest
-'''
+"""
 
 
 def test_removing_a_schedule_keeps_the_next_keys_comment() -> None:
@@ -208,75 +208,309 @@ def test_output_stays_valid_yaml_with_trailing_comment() -> None:
         yaml.safe_load(rewrite(WF_TRAILING_COMMENT, entries)[0])
 
 
-def _profile_config(tmp_path: Path, active: str = "off") -> Path:
-    path = tmp_path / "cron-profiles.yaml"
-    path.write_text(yaml.safe_dump({
-        "active": active,
-        "profiles": {
-            "off": {"workflows": {"agent": []}},
-            "slow": {"workflows": {"agent": [{"cron": "0 3 * * 1"}]}},
-        },
-    }, sort_keys=False))
-    return path
+@pytest.fixture
+def canonical(tmp_path, monkeypatch):
+    """A source checkout: canonical payloads and manifest, no downstream writes."""
+    import hashlib
+    import json
 
-
-def test_apply_updates_active_and_check_detects_later_manual_drift(
-    tmp_path, monkeypatch
-) -> None:
-    workflows = tmp_path / "workflows"
-    workflows.mkdir()
-    workflow = workflows / "agent.yaml"
+    source = "src/kg_microbe_governance/artifacts/workflows/agent.yaml"
+    workflow = tmp_path / source
+    workflow.parent.mkdir(parents=True)
     workflow.write_text(WF)
-    config_path = _profile_config(tmp_path)
-    monkeypatch.setattr(cron_profiles, "WORKFLOW_DIR", workflows)
+    manifest = tmp_path / "src/kg_microbe_governance/vendored_artifacts.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "canonical_repository": "CultureBotAI/culturebotai-claw",
+                "pin_path": "scripts/.vendored_canon_ref",
+                "consumers": {
+                    "traitmech": {
+                        "github": "CultureBotAI/TraitMech",
+                        "package_path": "src/traitmech",
+                    }
+                },
+                "artifacts": [
+                    {
+                        "id": "agent_workflow",
+                        "source": source,
+                        "target": ".github/workflows/agent.yaml",
+                        "consumers": "all",
+                        "sha256": hashlib.sha256(workflow.read_bytes()).hexdigest(),
+                        "mode": "0644",
+                    }
+                ],
+            },
+            indent=2,
+        )
+        + "\n"
+    )
+    config = tmp_path / "cron-profiles.yaml"
+    config.write_text(
+        yaml.safe_dump(
+            {
+                "active": "off",
+                "targets": {
+                    "agent": {"state": "governed", "artifact": "agent_workflow"},
+                    "future": {"state": "planned", "reason": "Not implemented yet."},
+                },
+                "profiles": {
+                    "off": {"workflows": {"agent": [], "future": []}},
+                    "slow": {
+                        "workflows": {
+                            "agent": [{"cron": "0 3 * * 1"}],
+                            "future": [{"cron": "0 4 * * 1"}],
+                        }
+                    },
+                },
+            },
+            sort_keys=False,
+        )
+    )
+    monkeypatch.setattr(cron_profiles, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(cron_profiles, "WORKFLOW_DIR", tmp_path / ".github/workflows")
+    monkeypatch.setattr(cron_profiles, "CANONICAL_WORKFLOW_DIR", workflow.parent)
+    monkeypatch.setattr(cron_profiles, "MANIFEST_PATH", manifest)
+    return config, workflow, manifest
 
+
+def _digest(manifest: Path, workflow: Path) -> None:
+    import hashlib
+    import json
+
+    data = json.loads(manifest.read_text())
+    data["artifacts"][0]["sha256"] = hashlib.sha256(workflow.read_bytes()).hexdigest()
+    manifest.write_text(json.dumps(data, indent=2) + "\n")
+
+
+def test_real_off_profile_reaches_existing_governed_workflow(config) -> None:
+    targets = cron_profiles.resolve_targets(config)
+    assert "pr-shepherd" in targets
+    assert targets["pr-shepherd"].path.is_file()
+    assert check_active_profile(config) == []
+
+
+def test_apply_updates_active_checksum_and_reports_planned(canonical, capsys) -> None:
+    import hashlib
+    import json
+
+    config_path, workflow, manifest = canonical
+    original = workflow.read_text()
     assert cron_profiles.main(["slow", "--config", str(config_path)]) == 0
-    config = yaml.safe_load(config_path.read_text())
+    config = cron_profiles.load_config(config_path)
     assert config["active"] == "slow"
     assert schedule_crons(workflow.read_text()) == ["0 3 * * 1"]
     assert check_active_profile(config) == []
-
-    workflow.write_text(rewrite(workflow.read_text(), [])[0])
-    assert check_active_profile(config) == [
-        "agent: active=slow expects ['0 3 * * 1'], found []"
-    ]
-
-
-def test_incomplete_nonempty_profile_does_not_change_active(tmp_path, monkeypatch) -> None:
-    config_path = _profile_config(tmp_path)
-    workflows = tmp_path / "workflows"
-    workflows.mkdir()
-    monkeypatch.setattr(cron_profiles, "WORKFLOW_DIR", workflows)
-
-    assert cron_profiles.main(["slow", "--config", str(config_path)]) == 1
-    assert yaml.safe_load(config_path.read_text())["active"] == "off"
-
-
-def test_missing_workflow_agrees_with_off_profile(tmp_path, monkeypatch) -> None:
-    config_path = _profile_config(tmp_path, active="slow")
-    workflows = tmp_path / "workflows"
-    workflows.mkdir()
-    monkeypatch.setattr(cron_profiles, "WORKFLOW_DIR", workflows)
-
-    assert cron_profiles.main(["off", "--config", str(config_path)]) == 0
-    config = yaml.safe_load(config_path.read_text())
-    assert config["active"] == "off"
-    assert check_active_profile(config) == []
-
-
-def test_active_is_not_updated_when_post_apply_verification_fails(
-    tmp_path, monkeypatch
-) -> None:
-    workflows = tmp_path / "workflows"
-    workflows.mkdir()
-    (workflows / "agent.yaml").write_text(WF)
-    config_path = _profile_config(tmp_path)
-    monkeypatch.setattr(cron_profiles, "WORKFLOW_DIR", workflows)
-    monkeypatch.setattr(
-        cron_profiles,
-        "rewrite",
-        lambda original, entries: (original, "claimed success without changing"),
+    assert (
+        json.loads(manifest.read_text())["artifacts"][0]["sha256"]
+        == hashlib.sha256(workflow.read_bytes()).hexdigest()
     )
+    assert rewrite(original, [])[0] == rewrite(workflow.read_text(), [])[0]
+    output = capsys.readouterr().out
+    assert "planned future" in output
+    assert "1 governed, 1 planned, 1 workflow changes" in output
+    assert "fleet re-pin" in output
+    assert not cron_profiles.WORKFLOW_DIR.exists()
 
+    # Drift detected even when a manual edit also updates the manifest digest.
+    workflow.write_text(rewrite(workflow.read_text(), [])[0])
+    _digest(manifest, workflow)
+    assert check_active_profile(config) == ["agent: active=slow expects ['0 3 * * 1'], found []"]
+
+
+def test_dry_run_preserves_payload_manifest_and_active(canonical) -> None:
+    originals = {path: path.read_bytes() for path in canonical}
+    assert cron_profiles.main(["slow", "--config", str(canonical[0]), "--dry-run"]) == 0
+    assert {path: path.read_bytes() for path in canonical} == originals
+
+
+def test_off_removes_actual_canonical_schedule_and_updates_checksum(canonical) -> None:
+    config_path, workflow, manifest = canonical
+    assert cron_profiles.main(["off", "--config", str(config_path)]) == 0
+    assert schedule_crons(workflow.read_text()) == []
+    assert "workflow_dispatch:" in workflow.read_text()
+    assert check_active_profile(cron_profiles.load_config(config_path)) == []
+    before = {path: path.read_bytes() for path in canonical}
+    assert cron_profiles.main(["off", "--config", str(config_path)]) == 0
+    assert {path: path.read_bytes() for path in canonical} == before
+
+
+@pytest.mark.parametrize("profile", ["off", "slow"])
+def test_missing_canonical_workflow_fails_even_when_off(canonical, profile) -> None:
+    config_path, workflow, manifest = canonical
+    original_config, original_manifest = config_path.read_bytes(), manifest.read_bytes()
+    workflow.unlink()
+    assert cron_profiles.main([profile, "--config", str(config_path)]) == 1
+    assert cron_profiles.main(["--check-active", "--config", str(config_path)]) == 1
+    assert config_path.read_bytes() == original_config
+    assert manifest.read_bytes() == original_manifest
+
+
+def test_resolver_follows_manifest_source_path_after_rename(canonical) -> None:
+    import json
+
+    config_path, workflow, manifest = canonical
+    renamed = workflow.with_name("canonical-agent.yaml")
+    workflow.rename(renamed)
+    data = json.loads(manifest.read_text())
+    data["artifacts"][0]["source"] = str(renamed.relative_to(cron_profiles.REPO_ROOT))
+    manifest.write_text(json.dumps(data))
+    assert cron_profiles.main(["slow", "--config", str(config_path)]) == 0
+    assert schedule_crons(renamed.read_text()) == ["0 3 * * 1"]
+    assert not workflow.exists()
+
+
+def test_stale_checksum_refuses_apply_without_overwriting_evidence(canonical) -> None:
+    config_path, workflow, manifest = canonical
+    workflow.write_text(workflow.read_text() + "# unreviewed change\n")
+    originals = {path: path.read_bytes() for path in canonical}
+    assert cron_profiles.main(["off", "--config", str(config_path)]) == 1
+    assert {path: path.read_bytes() for path in canonical} == originals
+
+
+@pytest.mark.parametrize("stem", ["future", "unregistered"])
+def test_new_canonical_workflow_cannot_bypass_off_even_if_ignored(canonical, stem) -> None:
+    config_path, workflow, manifest = canonical
+    workflow.write_text(rewrite(workflow.read_text(), [])[0])
+    _digest(manifest, workflow)
+    assert cron_profiles.main(["--check-active", "--config", str(config_path)]) == 0
+    (workflow.parent / ".gitignore").write_text("*.yml\n")
+    (workflow.parent / f"{stem}.yml").write_text(WF)
+    assert cron_profiles.main(["--check-active", "--config", str(config_path)]) == 1
+
+
+@pytest.mark.parametrize("resource_directory", ["workflows", "other-workflows"])
+def test_new_registered_workflow_requires_profile_target(canonical, resource_directory) -> None:
+    import json
+
+    config_path, workflow, manifest = canonical
+    workflow.write_text(rewrite(workflow.read_text(), [])[0])
+    _digest(manifest, workflow)
+    assert cron_profiles.main(["--check-active", "--config", str(config_path)]) == 0
+    future = workflow.parent.parent / resource_directory / "future.yaml"
+    future.parent.mkdir(exist_ok=True)
+    future.write_text(workflow.read_text())
+    data = json.loads(manifest.read_text())
+    added = {
+        **data["artifacts"][0],
+        "id": "future_workflow",
+        "source": str(future.relative_to(cron_profiles.REPO_ROOT)),
+        "target": ".github/workflows/future.yaml",
+    }
+    data["artifacts"].append(added)
+    manifest.write_text(json.dumps(data))
+    assert cron_profiles.main(["--check-active", "--config", str(config_path)]) == 1
+
+
+def test_local_copy_cannot_replace_governed_target(canonical) -> None:
+    config_path, workflow, manifest = canonical
+    workflow.write_text(rewrite(workflow.read_text(), [])[0])
+    _digest(manifest, workflow)
+    assert cron_profiles.main(["--check-active", "--config", str(config_path)]) == 0
+    cron_profiles.WORKFLOW_DIR.mkdir(parents=True)
+    (cron_profiles.WORKFLOW_DIR / "agent.yml").write_text(WF)
+    assert cron_profiles.main(["--check-active", "--config", str(config_path)]) == 1
+
+
+def test_all_planned_is_not_a_working_kill_switch(canonical) -> None:
+    import json
+
+    config_path, workflow, manifest = canonical
+    config = cron_profiles.load_config(config_path)
+    config["targets"]["agent"] = {"state": "planned", "reason": "Not implemented."}
+    config_path.write_text(yaml.safe_dump(config))
+    data = json.loads(manifest.read_text())
+    data["artifacts"] = []
+    manifest.write_text(json.dumps(data))
+    workflow.unlink()
+    assert cron_profiles.main(["--check-active", "--config", str(config_path)]) == 1
+
+
+def test_prepare_failure_does_not_apply_other_workflow(canonical) -> None:
+    import hashlib
+    import json
+
+    config_path, workflow, manifest = canonical
+    config = cron_profiles.load_config(config_path)
+    config["targets"]["future"] = {"state": "governed", "artifact": "future_workflow"}
+    config_path.write_text(yaml.safe_dump(config))
+    malformed = workflow.with_name("future.yaml")
+    malformed.write_text("name: invalid\njobs: {}\n")
+    data = json.loads(manifest.read_text())
+    data["artifacts"].append(
+        {
+            **data["artifacts"][0],
+            "id": "future_workflow",
+            "source": str(malformed.relative_to(cron_profiles.REPO_ROOT)),
+            "target": ".github/workflows/future.yaml",
+            "sha256": hashlib.sha256(malformed.read_bytes()).hexdigest(),
+        }
+    )
+    manifest.write_text(json.dumps(data))
+    originals = {path: path.read_bytes() for path in (*canonical, malformed)}
     assert cron_profiles.main(["slow", "--config", str(config_path)]) == 1
-    assert yaml.safe_load(config_path.read_text())["active"] == "off"
+    assert {path: path.read_bytes() for path in originals} == originals
+
+
+def test_failed_manifest_write_restores_workflow(canonical, monkeypatch) -> None:
+    config_path, workflow, manifest = canonical
+    originals = {path: path.read_bytes() for path in canonical}
+    real_write = cron_profiles._atomic_write
+
+    def fail_manifest(path, data):
+        if path == manifest:
+            raise OSError("injected manifest write failure")
+        real_write(path, data)
+
+    monkeypatch.setattr(cron_profiles, "_atomic_write", fail_manifest)
+    assert cron_profiles.main(["slow", "--config", str(config_path)]) == 1
+    assert {path: path.read_bytes() for path in canonical} == originals
+
+
+def test_active_is_not_updated_when_post_apply_verification_fails(canonical, monkeypatch) -> None:
+    originals = {path: path.read_bytes() for path in canonical}
+    monkeypatch.setattr(
+        cron_profiles, "check_active_profile", lambda config: ["injected post-apply failure"]
+    )
+    assert cron_profiles.main(["slow", "--config", str(canonical[0])]) == 1
+    assert {path: path.read_bytes() for path in canonical} == originals
+
+
+@pytest.mark.parametrize(
+    "events",
+    [
+        'on: {schedule: [{cron: "0 7 * * *"}], workflow_dispatch: {}}',
+        "'on':\n  schedule:\n    - cron: 0 7 * * *\n  workflow_dispatch:",
+        'on:\n  schedule:\n  - cron: "0 7 * * *"\n  workflow_dispatch:',
+        'on:\n  "schedule": [{cron: "0 7 * * *"}]\n  workflow_dispatch:',
+    ],
+)
+def test_yaml_schedule_variants_cannot_hide_from_off(canonical, events) -> None:
+    config_path, workflow, manifest = canonical
+    workflow.write_text("name: alternate\n" + events + "\njobs: {}\n")
+    _digest(manifest, workflow)
+    assert schedule_crons(workflow.read_text()) == ["0 7 * * *"]
+    assert cron_profiles.main(["--check-active", "--config", str(config_path)]) == 1
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "on:\n  schedule: []\n",
+        "on:\n  schedule: null\n",
+        "on:\n  schedule:\n    - cron: '0 7 * * *'\n  schedule: []\n",
+        "on: {workflow_dispatch: {}}\non: {schedule: [{cron: '0 7 * * *'}]}\n",
+    ],
+)
+def test_malformed_or_duplicate_schedule_fails_closed(text) -> None:
+    with pytest.raises(ValueError):
+        schedule_crons(text)
+
+
+def test_runtime_rejects_scheduled_off_profile(canonical) -> None:
+    config_path, workflow, manifest = canonical
+    config = cron_profiles.load_config(config_path)
+    config["profiles"]["off"]["workflows"]["agent"] = [{"cron": "0 3 * * 1"}]
+    config_path.write_text(yaml.safe_dump(config))
+    assert cron_profiles.main(["off", "--config", str(config_path)]) == 1
