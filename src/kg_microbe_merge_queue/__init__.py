@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import re
 import subprocess
 from pathlib import Path
 from urllib.parse import quote
@@ -172,7 +173,11 @@ def workflow_errors(text: str, contexts: list[str] | None = None) -> list[str]:
         concurrency = node.get("concurrency") or {}
         if concurrency and (
             not isinstance(concurrency, dict)
-            or "github.run_id" not in str(concurrency.get("group", ""))
+            or not re.search(
+                r"\$\{\{\s*(?:github\.run_id|github\.event_name == 'pull_request' "
+                r"&& github\.ref \|\| github\.run_id)\s*\}\}",
+                str(concurrency.get("group", "")),
+            )
         ):
             errors.append(f"{label}: concurrency must isolate non-PR runs with github.run_id")
         if label != "workflow" and contexts:
@@ -318,7 +323,10 @@ def context_evidence(api: GitHub, repo: str, workflows: dict, state: dict) -> di
 def configuration_matches(state: dict, wanted: dict, repo: str) -> bool:
     managed = managed_ruleset(state, repo)
     return bool(managed and state["repository"]["allow_auto_merge"] and
-                canonical_ruleset(managed) == canonical_ruleset(wanted))
+                canonical_ruleset(managed) == canonical_ruleset(wanted) and any(
+                    rule["type"] == "merge_queue" and rule.get("ruleset_id") == managed["id"]
+                    for rule in state["effective_rules"]
+                ))
 
 
 def fingerprint(state: dict) -> str:

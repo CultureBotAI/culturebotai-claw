@@ -53,6 +53,7 @@ class API:
         if method == "POST":
             managed = dict(body, id=42, source_type="Repository", source="CultureBotAI/example")
             self.live["rulesets"].append(managed)
+            self.live["effective_rules"] = [dict(rule, ruleset_id=42) for rule in body["rules"]]
             return managed
         if method == "PATCH":
             if self.fail_patch:
@@ -259,3 +260,18 @@ def test_foreign_requirements_cannot_silently_strand_queue(rule):
     live = state()
     live["effective_rules"] = [rule]
     assert queue.readiness_errors(live, "CultureBotAI/example", {".github/workflows/ci.yml": ["qc"]})
+
+
+def test_run_id_in_pr_only_arm_does_not_prove_queue_isolation():
+    workflow = WORKFLOW + """concurrency:
+  group: ${{ github.event_name == 'pull_request' && github.run_id || 'shared-queue' }}
+  cancel-in-progress: false
+"""
+    assert queue.workflow_errors(workflow)
+
+
+def test_declared_but_ineffective_queue_does_not_pass_check(setup):
+    setup["repository"]["allow_auto_merge"] = True
+    wanted = queue.desired_ruleset({".github/workflows/ci.yml": ["qc"]})
+    setup["rulesets"] = [dict(wanted, id=42, source_type="Repository", source="CultureBotAI/example")]
+    assert not queue.configuration_matches(setup, wanted, "CultureBotAI/example")
