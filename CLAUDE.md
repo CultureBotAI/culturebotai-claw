@@ -427,6 +427,13 @@ because they carry literal data the path rules would misread.
   manifest whose real `package_path` made a derived path identical to the
   hardcoded one; `--page` and `--card` both white; a token that resolved to
   nothing. Each ran, went green, and was consulted. None was caught by reading.
+  Run each mutation check in a fresh Python process running pytest. `tests/conftest.py` compiles
+  imports from the repository's source directories directly, including normal
+  imports, explicit script loaders, and their transitive imports. Existing
+  timestamp-valid bytecode cannot hide a same-size edit. The hook is restored
+  when pytest exits; a separate Python child interpreter does not inherit it.
+  For a mutation exercised only in a child interpreter, use a fresh
+  `PYTHONPYCACHEPREFIX` there; `-B` alone still reads existing caches.
 - Return nonzero from CLI failures; printing an error is not sufficient.
 - Do not swallow partial failures into a successful report.
 - Use timezone-aware UTC timestamps.
