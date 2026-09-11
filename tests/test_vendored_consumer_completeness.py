@@ -63,15 +63,6 @@ class IncompleteConsumer:
 # missing path fails rather than inheriting the waiver. When the repository
 # finishes vendoring, this test says so and the entry comes out.
 INCOMPLETE_CONSUMERS: dict[str, IncompleteConsumer] = {
-    "taxonmech": IncompleteConsumer(
-        expected_missing=frozenset({".github/workflows/pr-shepherd.yml"}),
-        reason=(
-            "Admission prepared 2026-09-11: origin/main 42c8e490 lacks "
-            ".github/workflows/pr-shepherd.yml. Publish the canonical admission "
-            "revision, sync TaxonMech and re-pin the fleet; remove this entry when "
-            "the missing workflow reaches TaxonMech main."
-        ),
-    ),
     # Entries leave this list because the test below fails when a repository
     # becomes complete. CellStructureMech left it when
     # CultureBotAI/CellStructureMech#53 merged; CultureMech, MediaIngredientMech
