@@ -337,6 +337,77 @@ def test_failed_rollback_reports_incomplete_update_and_retains_backup(checkout, 
     assert snapshot(checkout) != before
 
 
+def test_cleanup_failure_reports_verified_commit_and_retained_debris(
+    checkout, monkeypatch, capsys,
+):
+    before = snapshot(checkout)
+    unlink = Path.unlink
+    retained = []
+
+    def fail_first_existing_temporary(path, *args, **kwargs):
+        if path.name.startswith(".workflow-pins-") and path.is_file() and not retained:
+            retained.append(path)
+            raise OSError("simulated cleanup failure")
+        return unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", fail_first_existing_temporary)
+    monkeypatch.setattr(updater, "resolve_tag", lambda *_: "b" * 40)
+    assert updater.main(
+        ["--action", "astral-sh/setup-uv@v10.2.0", "--apply"], root=checkout
+    ) == 1
+    error = capsys.readouterr().err
+    assert "committed and verified" in error
+    assert "cleanup failed" in error
+    assert len(retained) == 1 and str(retained[0]) in error
+    assert retained[0].read_bytes() == before[CONTRACT_PATH]
+    check_workflow_pins(checkout)
+    assert load_pin_contract(checkout / CONTRACT_PATH)["actions"]["astral-sh/setup-uv"] == {
+        "sha": "b" * 40, "version": "v10.2.0",
+    }
+    assert list(checkout.rglob(".workflow-pins-*")) == retained
+
+
+@pytest.mark.parametrize("rollback_fails", [False, True])
+def test_cleanup_failure_does_not_mask_rollback_outcome(checkout, monkeypatch, rollback_fails):
+    before = snapshot(checkout)
+    contract = load_pin_contract(checkout / CONTRACT_PATH)
+    contract["uv_version"] = "0.12.6"
+    plan = updater.update_plan(checkout, contract)
+    replace = updater.os.replace
+    unlink = Path.unlink
+    calls = 0
+
+    def fail_replacement(source, target):
+        nonlocal calls
+        calls += 1
+        if calls == 2 or (rollback_fails and calls > 2):
+            raise OSError("simulated replacement failure")
+        replace(source, target)
+
+    def fail_temporary_cleanup(path, *args, **kwargs):
+        if path.name.startswith(".workflow-pins-") and path.is_file():
+            raise OSError("simulated cleanup failure")
+        return unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(updater.os, "replace", fail_replacement)
+    monkeypatch.setattr(Path, "unlink", fail_temporary_cleanup)
+    with pytest.raises(GovernanceError) as caught:
+        updater.apply_plan(checkout, plan)
+    message = str(caught.value)
+    assert "cleanup also failed" in message
+    assert "simulated cleanup failure" in message
+    assert "simulated replacement failure" in message
+    if rollback_fails:
+        assert "rollback was incomplete" in message
+        assert "backup=" in message
+        backups = list(checkout.rglob(".workflow-pins-*"))
+        assert before[CONTRACT_PATH] in [path.read_bytes() for path in backups]
+    else:
+        assert "canonical files restored" in message
+        assert "committed" not in message
+        assert all((checkout / path).read_bytes() == content for path, content in before.items())
+
+
 @pytest.mark.parametrize("valid", [True, False])
 def test_read_only_check_never_writes_even_when_drift_exists(checkout, monkeypatch, valid):
     if not valid:

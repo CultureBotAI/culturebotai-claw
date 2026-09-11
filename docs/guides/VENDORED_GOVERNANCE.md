@@ -226,8 +226,13 @@ just governed-workflow-pins --check
 ```
 
 `--apply` validates an isolated candidate before writing canonical claw files,
-then verifies the installed result within the same rollback scope. Ordinary
-errors and interrupts restore attempted files by atomic replacement. If the
+then verifies the installed result within the same rollback scope. Errors and
+interrupts before successful verification restore attempted files by atomic
+replacement. Successful verification is the commit point: a later cleanup
+failure returns nonzero but explicitly reports the update as committed and
+identifies retained temporary files; it does not roll back the verified update.
+Cleanup failures during recovery preserve the rollback outcome and backup
+diagnostics in the error. If the
 filesystem also prevents restoration, the command fails explicitly and retains
 original-byte backups with their paths in the error. This local transaction does
 not claim protection against process termination, power loss, or concurrent

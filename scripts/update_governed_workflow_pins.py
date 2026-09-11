@@ -88,11 +88,12 @@ def _validate_plan(root: Path, plan: dict[Path, str]) -> None:
 
 
 def apply_plan(root: Path, plan: dict[Path, str]) -> None:
-    """Validate, stage, replace, and verify; atomically roll back on failure.
+    """Validate, stage, replace, and verify; roll back before the commit point.
 
     This is a local file transaction for ordinary errors and interrupts. It does
     not claim durability across process termination, power loss, or concurrent
-    noncooperating writers.
+    noncooperating writers. Successful verification commits the update; later
+    cleanup failures report that state and never trigger a partial rollback.
     """
     _validate_plan(root, plan)
     staged: dict[Path, Path] = {}
@@ -100,6 +101,10 @@ def apply_plan(root: Path, plan: dict[Path, str]) -> None:
     temporaries: list[Path] = []
     attempted: list[Path] = []
     unrecovered: set[Path] = set()
+    committed = False
+    failure: BaseException | None = None
+    rollback_failures: list[str] = []
+    cleanup_failures: list[str] = []
 
     def stage(target: Path, content: bytes) -> Path:
         with tempfile.NamedTemporaryFile(
@@ -122,23 +127,46 @@ def apply_plan(root: Path, plan: dict[Path, str]) -> None:
             attempted.append(path)
             os.replace(temporary, root / path)
         check_workflow_pins(root)
+        committed = True
     except BaseException as error:
-        failures = []
+        failure = error
         for path in reversed(attempted):
             try:
                 os.replace(backups[path], root / path)
             except BaseException as restore_error:
                 unrecovered.add(backups[path])
-                failures.append(f"{path}: {restore_error}; backup={backups[path]}")
-        if failures:
-            raise GovernanceError(
-                "Workflow pin update failed and rollback was incomplete: " + "; ".join(failures)
-            ) from error
-        raise
+                rollback_failures.append(
+                    f"{path}: {restore_error}; backup={backups[path]}"
+                )
     finally:
         for temporary in temporaries:
             if temporary not in unrecovered:
-                temporary.unlink(missing_ok=True)
+                try:
+                    temporary.unlink(missing_ok=True)
+                except BaseException as cleanup_error:
+                    cleanup_failures.append(f"{temporary}: {cleanup_error}")
+
+    if committed:
+        if cleanup_failures:
+            raise GovernanceError(
+                "Workflow pin update committed and verified; cleanup failed. "
+                "Retained temporary files require inspection: " + "; ".join(cleanup_failures)
+            )
+        return
+    if failure is not None:
+        if rollback_failures or cleanup_failures:
+            if rollback_failures:
+                message = "Workflow pin update failed and rollback was incomplete: " + "; ".join(
+                    rollback_failures
+                )
+            else:
+                message = f"Workflow pin update failed; canonical files restored: {failure}"
+            if cleanup_failures:
+                message += "; cleanup also failed; retained temporary files: " + "; ".join(
+                    cleanup_failures
+                )
+            raise GovernanceError(message) from failure
+        raise failure
 
 
 def main(argv: list[str] | None = None, *, root: Path = ROOT) -> int:
