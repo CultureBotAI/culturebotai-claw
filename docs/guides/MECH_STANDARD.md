@@ -100,7 +100,7 @@ new Mech should not adopt any of them without its own reason.
 - CultureMech — ChEBI consistency, concentration plausibility, merged-YAML freshness
 - MediaIngredientMech — SSSOM QC, evidence QC, round-trip QC, flat-coverage QC
 - CommunityMech — KGX release, network quality, docs-currency
-- TraitMech — canonical example taxonomy, PR shepherd, PR-checks-present, in-CI Claude review
+- TraitMech — canonical example taxonomy, PR-checks-present, in-CI Claude review (PR shepherd was piloted here and is now vendored fleet-wide)
 - ProteinTraitsMech — page-size audit, reproducibility audit
 
 The lesson from claw's Phase 6 is that a shared implementation is worth building

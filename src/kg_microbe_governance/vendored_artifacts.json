@@ -167,6 +167,14 @@
       "consumers": "all",
       "sha256": "256e5058613d41b34d573041e8b386b593b21f625cfc18603230568294a500d8",
       "mode": "0644"
+    },
+    {
+      "id": "pr_shepherd_workflow",
+      "source": "src/kg_microbe_governance/artifacts/workflows/pr-shepherd.yml",
+      "target": ".github/workflows/pr-shepherd.yml",
+      "consumers": "all",
+      "sha256": "dabbe39a63dae27f954d5b6038b26371a4be1383d57424b8215283120c1e3adf",
+      "mode": "0644"
     }
   ]
 }

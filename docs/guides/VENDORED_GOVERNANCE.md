@@ -118,7 +118,7 @@ replace its fetch function with local fixtures, so the test suite is offline and
 no provider, model, credential, or paid API is involved.
 
 Each public fetch has a five-second total deadline and an 8 MiB response cap.
-The largest consumer performs one manifest plus fifteen artifact fetches, so
+The largest consumer performs one manifest plus sixteen artifact fetches, so
 three worst-case attempts plus the existing two five-second retry delays remain
 within a five-minute workflow timeout (235 seconds before runner overhead).
 

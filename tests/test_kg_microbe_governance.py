@@ -77,7 +77,7 @@ def test_shipped_manifest_is_complete_aligned_and_checksum_valid() -> None:
     fleet = load_fleet_manifest()
 
     assert set(manifest.consumers) == set(fleet.keys)
-    assert len(manifest.artifacts) == 15
+    assert len(manifest.artifacts) == 16
     assert {
         artifact.artifact_id for artifact in manifest.artifacts
     } >= {
@@ -88,6 +88,7 @@ def test_shipped_manifest_is_complete_aligned_and_checksum_valid() -> None:
         "vendored_checker",
         "vendored_checker_launcher",
         "deep_research_contract",
+        "pr_shepherd_workflow",
     }
     edison = next(
         artifact
@@ -196,7 +197,7 @@ def test_packaged_loader_rejects_manifest_checksum_drift(tmp_path: Path) -> None
 
 @pytest.mark.parametrize(
     ("repository", "expected"),
-    [("culturemech", 16), ("CultureBotAI/proteintraitsmech", 15)],
+    [("culturemech", 17), ("CultureBotAI/proteintraitsmech", 16)],
 )
 def test_sync_is_dry_run_by_default_then_applies_with_atomic_file_replacement(
     tmp_path: Path, repository: str, expected: int
@@ -272,7 +273,7 @@ def test_standalone_checker_uses_pin_and_remote_manifest_without_network(
     checked, problems = check_repository(
         root, "CultureBotAI/proteintraitsmech", fetch=_fake_fetch
     )
-    assert checked == 14
+    assert checked == 15
     assert problems == ()
 
     target = root / "tests/test_provider_triage_contract.py"
@@ -280,7 +281,7 @@ def test_standalone_checker_uses_pin_and_remote_manifest_without_network(
     checked, problems = check_repository(
         root, "proteintraitsmech", fetch=_fake_fetch
     )
-    assert checked == 14
+    assert checked == 15
     assert any("DRIFT: tests/test_provider_triage_contract.py" in item for item in problems)
 
 

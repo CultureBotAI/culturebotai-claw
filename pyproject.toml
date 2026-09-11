@@ -110,6 +110,7 @@ kg_microbe_governance = [
     "artifacts/**/*.py",
     "artifacts/**/*.sh",
     "artifacts/**/*.yaml",
+    "artifacts/**/*.yml",
     "artifacts/**/*.md",
 ]
 kg_microbe_config = ["openclaw_config.yaml"]
