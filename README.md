@@ -184,3 +184,8 @@ project history.
 `uv run kg-microbe-merge-queue check` inspects native queue readiness and policy
 across the manifest fleet and CLAW. The [merge queue guide](docs/guides/MERGE_QUEUES.md)
 covers planning, reviewed application, queue admission and rollout verification.
+
+When main requires the queue, merge an authorized PR with
+`gh pr merge <number> --match-head-commit <reviewed-sha>`. GitHub validates the
+combined commit; wait for the PR to report `MERGED` before cleaning up its branch.
+Queue admission and auto-merge scheduling are still pending work.
