@@ -158,6 +158,7 @@ def test_the_manifest_declares_the_consumers_the_fleet_expects():
         "culturemech",
         "habitatmech",
         "mediaingredientmech",
+        "naturalproductmech",
         "proteintraitsmech",
         "traitmech",
     ]

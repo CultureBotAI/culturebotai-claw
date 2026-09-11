@@ -180,7 +180,8 @@ uv run kg-microbe-governance fleet-audit \
   --target-root traitmech=/path/to/TraitMech-worktree \
   --target-root proteintraitsmech=/path/to/ProteinTraitsMech-worktree \
   --target-root cellstructuremech=/path/to/CellStructureMech-worktree \
-  --target-root habitatmech=/path/to/HabitatMech-worktree
+  --target-root habitatmech=/path/to/HabitatMech-worktree \
+  --target-root naturalproductmech=/path/to/NaturalProductMech-worktree
 ```
 
 It requires exactly the manifest keys, distinct exact Git roots, clean

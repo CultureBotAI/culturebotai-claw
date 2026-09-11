@@ -61,6 +61,13 @@ repositories:
     task_runner: just
     description: "Microbial habitats: GOLD, BacDive, PREGO and Madin et al. harmonized to ENVO"
 
+  naturalproductmech:
+    path: ${NATURALPRODUCTMECH_ROOT}
+    type: python
+    package_manager: uv
+    task_runner: just
+    description: "Natural products: one record per structure with producer, gene cluster and activity"
+
 agents:
   discovery_paths:
     - kg_microbe_agents/definitions
