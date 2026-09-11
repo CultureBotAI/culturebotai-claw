@@ -13,6 +13,7 @@ silently when its root is absent — so the report shrank without saying so.
 from __future__ import annotations
 
 import importlib.util
+import shlex
 import sys
 from pathlib import Path
 
@@ -274,3 +275,34 @@ def test_an_unknown_required_source_is_a_usage_error(tmp_path, monkeypatch):
     module = _prepare_inventory(tmp_path, monkeypatch)
 
     assert module.main(["--require-sources", "nosuchsource"]) == 2
+
+
+def test_project_is_installed_before_validation_scripts():
+    """#376: a late skill-check install cannot satisfy earlier roots imports.
+
+    Read commands rather than names/comments, and check the effective directory:
+    the claw checkout is nested under the Actions workspace.
+    """
+    steps = _steps()
+    installed = False
+    consumers = set()
+    for step in steps:
+        for line in step.get("run", "").replace("\\\n", " ").splitlines():
+            command = shlex.split(line, comments=True)
+            if command[:4] in (["python", "-m", "pip", "install"],
+                               ["python3", "-m", "pip", "install"]):
+                if "." in command[4:] and "--no-deps" not in command:
+                    assert step.get("working-directory") == "culturebotai-claw"
+                    assert not step.get("if"), "runtime setup must be unconditional"
+                    installed = True
+            if command[:1] not in (["python"], ["python3"]):
+                continue
+            targets = {
+                "scripts/validate_evidence_references.py",
+                "scripts/inventory_unmapped_ingredients.py",
+                "kg_microbe_skills",
+            }.intersection(command)
+            if targets:
+                assert installed, f"project dependencies missing before {command}"
+                consumers.update(targets)
+    assert len(consumers) == 3, "the workflow runtime consumers changed"
