@@ -141,8 +141,13 @@ def workflow_entries(root: Path) -> list[dict]:
     discovered = {path.relative_to(root).as_posix() for path in source_root.rglob("*")
                   if path.suffix in {".yml", ".yaml"}}
     registered = {entry["source"] for entry in entries}
-    if not entries or discovered != registered:
+    # The manifest may place a workflow anywhere inside the governed artifact
+    # root. The conventional directory is an orphan check, not a second registry.
+    if not entries or not discovered <= registered:
         raise GovernanceError("Canonical workflow files and governance registry differ")
+    for entry in entries:
+        if not (root / entry["source"]).is_file():
+            raise GovernanceError(f"Registered canonical workflow is missing: {entry['source']}")
     return entries
 
 

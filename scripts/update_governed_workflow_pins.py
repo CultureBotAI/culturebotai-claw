@@ -71,28 +71,74 @@ def update_plan(root: Path, contract: dict) -> dict[Path, str]:
             if (root / path).read_text() != content}
 
 
+def _validate_plan(root: Path, plan: dict[Path, str]) -> None:
+    """Check the complete candidate in isolation before touching canonical files."""
+    paths = {CONTRACT_PATH, MANIFEST_PATH}
+    paths.update(Path(entry["source"]) for entry in workflow_entries(root))
+    if not set(plan) <= paths:
+        raise GovernanceError("Update plan includes a file outside the workflow pin contract")
+    with tempfile.TemporaryDirectory(prefix="governed-pins-candidate-") as directory:
+        candidate = Path(directory)
+        for path in paths:
+            target = candidate / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            content = plan[path].encode() if path in plan else (root / path).read_bytes()
+            target.write_bytes(content)
+        check_workflow_pins(candidate)
+
+
 def apply_plan(root: Path, plan: dict[Path, str]) -> None:
-    """Stage complete output and replace each file atomically; restore on failure."""
+    """Validate, stage, replace, and verify; atomically roll back on failure.
+
+    This is a local file transaction for ordinary errors and interrupts. It does
+    not claim durability across process termination, power loss, or concurrent
+    noncooperating writers.
+    """
+    _validate_plan(root, plan)
     staged: dict[Path, Path] = {}
-    originals = {path: (root / path).read_bytes() for path in plan}
-    replaced = []
+    backups: dict[Path, Path] = {}
+    temporaries: list[Path] = []
+    attempted: list[Path] = []
+    unrecovered: set[Path] = set()
+
+    def stage(target: Path, content: bytes) -> Path:
+        with tempfile.NamedTemporaryFile(
+            dir=target.parent, prefix=".workflow-pins-", delete=False,
+        ) as output:
+            temporary = Path(output.name)
+            temporaries.append(temporary)
+            output.write(content)
+        temporary.chmod(target.stat().st_mode & 0o777)
+        return temporary
+
     try:
         for path, content in plan.items():
             target = root / path
-            with tempfile.NamedTemporaryFile(dir=target.parent, delete=False) as output:
-                staged[path] = Path(output.name)
-                output.write(content.encode())
-            staged[path].chmod(target.stat().st_mode & 0o777)
+            backups[path] = stage(target, target.read_bytes())
+            staged[path] = stage(target, content.encode())
         for path, temporary in staged.items():
+            # Record the attempt before os.replace: an interrupt can arrive
+            # immediately after the syscall completed but before it returns.
+            attempted.append(path)
             os.replace(temporary, root / path)
-            replaced.append(path)
-    except OSError:
-        for path in reversed(replaced):
-            (root / path).write_bytes(originals[path])
+        check_workflow_pins(root)
+    except BaseException as error:
+        failures = []
+        for path in reversed(attempted):
+            try:
+                os.replace(backups[path], root / path)
+            except BaseException as restore_error:
+                unrecovered.add(backups[path])
+                failures.append(f"{path}: {restore_error}; backup={backups[path]}")
+        if failures:
+            raise GovernanceError(
+                "Workflow pin update failed and rollback was incomplete: " + "; ".join(failures)
+            ) from error
         raise
     finally:
-        for temporary in staged.values():
-            temporary.unlink(missing_ok=True)
+        for temporary in temporaries:
+            if temporary not in unrecovered:
+                temporary.unlink(missing_ok=True)
 
 
 def main(argv: list[str] | None = None, *, root: Path = ROOT) -> int:
@@ -136,7 +182,6 @@ def main(argv: list[str] | None = None, *, root: Path = ROOT) -> int:
             )), end="")
         if args.apply:
             apply_plan(root, plan)
-            check_workflow_pins(root)
         print(f"{'Applied' if args.apply else 'Preview:'} {len(plan)} canonical files; downstream rollout separate.")
         return 0
     except (GovernanceError, OSError, ValueError, KeyError, subprocess.SubprocessError) as exc:

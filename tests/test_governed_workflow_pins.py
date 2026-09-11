@@ -222,3 +222,134 @@ def test_agent_model_config_has_no_silently_overridden_keys():
     content = (ROOT / ".github/agent-config.yaml").read_text()
     list(_walk(yaml.compose(content, Loader=yaml.BaseLoader)))
     assert yaml.safe_load(content)["workflows"]["pr-shepherd"]["model"] == "claude-opus-5"
+
+
+def test_manifest_workflow_can_move_outside_conventional_directory(checkout):
+    original = checkout / WORKFLOW
+    moved = checkout / "src/kg_microbe_governance/artifacts/alternate/shepherd.yml"
+    moved.parent.mkdir(parents=True)
+    original.rename(moved)
+    manifest_path = checkout / MANIFEST_PATH
+    manifest = json.loads(manifest_path.read_text())
+    entry = next(item for item in manifest["artifacts"] if item["source"] == str(WORKFLOW))
+    entry["source"] = moved.relative_to(checkout).as_posix()
+    manifest_path.write_text(json.dumps(manifest))
+    check_workflow_pins(checkout)
+    contract = load_pin_contract(checkout / CONTRACT_PATH)
+    contract["uv_version"] = "0.12.6"
+    updater.apply_plan(checkout, updater.update_plan(checkout, contract))
+    assert not original.exists()
+    assert 'version: "0.12.6"' in moved.read_text()
+    check_workflow_pins(checkout)
+    moved.write_text(moved.read_text().replace('version: "0.12.6"', 'version: "latest"'))
+    with pytest.raises(GovernanceError, match="pins differ"):
+        check_workflow_pins(checkout)
+
+
+def test_missing_manifest_workflow_is_an_error(checkout):
+    (checkout / WORKFLOW).unlink()
+    with pytest.raises(GovernanceError, match="Registered canonical workflow is missing"):
+        check_workflow_pins(checkout)
+
+
+def test_apply_prevalidates_candidate_before_any_canonical_replace(checkout, monkeypatch):
+    before = snapshot(checkout)
+    contract = load_pin_contract(checkout / CONTRACT_PATH)
+    contract["uv_version"] = "0.12.6"
+    plan = updater.update_plan(checkout, contract)
+    plan[MANIFEST_PATH] = before[MANIFEST_PATH].decode()  # deliberately stale digest
+
+    def forbidden(*_):
+        pytest.fail("invalid candidate reached canonical replacement")
+
+    monkeypatch.setattr(updater.os, "replace", forbidden)
+    with pytest.raises(GovernanceError, match="checksum drift"):
+        updater.apply_plan(checkout, plan)
+    assert snapshot(checkout) == before
+
+
+@pytest.mark.parametrize("error_type", [OSError, KeyboardInterrupt])
+@pytest.mark.parametrize("after_replace", [False, True])
+def test_failure_and_interrupt_restore_atomically_even_after_syscall(
+    checkout, monkeypatch, error_type, after_replace,
+):
+    before = snapshot(checkout)
+    contract = load_pin_contract(checkout / CONTRACT_PATH)
+    contract["uv_version"] = "0.12.6"
+    plan = updater.update_plan(checkout, contract)
+    replace = updater.os.replace
+    calls = []
+
+    def fails_once(source, target):
+        calls.append((Path(source), Path(target)))
+        if len(calls) == 2:
+            if after_replace:
+                replace(source, target)
+            raise error_type("simulated interruption")
+        replace(source, target)
+
+    monkeypatch.setattr(updater.os, "replace", fails_once)
+    with pytest.raises(error_type, match="simulated interruption"):
+        updater.apply_plan(checkout, plan)
+    assert snapshot(checkout) == before
+    # Both attempted paths are restored through atomic replacement, including
+    # the syscall that may have completed just before raising an interrupt.
+    assert len(calls) == 4
+    assert [target for _, target in calls[2:]] == [target for _, target in reversed(calls[:2])]
+
+
+def test_post_apply_verification_failure_restores_all_files(checkout, monkeypatch):
+    before = snapshot(checkout)
+    check = updater.check_workflow_pins
+
+    def fail_only_after_apply(root):
+        if root == checkout:
+            raise GovernanceError("post-apply verification failed")
+        check(root)
+
+    monkeypatch.setattr(updater, "check_workflow_pins", fail_only_after_apply)
+    monkeypatch.setattr(updater, "resolve_tag", lambda *_: "b" * 40)
+    assert updater.main(["--action", "astral-sh/setup-uv@v10.2.0", "--apply"], root=checkout) == 1
+    assert snapshot(checkout) == before
+
+
+def test_failed_rollback_reports_incomplete_update_and_retains_backup(checkout, monkeypatch):
+    contract = load_pin_contract(checkout / CONTRACT_PATH)
+    contract["uv_version"] = "0.12.6"
+    plan = updater.update_plan(checkout, contract)
+    before = snapshot(checkout)
+    replace = updater.os.replace
+    calls = 0
+
+    def fail_after_first_write(source, target):
+        nonlocal calls
+        calls += 1
+        if calls > 1:
+            raise OSError("filesystem unavailable")
+        replace(source, target)
+
+    monkeypatch.setattr(updater.os, "replace", fail_after_first_write)
+    with pytest.raises(GovernanceError, match="rollback was incomplete.*backup="):
+        updater.apply_plan(checkout, plan)
+    backups = list(checkout.rglob(".workflow-pins-*"))
+    assert backups
+    assert before[CONTRACT_PATH] in [path.read_bytes() for path in backups]
+    assert snapshot(checkout) != before
+
+
+@pytest.mark.parametrize("valid", [True, False])
+def test_read_only_check_never_writes_even_when_drift_exists(checkout, monkeypatch, valid):
+    if not valid:
+        path = checkout / WORKFLOW
+        path.write_text(path.read_text().replace('version: "0.12.5"', 'version: "latest"'))
+    before = snapshot(checkout)
+
+    def forbidden(*_, **__):
+        pytest.fail("read-only check attempted mutation")
+
+    monkeypatch.setattr(updater.os, "replace", forbidden)
+    monkeypatch.setattr(Path, "write_text", forbidden)
+    monkeypatch.setattr(Path, "write_bytes", forbidden)
+    monkeypatch.setattr(updater, "apply_plan", forbidden)
+    assert updater.main(["--check"], root=checkout) == (0 if valid else 1)
+    assert snapshot(checkout) == before

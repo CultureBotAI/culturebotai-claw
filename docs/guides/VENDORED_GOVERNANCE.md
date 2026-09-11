@@ -207,8 +207,9 @@ remain recoverable from every reviewed claw commit.
 ## Governed workflow action pins
 
 `src/kg_microbe_governance/workflow_pins.json` owns the action SHAs, release
-labels, and exact uv runtime for workflows under `artifacts/workflows/`.
-Every parsed `uses:` reference must match the contract's 40-hex revision and
+labels, and exact uv runtime for workflows registered in
+`vendored_artifacts.json`. Their source files may live anywhere within the
+governed artifact root; the manifest owns those locations. Every parsed `uses:` reference must match the contract's 40-hex revision and
 release comment; every setup-uv step must also set the contracted `version:`.
 Claw CI checks those values, the workflow registry, and the artifact checksums.
 Per-Mech pin contracts may exempt these governed paths because claw checks them
@@ -224,7 +225,13 @@ just governed-workflow-pins --verify-upstream
 just governed-workflow-pins --check
 ```
 
-`--apply` writes only the canonical claw files. `--verify-upstream` checks that
+`--apply` validates an isolated candidate before writing canonical claw files,
+then verifies the installed result within the same rollback scope. Ordinary
+errors and interrupts restore attempted files by atomic replacement. If the
+filesystem also prevents restoration, the command fails explicitly and retains
+original-byte backups with their paths in the error. This local transaction does
+not claim protection against process termination, power loss, or concurrent
+noncooperating writers. `--verify-upstream` checks that
 recorded labels still resolve to their recorded SHAs; CI's `--check` stays
 offline and does not claim that a reviewed version remains the latest release.
 Use `--uv-version X.Y.Z` for a deliberate runtime upgrade. Without that flag,
