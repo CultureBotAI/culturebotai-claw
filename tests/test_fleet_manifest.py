@@ -31,6 +31,7 @@ EXPECTED_MECHS = (
     "antibioticmech",
     "cellstructuremech",
     "habitatmech",
+    "naturalproductmech",
 )
 
 

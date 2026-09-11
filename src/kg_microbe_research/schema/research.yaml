@@ -79,6 +79,7 @@ enums:
       AntibioticMech:
       CellStructureMech:
       HabitatMech:
+      NaturalProductMech:
 
   ProviderEnum:
     description: >-

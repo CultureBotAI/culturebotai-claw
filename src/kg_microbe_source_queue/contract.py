@@ -3,8 +3,8 @@
 `curation/source_queue.tsv` is the ranked list of data sources a corpus draws on
 or might adopt: what gap each closes, whether its licence permits redistribution,
 and whether it has been verified. AntibioticMech wrote one and
-CellStructureMech adapted it, and the request to give the other six the same
-skill is the reason to write this now rather than after eight copies exist.
+CellStructureMech adapted it, and the request to give the other seven the same
+skill is the reason to write this now rather than after nine copies exist.
 
 The two are already diverging, with only two copies:
 

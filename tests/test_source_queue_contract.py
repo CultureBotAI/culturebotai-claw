@@ -183,6 +183,14 @@ REAL = {
         ),
         {},
     ),
+    # Measured on joining (2026-09-11): four rows spell NON_COMMERCIAL where the
+    # fleet spells NONCOMMERCIAL (npatlas, cmnpd, npbs, np-mrd). The same
+    # defect AntibioticMech#188 records for its queue; NaturalProductMech#99
+    # tracks the fix, and this row drops to {} when it lands.
+    "naturalproductmech": (
+        SourceQueueProfile(extensions=("structures",)),
+        {"REDISTRIBUTION_SPELLING": 4},
+    ),
 }
 
 

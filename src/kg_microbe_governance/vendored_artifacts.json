@@ -34,6 +34,10 @@
     "habitatmech": {
       "github": "CultureBotAI/HabitatMech",
       "package_path": "src/habitatmech"
+    },
+    "naturalproductmech": {
+      "github": "CultureBotAI/NaturalProductMech",
+      "package_path": "src/naturalproductmech"
     }
   },
   "artifacts": [

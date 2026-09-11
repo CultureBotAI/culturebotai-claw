@@ -1263,3 +1263,155 @@ mechs:
         sort_keys: false
         allow_unicode: true
         width: 80
+
+  naturalproductmech:
+    # Joined 2026-09-11. Every decision below was measured against this
+    # repository's tracked files on origin/main at that date; each disabled or
+    # not_applicable status names what would flip it. One Tier 1 item is
+    # honestly absent rather than declared: no history/ directory (the
+    # new-history recipe exists, the tree does not).
+    display_name: NaturalProductMech
+    github: CultureBotAI/NaturalProductMech
+    environment_variable: NATURALPRODUCTMECH_ROOT
+    package_path: src/naturalproductmech
+    schema_paths:
+      - src/naturalproductmech/schema/naturalproductmech.yaml
+    record_globs:
+      - data/natural_products/**/*.yaml
+    vendored_role: consumer
+    # Measured on joining: all 3,115 records round-trip byte-identically under
+    # this option set, so dump_record may write them back without reformatting.
+    serialization:
+      verified: true
+      options:
+        default_flow_style: false
+        sort_keys: false
+        allow_unicode: true
+        width: 80
+    capabilities:
+      id_label_validation:
+        status: enabled
+      curation_history:
+        status: disabled
+        reason: >-
+          Vendors the governed curation-history schema and carries a
+          new-history recipe, but has no history directory yet, so no record
+          can append an event. Adopting applies once the tree exists and the recipe is
+          wired into CI.
+        reason_claims:
+          absent: ["history"]
+      # Closed-schema validation (scripts/validate_strict.py, closed=True) and
+      # ruff both run on every PR through scripts/run_qc.py from main.yaml. The
+      # fleet convention names that workflow validate-strict.yaml; the gate is
+      # what the capability declares, and the gate is present.
+      strict_validation:
+        status: enabled
+      schema_sync:
+        status: enabled
+      release_management:
+        status: enabled
+      build_coordination:
+        status: enabled
+      documentation:
+        status: enabled
+      testing:
+        status: enabled
+      refactoring:
+        status: enabled
+      coordination_hooks:
+        status: enabled
+      deep_research:
+        status: disabled
+        reason: >-
+          No conf/deep_research_provider.yaml and no research recipe; sources
+          are assessed through the source queue. Adopting applies once a
+          provider profile exists under claw's contract.
+        reason_claims:
+          absent: ["conf/deep_research_provider.yaml"]
+      edison_key_discovery:
+        status: not_applicable
+        reason: >-
+          NaturalProductMech does not use an Edison research-provider key; it
+          has no research provider integration at all.
+      environment_coverage:
+        status: not_applicable
+        reason: >-
+          Environment coverage compares culture media, ingredients and
+          microbial communities. A natural-product structure corpus is not one
+          of those inputs.
+      knowledge_gap_scan:
+        status: disabled
+        reason: >-
+          Records do not carry the shared Discussion section the scan reads,
+          and this repository is not in the knowledge-gap-scan workflow
+          matrix. Enable once records carry it.
+      vendored_sync:
+        status: enabled
+      corpus_statistics:
+        status: enabled
+        settings:
+          fields:
+            - np_pathway
+            - np_classification
+            - grounding_status
+            - curation_status
+      page_budgets:
+        status: disabled
+        reason: >-
+          Serves tracked pages under pages/ straight from main via GitHub
+          Pages and declares no size or file-count budgets, so no
+          conf/pages_budgets.json exists for the audit to read.
+        reason_claims:
+          present: ["pages"]
+          absent: ["conf/pages_budgets.json"]
+      writer_audit:
+        status: disabled
+        reason: >-
+          Has no scripts/audit_writers.py, so there is no drift between
+          writer copies to remove yet. Adopting it applies here once the
+          corpus is edited by more than one writer.
+        reason_claims:
+          absent: ["scripts/audit_writers.py"]
+      sssom_export:
+        status: disabled
+        reason: >-
+          Records carry ChEBI, NPAtlas and PubChem identifiers inline rather
+          than through a mapping file. Adopting SSSOM applies once a mapping
+          product exists.
+      metpo_proposal:
+        status: disabled
+        reason: >-
+          No proposals directory and no METPO grounding; structures are
+          grounded in ChEBI. Adopting applies once a natural-product
+          phenotype needs a METPO term.
+        reason_claims:
+          absent: ["proposals"]
+      kgx_export:
+        status: disabled
+        reason: >-
+          No exporter and no graph product yet; adopting KGX applies once the
+          corpus is consumed as a graph.
+      source_queue:
+        status: enabled
+        settings:
+          queue_path: curation/source_queue.tsv
+          extensions: ["structures"]
+      site_contract:
+        status: enabled
+        settings:
+          site_path: pages
+      source_catalogue:
+        status: disabled
+        reason: >-
+          Keeps its ranked source list as curation/source_queue.tsv and
+          fetches each adopted source through its own extract recipe; there
+          is no download.yaml for the catalogue check to read. Adopting means
+          deriving the machine-fetchable half from the queue.
+        reason_claims:
+          present: ["curation/source_queue.tsv"]
+          absent: ["download.yaml"]
+      unmapped_inventory_input:
+        status: not_applicable
+        reason: >-
+          The unmapped inventory reconciles ingredient names across media
+          corpora; natural-product structures are not one of its inputs.
