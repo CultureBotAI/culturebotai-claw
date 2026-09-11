@@ -52,6 +52,9 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path) -> None
     with tarfile.open(source_archives[0], "r:gz") as source_archive:
         source_names = {name.split("/", 1)[1] for name in source_archive.getnames() if "/" in name}
     assert "src/kg_microbe_fleet/fleet.yaml" in source_names
+    assert "src/kg_microbe_merge_queue/__init__.py" in source_names
+    assert "src/kg_microbe_merge_queue/__main__.py" in source_names
+    assert "src/kg_microbe_merge_queue/policy.json" in source_names
     governance_document = json.loads(
         (REPOSITORY_ROOT / "src/kg_microbe_governance/vendored_artifacts.json").read_text(
             encoding="utf-8"
@@ -99,6 +102,12 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path) -> None
     with zipfile.ZipFile(wheels[0]) as wheel:
         names = set(wheel.namelist())
         assert "kg_microbe_fleet/fleet.yaml" in names
+        assert "kg_microbe_merge_queue/__init__.py" in names
+        assert "kg_microbe_merge_queue/__main__.py" in names
+        assert "kg_microbe_merge_queue/policy.json" in names
+        assert wheel.read("kg_microbe_merge_queue/policy.json") == (
+            REPOSITORY_ROOT / "src/kg_microbe_merge_queue/policy.json"
+        ).read_bytes()
         assert "kg_microbe_governance/vendored_artifacts.json" in names
         for artifact in governance_document["artifacts"]:
             assert artifact["source"].removeprefix("src/") in names
@@ -118,6 +127,7 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path) -> None
         )
         entry_points = wheel.read(entry_points_path).decode("utf-8")
         assert "kg-microbe-fleet = kg_microbe_fleet.__main__:main" in entry_points
+        assert "kg-microbe-merge-queue = kg_microbe_merge_queue.__main__:main" in entry_points
         assert "kg-microbe-governance = kg_microbe_governance.__main__:main" in entry_points
         assert "kg-microbe-history = kg_microbe_history.__main__:main" in entry_points
         assert "kg-microbe-research = kg_microbe_research.__main__:main" in entry_points
@@ -132,7 +142,10 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path) -> None
     )
     smoke_environment.pop("KG_MICROBE_FLEET_MANIFEST", None)
     smoke_code = """
+from contextlib import redirect_stdout
 from datetime import datetime, timedelta, timezone
+from importlib.metadata import distribution
+from io import StringIO
 import json
 import os
 from pathlib import Path
@@ -145,6 +158,8 @@ import kg_microbe_fleet
 import kg_microbe_governance
 import kg_microbe_governance.fleet_audit
 import kg_microbe_history
+import kg_microbe_merge_queue
+import kg_microbe_merge_queue.__main__
 import kg_microbe_research
 import kg_microbe_research.__main__
 import plugins
@@ -178,6 +193,8 @@ runtime_modules = (
     kg_microbe_governance,
     kg_microbe_governance.fleet_audit,
     kg_microbe_history,
+    kg_microbe_merge_queue,
+    kg_microbe_merge_queue.__main__,
     kg_microbe_research,
     kg_microbe_research.__main__,
     plugins,
@@ -200,6 +217,34 @@ assert manifest.keys == (
     "taxonmech",
 )
 assert default_manifest_path() == module_path.parent / "fleet.yaml"
+# Importing an editable package or merely declaring package-data can hide a
+# missing policy. Exercise the default loader using only the unpacked wheel.
+queue_policy = kg_microbe_merge_queue.load_policy()
+assert set(queue_policy) == {"claw", *manifest.keys}
+queue_rules = kg_microbe_merge_queue.desired_ruleset(queue_policy["claw"])
+assert {rule["type"] for rule in queue_rules["rules"]} == {
+    "pull_request", "required_status_checks", "merge_queue",
+}
+# Resolve the installed entry point, then start its parser without allowing a
+# GitHub call. Help must work outside a checkout, even without gh installed.
+def forbidden_queue_request(*args, **kwargs):
+    raise AssertionError("installed-wheel queue smoke must remain offline")
+kg_microbe_merge_queue.GitHub.request = forbidden_queue_request
+kg_microbe_merge_queue.GitHub.pages = forbidden_queue_request
+queue_entry = next(
+    entry for entry in distribution("kg-microbe-orchestration").entry_points
+    if entry.group == "console_scripts" and entry.name == "kg-microbe-merge-queue"
+)
+assert queue_entry.load() is kg_microbe_merge_queue.__main__.main
+queue_help = StringIO()
+with redirect_stdout(queue_help):
+    try:
+        queue_entry.load()(["--help"])
+    except SystemExit as exc:
+        assert exc.code == 0
+    else:
+        raise AssertionError("queue CLI help did not exit through its parser")
+assert "{plan,check,apply}" in queue_help.getvalue()
 assert default_config_path().is_relative_to(unpacked)
 governance = load_governance_manifest(fleet_manifest=manifest)
 assert len(governance.artifacts) == 16
