@@ -130,9 +130,9 @@ def test_audit_accepts_exact_clean_merged_fleet_and_caches_canonical_fetches(
         repository.checked_artifacts == repository.expected_artifacts
         for repository in result.repositories
     )
-    assert result.for_repository("culturemech").checked_artifacts == 15
+    assert result.for_repository("culturemech").checked_artifacts == 16
     protein = result.for_repository("proteintraitsmech")
-    assert protein.checked_artifacts == 14
+    assert protein.checked_artifacts == 15
     assert not (protein.root / "scripts/_edison_capture.py").exists()
     assert len(calls) == len(set(calls))
 
