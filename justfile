@@ -544,11 +544,12 @@ view-cas-tsv:
 cron-profiles:
     uv run python scripts/apply_cron_profile.py --list
 
-# Verify the active profile against the schedules actually present on disk.
+# Verify the active profile against canonical schedules and their checksums.
 cron-profile-check:
     uv run python scripts/apply_cron_profile.py --check-active
 
-# Apply a cadence profile to the managed agent workflows.
+# Apply a cadence profile to canonical agent workflows and manifest checksums.
+# Then publish the reviewed claw revision, re-pin consumers and fleet-audit.
 #   just cron-profile off      # kill switch
 #   just cron-profile slow
 cron-profile name *args:

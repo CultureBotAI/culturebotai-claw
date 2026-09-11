@@ -653,6 +653,28 @@ routes effort tiers to models; `.github/cron-profiles.yaml` carries `off` / `slo
 `scripts/apply_cron_profile.py` (`just cron-profile <name>`); and the five agent
 labels exist in all six repos.
 
+**Canonical cadence deployment (#390).** The profile applier resolves each
+implemented workflow through its artifact ID in the governed manifest. It edits
+that canonical payload's schedule and checksum together; it never edits a Mech
+checkout. `pr-shepherd` is implemented. The other cadence targets are explicitly
+`planned`, with reasons and future schedule proposals. A new canonical workflow
+must be registered as governed and named by every profile before the active
+profile check passes. Missing implemented payloads fail even under `off`.
+
+```bash
+just cron-profile off --dry-run
+just cron-profile off
+just cron-profile-check
+```
+
+These commands prepare a local canonical revision. To change deployed cadence,
+publish the reviewed revision, sync and re-pin every manifest consumer through
+the [governance release process](guides/VENDORED_GOVERNANCE.md), then fleet-audit
+the committed mains. `active` describes canonical source state; it is not a
+claim that downstream repositories have deployed it. Until the rollout finishes,
+a previously scheduled downstream copy can still run. Keep `off` selected until
+live scheduled execution is explicitly authorized.
+
 One scoping correction worth recording: `knowledge-gap-scan` is deliberately NOT
 managed by the cadence config. It spends no tokens, and an early draft that
 managed it would have made the kill switch silently disable a wanted nightly job
