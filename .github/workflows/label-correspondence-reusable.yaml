@@ -24,8 +24,9 @@ on:
   workflow_call:
     inputs:
       python-version:
-        description: "Python the gate runs under; Mechs differ (3.10 to 3.12)."
-        required: true
+        description: "Fleet runtime; override only for a documented compatibility requirement."
+        required: false
+        default: "3.13"
         type: string
       prepare-recipe:
         description: >-
@@ -128,6 +129,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
+          python-version: ${{ inputs.python-version }}
           # Empty is setup-uv's OWN default for this input, so passing "" is
           # identical to omitting it -- verified in that action's action.yml,
           # where the default is "" and the documented behaviour is "the

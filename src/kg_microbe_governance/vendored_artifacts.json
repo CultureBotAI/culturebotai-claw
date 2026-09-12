@@ -181,7 +181,7 @@
       "source": "src/kg_microbe_governance/artifacts/workflows/pr-shepherd.yml",
       "target": ".github/workflows/pr-shepherd.yml",
       "consumers": "all",
-      "sha256": "e0c966300e33045fb85cb93f6ced2cebb577b9cc3b8f347bba20e9875e192387",
+      "sha256": "3230756053abfa76afb6f65c3615106617273246a00598758d1b37ded82d687b",
       "mode": "0644"
     }
   ]

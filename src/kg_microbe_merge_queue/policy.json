@@ -14,8 +14,7 @@
     ],
     ".github/workflows/tests.yaml": [
       "Changed Python quality + wheel smoke",
-      "Fast tests (Python 3.10)",
-      "Fast tests (Python 3.14)",
+      "Fast tests",
       "Full corpus and integration suite"
     ],
     ".github/workflows/validate-strict.yaml": [
@@ -83,8 +82,7 @@
       "Audit Network Integrity"
     ],
     ".github/workflows/validate-strict.yaml": [
-      "validate-strict",
-      "python-compatibility"
+      "validate-strict"
     ],
     ".github/workflows/vendored-sync.yaml": [
       "vendored-sync"
@@ -113,10 +111,7 @@
       "qc"
     ],
     ".github/workflows/pytest.yaml": [
-      "pytest (Python 3.10)",
-      "pytest (Python 3.11)",
-      "pytest (Python 3.12)",
-      "pytest (Python 3.13)"
+      "pytest"
     ],
     ".github/workflows/validate-strict.yaml": [
       "validate-strict"
@@ -145,8 +140,7 @@
   },
   "taxonmech": {
     ".github/workflows/main.yaml": [
-      "qc (3.10)",
-      "qc (3.12)"
+      "qc"
     ],
     ".github/workflows/vendored-sync.yaml": [
       "vendored-sync"
@@ -154,8 +148,7 @@
   },
   "antibioticmech": {
     ".github/workflows/main.yaml": [
-      "qc (3.10)",
-      "qc (3.12)"
+      "qc"
     ],
     ".github/workflows/vendored-sync.yaml": [
       "vendored-sync"
@@ -163,8 +156,7 @@
   },
   "cellstructuremech": {
     ".github/workflows/main.yaml": [
-      "qc (3.10)",
-      "qc (3.12)"
+      "qc"
     ],
     ".github/workflows/vendored-sync.yaml": [
       "vendored-sync"
@@ -178,8 +170,7 @@
   },
   "habitatmech": {
     ".github/workflows/main.yaml": [
-      "qc (3.10)",
-      "qc (3.12)"
+      "qc"
     ],
     ".github/workflows/vendored-sync.yaml": [
       "vendored-sync"
@@ -190,8 +181,7 @@
   },
   "naturalproductmech": {
     ".github/workflows/main.yaml": [
-      "qc (3.10)",
-      "qc (3.12)"
+      "qc"
     ],
     ".github/workflows/label-correspondence.yaml": [
       "label-correspondence"
