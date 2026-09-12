@@ -63,7 +63,14 @@ the working tree. Before concluding a path or feature is absent, search with
    `.env.example`. Configure only this root in local `.env` when its location is
    verified, preserving unrelated values and avoiding secret-bearing output.
    Check `plugins/repository_settings.py` integration; do not duplicate its list.
-5. Reconcile `MechEnum` in
+5. Add the candidate's workflow/check mapping to the packaged merge queue policy
+   at `src/kg_microbe_merge_queue/policy.json`; its keys must equal the fleet plus
+   CLAW. Inspect exact GitHub job names, make required PR triggers unconditional,
+   add `merge_group: {types: [checks_requested]}`, and validate the combined commit.
+   Follow `docs/guides/MERGE_QUEUES.md`: land CI readiness before enabling rules,
+   retain before/after receipts and prove an authorized PR actually merges through
+   the queue. Membership alone does not enable the remote queue.
+6. Reconcile `MechEnum` in
    `src/kg_microbe_research/schema/research.yaml`, required fleet contract tests,
    and maintained setup documentation. Record Tier 1 gaps and deferred capability
    work with evidence; registration alone does not implement missing features.

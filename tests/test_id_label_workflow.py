@@ -90,6 +90,8 @@ def test_fleet_audit_uses_only_immutable_local_claw_checkouts() -> None:
     assert trusted["fetch-depth"] == 0
     assert "github.event_name == 'pull_request'" in trusted["ref"]
     assert "github.event.pull_request.base.sha" in trusted["ref"]
+    assert "github.event_name == 'merge_group'" in trusted["ref"]
+    assert "github.event.merge_group.base_sha" in trusted["ref"]
     assert "github.event_name == 'push'" in trusted["ref"]
     assert "github.sha" in trusted["ref"]
     assert "|| 'main'" in trusted["ref"]

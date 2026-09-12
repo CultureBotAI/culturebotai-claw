@@ -10,6 +10,8 @@ name: tests
 
 on:
   pull_request:
+  merge_group:
+    types: [checks_requested]
   push:
     branches: [main]
   workflow_dispatch:
@@ -18,8 +20,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: tests-${{ github.ref }}
-  cancel-in-progress: true
+  group: tests-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   pytest:
@@ -54,6 +56,7 @@ jobs:
           src/kg_microbe_history
           src/kg_microbe_kgscan
           src/kg_microbe_fleet
+          src/kg_microbe_merge_queue
           src/kg_microbe_research
           src/kg_microbe_write
           src/kg_microbe_consistency

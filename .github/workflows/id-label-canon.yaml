@@ -2,7 +2,7 @@ name: canonical ID-label contract
 
 # Exercise the authoritative packaged validator and its three behavioral
 # contracts directly. The separate governance-fleet-audit workflow verifies
-# every deployed artifact and immutable pin across the five Mech mains.
+# every deployed artifact and immutable pin across the manifest Mech mains.
 
 on:
   # Keep the canonical dependency/behavior canary independent of source changes.
@@ -10,11 +10,8 @@ on:
   schedule:
     - cron: "51 6 * * *"
   pull_request:
-    paths:
-      - "src/kg_microbe_governance/**"
-      - "pyproject.toml"
-      - "uv.lock"
-      - ".github/workflows/id-label-canon.yaml"
+  merge_group:
+    types: [checks_requested]
   push:
     branches: [main]
     paths:

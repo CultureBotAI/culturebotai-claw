@@ -313,21 +313,32 @@ esac
   `kg-microbe-governance check --repository <key> --target-root <worktree> --ref <full-sha>`.
 - Tests: `uv run pytest <the synced tests> -q`.
 - CI: `gh pr view "$PR_NUMBER" -R "$TARGET_GITHUB" --json mergeable,mergeStateStatus,statusCheckRollup`
-  → `MERGEABLE` / `CLEAN` and checks `SUCCESS`.
+  → no conflicts and checks `SUCCESS`; the manual path also requires `CLEAN`.
 - Scope: `gh pr view "$PR_NUMBER" -R "$TARGET_GITHUB" --json files` — confirm no stray files.
 
-Immediately before merge, close the concurrent-update window as far as local
-automation can: refresh `origin/main`, verify it is an ancestor of the exact
-pushed head, require GitHub checks to pass, and re-check mergeability. If `main`
-advanced, rebase only this unique branch, rerun validation and CI, and repeat
-review as required.
+Immediately before merge, query the effective branch rules and verify the exact
+reviewed head, PR identity, scope and passing CI. With a native merge queue,
+GitHub tests the combined changes against current main; do not rebase merely
+because main advanced. A real conflict still needs repair and renewed validation.
+Without a queue, refresh `origin/main` and require it to be an ancestor of the
+pushed head; if it advanced, rebase only this unique branch and rerun validation,
+CI and review as required. See `docs/guides/MERGE_QUEUES.md` for queue setup,
+failures, policy drift and rollout receipts.
 
 ```bash
+# Query effective rules now; API failure must stop this operation.
+QUEUE_ENABLED="$(gh api "repos/$TARGET_GITHUB/rules/branches/main" \
+  --jq 'any(.[]; .type == "merge_queue")')"
+case "$QUEUE_ENABLED" in
+  true|false) ;;
+  *) echo "Could not determine merge queue policy" >&2; exit 2 ;;
+esac
+
 run_with_repo_lock "$TARGET_KEY" 300 \
   git -C "$WT" fetch origin \
     refs/heads/main:refs/remotes/origin/main
 
-if ! git -C "$WT" merge-base --is-ancestor origin/main HEAD; then
+if [ "$QUEUE_ENABLED" = false ] && ! git -C "$WT" merge-base --is-ancestor origin/main HEAD; then
   echo "origin/main advanced; rebase and rerun validation/CI" >&2
   exit 2
 fi
@@ -346,14 +357,26 @@ test "$pr_base" = "main"
 test "$pr_branch" = "$BRANCH"
 test "$pr_head" = "$local_head"
 test "$pr_head_repo" = "$TARGET_GITHUB"
-test "$pr_mergeable:$pr_merge_state" = "MERGEABLE:CLEAN"
+if [ "$QUEUE_ENABLED" = true ]; then
+  test "$pr_mergeable" = "MERGEABLE"
+else
+  test "$pr_mergeable:$pr_merge_state" = "MERGEABLE:CLEAN"
+fi
 ```
 
 ### F. Merge + clean up
 
 ```bash
-gh pr merge "$PR_NUMBER" -R "$TARGET_GITHUB" --squash --delete-branch \
-  --match-head-commit "$local_head"
+if [ "$QUEUE_ENABLED" = true ]; then
+  gh pr merge "$PR_NUMBER" -R "$TARGET_GITHUB" \
+    --match-head-commit "$local_head"
+else
+  gh pr merge "$PR_NUMBER" -R "$TARGET_GITHUB" --squash \
+    --match-head-commit "$local_head"
+fi
+# Queued/auto-merge enabled is still OPEN. Wait for actual MERGED before
+# continuing below; preserve the worktree if checks fail or the queue ejects it.
+# Do not use --admin to bypass the queue.
 merged_gate="$(gh pr view -R "$TARGET_GITHUB" "$PR_NUMBER" \
   --json state,baseRefName,headRefName,headRefOid,headRepository \
   --jq '[.state,.baseRefName,.headRefName,.headRefOid,.headRepository.nameWithOwner] | @tsv')"
@@ -364,6 +387,14 @@ test "$merged_base" = "main"
 test "$merged_branch" = "$BRANCH"
 test "$merged_head" = "$local_head"
 test "$merged_head_repo" = "$TARGET_GITHUB"
+# In both merge modes, delete only the exact reviewed remote head after the
+# MERGED and identity guards above. CLI --delete-branch has no old-head lease.
+remote_branch_head="$(git -C "$REPO" ls-remote origin "refs/heads/$BRANCH" | awk 'NR == 1 {print $1}')"
+if [ -n "$remote_branch_head" ]; then
+  test "$remote_branch_head" = "$local_head"
+  git -C "$REPO" push origin \
+    --force-with-lease="refs/heads/$BRANCH:$local_head" ":refs/heads/$BRANCH"
+fi
 # Verify the remote branch is absent. Status 2 means no matching ref; any other
 # result either found the branch or failed to query the remote.
 if git -C "$REPO" ls-remote --exit-code --heads origin "$BRANCH"; then
@@ -432,7 +463,7 @@ uv run kg-microbe-governance check \
 ```
 
 After all downstream PRs merge, refresh every local `origin/main` and run one
-`kg-microbe-governance fleet-audit` with exactly the five manifest keys and the
+`kg-microbe-governance fleet-audit` with exactly the manifest keys and the
 common full SHA. The audit requires clean exact repository roots, committed
 main tips, identical pins, canonical bytes, and Git modes. See
 `docs/guides/VENDORED_GOVERNANCE.md` for the bootstrap, rollout, audit, and

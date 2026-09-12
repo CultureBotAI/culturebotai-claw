@@ -60,6 +60,7 @@ dependencies = [
 
 [project.scripts]
 openclaw-cli = "cli.main:cli"
+kg-microbe-merge-queue = "kg_microbe_merge_queue.__main__:main"
 kg-microbe-fleet = "kg_microbe_fleet.__main__:main"
 kg-microbe-consistency = "kg_microbe_consistency.__main__:main"
 kg-microbe-research = "kg_microbe_research.__main__:main"
@@ -100,6 +101,7 @@ namespaces = false
 # The fleet manifest is imported at package-import time, so it must ship in
 # the wheel; `conf/` at the repository root would not be packaged.
 kg_microbe_fleet = ["fleet.yaml"]
+kg_microbe_merge_queue = ["policy.json"]
 kg_microbe_write = ["writers.yaml"]
 kg_microbe_research = ["schema/*.yaml"]
 # The catalogue and its canonical templates are read at runtime, so an
