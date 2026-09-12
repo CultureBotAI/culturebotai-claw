@@ -61,22 +61,31 @@ jobs:
           path: CommunityMech
         # Also public (verified 2026-07-31) — same reasoning as CultureMech above.
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      # `uv sync`, not a hand-listed `pip install`: every step below runs
+      # claw's own code, so the dependency set it needs is pyproject's, and a
+      # list typed here is a second unversioned copy that drifts from it
+      # silently. It did. #372 added `from dotenv import dotenv_values` to
+      # src/kg_microbe_fleet/roots.py; python-dotenv was already declared in
+      # pyproject.toml and was not in the typed list, so every run from
+      # 2026-09-08 died in the first step with ModuleNotFoundError before
+      # reading one record (#376). `.python-version` pins 3.13, so uv
+      # provisions the interpreter too and setup-python is no longer needed.
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
         with:
-          python-version: "3.13"
+          enable-cache: true
+          working-directory: culturebotai-claw
 
-      - name: Install deps
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install pyyaml jinja2 matplotlib
+      - name: Sync claw's declared environment
+        working-directory: culturebotai-claw
+        run: uv sync
 
       - name: Validate evidence references (MIM)
         working-directory: culturebotai-claw
         env:
           MEDIAINGREDIENTMECH_ROOT: ${{ github.workspace }}/MediaIngredientMech
         run: |
-          python3 scripts/validate_evidence_references.py
+          uv run python scripts/validate_evidence_references.py
         continue-on-error: false
 
       - name: Inventory unmapped ingredients
@@ -95,7 +104,7 @@ jobs:
           # this workflow does not check out, so its two sources are expected to
           # report ABSENT here. The report states that rather than implying the
           # inventory was complete.
-          python3 scripts/inventory_unmapped_ingredients.py \
+          uv run python scripts/inventory_unmapped_ingredients.py \
             --require-sources MIM:unmapped \
             --require-sources MIM:mapped-placeholder \
             --require-sources culturemech:pending \
@@ -113,10 +122,15 @@ jobs:
           CULTUREMECH_ROOT: ${{ github.workspace }}/CultureMech
           COMMUNITYMECH_ROOT: ${{ github.workspace }}/CommunityMech
         run: |
-          python3 -m pip install --quiet .
-          python3 -m kg_microbe_skills check
+          uv run python -m kg_microbe_skills check
 
       - name: Upload inventory + validation reports
+        # The job stops at the first failed step, so without this the reports
+        # are uploaded only on the runs nobody needs them for. Every failing
+        # run in #376 skipped this step while the issue it opened said
+        # "inspect the workflow artifacts". `!cancelled()` rather than
+        # `always()`: a cancelled run has nothing worth uploading.
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: cross-repo-validation-${{ github.run_id }}
