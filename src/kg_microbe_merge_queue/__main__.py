@@ -31,7 +31,12 @@ def main(argv=None) -> int:
         return int(any(row["status"] == "blocked" for row in result["repositories"]))
     except (QueueError, OSError, ValueError, KeyError) as exc:
         if args.command == "apply" and not receipt_existed and args.receipt.exists():
-            print(table(json.loads(args.receipt.read_text())["repositories"]))
+            try:
+                print(table(json.loads(args.receipt.read_text())["repositories"]))
+            except (OSError, ValueError, KeyError, TypeError) as receipt_error:
+                # Keep the original operation failure visible even when storage
+                # also prevents rendering recovery evidence (#403).
+                print(f"Could not read receipt {args.receipt}: {receipt_error}")
         parser.exit(2, f"{exc}\n")
 
 

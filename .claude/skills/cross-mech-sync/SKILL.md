@@ -371,7 +371,7 @@ if [ "$QUEUE_ENABLED" = true ]; then
   gh pr merge "$PR_NUMBER" -R "$TARGET_GITHUB" \
     --match-head-commit "$local_head"
 else
-  gh pr merge "$PR_NUMBER" -R "$TARGET_GITHUB" --squash --delete-branch \
+  gh pr merge "$PR_NUMBER" -R "$TARGET_GITHUB" --squash \
     --match-head-commit "$local_head"
 fi
 # Queued/auto-merge enabled is still OPEN. Wait for actual MERGED before
@@ -387,15 +387,13 @@ test "$merged_base" = "main"
 test "$merged_branch" = "$BRANCH"
 test "$merged_head" = "$local_head"
 test "$merged_head_repo" = "$TARGET_GITHUB"
-# Queue admission does not delete the branch. After verifying MERGED and all
-# identities above, delete only the exact reviewed remote head if still present.
-if [ "$QUEUE_ENABLED" = true ]; then
-  queue_branch_head="$(git -C "$REPO" ls-remote origin "refs/heads/$BRANCH" | awk 'NR == 1 {print $1}')"
-  if [ -n "$queue_branch_head" ]; then
-    test "$queue_branch_head" = "$local_head"
-    git -C "$REPO" push origin \
-      --force-with-lease="refs/heads/$BRANCH:$local_head" ":refs/heads/$BRANCH"
-  fi
+# In both merge modes, delete only the exact reviewed remote head after the
+# MERGED and identity guards above. CLI --delete-branch has no old-head lease.
+remote_branch_head="$(git -C "$REPO" ls-remote origin "refs/heads/$BRANCH" | awk 'NR == 1 {print $1}')"
+if [ -n "$remote_branch_head" ]; then
+  test "$remote_branch_head" = "$local_head"
+  git -C "$REPO" push origin \
+    --force-with-lease="refs/heads/$BRANCH:$local_head" ":refs/heads/$BRANCH"
 fi
 # Verify the remote branch is absent. Status 2 means no matching ref; any other
 # result either found the branch or failed to query the remote.

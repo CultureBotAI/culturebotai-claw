@@ -471,6 +471,8 @@ The command may only enqueue the PR or enable auto-merge. Wait for actual
 `MERGED`; neither queued nor auto-merge enabled permits cleanup. If queue checks
 fail, inspect that merge group's logs and fix/review only the owned branch before
 retrying. With `QUEUE_ENABLED=false`, supply the reviewed merge strategy.
+Do not pass `--delete-branch` in either mode: it deletes by name without an
+expected-head lease. The teardown below deletes only the reviewed remote head.
 A web merge cannot provide this SHA guard.
 
 ---
@@ -490,6 +492,20 @@ test "$merged_base" = "main"
 test "$merged_branch" = "$BRANCH"
 test "$merged_head" = "$local_head"
 test "$merged_head_repo" = "$TARGET_GITHUB"
+
+remote_branch_head="$(git -C "$REPO" ls-remote origin "refs/heads/$BRANCH" | awk 'NR == 1 {print $1}')"
+if [ -n "$remote_branch_head" ]; then
+  test "$remote_branch_head" = "$local_head"
+  git -C "$REPO" push origin \
+    --force-with-lease="refs/heads/$BRANCH:$local_head" ":refs/heads/$BRANCH"
+fi
+if git -C "$REPO" ls-remote --exit-code --heads origin "$BRANCH"; then
+  echo "Remote branch still exists: $BRANCH" >&2
+  exit 2
+else
+  remote_status=$?
+  test "$remote_status" -eq 2 || exit "$remote_status"
+fi
 
 if tmux has-session -t "$SESSION" 2>/dev/null; then
   tmux kill-session -t "$SESSION"

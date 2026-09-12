@@ -49,8 +49,10 @@ It preserves other rulesets and repository settings, and refuses a conflicting
 queue or existing classic branch protection until explicitly reconciled. Never
 remove an existing protection merely to make adoption succeed.
 
-Readiness checks cover triggers, cancellation, required job conditions, candidate
-checkout refs, and exact unique successful job names observed in the ten latest
+Readiness checks cover triggers, cancellation, required jobs and their transitive
+prerequisites, candidate repository and commit, and separate immutable auxiliary
+checkouts. Concurrency belongs at workflow level to avoid jobs contending with
+their own workflow. The checker also requires exact unique successful job names observed in the ten latest
 completed runs using the same workflow bytes. No match requires a fresh CI run.
 This is not a proof of arbitrary workflow shell code: review step conditions,
 changed-file selection, matrix behavior and pinned reusable workflow internals
@@ -84,6 +86,8 @@ repeat validation/review when the branch changes.
 
 Wait until GitHub reports `state: MERGED`, and verify the same base, source
 repository, branch and reviewed head before deleting branches or worktrees.
+Delete the remote branch separately with a force-with-lease bound to the reviewed
+head; preserve it and the worktree if someone has pushed another commit.
 Keep worktrees while a PR is queued or ejected. Inspect failing **merge-group**
 runs, fix the owned branch, and re-enqueue only after passing checks and review.
 For an infrastructure failure, retry the failed run once after diagnosing it;
@@ -91,8 +95,12 @@ repeated failure requires fixing the cause, not bypassing protection.
 
 ## Failed or interrupted apply
 
-The receipt contains the complete before state and each completed write. An API
-failure stops further writes and marks later repositories unattempted. Inspect
+The receipt contains the freshly verified before state and a durable intent before
+each API write. `actions` records confirmed responses; `attempts` also records
+pending or unknown outcomes. A failed response can follow a successful remote
+write. A storage failure preserves the last complete receipt, which can still
+show a pending attempt. Inspect GitHub before deciding whether that write happened.
+An API failure stops further writes and marks later repositories unattempted. Inspect
 GitHub and generate a fresh plan to resume; the operation is idempotent. Never
 replay a stale plan or delete an unrelated ruleset. If an enabled queue cannot run,
 repair CI through an authorized branch first. Any explicit emergency rollback

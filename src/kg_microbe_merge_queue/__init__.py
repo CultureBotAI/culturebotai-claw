@@ -7,10 +7,13 @@ before any write. Receipts retain partial progress if a later API call fails.
 from __future__ import annotations
 
 import base64
+import copy
 import hashlib
 import json
+import os
 import re
 import subprocess
+import tempfile
 from pathlib import Path
 from urllib.parse import quote
 
@@ -140,7 +143,7 @@ def canonical_ruleset(ruleset: dict) -> dict:
 
 
 def workflow_errors(text: str, contexts: list[str] | None = None) -> list[str]:
-    """Check trigger/cancellation readiness; domain correctness remains CI's job."""
+    """Check queue triggers and required job execution without interpreting shell."""
     document = yaml.load(text, Loader=UniqueKeySafeLoader)
     if not isinstance(document, dict):
         return ["workflow must be a mapping"]
@@ -169,8 +172,42 @@ def workflow_errors(text: str, contexts: list[str] | None = None) -> list[str]:
             "opened", "synchronize", "reopened"
         } <= set(types):
             errors.append("pull_request is missing normal validation activity types")
-    for label, node in [("workflow", document), *list((document.get("jobs") or {}).items())]:
+    jobs = document.get("jobs") or {}
+    if not isinstance(jobs, dict) or not all(isinstance(job, dict) for job in jobs.values()):
+        return [*errors, "jobs must be a mapping of job definitions"]
+    required = set()
+    for label, node in jobs.items():
+        name = str(node.get("name", label))
+        prefix = name.split("${{", 1)[0]
+        if any(context == name or context.startswith(name + " (")
+               or context.startswith(name + " / ")
+               or ("${{" in name and context.startswith(prefix))
+               for context in contexts or []):
+            required.add(label)
+    # A skipped prerequisite skips its dependents too, even when the dependent
+    # has no condition of its own. Apply the execution guard transitively.
+    pending = list(required)
+    while pending:
+        label = pending.pop()
+        needs = jobs[label].get("needs", [])
+        if isinstance(needs, str):
+            needs = [needs]
+        if not isinstance(needs, list) or not all(isinstance(need, str) for need in needs):
+            errors.append(f"{label}: needs must name static jobs")
+            continue
+        for need in needs:
+            if need not in jobs:
+                errors.append(f"{label}: unresolved prerequisite {need}")
+            elif need not in required:
+                required.add(need)
+                pending.append(need)
+    for label, node in [("workflow", document), *list(jobs.items())]:
         concurrency = node.get("concurrency") or {}
+        if node is not document and "concurrency" in node:
+            # Jobs and workflows share a concurrency namespace. A run-id
+            # expression alone cannot rule out self-contention or collisions
+            # between matrix jobs; the supported policy schedules whole runs.
+            errors.append(f"{label}: job concurrency is unsupported; isolate runs at workflow level")
         if concurrency and (
             not isinstance(concurrency, dict)
             or not re.search(
@@ -180,34 +217,53 @@ def workflow_errors(text: str, contexts: list[str] | None = None) -> list[str]:
             )
         ):
             errors.append(f"{label}: concurrency must isolate non-PR runs with github.run_id")
-        if label != "workflow" and contexts:
-            name = node.get("name", label)
-            prefix = name.split("${{", 1)[0]
-            required = any(context == name or context.startswith(name + " (")
-                           or context.startswith(name + " / ")
-                           or ("${{" in name and context.startswith(prefix))
-                           for context in contexts)
-            if required:
-                if node.get("if") or node.get("continue-on-error"):
-                    errors.append(f"{label}: required jobs must be unconditional and fail closed")
-                for step in node.get("steps", []):
-                    if not step.get("uses", "").startswith("actions/checkout@"):
-                        continue
-                    options = step.get("with", {})
-                    ref = options.get("ref")
-                    trusted_audit_base = (
-                        options.get("path") == "fleet/trusted-claw"
-                        and ref == "${{ github.event_name == 'pull_request' && "
-                        "github.event.pull_request.base.sha || github.event_name == 'merge_group' "
-                        "&& github.event.merge_group.base_sha || github.event_name == 'push' "
-                        "&& github.sha || 'main' }}"
-                    )
-                    if ref not in (None, "${{ github.sha }}") and not trusted_audit_base:
-                        errors.append(f"{label}: candidate checkout must use the event commit")
         if isinstance(concurrency, dict) and concurrency.get("cancel-in-progress") not in (
             None, False, "${{ github.event_name == 'pull_request' }}"
         ):
             errors.append(f"{label}: cancellation must be PR-only or disabled")
+        if node is document or label not in required:
+            continue
+        if "if" in node or node.get("continue-on-error"):
+            errors.append(f"{label}: required jobs and prerequisites must be unconditional and fail closed")
+        checkouts = [step.get("with", {}) for step in node.get("steps", [])
+                     if step.get("uses", "").startswith("actions/checkout@")]
+        candidates = [options for options in checkouts
+                      if options.get("repository") in (None, "${{ github.repository }}")
+                      and options.get("ref") in (None, "${{ github.sha }}")]
+        if checkouts and not candidates:
+            errors.append(f"{label}: candidate checkout must use the event commit and repository")
+        candidate_paths = []
+        for options in candidates:
+            path = options.get("path", ".")
+            if not isinstance(path, str) or not re.fullmatch(r"[A-Za-z0-9_./-]+", path) or path.startswith("/") or any(
+                part in ("..", "") for part in path.split("/")
+            ) or "${{" in path or "\\" in path:
+                errors.append(f"{label}: candidate checkout needs a static relative path without traversal")
+                continue
+            candidate_paths.append("/".join(part for part in path.split("/") if part != ".") or ".")
+        for options in checkouts:
+            if options in candidates:
+                continue
+            ref = options.get("ref")
+            path = options.get("path")
+            trusted_audit_base = (
+                path == "fleet/trusted-claw"
+                and options.get("repository") in (None, "${{ github.repository }}")
+                and ref == "${{ github.event_name == 'pull_request' && "
+                "github.event.pull_request.base.sha || github.event_name == 'merge_group' "
+                "&& github.event.merge_group.base_sha || github.event_name == 'push' "
+                "&& github.sha || 'main' }}"
+            )
+            auxiliary = isinstance(ref, str) and re.fullmatch(r"[0-9a-f]{40}", ref)
+            if not trusted_audit_base and not auxiliary:
+                errors.append(f"{label}: auxiliary checkout needs an immutable full commit SHA")
+            if not isinstance(path, str) or not re.fullmatch(r"[A-Za-z0-9_./-]+", path) or path.startswith("/") or any(
+                part in (".", "..", "") for part in path.split("/")
+            ) or "${{" in path or "\\" in path:
+                errors.append(f"{label}: auxiliary checkout needs an explicit separate path")
+            elif any(candidate == "." or candidate == path or candidate.startswith(path + "/")
+                     or path.startswith(candidate + "/") for candidate in candidate_paths):
+                errors.append(f"{label}: auxiliary checkout overlaps the event candidate")
     return errors
 
 
@@ -362,10 +418,63 @@ def plan(api: GitHub, keys: list[str] | None = None) -> dict:
 
 
 def write_json(path: Path, value: dict, *, exclusive: bool = False) -> None:
-    with path.open("x" if exclusive else "w", encoding="utf-8") as stream:
-        json.dump(value, stream, indent=2)
-        stream.write("\n")
-        stream.flush()
+    """Publish complete, durable JSON without truncating an existing receipt."""
+    serialized = json.dumps(value, indent=2) + "\n"
+    descriptor, name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    temporary = Path(name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            stream.write(serialized)
+            stream.flush()
+            os.fsync(stream.fileno())
+        if exclusive:
+            # A hard link publishes the complete file without replacing any path.
+            os.link(temporary, path)
+        else:
+            os.replace(temporary, path)
+        temporary.unlink(missing_ok=True)
+        directory = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def _journaled_write(api: GitHub, endpoint: str, method: str, body: dict,
+                     receipt: dict, result: dict, receipt_path: Path,
+                     expected_ruleset_id: int | None = None) -> None:
+    """Persist intent before dispatch; a lost response never means no mutation."""
+    attempt = {"method": method, "endpoint": endpoint, "body": copy.deepcopy(body),
+               "status": "pending"}
+    result["attempts"].append(attempt)
+    result["status"] = "updating"
+    try:
+        write_json(receipt_path, receipt)
+    except (OSError, ValueError, TypeError):
+        attempt["status"] = "not sent"
+        raise
+    try:
+        response = api.request(endpoint, method, body)
+        if method in ("POST", "PUT"):
+            rule_id = response.get("id") if isinstance(response, dict) else None
+            if type(rule_id) is not int or rule_id <= 0 or (
+                expected_ruleset_id is not None and rule_id != expected_ruleset_id
+            ):
+                raise QueueError("Ruleset write response has no valid matching ID")
+            action = {"method": method, "ruleset_id": rule_id}
+        else:
+            if not isinstance(response, dict) or response.get("allow_auto_merge") is not True:
+                raise QueueError("Repository write response does not confirm auto-merge")
+            action = {"allow_auto_merge": True}
+    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as exc:
+        attempt.update(status="unknown", error=str(exc))
+        raise QueueError(f"{method} {endpoint}: outcome unknown; inspect GitHub before retry: {exc}") from exc
+    attempt["status"] = "confirmed"
+    attempt["response"] = action
+    result["actions"].append(action)
+    write_json(receipt_path, receipt)
 
 
 def apply(api: GitHub, saved: dict, receipt_path: Path) -> dict:
@@ -377,30 +486,39 @@ def apply(api: GitHub, saved: dict, receipt_path: Path) -> dict:
     keys = [row["key"] for row in rows]
     if len(set(keys)) != len(keys) or not set(keys) <= set(repos):
         raise QueueError("Plan contains duplicate or unknown repositories")
-    for row in rows:
+    verified_plan = copy.deepcopy(saved)
+    for row, verified in zip(rows, verified_plan["repositories"], strict=True):
         key, repo = row["key"], repos[row["key"]]
         if row["repository"] != repo or row["desired"] != desired_ruleset(policy[key]):
             raise QueueError(f"{key}: plan differs from installed policy; regenerate it")
         if row["status"] not in ("planned", "unchanged") or row.get("errors"):
             raise QueueError(f"{key}: plan is blocked")
+        try:
+            baseline_matches = fingerprint(row["before"]) == row["fingerprint"]
+        except (KeyError, TypeError, ValueError) as exc:
+            raise QueueError(f"{key}: invalid saved baseline; regenerate plan") from exc
+        if not baseline_matches:
+            raise QueueError(f"{key}: saved baseline differs from its fingerprint; regenerate plan")
         current = snapshot(api, repo, policy[key])
         if readiness_errors(current, repo, policy[key]) or fingerprint(current) != row["fingerprint"]:
             raise QueueError(f"{key}: settings or workflow bytes changed; regenerate plan")
         # Evidence is fetched again; a tampered plan cannot assert passing CI.
-        context_evidence(api, repo, policy[key], current)
-    receipt: dict = {"version": 1, "plan": saved, "repositories": [
+        verified["evidence"] = context_evidence(api, repo, policy[key], current)
+        verified["before"] = current
+    receipt: dict = {"version": 1, "plan": verified_plan, "repositories": [
         {"key": row["key"], "repository": row["repository"],
-         "status": "not updated", "actions": []} for row in rows
+         "status": "not updated", "actions": [], "attempts": []} for row in rows
     ]}
     write_json(receipt_path, receipt, exclusive=True)
-    for row, result in zip(rows, receipt["repositories"], strict=True):
+    for row, verified, result in zip(rows, verified_plan["repositories"], receipt["repositories"], strict=True):
         key, repo = row["key"], row["repository"]
-        write_json(receipt_path, receipt)
         try:
             # Recheck immediately before this repository's first write as well.
             current = snapshot(api, repo, policy[key])
             if fingerprint(current) != row["fingerprint"]:
                 raise QueueError("Settings or workflows changed during fleet apply")
+            # The receipt's rollback baseline comes from the immediate live read.
+            verified["before"] = current
             managed = managed_ruleset(current, repo)
             if not managed or canonical_ruleset(managed) != canonical_ruleset(row["desired"]):
                 endpoint = f"repos/{repo}/rulesets"
@@ -408,23 +526,26 @@ def apply(api: GitHub, saved: dict, receipt_path: Path) -> dict:
                 if managed:
                     endpoint += f"/{managed['id']}"
                     method = "PUT"
-                changed = api.request(endpoint, method, row["desired"])
-                result["actions"].append({"method": method, "ruleset_id": changed["id"]})
-                write_json(receipt_path, receipt)
+                _journaled_write(api, endpoint, method, row["desired"], receipt, result,
+                                 receipt_path, managed["id"] if managed else None)
             if not current["repository"]["allow_auto_merge"]:
-                api.request(f"repos/{repo}", "PATCH", {"allow_auto_merge": True})
-                result["actions"].append({"allow_auto_merge": True})
-                write_json(receipt_path, receipt)
+                _journaled_write(api, f"repos/{repo}", "PATCH", {"allow_auto_merge": True},
+                                 receipt, result, receipt_path)
             after = snapshot(api, repo, policy[key])
             result["after"] = after
             if not configuration_matches(after, row["desired"], repo):
                 raise QueueError("GitHub read-back differs from desired queue policy")
             result["status"] = "updated" if result["actions"] else "unchanged"
-        except QueueError as exc:
-            result.update(status="failed", error=str(exc))
             write_json(receipt_path, receipt)
+        except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as exc:
+            result.update(status="failed", error=str(exc))
+            try:
+                write_json(receipt_path, receipt)
+            except (OSError, ValueError, TypeError) as receipt_exc:
+                raise QueueError(f"{key}: {exc}; receipt update failed: {receipt_exc}; "
+                                 f"inspect the last durable receipt at {receipt_path} and GitHub "
+                                 "before retrying") from exc
             raise QueueError(f"{key}: {exc}; partial results saved to {receipt_path}") from exc
-        write_json(receipt_path, receipt)
     return receipt
 
 
