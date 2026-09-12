@@ -133,6 +133,10 @@ def canonical_ruleset(ruleset: dict) -> dict:
                 params["required_status_checks"], key=lambda item: item["context"]
             )
         if rule["type"] == "pull_request":
+            # Observed defaults on the live rules API when omitted from POST.
+            # Compare explicit values so altered or unknown fields remain drift.
+            params.setdefault("dismissal_restriction", {"enabled": False, "allowed_actors": []})
+            params.setdefault("require_extra_approval_for_unattributed_changes", True)
             # GitHub may return these default empty/false additions.
             if params.get("allowed_merge_methods") == ["merge", "squash", "rebase"]:
                 params.pop("allowed_merge_methods")
