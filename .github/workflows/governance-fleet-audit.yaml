@@ -45,6 +45,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
         with:
+          python-version: "3.13"
           enable-cache: true
           working-directory: fleet/trusted-claw
 
@@ -112,7 +113,7 @@ jobs:
           # the audit and install code a downstream pin selects, and the
           # classifier is neither. It imports only the standard library, so no
           # sync is needed before the pin comparison runs.
-          PYTHONPATH=control/src python - <<'PY'
+          PYTHONPATH=control/src uv run --no-project python - <<'PY'
           from __future__ import annotations
 
           import os
