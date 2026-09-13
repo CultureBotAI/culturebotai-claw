@@ -57,6 +57,11 @@ skills:
     reason: >-
       Catalogues every branch across claw and the manifest-defined Mechs,
       reading membership from the manifest rather than a list in the skill.
+  fleet-issue-status:
+    scope: fleet
+    reason: >-
+      One row per repository of open issues and open PRs across claw and the
+      manifest-defined Mechs, reading membership from the manifest.
   fleet-pr-review:
     scope: fleet
     reason: Reviews open PRs across the manifest-defined control plane.
