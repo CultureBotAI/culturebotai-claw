@@ -61,23 +61,26 @@ jobs:
           path: CommunityMech
         # Also public (verified 2026-07-31) — same reasoning as CultureMech above.
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      # Install the locked project environment and enter it for every validator.
+      # The earlier project-install fix (#398) addressed the missing dotenv
+      # dependency; this keeps installation and execution on the same runtime.
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
         with:
           python-version: "3.13"
+          enable-cache: true
+          working-directory: culturebotai-claw
 
-      - name: Install project dependencies
+      - name: Sync claw's declared environment
         working-directory: culturebotai-claw
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install .
+        run: uv sync --frozen
 
       - name: Validate evidence references (MIM)
         working-directory: culturebotai-claw
         env:
           MEDIAINGREDIENTMECH_ROOT: ${{ github.workspace }}/MediaIngredientMech
         run: |
-          python3 scripts/validate_evidence_references.py
+          uv run --frozen python scripts/validate_evidence_references.py
         continue-on-error: false
 
       - name: Inventory unmapped ingredients
@@ -96,7 +99,7 @@ jobs:
           # this workflow does not check out, so its two sources are expected to
           # report ABSENT here. The report states that rather than implying the
           # inventory was complete.
-          python3 scripts/inventory_unmapped_ingredients.py \
+          uv run --frozen python scripts/inventory_unmapped_ingredients.py \
             --require-sources MIM:unmapped \
             --require-sources MIM:mapped-placeholder \
             --require-sources culturemech:pending \
@@ -114,9 +117,15 @@ jobs:
           CULTUREMECH_ROOT: ${{ github.workspace }}/CultureMech
           COMMUNITYMECH_ROOT: ${{ github.workspace }}/CommunityMech
         run: |
-          python3 -m kg_microbe_skills check
+          uv run --frozen python -m kg_microbe_skills check
 
       - name: Upload inventory + validation reports
+        # The job stops at the first failed step, so without this the reports
+        # are uploaded only on the runs nobody needs them for. Every failing
+        # run in #376 skipped this step while the issue it opened said
+        # "inspect the workflow artifacts". `!cancelled()` rather than
+        # `always()`: a cancelled run has nothing worth uploading.
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: cross-repo-validation-${{ github.run_id }}

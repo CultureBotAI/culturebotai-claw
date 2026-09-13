@@ -285,6 +285,7 @@ def test_project_is_installed_before_validation_scripts():
     """
     steps = _steps()
     installed = False
+    synced = False
     consumers = set()
     for step in steps:
         for line in step.get("run", "").replace("\\\n", " ").splitlines():
@@ -295,6 +296,16 @@ def test_project_is_installed_before_validation_scripts():
                     assert step.get("working-directory") == "culturebotai-claw"
                     assert not step.get("if"), "runtime setup must be unconditional"
                     installed = True
+            if command[:2] == ["uv", "sync"]:
+                assert command == ["uv", "sync", "--frozen"]
+                assert step.get("working-directory") == "culturebotai-claw"
+                assert not step.get("if") and not step.get("continue-on-error")
+                synced = True
+            through_uv = command[:2] == ["uv", "run"]
+            if through_uv:
+                assert command[:4] == ["uv", "run", "--frozen", "python"]
+                assert synced, "uv project environment must be installed before validation"
+                command = ["python", *command[4:]]
             if command[:1] not in (["python"], ["python3"]):
                 continue
             targets = {
@@ -303,6 +314,7 @@ def test_project_is_installed_before_validation_scripts():
                 "kg_microbe_skills",
             }.intersection(command)
             if targets:
-                assert installed, f"project dependencies missing before {command}"
+                assert installed or through_uv, f"project dependencies missing before {command}"
+                assert step.get("working-directory") == "culturebotai-claw"
                 consumers.update(targets)
     assert len(consumers) == 3, "the workflow runtime consumers changed"
