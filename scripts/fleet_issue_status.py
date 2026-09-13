@@ -56,7 +56,6 @@ TSV_COLUMNS = (
 )
 
 DEFAULT_TSV_DIR = Path(__file__).resolve().parents[1] / "workspace" / "reports"
-TITLE_WIDTH = 58
 
 
 class GhError(RuntimeError):
@@ -119,6 +118,8 @@ def collect(
 
     A repository whose issue query fails is not queried for PRs either: half a
     row would read as a whole one. It goes to `errors` and out of every total.
+    With `include_prs=False` the `prs` mapping stays empty rather than holding
+    an empty list per repository, which `--json` would print as zero open PRs.
     """
 
     identities = fleet_repository_identities(manifest)
@@ -153,7 +154,9 @@ def collect(
                 result["errors"][repo] = f"prs: {str(exc)[:200]}"
                 continue
         result["issues"][repo] = issues
-        result["prs"][repo] = prs
+        if include_prs:
+            # Never store a plausible zero for a query that was not made.
+            result["prs"][repo] = prs
         if truncated:
             result["issue_listing_truncated"].append(repo)
         if prs_truncated:
@@ -175,6 +178,8 @@ def _parse_time(value: str) -> _dt.datetime:
 
 
 def _days_between(earlier: str, now: _dt.datetime) -> int:
+    # Clamped: a timestamp after `now` (clock skew between GitHub and the
+    # caller) must not render as a negative age.
     return max(0, (now - _parse_time(earlier)).days)
 
 
@@ -220,12 +225,6 @@ def _cell(value: object) -> object:
     if flattened.startswith(("=", "+", "-", "@")):
         return "'" + flattened
     return flattened
-
-
-def _title(text: str, width: int = TITLE_WIDTH) -> str:
-    """Truncate visibly: a cut title with no marker reads as a whole one."""
-    text = " ".join(text.split())
-    return text if len(text) <= width else text[: width - 1] + "…"
 
 
 def tsv_rows(data: dict, snapshot_utc: str) -> list[dict]:
@@ -303,7 +302,7 @@ def render(data: dict, snapshot_utc: str, stale_days: int) -> str:
     total_prs = 0
 
     header = (
-        f"{'REPO':<21} {'ISSUES':>6} {'UNASSIGNED':>10} {'STALE>' + str(stale_days) + 'd':>10} "
+        f"{'REPO':<21} {'ISSUES':>6} {'UNASSIGNED':>10} {'STALE ' + str(stale_days) + 'd+':>10} "
         f"{'OLDEST':>7}"
     )
     if include_prs:

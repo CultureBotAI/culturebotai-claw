@@ -18,9 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 import fleet_issue_status as fis  # noqa: E402
 from fleet_issue_status import (  # noqa: E402
-    TITLE_WIDTH,
     TSV_COLUMNS,
-    _title,
     fleet_repository_identities,
     main,
     render,
@@ -92,6 +90,30 @@ def test_an_org_repo_not_in_the_manifest_is_not_swept():
     assert "CultureBotAI/CultureBotAI.github.io" not in fleet_repository_identities()
 
 
+def test_adding_a_mech_to_the_manifest_adds_it_to_the_sweep():
+    """Membership is declared, not discovered."""
+    manifest = load_fleet_manifest()
+    before = fleet_repository_identities(manifest)
+
+    class _Extended:
+        mechs = {
+            **manifest.mechs,
+            "enzymemech": type("M", (), {"github": "CultureBotAI/EnzymeMech"})(),
+        }
+        keys = tuple(manifest.keys) + ("enzymemech",)
+
+    after = fleet_repository_identities(_Extended())
+    assert "CultureBotAI/EnzymeMech" not in before
+    assert "CultureBotAI/EnzymeMech" in after
+
+
+def test_repo_order_is_stable_and_follows_manifest_order():
+    manifest = load_fleet_manifest()
+    first = fleet_repository_identities(manifest)
+    assert first == fleet_repository_identities(manifest)
+    assert list(first[1:]) == [mech.github for mech in manifest.mechs.values()]
+
+
 # --------------------------------------------------------------------------
 # summaries are computed against the snapshot, not the wall clock
 # --------------------------------------------------------------------------
@@ -117,6 +139,26 @@ def test_stale_boundary_is_inclusive_at_exactly_stale_days():
     one_less = _issue(2, updatedAt="2026-07-15T10:00:01Z")  # 59 days, 23:59:59
     assert summarize([exactly], NOW, 60)["stale"] == 1
     assert summarize([one_less], NOW, 60)["stale"] == 0
+
+
+def test_a_timestamp_after_the_snapshot_is_clamped_to_zero_not_negative():
+    """Clock skew between GitHub and the caller must not print `-1d` or put a
+    negative age in the TSV."""
+    future = _issue(1, createdAt="2026-09-14T00:00:00Z", updatedAt="2026-09-14T00:00:00Z")
+    summary = summarize([future], NOW, 60)
+    assert summary["oldest_age_days"] == 0
+    assert summary["stale"] == 0
+    row = tsv_rows(_data(issues={"culturebotai-claw": [future], "TraitMech": []}), SNAP)[0]
+    assert row["age_days"] == 0 and row["days_since_update"] == 0
+
+
+def test_unknown_mergeability_is_not_counted_as_a_conflict():
+    """GitHub computes mergeability lazily; a freshly-pushed PR reports
+    UNKNOWN. The column must count only what GitHub calls CONFLICTING, so the
+    fixture carries every other value the field takes."""
+    prs = [_pr(1, mergeable="UNKNOWN"), _pr(2, mergeable=None), _pr(3),
+           _pr(4, mergeable="CONFLICTING")]
+    assert fis._pr_summary(prs) == {"open": 4, "conflicts": 1, "drafts": 0}
 
 
 def test_unassigned_counts_only_issues_with_no_assignee():
@@ -274,6 +316,19 @@ def test_a_failing_pr_query_marks_the_whole_row_not_half_of_it(monkeypatch):
     assert "TraitMech" not in data["issues"]
 
 
+def test_the_cap_keeps_the_newest_even_if_gh_returns_them_unordered(monkeypatch):
+    """Sorting happens before the slice. `gh` returns newest-first today, which
+    is exactly why the fixture must not: with a sorted fake, slicing before
+    sorting gives the same answer and the property is untested."""
+    def _unordered_gh(args, timeout=60):
+        limit = int(args[args.index("--limit") + 1])
+        return _json.dumps([_issue(i) for i in [3, 9, 1, 7, 5][:limit]])
+    monkeypatch.setattr(fis, "_gh", _unordered_gh)
+    issues, truncated = fis.open_issues("CultureBotAI/TraitMech", 3)
+    assert [i["number"] for i in issues] == [9, 7, 3]
+    assert truncated is True
+
+
 def test_no_prs_mode_never_calls_gh_pr(monkeypatch):
     calls = []
 
@@ -286,13 +341,20 @@ def test_no_prs_mode_never_calls_gh_pr(monkeypatch):
     data = fis.collect(issue_limit=5, pr_limit=5, include_prs=False)
     assert set(calls) == {"issue"}
     assert data["include_prs"] is False
+    # and --json must not carry a plausible zero for a query never made
+    assert data["prs"] == {}
+    assert "culturebotai-claw" in data["issues"]
 
 
 # --------------------------------------------------------------------------
 # main
 # --------------------------------------------------------------------------
 
-def test_nonpositive_limits_are_rejected_before_any_gh_call(capsys):
+def test_nonpositive_limits_are_rejected_before_any_gh_call(capsys, monkeypatch):
+    def _never(args, timeout=60):
+        raise AssertionError("gh must not be called for a rejected argument")
+    monkeypatch.setattr(fis, "_gh", _never)
+    monkeypatch.setattr(fis.shutil, "which", lambda command: "/usr/bin/gh")
     assert main(["--issue-limit", "0", "--no-tsv"]) == 2
     assert main(["--pr-limit", "-1", "--no-tsv"]) == 2
     assert main(["--stale-days", "-1", "--no-tsv"]) == 2
@@ -398,6 +460,3 @@ def test_tsv_path_is_pure(tmp_path):
     assert not p.exists() and p.parent == tmp_path
 
 
-def test_a_truncated_title_is_marked_not_silently_cut():
-    out = _title("x" * (TITLE_WIDTH + 40))
-    assert len(out) == TITLE_WIDTH and out.endswith("…")

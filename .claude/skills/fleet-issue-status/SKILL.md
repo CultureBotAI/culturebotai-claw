@@ -32,6 +32,7 @@ uv run python scripts/fleet_issue_status.py --no-prs        # issues only
 uv run python scripts/fleet_issue_status.py --stale-days 30
 uv run python scripts/fleet_issue_status.py --issue-limit 1000   # a repo has >500 open
 uv run python scripts/fleet_issue_status.py --no-tsv
+uv run python scripts/fleet_issue_status.py --tsv-dir DIR
 ```
 
 `--issue-limit` (default 500) and `--pr-limit` (default 200) cap what is
@@ -48,7 +49,7 @@ exit means the report is incomplete** — do not quote its totals as the answer.
 ```
 Open issues across the CultureBotAI fleet: 504; open PRs: 1
 
-REPO                  ISSUES UNASSIGNED  STALE>60d  OLDEST  PRs CONFLICTS DRAFTS
+REPO                  ISSUES UNASSIGNED STALE 60d+  OLDEST  PRs CONFLICTS DRAFTS
 culturebotai-claw         51         51         12    240d    0         0      0
 CultureMech               46         46          9    310d    0         0      0
 …
@@ -63,7 +64,7 @@ Coverage
   requests too. The report's number is the one that means "issues".
 - **UNASSIGNED** — open issues with no assignee. In this fleet that is usually
   all of them; the column exists so the exceptions are visible.
-- **STALE>Nd** — no update (comment, label, edit) in `--stale-days` or more,
+- **STALE Nd+** — no update (comment, label, edit) in `--stale-days` or more,
   measured from the snapshot timestamp, never the wall clock. A snapshot
   summarises the same way whenever it is read.
 - **OLDEST** — age of the oldest open issue.
