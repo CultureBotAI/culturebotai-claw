@@ -109,7 +109,7 @@ def test_the_pin_step_reads_the_classifier_from_the_candidate_checkout():
     added it -- and always would have. Caught by CI, not by me."""
     run = _pin_step()["run"]
 
-    assert "PYTHONPATH=control/src python -" in run, (
+    assert "PYTHONPATH=control/src uv run --no-project python -" in run, (
         "the classifier must come from the candidate checkout; trusted-claw is "
         "the PR base commit, so a function this PR adds is not there"
     )

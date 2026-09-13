@@ -26,7 +26,7 @@ between turns and across concurrent sessions.
 
 ## Purpose and boundaries
 
-CultureBotAI CLAW coordinates work across five downstream Mech repositories.
+CultureBotAI CLAW coordinates work across the manifest-defined Mech repositories.
 `src/kg_microbe_fleet/fleet.yaml` is the canonical list; do not re-declare it
 in code. Read it through `kg_microbe_fleet.load_fleet_manifest()`. It lives
 inside the package rather than in `conf/` so installed commands retain the
@@ -42,6 +42,7 @@ manifest when no source checkout is present:
 - CellStructureMech (`CELLSTRUCTUREMECH_ROOT`)
 - HabitatMech (`HABITATMECH_ROOT`)
 - NaturalProductMech (`NATURALPRODUCTMECH_ROOT`)
+- TaxonMech (`TAXONMECH_ROOT`)
 
 You do not need every Mech cloned. `openclaw-cli config validate` reports an
 unset root as "not configured locally" rather than a failure; pass
@@ -134,7 +135,7 @@ uv run --extra dev mypy \
   cli/main.py plugins/repository_settings.py plugins/lock_manager.py \
   plugins/git_integration.py plugins/just_runner.py \
   src/kg_microbe_history src/kg_microbe_kgscan src/kg_microbe_fleet \
-  src/kg_microbe_research src/kg_microbe_write \
+  src/kg_microbe_merge_queue src/kg_microbe_research src/kg_microbe_write \
   src/kg_microbe_consistency src/kg_microbe_patches \
   src/kg_microbe_governance/__init__.py \
   src/kg_microbe_governance/__main__.py \
@@ -427,6 +428,13 @@ because they carry literal data the path rules would misread.
   manifest whose real `package_path` made a derived path identical to the
   hardcoded one; `--page` and `--card` both white; a token that resolved to
   nothing. Each ran, went green, and was consulted. None was caught by reading.
+  Run each mutation check in a fresh Python process running pytest. `tests/conftest.py` compiles
+  imports from the repository's source directories directly, including normal
+  imports, explicit script loaders, and their transitive imports. Existing
+  timestamp-valid bytecode cannot hide a same-size edit. The hook is restored
+  when pytest exits; a separate Python child interpreter does not inherit it.
+  For a mutation exercised only in a child interpreter, use a fresh
+  `PYTHONPYCACHEPREFIX` there; `-B` alone still reads existing caches.
 - Return nonzero from CLI failures; printing an error is not sufficient.
 - Do not swallow partial failures into a successful report.
 - Use timezone-aware UTC timestamps.

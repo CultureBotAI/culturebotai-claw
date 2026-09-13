@@ -10,6 +10,8 @@ name: tests
 
 on:
   pull_request:
+  merge_group:
+    types: [checks_requested]
   push:
     branches: [main]
   workflow_dispatch:
@@ -18,8 +20,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: tests-${{ github.ref }}
-  cancel-in-progress: true
+  group: tests-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   pytest:
@@ -32,6 +34,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
+          python-version: "3.13"
           enable-cache: true
 
       - name: Sync environment
@@ -54,6 +57,7 @@ jobs:
           src/kg_microbe_history
           src/kg_microbe_kgscan
           src/kg_microbe_fleet
+          src/kg_microbe_merge_queue
           src/kg_microbe_research
           src/kg_microbe_write
           src/kg_microbe_consistency
@@ -65,6 +69,9 @@ jobs:
 
       - name: Verify active cron profile
         run: uv run python scripts/apply_cron_profile.py --check-active
+
+      - name: Verify governed action and runtime pins
+        run: uv run python scripts/update_governed_workflow_pins.py --check
 
       - name: Run tests
         # `python -m pytest`, NOT `uv run pytest`. The latter resolves a pytest
@@ -101,6 +108,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
+          python-version: "3.13"
           enable-cache: true
 
       - name: Sync environment

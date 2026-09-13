@@ -51,17 +51,15 @@ def test_the_inputs_callers_depend_on_exist(workflow):
     }
 
 
-def test_python_version_is_required_and_the_rest_are_not(workflow):
-    """The Mechs run 3.10 to 3.12, so there is no defensible default -- guessing
-    one would silently run a gate under the wrong interpreter. Everything else
-    has a working default so a plain corpus needs three lines to adopt this."""
+def test_python_defaults_to_the_fleet_runtime_and_selects_uv_interpreter(workflow):
+    """Installing Python alone must not leave uv using a different interpreter."""
     inputs = workflow[ON]["workflow_call"]["inputs"]
-
-    assert inputs["python-version"]["required"] is True
-    assert "default" not in inputs["python-version"]
+    assert inputs["python-version"]["default"] == (ROOT / ".python-version").read_text().strip()
+    steps = workflow["jobs"]["label-correspondence"]["steps"]
+    for action in ("actions/setup-python@", "astral-sh/setup-uv@"):
+        step = next(step for step in steps if step.get("uses", "").startswith(action))
+        assert step["with"]["python-version"] == "${{ inputs.python-version }}"
     for name, spec in inputs.items():
-        if name == "python-version":
-            continue
         assert spec.get("required") is False, name
         assert "default" in spec, name
 

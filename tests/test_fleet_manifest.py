@@ -32,6 +32,7 @@ EXPECTED_MECHS = (
     "cellstructuremech",
     "habitatmech",
     "naturalproductmech",
+    "taxonmech",
 )
 
 

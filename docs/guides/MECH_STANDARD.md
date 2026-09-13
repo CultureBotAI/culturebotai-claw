@@ -156,6 +156,14 @@ A new Mech should not replicate any of these to "match the fleet".
 
 ## Adopting the standard in a new repository
 
+Use the [onboard-mech skill](../../.claude/skills/onboard-mech/SKILL.md) to inspect
+the candidate, register its identity and measured capabilities, configure the
+local root, and verify that fleet commands include it. A local registration is
+ready for use before the governing release is complete: adding a consumer also
+requires publishing the new canonical revision, synchronizing all consumer
+pins, and auditing their committed main branches. The skill reports these
+stages separately and preserves active downstream work.
+
 In dependency order, because each step makes the next enforceable:
 
 1. **Join the fleet manifest** (1.12) — declare `package_path`, `schema_paths`,

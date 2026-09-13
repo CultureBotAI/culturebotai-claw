@@ -23,8 +23,12 @@ Workflow support is narrower than a single "CI-supported" category:
   fail the workflow.
 - `generate_kg_microbe_review.py` is named in that workflow's push path filter
   but is not executed by the workflow. Use the `just kg-microbe-review` recipe.
-- `apply_cron_profile.py` is not executed by a workflow. It is an operator tool
-  exposed through `just cron-profiles` and `just cron-profile`.
+- `apply_cron_profile.py --check-active` runs in the tests workflow and fails
+  if canonical governed schedules disagree with the active profile or a workflow
+  bypasses target registration. `just cron-profile <name>` edits canonical
+  schedules and manifest checksums locally; deployment requires a reviewed claw
+  revision, consumer re-pins and a fleet audit. Planned workflows are reported
+  explicitly and are admitted to governance before becoming profile targets.
 
 Changes to these scripts require focused tests under `tests/` and must preserve
 their documented command-line interface. Do not describe a script as a

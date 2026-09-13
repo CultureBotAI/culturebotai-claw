@@ -9,6 +9,8 @@ on:
   schedule:
     - cron: "41 6 * * *"
   pull_request:
+  merge_group:
+    types: [checks_requested]
   push:
     branches: [main]
   workflow_dispatch:
@@ -28,13 +30,14 @@ jobs:
           persist-credentials: false
 
       # Pull requests use their exact protected-base commit as the trusted audit
-      # runner, main pushes use their triggering commit, and schedules/manual
+      # runner, merge groups use their exact base SHA, main pushes use their
+      # triggering commit, and schedules/manual
       # runs use main even if workflow_dispatch selected another candidate ref.
       # A downstream pin never selects executable audit or install code.
       - name: Check out trusted claw revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'push' && github.sha || 'main' }}
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'merge_group' && github.event.merge_group.base_sha || github.event_name == 'push' && github.sha || 'main' }}
           path: fleet/trusted-claw
           fetch-depth: 0
           persist-credentials: false
@@ -42,6 +45,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
         with:
+          python-version: "3.13"
           enable-cache: true
           working-directory: fleet/trusted-claw
 
@@ -109,7 +113,7 @@ jobs:
           # the audit and install code a downstream pin selects, and the
           # classifier is neither. It imports only the standard library, so no
           # sync is needed before the pin comparison runs.
-          PYTHONPATH=control/src python - <<'PY'
+          PYTHONPATH=control/src uv run --no-project python - <<'PY'
           from __future__ import annotations
 
           import os
@@ -217,8 +221,11 @@ jobs:
       # everywhere without one it skipped every per-consumer case -- which was
       # everywhere, including this workflow, which ran the four files above and
       # not this one. It had never executed its failure path (#209, #216).
-      # This job already clones every manifest-declared consumer, so it is the
-      # one place the guard can actually run. FLEET_CONSUMER_ROOTS_REQUIRED
+      # The trusted deployed fleet above excludes a consumer newly declared by
+      # a PR. Derive this candidate check's own roots from its validated package
+      # and clone additions before running the mandatory completeness guard.
+      # This does not add candidate consumers to the trusted deployed audit.
+      # FLEET_CONSUMER_ROOTS_REQUIRED
       # turns an unresolvable root from a silent skip into a failure, so the
       # step cannot pass by examining nothing.
       - name: Check every declared consumer carries what the manifest says
@@ -227,9 +234,25 @@ jobs:
           FLEET_CONSUMER_ROOTS_REQUIRED: "1"
         run: |
           set -euo pipefail
+          uv run --project control --extra dev python - > fleet/candidate-governance-consumers.tsv <<'PY'
+          from kg_microbe_governance import load_governance_manifest
+
+          manifest = load_governance_manifest()
+          for consumer in manifest.consumers.values():
+              print("\t".join((consumer.key, consumer.github, consumer.package_path, manifest.pin_path)))
+          PY
+          test -s fleet/candidate-governance-consumers.tsv
           while IFS=$'\t' read -r key github package_path pin_path; do
+            root="$GITHUB_WORKSPACE/fleet/$key"
+            if [ ! -e "$root" ]; then
+              # Completeness reads only origin/main tree entries with ls-tree;
+              # it needs no checkout of downstream code or governed payloads.
+              git clone --filter=blob:none --no-checkout --depth 1 --branch main \
+                "https://github.com/$github.git" "$root"
+            fi
+            test "$(git -C "$root" remote get-url origin)" = "https://github.com/$github.git"
             var="$(printf '%s' "$key" | tr '[:lower:]' '[:upper:]')_ROOT"
             export "$var=$GITHUB_WORKSPACE/fleet/$key"
-          done < fleet/governance-consumers.tsv
+          done < fleet/candidate-governance-consumers.tsv
           uv run --project control --extra dev python -m pytest -q \
             control/tests/test_vendored_consumer_completeness.py

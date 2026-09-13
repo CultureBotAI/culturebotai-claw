@@ -38,6 +38,10 @@
     "naturalproductmech": {
       "github": "CultureBotAI/NaturalProductMech",
       "package_path": "src/naturalproductmech"
+    },
+    "taxonmech": {
+      "github": "CultureBotAI/TaxonMech",
+      "package_path": "src/taxonmech"
     }
   },
   "artifacts": [
@@ -177,7 +181,7 @@
       "source": "src/kg_microbe_governance/artifacts/workflows/pr-shepherd.yml",
       "target": ".github/workflows/pr-shepherd.yml",
       "consumers": "all",
-      "sha256": "dabbe39a63dae27f954d5b6038b26371a4be1383d57424b8215283120c1e3adf",
+      "sha256": "3230756053abfa76afb6f65c3615106617273246a00598758d1b37ded82d687b",
       "mode": "0644"
     }
   ]

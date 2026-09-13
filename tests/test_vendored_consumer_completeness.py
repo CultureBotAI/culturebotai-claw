@@ -36,6 +36,7 @@ import json
 import os
 import subprocess
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
@@ -50,10 +51,18 @@ MANIFEST = json.loads(
     )
 )
 
-# Consumers known to be mid-adoption, with the reason. A ledger rather than a
-# skip: it fails in both directions, so the list can only shrink. When a
-# repository finishes vendoring, this test says so and the entry comes out.
-INCOMPLETE_CONSUMERS: dict[str, str] = {
+@dataclass(frozen=True)
+class IncompleteConsumer:
+    """One reviewed admission gap, bounded to its exact outstanding paths."""
+
+    expected_missing: frozenset[str]
+    reason: str
+
+
+# Consumers known to be mid-adoption, with the exact gaps and reason. A new
+# missing path fails rather than inheriting the waiver. When the repository
+# finishes vendoring, this test says so and the entry comes out.
+INCOMPLETE_CONSUMERS: dict[str, IncompleteConsumer] = {
     # Entries leave this list because the test below fails when a repository
     # becomes complete. CellStructureMech left it when
     # CultureBotAI/CellStructureMech#53 merged; CultureMech, MediaIngredientMech
@@ -112,7 +121,7 @@ def roots_are_required(environ: Mapping[str, str] | None = None) -> bool:
     """Whether an unresolvable consumer root is a failure rather than a skip.
 
     Set wherever the caller has arranged the checkouts -- the governance audit
-    clones all six. Anywhere else, a developer without roots still gets the
+    clones every declared consumer. Anywhere else, a developer without roots still gets the
     offline assertions and skips the rest.
     """
     env = os.environ if environ is None else environ
@@ -160,6 +169,7 @@ def test_the_manifest_declares_the_consumers_the_fleet_expects():
         "mediaingredientmech",
         "naturalproductmech",
         "proteintraitsmech",
+        "taxonmech",
         "traitmech",
     ]
 
@@ -219,6 +229,7 @@ def test_the_scope_rule_catches_what_it_is_for(scope, expected):
 def test_a_declared_consumer_carries_every_artifact_that_applies_to_it(consumer):
     missing = _missing(consumer)
     if consumer in INCOMPLETE_CONSUMERS:
+        _assert_exact_admission_gap(consumer, missing)
         pytest.skip(f"{consumer} is a known-incomplete consumer")
     assert not missing, (
         f"{consumer} is declared a vendored consumer but its origin/main does "
@@ -228,16 +239,88 @@ def test_a_declared_consumer_carries_every_artifact_that_applies_to_it(consumer)
     )
 
 
-@pytest.mark.parametrize("consumer", sorted(INCOMPLETE_CONSUMERS))
-def test_a_known_incomplete_consumer_is_still_incomplete(consumer):
-    """The other direction, so the ledger can only shrink. When the repository
-    finishes vendoring, this fails and the entry comes out -- rather than a
-    stale exemption quietly outliving the problem it was written for."""
-    missing = _missing(consumer)
+def _assert_exact_admission_gap(consumer: str, missing: list[str]) -> None:
+    """A recorded gap excuses neither new omissions nor a stale waiver."""
+    admission = INCOMPLETE_CONSUMERS[consumer]
     assert missing, (
         f"{consumer} now tracks every artifact that applies to it, so remove it "
-        f"from INCOMPLETE_CONSUMERS ({INCOMPLETE_CONSUMERS[consumer]})"
+        f"from INCOMPLETE_CONSUMERS ({admission.reason})"
     )
+    actual = frozenset(missing)
+    assert actual == admission.expected_missing, (
+        f"{consumer}'s admission gap changed: unexpected missing artifacts "
+        f"{sorted(actual - admission.expected_missing)}; resolved artifacts "
+        f"{sorted(admission.expected_missing - actual)}. The recorded exception "
+        f"covers exactly {sorted(admission.expected_missing)} ({admission.reason})"
+    )
+
+
+@pytest.mark.parametrize("consumer", sorted(INCOMPLETE_CONSUMERS))
+def test_a_known_incomplete_consumer_is_still_incomplete(consumer):
+    """Fail when an admission gains a gap or its recorded gap is resolved."""
+    _assert_exact_admission_gap(consumer, _missing(consumer))
+
+
+def test_admission_gaps_name_known_consumers_and_applicable_artifacts():
+    for consumer, admission in INCOMPLETE_CONSUMERS.items():
+        assert consumer in CONSUMERS
+        assert admission.reason.strip()
+        assert admission.expected_missing
+        assert admission.expected_missing <= set(_applicable(consumer))
+
+
+@pytest.fixture
+def admission_exception(monkeypatch):
+    """Synthetic admission so the regression outlives the real rollout."""
+    monkeypatch.setitem(globals(), "INCOMPLETE_CONSUMERS", {
+        "newcomer": IncompleteConsumer(
+            expected_missing=frozenset({"expected.yml"}), reason="offline fixture"
+        )
+    })
+
+
+@pytest.mark.parametrize(
+    "check",
+    [
+        test_a_declared_consumer_carries_every_artifact_that_applies_to_it,
+        test_a_known_incomplete_consumer_is_still_incomplete,
+    ],
+)
+@pytest.mark.parametrize(
+    ("missing", "diagnostic"),
+    [
+        (
+            ["expected.yml", "unexpected.py"],
+            "unexpected missing artifacts.*unexpected.py",
+        ),
+        ([], "now tracks every artifact.*remove it"),
+    ],
+)
+def test_admission_exception_rejects_new_gaps_and_completed_adoptions(
+    admission_exception, monkeypatch, check, missing, diagnostic
+):
+    monkeypatch.setitem(globals(), "_missing", lambda _consumer: missing)
+    with pytest.raises(AssertionError, match=diagnostic):
+        check("newcomer")
+
+
+def test_admission_exception_accepts_only_the_recorded_gap(admission_exception, monkeypatch):
+    monkeypatch.setitem(
+        globals(), "_missing", lambda _consumer: ["expected.yml"]
+    )
+    with pytest.raises(pytest.skip.Exception, match="known-incomplete"):
+        test_a_declared_consumer_carries_every_artifact_that_applies_to_it("newcomer")
+    test_a_known_incomplete_consumer_is_still_incomplete("newcomer")
+
+
+def test_admission_exception_still_requires_its_ci_checkout(admission_exception, monkeypatch):
+    def unavailable(*_args, **_kwargs):
+        raise MechRootError("offline missing-root fixture")
+
+    monkeypatch.setenv(ROOTS_REQUIRED_VAR, "1")
+    monkeypatch.setitem(globals(), "resolve_mech_root", unavailable)
+    with pytest.raises(pytest.fail.Exception, match="every declared consumer must be"):
+        test_a_declared_consumer_carries_every_artifact_that_applies_to_it("newcomer")
 
 
 def test_each_consumers_env_var_is_the_name_the_audit_derives():

@@ -3,7 +3,7 @@
 CultureBotAI CLAW coordinates validation, curation, and shared tooling across
 the Mech repositories: CultureMech, MediaIngredientMech (MIM),
 CommunityMech, TraitMech, ProteinTraitsMech, AntibioticMech,
-CellStructureMech, HabitatMech, and NaturalProductMech.
+CellStructureMech, HabitatMech, NaturalProductMech, and TaxonMech.
 `src/kg_microbe_fleet/fleet.yaml` is the
 canonical definition of that fleet. It contains repository-aware plugins,
 file-based coordination, curation pipelines, shared Mech utilities, and fleet
@@ -144,7 +144,7 @@ uv run --extra dev mypy \
   cli/main.py plugins/repository_settings.py plugins/lock_manager.py \
   plugins/git_integration.py plugins/just_runner.py \
   src/kg_microbe_history src/kg_microbe_kgscan src/kg_microbe_fleet \
-  src/kg_microbe_research src/kg_microbe_write \
+  src/kg_microbe_merge_queue src/kg_microbe_research src/kg_microbe_write \
   src/kg_microbe_consistency src/kg_microbe_patches \
   src/kg_microbe_governance/__init__.py \
   src/kg_microbe_governance/__main__.py \
@@ -178,3 +178,14 @@ workspace/    gitignored runtime locks, tasks, reports, and caches
 
 See the [documentation index](docs/README.md) for longer guides and archived
 project history.
+
+### Merge queues
+
+`uv run kg-microbe-merge-queue check` inspects native queue readiness and policy
+across the manifest fleet and CLAW. The [merge queue guide](docs/guides/MERGE_QUEUES.md)
+covers planning, reviewed application, queue admission and rollout verification.
+
+When main requires the queue, merge an authorized PR with
+`gh pr merge <number> --match-head-commit <reviewed-sha>`. GitHub validates the
+combined commit; wait for the PR to report `MERGED` before cleaning up its branch.
+Queue admission and auto-merge scheduling are still pending work.

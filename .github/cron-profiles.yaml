@@ -8,20 +8,23 @@
 #     just cron-profiles             # list profiles, show the active one
 #     uv run python scripts/apply_cron_profile.py <name> --dry-run
 #
-# The applier rewrites ONLY the `on.schedule` block of each managed workflow.
-# Everything else — inputs, jobs, comments outside that block — is untouched.
+# The applier edits canonical workflow schedules and their manifest checksums.
+# Publish the reviewed claw commit, re-pin every consumer with governance sync,
+# then fleet-audit the committed mains. Local apply does not change deployed cron.
+# Inputs, jobs and comments outside the schedule block remain unchanged.
 #
 # `active` is written by the applier after every complete, non-dry-run change.
 # `--check-active` verifies it against the workflows. It starts at `off`
-# deliberately: no agent workflow exists yet, so the first one lands into a
-# fleet that is already dialled down.
+# deliberately: implemented agent workflows remain dispatch-only.
 #
 # Conventions:
 #   * A profile MUST name every managed workflow. The applier enforces this, so a
 #     profile cannot be half-configured — a missing key would silently leave a
 #     workflow on its old cadence, which is the failure mode this file exists to
 #     prevent.
-#   * Keys are the workflow file stem under .github/workflows/.
+#   * Keys are downstream workflow stems; targets resolve canonical artifact IDs.
+#   * Planned targets describe future cadence and are reported, never treated as
+#     implemented. Adding their workflow requires governance registration first.
 #   * Weekday/weekend splits use two entries: `* * 1-5` and `* * 0,6`.
 #   * An empty list REMOVES that workflow's schedule block, leaving manual
 #     workflow_dispatch intact.
@@ -38,6 +41,22 @@
 # agent, IS managed.
 
 active: "off"
+
+# Explicit deployment state avoids both vacuous success and blocking a working
+# agent because another workflow has not been implemented yet.
+targets:
+  pr-shepherd:
+    state: governed
+    artifact: pr_shepherd_workflow
+  issue-scanner:
+    state: planned
+    reason: Worker loop has not been implemented or admitted to governance.
+  knowledge-gap-triage:
+    state: planned
+    reason: Agent issue-filing step has not been implemented or admitted to governance.
+  stale-claim-sweep:
+    state: planned
+    reason: Stale-agent assignment loop has not been implemented or admitted to governance.
 
 profiles:
 
