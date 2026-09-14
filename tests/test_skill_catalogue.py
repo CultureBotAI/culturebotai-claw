@@ -262,6 +262,22 @@ def test_a_rendered_adapter_has_no_broken_reference(tmp_path, name, mech, adapte
     assert not broken, format_report(findings)
 
 
+def test_review_yaml_record_keeps_generated_records_read_only():
+    text = canonical_text("review-yaml-record")
+
+    assert "Review only maintained YAML records" not in text
+    assert "record is generated from a maintained table, overlay, or source transform" in text
+    assert "report the maintained upstream input that owns any future fix" in text
+
+
+def test_review_yaml_record_selects_documented_validators():
+    text = canonical_text("review-yaml-record")
+
+    assert "`justfile`" in text
+    assert "Do not invent a focused validator" in text
+    assert "narrowest documented validator" in text
+
+
 def test_the_adapter_reference_check_is_not_vacuous():
     """Guards the test above. A skill file with a path that exists in no
     repository must be reported broken; if it is not, that test is checking
