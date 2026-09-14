@@ -71,6 +71,9 @@ skills:
   onboard-mech:
     scope: fleet
     reason: Registers a verified Mech with complete capability decisions and coordinated governance.
+  fleet-pull:
+    scope: fleet
+    reason: Previews or fast-forwards current origin-tracking branches in manifest-resolved Mechs.
   metpo-aggregate:
     scope: fleet
     reason: >-
