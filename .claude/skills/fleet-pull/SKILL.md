@@ -67,6 +67,10 @@ scope. Do not add either implicitly.
   lock. Preserve the checkout and report the reason.
 - `not_configured`, `error`: coverage is incomplete; report the affected Mech.
 
+Error results retain the branch, upstream, initial HEAD and fetched target when
+those were observed. After a failed fetch or merge, `after: null` means the final
+HEAD was not verified; do not interpret it as proof that the checkout was unchanged.
+
 Exit `0` means all selected repositories were assessed successfully. Exit `1`
 means at least one was skipped or failed. Exit `2` means invalid invocation or
 configuration. JSON includes the full selected denominator and one result per

@@ -456,6 +456,12 @@ def test_fast_forward_does_not_overwrite_an_ignored_local_file(fleet: LocalFleet
     result = fleet.run(apply=True)
 
     assert result["status"] == "error"
+    assert result["branch"] == "main"
+    assert result["upstream"] == "refs/remotes/origin/main"
+    assert result["before"] == fleet.initial
+    assert result["target"] == remote
+    assert result["after"] is None
+    assert "| culturemech | main | error |" in fleet_pull.render_table([result])
     assert git(fleet.checkout, "rev-parse", "HEAD") == fleet.initial
     assert git(fleet.checkout, "rev-parse", "origin/main") == remote
     assert local_file.read_text() == "local ignored artifact\n"
@@ -543,6 +549,13 @@ def test_deleted_upstream_fails_without_merging_cached_commit(fleet: LocalFleet)
     result = fleet.run(apply=True)
 
     assert result["status"] == "error"
+    assert result["branch"] == "main"
+    assert result["upstream"] == "refs/remotes/origin/main"
+    assert result["remote_ref"] == "refs/heads/main"
+    assert result["before"] == fleet.initial
+    assert result["after"] is None
+    assert "target" not in result
+    assert "| culturemech | main | error |" in fleet_pull.render_table([result])
     assert git(fleet.checkout, "rev-parse", "HEAD") == fleet.initial
     assert not (fleet.checkout / "remote.txt").exists()
     assert fleet.locks.check_lock("culturemech") is None
@@ -570,10 +583,71 @@ def test_fetch_timeout_releases_lease_and_continues_other_repositories(
 
     assert [row["status"] for row in results] == ["error", "updated"]
     assert "timed out" in results[0]["detail"]
+    assert results[0]["branch"] == "main"
+    assert results[0]["upstream"] == "refs/remotes/origin/main"
+    assert results[0]["before"] == fleet.initial
+    assert results[0]["after"] is None
+    table = fleet_pull.render_table(results)
+    assert "| traitmech | main | error |" in table
+    assert table.index("| culturemech |") < table.index("| traitmech |")
     assert git(sibling, "rev-parse", "HEAD") == fleet.initial
     assert git(fleet.checkout, "rev-parse", "HEAD") == remote
     assert fleet.locks.check_lock("traitmech") is None
     assert fleet.locks.check_lock("culturemech") is None
+
+
+@pytest.mark.parametrize("failure", ["merge_error", "postcheck_timeout"])
+def test_failure_after_merge_retains_initial_state_without_claiming_final_head(
+    fleet: LocalFleet, monkeypatch: pytest.MonkeyPatch, failure: str
+):
+    sibling = fleet.checkout.parent / "sibling"
+    git(fleet.checkout.parent, "clone", str(fleet.origin), str(sibling))
+    fleet.settings.paths["traitmech"] = sibling
+    remote = fleet.publish()
+    original_run = fleet_pull.Git.run
+
+    def fail_after_real_merge(self, *args, **kwargs):
+        output = original_run(self, *args, **kwargs)
+        if args[0] == "merge" and self.root == sibling:
+            if failure == "merge_error":
+                raise fleet_pull.GitError("git merge failed after updating HEAD")
+            # Exercise the real shared-deadline check at the post-merge read.
+            self.deadline = 0
+        return output
+
+    monkeypatch.setattr(fleet_pull.Git, "run", fail_after_real_merge)
+
+    results = fleet_pull.run_fleet(
+        fleet.settings, ["traitmech", "culturemech"], apply=True, locks=fleet.locks
+    )
+
+    assert [row["status"] for row in results] == ["error", "updated"]
+    failed = results[0]
+    assert failed["branch"] == "main"
+    assert failed["upstream"] == "refs/remotes/origin/main"
+    assert failed["before"] == fleet.initial
+    assert failed["target"] == remote
+    assert failed["after"] is None
+    assert git(sibling, "rev-parse", "HEAD") == remote
+    assert (sibling / "remote.txt").read_text() == "remote\n"
+    assert git(fleet.checkout, "rev-parse", "HEAD") == remote
+    assert fleet.locks.check_lock("traitmech") is None
+    assert fleet.locks.check_lock("culturemech") is None
+
+
+def test_preview_comparison_failure_retains_inspected_state(fleet: LocalFleet):
+    git(fleet.checkout, "update-ref", "-d", "refs/remotes/origin/main")
+    before = git_files(fleet.checkout)
+
+    result = fleet.run()
+
+    assert result["status"] == "error"
+    assert result["branch"] == "main"
+    assert result["upstream"] == "refs/remotes/origin/main"
+    assert result["before"] == fleet.initial
+    assert result["after"] == fleet.initial
+    assert "| culturemech | main | error |" in fleet_pull.render_table([result])
+    assert git_files(fleet.checkout) == before
 
 
 @pytest.mark.parametrize("apply", [False, True])

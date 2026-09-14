@@ -129,34 +129,45 @@ def compare(git: Git, state: dict) -> dict:
 
 def update_one(settings, key: str, root: Path, *, timeout: float) -> dict:
     git = Git(root, timeout)
-    # Revalidate after acquiring the lock, not just at fleet discovery time.
-    if settings.get_target(key).path != root:
-        raise GitError("repository path changed during preflight")
-    before = inspect(git)
-    if before["status"] != "eligible":
-        return before
-    git.run("fetch", "--no-tags", "--no-recurse-submodules", "--no-write-fetch-head",
-            "--no-auto-maintenance", "--no-prune", "--refmap=", "origin",
-            "+" + before["remote_ref"] + ":" + before["upstream"])
-    # A non-cooperating process could edit files, change branch, or reconfigure
-    # tracking during fetch. Recheck before touching the working tree.
-    if settings.get_target(key).path != root:
-        raise GitError("repository path changed during fetch")
-    current = inspect(git)
-    if current["status"] != "eligible":
-        return current
-    if any(current.get(name) != before.get(name)
-           for name in ("before", "branch", "upstream", "remote_ref")):
-        raise GitError("HEAD, branch, or tracking changed during fetch; rerun")
-    current = compare(git, current)
-    if current["status"] != "would_update":
-        return current
-    git.run("merge", "--ff-only", "--no-squash", "--no-autostash",
-            "--no-overwrite-ignore", "--no-edit", "--no-stat", current["target"])
-    after = git.run("rev-parse", "--verify", "HEAD^{commit}")
-    if after != current["target"]:
-        raise GitError("HEAD differs from the fetched commit after fast-forward; inspect checkout")
-    return {**current, "status": "updated", "after": after}
+    state: dict = {}
+    try:
+        # Revalidate after acquiring the lock, not just at fleet discovery time.
+        if settings.get_target(key).path != root:
+            raise GitError("repository path changed during preflight")
+        before = inspect(git)
+        state = before.copy()
+        if before["status"] != "eligible":
+            return state
+        # Keep the inspected branch/HEAD even if a mutation fails. Its final
+        # HEAD is unknown until another successful observation, including when
+        # a command changes the checkout before failing or exhausting its deadline.
+        state["after"] = None
+        git.run("fetch", "--no-tags", "--no-recurse-submodules", "--no-write-fetch-head",
+                "--no-auto-maintenance", "--no-prune", "--refmap=", "origin",
+                "+" + before["remote_ref"] + ":" + before["upstream"])
+        # A non-cooperating process could edit files, change branch, or reconfigure
+        # tracking during fetch. Recheck before touching the working tree.
+        if settings.get_target(key).path != root:
+            raise GitError("repository path changed during fetch")
+        current = inspect(git)
+        state["after"] = current["before"]
+        if current["status"] != "eligible":
+            return current
+        if any(current.get(name) != before.get(name)
+               for name in ("before", "branch", "upstream", "remote_ref")):
+            raise GitError("HEAD, branch, or tracking changed during fetch; rerun")
+        state = compare(git, current)
+        if state["status"] != "would_update":
+            return state
+        state["after"] = None
+        git.run("merge", "--ff-only", "--no-squash", "--no-autostash",
+                "--no-overwrite-ignore", "--no-edit", "--no-stat", state["target"])
+        state["after"] = git.run("rev-parse", "--verify", "HEAD^{commit}")
+        if state["after"] != state["target"]:
+            raise GitError("HEAD differs from the fetched commit after fast-forward; inspect checkout")
+        return {**state, "status": "updated"}
+    except (RepositoryConfigurationError, GitError, OSError, ValueError) as exc:
+        return {**state, "status": "error", "detail": str(exc)}
 
 
 def run_fleet(settings, keys, *, apply=False, locks=None, timeout=60) -> list[dict]:
@@ -184,7 +195,9 @@ def run_fleet(settings, keys, *, apply=False, locks=None, timeout=60) -> list[di
             else:
                 git = Git(root, timeout)
                 state = inspect(git)
-                result.update(compare(git, state) if state["status"] == "eligible" else state)
+                result.update(state)
+                if state["status"] == "eligible":
+                    result.update(compare(git, state))
         except (RepositoryConfigurationError, GitError, OSError, ValueError) as exc:
             result.update(status="error", detail=str(exc))
         results.append(result)
