@@ -75,6 +75,14 @@ until the OpenClaw execution integration is implemented.
 
 ## Shared Mech tools
 
+Update local Mech checkouts with `just fleet-pull --apply`, or preview with
+`just fleet-pull`. The preview is offline and compares cached upstream refs.
+The updater fetches each clean current branch's existing `origin` upstream and
+fast-forwards it; dirty, detached, diverged, locked, and unconfigured repositories
+are reported individually. It preserves branch selection and local work.
+Use `--mech traitmech` to select a repository, or `--json` for a structured report.
+The Claude skill is `/fleet-pull`.
+
 `src/` is installed as part of this project. These equivalent module and
 console-script forms are available:
 

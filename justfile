@@ -420,6 +420,10 @@ inventory-unmapped:
 sync-kgm:
     uv run python scripts/sync_kgm_dependencies.py
 
+# Preview current Mech branches; pass --apply to fetch and fast-forward.
+fleet-pull *args:
+    uv run python scripts/fleet_pull.py {{args}}
+
 # Mapping-schema validators moved into kg-microbe at
 # mappings/validate_mapping_schema.py (lives next to the data it
 # gates). Invoke from the kg-microbe checkout:
