@@ -322,3 +322,13 @@ canonical:
       same task in every Mech. What differs -- the repository, its corpus
       globs, its schema, the variable naming its checkout -- comes from the
       manifest, which is exactly what a rendered adapter is for.
+  review-yaml-record:
+    capability: testing
+    reason: >-
+      ProteinTraitsMech had the only explicit record-review skill, and that
+      one samples records by axis and category rather than taking one named
+      target. Every testing-capable Mech curates YAML records and should have a
+      read-only skill for inspecting one record before a curation edit. The
+      testing capability is a stand-in until the manifest grows an exact
+      record-review capability (#316), matching the way fetch-source and
+      manage-identifiers select all current Mechs.
