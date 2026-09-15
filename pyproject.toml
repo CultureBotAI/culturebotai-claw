@@ -115,6 +115,8 @@ kg_microbe_governance = [
     "artifacts/**/*.yaml",
     "artifacts/**/*.yml",
     "artifacts/**/*.md",
+    "artifacts/embedding-runtime/pyproject.toml",
+    "artifacts/embedding-runtime/uv.lock",
 ]
 kg_microbe_config = ["openclaw_config.yaml"]
 kg_microbe_agents = ["definitions/**/*.yaml"]

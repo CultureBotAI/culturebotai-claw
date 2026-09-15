@@ -183,6 +183,51 @@
       "consumers": "all",
       "sha256": "3230756053abfa76afb6f65c3615106617273246a00598758d1b37ded82d687b",
       "mode": "0644"
+    },
+    {
+      "id": "semantic_text_pipeline",
+      "source": "src/kg_microbe_governance/artifacts/scripts/embedding_pipeline.py",
+      "target": "scripts/embedding_pipeline.py",
+      "consumers": "all",
+      "sha256": "7a149d1af6f8fd3152ded3c04ea156a675162dfc8e3753355cdc9efc8c2f1902",
+      "mode": "0644"
+    },
+    {
+      "id": "embedding_runtime_project",
+      "source": "src/kg_microbe_governance/artifacts/embedding-runtime/pyproject.toml",
+      "target": "conf/embedding-runtime/pyproject.toml",
+      "consumers": "all",
+      "sha256": "175bc6d551c039f01c0f7348ad6417a89a5f948377083355f07a73673a53c8b1",
+      "mode": "0644"
+    },
+    {
+      "id": "embedding_runtime_lock",
+      "source": "src/kg_microbe_governance/artifacts/embedding-runtime/uv.lock",
+      "target": "conf/embedding-runtime/uv.lock",
+      "consumers": "all",
+      "sha256": "c11077011f263fe174de5ae7a2cf176cf3fc6028e22c5c03847d4f9ae803edc5",
+      "mode": "0644"
+    },
+    {
+      "id": "embedding_runtime_guide",
+      "source": "src/kg_microbe_governance/artifacts/embedding-runtime/README.md",
+      "target": "conf/embedding-runtime/README.md",
+      "consumers": "all",
+      "sha256": "4b833edb2ffb81cb01c5bcac4c7940bb798976543a2059a914c8dfa4ed0202a6",
+      "mode": "0644"
+    },
+    {
+      "id": "graph_embedding_receipts",
+      "source": "src/kg_microbe_governance/artifacts/scripts/graph_embedding_receipts.py",
+      "target": "{package_path}/graph_embedding_receipts.py",
+      "consumers": [
+        "culturemech",
+        "mediaingredientmech",
+        "communitymech",
+        "traitmech"
+      ],
+      "sha256": "a05bd278bc09c3a9b4948da4cb27dd42105f8bca543d8b920d391142b5da8b37",
+      "mode": "0644"
     }
   ]
 }
