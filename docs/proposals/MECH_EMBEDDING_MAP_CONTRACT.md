@@ -59,9 +59,23 @@ with a small declared input limit; its files are inspected before expensive
 runs are expanded. Full migration is verified per Mech, not inferred from a
 successful template or a single canary.
 
+Each Mech fits its PaCMAP projection separately. Sharing the encoder does not
+align coordinates between maps; a cross-Mech overlay requires a joint
+projection of an explicitly declared combined corpus.
+
 Old graph-map coordinates retain their historical uncertainty. Fresh graph
 regeneration records the actual source file digest, vector mapping/proxy or
 synthetic status, coverage and reducer. A title is not evidence of the method
 used to generate old coordinates. Protein signature TF-IDF and Morgan chemical
 fingerprints keep those names; neither is described as a neural sequence or
 molecular language model.
+
+New governed artifacts follow the existing consumer-completeness gate: first
+land the reviewed consumer files while retaining the deployed canonical pin,
+then register those artifacts in CLAW, then update the fleet pins. Verify the
+candidate's governed payloads before the first phase. After the CLAW PR merges,
+resolve its actual main-reachable commit and verify its manifest and payloads
+against the reviewed candidate before using it as the shared release pin.
+The merge queue uses squash merges, so the draft branch SHA must not be assumed
+reachable from main. Coordinate the pin updates and finish with the fleet
+convergence audit. See tracking issues #426 and #434.
