@@ -247,7 +247,7 @@ with redirect_stdout(queue_help):
 assert "{plan,check,apply}" in queue_help.getvalue()
 assert default_config_path().is_relative_to(unpacked)
 governance = load_governance_manifest(fleet_manifest=manifest)
-assert len(governance.artifacts) == 16
+assert len(governance.artifacts) == 21
 assert load_pin_contract()["uv_version"]
 assert governance_main(["list", "--repository", "proteintraitsmech", "--json"]) == 0
 history_schema = Path(_default_schema_path()).resolve()
