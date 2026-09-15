@@ -402,6 +402,37 @@ def test_invalid_projection_cannot_publish(populated, tmp_path, profile, coordin
     assert not (output / "current.json").exists()
 
 
+def test_current_bundle_rejects_renamed_generation(populated, tmp_path, profile):
+    source, cache, _ = populated
+    output = tmp_path / "site"
+    publish(source, cache, output, profile)
+    active = pipeline.current_bundle(output)
+    renamed = output / ("0" * 64)
+    assert renamed != active
+    active.rename(renamed)
+    pointer = json.loads((output / "current.json").read_text())
+    pipeline.atomic_json(output / "current.json", {**pointer, "bundle": renamed.name})
+
+    with pytest.raises(pipeline.ContractError, match="immutable generation"):
+        pipeline.current_bundle(output)
+
+
+@pytest.mark.parametrize("target", ["pointer", "manifest", "bundle"])
+def test_current_bundle_rejects_symbolic_links(populated, tmp_path, profile, target):
+    source, cache, _ = populated
+    output = tmp_path / "site"
+    publish(source, cache, output, profile)
+    active = pipeline.current_bundle(output)
+    linked = {"pointer": output / "current.json",
+              "manifest": active / "manifest.json", "bundle": active}[target]
+    original = linked.with_name(linked.name + ".original")
+    linked.rename(original)
+    linked.symlink_to(original, target_is_directory=original.is_dir())
+
+    with pytest.raises(pipeline.ContractError, match="symbolic links?"):
+        pipeline.current_bundle(output)
+
+
 def test_current_pointer_and_artifact_tampering_are_rejected(populated, tmp_path, profile):
     source, cache, _ = populated
     output = tmp_path / "site"
@@ -839,7 +870,7 @@ def test_preflight_same_name_content_substitution_never_writes_site(deployable_b
     approved = pipeline.current_bundle(output).name
     alternate_generation(output, preserve_generation_name=True)
     destination = tmp_path / "pages/text-map"
-    with pytest.raises(pipeline.ContractError, match="immutable generation identity"):
+    with pytest.raises(pipeline.ContractError, match="immutable generation"):
         pipeline.stage_map(output, destination, input_path=source, expected_bundle=approved)
     assert not destination.parent.exists()
 

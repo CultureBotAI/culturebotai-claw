@@ -189,7 +189,7 @@
       "source": "src/kg_microbe_governance/artifacts/scripts/embedding_pipeline.py",
       "target": "scripts/embedding_pipeline.py",
       "consumers": "all",
-      "sha256": "7a149d1af6f8fd3152ded3c04ea156a675162dfc8e3753355cdc9efc8c2f1902",
+      "sha256": "9ef7708303150938c8f2c2a81885d9184ed0a7af0a78d9acc88c01224339b5fe",
       "mode": "0644"
     },
     {
