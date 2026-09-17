@@ -1,0 +1,53 @@
+version: 1
+scope: Primary claim evidence, not extraction provenance or strain-link provenance
+upstream: https://github.com/diatomsRcool/ecomech/blob/5d3f55467f3caaa6e88eb7f33037e4a8103873a7/src/ecomech/schema/ecomech.yaml
+supports:
+  SUPPORT: The cited evidence supports the attached claim.
+  REFUTE: The cited evidence contradicts the attached claim.
+  PARTIAL: The cited evidence supports only part of the claim or only under stated
+    conditions.
+  NO_EVIDENCE: The citation provides no relevant evidence for the attached claim;
+    not proof of a negative result.
+  WRONG_STATEMENT: The attached claim was assessed as incorrect; retain the assessment
+    and its explanation.
+evidence_source:
+  FIELD_STUDY: Observation or measurement made in a natural system.
+  MESOCOSM: Experiment in a controlled enclosure representing a natural system.
+  LABORATORY: Controlled laboratory study; use IN_VITRO or IN_VIVO when that distinction
+    is known.
+  IN_VITRO: Experiment outside an intact organism, such as a culture or biochemical
+    assay.
+  IN_VIVO: Experiment or observation in an intact living organism.
+  COMPUTATIONAL: Model, simulation, prediction, or computational analysis providing
+    the cited evidence.
+  META_ANALYSIS: Systematic synthesis or quantitative analysis of results across studies.
+  REVIEW: Narrative review or expert synthesis of published work.
+  REMOTE_SENSING: Satellite, aerial, or other remotely sensed observations.
+  LONG_TERM_MONITORING: Repeated observations from a long-term monitoring programme.
+  EXPERT_OPINION: Expert judgement or consensus rather than a primary experimental
+    result.
+  DATABASE: Assertion or observation obtained from a database or curated data resource.
+  OTHER: A known study or data-source type outside these categories; explain it in
+    notes or explanation.
+classes:
+  culturemech:
+  - EvidenceItem
+  mediaingredientmech:
+  - MappingEvidence
+  - ComponentEvidence
+  communitymech:
+  - EvidenceItem
+  traitmech:
+  - EvidenceItem
+  proteintraitsmech:
+  - EvidenceItem
+  antibioticmech:
+  - EvidenceItem
+  cellstructuremech:
+  - EvidenceItem
+  habitatmech:
+  - EvidenceItem
+  naturalproductmech:
+  - EvidenceItem
+  taxonmech:
+  - EvidenceItem
