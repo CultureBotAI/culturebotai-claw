@@ -71,3 +71,41 @@ scientific records or graph assertions are changed. Curators should fill these
 fields only after reading the source in the context of its attached claim.
 Omission remains unassessed. Consumers must check the assessment before treating
 a citation as positive support; the number of citations is not a support score.
+
+## Implementation PRs and validation
+
+The implementation is staged in the following PRs; opening a PR does not mean
+it has been merged or deployed.
+
+| Repository | PR | Local validation |
+| --- | --- | --- |
+| culturemech | [#481](https://github.com/CultureBotAI/CultureMech/pull/481) | 39 assessment tests; 6 generated-artifact tests; all 15,878 records pass strict validation and unique ID checks |
+| mediaingredientmech | [#692](https://github.com/CultureBotAI/MediaIngredientMech/pull/692) | 138 assessment and schema tests pass |
+| communitymech | [#937](https://github.com/CultureBotAI/CommunityMech/pull/937) | 39 assessment tests including generated-model serialization pass |
+| traitmech | [#973](https://github.com/CultureBotAI/TraitMech/pull/973) | 41 assessment/validator/writer tests and all 630 records pass strict validation; Pydantic roundtrip passes |
+| proteintraitsmech | [#714](https://github.com/CultureBotAI/proteintraitsmech/pull/714) | 51 assessment/validator tests and Pydantic roundtrip pass |
+| antibioticmech | [#401](https://github.com/CultureBotAI/AntibioticMech/pull/401) | 35 assessment/writer tests pass; 1 corpus-dependent test skipped |
+| cellstructuremech | [#1126](https://github.com/CultureBotAI/CellStructureMech/pull/1126) | 49 assessment/writer tests pass; 1 corpus-dependent test skipped |
+| habitatmech | [#337](https://github.com/CultureBotAI/HabitatMech/pull/337) | 35 assessment/writer tests and schema history validation pass; 1 corpus-dependent test skipped |
+| naturalproductmech | [#165](https://github.com/CultureBotAI/NaturalProductMech/pull/165) | 39 assessment/writer tests pass |
+| taxonmech | [#73](https://github.com/CultureBotAI/TaxonMech/pull/73) | 68 tests pass; 13 baseline failures reproduced; 1 corpus-dependent test skipped |
+
+Across the ten repositories, **311 new assessment tests pass**. They cover all
+allowed values, existing requiredness, omission without defaults, invalid inputs,
+closed-schema rejection of unknown fields and compatibility with shared quote
+locations. CultureMech and CommunityMech also exercise the tracked generated
+models for every source type. Generated artifacts use each repository's locked
+LinkML toolchain. TraitMech and ProteinTraitsMech Pydantic models were generated
+for smoke checks without committing ignored build outputs.
+
+A whole-schema comparison against each checkout's original main commit verifies
+that removing the intended additions yields the original schema exactly.
+No vendored shared schema or scientific record changed. Ruff and whitespace
+checks pass. Corpus-dependent skips reflect intentionally sparse test checkouts;
+this is not a claim that every full fleet corpus gate ran locally.
+
+TaxonMech's 13 unrelated failures reproduce against its untouched baseline
+`be6b63fad5d5ff9cb9629d4332bbaf6e721e9c83`. Its strain/genome fixtures use
+`1970-01-01T00:00:00Z`, which the existing `^20[0-9]{2}-` timestamp pattern rejects.
+All new claim-evidence tests pass. These historical-date tests and the shared
+timestamp contract are outside this change.
