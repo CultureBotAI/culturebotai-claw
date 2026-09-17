@@ -109,3 +109,11 @@ TaxonMech's 13 unrelated failures reproduce against its untouched baseline
 `1970-01-01T00:00:00Z`, which the existing `^20[0-9]{2}-` timestamp pattern rejects.
 All new claim-evidence tests pass. These historical-date tests and the shared
 timestamp contract are outside this change.
+
+CultureMech's ontology-label gate checked the normalized records successfully
+and initially reported one missing required generated SSSOM product. Regenerating
+that product yielded 1,915 mapping rows. Re-running the same maintained validator
+on the previously missing SSSOM target passed (1,820 canonical matches, 2 accepted
+exceptions and 2,008 non-ontology identifiers skipped by configured policy).
+The normalized record check reported 53 existing non-blocking plausibility
+warnings. The generated mapping artifact remains ignored and uncommitted.
