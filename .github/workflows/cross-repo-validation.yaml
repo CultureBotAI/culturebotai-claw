@@ -17,6 +17,7 @@ on:
 permissions:
   contents: read
   issues: write   # to open follow-up issues on failure
+  actions: read   # to name the step that failed in that issue (see below)
 
 concurrency:
   group: cross-repo-validation
@@ -145,9 +146,42 @@ jobs:
           script: |
             const today = new Date().toISOString().slice(0, 10);
             const title = `Cross-repo validation failed (${today})`;
+            // Report WHICH step failed; do not guess WHY. This body used to
+            // assert "a snippet in MIM evidence does not match its cached
+            // PubMed abstract" as the likely cause of every failure. In #376
+            // the run had died importing python-dotenv before reading a
+            // record, and four notices carried that sentence while the name
+            // of the failing step -- which the run knows -- went unprinted.
+            let where =
+              "No step reported a failure conclusion; read the run log directly.";
+            try {
+              const { data: listing } = await github.rest.actions.listJobsForWorkflowRun({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: context.runId,
+              });
+              const failed = listing.jobs
+                .flatMap((job) => (job.steps || []).map((step) => ({ job, step })))
+                .filter(({ step }) => step.conclusion === "failure")
+                .map(({ job, step }) => `\`${job.name}\` -> \`${step.name}\``);
+              if (failed.length) {
+                where = `Failed step(s): ${failed.join(", ")}.`;
+              }
+            } catch (error) {
+              // Naming the step is a nicety; opening the issue is the point.
+              // #376 ran four days on a misleading body. On a dropped scope or
+              // a rate limit it would otherwise run silently on no body at all,
+              // which is strictly worse.
+              where =
+                `Could not list this run's steps (${error.message}); read the run log directly.`;
+            }
             const body = `Daily cross-repo validation failed in [run #${context.runNumber}](${context.payload.repository.html_url}/actions/runs/${context.runId}).\n\n` +
-              `Likely cause: a snippet in MIM evidence does not match its cached PubMed abstract, or another validator gate.\n\n` +
-              `Inspect the workflow artifacts for the per-row TSV/MD reports.`;
+              `${where}\n\n` +
+              `This job runs three independent gates -- evidence-reference validation, ` +
+              `the unmapped-ingredient inventory, and the skill-reference check -- plus ` +
+              `its own environment setup. Read that step's log before assuming a data ` +
+              `finding. Reports are uploaded as artifacts on every run that was not ` +
+              `cancelled.`;
             const { data: issues } = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
