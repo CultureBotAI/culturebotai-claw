@@ -606,7 +606,7 @@ def _row_from_yaml(
     `backfill_parent_terms.py`) emit TWO rows so downstream consumers
     keep both joins:
 
-      Row A (parent):   subject → ontology parent  (skos:narrowMatch)
+      Row A (parent):   subject → ontology parent  (skos:broadMatch)
       Row B (registry): subject → identifier       (skos:exactMatch)
 
     Returns [] for records with no supported ontology_id prefix.
@@ -927,8 +927,12 @@ def _row_from_yaml(
                 "source": parent_row["source"],
                 "mapping_date": parent_row["mapping_date"],
                 "confidence": "0.99",
+                # The predicate word comes from the parent row itself. It was
+                # a literal "narrowMatch", which went stale on 128 published
+                # rows the moment the parent predicate moved (MIM#390).
                 "comment": (f"Registry/identity row (Rule B1) for "
-                            f"narrowMatch subject; kg-microbe primary id "
+                            f"{parent_row['predicate_id'].split(':', 1)[-1]} "
+                            f"subject; kg-microbe primary id "
                             f"{kgm_curie} alongside parent {obj_id}."),
                 # The parent row is asymmetric, so this registry row is the
                 # only place the subject's CAS can reach a KG synonym.
