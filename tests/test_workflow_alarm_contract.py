@@ -65,7 +65,11 @@ _LITERAL = re.compile(
 )
 _OPENS_AN_ISSUE = re.compile(r"github\.rest\.issues\.(?:create|createComment)\b")
 _INTERPOLATION = re.compile(r"\$\{(?P<name>[A-Za-z_]\w*)")
-_ASSIGNMENT = re.compile(r"(?:^|[;{\s])(?P<name>[A-Za-z_]\w*)\s*=(?!=)")
+# `(?![=>])` excludes both `==` and the parameter of a bare arrow function:
+# `step => step` assigns nothing, and counting it would let the alarm report
+# a name it never measured -- the #286 vacuity, inside a test written to
+# prevent one.
+_ASSIGNMENT = re.compile(r"(?:^|[;{\s])(?P<name>[A-Za-z_]\w*)\s*=(?![=>])")
 
 
 def _workflows() -> dict[str, dict]:
@@ -147,6 +151,22 @@ def calls_outside_try(script: str, namespaces: set[str]) -> list[str]:
     return loose
 
 
+def measured_names(script: str) -> set[str]:
+    """Names the `try` assigned: what the script knows only because it ran."""
+    return {
+        match.group("name")
+        for start, end in try_spans(script)
+        for match in _ASSIGNMENT.finditer(script[start:end])
+    }
+
+
+def reported_names(script: str) -> set[str]:
+    """Names interpolated into the text written after the last `try`."""
+    spans = try_spans(script)
+    after = script[max(end for _, end in spans) :] if spans else script
+    return {match.group("name") for match in _INTERPOLATION.finditer(after)}
+
+
 def _alarms() -> list[tuple[str, str, str, dict]]:
     return [row for row in _script_steps() if _OPENS_AN_ISSUE.search(row[2])]
 
@@ -220,19 +240,34 @@ def test_an_alarm_reports_something_the_run_measured():
     is written after it, or the body is a constant however it is worded."""
     silent = []
     for workflow, step, script, _ in _alarms():
-        spans = try_spans(script)
-        if not spans:
+        if not try_spans(script):
             silent.append(f"{workflow} [{step}]: no try/catch, nothing is measured")
             continue
-        measured = {
-            match.group("name")
-            for start, end in spans
-            for match in _ASSIGNMENT.finditer(script[start:end])
-        }
-        after = script[max(end for _, end in spans) :]
-        reported = {match.group("name") for match in _INTERPOLATION.finditer(after)}
+        measured = measured_names(script)
+        reported = reported_names(script)
         if not measured & reported:
             silent.append(f"{workflow} [{step}]: measured {sorted(measured)}, "
                           f"reported {sorted(reported)}")
 
     assert not silent, "\n".join(silent)
+
+
+def test_an_arrow_parameter_is_not_mistaken_for_something_measured():
+    """A name the script never assigned must not enter the measured set, or the
+    test above passes on a body that reports nothing the run established."""
+    # `step` here is an arrow parameter preceded by a space, which is the
+    # position a name-then-`=` pattern mistakes for an assignment. An arrow
+    # inside a call -- `map(step => ...)` -- sits after `(` and is excluded by
+    # accident, so a fixture built from that spelling would pass either way.
+    script = (
+        "try {\n"
+        "  const listing = await github.rest.actions.listJobsForWorkflowRun();\n"
+        "  const label = step => step.name;\n"
+        "  listing.jobs.map(label);\n"
+        "} catch (error) { }\n"
+        "const body = `${step}`;\n"
+    )
+
+    assert measured_names(script) == {"listing", "label"}
+    assert reported_names(script) == {"step"}
+    assert not measured_names(script) & reported_names(script)
