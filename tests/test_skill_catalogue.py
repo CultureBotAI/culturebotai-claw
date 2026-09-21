@@ -282,6 +282,9 @@ def test_review_yaml_record_writes_timestamped_structured_markdown():
     text = canonical_text("review-yaml-record")
 
     assert "reports/yaml_record_review/<YYYYMMDDTHHMMSSZ>-<record-stem>.md" in text
+    assert "After resolving exactly one target and completing a review" in text
+    assert "Create `reports/yaml_record_review/` if it does not exist" in text
+    assert "without creating a report" in text
     assert "date -u +%Y%m%dT%H%M%SZ" in text
     assert "Do not overwrite or append to a prior review" in text
     assert "Use tables, bullets, or prose inside those headings" in text
