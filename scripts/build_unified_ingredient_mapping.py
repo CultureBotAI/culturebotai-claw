@@ -49,6 +49,42 @@ STRUCTURED_MIM_SYNONYM_MARKERS = (
     'properties:',
     'synonym source:',
 )
+REJECTIONS_PATH = Path('mappings/unified_mapping_rejections.tsv')
+
+
+def load_mapping_rejections(mim_root: Path, name_index: dict) -> dict:
+    """Read reviewed source-ID rejections; never infer them from prefix alone.
+
+    The ledger preserves the rejected source ID and its curation reason outside
+    the published identity columns. Older MIM checkouts may lack the ledger.
+    A present but malformed or stale ledger must fail rather than silently
+    republish the rejected ID.
+    """
+    path = mim_root / REJECTIONS_PATH
+    if not path.exists():
+        return {}
+    rejections = {}
+    with path.open(encoding='utf-8', newline='') as handle:
+        reader = csv.DictReader(handle, delimiter='\t')
+        columns = ['ingredient_name', 'rejected_id', 'mim_id', 'reason']
+        if reader.fieldnames != columns:
+            raise ValueError(f'{path}: expected columns {columns}')
+        for line, row in enumerate(reader, 2):
+            if None in row or any(not (row.get(c) or '').strip() for c in columns):
+                raise ValueError(f'{path}:{line}: incomplete rejection')
+            row = {k: v.strip() for k, v in row.items()}
+            key = (row['mim_id'], row['rejected_id'])
+            if key in rejections or ':' not in row['rejected_id']:
+                raise ValueError(f'{path}:{line}: duplicate or invalid rejection')
+            mim = name_index.get(_normalize(row['ingredient_name']))
+            if (not mim or mim['mim_id'] != row['mim_id']
+                    or mim['mapping_status'] not in ('MAPPED', 'REJECTED')
+                    or row['rejected_id'] == row['mim_id']):
+                raise ValueError(f'{path}:{line}: rejection disagrees with MIM identity')
+            if row['rejected_id'] in (mim['chebi_id'], mim['kg_microbe_node_id']):
+                raise ValueError(f'{path}:{line}: MIM still publishes the rejected ID')
+            rejections[key] = row['mim_id']
+    return rejections
 
 
 def _synonym_text(syn: object) -> str:
@@ -277,6 +313,9 @@ def _prefix(curie: str) -> str:
 def _published_ids(term_id: str, mim: dict | None) -> tuple[str, str]:
     """The (chebi_id, culturemech_term_id) a row publishes, MIM's ruling first.
 
+    ``build_unified_rows`` removes explicitly rejected source IDs before calling
+    this helper; the rules here apply to the remaining, unreviewed source IDs.
+
     This file is the source of truth for kg-microbe's ingredient groundings
     (priority 11 in its consolidator), and that consumer selects a row's
     primary with ``best_primary([chebi_id, culturemech_term_id, mim_id,
@@ -345,15 +384,14 @@ def build_unified_rows(
     name_index: dict,
     chebi_index: dict,
     ontology_index: dict,
+    rejections: dict | None = None,
 ) -> list:
     """
     Join CultureMech occurrences with MIM records.
 
-    CHEBI is the primary chemical identifier:
-      - CultureMech term.id (if CHEBI) → used directly as chebi_id
-      - MIM record → fallback source for chebi_id when CultureMech has
-        no CHEBI term (e.g. has FOODON, or is unmapped in CultureMech)
-      - mim_id → fallback identifier when no CHEBI is available at all
+    Reviewed source-ID rejections are applied before identifier lookup and
+    publication. Other IDs follow the existing MIM-ruling policy in
+    ``_published_ids``.
 
     Returns list of row dicts, sorted by occurrence count descending.
     """
@@ -362,7 +400,15 @@ def build_unified_rows(
 
     for name, info in occurrences.items():
         term_id = info['term_id']
+        named_mim = name_index.get(_normalize(name))
+        expected_id = (rejections or {}).get(((named_mim or {}).get('mim_id'), term_id))
+        if expected_id:
+            # Do not let a rejected source ID select another MIM record before
+            # the curated name can resolve (e.g. a real detergent record).
+            term_id = ''
         mim = resolve_mim_record(name, term_id, name_index, chebi_index, ontology_index)
+        if expected_id and (not mim or mim['mim_id'] != expected_id):
+            raise ValueError(f'{name}: rejected source ID has no matching curated identity')
 
         chebi_id, cm_term_id = _published_ids(term_id, mim)
 
@@ -521,12 +567,13 @@ def main():
 
     # Load MIM index
     name_index, chebi_index, ontology_index = load_mim_index(args.mim)
+    rejections = load_mapping_rejections(args.mim, name_index)
 
     # Scan CultureMech
     occurrences = scan_culturemech(args.culturemech)
 
     # Join
-    rows = build_unified_rows(occurrences, name_index, chebi_index, ontology_index)
+    rows = build_unified_rows(occurrences, name_index, chebi_index, ontology_index, rejections)
 
     # Print coverage report
     print_coverage_report(rows)

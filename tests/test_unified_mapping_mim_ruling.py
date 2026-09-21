@@ -15,6 +15,8 @@ import sys
 import textwrap
 from pathlib import Path
 
+import pytest
+
 _SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(_SCRIPTS))
 _SPEC = importlib.util.spec_from_file_location(
@@ -142,3 +144,77 @@ def test_write_tsv_uses_lf_line_endings(tmp_path):
     raw = output.read_bytes()
     assert b"\r" not in raw
     assert raw.count(b"\n") == 2
+
+
+def _ledger(tmp_path, rows):
+    path = tmp_path / b.REJECTIONS_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("ingredient_name\trejected_id\tmim_id\treason\n" + rows, encoding="utf-8")
+    return path
+
+
+@pytest.mark.parametrize("name,identity", [
+    ("Trypticase", "MICRO:0000175"), ("Bacto-tryptone", "MICRO:0000182"),
+])
+def test_reviewed_peptone_rejection_survives_a_rebuild(tmp_path, name, identity):
+    """Both active identity columns must omit the known-wrong detergent."""
+    rec = _mim(identity)
+    names = {b._normalize(name): rec}
+    _ledger(tmp_path, f"{name}\tCHEBI:78018\t{identity}\tReviewed detergent mismatch\n")
+    rejected = b.load_mapping_rejections(tmp_path, names)
+    rows = b.build_unified_rows(
+        {name: {"term_id": "CHEBI:78018", "count": 2, "example_media": ["CM:1"]}},
+        names, {}, {}, rejected,
+    )
+    assert rows[0]["chebi_id"] == rows[0]["culturemech_term_id"] == ""
+    assert rows[0]["mim_id"] == identity
+    assert rows[0]["occurrence_count"] == 2
+    assert rows[0]["example_media"] == "CM:1"
+
+
+def test_rejected_source_cannot_hijack_lookup_to_a_real_detergent(tmp_path):
+    """ID lookup normally wins over names; the rejection must run first."""
+    peptone, detergent = _mim("MICRO:0000182"), _mim("CHEBI:78018")
+    names = {"bacto-tryptone": peptone, "detergent": detergent}
+    _ledger(tmp_path, "Bacto-tryptone\tCHEBI:78018\tMICRO:0000182\tReviewed\n")
+    rejected = b.load_mapping_rejections(tmp_path, names)
+    info = {"term_id": "CHEBI:78018", "count": 1, "example_media": []}
+    rows = b.build_unified_rows(
+        {"Bacto-tryptone": info, "detergent": info}, names,
+        {"CHEBI:78018": detergent}, {"CHEBI:78018": detergent}, rejected,
+    )
+    assert rows[0]["mim_id"] == "MICRO:0000182"
+    assert rows[0]["chebi_id"] == rows[0]["culturemech_term_id"] == ""
+    assert rows[1]["mim_id"] == rows[1]["chebi_id"] == "CHEBI:78018"
+
+
+@pytest.mark.parametrize("rows", [
+    "Trypticase\tCHEBI:78018\tMICRO:wrong\tReviewed\n",
+    "Missing\tCHEBI:78018\tMICRO:0000175\tReviewed\n",
+    "Trypticase\tMICRO:0000175\tMICRO:0000175\tReviewed\n",
+    "Trypticase\tCHEBI:78018\tMICRO:0000175\t\n",
+    "Trypticase\tCHEBI:78018\tMICRO:0000175\tReviewed\textra\n",
+    "Trypticase\tCHEBI:78018\tMICRO:0000175\tReviewed\n" * 2,
+])
+def test_invalid_rejection_ledger_fails_closed(tmp_path, rows):
+    _ledger(tmp_path, rows)
+    with pytest.raises(ValueError):
+        b.load_mapping_rejections(tmp_path, {"trypticase": _mim("MICRO:0000175")})
+
+
+def test_older_mim_checkout_without_ledger_retains_existing_policy(tmp_path):
+    assert b.load_mapping_rejections(tmp_path, {}) == {}
+
+
+def test_reviewed_rejection_covers_synonyms_of_the_curated_identity(tmp_path):
+    """An alternative CultureMech label must not resurrect the same bad ID."""
+    rec = _mim("MICRO:0000182")
+    names = {"bacto-tryptone": rec, "bacto tryptone": rec}
+    _ledger(tmp_path, "Bacto-tryptone\tCHEBI:78018\tMICRO:0000182\tReviewed\n")
+    rejected = b.load_mapping_rejections(tmp_path, names)
+    rows = b.build_unified_rows(
+        {"Bacto Tryptone": {"term_id": "CHEBI:78018", "count": 1, "example_media": []}},
+        names, {}, {}, rejected,
+    )
+    assert rows[0]["mim_id"] == "MICRO:0000182"
+    assert rows[0]["chebi_id"] == rows[0]["culturemech_term_id"] == ""
