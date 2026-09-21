@@ -302,6 +302,53 @@ def test_review_yaml_record_writes_timestamped_structured_markdown():
         assert heading in text
 
 
+def test_review_yaml_category_resolves_cohorts_before_reporting():
+    text = canonical_text("review-yaml-category")
+
+    assert "Resolve at least one bounded, coherent target category" in text
+    assert "Record the selection rule for each cohort" in text
+    assert "Do not write a" in text
+    assert "report for an ambiguous or unbounded set" in text
+    assert "If the request needs disambiguation" in text
+    assert "without creating a report" in text
+
+
+def test_review_yaml_category_has_lump_and_split_boundary_review():
+    text = canonical_text("review-yaml-category")
+
+    assert "lump them before reviewing" in text
+    assert "split it into coherent cohorts" in text
+    assert "Lump and Split Review" in text
+    assert "Preserve legitimate variants" in text
+    assert "duplicate identities" in text
+    assert "over-broad groups" in text
+
+
+def test_review_yaml_category_writes_timestamped_structured_markdown():
+    text = canonical_text("review-yaml-category")
+
+    assert "reports/yaml_category_review/<YYYYMMDDTHHMMSSZ>-<category-slug>.md" in text
+    assert "After resolving at least one coherent target category" in text
+    assert "Create `reports/yaml_category_review/` if it does not exist" in text
+    assert "date -u +%Y%m%dT%H%M%SZ" in text
+    assert "Do not overwrite or append to a prior review" in text
+    assert "Use tables, bullets, or prose inside those headings" in text
+    assert "verdict must say `sampled`" in text
+    for heading in (
+        "## Target Category",
+        "## Selection and Membership",
+        "## Validation",
+        "## Lump and Split Review",
+        "## Identity and Grounding",
+        "## Evidence Patterns",
+        "## Completeness Patterns",
+        "## Findings",
+        "## Recommended Edits",
+        "## Follow-up Checks",
+    ):
+        assert heading in text
+
+
 def test_the_adapter_reference_check_is_not_vacuous():
     """Guards the test above. A skill file with a path that exists in no
     repository must be reported broken; if it is not, that test is checking
