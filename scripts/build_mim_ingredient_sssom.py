@@ -9,8 +9,10 @@ ENVO when populated) becomes one SSSOM row with:
   subject_id        MIM:<safe_stem>         -- stable per-YAML CURIE
   subject_label     preferred_term
   predicate_id      skos:exactMatch         -- default
-                    skos:narrowMatch        -- MIM is more specific than CHEBI
-                    skos:broadMatch         -- MIM is less specific than CHEBI
+                    skos:broadMatch         -- MIM is more specific; the object is
+                                               the broader parent (SKOS reading,
+                                               declared in the header; MIM#390)
+                    skos:narrowMatch        -- MIM is less specific than the object
                     skos:closeMatch         -- SYMMETRIC (both defensible)
   object_id         <CHEBI|FOODON|...>:X
   object_label      canonical rdfs:label from OAK/OLS (fallback: MIM label)
@@ -140,10 +142,12 @@ JUST_LEXICAL = "semapv:LexicalMatching"
 
 _PREDICATE_BY_CATEGORY = {
     # Residual-P2.5 buckets → SKOS predicates.
-    "CONSIDER_SPECIFIC": "skos:narrowMatch",  # we pick kg-microbe CHEBI which
-                                              # is *narrower* than the MIM
-                                              # generic → narrowMatch from the
-                                              # MIM subject's perspective.
+    "CONSIDER_SPECIFIC": "skos:narrowMatch",  # kg-microbe's CHEBI is *narrower*
+                                              # than the MIM generic, so this one
+                                              # IS narrowMatch under SKOS and did
+                                              # not move in MIM#390. Both branches
+                                              # below clear `cat`, so it is
+                                              # currently unreachable.
     "ENRICH_SYNONYM": "skos:exactMatch",
     "SYMMETRIC": "skos:closeMatch",
 }
@@ -602,7 +606,7 @@ def _row_from_yaml(
     `backfill_parent_terms.py`) emit TWO rows so downstream consumers
     keep both joins:
 
-      Row A (parent):   subject → ontology parent  (skos:narrowMatch)
+      Row A (parent):   subject → ontology parent  (skos:broadMatch)
       Row B (registry): subject → identifier       (skos:exactMatch)
 
     Returns [] for records with no supported ontology_id prefix.
@@ -661,9 +665,15 @@ def _row_from_yaml(
     if quality and quality not in EXACT_QUALITIES:
         predicate = "skos:closeMatch"
     # NARROW_MATCH (typically minted kgmicrobe.ingredient:* primaries)
-    # asserts the MIM term is narrower than the parent ontology term.
+    # asserts the MIM term is narrower than the parent ontology term, so the
+    # parent is the BROADER concept and the row is skos:broadMatch --
+    # `A skos:broadMatch B` asserts B is broader than A. This emitted
+    # skos:narrowMatch until MediaIngredientMech#390, which is the inverse
+    # relation (a sub-property of skos:narrower). The set declares
+    # `predicate_semantics: skos` in its header so consumers read it that way;
+    # kg-microbe treats absence as the legacy convention (kg-microbe#822).
     if quality == "NARROW_MATCH":
-        predicate = "skos:narrowMatch"
+        predicate = "skos:broadMatch"
     comment = ""
 
     # Residual-P2.5 override: the generator ran a specificity / symmetry
@@ -917,8 +927,12 @@ def _row_from_yaml(
                 "source": parent_row["source"],
                 "mapping_date": parent_row["mapping_date"],
                 "confidence": "0.99",
+                # The predicate word comes from the parent row itself. It was
+                # a literal "narrowMatch", which went stale on 128 published
+                # rows the moment the parent predicate moved (MIM#390).
                 "comment": (f"Registry/identity row (Rule B1) for "
-                            f"narrowMatch subject; kg-microbe primary id "
+                            f"{parent_row['predicate_id'].split(':', 1)[-1]} "
+                            f"subject; kg-microbe primary id "
                             f"{kgm_curie} alongside parent {obj_id}."),
                 # The parent row is asymmetric, so this registry row is the
                 # only place the subject's CAS can reach a KG synonym.
@@ -954,6 +968,7 @@ HEADER_YAML = f"""\
 # mapping_set_version: "{{version}}"
 # mapping_set_description: "Canonical MediaIngredientMech → ingredient-ontology mappings (CHEBI + FOODON; UBERON/ENVO when populated). One row per mapped MIM ingredient record. Per-row object_source distinguishes ontologies. Predicate is skos:exactMatch by default; narrowMatch/broadMatch/closeMatch where residual-P2.5 triage found a specificity or symmetry difference, or where mapping_quality != EXACT_MATCH. The `source` extension column records the upstream origin (MIM evidence + kg-microbe source pipeline, CHEBI only)."
 # mapping_date: "{{version}}"
+# predicate_semantics: skos
 # creator_id:
 #   - "orcid:0000-0001-8175-045X"
 # subject_source: "MIM:ingredients"

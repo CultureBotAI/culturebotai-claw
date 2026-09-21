@@ -202,14 +202,20 @@ def test_a_row_with_no_prior_stamp_is_absent_not_reset():
     assert (stamp, outcome) == (None, "absent")
 
 
-def test_narrow_match_to_a_different_parent_stays_narrow(tmp_path):
+def test_narrow_match_to_a_different_parent_stays_asymmetric(tmp_path):
     """NARROW_MATCH identity rows were already exactMatch and must stay so,
-    while the asymmetric parent row keeps its narrowMatch."""
+    while the parent row stays asymmetric.
+
+    The parent predicate is skos:broadMatch since MediaIngredientMech#390: a
+    record graded NARROW_MATCH is narrower, so its ontology parent is the
+    BROADER concept, and `A skos:broadMatch B` asserts exactly that. It emitted
+    skos:narrowMatch before, which under SKOS says the parent is narrower.
+    """
     rows = rows_for(tmp_path, stem="Thing", identifier="kgmicrobe.ingredient:thing",
                     ontology_id="CHEBI:17634", quality="NARROW_MATCH")
 
     assert next(r for r in rows
-                if r["object_id"] == "CHEBI:17634")["predicate_id"] == "skos:narrowMatch"
+                if r["object_id"] == "CHEBI:17634")["predicate_id"] == "skos:broadMatch"
     assert identity_row(rows, "kgmicrobe.ingredient:thing")["predicate_id"] == "skos:exactMatch"
 
 
@@ -378,3 +384,20 @@ def test_the_outcome_counts_sum_to_the_rows_considered():
     outcomes = builder.apply_replayed_stamps(rows, prior)
 
     assert sum(outcomes.values()) == 2, "the pre-stamped row is skipped, not counted"
+
+
+def test_the_header_declares_skos_predicate_semantics():
+    """kg-microbe reads the direction of every asymmetric row from this one
+    header line and treats its absence as the legacy inverted convention
+    (kg-microbe#822). Emitting broadMatch rows under a header without it would
+    invert every parent edge downstream, so the two ship together or not at all.
+
+    Top-level means `# key: value` with exactly one space after the `#` -- SSSOM
+    headers are nested YAML, and a nested key of this name is not the declaration.
+    """
+    header = builder.HEADER_TEMPLATE if hasattr(builder, "HEADER_TEMPLATE") else None
+    source = Path(builder.__file__).read_text(encoding="utf-8")
+    text = header if isinstance(header, str) else source
+    assert "\n# predicate_semantics: skos\n" in text
+    assert 'predicate = "skos:broadMatch"' in source
+    assert 'predicate = "skos:narrowMatch"' not in source
