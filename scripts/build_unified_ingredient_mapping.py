@@ -74,6 +74,27 @@ def _is_publishable_mim_synonym(syn: object) -> bool:
 # Step 1: Build MIM index (preferred_term + all synonyms → record)
 # ---------------------------------------------------------------------------
 
+def _mim_record_files(ingredients_dir: Path) -> list:
+    """MIM's per-record files: the direct ``*.yaml`` children of each category dir.
+
+    Not ``rglob``. MIM's ``save_yaml`` copies a record into a gitignored
+    ``backups/`` directory beside it before overwriting, so on any machine that
+    has edited records a recursive walk returns each edited record twice -- once
+    live, once stale. This builder loaded 2,962 "records" from a tree holding
+    2,951. The indexes below are first-writer-wins over sorted paths, and
+    ``backups/`` sorts after an uppercase stem but BEFORE a lowercase one from
+    ``c`` onward, so for those records the stale backup won and the published
+    snapshot depended on whether the machine that built it had local edits
+    (MediaIngredientMech#698).
+    """
+    if not ingredients_dir.is_dir():
+        return []
+    files = []
+    for category in sorted(p for p in ingredients_dir.iterdir() if p.is_dir()):
+        files.extend(sorted(category.glob('*.yaml')))
+    return files
+
+
 def load_mim_index(mim_root: Path) -> tuple[dict, dict, dict]:
     """
     Returns:
@@ -90,7 +111,7 @@ def load_mim_index(mim_root: Path) -> tuple[dict, dict, dict]:
 
     print("Loading MIM ingredient records...")
     count = 0
-    for yaml_file in sorted(ingredients_dir.rglob('*.yaml')):
+    for yaml_file in _mim_record_files(ingredients_dir):
         try:
             data = yaml.safe_load(yaml_file.read_text())
         except Exception:
