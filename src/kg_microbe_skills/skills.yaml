@@ -322,6 +322,17 @@ canonical:
       same task in every Mech. What differs -- the repository, its corpus
       globs, its schema, the variable naming its checkout -- comes from the
       manifest, which is exactly what a rendered adapter is for.
+  review-yaml-category:
+    capability: testing
+    reason: >-
+      The record reviewer handles exactly one YAML target. ProteinTraitsMech's
+      older sample reviewer exposed the next shared verb: resolve a category or
+      cohort, judge its member boundary, and decide which apparent duplicates
+      should be lumped or split before a curator edits anything. Every
+      testing-capable Mech has YAML record categories that need that read-only
+      cohort pass, and the testing capability is the same stand-in used by
+      review-yaml-record until the manifest grows an exact record-review
+      capability (#316).
   review-yaml-record:
     capability: testing
     reason: >-
