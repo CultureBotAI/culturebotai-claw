@@ -59,14 +59,10 @@ def test_unmapped_record_withholds_a_raw_id_that_would_win_by_default():
     assert b._published_ids("UBERON:0000955", _mim("UNMAPPED_0170", status="UNMAPPED")) == ("", "")
 
 
-def test_rejected_tombstone_carrying_the_winners_id_counts_as_a_ruling():
-    """Ca-pantothenate: the label was merged, its tombstone holds the salt's id (#358).
-
-    The builder already publishes that id as mim_id, so it must also win the
-    tie -- otherwise the 137-occurrence flagship case of #138 stays broken.
-    """
+def test_a_rejected_record_cannot_supply_a_published_identity():
+    """Merged labels must first resolve to a live representative (#463)."""
     chebi, cm = b._published_ids("CHEBI:29032", _mim("CHEBI:31345", status="REJECTED"))
-    assert chebi == "CHEBI:31345"
+    assert chebi == ""
     assert cm == ""
 
 

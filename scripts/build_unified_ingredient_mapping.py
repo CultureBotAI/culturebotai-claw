@@ -43,6 +43,8 @@ from plugins.ingredient_name_normalizer import canonicalize_hydrate  # noqa: E40
 
 DEFAULT_OUTPUT = Path('workspace/unified_ingredient_mapping.tsv')
 NON_PUBLISHABLE_MIM_SYNONYM_TYPES = {"REJECTED_LABEL"}
+NON_IDENTITY_MIM_STATUSES = {"UNMAPPED", "AMBIGUOUS", "REJECTED"}
+MIM_MERGE_ACTIONS = {"MERGED_INTO", "MERGED_INTO_EXISTING", "MERGED"}
 STRUCTURED_MIM_SYNONYM_MARKERS = (
     'cross-references:',
     'role:',
@@ -110,29 +112,47 @@ def _is_publishable_mim_synonym(syn: object) -> bool:
 # Step 1: Build MIM index (preferred_term + all synonyms → record)
 # ---------------------------------------------------------------------------
 
-def _mim_record_files(ingredients_dir: Path) -> list:
-    """MIM's per-record files: the direct ``*.yaml`` children of each category dir.
+def _is_mim_nonidentity(record: dict) -> bool:
+    return (
+        record.get('mapping_status') in NON_IDENTITY_MIM_STATUSES
+        or (record.get('mim_id') or '').startswith('UNMAPPED')
+    )
 
-    Not ``rglob``. MIM's ``save_yaml`` copies a record into a gitignored
-    ``backups/`` directory beside it before overwriting, so on any machine that
-    has edited records a recursive walk returns each edited record twice -- once
-    live, once stale. This builder loaded 2,962 "records" from a tree holding
-    2,951. The indexes below are first-writer-wins over sorted paths, and
-    ``backups/`` sorts after an uppercase stem but BEFORE a lowercase one from
-    ``c`` onward, so for those records the stale backup won and the published
-    snapshot depended on whether the machine that built it had local edits
-    (MediaIngredientMech#698).
+
+def _mim_merge_target(data: dict) -> str:
+    representative = (data.get('representative') or '').strip()
+    if representative:
+        return representative
+    # A reused ID alone does not distinguish a legacy merge from an invalid
+    # record. Legacy merges also record their disposition in curation history.
+    for event in reversed(data.get('curation_history', []) or []):
+        if event.get('action') in MIM_MERGE_ACTIONS:
+            return (data.get('identifier') or '').strip()
+        if event.get('new_status') == 'REJECTED':
+            return ''
+    return ''
+
+
+def _mim_record_files(ingredients_dir: Path) -> list:
+    """Read direct mapped/unmapped YAML, excluding backups and other directories.
+
+    MIM saves gitignored backups beside its records. A recursive walk can load
+    the stale copy first, making exports depend on the builder's local backups
+    (MediaIngredientMech#698, claw#463).
     """
     if not ingredients_dir.is_dir():
         return []
     files = []
-    for category in sorted(p for p in ingredients_dir.iterdir() if p.is_dir()):
-        files.extend(sorted(category.glob('*.yaml')))
+    for category in ('mapped', 'unmapped'):
+        files.extend(sorted((ingredients_dir / category).glob('*.yaml')))
     return files
 
 
 def load_mim_index(mim_root: Path) -> tuple[dict, dict, dict]:
     """
+    Load only direct mapped/unmapped records. Retired labels resolve through
+    live representatives; retired IDs and nested backups never supply identities.
+
     Returns:
         name_index: normalized_name → MIM record dict
         chebi_index: chebi_id → MIM record dict
@@ -144,10 +164,15 @@ def load_mim_index(mim_root: Path) -> tuple[dict, dict, dict]:
     name_index: Dict[str, dict] = {}
     chebi_index: Dict[str, dict] = {}
     ontology_index: Dict[str, dict] = {}
+    live_by_id: dict[str, tuple[dict, set[str]]] = {}
+    redirects: dict[str, set[str]] = {}
+    retired: list[dict] = []
+    name_records: list[tuple[dict, dict, set[str]]] = []
 
     print("Loading MIM ingredient records...")
     count = 0
-    for yaml_file in _mim_record_files(ingredients_dir):
+    yaml_files = _mim_record_files(ingredients_dir)
+    for yaml_file in yaml_files:
         try:
             data = yaml.safe_load(yaml_file.read_text())
         except Exception:
@@ -159,6 +184,19 @@ def load_mim_index(mim_root: Path) -> tuple[dict, dict, dict]:
         identifier = data.get('identifier', '').strip()
         if not preferred:
             continue
+        count += 1
+
+        if data.get('mapping_status') == 'REJECTED':
+            retired.append(data)
+            target = _mim_merge_target(data)
+            if identifier and target:
+                redirects.setdefault(identifier, set()).add(target)
+            continue
+
+        nonidentity = (
+            data.get('mapping_status') in NON_IDENTITY_MIM_STATUSES
+            or identifier.startswith('UNMAPPED')
+        )
 
         ont_mapping = data.get('ontology_mapping') or {}
         ontology_id = ont_mapping.get('ontology_id', '').strip()
@@ -167,7 +205,7 @@ def load_mim_index(mim_root: Path) -> tuple[dict, dict, dict]:
         # Collect distinct synonym surface forms: preferred_term, ontology_label,
         # and every publishable synonym_text.
         syn_set: set[str] = set()
-        if ontology_label and ontology_label.lower() != preferred.lower():
+        if not nonidentity and ontology_label and ontology_label.lower() != preferred.lower():
             syn_set.add(ontology_label)
         for syn in data.get('synonyms', []) or []:
             if not _is_publishable_mim_synonym(syn):
@@ -178,60 +216,95 @@ def load_mim_index(mim_root: Path) -> tuple[dict, dict, dict]:
             syn_set.add(txt)
 
         record = {
-            'mim_id': identifier,
+            # Preserve local UNMAPPED identifiers, but never publish a retained
+            # ontology ID as the identity of an explicitly unresolved record.
+            'mim_id': identifier if not nonidentity or identifier.startswith('UNMAPPED') else '',
             'preferred_term': preferred,
-            'chebi_id': identifier if identifier.startswith('CHEBI:') else '',
-            'cas_rn': (data.get('chemical_properties') or {}).get('cas_rn', ''),
-            'kg_microbe_node_id': data.get('kg_microbe_node_id', ''),
+            'chebi_id': identifier if not nonidentity and identifier.startswith('CHEBI:') else '',
+            'cas_rn': '' if nonidentity else (data.get('chemical_properties') or {}).get('cas_rn', ''),
+            'kg_microbe_node_id': '' if nonidentity else data.get('kg_microbe_node_id', ''),
             'mapping_status': data.get('mapping_status', ''),
             'synonyms': sorted(syn_set),
         }
-
-        # Index by normalized preferred_term
-        norm = _normalize(preferred)
-        if norm and norm not in name_index:
-            name_index[norm] = record
-
-        # Index synonyms
-        for syn in data.get('synonyms', []) or []:
-            if not _is_publishable_mim_synonym(syn):
-                continue
-            norm_syn = _normalize(_synonym_text(syn))
-            if norm_syn and norm_syn not in name_index:
-                name_index[norm_syn] = record
-
-        # Index by CHEBI (primary) and by any ontology ID (CHEBI, FOODON, ENVO).
-        #
-        # A live record always beats a tombstone. MIM's merge pattern gives the
-        # REJECTED loser the WINNER's identifier — that is deliberate, so
-        # downstream lookups on the loser still resolve — which means every merge
-        # puts two records on one id. These indexes used to be last-writer-wins,
-        # so whichever sorted later took the id, and for 18 CHEBI ids that was the
-        # tombstone. `Glucose` (2,120 CultureMech occurrences) was published as
-        # REJECTED because `Glucose_2.yaml` (the merged-away lowercase `glucose`)
-        # sorts after it. The identifier was right and the status was wrong, which
-        # is the worst shape for a consumer that filters on status.
-        #
-        # `name_index` above is already first-writer-wins and was unaffected.
-        def _prefer(index: Dict[str, dict], key: str) -> None:
-            prior = index.get(key)
-            if prior is None:
-                index[key] = record
-                return
-            prior_dead = prior.get('mapping_status') == 'REJECTED'
-            this_dead = record.get('mapping_status') == 'REJECTED'
-            if prior_dead and not this_dead:
-                index[key] = record
-
-        if record['chebi_id']:
-            _prefer(chebi_index, record['chebi_id'])
-
-        if ontology_id:
-            _prefer(ontology_index, ontology_id)
+        rejected_names = {
+            _normalize(_synonym_text(syn))
+            for syn in data.get('synonyms', []) or []
+            if isinstance(syn, dict)
+            and (syn.get('synonym_type') or '').strip().upper()
+            in NON_PUBLISHABLE_MIM_SYNONYM_TYPES
+        }
+        name_records.append((data, record, rejected_names))
         if identifier:
-            _prefer(ontology_index, identifier)
+            live_by_id.setdefault(identifier, (record, rejected_names))
 
-        count += 1
+        # An unresolved record may retain a parent ontology annotation, which
+        # is not an identity and must not answer lookups for that ontology ID.
+        if nonidentity:
+            continue
+        if record['chebi_id']:
+            chebi_index.setdefault(record['chebi_id'], record)
+        if ontology_id:
+            ontology_index.setdefault(ontology_id, record)
+        if identifier:
+            ontology_index.setdefault(identifier, record)
+
+    # New merges point at `representative`; documented legacy merges carry
+    # the winner's identifier. Resolve only to live records. Missing, cyclic,
+    # conflicting, or non-merge rejections remain identity-free refusals so
+    # the caller cannot reintroduce a retired ID through CultureMech fallback.
+    for data in retired:
+        target = _mim_merge_target(data)
+        resolved = None
+        seen: set[str] = set()
+        while target and target not in seen:
+            if target in live_by_id:
+                resolved = live_by_id[target]
+                break
+            seen.add(target)
+            candidates = redirects.get(target, set())
+            if len(candidates) != 1:
+                break
+            target = next(iter(candidates))
+
+        if resolved is None:
+            record = {
+                'mim_id': '', 'preferred_term': data['preferred_term'],
+                'chebi_id': '', 'cas_rn': '', 'kg_microbe_node_id': '',
+                'mapping_status': 'REJECTED', 'synonyms': [],
+            }
+            rejected_names = set()
+        else:
+            record, rejected_names = resolved
+        name_records.append((data, record, rejected_names))
+
+    # Active names come first, followed by aliases of resolved tombstones.
+    # Explicit nonidentities must survive competing synonyms, and a retired
+    # alias cannot undo a REJECTED_LABEL decision on its representative.
+    for data, record, rejected_names in name_records:
+        names = [data['preferred_term']]
+        names.extend(
+            _synonym_text(syn) for syn in data.get('synonyms', []) or []
+            if _is_publishable_mim_synonym(syn)
+        )
+        for name in names:
+            norm = _normalize(name)
+            if not norm or norm in rejected_names:
+                continue
+            prior = name_index.get(norm)
+            if prior is None or (_is_mim_nonidentity(record) and not _is_mim_nonidentity(prior)):
+                name_index[norm] = record
+
+    # Lookup exclusions must also hold in exported synonym columns, or a
+    # consumer could recreate a refused identity from another ingredient's row.
+    for _, record, rejected_names in name_records:
+        record['synonyms'] = [
+            synonym for synonym in record['synonyms']
+            if _normalize(synonym) not in rejected_names
+            and (
+                _is_mim_nonidentity(record)
+                or not _is_mim_nonidentity(name_index.get(_normalize(synonym), {}))
+            )
+        ]
 
     print(f"  {count} MIM records → {len(name_index)} name entries, "
           f"{len(chebi_index)} CHEBI, {len(ontology_index)} ontology IDs\n")
@@ -310,21 +383,22 @@ def resolve_mim_record(
     Find best MIM record for this ingredient name + optional term_id.
 
     Priority:
+      0. Explicit MIM nonidentity/refusal → no identity
       1. CultureMech CHEBI term.id → direct CHEBI index lookup
       2. Any CultureMech term.id (FOODON/ENVO) → ontology index lookup
       3. Name/synonym → name index lookup
     """
+    named = name_index.get(_normalize(name))
+    if named and _is_mim_nonidentity(named):
+        return named
+
     if term_id:
         if term_id in chebi_index:
             return chebi_index[term_id]
         if term_id in ontology_index:
             return ontology_index[term_id]
 
-    norm = _normalize(name)
-    if norm in name_index:
-        return name_index[norm]
-
-    return None
+    return named
 
 
 def _prefix(curie: str) -> str:
@@ -336,7 +410,6 @@ def _published_ids(term_id: str, mim: dict | None) -> tuple[str, str]:
 
     ``build_unified_rows`` removes explicitly rejected source IDs before calling
     this helper; the rules here apply to the remaining, unreviewed source IDs.
-
     This file is the source of truth for kg-microbe's ingredient groundings
     (priority 11 in its consolidator), and that consumer selects a row's
     primary with ``best_primary([chebi_id, culturemech_term_id, mim_id,
@@ -356,31 +429,24 @@ def _published_ids(term_id: str, mim: dict | None) -> tuple[str, str]:
       different value. A different-prefix disagreement is left as today: the
       consumer's tier ranking already decides it, and blanking would only
       erase provenance the curation queue (CultureMech#256) still needs.
-    - MIM deliberately UNMAPPED: MIM's ruling is "no identity". A raw column
+    - MIM explicitly UNMAPPED/AMBIGUOUS/REJECTED: MIM's ruling is "no identity". A raw column
       asserting one contradicts that and would win by default, since there is
       no corrected candidate at all. Both columns are withheld.
     - No MIM record: unchanged. CultureMech's term is the only opinion.
 
-    A REJECTED record counts as a ruling too. The index prefers a live record,
-    so a tombstone is only ever resolved when it is the sole match for the
-    label -- and MIM gives a merged loser the winner's identifier precisely so
-    that lookups on the loser still resolve (MediaIngredientMech#358). This
-    builder already publishes that identifier as the row's ``mim_id``; letting
-    a stale CultureMech id outrank it while trusting it as the identity would
-    be incoherent. On the 2026-09-06 baseline the MAPPED/UNMAPPED rules alone
-    left 5 of 28 defective rows, all tombstones, Ca-pantothenate (137
-    occurrences) among them.
+    The loader resolves documented merge labels to live representatives.
+    Rejected records without a live representative cannot assert an identity.
     """
     term_id = term_id or ''
     mim_id = (mim or {}).get('mim_id') or ''
     status = (mim or {}).get('mapping_status') or ''
     ruled = (
         bool(mim)
-        and status in ('MAPPED', 'REJECTED')
+        and status == 'MAPPED'
         and ':' in mim_id
         and not mim_id.startswith('UNMAPPED')
     )
-    refused = bool(mim) and mim_id.startswith('UNMAPPED')
+    refused = bool(mim) and _is_mim_nonidentity(mim)
 
     if refused:
         return '', ''
