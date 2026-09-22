@@ -133,6 +133,17 @@ def _mim_merge_target(data: dict) -> str:
     return ''
 
 
+def _identity_ontology_mapping(data: dict) -> dict:
+    """Only equivalence mappings supply identity aliases or alternate labels.
+
+    Missing quality preserves compatibility with older records. Explicit
+    broader, narrower, and approximate mappings cannot identify one child.
+    """
+    mapping = data.get('ontology_mapping') or {}
+    quality = (mapping.get('mapping_quality') or '').strip().upper()
+    return mapping if quality in ('', 'EXACT_MATCH', 'SYNONYM_MATCH', 'LEXICAL_MATCH') else {}
+
+
 def _mim_record_files(ingredients_dir: Path) -> list:
     """Read direct mapped/unmapped YAML, excluding backups and other directories.
 
@@ -198,7 +209,7 @@ def load_mim_index(mim_root: Path) -> tuple[dict, dict, dict]:
             or identifier.startswith('UNMAPPED')
         )
 
-        ont_mapping = data.get('ontology_mapping') or {}
+        ont_mapping = _identity_ontology_mapping(data)
         ontology_id = ont_mapping.get('ontology_id', '').strip()
         ontology_label = ont_mapping.get('ontology_label', '').strip()
 
@@ -275,7 +286,18 @@ def load_mim_index(mim_root: Path) -> tuple[dict, dict, dict]:
             rejected_names = set()
         else:
             record, rejected_names = resolved
+            old_id = (data.get('identifier') or '').strip()
+            if (not _is_mim_nonidentity(record) and old_id
+                    and old_id != record['mim_id'] and not old_id.startswith('UNMAPPED')):
+                record.setdefault('_retired_source_ids', set()).add(old_id)
         name_records.append((data, record, rejected_names))
+
+    # Every active label sharing the representative identity inherits its
+    # retired source IDs, including labels loaded as separate live records.
+    for _, record, _ in name_records:
+        canonical = live_by_id.get(record['mim_id'])
+        if canonical and '_retired_source_ids' in canonical[0]:
+            record['_retired_source_ids'] = canonical[0]['_retired_source_ids']
 
     # Active names come first, followed by aliases of resolved tombstones.
     # Explicit nonidentities must survive competing synonyms, and a retired
@@ -391,6 +413,8 @@ def resolve_mim_record(
     named = name_index.get(_normalize(name))
     if named and _is_mim_nonidentity(named):
         return named
+    if term_id in (named or {}).get('_retired_source_ids', ()):
+        return named
 
     if term_id:
         if term_id in chebi_index:
@@ -476,8 +500,8 @@ def build_unified_rows(
     """
     Join CultureMech occurrences with MIM records.
 
-    Reviewed source-ID rejections are applied before identifier lookup and
-    publication. Other IDs follow the existing MIM-ruling policy in
+    Retired primary IDs and reviewed source-ID rejections are applied before
+    identifier lookup and publication. Other IDs follow the existing MIM-ruling policy in
     ``_published_ids``.
 
     Returns list of row dicts, sorted by occurrence count descending.
@@ -488,6 +512,8 @@ def build_unified_rows(
     for name, info in occurrences.items():
         term_id = info['term_id']
         named_mim = name_index.get(_normalize(name))
+        if term_id in (named_mim or {}).get('_retired_source_ids', ()):
+            term_id = ''
         expected_id = (rejections or {}).get(((named_mim or {}).get('mim_id'), term_id))
         if expected_id:
             # Do not let a rejected source ID select another MIM record before
