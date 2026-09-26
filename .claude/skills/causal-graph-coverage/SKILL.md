@@ -101,17 +101,19 @@ uv run kg-microbe-graph coverage --all > workspace/causal_graph_coverage/fleet.j
 uv run kg-microbe-graph coverage --mech proteintraitsmech --sample 5000
 ```
 
-Every record is parsed, so the two large corpora dominate a fleet run:
-ProteinTraitsMech (about 430,000 records) took about three and a half minutes
-and TaxonMech (about 626,000) about nine and a half on 2026-09-25. `--sample N`
-reads the first N records in sorted order -- a different corpus, which the
-report marks `sampled: true` and `--summary` marks with `*` -- so use it to try
-a declaration, not to quote.
+Every record is parsed, so the two large corpora dominate a fleet run. A
+corpus of 5,000 records or more is parsed in `--jobs` processes (default: up to
+8), and the report is identical for any value: ProteinTraitsMech (about
+430,000 records) took 206 s in one process and 74 s in eight on 2026-09-25,
+TaxonMech (about 626,000) 560 s and 158 s.
+`--sample N` reads the first N records in sorted order -- a different corpus,
+which the report marks `sampled: true` and `--summary` marks with `*` -- so use
+it to try a declaration, not to quote.
 
 Exit codes: `0` report produced (or the Mech declares no graph model and the
 command printed why); `1` the report is **incomplete** — a record could not be
-read or did not have the declared shape (named under `unreadable` /
-`malformed`, and on stderr), or with `--all` a Mech could not be read or held
+read, held no document at all, or did not have the declared shape (named
+under `unreadable`, `empty` and `malformed`, and on stderr), or with `--all` a Mech could not be read or held
 no records at its globs (named under `unavailable`); `2` bad usage, an
 unresolvable or empty root for a single `--mech`, or a declaration the tool
 cannot apply. Do not quote a fraction from a run that exited `1` without saying
@@ -200,16 +202,22 @@ its own. In outline:
 When a kind of record genuinely takes no graph:
 
 1. Find the Mech's own statement of it — a schema enum description, a
-   curation playbook, a builder's skip rule. If there is none, the exemption is
-   a scientific decision for that Mech's curators, not for this report: file it
-   there as a question.
+   curation playbook, a documented policy. A builder that merely skips such
+   records is not one: ProteinTraitsMech's EC builder skips class-level EC
+   numbers while its backlog counts them as gaps (#470). If there is none, the
+   exemption is a scientific decision for that Mech's curators, not for this
+   report: file it there as a question.
 2. Express it as one rule in `exempt_when`, with the quotation in a comment
    beside it:
-   - `field=VALUE|OTHER` — the value, or any element of a list, is one of these
-   - `field~REGEX` — `re.search` on the value
+   - `field=VALUE|OTHER` — a value at the path is one of these
+   - `field~REGEX` — `re.search` on a value at the path (no surrounding
+     whitespace; write `\s`)
    - `path:GLOB` — the record's path, with record-glob semantics (`*` does not
-     cross a directory)
-   Prefer a field the curators set over a path or a label pattern.
+     cross a directory; a glob that reaches only directories is refused)
+   A dotted path reaches every element of every list on the way, so
+   `lineage.taxon_id=X` matches wherever X sits in the lineage. A boolean
+   matches `true`, `yes` or `on` in any case. Prefer a field the curators set
+   over a path or a label pattern.
 3. Run the report before and after. The rule's count, and `exempt.with_graph`,
    are the review evidence: a rule that exempts records carrying graphs is
    probably the wrong rule.

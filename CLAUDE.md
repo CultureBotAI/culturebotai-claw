@@ -361,7 +361,13 @@ not one the Mech names as mechanistic is coverage but is counted apart, since
 NONMECHANISTIC means different things in different Mechs. Graphs per record,
 per-record facet combinations, and `kg_microbe_graph.audit` findings (counted
 both as findings and as graphs) come with it. It reads the working tree; pass
-`--root` a `git archive origin/main` snapshot when the checkout lags.
+`--root` a `git archive origin/main` snapshot when the checkout lags. A large
+corpus is parsed in `--jobs` processes and the report is identical for any
+value.
+
+Every `kg-microbe-*` console script finds claw's checkout, and so its `.env`,
+through `kg_microbe_fleet.roots.claw_root()`, never `Path(__file__).parents[2]`,
+which points into the virtualenv once the package is installed from a wheel.
 
 `kg-microbe-source-queue check` judges a Mech's `curation/source_queue.tsv`:
 the eleven columns both existing queues share, one spelling per licence class,

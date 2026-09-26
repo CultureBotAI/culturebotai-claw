@@ -982,7 +982,7 @@ def test_a_malformed_record_makes_the_command_fail(tmp_path, capsys):
     assert main(["coverage", "--mech", "traitmech", "--root", str(root)]) == 1
     captured = capsys.readouterr()
     assert json.loads(captured.out)["malformed"]
-    assert "excluded 0 unreadable and 1 malformed" in captured.err
+    assert "excluded 0 unreadable, 0 empty and 1 malformed" in captured.err
 
 
 def test_one_mech_that_cannot_be_read_is_a_usage_failure(monkeypatch, tmp_path):
@@ -1048,3 +1048,115 @@ def test_a_sample_must_read_at_least_one_record(value):
     with pytest.raises(SystemExit) as raised:
         main(["coverage", "--mech", "traitmech", "--sample", value])
     assert raised.value.code == 2
+
+
+# --------------------------------------------------------------------------
+# Second review round (#480-#483)
+# --------------------------------------------------------------------------
+
+
+def _rich_corpus(tmp_path: Path) -> Path:
+    """A corpus exercising every counter, so a part left out of a merge shows."""
+    referencing = _graph("g", 1, "MECHANISTIC", graph_kind="ASSEMBLY")
+    referencing["nodes"][1]["grounding"] = "T:3"
+    referencing["nodes"][0]["grounding"] = "CHEBI:1"
+    referencing["nodes"].append({"node_id": "lonely", "node_type": "X", "grounding": "CHEBI:1"})
+    records: dict[str, object] = {
+        "data/a/1.yaml": {"identifier": "T:1", "status": "REVIEWED", "causal_graphs": [
+            referencing, _graph("h", 3, "NONMECHANISTIC", graph_kind="FUNCTION")]},
+        "data/a/2.yaml": {"identifier": "T:2", "status": "DEPRECATED",
+                          "causal_graphs": [_graph("g", 2, "MECHANISTIC")]},
+        "data/b/3.yaml": {"identifier": "T:3", "status": "PROPOSED"},
+        "data/b/4.yaml": {"identifier": "T:4", "causal_graphs": [
+            _graph("g", 0), _graph("g", 1, graph_kind="FUNCTION")]},
+        "data/b/5.yaml": {"identifier": "T:5", "causal_graphs": [_graph("e", 0)]},
+        "data/c/broken.yaml": "x: [unclosed\n",
+        "data/c/empty.yaml": "# nothing here\n",
+        "data/c/list.yaml": "- a\n",
+    }
+    for i in range(6, 40):
+        records[f"data/d/{i:02d}.yaml"] = {
+            "identifier": f"T:{i}", "status": "REVIEWED" if i % 3 else "PROPOSED",
+            "causal_graphs": [_graph("g", i % 7, "MECHANISTIC" if i % 2 else "NONMECHANISTIC",
+                                     graph_kind="ASSEMBLY" if i % 4 else "FUNCTION")] if i % 5 else [],
+        }
+    return _corpus(tmp_path, records)
+
+
+def test_a_parallel_walk_reports_exactly_what_one_process_does(tmp_path, monkeypatch):
+    import kg_microbe_graph.coverage as coverage
+
+    root = _rich_corpus(tmp_path)
+    config = _config(
+        scope_field="scope_status", mechanistic_scopes=["MECHANISTIC"],
+        graph_facets=["graph_kind"], anchor_node_types=["X"], duplicate_grounding_check=True,
+        record_id_field="identifier", exempt_when=["status=DEPRECATED"],
+        strata=["status", "@directory"],
+    )
+    sequential = collect("m", root, GLOBS, config).to_json()
+    monkeypatch.setattr(coverage, "PARALLEL_THRESHOLD", 0)
+    parallel = collect("m", root, GLOBS, config, jobs=3).to_json()
+
+    assert parallel == sequential
+    report = json.loads(sequential)
+    # The fixture must reach every part of the report, or equality proves little.
+    assert report["exempt"]["records"] and report["strata"] and report["empty"]
+    assert report["coverage"]["graphless_but_referenced_elsewhere"] == 1
+    assert {"DUPLICATE_GRAPH_ID", "ORPHAN_NODE"} <= set(report["structure"]["findings"])
+    assert report["graphs"]["facets"]["graph_kind"]["record_combinations"]
+
+
+def test_an_empty_file_is_named_empty_not_unreadable(tmp_path):
+    report = _report(tmp_path, {
+        "data/good.yaml": {"identifier": "A"},
+        "data/blank.yaml": "",
+        "data/comments.yaml": "# placeholder\n",
+        "data/broken.yaml": "x: [unclosed\n",
+    })
+    assert report["empty"] == ["data/blank.yaml", "data/comments.yaml"]
+    assert report["unreadable"] == ["data/broken.yaml"]
+    assert report["records"] == 1
+
+
+def test_a_file_holding_nothing_still_fails_the_command(tmp_path, capsys):
+    from kg_microbe_graph.__main__ import main
+
+    root = _traitmech_root(tmp_path, {"a.yaml": {"mapping_status": "REVIEWED"}, "b.yaml": ""})
+    assert main(["coverage", "--mech", "traitmech", "--root", str(root)]) == 1
+    assert "data/traits/b.yaml: holds no document" in capsys.readouterr().err
+
+
+def test_a_regex_with_surrounding_whitespace_is_refused():
+    """`label~ grouping` would require a literal leading space (#483)."""
+    with pytest.raises(CoverageConfigError, match="whitespace"):
+        ExemptionRule.parse("label~ grouping")
+    assert ExemptionRule.parse(r"label~\sgrouping").pattern is not None
+
+
+def test_a_path_rule_that_names_only_directories_is_refused(tmp_path):
+    root = _corpus(tmp_path, {"data/metpo/a.yaml": {"identifier": "A"}})
+    with pytest.raises(CoverageError, match="names directories"):
+        collect("m", root, GLOBS, _config(exempt_when=["path:data/metpo"]))
+
+
+@pytest.mark.parametrize("spelling", ["true", "True", "yes", "on"])
+def test_a_boolean_matches_any_spelling_yaml_reads_as_true(tmp_path, spelling):
+    report = _report(
+        tmp_path,
+        {"data/a.yaml": {"abstract": True}, "data/b.yaml": {"abstract": False}},
+        exempt_when=[f"abstract={spelling}"],
+    )
+    assert report["exempt"]["records"] == 1
+
+
+def test_a_dotted_rule_reaches_every_list_element_not_just_the_first(tmp_path):
+    """The metagenome marker sits somewhere in a lineage, not first (#483)."""
+    report = _report(
+        tmp_path,
+        {"data/metagenome.yaml": {"lineage": [
+            {"taxon_id": "NCBITaxon:1"}, {"taxon_id": "NCBITaxon:408169"}]},
+         "data/organism.yaml": {"lineage": [
+            {"taxon_id": "NCBITaxon:1"}, {"taxon_id": "NCBITaxon:2"}]}},
+        exempt_when=["lineage.taxon_id=NCBITaxon:408169"],
+    )
+    assert report["exempt"]["records"] == 1

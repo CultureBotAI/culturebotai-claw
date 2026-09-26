@@ -278,3 +278,33 @@ def test_the_corpus_is_globbed_once(tmp_path, monkeypatch):
     statistics.collect("m", root, ["d/*.yaml"], ["x"])
 
     assert calls["n"] == 1
+
+
+def test_an_empty_file_is_named_empty_and_still_excluded(tmp_path):
+    """It parses; it is simply not a record. Calling it unreadable sent a
+    reader looking for a syntax error that is not there (#481)."""
+    root = _corpus(tmp_path, {"d/a.yaml": {"x": 1}, "d/b.yaml": "", "d/c.yaml": "x: [\n"})
+    report = collect("m", root, ["d/*.yaml"])
+    assert report.empty == ["d/b.yaml"]
+    assert report.unreadable == ["d/c.yaml"]
+    assert report.records == 1
+
+
+def test_iter_records_keeps_its_old_contract_unless_asked(tmp_path):
+    from kg_microbe_corpus import EMPTY_DOCUMENT
+
+    root = _corpus(tmp_path, {"d/b.yaml": ""})
+    assert [r for _, r in iter_records(root, ["d/*.yaml"])] == [None]
+    assert [r for _, r in iter_records(root, ["d/*.yaml"], distinguish_empty=True)] == [
+        EMPTY_DOCUMENT
+    ]
+
+
+def test_an_empty_file_fails_the_command(tmp_path, monkeypatch, capsys):
+    import kg_microbe_corpus.__main__ as cli
+
+    root = _corpus(tmp_path, {"data/merge_yaml/merged/a.yaml": {"x": 1},
+                              "data/merge_yaml/merged/b.yaml": ""})
+    monkeypatch.setattr(cli, "resolve_mech_root", lambda key, **_: root)
+    assert cli.main(["report", "--mech", "culturemech"]) == 1
+    assert json.loads(capsys.readouterr().out)["empty"] == ["data/merge_yaml/merged/b.yaml"]

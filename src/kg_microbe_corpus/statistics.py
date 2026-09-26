@@ -46,11 +46,13 @@ from kg_microbe_corpus.loader import safe_loader, soundness
 # judge's second probe refuses any loader whose parse errors escape it.
 
 __all__ = [
+    "EMPTY_DOCUMENT",
     "CorpusError",
     "CorpusReport",
     "FieldStats",
     "collect",
     "iter_records",
+    "list_records",
     "resolve_value",
 ]
 
@@ -59,6 +61,20 @@ MAX_TOP_VALUES = 10
 
 class CorpusError(RuntimeError):
     """The corpus could not be read as declared."""
+
+
+class _EmptyDocument:
+    """A file that parses, and holds no document at all (#481)."""
+
+    def __repr__(self) -> str:
+        return "EMPTY_DOCUMENT"
+
+
+# What `iter_records(..., distinguish_empty=True)` yields for a file that
+# holds nothing: empty, or only whitespace and comments. It parsed fine, so
+# calling it unreadable sent a reader looking for a syntax error that is not
+# there; it is still not a record, and is still excluded from every count.
+EMPTY_DOCUMENT = _EmptyDocument()
 
 
 @dataclass(frozen=True)
@@ -85,6 +101,7 @@ class CorpusReport:
     records: int = 0
     bytes: int = 0
     unreadable: list[str] = field(default_factory=list)
+    empty: list[str] = field(default_factory=list)
     by_glob: dict[str, int] = field(default_factory=dict)
     fields: dict[str, FieldStats] = field(default_factory=dict)
     sampled: bool = False
@@ -123,6 +140,7 @@ class CorpusReport:
             "bytes": self.bytes,
             "sampled": self.sampled,
             "unreadable": sorted(self.unreadable),
+            "empty": sorted(self.empty),
             "by_glob": dict(sorted(self.by_glob.items())),
             "fields": {
                 name: stats.as_dict() for name, stats in sorted(self.fields.items())
@@ -186,19 +204,32 @@ def _paths_by_glob(root: Path, globs: Sequence[str]) -> dict[str, list[Path]]:
     return by_glob
 
 
+def list_records(root: Path, globs: Sequence[str]) -> list[Path]:
+    """Every record file, in the order `iter_records` reads them.
+
+    For a caller that divides the walk -- `kg-microbe-graph` parses in several
+    processes -- and must divide the same list, in the same order.
+    """
+    return [p for matches in _paths_by_glob(Path(root), globs).values() for p in matches]
+
+
 def iter_records(
     root: Path,
     globs: Sequence[str],
     *,
     sample: int | None = None,
     paths_by_glob: dict[str, list[Path]] | None = None,
+    distinguish_empty: bool = False,
 ) -> Iterator[tuple[Path, Any]]:
     """Yield (path, parsed) for each record, in a stable order.
 
     Sorted, so a sample is the same sample on every machine and the report can
     be diffed. A file that will not parse is yielded as None rather than
     raising: one broken record must not hide the statistics for the rest, and
-    the report names it.
+    the report names it. With `distinguish_empty`, a file that parses to no
+    document at all is yielded as `EMPTY_DOCUMENT` instead of None, so the
+    two can be named differently (#481); without it, both are None, as they
+    always were.
     """
     root = Path(root)
     # Accepting the caller's listing matters at scale: globbing and sorting
@@ -216,13 +247,15 @@ def iter_records(
     loader = safe_loader()
     for path in paths:
         try:
-            yield path, yaml.load(  # noqa: S506 - loader is judged, not guessed
+            parsed = yaml.load(  # noqa: S506 - loader is judged, not guessed
                 path.read_text(encoding="utf-8"), Loader=loader
             )
         # UnicodeDecodeError is a ValueError, not an OSError: without it one
         # non-UTF-8 file ended the walk instead of being named (#476).
         except (OSError, UnicodeDecodeError, yaml.YAMLError):
             yield path, None
+            continue
+        yield path, EMPTY_DOCUMENT if parsed is None and distinguish_empty else parsed
 
 
 def collect(
@@ -260,11 +293,14 @@ def collect(
         report.by_glob[pattern] = 0
 
     for path, record in iter_records(
-        root, globs, sample=sample, paths_by_glob=matched
+        root, globs, sample=sample, paths_by_glob=matched, distinguish_empty=True
     ):
         relative = path.relative_to(root).as_posix()
         report.bytes += path.stat().st_size
         report.by_glob[owner[path]] += 1
+        if record is EMPTY_DOCUMENT:
+            report.empty.append(relative)
+            continue
         if record is None:
             report.unreadable.append(relative)
             continue

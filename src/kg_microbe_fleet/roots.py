@@ -98,6 +98,40 @@ def looks_like(root: Path, package_path: str) -> bool:
     return (Path(root) / package_path).is_dir()
 
 
+def _is_claw_checkout(path: Path) -> bool:
+    return (path / "pyproject.toml").is_file() and (
+        path / "src" / "kg_microbe_fleet" / "fleet.yaml"
+    ).is_file()
+
+
+def claw_root(start: Path | None = None) -> Path:
+    """The claw checkout whose `.env` configures the fleet (#480).
+
+    Every `kg-microbe-*` console script used
+    `Path(__file__).resolve().parents[2]`, which is claw's root only while the
+    package runs from its source tree. Installed from a wheel, that is a
+    directory inside the virtualenv: claw's `.env` was never read, and a
+    fleet configured exactly as CLAUDE.md prescribes reported every Mech as
+    not configured.
+
+    So: the source checkout this package was imported from, when it is one --
+    which leaves every editable and development install exactly as it was --
+    and otherwise the working directory or the nearest ancestor that is a
+    claw checkout, which is how an installed command is run. Failing both,
+    the working directory: its `.env` lookup finds nothing, and the sibling
+    guess `resolve_mech_root` then makes is verified before it is used, so a
+    wrong answer here produces a refusal rather than work on the wrong tree.
+    """
+    packaged = Path(__file__).resolve().parents[2]
+    if _is_claw_checkout(packaged):
+        return packaged
+    here = (start or Path.cwd()).resolve()
+    for candidate in (here, *here.parents):
+        if _is_claw_checkout(candidate):
+            return candidate
+    return here
+
+
 # kg-microbe is a corpus this fleet reads, not a Mech, so the manifest has no
 # row for it and `resolve_mech_root` cannot answer for it. The resolution is
 # the same shape, so it lives here rather than being re-implemented by each

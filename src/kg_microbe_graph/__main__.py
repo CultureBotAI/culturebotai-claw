@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Sequence
 
 from kg_microbe_fleet import load_fleet_manifest
-from kg_microbe_fleet.roots import MechRootError, resolve_mech_root
+from kg_microbe_fleet.roots import MechRootError, claw_root, resolve_mech_root
 from kg_microbe_graph.coverage import (
     CAPABILITY,
     CoverageConfig,
@@ -21,7 +21,7 @@ from kg_microbe_graph.coverage import (
     collect,
 )
 
-CLAW_ROOT = Path(__file__).resolve().parents[2]
+CLAW_ROOT = claw_root()
 SNAPSHOT = "not a git checkout (a snapshot?)"
 MAX_NAMED = 5
 
@@ -113,14 +113,14 @@ SUMMARY_HEADER = (
 
 def _excluded(key: str, report: CoverageReport) -> str | None:
     """One stderr line naming what a report left out, or None."""
-    left_out = sorted(report.unreadable) + sorted(report.malformed)
+    left_out = report.excluded
     if not left_out:
         return None
     named = "; ".join(left_out[:MAX_NAMED])
     more = f"; and {len(left_out) - MAX_NAMED} more" if len(left_out) > MAX_NAMED else ""
     return (
-        f"{key}: excluded {len(report.unreadable)} unreadable and "
-        f"{len(report.malformed)} malformed record(s): {named}{more}"
+        f"{key}: excluded {len(report.unreadable)} unreadable, {len(report.empty)} "
+        f"empty and {len(report.malformed)} malformed file(s): {named}{more}"
     )
 
 
@@ -161,6 +161,11 @@ def main(argv: list[str] | None = None) -> int:
         "--summary", action="store_true",
         help="print a table instead of JSON",
     )
+    parser.add_argument(
+        "--jobs", type=_positive, default=min(8, os.cpu_count() or 1),
+        help="processes to parse a large corpus with (default: up to 8); the "
+             "report is identical for any value",
+    )
     args = parser.parse_args(argv)
     if args.root is not None and args.all:
         parser.error("--root names one checkout; use it with --mech")
@@ -191,7 +196,9 @@ def main(argv: list[str] | None = None) -> int:
         globs = list(mech.record_globs)
         print(f"{key}: reading {root.name} ({_revision(root, globs)})", file=sys.stderr)
         try:
-            reports[key] = collect(key, root, globs, config, sample=args.sample)
+            reports[key] = collect(
+                key, root, globs, config, sample=args.sample, jobs=args.jobs
+            )
         except CoverageError as exc:
             unavailable[key] = str(exc)
             continue
@@ -232,9 +239,7 @@ def main(argv: list[str] | None = None) -> int:
     # A record that could not be read or did not have the declared shape is
     # excluded from every count above, and a fleet run that skipped a Mech is
     # not the fleet: either way the numbers are incomplete, and say so.
-    incomplete = bool(unavailable) or any(
-        report.unreadable or report.malformed for report in reports.values()
-    )
+    incomplete = bool(unavailable) or any(report.excluded for report in reports.values())
     return 1 if incomplete else 0
 
 

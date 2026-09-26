@@ -53,15 +53,17 @@ codes (FRAGMENTED_GRAPH) otherwise read as comparable when they are not.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import re
 import statistics
 from collections import Counter
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from kg_microbe_corpus import iter_records, resolve_value
+from kg_microbe_corpus import EMPTY_DOCUMENT, iter_records, list_records, resolve_value
 from kg_microbe_corpus.loader import soundness
 from kg_microbe_graph.structure import Edge, Graph, Node, audit
 
@@ -87,6 +89,11 @@ UNSET = "<unset>"
 DIRECTORY_STRATUM = "@directory"
 MAX_TOP_PREDICATES = 10
 EDGE_BUCKETS = ((0, 0, "0"), (1, 1, "1"), (2, 4, "2-4"), (5, 9, "5-9"), (10, 19, "10-19"))
+# Below this many records a process pool costs more than it saves (#482).
+PARALLEL_THRESHOLD = 5_000
+CHUNKS_PER_JOB = 4
+TRUE_SPELLINGS = frozenset({"true", "yes", "on"})
+FALSE_SPELLINGS = frozenset({"false", "no", "off"})
 
 _FIELD = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$")
 _KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -116,14 +123,19 @@ class ExemptionRule:
     Three forms, and nothing else, so a typo is an error rather than a rule
     that quietly matches nothing:
 
-        field.path=A|B   the value at the path (or any element, when it is a
-                         list) equals one of the alternatives
-        field.path~REGEX the value matches the regular expression (re.search)
+        field.path=A|B   a value at the path equals one of the alternatives
+        field.path~REGEX a value at the path matches the expression (re.search)
         path:GLOB        the record's path matches GLOB, with the same
                          semantics as the manifest's record_globs
 
-    A dotted path follows `kg_microbe_corpus.resolve_value`, so a field means
-    the same thing here as in the corpus report.
+    A dotted path reaches *every* value it can: through every element of a
+    list on the way, and every element of a list at the end. That is
+    deliberately wider than `kg_microbe_corpus.resolve_value`, which takes the
+    first list element carrying the key (#483): whether a record is exempt is
+    a question any lineage entry or any tag can answer, and a rule that looked
+    only at the first would match or not depending on list order. A boolean
+    matches any usual spelling (`true`/`yes`/`on`), since YAML itself reads
+    all three as the same value.
     """
 
     text: str
@@ -157,6 +169,11 @@ class ExemptionRule:
                 f"exempt_when {text!r}: {name!r} is not a dotted field path"
             )
         if operator == "~":
+            if rest != rest.strip():
+                raise CoverageConfigError(
+                    f"exempt_when {text!r}: the pattern has surrounding whitespace, "
+                    f"which would have to match literally; write \\s if it should"
+                )
             try:
                 pattern = re.compile(rest)
             except re.error as exc:
@@ -178,10 +195,13 @@ class ExemptionRule:
         if self.kind == "path":
             return relative in globbed
         assert self.field is not None
-        value = resolve_value(record, self.field)
-        candidates = value if isinstance(value, list) else [value]
-        for candidate in candidates:
+        for candidate in _values_at(record, self.field.split(".")):
             if candidate is None or isinstance(candidate, (dict, list)):
+                continue
+            if self.kind == "equals" and isinstance(candidate, bool):
+                spellings = TRUE_SPELLINGS if candidate else FALSE_SPELLINGS
+                if any(value.lower() in spellings for value in self.values):
+                    return True
                 continue
             text = _scalar(candidate)
             if self.kind == "equals" and text in self.values:
@@ -189,6 +209,17 @@ class ExemptionRule:
             if self.kind == "matches" and self.pattern is not None and self.pattern.search(text):
                 return True
         return False
+
+
+def _values_at(node: Any, parts: Sequence[str]) -> list[Any]:
+    """Every value a dotted path reaches, through every list on the way."""
+    if isinstance(node, list):
+        return [value for element in node for value in _values_at(element, parts)]
+    if not parts:
+        return [node]
+    if isinstance(node, dict) and parts[0] in node:
+        return _values_at(node[parts[0]], parts[1:])
+    return []
 
 
 @dataclass(frozen=True)
@@ -557,6 +588,7 @@ class CoverageReport:
     sampled: bool = False
     records: int = 0
     unreadable: list[str] = field(default_factory=list)
+    empty: list[str] = field(default_factory=list)
     malformed: list[str] = field(default_factory=list)
     exempt_by_rule: dict[str, int] = field(default_factory=dict)
     exempt_with_graph: int = 0
@@ -585,6 +617,27 @@ class CoverageReport:
         return sum(self.exempt_by_rule.values())
 
     @property
+    def excluded(self) -> list[str]:
+        """Every file left out of every count, and why (#481)."""
+        return (
+            [f"{path}: unreadable" for path in sorted(self.unreadable)]
+            + [f"{path}: holds no document" for path in sorted(self.empty)]
+            + sorted(self.malformed)
+        )
+
+    def absorb(self, other: CoverageReport) -> None:
+        """Add another part of the same walk into this one.
+
+        Field by field and by type, so a counter added later cannot be left
+        out of the merge: the parallel walk is only correct if every field
+        is (#482).
+        """
+        for spec in dataclasses.fields(self):
+            if spec.name in _NOT_MERGED:
+                continue
+            setattr(self, spec.name, _merge(getattr(self, spec.name), getattr(other, spec.name)))
+
+    @property
     def eligible(self) -> int:
         return self.records - self.exempt
 
@@ -606,6 +659,7 @@ class CoverageReport:
             "definition": config.definition(),
             "records": self.records,
             "unreadable": sorted(self.unreadable),
+            "empty": sorted(self.empty),
             "malformed": sorted(self.malformed),
             "exempt": {
                 "records": self.exempt,
@@ -705,6 +759,24 @@ def _stratum_value(record: Mapping[str, Any], stratum: str, relative: str) -> st
     return _key(resolve_value(record, stratum))
 
 
+_NOT_MERGED = frozenset({"mech", "config", "sampled", "parser", "referenced_elsewhere"})
+
+
+def _merge(mine: Any, theirs: Any) -> Any:
+    if isinstance(mine, Counter):
+        mine.update(theirs)
+        return mine
+    if isinstance(mine, dict):
+        for key, value in theirs.items():
+            mine[key] = _merge(mine[key], value) if key in mine else value
+        return mine
+    if isinstance(mine, list):
+        return mine + theirs
+    if isinstance(mine, int) and not isinstance(mine, bool):
+        return mine + theirs
+    raise TypeError(f"no rule to merge {type(mine).__name__}")  # pragma: no cover
+
+
 def collect(
     mech: str,
     root: Path,
@@ -712,8 +784,15 @@ def collect(
     config: CoverageConfig,
     *,
     sample: int | None = None,
+    jobs: int = 1,
 ) -> CoverageReport:
-    """Walk one Mech's corpus and report its causal-graph coverage."""
+    """Walk one Mech's corpus and report its causal-graph coverage.
+
+    With `jobs` > 1 and a corpus large enough to repay it, the records are
+    parsed in that many processes, in contiguous chunks of the sorted
+    listing. Every count is a sum, so the report is identical either way;
+    TaxonMech's 626,000 records took nine and a half minutes in one (#482).
+    """
     root = Path(root)
     if not root.is_dir():
         raise CoverageError(f"{mech}: {root} is not a directory")
@@ -729,24 +808,86 @@ def collect(
         sampled=sample is not None,
         parser=("CSafeLoader" if sound else "SafeLoader", why),
     )
-    mechanistic_scopes = config.mechanistic_scopes
-    globbed = {
-        rule.text: {
-            path.relative_to(root).as_posix()
-            for path in root.glob(rule.glob)
-            if path.is_file()
-        }
-        for rule in config.exempt_when
-        if rule.kind == "path" and rule.glob is not None
-    }
+    globbed = _path_rule_matches(mech, root, config)
+    paths = list_records(root, globs)
+    if sample is not None:
+        paths = paths[:sample]
+
+    if jobs > 1 and len(paths) >= PARALLEL_THRESHOLD:
+        size = -(-len(paths) // (jobs * CHUNKS_PER_JOB))
+        chunks = [paths[i : i + size] for i in range(0, len(paths), size)]
+        with ProcessPoolExecutor(max_workers=jobs) as pool:
+            parts = list(pool.map(
+                _walk, *zip(*[(mech, root, chunk, config, globbed) for chunk in chunks])
+            ))
+    else:
+        parts = [_walk(mech, root, paths, config, globbed)]
+
     # Groundings seen in edge-bearing graphs, to ask afterwards whether a
-    # graphless record is modelled inside someone else's. A record with no
-    # edge-bearing graph cannot be the one referencing itself.
+    # graphless record is modelled inside someone else's -- across the whole
+    # corpus, so only after every part is in.
+    referenced: set[str] = set()
+    graphless_ids: list[str] = []
+    for part, part_referenced, part_graphless in parts:
+        report.absorb(part)
+        referenced |= part_referenced
+        graphless_ids += part_graphless
+
+    if not (report.records or report.excluded):
+        # Nothing at the declared globs is not an empty corpus: it is the wrong
+        # directory, or a Mech that moved its records. Reporting 0 of 0 as a
+        # completed read would hide that (#473).
+        raise CoverageError(
+            f"{mech}: no records at {', '.join(globs)} under {root}; is this "
+            f"the {mech} checkout?"
+        )
+    report.referenced_elsewhere = sum(1 for own in graphless_ids if own in referenced)
+    return report
+
+
+def _path_rule_matches(mech: str, root: Path, config: CoverageConfig) -> dict[str, set[str]]:
+    """The files each path rule names, globbed once.
+
+    A glob that reaches directories and no file can never match a record --
+    `path:data/metpo` for `path:data/metpo/*.yaml` -- so it is refused rather
+    than reported as a rule matching nothing (#483).
+    """
+    globbed: dict[str, set[str]] = {}
+    for rule in config.exempt_when:
+        if rule.kind != "path" or rule.glob is None:
+            continue
+        matches = list(root.glob(rule.glob))
+        files = {path.relative_to(root).as_posix() for path in matches if path.is_file()}
+        if not files and any(path.is_dir() for path in matches):
+            raise CoverageError(
+                f"{mech}: exempt_when {rule.text!r} names directories, never a "
+                f"record file; end the glob with the files, e.g. {rule.glob}/*.yaml"
+            )
+        globbed[rule.text] = files
+    return globbed
+
+
+def _walk(
+    mech: str,
+    root: Path,
+    paths: Sequence[Path],
+    config: CoverageConfig,
+    globbed: Mapping[str, set[str]],
+) -> tuple[CoverageReport, set[str], list[str]]:
+    """One contiguous part of the walk: a partial report, the groundings its
+    edge-bearing graphs carry, and the ids of its eligible graphless records."""
+    report = CoverageReport(mech=mech, config=config)
+    mechanistic_scopes = config.mechanistic_scopes
     referenced: set[str] = set()
     graphless_ids: list[str] = []
 
-    for path, record in iter_records(root, globs, sample=sample):
+    for path, record in iter_records(
+        root, (), paths_by_glob={"": list(paths)}, distinguish_empty=True
+    ):
         relative = path.relative_to(root).as_posix()
+        if record is EMPTY_DOCUMENT:
+            report.empty.append(relative)
+            continue
         if record is None:
             report.unreadable.append(relative)
             continue
@@ -817,16 +958,7 @@ def collect(
             if parsed.graph.edges:
                 referenced.update(parsed.groundings.values())
 
-    if not (report.records or report.unreadable or report.malformed):
-        # Nothing at the declared globs is not an empty corpus: it is the wrong
-        # directory, or a Mech that moved its records. Reporting 0 of 0 as a
-        # completed read would hide that (#473).
-        raise CoverageError(
-            f"{mech}: no records at {', '.join(globs)} under {root}; is this "
-            f"the {mech} checkout?"
-        )
-    report.referenced_elsewhere = sum(1 for own in graphless_ids if own in referenced)
-    return report
+    return report, referenced, graphless_ids
 
 
 def _measure(

@@ -4,13 +4,12 @@ from __future__ import annotations
 
 import argparse
 import sys
-from pathlib import Path
 
 from kg_microbe_fleet import load_fleet_manifest
-from kg_microbe_fleet.roots import MechRootError, resolve_mech_root
+from kg_microbe_fleet.roots import MechRootError, claw_root, resolve_mech_root
 from kg_microbe_writers.audit import WriterProfile, as_tsv, audit
 
-CLAW_ROOT = Path(__file__).resolve().parents[2]
+CLAW_ROOT = claw_root()
 
 
 def profile_for(settings) -> WriterProfile:
