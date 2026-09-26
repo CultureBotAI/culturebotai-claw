@@ -83,6 +83,14 @@ are reported individually. It preserves branch selection and local work.
 Use `--mech traitmech` to select a repository, or `--json` for a structured report.
 The Claude skill is `/fleet-pull`.
 
+Report how much of each corpus carries a causal graph with
+`uv run kg-microbe-graph coverage --all --summary`, or `--mech traitmech` for one
+Mech's full JSON. Records a Mech declares do not need a graph (deprecated
+records, relation carriers, concepts that are not habitats) are left out of the
+denominator and counted per rule; mechanistic graphs, graphs per record, and
+structural findings are reported beside the headline fraction. The Claude skill
+is `/causal-graph-coverage`.
+
 `src/` is installed as part of this project. These equivalent module and
 console-script forms are available:
 

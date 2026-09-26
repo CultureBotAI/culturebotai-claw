@@ -24,6 +24,7 @@ at least exist.
 from __future__ import annotations
 
 import os
+import sys
 from collections.abc import Mapping
 from io import StringIO
 from pathlib import Path
@@ -96,6 +97,63 @@ def looks_like(root: Path, package_path: str) -> bool:
     conventional path, which is what the bare fallback could not do.
     """
     return (Path(root) / package_path).is_dir()
+
+
+# Answered when no claw checkout can be found: a name that is never created,
+# so it holds no `.env` and no `.git` wherever the package is installed (#502).
+NO_CLAW_CHECKOUT = ".no-claw-checkout-found"
+
+
+def is_claw_checkout(path: Path) -> bool:
+    """Whether `path` is the top of a claw checkout."""
+    return (Path(path) / "pyproject.toml").is_file() and (
+        Path(path) / "src" / "kg_microbe_fleet" / "fleet.yaml"
+    ).is_file()
+
+
+def claw_root(start: Path | None = None) -> Path:
+    """The claw checkout whose `.env` configures the fleet (#480, #486).
+
+    Every `kg-microbe-*` console script used
+    `Path(__file__).resolve().parents[2]`, which is claw's root only while the
+    package runs from its source tree. Installed from a wheel, that is a
+    directory inside the virtualenv: claw's `.env` was never read, and a
+    fleet configured exactly as CLAUDE.md prescribes reported every Mech as
+    not configured.
+
+    In order: the source checkout this package was imported from, which
+    leaves every editable and development install exactly as it was; the
+    checkout holding the running virtualenv (`uv sync --no-editable` inside
+    claw); then the working directory or its nearest claw ancestor, which is
+    how an installed command is run.
+
+    Failing all three it returns a path beneath the package's own location
+    that is never created (`NO_CLAW_CHECKOUT`). It holds no `.env` and no
+    `.git`, so every consumer refuses: `resolve_mech_root` falls through to a
+    sibling guess that `looks_like` verifies, and `kg-microbe-health --mech
+    claw` finds no checkout to measure. The working directory would read an
+    unrelated `.env` as claw's and measure an unrelated repository as claw
+    (#486); the package location itself is `lib/pythonX.Y` in a virtualenv,
+    but an ordinary directory, `.env` and all, under `pip install --target`
+    (#502).
+    """
+    packaged = Path(__file__).resolve().parents[2]
+    if is_claw_checkout(packaged):
+        return packaged
+    prefix = Path(sys.prefix).resolve()
+    for candidate in (prefix, *prefix.parents):
+        if is_claw_checkout(candidate):
+            return candidate
+    nowhere = packaged / NO_CLAW_CHECKOUT
+    try:
+        here = (start or Path.cwd()).resolve()
+    except OSError:
+        # A working directory deleted under the shell; `--help` must still work.
+        return nowhere
+    for candidate in (here, *here.parents):
+        if is_claw_checkout(candidate):
+            return candidate
+    return nowhere
 
 
 # kg-microbe is a corpus this fleet reads, not a Mech, so the manifest has no

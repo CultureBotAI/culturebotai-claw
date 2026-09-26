@@ -302,6 +302,7 @@ uv run kg-microbe-research --help
 uv run kg-microbe-history --help
 uv run kg-microbe-governance --help
 uv run kg-microbe-kgscan --help
+uv run kg-microbe-graph --help
 uv run kg-microbe-qc --help
 uv run kg-microbe-discussions --help
 uv run kg-microbe-skills --help
@@ -349,6 +350,31 @@ duplicate node ids, orphan nodes, fragmentation, and reachability from a
 declared anchor type. These are properties of a graph rather than of a schema,
 so enum membership, evidence and CURIE shapes stay in each Mech. Connectivity is
 undirected -- a mechanism written effect-to-cause is the same mechanism.
+
+`kg-microbe-graph coverage --mech X` (or `--all`) reports what fraction of a
+Mech's records carry a causal graph, over the records its
+`causal_graph_coverage` declaration does not exempt. Applicability is never
+inferred: a record leaves the denominator only through an `exempt_when` rule,
+because "parent classes and habitats need no graph" is false in HabitatMech and
+CellStructureMech. A graph with no edge is not coverage; a graph whose scope is
+not one the Mech names as mechanistic is coverage but is counted apart, since
+NONMECHANISTIC means different things in different Mechs. Graphs per record,
+per-record facet combinations, and `kg_microbe_graph.audit` findings (counted
+both as findings and as graphs) come with it. It reads the working tree; pass
+`--root` a `git archive origin/main` snapshot when the checkout lags. A large
+corpus is parsed in `--jobs` processes and the report is identical for any
+value.
+
+Every `kg-microbe-*` console script that resolves Mech roots through claw's
+`.env` -- corpus, graph, health, kgx, pages, site, source-queue, sources, sssom
+and writers -- finds claw through `kg_microbe_fleet.roots.claw_root()`, never
+`Path(__file__).parents[2]`, which points into the virtualenv once the package
+is installed from a wheel. The source checkout wins, then the checkout holding
+the virtualenv, then the working directory; failing all three it answers with
+a path that is never created, so no `.env` is read and every consumer refuses. `kg-microbe-skills`
+is the exception: it finds the checkout being checked from the working
+directory (`find_claw_root`), and its catalogue still derives `.claude/skills`
+from `parents[2]` (#489).
 
 `kg-microbe-source-queue check` judges a Mech's `curation/source_queue.tsv`:
 the eleven columns both existing queues share, one spelling per licence class,
