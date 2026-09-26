@@ -817,9 +817,12 @@ mechs:
             - trait_axis
             - mapping_status
       causal_graph_coverage:
-        # Coverage is set by source: six source directories hold every graph
-        # and the rest hold none, so @directory is the stratum that explains
-        # the headline. Only exclusions the Mech itself records are declared.
+        # Which directories carry graphs is set by source: six source
+        # directories hold every graph and the rest hold none, so @directory
+        # explains the headline. Only exclusions the Mech itself records are
+        # declared. Class-level EC numbers (EC:x.x.x.-) are NOT exempt: the EC
+        # builder skips them without saying why, and NEXT_TASKS counts all 410
+        # among the EC records that "got no graph at all" -- a gap (#470).
         # No anchor type: a graph is anchored on the node grounded to the
         # record, whose type depends on the source. Duplicate groundings are a
         # modelling convention (a residue grounds to its protein), not a defect.
@@ -828,9 +831,9 @@ mechs:
           graph_shape: graph_list
           record_id_field: identifier
           exempt_when:
-            # The EC builder skips a "class-level EC node" (identifier ends
-            # in "-"): a sub-subclass maps to no single reaction.
-            - 'identifier~^EC:.*-$'
+            # MappingStatusEnum.DEPRECATED: "Superseded by another
+            # ProteinTraitRecord."
+            - "mapping_status=DEPRECATED"
             # NEXT_TASKS: these METPO records "are metabolic strategies, not
             # protein traits, so their causal graphs belong in" TraitMech.
             - "path:data/traits/function/enzymatic_activity/metpo/*.yaml"
@@ -1016,7 +1019,8 @@ mechs:
           anchor_node_types: [COMPOUND]
           duplicate_grounding_check: true
           exempt_when:
-            # A deprecated record's mechanism belongs on its successor.
+            # CurationStatusEnum.DEPRECATED: "Superseded or found out of scope;
+            # retained for traceability."
             - "curation_status=DEPRECATED"
           strata:
             - antimicrobial_class
@@ -1161,6 +1165,7 @@ mechs:
           graph_facets: [graph_kind]
           anchor_node_types: [STRUCTURE]
           exempt_when:
+            # MappingStatusEnum.DEPRECATED: "Superseded by another record."
             - "mapping_status=DEPRECATED"
           strata:
             - structure_category
@@ -1347,6 +1352,8 @@ mechs:
             # NOT_APPLICABLE: "The source concept is not a habitat ... so
             # grounding it as one would be wrong."
             - "grounding_status=NOT_APPLICABLE"
+            # MappingStatusEnum.DEPRECATED: "Superseded by another
+            # HabitatRecord; see `replaces` on the successor."
             - "mapping_status=DEPRECATED"
           strata:
             - grounding_status
@@ -1564,6 +1571,8 @@ mechs:
           anchor_node_types: [COMPOUND]
           duplicate_grounding_check: true
           exempt_when:
+            # CurationStatusEnum.DEPRECATED: "Superseded or found out of scope;
+            # retained for traceability."
             - "curation_status=DEPRECATED"
           strata:
             - np_pathway
@@ -1708,6 +1717,9 @@ mechs:
         # Higher taxa are never records, so the general-parent case does not
         # arise. The seeder owns every record and writes no graph, so coverage
         # is zero until the curator overlay the seeder would merge exists.
+        # The nine metagenome / uncultured / unidentified records (domain
+        # OTHER) are counted, not exempt: TaxonMech has not said they take no
+        # graph, and OTHER also means "lineage unavailable" (#484).
         status: enabled
         settings:
           graph_shape: graph_list
@@ -1715,10 +1727,12 @@ mechs:
           anchor_node_types: [TAXON]
           duplicate_grounding_check: true
           exempt_when:
+            # MappingStatusEnum.DEPRECATED: "Superseded by another TaxonRecord;
+            # see `replaces` on the successor."
             - "mapping_status=DEPRECATED"
-            # Domain OTHER holds metagenome and uncultured or unidentified
-            # sample nodes: environments, not organisms with a mechanism.
-            - "taxon_domain=OTHER"
+            # GroundingStatusEnum.NOT_APPLICABLE: "The source concept is not
+            # a taxon."
+            - "grounding_status=NOT_APPLICABLE"
           strata:
             - rank
             - taxon_domain

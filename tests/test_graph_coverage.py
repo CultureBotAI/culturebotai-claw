@@ -267,8 +267,8 @@ def test_the_first_matching_rule_is_credited(tmp_path):
 
 
 def test_a_rule_that_matches_nothing_is_still_reported(tmp_path):
-    """Five Mechs declare DEPRECATED rules that match no record today. A zero
-    is the report saying so; an absent key would look like no rule at all."""
+    """Most declared DEPRECATED rules match no record today. A zero is the
+    report saying so; an absent key would look like no rule at all."""
     report = _report(tmp_path, {"data/a.yaml": {"mapping_status": "SEEDED"}},
                      exempt_when=["mapping_status=DEPRECATED"])
     assert report["exempt"]["by_rule"] == {"mapping_status=DEPRECATED": 0}
@@ -400,9 +400,10 @@ def test_a_record_can_be_one_graph_whose_nodes_list_their_edges(tmp_path):
     assert (coverage["with_graph"], coverage["edgeless_only"], coverage["no_graph"]) == (2, 1, 2)
     assert report["structure"]["findings"]["DANGLING_EDGE"] == {"findings": 1, "graphs": 1}
     assert report["graphs"]["node_types"] == {"<unset>": 5, "CROSS_FEEDING": 1}
-    # Undeclared, so unmeasured -- not zero.
+    # Undeclared, so unmeasured -- not zero, and not "<unset>" (#477).
     assert report["graphs"]["edges_with_evidence"] is None
     assert report["graphs"]["nodes_grounded"] is None
+    assert report["graphs"]["predicates"] is None
 
 
 def test_directed_cycles_are_not_findings(tmp_path):
@@ -493,7 +494,10 @@ def test_a_graph_id_repeated_within_a_record_is_a_finding(tmp_path):
         "data/b.yaml": {"causal_graphs": [_graph("h", 1)]},
         "data/c.yaml": {"causal_graphs": [_graph("h", 1)]},
     })
-    assert report["structure"]["findings"]["DUPLICATE_GRAPH_ID"] == {"findings": 1, "graphs": 2}
+    structure = report["structure"]
+    assert structure["findings"]["DUPLICATE_GRAPH_ID"] == {"findings": 2, "graphs": 2}
+    # Counted on the same path as every other code, so the aggregate agrees (#475).
+    assert structure["graphs_with_findings"] == 2
 
 
 # --------------------------------------------------------------------------
@@ -566,6 +570,17 @@ def test_the_corpus_must_exist_and_be_declared(tmp_path):
         collect("m", tmp_path, [], _config())
 
 
+def test_a_root_with_no_records_at_the_globs_is_an_error_not_an_empty_corpus(tmp_path):
+    """The wrong directory, or a Mech that moved its records, reads as 0 of 0
+    -- which a fleet table would show as a completed read (#473)."""
+    root = _corpus(tmp_path, {"elsewhere/a.yaml": {"causal_graphs": [_graph("g", 1)]}})
+    with pytest.raises(CoverageError, match="no records at"):
+        collect("m", root, GLOBS, _config())
+    # A corpus whose every record is unreadable is not empty: it is named.
+    broken = _corpus(tmp_path / "b", {"data/a.yaml": "x: [unclosed\n"})
+    assert collect("m", broken, GLOBS, _config()).unreadable == ["data/a.yaml"]
+
+
 # --------------------------------------------------------------------------
 # The command
 # --------------------------------------------------------------------------
@@ -616,10 +631,20 @@ def test_a_fleet_run_names_what_it_could_not_read_and_fails(monkeypatch, capsys)
     assert payload["reports"] == {}
 
 
+def _fleet_root(tmp_path: Path) -> Path:
+    """One directory holding a record at every enabled Mech's first glob."""
+    manifest = load_fleet_manifest()
+    records = {}
+    for key in manifest.with_capability(CAPABILITY):
+        glob = manifest.mechs[key].record_globs[0]
+        records[glob.replace("**/", "").replace("*", key)] = {"identifier": key}
+    return _corpus(tmp_path, records)
+
+
 def test_a_fleet_summary_has_a_row_for_every_mech(monkeypatch, tmp_path, capsys):
     import kg_microbe_graph.__main__ as cli
 
-    root = _corpus(tmp_path, {"data/x.yaml": {"identifier": "A"}})
+    root = _fleet_root(tmp_path)
     monkeypatch.setattr(cli, "resolve_mech_root", lambda key, **_: root)
     assert cli.main(["coverage", "--all", "--summary"]) == 0
     lines = capsys.readouterr().out.splitlines()
@@ -700,38 +725,326 @@ def test_every_declared_field_is_one_the_corpus_carries(mech):
             )
 
 
-def _enum_values(schema: dict, slot: str) -> list[str] | None:
-    ranges = [
-        (cls.get("attributes") or {}).get(slot, {}).get("range")
-        for cls in (schema.get("classes") or {}).values()
-    ]
-    ranges.append((schema.get("slots") or {}).get(slot, {}).get("range"))
-    for name in filter(None, ranges):
-        enum = (schema.get("enums") or {}).get(name)
-        if enum is not None:
-            return list(enum.get("permissible_values") or {})
-    return None
+def _slot_ranges(schema_view, slot: str) -> set[str]:
+    """Every range the schema gives `slot`, on any class that has it --
+    through imports, attributes and slot_usage, which raw YAML cannot see.
+    TraitMech declares no tree_root, so no single class can be assumed."""
+    return {
+        schema_view.induced_slot(slot, name).range
+        for name in schema_view.all_classes()
+        if slot in schema_view.class_slots(name)
+    }
 
 
 @pytest.mark.parametrize("mech", load_fleet_manifest().with_capability(CAPABILITY))
 def test_an_exempted_value_is_one_the_schema_permits(mech):
-    """Five DEPRECATED rules match no record today, so the corpus cannot say
-    whether the value is spelt right. The schema can."""
+    """Most DEPRECATED rules match no record today, so the corpus cannot say
+    whether the value is spelt right. The schema can -- and a rule whose field
+    the schema cannot resolve is a failure, not a silent skip (#478)."""
+    from linkml_runtime.utils.schemaview import SchemaView
+
     root = _root_or_skip(mech)
     declaration = load_fleet_manifest().mechs[mech]
     config = CoverageConfig.from_settings(declaration.capabilities[CAPABILITY].settings)
-    schema = yaml.safe_load((root / declaration.schema_paths[0]).read_text(encoding="utf-8"))
-    judged = 0
-    for rule in config.exempt_when:
-        if rule.kind != "equals" or not rule.field or "." in rule.field:
+    rules = [r for r in config.exempt_when if r.kind == "equals" and r.field]
+    if not rules:
+        pytest.skip(f"{mech} declares no field=value exemption")
+    schema_view = SchemaView(str(root / declaration.schema_paths[0]))
+    for rule in rules:
+        assert rule.field is not None
+        ranges = _slot_ranges(schema_view, rule.field.rsplit(".", 1)[-1])
+        assert len(ranges) == 1, f"{mech}: {rule.field} resolves to ranges {ranges}"
+        enum = schema_view.get_enum(ranges.pop())
+        if enum is None:
             continue
-        permitted = _enum_values(schema, rule.field)
-        if permitted is None:
-            continue
-        judged += 1
-        assert rule.values <= set(permitted), (
-            f"{mech} exempts {sorted(rule.values - set(permitted))} for {rule.field}, "
+        permitted = set(enum.permissible_values)
+        assert rule.values <= permitted, (
+            f"{mech} exempts {sorted(rule.values - permitted)} for {rule.field}, "
             f"which its schema does not permit"
         )
-    if not judged:
-        pytest.skip(f"{mech} declares no enum-valued exemption to judge")
+
+
+def _graph_keys(mech: str, root: Path, config: CoverageConfig) -> tuple[set, set, set, set]:
+    """Keys seen on records, graphs, nodes and edges, from the first records
+    that carry graphs -- bounded, because PTM's graphs sit deep in its sort."""
+    from kg_microbe_corpus import iter_records
+
+    shape = config.shape
+    declaration = load_fleet_manifest().mechs[mech]
+    record_keys, graph_keys, node_keys, edge_keys = set(), set(), set(), set()
+    graphs_seen = 0
+    for scanned, (_, record) in enumerate(iter_records(root, list(declaration.record_globs))):
+        if scanned >= 20_000 or graphs_seen >= 50:
+            break
+        if not isinstance(record, dict):
+            continue
+        record_keys.update(k for k, v in record.items() if v not in (None, "", [], {}))
+        if shape.graphs_field:
+            graphs = record.get(shape.graphs_field) or []
+        else:
+            graphs = [{shape.nodes_field: record.get(shape.nodes_field) or []}]
+        for graph in graphs:
+            if not isinstance(graph, dict) or not graph.get(shape.nodes_field):
+                continue
+            graphs_seen += 1
+            graph_keys.update(k for k, v in graph.items() if v not in (None, "", [], {}))
+            for node in graph.get(shape.nodes_field) or []:
+                node_keys.update(k for k, v in node.items() if v not in (None, "", [], {}))
+                if shape.kind == "node_nested_edges":
+                    for edge in node.get(shape.edges_field) or []:
+                        edge_keys.update(k for k, v in edge.items() if v not in (None, "", []))
+            for edge in graph.get(shape.edges_field) or [] if shape.graphs_field else []:
+                edge_keys.update(k for k, v in edge.items() if v not in (None, "", [], {}))
+    if not graphs_seen:
+        pytest.skip(f"{mech}: no graph in the first records scanned here")
+    return record_keys, graph_keys, node_keys, edge_keys
+
+
+@pytest.mark.parametrize("mech", load_fleet_manifest().with_capability(CAPABILITY))
+def test_every_declared_graph_field_is_one_the_graphs_carry(mech):
+    """A misspelt scope_field zeroes the mechanistic headline without an error;
+    a misspelt grounding field reports every node ungrounded (#478)."""
+    root = _root_or_skip(mech)
+    config = CoverageConfig.from_settings(
+        load_fleet_manifest().mechs[mech].capabilities[CAPABILITY].settings
+    )
+    shape = config.shape
+    _, graph_keys, node_keys, edge_keys = _graph_keys(mech, root, config)
+    expected = {
+        "graph": {config.scope_field, *config.graph_facets, shape.graph_id_field,
+                  shape.edges_field if shape.graphs_field else None} - {None},
+        "node": {shape.node_id_field, shape.node_type_field,
+                 shape.node_grounding_field} - {None},
+        "edge": {shape.edge_subject_field, shape.edge_object_field,
+                 shape.edge_predicate_field, shape.edge_evidence_field} - {None},
+    }
+    if shape.kind == "node_nested_edges":
+        expected["node"].add(shape.edges_field)
+    seen = {"graph": graph_keys, "node": node_keys, "edge": edge_keys}
+    missing = {part: sorted(fields - seen[part]) for part, fields in expected.items()
+               if fields - seen[part]}
+    assert not missing, f"{mech} declares {missing}, which no sampled graph carries"
+
+
+# --------------------------------------------------------------------------
+# Review follow-ups (#473-#478)
+# --------------------------------------------------------------------------
+
+
+def test_strata_carry_the_mechanistic_count(tmp_path):
+    """TraitMech's mapping_status stratum exists to separate "does not apply"
+    from "deferred" NONMECHANISTIC graphs; that needs the count per stratum."""
+    report = _report(
+        tmp_path,
+        {"data/r.yaml": {"status": "REVIEWED", "causal_graphs": [_graph("g", 1, "MECHANISTIC")]},
+         "data/p.yaml": {"status": "PROPOSED", "causal_graphs": [_graph("g", 1, "NONMECHANISTIC")]}},
+        scope_field="scope_status", mechanistic_scopes=["MECHANISTIC"], strata=["status"],
+    )
+    status = report["strata"]["status"]
+    assert status["REVIEWED"]["with_mechanistic_graph"] == 1
+    assert status["PROPOSED"] == {
+        "records": 1, "exempt": 0, "eligible": 1, "with_graph": 1,
+        "edgeless_only": 0, "no_graph": 0, "with_mechanistic_graph": 0,
+    }
+
+
+def test_an_exempt_record_is_out_of_every_eligible_count_but_its_graphs_are_measured(tmp_path):
+    graph = _graph("g", 1, "MECHANISTIC")
+    graph["nodes"][1]["grounding"] = "T:9"
+    report = _report(
+        tmp_path,
+        {"data/retired.yaml": {"identifier": "T:1", "status": "DEPRECATED",
+                               "causal_graphs": [_graph("g", 2, "MECHANISTIC")]},
+         "data/retired_graphless.yaml": {"identifier": "T:9", "status": "DEPRECATED"},
+         "data/live.yaml": {"identifier": "T:2", "causal_graphs": [graph]}},
+        scope_field="scope_status", mechanistic_scopes=["MECHANISTIC"],
+        record_id_field="identifier", exempt_when=["status=DEPRECATED"],
+    )
+    coverage = report["coverage"]
+    assert coverage["with_mechanistic_graph"] == 1
+    # T:9 is grounded in live.yaml's graph, but it is exempt, not a gap.
+    assert coverage["graphless_but_referenced_elsewhere"] == 0
+    # Graph statistics describe every graph in the corpus, exempt or not.
+    assert report["graphs"]["total"] == 2
+    assert report["exempt"]["with_graph"] == 1
+
+
+def test_a_combination_is_a_set_and_multiplicity_lives_in_per_record(tmp_path):
+    report = _report(
+        tmp_path,
+        {"data/a.yaml": {"causal_graphs": [
+            _graph("f1", 1, graph_kind="FUNCTION"), _graph("f2", 1, graph_kind="FUNCTION")]}},
+        graph_facets=["graph_kind"],
+    )
+    facet = report["graphs"]["facets"]["graph_kind"]
+    assert facet["record_combinations"] == {"FUNCTION": 1}
+    assert facet["graphs"] == {"FUNCTION": 2}
+    assert report["graphs"]["per_record"] == {"2": 1}
+
+
+def test_a_dict_valued_stratum_with_dates_and_boolean_keys_is_a_key_not_a_crash(tmp_path):
+    root = _corpus(tmp_path, {
+        "data/a.yaml": "provenance: {date: 2024-01-01, on: x}\ncausal_graphs: []\n",
+    })
+    report = collect("m", root, GLOBS, _config(strata=["provenance"])).as_dict()
+    (key,) = report["strata"]["provenance"]
+    assert "2024-01-01" in key and "true" in key.lower()
+
+
+def test_a_record_that_is_not_utf8_is_named_unreadable(tmp_path):
+    root = _corpus(tmp_path, {"data/good.yaml": {"identifier": "A"}})
+    (root / "data" / "latin1.yaml").write_bytes("label: caf\xe9\n".encode("latin-1"))
+    report = collect("m", root, GLOBS, _config()).as_dict()
+    assert report["unreadable"] == ["data/latin1.yaml"]
+    assert report["records"] == 1
+
+
+@pytest.mark.parametrize(
+    ("edges", "bucket"),
+    [(0, "0"), (1, "1"), (2, "2-4"), (4, "2-4"), (5, "5-9"), (9, "5-9"),
+     (10, "10-19"), (19, "10-19"), (20, "20+")],
+)
+def test_edge_count_buckets_have_the_documented_boundaries(edges, bucket):
+    from kg_microbe_graph.coverage import _edge_bucket
+
+    assert _edge_bucket(edges) == bucket
+
+
+@pytest.mark.parametrize(
+    ("pattern", "directory"),
+    [("data/traits/**/*.yaml", "data/traits"), ("kb/communities/*.yaml", "kb/communities"),
+     ("records.yaml", "."), ("*.yaml", ".")],
+)
+def test_the_revision_check_is_limited_to_the_record_directories(pattern, directory):
+    from kg_microbe_graph.__main__ import _glob_directory
+
+    assert _glob_directory(pattern) == directory
+
+
+def _git_init(path: Path) -> None:
+    import subprocess
+
+    path.mkdir(parents=True, exist_ok=True)
+    for command in (["init", "-q"], ["-c", "user.email=t@t", "-c", "user.name=t",
+                                     "commit", "-q", "--allow-empty", "-m", "x"]):
+        subprocess.run(["git", "-C", str(path), *command], check=True, capture_output=True)
+
+
+def test_a_snapshot_inside_another_checkout_is_not_reported_as_that_checkout(tmp_path):
+    """The skill extracts snapshots under claw's workspace; asking git there
+    answered with claw's HEAD (#472)."""
+    from kg_microbe_graph.__main__ import SNAPSHOT, _revision
+
+    _git_init(tmp_path / "enclosing")
+    snapshot = _corpus(tmp_path / "enclosing" / "workspace", {"data/a.yaml": {"x": 1}})
+    assert _revision(snapshot, GLOBS) == SNAPSHOT
+    assert _revision(tmp_path / "plain", GLOBS) == SNAPSHOT
+
+
+def test_an_untracked_record_makes_a_checkout_uncommitted(tmp_path):
+    from kg_microbe_graph.__main__ import _revision
+
+    _git_init(tmp_path / "mech")
+    clean = _revision(tmp_path / "mech", GLOBS)
+    assert clean.startswith("HEAD ") and "uncommitted" not in clean
+    (tmp_path / "mech" / "data").mkdir()
+    (tmp_path / "mech" / "data" / "new.yaml").write_text("identifier: A\n")
+    assert "uncommitted" in _revision(tmp_path / "mech", GLOBS)
+    # Outside the record directories, a change is not the corpus's business.
+    assert "uncommitted" not in _revision(tmp_path / "mech", ["kb/*.yaml"])
+
+
+def test_the_revision_probe_takes_no_optional_locks(monkeypatch, tmp_path):
+    import subprocess
+
+    import kg_microbe_graph.__main__ as cli
+
+    calls = []
+
+    def record(command, **kwargs):
+        calls.append((command, kwargs.get("env", {})))
+        raise subprocess.CalledProcessError(128, command)
+
+    monkeypatch.setattr(cli.subprocess, "run", record)
+    cli._revision(tmp_path, GLOBS)
+    command, env = calls[0]
+    assert "--no-optional-locks" in command and env["GIT_OPTIONAL_LOCKS"] == "0"
+
+
+def _traitmech_root(tmp_path: Path, records: dict[str, object]) -> Path:
+    return _corpus(tmp_path, {f"data/traits/{name}": body for name, body in records.items()})
+
+
+def test_a_malformed_record_makes_the_command_fail(tmp_path, capsys):
+    from kg_microbe_graph.__main__ import main
+
+    root = _traitmech_root(tmp_path, {"a.yaml": {"causal_graphs": "see elsewhere"}})
+    assert main(["coverage", "--mech", "traitmech", "--root", str(root)]) == 1
+    captured = capsys.readouterr()
+    assert json.loads(captured.out)["malformed"]
+    assert "excluded 0 unreadable and 1 malformed" in captured.err
+
+
+def test_one_mech_that_cannot_be_read_is_a_usage_failure(monkeypatch, tmp_path):
+    import kg_microbe_graph.__main__ as cli
+
+    def unavailable(key, **_):
+        raise MechRootError(f"{key} is not configured")
+
+    monkeypatch.setattr(cli, "resolve_mech_root", unavailable)
+    assert cli.main(["coverage", "--mech", "traitmech"]) == 2
+    empty = _corpus(tmp_path, {"elsewhere/a.yaml": {"x": 1}})
+    assert cli.main(["coverage", "--mech", "traitmech", "--root", str(empty)]) == 2
+
+
+def test_a_fleet_mech_with_no_records_is_unavailable(monkeypatch, tmp_path, capsys):
+    import kg_microbe_graph.__main__ as cli
+
+    empty = _corpus(tmp_path, {"elsewhere/a.yaml": {"x": 1}})
+    monkeypatch.setattr(cli, "resolve_mech_root", lambda key, **_: empty)
+    assert cli.main(["coverage", "--all"]) == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert set(payload["unavailable"]) == set(load_fleet_manifest().with_capability(CAPABILITY))
+    assert all("no records at" in why for why in payload["unavailable"].values())
+
+
+def test_a_declaration_the_tool_cannot_apply_fails_the_command(monkeypatch):
+    import kg_microbe_graph.__main__ as cli
+
+    def refuse(settings):
+        raise CoverageConfigError("nonsense")
+
+    monkeypatch.setattr(cli.CoverageConfig, "from_settings", staticmethod(refuse))
+    assert cli.main(["coverage", "--mech", "traitmech"]) == 2
+
+
+def test_a_summary_row_carries_the_reports_numbers_and_marks_a_sample(tmp_path, capsys):
+    from kg_microbe_graph.__main__ import main
+
+    root = _traitmech_root(tmp_path, {
+        "a.yaml": {"causal_graphs": [_graph("g", 1, "MECHANISTIC")]},
+        "b.yaml": {"causal_graphs": [_graph("g", 1, "NONMECHANISTIC")]},
+        "c.yaml": {"mapping_status": "DEPRECATED"},
+        "d.yaml": {},
+    })
+    assert main(["coverage", "--mech", "traitmech", "--root", str(root), "--summary"]) == 0
+    row = next(line for line in capsys.readouterr().out.splitlines()
+               if line.startswith("traitmech"))
+    # records exempt eligible w/graph % mechan. % edgeless graphs flagged
+    assert row.split()[1:] == ["4", "1", "3", "2", "66.7%", "1", "33.3%", "0", "2", "2"]
+
+    assert main(["coverage", "--mech", "traitmech", "--root", str(root),
+                 "--summary", "--sample", "2"]) == 0
+    out = capsys.readouterr().out
+    row = next(line for line in out.splitlines() if line.startswith("traitmech"))
+    assert row.split()[1] == "2*"
+    assert "sampled: the first 2 records only" in out
+
+
+@pytest.mark.parametrize("value", ["0", "-1"])
+def test_a_sample_must_read_at_least_one_record(value):
+    from kg_microbe_graph.__main__ import main
+
+    with pytest.raises(SystemExit) as raised:
+        main(["coverage", "--mech", "traitmech", "--sample", value])
+    assert raised.value.code == 2

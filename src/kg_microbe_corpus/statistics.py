@@ -219,7 +219,9 @@ def iter_records(
             yield path, yaml.load(  # noqa: S506 - loader is judged, not guessed
                 path.read_text(encoding="utf-8"), Loader=loader
             )
-        except (OSError, yaml.YAMLError):
+        # UnicodeDecodeError is a ValueError, not an OSError: without it one
+        # non-UTF-8 file ended the walk instead of being named (#476).
+        except (OSError, UnicodeDecodeError, yaml.YAMLError):
             yield path, None
 
 

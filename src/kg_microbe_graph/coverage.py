@@ -21,8 +21,9 @@ HabitatMech's 32 graphs sit on parent classes, and habitats are exactly the
 records HabitatMech graphs; 65 of CellStructureMech's 66 is-a parents carry a
 graph. An automatic "parents and habitats need no graph" rule would erase most
 of the coverage those Mechs have. Every rule is reported with the number of
-records it matched, zero included, so a rule that has stopped matching anything
-is visible rather than silently harmless.
+records credited to it, zero included. Credit goes to the first rule a record
+matches, so a zero means the rule matched nothing *that an earlier rule had not
+already claimed* -- either way, visible rather than silently harmless.
 
 **A graph with no edge is not coverage.** CommunityMech has 52 records whose
 interaction nodes have no downstream edge. They are counted as `edgeless_only`
@@ -384,13 +385,29 @@ def _scalar(value: Any) -> str:
     return str(value)
 
 
+def _plain(value: Any) -> Any:
+    """`value` with every key a string and every leaf JSON-serialisable.
+
+    YAML hands back dates, and YAML 1.1 reads `on`/`yes` keys as booleans;
+    `json.dumps(sort_keys=True)` raises on the first and cannot order the
+    second against strings (#476).
+    """
+    if isinstance(value, dict):
+        return {str(key): _plain(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_plain(item) for item in value]
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    return str(value)
+
+
 def _key(value: Any) -> str:
     if value is None or value == "" or value == [] or value == {}:
         return UNSET
     if isinstance(value, list):
         return "+".join(sorted(_key(item) for item in value))
     if isinstance(value, dict):
-        return json.dumps(value, sort_keys=True)
+        return json.dumps(_plain(value), sort_keys=True)
     return _scalar(value)
 
 
@@ -632,16 +649,24 @@ class CoverageReport:
                 "nodes_grounded": (
                     self.nodes_grounded if shape.node_grounding_field else None
                 ),
-                "node_types": dict(sorted(self.node_types.items())),
-                "predicates": {
-                    "distinct": len(self.predicates),
-                    "top": [
-                        list(pair)
-                        for pair in sorted(
-                            self.predicates.items(), key=lambda item: (-item[1], item[0])
-                        )[:MAX_TOP_PREDICATES]
-                    ],
-                },
+                # Undeclared means unmeasured, as for evidence and grounding:
+                # a count of "<unset>" would read as data (#477).
+                "node_types": (
+                    dict(sorted(self.node_types.items())) if shape.node_type_field else None
+                ),
+                "predicates": (
+                    {
+                        "distinct": len(self.predicates),
+                        "top": [
+                            list(pair)
+                            for pair in sorted(
+                                self.predicates.items(), key=lambda item: (-item[1], item[0])
+                            )[:MAX_TOP_PREDICATES]
+                        ],
+                    }
+                    if shape.edge_predicate_field
+                    else None
+                ),
                 "scopes": dict(sorted(self.scopes.items())) if config.scope_field else None,
                 "facets": {
                     facet: {
@@ -776,10 +801,6 @@ def collect(
                 counts["with_mechanistic_graph"] += 1
 
         seen_ids: Counter[str] = Counter(g.graph_id for g in graphs)
-        for graph_id, count in seen_ids.items():
-            if count > 1:
-                report.findings["DUPLICATE_GRAPH_ID"] += count - 1
-                report.finding_graphs["DUPLICATE_GRAPH_ID"] += count
 
         for facet in config.graph_facets:
             values = {g.facets[facet] for g in graphs}
@@ -792,15 +813,29 @@ def collect(
                 ] += 1
 
         for parsed in graphs:
-            _measure(report, parsed, config, relative)
+            _measure(report, parsed, config, relative, seen_ids[parsed.graph_id] > 1)
             if parsed.graph.edges:
                 referenced.update(parsed.groundings.values())
 
+    if not (report.records or report.unreadable or report.malformed):
+        # Nothing at the declared globs is not an empty corpus: it is the wrong
+        # directory, or a Mech that moved its records. Reporting 0 of 0 as a
+        # completed read would hide that (#473).
+        raise CoverageError(
+            f"{mech}: no records at {', '.join(globs)} under {root}; is this "
+            f"the {mech} checkout?"
+        )
     report.referenced_elsewhere = sum(1 for own in graphless_ids if own in referenced)
     return report
 
 
-def _measure(report: CoverageReport, parsed: _Parsed, config: CoverageConfig, relative: str) -> None:
+def _measure(
+    report: CoverageReport,
+    parsed: _Parsed,
+    config: CoverageConfig,
+    relative: str,
+    duplicate_id: bool,
+) -> None:
     graph = parsed.graph
     report.nodes_per_graph.append(len(graph.nodes))
     report.edges_per_graph.append(len(graph.edges))
@@ -818,10 +853,16 @@ def _measure(report: CoverageReport, parsed: _Parsed, config: CoverageConfig, re
         anchor_types=config.anchor_node_types,
         groundings=parsed.groundings if config.duplicate_grounding_check else None,
     )
-    if not findings:
+    codes = Counter(finding.code for finding in findings)
+    # A graph_id repeated within one record is a property of the record, not
+    # of either graph, so audit() cannot see it. Counting it here, per graph,
+    # keeps every code on the one path that feeds graphs_with_findings and
+    # graphs_by_scope (#475).
+    if duplicate_id:
+        codes["DUPLICATE_GRAPH_ID"] += 1
+    if not codes:
         return
     report.graphs_with_findings += 1
-    codes = Counter(finding.code for finding in findings)
     for code, count in codes.items():
         report.findings[code] += count
         report.finding_graphs[code] += 1

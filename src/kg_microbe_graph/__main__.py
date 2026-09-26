@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 
 from kg_microbe_fleet import load_fleet_manifest
 from kg_microbe_fleet.roots import MechRootError, resolve_mech_root
@@ -21,26 +22,66 @@ from kg_microbe_graph.coverage import (
 )
 
 CLAW_ROOT = Path(__file__).resolve().parents[2]
+SNAPSHOT = "not a git checkout (a snapshot?)"
+MAX_NAMED = 5
 
 
-def _revision(root: Path) -> str:
+def _git(root: Path, *args: str, timeout: int) -> str:
+    """Read-only git: no optional locks, no fsmonitor, no inherited repo env.
+
+    A plain `git status` refreshes the index and so rewrites `.git/index` in
+    the Mech checkout -- a write from a tool that promises none (#472).
+    """
+    env = {
+        key: value for key, value in os.environ.items()
+        if key not in {"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"}
+    }
+    env["GIT_OPTIONAL_LOCKS"] = "0"
+    return subprocess.run(
+        ["git", "--no-optional-locks", "-c", "core.fsmonitor=false", "-C", str(root), *args],
+        capture_output=True, text=True, timeout=timeout, check=True, env=env,
+    ).stdout.strip()
+
+
+def _glob_directory(pattern: str) -> str:
+    """The fixed directory a record glob starts from: `data/traits` for
+    `data/traits/**/*.yaml`."""
+    fixed = []
+    for part in Path(pattern).parts:
+        if any(char in part for char in "*?["):
+            break
+        fixed.append(part)
+    if fixed and fixed[-1] == Path(pattern).name:
+        fixed.pop()
+    return "/".join(fixed) or "."
+
+
+def _revision(root: Path, globs: Sequence[str]) -> str:
     """Which commit was read, for stderr: a local checkout can lag origin.
 
-    Best effort and never part of the JSON. A snapshot extracted with
-    `git archive` has no repository, and that is a legitimate thing to read.
+    Best effort and never part of the JSON. Answered only when `root` is
+    itself the top of a git checkout. A snapshot extracted with `git archive`
+    has no repository of its own, and asking git inside one answers for
+    whatever repository encloses it -- claw's, when the snapshot sits in
+    claw's workspace (#472).
     """
     try:
-        head = subprocess.run(
-            ["git", "-C", str(root), "rev-parse", "--short", "HEAD"],
-            capture_output=True, text=True, timeout=30, check=True,
-        ).stdout.strip()
-        dirty = subprocess.run(
-            ["git", "-C", str(root), "status", "--porcelain", "--untracked-files=no"],
-            capture_output=True, text=True, timeout=120, check=True,
-        ).stdout.strip()
+        top = _git(root, "rev-parse", "--show-toplevel", timeout=30)
+        if Path(top).resolve() != Path(root).resolve():
+            return SNAPSHOT
+        head = _git(root, "rev-parse", "--short", "HEAD", timeout=30)
+        # Untracked files count: a new record under the globs is read and
+        # counted, so a tree holding one is not the commit named above.
+        changed = _git(
+            root, "status", "--porcelain", "--untracked-files=normal", "--",
+            *sorted({_glob_directory(pattern) for pattern in globs}),
+            timeout=300,
+        )
+    except subprocess.TimeoutExpired:
+        return "revision unknown: git timed out"
     except (OSError, subprocess.SubprocessError):
-        return "not a git checkout (a snapshot?)"
-    return f"HEAD {head}" + (", with uncommitted changes" if dirty else "")
+        return SNAPSHOT
+    return f"HEAD {head}" + (", with uncommitted changes under the record globs" if changed else "")
 
 
 def _summary_row(key: str, report: CoverageReport) -> str:
@@ -51,8 +92,10 @@ def _summary_row(key: str, report: CoverageReport) -> str:
         return "-" if value is None else f"{100 * value:5.1f}%"
 
     mechanistic = coverage["with_mechanistic_graph"]
+    # A sampled row is a different corpus; mark it where the number is read.
+    records = f"{data['records']}{'*' if data['sampled'] else ''}"
     return (
-        f"{key:<20} {data['records']:>8} {data['exempt']['records']:>7} "
+        f"{key:<20} {records:>8} {data['exempt']['records']:>7} "
         f"{coverage['eligible']:>8} {coverage['with_graph']:>8} "
         f"{pct(coverage['fraction_with_graph']):>7} "
         f"{'-' if mechanistic is None else mechanistic:>8} "
@@ -66,6 +109,26 @@ SUMMARY_HEADER = (
     f"{'mech':<20} {'records':>8} {'exempt':>7} {'eligible':>8} {'w/graph':>8} "
     f"{'':>7} {'mechan.':>8} {'':>7} {'edgeless':>8} {'graphs':>7} {'flagged':>8}"
 )
+
+
+def _excluded(key: str, report: CoverageReport) -> str | None:
+    """One stderr line naming what a report left out, or None."""
+    left_out = sorted(report.unreadable) + sorted(report.malformed)
+    if not left_out:
+        return None
+    named = "; ".join(left_out[:MAX_NAMED])
+    more = f"; and {len(left_out) - MAX_NAMED} more" if len(left_out) > MAX_NAMED else ""
+    return (
+        f"{key}: excluded {len(report.unreadable)} unreadable and "
+        f"{len(report.malformed)} malformed record(s): {named}{more}"
+    )
+
+
+def _positive(text: str) -> int:
+    value = int(text)
+    if value < 1:
+        raise argparse.ArgumentTypeError("must be at least 1")
+    return value
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -91,7 +154,7 @@ def main(argv: list[str] | None = None) -> int:
              "`git archive origin/main` snapshot (single --mech only)",
     )
     parser.add_argument(
-        "--sample", type=int,
+        "--sample", type=_positive,
         help="read only the first N records, in sorted order, for a large corpus",
     )
     parser.add_argument(
@@ -125,15 +188,17 @@ def main(argv: list[str] | None = None) -> int:
         except MechRootError as exc:
             unavailable[key] = str(exc)
             continue
-        print(f"{key}: reading {root.name} ({_revision(root)})", file=sys.stderr)
+        globs = list(mech.record_globs)
+        print(f"{key}: reading {root.name} ({_revision(root, globs)})", file=sys.stderr)
         try:
-            reports[key] = collect(
-                key, root, list(mech.record_globs), config, sample=args.sample
-            )
+            reports[key] = collect(key, root, globs, config, sample=args.sample)
         except CoverageError as exc:
             unavailable[key] = str(exc)
             continue
         print(f"{key}: {reports[key].parser_note()}", file=sys.stderr)
+        excluded = _excluded(key, reports[key])
+        if excluded:
+            print(excluded, file=sys.stderr)
 
     if not args.all:
         key = keys[0]
@@ -152,6 +217,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{key:<20} {why}")
         for key, why in unavailable.items():
             print(f"{key:<20} UNAVAILABLE: {why}")
+        if args.sample is not None:
+            print(f"* sampled: the first {args.sample} records only, not the corpus")
     elif args.all:
         payload: dict[str, Any] = {
             "reports": {key: report.as_dict() for key, report in reports.items()},

@@ -41,14 +41,16 @@ false in others, and the data says which:
 | HabitatMech | every record is a habitat | 27 of the 32 graphs sit on parent classes; biome-level graphs are the curation pattern. The real exemption is `grounding_status=NOT_APPLICABLE`: the concept is not a habitat at all. |
 | CellStructureMech | is-a parents, subcellular regions | 65 of 66 parents and 71 of 72 regions carry a graph. |
 | TraitMech | upper classes, ECOLOGY habitat traits | Upper classes are exempt by the Mech's own priority config; ECOLOGY habitat traits all carry (NONMECHANISTIC) graphs and are not. |
-| ProteinTraitsMech | EC and ARO parents | Class-level EC numbers (ending in `-`) are exempt; 699 of 741 ARO parents carry graphs. |
-| TaxonMech | higher taxa | Never records, so the question does not arise. Metagenome and unidentified sample nodes (domain OTHER) are exempt. |
+| ProteinTraitsMech | EC and ARO parents | 699 of 741 ARO parents carry graphs. The 410 class-level EC numbers have none, but the Mech's backlog counts them as gaps, so they are not exempt. |
+| TaxonMech | higher taxa, metagenomes | Higher taxa are never records. Nine metagenome and unidentified sample records look like the habitat case, but TaxonMech has not said they take no graph, so they are counted (the question is with its curators, #484). |
 
 Measured 2026-09-25 against each Mech's `origin/main`. Re-run rather than
 quote them. So: **never add a structural rule ("has children", "is in the
 hierarchy", "is a habitat") as an exemption.** Add a rule only when the Mech's
 own schema, documentation or tooling says records of that kind take no graph,
-and cite that source in a comment beside the rule.
+and cite that source in a comment beside the rule. A builder that merely skips
+a kind of record is not such a statement; check whether the Mech's backlog
+counts those records as gaps before calling them exempt.
 
 ## Before running: which checkout is being read
 
@@ -62,6 +64,8 @@ uv run python -m kg_microbe_fleet list --capability causal_graph_coverage --form
 uv run python -m kg_microbe_fleet targets --capability causal_graph_coverage --dotenv .env
 ROOT="$(uv run python -m kg_microbe_fleet targets --capability causal_graph_coverage \
           --dotenv .env | awk -F'\t' '$1 == "habitatmech" {print $5}')"
+# An unconfigured Mech has an empty root, and `git -C ""` would act on claw.
+: "${ROOT:?habitatmech has no configured checkout}"
 git -C "$ROOT" fetch -q origin
 git -C "$ROOT" rev-list --count origin/main --not HEAD   # 0 means current
 ```
@@ -71,15 +75,20 @@ change to the checkout's Git state, so ask first) or read a snapshot of
 `origin/main` without touching the checkout at all:
 
 ```bash
-SNAP="workspace/causal_graph_coverage/snapshots/habitatmech"
-mkdir -p "$SNAP"
+# Named for the commit and extracted fresh: extracting over an older snapshot
+# keeps records that upstream has since deleted.
+SNAP="workspace/causal_graph_coverage/snapshots/habitatmech-$(git -C "$ROOT" rev-parse --short origin/main)"
+rm -rf "$SNAP" && mkdir -p "$SNAP"
 git -C "$ROOT" archive origin/main | tar -x -C "$SNAP"
 uv run kg-microbe-graph coverage --mech habitatmech --root "$SNAP"
 ```
 
-The command prints which commit it read on stderr (`HEAD <sha>`, and whether
-the tree has uncommitted changes); a snapshot reads as "not a git checkout".
-State which one you read whenever you quote a number.
+The command prints which commit it read on stderr: `HEAD <sha>`, plus whether
+the record directories hold uncommitted or untracked changes, when the root is
+itself a checkout; "not a git checkout (a snapshot?)" otherwise, as for the
+snapshot above -- so name the snapshot's commit yourself. State which you read
+whenever you quote a number. A root where the declared globs match nothing is
+an error, not an empty corpus.
 
 ## Run it
 
@@ -87,6 +96,7 @@ State which one you read whenever you quote a number.
 uv run kg-microbe-graph coverage --mech traitmech            # one Mech, JSON
 uv run kg-microbe-graph coverage --mech traitmech --summary  # one row
 uv run kg-microbe-graph coverage --all --summary             # the fleet table
+mkdir -p workspace/causal_graph_coverage
 uv run kg-microbe-graph coverage --all > workspace/causal_graph_coverage/fleet.json
 uv run kg-microbe-graph coverage --mech proteintraitsmech --sample 5000
 ```
@@ -95,13 +105,15 @@ Every record is parsed, so the two large corpora dominate a fleet run:
 ProteinTraitsMech (about 430,000 records) took about three and a half minutes
 and TaxonMech (about 626,000) about nine and a half on 2026-09-25. `--sample N`
 reads the first N records in sorted order -- a different corpus, which the
-report marks `sampled: true` -- so use it to try a declaration, not to quote.
+report marks `sampled: true` and `--summary` marks with `*` -- so use it to try
+a declaration, not to quote.
 
 Exit codes: `0` report produced (or the Mech declares no graph model and the
 command printed why); `1` the report is **incomplete** — a record could not be
 read or did not have the declared shape (named under `unreadable` /
-`malformed`), or with `--all` a Mech could not be read (named under
-`unavailable`); `2` bad usage, an unresolvable root, or a declaration the tool
+`malformed`, and on stderr), or with `--all` a Mech could not be read or held
+no records at its globs (named under `unavailable`); `2` bad usage, an
+unresolvable or empty root for a single `--mech`, or a declaration the tool
 cannot apply. Do not quote a fraction from a run that exited `1` without saying
 what it excluded.
 
@@ -123,7 +135,8 @@ what it excluded.
 `records = eligible + exempt.records`, always.
 
 **`exempt`** — records per rule, the first matching rule credited, zero
-included; and `with_graph`, exempt records that carry a graph anyway (TraitMech's
+included (so a zero can also mean an earlier rule claimed every record this one
+matches); and `with_graph`, exempt records that carry a graph anyway (TraitMech's
 upper classes carry context graphs — not wrong, but worth knowing when a rule is
 proposed).
 
@@ -137,11 +150,12 @@ meanings exactly).
 **`graphs`** — over every graph, exempt records included: `per_record`
 (the multiplicity histogram), nodes and edges per graph (min/median/max, and an
 edge-count histogram — a one-edge graph restates a single claim), evidence and
-grounding counts (`null` where the Mech's edges or nodes have no such slot —
-not measured, not zero), node types, top predicates, `scopes`, and for each
+grounding counts, node types and top predicates (each `null` where the Mech
+declares no such slot — not measured, not zero), `scopes`, and for each
 declared facet the values per graph and the **combination each record
 carries** (`ASSEMBLY+FUNCTION: 7`) — the answer to "does it have the several
-graphs it needs?".
+graphs it needs?". A combination is a set of values: two FUNCTION graphs read
+as `FUNCTION`, and how many graphs a record has is `per_record`.
 
 **`structure`** — `kg_microbe_graph.audit` per graph, with the Mech's anchor
 type. Each code is counted twice, as `findings` and as `graphs`, because
@@ -155,7 +169,9 @@ do not call either wrong without reading the graph.
 
 **`strata`** — every count broken down by each declared field (or
 `@directory`). A headline that looks alarming is usually explained here:
-ProteinTraitsMech's coverage is set entirely by source directory.
+in ProteinTraitsMech, which directories carry graphs at all is set by source,
+and the stratum then shows the gaps left inside those that do (EC, BioLiP,
+MetalPDB, ARO).
 
 ## What a "graph" is in each Mech
 
