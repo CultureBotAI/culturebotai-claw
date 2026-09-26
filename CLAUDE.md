@@ -302,6 +302,7 @@ uv run kg-microbe-research --help
 uv run kg-microbe-history --help
 uv run kg-microbe-governance --help
 uv run kg-microbe-kgscan --help
+uv run kg-microbe-graph --help
 uv run kg-microbe-qc --help
 uv run kg-microbe-discussions --help
 uv run kg-microbe-skills --help
@@ -349,6 +350,18 @@ duplicate node ids, orphan nodes, fragmentation, and reachability from a
 declared anchor type. These are properties of a graph rather than of a schema,
 so enum membership, evidence and CURIE shapes stay in each Mech. Connectivity is
 undirected -- a mechanism written effect-to-cause is the same mechanism.
+
+`kg-microbe-graph coverage --mech X` (or `--all`) reports what fraction of a
+Mech's records carry a causal graph, over the records its
+`causal_graph_coverage` declaration does not exempt. Applicability is never
+inferred: a record leaves the denominator only through an `exempt_when` rule,
+because "parent classes and habitats need no graph" is false in HabitatMech and
+CellStructureMech. A graph with no edge is not coverage; a graph whose scope is
+not one the Mech names as mechanistic is coverage but is counted apart, since
+NONMECHANISTIC means different things in different Mechs. Graphs per record,
+per-record facet combinations, and `kg_microbe_graph.audit` findings (counted
+both as findings and as graphs) come with it. It reads the working tree; pass
+`--root` a `git archive origin/main` snapshot when the checkout lags.
 
 `kg-microbe-source-queue check` judges a Mech's `curation/source_queue.tsv`:
 the eleven columns both existing queues share, one spelling per licence class,

@@ -52,6 +52,65 @@ capability_catalogue:
       fields:
         type: string_list
         required_when_enabled: true
+  # What fraction of records carry a causal graph, which are declared not to
+  # need one, how many graphs each has, and their structure
+  # (kg-microbe-graph coverage). Applicability is never inferred: a record
+  # leaves the denominator only through an exempt_when rule declared here,
+  # because "parents and habitats need no graph" is false in several Mechs.
+  # Combinations that are invalid together are rejected by
+  # kg_microbe_graph.coverage.CoverageConfig, and a test applies it to every
+  # enabled declaration.
+  causal_graph_coverage:
+    settings:
+      # graph_list (a record holds a list of graphs) or node_nested_edges
+      # (the record is one graph; each node lists its outgoing edges).
+      graph_shape:
+        type: string
+        required_when_enabled: true
+      graphs_field:
+        type: string
+      graph_id_field:
+        type: string
+      nodes_field:
+        type: string
+      edges_field:
+        type: string
+      node_id_field:
+        type: string
+      node_type_field:
+        type: string
+      node_grounding_field:
+        type: string
+      edge_subject_field:
+        type: string
+      edge_object_field:
+        type: string
+      edge_predicate_field:
+        type: string
+      edge_evidence_field:
+        type: string
+      # The record's own id, to count graphless records grounded inside
+      # another record's graph.
+      record_id_field:
+        type: string
+      # A per-graph disposition, and which of its values count as a mechanism.
+      scope_field:
+        type: string
+      mechanistic_scopes:
+        type: string_list
+      # Per-graph fields whose per-record combinations are tabulated.
+      graph_facets:
+        type: string_list
+      anchor_node_types:
+        type: string_list
+      duplicate_grounding_check:
+        type: boolean
+      # field=A|B, field~REGEX, or path:GLOB. First match is credited.
+      exempt_when:
+        type: string_list
+      # Record fields (or @directory) to break every count down by.
+      strata:
+        type: string_list
   page_budgets:
     settings:
       site_path:
@@ -184,6 +243,13 @@ mechs:
           fields:
             - source_environment
             - medium_type
+      causal_graph_coverage:
+        status: not_applicable
+        reason: >-
+          MediaRecipe records are compositions. The schema has no causal-graph
+          slot and no record carries graph-shaped content; what CultureMech's
+          own tooling calls causal-graph coverage (#468) is its review-need
+          score over recipe grounding, not a graph.
       page_budgets:
         status: disabled
         reason: >-
@@ -320,6 +386,15 @@ mechs:
           fields:
             - ingredient_type
             - ontology_mapping.mapping_quality
+      causal_graph_coverage:
+        status: disabled
+        reason: >-
+          IngredientRecord has no causal-graph slot. Its role facets and
+          components are typed assertions around one ingredient, a star with
+          nothing to connect, and scripts/score_causal_graph_readiness.py ranks
+          their readiness to seed a graph. Enable once records carry graphs.
+        reason_claims:
+          present: ["scripts/score_causal_graph_readiness.py"]
       page_budgets:
         status: disabled
         reason: >-
@@ -445,6 +520,24 @@ mechs:
         settings:
           fields:
             - environment_term
+      causal_graph_coverage:
+        # The graph is implicit: interactions are the nodes and each lists the
+        # interactions it feeds as downstream, so a record is one graph and an
+        # interaction with no downstream edge asserts no causal link. Edges
+        # carry only a description (evidence sits on the interaction), so edge
+        # evidence is not declared and not measured. No field exempts a
+        # community, and directed cycles are intended (syntrophic loops).
+        status: enabled
+        settings:
+          graph_shape: node_nested_edges
+          nodes_field: ecological_interactions
+          node_id_field: name
+          node_type_field: interaction_type
+          edges_field: downstream
+          edge_object_field: target
+          strata:
+            - community_origin
+            - "@directory"
       page_budgets:
         status: disabled
         reason: >-
@@ -560,6 +653,31 @@ mechs:
         status: enabled
         settings:
           fields:
+            - mapping_status
+            - trait_category
+      causal_graph_coverage:
+        # NONMECHANISTIC means "a mechanism does not apply" on REVIEWED records
+        # and "deferred" on PROPOSED genomics systems, so it is reported as its
+        # own count, and mapping_status is a stratum to tell the two apart.
+        # Habitat-like ECOLOGY traits are not exempt: they carry graphs.
+        status: enabled
+        settings:
+          graph_shape: graph_list
+          record_id_field: identifier
+          scope_field: scope_status
+          mechanistic_scopes: [MECHANISTIC]
+          anchor_node_types: [TRAIT]
+          duplicate_grounding_check: true
+          exempt_when:
+            # README: the deprecated records "are not intended to carry
+            # mechanism graphs in TraitMech".
+            - "mapping_status=DEPRECATED"
+            # CURATION_PLAYBOOK: "Skip causal graphs entirely when" the record
+            # is a relation carrier -- "predicates, not phenotypes".
+            - "term_kind=OBJECT_PROPERTY|DATATYPE_PROPERTY"
+            # trait_priority: upper-ontology classifiers are non_mechanism.
+            - "trait_category=UPPER"
+          strata:
             - mapping_status
             - trait_category
       page_budgets:
@@ -698,6 +816,27 @@ mechs:
           fields:
             - trait_axis
             - mapping_status
+      causal_graph_coverage:
+        # Coverage is set by source: six source directories hold every graph
+        # and the rest hold none, so @directory is the stratum that explains
+        # the headline. Only exclusions the Mech itself records are declared.
+        # No anchor type: a graph is anchored on the node grounded to the
+        # record, whose type depends on the source. Duplicate groundings are a
+        # modelling convention (a residue grounds to its protein), not a defect.
+        status: enabled
+        settings:
+          graph_shape: graph_list
+          record_id_field: identifier
+          exempt_when:
+            # The EC builder skips a "class-level EC node" (identifier ends
+            # in "-"): a sub-subclass maps to no single reaction.
+            - 'identifier~^EC:.*-$'
+            # NEXT_TASKS: these METPO records "are metabolic strategies, not
+            # protein traits, so their causal graphs belong in" TraitMech.
+            - "path:data/traits/function/enzymatic_activity/metpo/*.yaml"
+          strata:
+            - trait_axis
+            - "@directory"
       page_budgets:
         status: enabled
         settings:
@@ -865,6 +1004,23 @@ mechs:
         status: enabled
         settings:
           site_path: pages
+      causal_graph_coverage:
+        # Structural classes and mixtures never become records, so the
+        # general-parent case does not arise.
+        status: enabled
+        settings:
+          graph_shape: graph_list
+          record_id_field: identifier
+          scope_field: scope_status
+          mechanistic_scopes: [MECHANISTIC]
+          anchor_node_types: [COMPOUND]
+          duplicate_grounding_check: true
+          exempt_when:
+            # A deprecated record's mechanism belongs on its successor.
+            - "curation_status=DEPRECATED"
+          strata:
+            - antimicrobial_class
+            - curation_status
       page_budgets:
         status: disabled
         reason: >-
@@ -989,6 +1145,26 @@ mechs:
           fields:
             - structure_category
             - mapping_status
+      causal_graph_coverage:
+        # NONMECHANISTIC graphs here are topology, parthood or containment
+        # graphs in place of a mechanism -- a lower grade of graph, not an
+        # exemption -- and the Mech's skills set the target as a MECHANISTIC
+        # ASSEMBLY or FUNCTION graph. A record may carry one of each, hence the
+        # graph_kind facet. Is-a parents and regions are not exempt: nearly all
+        # carry graphs. Duplicate groundings are deliberate state variants.
+        status: enabled
+        settings:
+          graph_shape: graph_list
+          record_id_field: identifier
+          scope_field: scope_status
+          mechanistic_scopes: [MECHANISTIC]
+          graph_facets: [graph_kind]
+          anchor_node_types: [STRUCTURE]
+          exempt_when:
+            - "mapping_status=DEPRECATED"
+          strata:
+            - structure_category
+            - structure_kind
       page_budgets:
         status: disabled
         reason: >-
@@ -1157,6 +1333,24 @@ mechs:
             - habitat_category
             - grounding_status
             - mapping_status
+      causal_graph_coverage:
+        # Parent classes are not exempt: most graphs sit on them, and a
+        # biome-level graph is the curation pattern. Graphs are authored as
+        # overlays and merged into records by the seeder; this reads records.
+        status: enabled
+        settings:
+          graph_shape: graph_list
+          record_id_field: identifier
+          anchor_node_types: [HABITAT]
+          duplicate_grounding_check: true
+          exempt_when:
+            # NOT_APPLICABLE: "The source concept is not a habitat ... so
+            # grounding it as one would be wrong."
+            - "grounding_status=NOT_APPLICABLE"
+            - "mapping_status=DEPRECATED"
+          strata:
+            - grounding_status
+            - habitat_category
       page_budgets:
         status: disabled
         reason: >-
@@ -1355,6 +1549,24 @@ mechs:
             - np_classification
             - grounding_status
             - curation_status
+      causal_graph_coverage:
+        # scope says which mechanism a graph describes (BIOSYNTHESIS or
+        # BIOACTIVITY), not whether it is one, so it is a facet rather than a
+        # scope_field. Nodes ground through identifier. A fragmented graph that
+        # says it is partial passes the Mech's own test and is still reported
+        # here as FRAGMENTED_GRAPH.
+        status: enabled
+        settings:
+          graph_shape: graph_list
+          record_id_field: identifier
+          node_grounding_field: identifier
+          graph_facets: [scope]
+          anchor_node_types: [COMPOUND]
+          duplicate_grounding_check: true
+          exempt_when:
+            - "curation_status=DEPRECATED"
+          strata:
+            - np_pathway
       page_budgets:
         status: disabled
         reason: >-
@@ -1492,6 +1704,24 @@ mechs:
             - rank
             - grounding_status
             - mapping_status
+      causal_graph_coverage:
+        # Higher taxa are never records, so the general-parent case does not
+        # arise. The seeder owns every record and writes no graph, so coverage
+        # is zero until the curator overlay the seeder would merge exists.
+        status: enabled
+        settings:
+          graph_shape: graph_list
+          record_id_field: identifier
+          anchor_node_types: [TAXON]
+          duplicate_grounding_check: true
+          exempt_when:
+            - "mapping_status=DEPRECATED"
+            # Domain OTHER holds metagenome and uncultured or unidentified
+            # sample nodes: environments, not organisms with a mechanism.
+            - "taxon_domain=OTHER"
+          strata:
+            - rank
+            - taxon_domain
       page_budgets:
         status: disabled
         reason: >-

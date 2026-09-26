@@ -30,6 +30,11 @@ skills:
   cas-rn-integration:
     scope: domain
     reason: CAS Registry enrichment of MIM ingredient records.
+  causal-graph-coverage:
+    scope: fleet
+    reason: >-
+      Reports causal-graph coverage for every Mech that declares the
+      causal_graph_coverage capability, resolved from the manifest.
   complex-ingredient-resolver:
     scope: domain
     reason: Multi-ontology cascade for heuristic-complex MIM ingredients.

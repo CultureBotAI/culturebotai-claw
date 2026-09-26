@@ -1,0 +1,737 @@
+"""Causal-graph coverage, comparable across the fleet (#132 Phase 6, item 2).
+
+Every Mech with a graph model counted its own coverage, and each count was a
+different question: TraitMech's dashboard divided by every record, deprecated
+ones included; CellStructureMech's README counted topology graphs as
+mechanisms; CommunityMech's graph was invisible to anything looking for a
+`causal_graphs` slot. These tests pin the distinctions the shared report draws
+instead -- each one against a fixture in which the two sides differ, because a
+fixture built from the case that already holds passes whether or not the
+distinction is implemented (#286).
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+import yaml
+
+from kg_microbe_corpus import collect as corpus_report
+from kg_microbe_fleet import load_fleet_manifest
+from kg_microbe_fleet.roots import MechRootError, resolve_mech_root
+from kg_microbe_graph.coverage import (
+    CAPABILITY,
+    CoverageConfig,
+    CoverageConfigError,
+    CoverageError,
+    ExemptionRule,
+    collect,
+)
+
+ROOT = Path(__file__).resolve().parents[1]
+GLOBS = ["data/**/*.yaml"]
+
+
+def _corpus(tmp_path: Path, records: dict[str, object]) -> Path:
+    root = tmp_path / "repo"
+    for name, content in records.items():
+        path = root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            content if isinstance(content, str) else yaml.safe_dump(content),
+            encoding="utf-8",
+        )
+    return root
+
+
+def _config(**settings: object) -> CoverageConfig:
+    return CoverageConfig.from_settings({"graph_shape": "graph_list", **settings})
+
+
+def _graph(graph_id: str, edges: int, scope: str | None = None, **extra: object) -> dict:
+    """A chain of `edges` edges over `edges + 1` nodes (one node when 0)."""
+    nodes = [{"node_id": f"n{i}", "node_type": "X"} for i in range(max(edges + 1, 1))]
+    graph: dict = {
+        "graph_id": graph_id,
+        "nodes": nodes,
+        "edges": [
+            {"subject": f"n{i}", "object": f"n{i + 1}", "predicate": "causes"}
+            for i in range(edges)
+        ],
+        **extra,
+    }
+    if scope is not None:
+        graph["scope_status"] = scope
+    return graph
+
+
+def _report(tmp_path: Path, records: dict[str, object], **settings: object) -> dict:
+    root = _corpus(tmp_path, records)
+    return collect("m", root, GLOBS, _config(**settings)).as_dict()
+
+
+# --------------------------------------------------------------------------
+# Configuration
+# --------------------------------------------------------------------------
+
+
+def test_a_graph_list_defaults_to_the_shape_traitmech_set_and_others_copied():
+    shape = _config().shape
+    assert (shape.graphs_field, shape.nodes_field, shape.edges_field) == (
+        "causal_graphs", "nodes", "edges",
+    )
+    assert (shape.edge_subject_field, shape.edge_object_field) == ("subject", "object")
+    assert shape.node_grounding_field == "grounding"
+
+
+def test_a_declared_field_overrides_its_default():
+    assert _config(node_grounding_field="identifier").shape.node_grounding_field == "identifier"
+
+
+def test_the_nested_shape_defaults_nothing():
+    """A field that is not declared must read as not measured. Defaulting
+    `edge_evidence_field` to `evidence` would report CommunityMech's 944 edges
+    as unevidenced, when its edges have no evidence slot at all."""
+    with pytest.raises(CoverageConfigError, match="nothing is defaulted"):
+        CoverageConfig.from_settings(
+            {"graph_shape": "node_nested_edges", "nodes_field": "interactions"}
+        )
+    config = CoverageConfig.from_settings({
+        "graph_shape": "node_nested_edges", "nodes_field": "interactions",
+        "edges_field": "downstream", "node_id_field": "name", "edge_object_field": "target",
+    })
+    assert config.shape.edge_evidence_field is None
+    assert config.shape.node_grounding_field is None
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [{"graphs_field": "causal_graphs"}, {"edge_subject_field": "source"},
+     {"scope_field": "scope"}, {"graph_facets": ["kind"]}],
+)
+def test_the_nested_shape_refuses_what_only_a_graph_object_has(extra):
+    with pytest.raises(CoverageConfigError):
+        CoverageConfig.from_settings({
+            "graph_shape": "node_nested_edges", "nodes_field": "interactions",
+            "edges_field": "downstream", "node_id_field": "name",
+            "edge_object_field": "target", **extra,
+        })
+
+
+def test_mechanistic_scopes_need_a_scope_field_to_name_values_of():
+    with pytest.raises(CoverageConfigError, match="no.*scope_field|none is declared"):
+        _config(mechanistic_scopes=["MECHANISTIC"])
+    assert _config(scope_field="scope_status", mechanistic_scopes=["MECHANISTIC"])
+
+
+def test_a_duplicate_grounding_check_needs_somewhere_to_read_groundings():
+    with pytest.raises(CoverageConfigError, match="node_grounding_field"):
+        CoverageConfig.from_settings({
+            "graph_shape": "node_nested_edges", "nodes_field": "interactions",
+            "edges_field": "downstream", "node_id_field": "name",
+            "edge_object_field": "target", "duplicate_grounding_check": True,
+        })
+
+
+@pytest.mark.parametrize(
+    "settings",
+    [{"graph_shape": "graphs"}, {"graph_shape": "graph_list", "nodes_field": "a.b"},
+     {"graph_shape": "graph_list", "strata": ["bad path!"]},
+     {"graph_shape": "graph_list", "record_id_field": "has space"}],
+)
+def test_a_declaration_that_cannot_be_applied_is_refused(settings):
+    with pytest.raises(CoverageConfigError):
+        CoverageConfig.from_settings(settings)
+
+
+@pytest.mark.parametrize(
+    ("text", "kind"),
+    [("mapping_status=DEPRECATED", "equals"), ("a.b=X|Y", "equals"),
+     ("identifier~^EC:.*-$", "matches"), ("path:data/x/*.yaml", "path")],
+)
+def test_an_exemption_rule_has_three_forms(text, kind):
+    assert ExemptionRule.parse(text).kind == kind
+
+
+def test_the_first_operator_splits_a_rule():
+    """`=` inside a regex is part of the pattern, not a second operator."""
+    rule = ExemptionRule.parse("label~a=b")
+    assert (rule.kind, rule.field) == ("matches", "label")
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["DEPRECATED", "=DEPRECATED", "bad field=X", "status=A||B", "status=",
+     "id~(", "id~", "path:", "path:/etc/*.yaml", "path:../other/*.yaml"],
+)
+def test_a_rule_that_cannot_mean_anything_is_an_error(text):
+    """A typo must fail the declaration, not become a rule matching nothing."""
+    with pytest.raises(CoverageConfigError):
+        ExemptionRule.parse(text)
+
+
+# --------------------------------------------------------------------------
+# What counts as covered
+# --------------------------------------------------------------------------
+
+
+def test_a_graph_with_no_edge_is_not_coverage(tmp_path):
+    report = _report(tmp_path, {
+        "data/none.yaml": {"identifier": "A"},
+        "data/edgeless.yaml": {"identifier": "B", "causal_graphs": [_graph("g", 0)]},
+        "data/covered.yaml": {"identifier": "C", "causal_graphs": [_graph("g", 2)]},
+    })
+    coverage = report["coverage"]
+    assert (coverage["no_graph"], coverage["edgeless_only"], coverage["with_graph"]) == (1, 1, 1)
+    assert coverage["fraction_with_graph"] == round(1 / 3, 4)
+
+
+def test_an_empty_graph_list_is_no_graph(tmp_path):
+    report = _report(tmp_path, {"data/a.yaml": {"causal_graphs": []}})
+    assert report["coverage"]["no_graph"] == 1
+
+
+def test_a_nonmechanistic_graph_is_coverage_but_not_a_mechanism(tmp_path):
+    report = _report(
+        tmp_path,
+        {
+            "data/mech.yaml": {"causal_graphs": [_graph("g", 2, "MECHANISTIC")]},
+            "data/non.yaml": {"causal_graphs": [_graph("g", 2, "NONMECHANISTIC")]},
+            "data/unset.yaml": {"causal_graphs": [_graph("g", 2)]},
+            "data/edgeless.yaml": {"causal_graphs": [_graph("g", 0, "MECHANISTIC")]},
+        },
+        scope_field="scope_status", mechanistic_scopes=["MECHANISTIC"],
+    )
+    coverage = report["coverage"]
+    assert coverage["with_graph"] == 3
+    # An edgeless graph cannot be a mechanism whatever its scope says.
+    assert coverage["with_mechanistic_graph"] == 1
+    assert coverage["edgeless_only"] == 1
+    assert report["graphs"]["scopes"] == {
+        "<unset>": 1, "MECHANISTIC": 2, "NONMECHANISTIC": 1,
+    }
+
+
+def test_one_mechanistic_graph_makes_a_record_mechanistic(tmp_path):
+    report = _report(
+        tmp_path,
+        {"data/a.yaml": {"causal_graphs": [
+            _graph("topology", 3, "NONMECHANISTIC"), _graph("assembly", 2, "MECHANISTIC"),
+        ]}},
+        scope_field="scope_status", mechanistic_scopes=["MECHANISTIC"],
+    )
+    assert report["coverage"]["with_mechanistic_graph"] == 1
+
+
+def test_without_a_declared_scope_there_is_no_mechanistic_count(tmp_path):
+    """HabitatMech's graphs carry no disposition. Reporting all 32 as
+    "mechanistic" would assert something no field says."""
+    report = _report(tmp_path, {"data/a.yaml": {"causal_graphs": [_graph("g", 2)]}})
+    assert report["coverage"]["with_mechanistic_graph"] is None
+    assert report["coverage"]["fraction_mechanistic"] is None
+    assert report["graphs"]["scopes"] is None
+
+
+# --------------------------------------------------------------------------
+# Declared exemptions
+# --------------------------------------------------------------------------
+
+
+def test_an_exempt_record_leaves_the_denominator(tmp_path):
+    records = {
+        "data/live.yaml": {"mapping_status": "REVIEWED"},
+        "data/retired.yaml": {"mapping_status": "DEPRECATED",
+                              "causal_graphs": [_graph("g", 1)]},
+    }
+    exempted = _report(tmp_path / "a", records, exempt_when=["mapping_status=DEPRECATED"])
+    counted = _report(tmp_path / "b", records)
+
+    assert counted["coverage"]["eligible"] == 2
+    assert exempted["coverage"]["eligible"] == 1
+    assert exempted["coverage"]["fraction_with_graph"] == 0.0
+    assert exempted["exempt"]["records"] == 1
+    # It still carries a graph, and saying so is how a wrong rule shows up.
+    assert exempted["exempt"]["with_graph"] == 1
+    assert exempted["records"] == exempted["exempt"]["records"] + exempted["coverage"]["eligible"]
+
+
+def test_the_first_matching_rule_is_credited(tmp_path):
+    records = {"data/a.yaml": {"mapping_status": "DEPRECATED", "term_kind": "OBJECT_PROPERTY"}}
+    rules = ["mapping_status=DEPRECATED", "term_kind=OBJECT_PROPERTY"]
+    forward = _report(tmp_path / "f", records, exempt_when=rules)["exempt"]["by_rule"]
+    backward = _report(tmp_path / "b", records, exempt_when=rules[::-1])["exempt"]["by_rule"]
+    assert forward == {"mapping_status=DEPRECATED": 1, "term_kind=OBJECT_PROPERTY": 0}
+    assert backward == {"term_kind=OBJECT_PROPERTY": 1, "mapping_status=DEPRECATED": 0}
+
+
+def test_a_rule_that_matches_nothing_is_still_reported(tmp_path):
+    """Five Mechs declare DEPRECATED rules that match no record today. A zero
+    is the report saying so; an absent key would look like no rule at all."""
+    report = _report(tmp_path, {"data/a.yaml": {"mapping_status": "SEEDED"}},
+                     exempt_when=["mapping_status=DEPRECATED"])
+    assert report["exempt"]["by_rule"] == {"mapping_status=DEPRECATED": 0}
+
+
+def test_alternatives_and_list_values_match_any_element(tmp_path):
+    report = _report(
+        tmp_path,
+        {"data/a.yaml": {"term_kind": "DATATYPE_PROPERTY"},
+         "data/b.yaml": {"tags": ["x", "grouping"]},
+         "data/c.yaml": {"term_kind": "CLASS", "tags": ["x"]}},
+        exempt_when=["term_kind=OBJECT_PROPERTY|DATATYPE_PROPERTY", "tags=grouping"],
+    )
+    assert report["exempt"]["records"] == 2
+
+
+def test_a_dotted_rule_follows_the_same_path_as_the_corpus_report(tmp_path):
+    report = _report(
+        tmp_path,
+        {"data/a.yaml": {"ontology_mapping": {"mapping_quality": "PLACEHOLDER"}},
+         "data/b.yaml": {"ontology_mapping": {"mapping_quality": "EXACT"}}},
+        exempt_when=["ontology_mapping.mapping_quality=PLACEHOLDER"],
+    )
+    assert report["exempt"]["records"] == 1
+
+
+def test_a_regex_rule_searches_the_value(tmp_path):
+    """Searched, not matched whole: an unanchored pattern finds a substring,
+    and anchoring is the rule author's to write."""
+    report = _report(
+        tmp_path,
+        {"data/a.yaml": {"identifier": "EC:1.1.1.-", "label": "x"},
+         "data/b.yaml": {"identifier": "EC:1.1.1.1", "label": "a grouping term"},
+         "data/c.yaml": {"identifier": "EC:1.1.1.2", "label": "leaf"}},
+        exempt_when=["identifier~^EC:.*-$", "label~grouping"],
+    )
+    assert report["exempt"]["by_rule"] == {"identifier~^EC:.*-$": 1, "label~grouping": 1}
+
+
+def test_scalars_compare_as_text(tmp_path):
+    report = _report(
+        tmp_path,
+        {"data/a.yaml": {"abstract": True}, "data/b.yaml": {"abstract": False},
+         "data/c.yaml": {"level": 1}},
+        exempt_when=["abstract=true", "level=1"],
+    )
+    assert report["exempt"]["records"] == 2
+
+
+def test_a_path_rule_uses_record_glob_semantics(tmp_path):
+    """`*` does not cross a directory, as in the manifest's record_globs.
+    fnmatch's `*` does, and would exempt the nested record too."""
+    report = _report(
+        tmp_path,
+        {"data/metpo/a.yaml": {"identifier": "A"},
+         "data/metpo/nested/b.yaml": {"identifier": "B"},
+         "data/other/c.yaml": {"identifier": "C"}},
+        exempt_when=["path:data/metpo/*.yaml"],
+    )
+    assert report["exempt"]["records"] == 1
+
+
+# --------------------------------------------------------------------------
+# Several graphs per record
+# --------------------------------------------------------------------------
+
+
+def test_graphs_per_record_and_the_combination_each_record_carries(tmp_path):
+    report = _report(
+        tmp_path,
+        {"data/both.yaml": {"causal_graphs": [
+            _graph("a", 2, graph_kind="ASSEMBLY"), _graph("f", 2, graph_kind="FUNCTION")]},
+         "data/one.yaml": {"causal_graphs": [_graph("f", 2, graph_kind="FUNCTION")]},
+         "data/none.yaml": {"identifier": "X"}},
+        graph_facets=["graph_kind"],
+    )
+    assert report["graphs"]["per_record"] == {"0": 1, "1": 1, "2": 1}
+    facet = report["graphs"]["facets"]["graph_kind"]
+    assert facet["graphs"] == {"ASSEMBLY": 1, "FUNCTION": 2}
+    assert facet["record_combinations"] == {"ASSEMBLY+FUNCTION": 1, "FUNCTION": 1}
+
+
+def test_a_graphless_record_grounded_in_another_records_graph_is_counted(tmp_path):
+    """TraitMech's acetoclastic methanogenesis has no graph of its own and is
+    a node in methanogenesis's. A per-record count cannot see that."""
+    graph = _graph("g", 1)
+    graph["nodes"][1]["grounding"] = "T:2"
+    edgeless = _graph("g", 0)
+    edgeless["nodes"][0]["grounding"] = "T:3"
+    records = {
+        "data/parent.yaml": {"identifier": "T:1", "causal_graphs": [graph]},
+        "data/modelled_elsewhere.yaml": {"identifier": "T:2"},
+        "data/only_in_an_edgeless_graph.yaml": {"identifier": "T:3"},
+        "data/other.yaml": {"identifier": "T:4", "causal_graphs": [edgeless]},
+        "data/nowhere.yaml": {"identifier": "T:5"},
+    }
+    report = _report(tmp_path / "a", records, record_id_field="identifier")
+    assert report["coverage"]["graphless_but_referenced_elsewhere"] == 1
+    assert _report(tmp_path / "b", records)["coverage"][
+        "graphless_but_referenced_elsewhere"
+    ] is None
+
+
+# --------------------------------------------------------------------------
+# A record that is one graph
+# --------------------------------------------------------------------------
+
+NESTED = {
+    "graph_shape": "node_nested_edges", "nodes_field": "ecological_interactions",
+    "node_id_field": "name", "node_type_field": "interaction_type",
+    "edges_field": "downstream", "edge_object_field": "target",
+}
+
+
+def test_a_record_can_be_one_graph_whose_nodes_list_their_edges(tmp_path):
+    root = _corpus(tmp_path, {
+        "data/chain.yaml": {"ecological_interactions": [
+            {"name": "a", "interaction_type": "CROSS_FEEDING", "downstream": [{"target": "b"}]},
+            {"name": "b", "downstream": [{"target": "c"}]},
+            {"name": "c"}]},
+        "data/unlinked.yaml": {"ecological_interactions": [{"name": "a"}, {"name": "b"}]},
+        "data/empty.yaml": {"ecological_interactions": []},
+        "data/absent.yaml": {"id": "x"},
+        "data/typo.yaml": {"ecological_interactions": [
+            {"name": "a", "downstream": [{"target": "missing"}]}]},
+    })
+    report = collect("m", root, GLOBS, CoverageConfig.from_settings(NESTED)).as_dict()
+    coverage = report["coverage"]
+    assert (coverage["with_graph"], coverage["edgeless_only"], coverage["no_graph"]) == (2, 1, 2)
+    assert report["structure"]["findings"]["DANGLING_EDGE"] == {"findings": 1, "graphs": 1}
+    assert report["graphs"]["node_types"] == {"<unset>": 5, "CROSS_FEEDING": 1}
+    # Undeclared, so unmeasured -- not zero.
+    assert report["graphs"]["edges_with_evidence"] is None
+    assert report["graphs"]["nodes_grounded"] is None
+
+
+def test_directed_cycles_are_not_findings(tmp_path):
+    """CommunityMech's syntrophic loops are cycles by design."""
+    root = _corpus(tmp_path, {"data/loop.yaml": {"ecological_interactions": [
+        {"name": "a", "downstream": [{"target": "b"}]},
+        {"name": "b", "downstream": [{"target": "a"}]}]}})
+    report = collect("m", root, GLOBS, CoverageConfig.from_settings(NESTED)).as_dict()
+    assert report["structure"]["findings"] == {}
+
+
+# --------------------------------------------------------------------------
+# Graph statistics and structure
+# --------------------------------------------------------------------------
+
+
+def test_evidence_and_grounding_are_counted_where_present(tmp_path):
+    graph = _graph("g", 2)
+    graph["edges"][0]["evidence"] = [{"reference": "PMID:1"}]
+    graph["edges"][1]["evidence"] = []
+    graph["nodes"][0]["grounding"] = "GO:1"
+    report = _report(tmp_path, {"data/a.yaml": {"causal_graphs": [graph]}})
+    assert report["graphs"]["edges_with_evidence"] == 1
+    assert report["graphs"]["nodes_grounded"] == 1
+
+
+def test_node_and_edge_counts_are_spread_and_bucketed(tmp_path):
+    report = _report(tmp_path, {"data/a.yaml": {"causal_graphs": [
+        _graph("a", 1), _graph("b", 3), _graph("c", 25)]}})
+    graphs = report["graphs"]
+    assert graphs["edges_per_graph"] == {"min": 1, "median": 3, "max": 25}
+    assert graphs["edge_count_histogram"] == {"1": 1, "2-4": 1, "20+": 1}
+    assert graphs["total"] == 3 and graphs["edges"] == 29
+
+
+def test_findings_are_counted_both_as_findings_and_as_graphs(tmp_path):
+    """ORPHAN_NODE is per node and FRAGMENTED_GRAPH per graph; one number per
+    code would make 71 findings on 27 graphs read like 71 bad graphs."""
+    graph = _graph("g", 1)
+    graph["nodes"] += [{"node_id": "lonely1"}, {"node_id": "lonely2"}]
+    report = _report(tmp_path, {"data/a.yaml": {"causal_graphs": [graph]}})
+    findings = report["structure"]["findings"]
+    assert findings["ORPHAN_NODE"] == {"findings": 2, "graphs": 1}
+    assert report["structure"]["graphs_with_findings"] == 1
+
+
+def test_findings_are_split_by_scope(tmp_path):
+    """TraitMech exempts NONMECHANISTIC graphs from connectivity (#598), and
+    TraitMech#613 asks that the fragmentation it hides still be counted."""
+    fragmented = {
+        "graph_id": "g", "nodes": [{"node_id": x} for x in "abcd"],
+        "edges": [{"subject": "a", "object": "b"}, {"subject": "c", "object": "d"}],
+    }
+    report = _report(
+        tmp_path,
+        {"data/m.yaml": {"causal_graphs": [dict(fragmented, scope_status="MECHANISTIC")]},
+         "data/n.yaml": {"causal_graphs": [dict(fragmented, scope_status="NONMECHANISTIC")]}},
+        scope_field="scope_status", mechanistic_scopes=["MECHANISTIC"],
+    )
+    assert report["structure"]["graphs_by_scope"]["FRAGMENTED_GRAPH"] == {
+        "MECHANISTIC": 1, "NONMECHANISTIC": 1,
+    }
+
+
+def test_duplicate_groundings_are_checked_only_when_declared(tmp_path):
+    graph = _graph("g", 1)
+    graph["nodes"][0]["grounding"] = graph["nodes"][1]["grounding"] = "CHEBI:1"
+    records = {"data/a.yaml": {"causal_graphs": [graph]}}
+    checked = _report(tmp_path / "a", records, duplicate_grounding_check=True)
+    unchecked = _report(tmp_path / "b", records)
+    assert "DUPLICATE_GROUNDING" in checked["structure"]["findings"]
+    assert "DUPLICATE_GROUNDING" not in unchecked["structure"]["findings"]
+
+
+def test_the_declared_anchor_reaches_the_audit(tmp_path):
+    records = {"data/a.yaml": {"causal_graphs": [_graph("g", 1)]}}
+    anchored = _report(tmp_path / "a", records, anchor_node_types=["TRAIT"])
+    unanchored = _report(tmp_path / "b", records)
+    assert anchored["structure"]["findings"]["NO_ANCHOR_NODE"] == {"findings": 1, "graphs": 1}
+    assert unanchored["structure"]["findings"] == {}
+
+
+def test_a_graph_id_repeated_within_a_record_is_a_finding(tmp_path):
+    """Two records may share a graph_id -- CellStructureMech does -- but one
+    record may not, since an anchor `causal_graphs#<id>` could not say which."""
+    report = _report(tmp_path, {
+        "data/a.yaml": {"causal_graphs": [_graph("g", 1), _graph("g", 2)]},
+        "data/b.yaml": {"causal_graphs": [_graph("h", 1)]},
+        "data/c.yaml": {"causal_graphs": [_graph("h", 1)]},
+    })
+    assert report["structure"]["findings"]["DUPLICATE_GRAPH_ID"] == {"findings": 1, "graphs": 2}
+
+
+# --------------------------------------------------------------------------
+# Reading the corpus
+# --------------------------------------------------------------------------
+
+
+def test_unreadable_and_malformed_records_are_named_and_excluded(tmp_path):
+    no_id = _graph("g", 1)
+    del no_id["nodes"][0]["node_id"]
+    report = _report(tmp_path, {
+        "data/good.yaml": {"causal_graphs": [_graph("g", 1)]},
+        "data/broken.yaml": "causal_graphs: [unclosed\n",
+        "data/list.yaml": "- a\n- b\n",
+        "data/string.yaml": {"causal_graphs": "see elsewhere"},
+        "data/no_node_id.yaml": {"causal_graphs": [no_id]},
+    })
+    assert report["records"] == 1
+    assert report["unreadable"] == ["data/broken.yaml"]
+    assert [entry.split(":")[0] for entry in report["malformed"]] == [
+        "data/list.yaml", "data/no_node_id.yaml", "data/string.yaml",
+    ]
+    assert "not a list" in next(m for m in report["malformed"] if "string" in m)
+
+
+def test_strata_break_every_count_down(tmp_path):
+    report = _report(
+        tmp_path,
+        {"data/a/x.yaml": {"status": "REVIEWED", "causal_graphs": [_graph("g", 1)]},
+         "data/a/y.yaml": {"status": "REVIEWED"},
+         "data/b/z.yaml": {"status": "DEPRECATED"},
+         "data/b/w.yaml": {}},
+        exempt_when=["status=DEPRECATED"], strata=["status", "@directory"],
+    )
+    status = report["strata"]["status"]
+    assert status["REVIEWED"] == {
+        "records": 2, "exempt": 0, "eligible": 2,
+        "with_graph": 1, "edgeless_only": 0, "no_graph": 1,
+    }
+    # An exempt record is in no eligible bucket, in a stratum as in the total.
+    assert status["DEPRECATED"] == {
+        "records": 1, "exempt": 1, "eligible": 0,
+        "with_graph": 0, "edgeless_only": 0, "no_graph": 0,
+    }
+    assert status["<unset>"]["no_graph"] == 1
+    assert set(report["strata"]["@directory"]) == {"data/a", "data/b"}
+
+
+def test_the_report_is_deterministic_and_carries_no_absolute_paths(tmp_path):
+    records = {f"data/{name}.yaml": {"causal_graphs": [_graph("g", i)]}
+               for i, name in enumerate("cab")}
+    root = _corpus(tmp_path, records)
+    config = _config(strata=["@directory"])
+    first = collect("m", root, GLOBS, config).to_json()
+    assert first == collect("m", root, GLOBS, config).to_json()
+    assert str(root) not in first
+    json.loads(first)
+
+
+def test_a_sample_reads_the_first_n_records(tmp_path):
+    root = _corpus(tmp_path, {f"data/{i}.yaml": {"identifier": str(i)} for i in range(5)})
+    report = collect("m", root, GLOBS, _config(), sample=2).as_dict()
+    assert report["records"] == 2 and report["sampled"] is True
+
+
+def test_the_corpus_must_exist_and_be_declared(tmp_path):
+    with pytest.raises(CoverageError, match="not a directory"):
+        collect("m", tmp_path / "absent", GLOBS, _config())
+    with pytest.raises(CoverageError, match="no record globs"):
+        collect("m", tmp_path, [], _config())
+
+
+# --------------------------------------------------------------------------
+# The command
+# --------------------------------------------------------------------------
+
+
+def test_a_mech_without_a_graph_model_reports_its_reason(capsys):
+    from kg_microbe_graph.__main__ import main
+
+    assert main(["coverage", "--mech", "culturemech"]) == 0
+    assert "reports no causal-graph coverage: not_applicable" in capsys.readouterr().out
+
+
+def test_root_reads_a_snapshot_under_the_mechs_own_declaration(tmp_path, capsys):
+    from kg_microbe_graph.__main__ import main
+
+    root = _corpus(tmp_path, {
+        "data/traits/a.yaml": {"mapping_status": "REVIEWED",
+                               "causal_graphs": [_graph("g", 1, "MECHANISTIC")]},
+        "data/traits/b.yaml": {"mapping_status": "DEPRECATED"},
+    })
+    assert main(["coverage", "--mech", "traitmech", "--root", str(root)]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["exempt"]["by_rule"]["mapping_status=DEPRECATED"] == 1
+    assert report["coverage"]["with_mechanistic_graph"] == 1
+
+
+def test_an_unreadable_record_makes_the_command_fail(tmp_path, capsys):
+    from kg_microbe_graph.__main__ import main
+
+    root = _corpus(tmp_path, {"data/traits/a.yaml": "identifier: [unclosed\n"})
+    assert main(["coverage", "--mech", "traitmech", "--root", str(root)]) == 1
+    assert json.loads(capsys.readouterr().out)["unreadable"] == ["data/traits/a.yaml"]
+
+
+def test_a_fleet_run_names_what_it_could_not_read_and_fails(monkeypatch, capsys):
+    import kg_microbe_graph.__main__ as cli
+
+    def unavailable(key, **_):
+        raise MechRootError(f"{key} is not configured")
+
+    monkeypatch.setattr(cli, "resolve_mech_root", unavailable)
+    assert cli.main(["coverage", "--all"]) == 1
+    payload = json.loads(capsys.readouterr().out)
+    manifest = load_fleet_manifest()
+    enabled = set(manifest.with_capability(CAPABILITY))
+    assert set(payload["unavailable"]) == enabled
+    assert set(payload["not_enabled"]) == set(manifest.mechs) - enabled
+    assert payload["reports"] == {}
+
+
+def test_a_fleet_summary_has_a_row_for_every_mech(monkeypatch, tmp_path, capsys):
+    import kg_microbe_graph.__main__ as cli
+
+    root = _corpus(tmp_path, {"data/x.yaml": {"identifier": "A"}})
+    monkeypatch.setattr(cli, "resolve_mech_root", lambda key, **_: root)
+    assert cli.main(["coverage", "--all", "--summary"]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    for key in load_fleet_manifest().mechs:
+        assert any(line.startswith(key) for line in lines), key
+
+
+def test_root_names_one_checkout(capsys):
+    from kg_microbe_graph.__main__ import main
+
+    with pytest.raises(SystemExit) as raised:
+        main(["coverage", "--all", "--root", "."])
+    assert raised.value.code == 2
+
+
+# --------------------------------------------------------------------------
+# The manifest
+# --------------------------------------------------------------------------
+
+
+def test_every_mech_decides_whether_it_has_a_causal_graph_to_cover():
+    """CultureMech and MIM have no graph model. Saying so with a reason is
+    what separates "does not apply" from "forgot"."""
+    manifest = load_fleet_manifest()
+    assert set(manifest.with_capability(CAPABILITY)) == {
+        "communitymech", "traitmech", "proteintraitsmech", "antibioticmech",
+        "cellstructuremech", "habitatmech", "naturalproductmech", "taxonmech",
+    }
+    for key, mech in manifest.mechs.items():
+        capability = mech.capabilities[CAPABILITY]
+        if not capability.is_enabled:
+            assert capability.reason, f"{key} opts out without a reason"
+
+
+@pytest.mark.parametrize("mech", load_fleet_manifest().with_capability(CAPABILITY))
+def test_every_enabled_declaration_is_one_the_tool_can_apply(mech):
+    """The loader checks each setting's type; only this checks that they make
+    sense together. It needs no checkout, so it runs in CI."""
+    settings = load_fleet_manifest().mechs[mech].capabilities[CAPABILITY].settings
+    CoverageConfig.from_settings(settings)
+
+
+# --------------------------------------------------------------------------
+# Against the real corpora
+# --------------------------------------------------------------------------
+
+
+def _root_or_skip(mech: str) -> Path:
+    try:
+        return resolve_mech_root(mech, claw_root=ROOT)
+    except MechRootError as exc:
+        pytest.skip(f"needs a {mech} checkout: {exc}")
+
+
+@pytest.mark.parametrize("mech", load_fleet_manifest().with_capability(CAPABILITY))
+def test_every_declared_field_is_one_the_corpus_carries(mech):
+    """A misspelt exemption field matches nothing and reads as "no record is
+    exempt"; a misspelt stratum reports everything as <unset>. Both look like
+    data, so each declared field is checked against its own corpus."""
+    root = _root_or_skip(mech)
+    declaration = load_fleet_manifest().mechs[mech]
+    config = CoverageConfig.from_settings(declaration.capabilities[CAPABILITY].settings)
+    fields = [rule.field for rule in config.exempt_when if rule.field]
+    fields += [s for s in config.strata if not s.startswith("@")]
+    if config.record_id_field:
+        fields.append(config.record_id_field)
+
+    report = corpus_report(mech, root, list(declaration.record_globs), fields, sample=400)
+    if not report.records:
+        pytest.skip(f"{mech} has no records at its declared globs here")
+    empty = [name for name, stats in report.fields.items() if not stats.populated]
+    assert not empty, f"{mech} declares {empty}, which no sampled record carries"
+
+    for rule in config.exempt_when:
+        if rule.kind == "path":
+            assert any(p.is_file() for p in root.glob(rule.glob or "")), (
+                f"{mech} exempts {rule.text}, which matches no file"
+            )
+
+
+def _enum_values(schema: dict, slot: str) -> list[str] | None:
+    ranges = [
+        (cls.get("attributes") or {}).get(slot, {}).get("range")
+        for cls in (schema.get("classes") or {}).values()
+    ]
+    ranges.append((schema.get("slots") or {}).get(slot, {}).get("range"))
+    for name in filter(None, ranges):
+        enum = (schema.get("enums") or {}).get(name)
+        if enum is not None:
+            return list(enum.get("permissible_values") or {})
+    return None
+
+
+@pytest.mark.parametrize("mech", load_fleet_manifest().with_capability(CAPABILITY))
+def test_an_exempted_value_is_one_the_schema_permits(mech):
+    """Five DEPRECATED rules match no record today, so the corpus cannot say
+    whether the value is spelt right. The schema can."""
+    root = _root_or_skip(mech)
+    declaration = load_fleet_manifest().mechs[mech]
+    config = CoverageConfig.from_settings(declaration.capabilities[CAPABILITY].settings)
+    schema = yaml.safe_load((root / declaration.schema_paths[0]).read_text(encoding="utf-8"))
+    judged = 0
+    for rule in config.exempt_when:
+        if rule.kind != "equals" or not rule.field or "." in rule.field:
+            continue
+        permitted = _enum_values(schema, rule.field)
+        if permitted is None:
+            continue
+        judged += 1
+        assert rule.values <= set(permitted), (
+            f"{mech} exempts {sorted(rule.values - set(permitted))} for {rule.field}, "
+            f"which its schema does not permit"
+        )
+    if not judged:
+        pytest.skip(f"{mech} declares no enum-valued exemption to judge")

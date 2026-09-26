@@ -94,6 +94,9 @@ EXPECTED_CAPABILITIES = {
     # Phase 7: whose YAML-writing scripts are audited by the shared rule, and
     # why the two that are not have decided rather than forgotten.
     "writer_audit",
+    # Where each Mech keeps its causal graphs, which records are declared not
+    # to need one, and why the two without a graph model say so.
+    "causal_graph_coverage",
     "id_label_validation",
     "curation_history",
     "strict_validation",
