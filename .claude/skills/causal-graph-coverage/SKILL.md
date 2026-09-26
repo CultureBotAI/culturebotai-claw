@@ -64,8 +64,10 @@ uv run python -m kg_microbe_fleet list --capability causal_graph_coverage --form
 uv run python -m kg_microbe_fleet targets --capability causal_graph_coverage --dotenv .env
 ROOT="$(uv run python -m kg_microbe_fleet targets --capability causal_graph_coverage \
           --dotenv .env | awk -F'\t' '$1 == "habitatmech" {print $5}')"
-# An unconfigured Mech has an empty root, and `git -C ""` would act on claw.
-: "${ROOT:?habitatmech has no configured checkout}"
+# An empty root means `targets` returned no checkout for habitatmech -- unset,
+# or refused by its identity check (see its output above); `git -C ""` would
+# otherwise act on claw.
+: "${ROOT:?targets returned no checkout for habitatmech}"
 git -C "$ROOT" fetch -q origin
 git -C "$ROOT" rev-list --count origin/main --not HEAD   # 0 means current
 ```
@@ -108,7 +110,8 @@ corpus of 5,000 records or more is parsed in `--jobs` processes (default: up to
 TaxonMech (about 626,000) 560 s and 158 s.
 `--sample N` reads the first N records in sorted order -- a different corpus,
 which the report marks `sampled: true` and `--summary` marks with `*` -- so use
-it to try a declaration, not to quote.
+it to try a declaration, not to quote. `--summary` marks a row with `!` when
+files were excluded from its counts, and says how many under the table.
 
 Exit codes: `0` report produced (or the Mech declares no graph model and the
 command printed why); `1` the report is **incomplete** — a record could not be
@@ -116,7 +119,8 @@ read, held no document at all, or did not have the declared shape (named
 under `unreadable`, `empty` and `malformed`, and on stderr), or with `--all` a Mech could not be read or held
 no records at its globs (named under `unavailable`); `2` bad usage, an
 unresolvable or empty root for a single `--mech`, or a declaration the tool
-cannot apply. Do not quote a fraction from a run that exited `1` without saying
+cannot apply -- including one only the corpus refutes, such as a path rule that
+reaches directories and no file. Do not quote a fraction from a run that exited `1` without saying
 what it excluded.
 
 ## Reading the report
@@ -216,7 +220,8 @@ When a kind of record genuinely takes no graph:
      cross a directory; a glob that reaches only directories is refused)
    A dotted path reaches every element of every list on the way, so
    `lineage.taxon_id=X` matches wherever X sits in the lineage. A boolean
-   matches `true`, `yes` or `on` in any case. Prefer a field the curators set
+   matches `true`, `yes` or `on` (or `false`, `no`, `off`) in any case, under
+   either operator. Prefer a field the curators set
    over a path or a label pattern.
 3. Run the report before and after. The rule's count, and `exempt.with_graph`,
    are the review evidence: a rule that exempts records carrying graphs is

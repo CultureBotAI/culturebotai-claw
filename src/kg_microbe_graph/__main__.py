@@ -66,8 +66,9 @@ def _revision(root: Path, globs: Sequence[str]) -> str:
     claw's workspace (#472).
     """
     try:
-        top = _git(root, "rev-parse", "--show-toplevel", timeout=30)
-        if Path(top).resolve() != Path(root).resolve():
+        # Asked of git rather than compared as paths: a checkout reached through
+        # a case-variant spelling or a firmlink is still the checkout (#493).
+        if _git(root, "rev-parse", "--show-prefix", timeout=30) != "":
             return SNAPSHOT
         head = _git(root, "rev-parse", "--short", "HEAD", timeout=30)
         # Untracked files count: a new record under the globs is read and
@@ -92,8 +93,11 @@ def _summary_row(key: str, report: CoverageReport) -> str:
         return "-" if value is None else f"{100 * value:5.1f}%"
 
     mechanistic = coverage["with_mechanistic_graph"]
-    # A sampled row is a different corpus; mark it where the number is read.
-    records = f"{data['records']}{'*' if data['sampled'] else ''}"
+    # A sampled row is a different corpus, and a row with excluded files an
+    # incomplete one; mark both where the number is read, not only on stderr,
+    # which a captured table loses (#494).
+    marks = ("*" if data["sampled"] else "") + ("!" if report.excluded else "")
+    records = f"{data['records']}{marks}"
     return (
         f"{key:<20} {records:>8} {data['exempt']['records']:>7} "
         f"{coverage['eligible']:>8} {coverage['with_graph']:>8} "
@@ -199,6 +203,11 @@ def main(argv: list[str] | None = None) -> int:
             reports[key] = collect(
                 key, root, globs, config, sample=args.sample, jobs=args.jobs
             )
+        except CoverageConfigError as exc:
+            # A declaration only the corpus could refute -- still the
+            # manifest's error, not an unavailable checkout (#497).
+            print(f"{key}: {CAPABILITY} is declared incorrectly: {exc}", file=sys.stderr)
+            return 2
         except CoverageError as exc:
             unavailable[key] = str(exc)
             continue
@@ -226,6 +235,13 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{key:<20} UNAVAILABLE: {why}")
         if args.sample is not None:
             print(f"* sampled: the first {args.sample} records only, not the corpus")
+        for key, report in reports.items():
+            if report.excluded:
+                print(
+                    f"! {key}: {len(report.excluded)} file(s) excluded from every "
+                    f"count (unreadable {len(report.unreadable)}, empty "
+                    f"{len(report.empty)}, malformed {len(report.malformed)})"
+                )
     elif args.all:
         payload: dict[str, Any] = {
             "reports": {key: report.as_dict() for key, report in reports.items()},

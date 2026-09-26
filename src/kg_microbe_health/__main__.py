@@ -6,7 +6,12 @@ import argparse
 import sys
 
 from kg_microbe_fleet import load_fleet_manifest
-from kg_microbe_fleet.roots import MechRootError, claw_root, resolve_mech_root
+from kg_microbe_fleet.roots import (
+    MechRootError,
+    claw_root,
+    is_claw_checkout,
+    resolve_mech_root,
+)
 from kg_microbe_health.repository import (
     DEFAULT_LARGE_FILE_BYTES,
     DEFAULT_LARGEST,
@@ -42,6 +47,14 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.mech == "claw":
+        # Measuring whatever repository happens to be here and labelling it
+        # claw is worse than refusing (#486).
+        if not is_claw_checkout(CLAW_ROOT):
+            print(
+                f"{CLAW_ROOT} is not a claw checkout; run from inside one",
+                file=sys.stderr,
+            )
+            return 2
         root = CLAW_ROOT
     else:
         try:

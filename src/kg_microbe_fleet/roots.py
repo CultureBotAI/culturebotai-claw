@@ -24,6 +24,7 @@ at least exist.
 from __future__ import annotations
 
 import os
+import sys
 from collections.abc import Mapping
 from io import StringIO
 from pathlib import Path
@@ -98,14 +99,15 @@ def looks_like(root: Path, package_path: str) -> bool:
     return (Path(root) / package_path).is_dir()
 
 
-def _is_claw_checkout(path: Path) -> bool:
-    return (path / "pyproject.toml").is_file() and (
-        path / "src" / "kg_microbe_fleet" / "fleet.yaml"
+def is_claw_checkout(path: Path) -> bool:
+    """Whether `path` is the top of a claw checkout."""
+    return (Path(path) / "pyproject.toml").is_file() and (
+        Path(path) / "src" / "kg_microbe_fleet" / "fleet.yaml"
     ).is_file()
 
 
 def claw_root(start: Path | None = None) -> Path:
-    """The claw checkout whose `.env` configures the fleet (#480).
+    """The claw checkout whose `.env` configures the fleet (#480, #486).
 
     Every `kg-microbe-*` console script used
     `Path(__file__).resolve().parents[2]`, which is claw's root only while the
@@ -114,22 +116,35 @@ def claw_root(start: Path | None = None) -> Path:
     fleet configured exactly as CLAUDE.md prescribes reported every Mech as
     not configured.
 
-    So: the source checkout this package was imported from, when it is one --
-    which leaves every editable and development install exactly as it was --
-    and otherwise the working directory or the nearest ancestor that is a
-    claw checkout, which is how an installed command is run. Failing both,
-    the working directory: its `.env` lookup finds nothing, and the sibling
-    guess `resolve_mech_root` then makes is verified before it is used, so a
-    wrong answer here produces a refusal rather than work on the wrong tree.
+    In order: the source checkout this package was imported from, which
+    leaves every editable and development install exactly as it was; the
+    checkout holding the running virtualenv (`uv sync --no-editable` inside
+    claw); then the working directory or its nearest claw ancestor, which is
+    how an installed command is run.
+
+    Failing all three it returns the package's own location, the answer the
+    old expression gave. That directory has no `.env` and no `.git`, so every
+    consumer refuses -- `resolve_mech_root` falls through to a verified
+    sibling guess, and `kg-microbe-health --mech claw` finds no checkout to
+    measure. Returning the working directory instead would read an unrelated
+    `.env` as claw's and measure an unrelated repository as claw (#486).
     """
     packaged = Path(__file__).resolve().parents[2]
-    if _is_claw_checkout(packaged):
+    if is_claw_checkout(packaged):
         return packaged
-    here = (start or Path.cwd()).resolve()
-    for candidate in (here, *here.parents):
-        if _is_claw_checkout(candidate):
+    prefix = Path(sys.prefix).resolve()
+    for candidate in (prefix, *prefix.parents):
+        if is_claw_checkout(candidate):
             return candidate
-    return here
+    try:
+        here = (start or Path.cwd()).resolve()
+    except OSError:
+        # A working directory deleted under the shell; `--help` must still work.
+        return packaged
+    for candidate in (here, *here.parents):
+        if is_claw_checkout(candidate):
+            return candidate
+    return packaged
 
 
 # kg-microbe is a corpus this fleet reads, not a Mech, so the manifest has no

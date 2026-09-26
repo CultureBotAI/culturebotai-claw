@@ -365,9 +365,16 @@ both as findings and as graphs) come with it. It reads the working tree; pass
 corpus is parsed in `--jobs` processes and the report is identical for any
 value.
 
-Every `kg-microbe-*` console script finds claw's checkout, and so its `.env`,
-through `kg_microbe_fleet.roots.claw_root()`, never `Path(__file__).parents[2]`,
-which points into the virtualenv once the package is installed from a wheel.
+Every `kg-microbe-*` console script that resolves Mech roots through claw's
+`.env` -- corpus, graph, health, kgx, pages, site, source-queue, sources, sssom
+and writers -- finds claw through `kg_microbe_fleet.roots.claw_root()`, never
+`Path(__file__).parents[2]`, which points into the virtualenv once the package
+is installed from a wheel. The source checkout wins, then the checkout holding
+the virtualenv, then the working directory; failing all three it answers with
+the package's own location, where every consumer refuses. `kg-microbe-skills`
+is the exception: it finds the checkout being checked from the working
+directory (`find_claw_root`), and its catalogue still derives `.claude/skills`
+from `parents[2]` (#489).
 
 `kg-microbe-source-queue check` judges a Mech's `curation/source_queue.tsv`:
 the eleven columns both existing queues share, one spelling per licence class,

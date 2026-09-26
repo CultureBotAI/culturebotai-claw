@@ -764,66 +764,55 @@ def test_an_exempted_value_is_one_the_schema_permits(mech):
         )
 
 
-def _graph_keys(mech: str, root: Path, config: CoverageConfig) -> tuple[set, set, set, set]:
-    """Keys seen on records, graphs, nodes and edges, from the first records
-    that carry graphs -- bounded, because PTM's graphs sit deep in its sort."""
-    from kg_microbe_corpus import iter_records
+def _slots(schema_view, class_name: str) -> set[str]:
+    return set(schema_view.class_slots(class_name))
 
-    shape = config.shape
-    declaration = load_fleet_manifest().mechs[mech]
-    record_keys, graph_keys, node_keys, edge_keys = set(), set(), set(), set()
-    graphs_seen = 0
-    for scanned, (_, record) in enumerate(iter_records(root, list(declaration.record_globs))):
-        if scanned >= 20_000 or graphs_seen >= 50:
-            break
-        if not isinstance(record, dict):
-            continue
-        record_keys.update(k for k, v in record.items() if v not in (None, "", [], {}))
-        if shape.graphs_field:
-            graphs = record.get(shape.graphs_field) or []
-        else:
-            graphs = [{shape.nodes_field: record.get(shape.nodes_field) or []}]
-        for graph in graphs:
-            if not isinstance(graph, dict) or not graph.get(shape.nodes_field):
-                continue
-            graphs_seen += 1
-            graph_keys.update(k for k, v in graph.items() if v not in (None, "", [], {}))
-            for node in graph.get(shape.nodes_field) or []:
-                node_keys.update(k for k, v in node.items() if v not in (None, "", [], {}))
-                if shape.kind == "node_nested_edges":
-                    for edge in node.get(shape.edges_field) or []:
-                        edge_keys.update(k for k, v in edge.items() if v not in (None, "", []))
-            for edge in graph.get(shape.edges_field) or [] if shape.graphs_field else []:
-                edge_keys.update(k for k, v in edge.items() if v not in (None, "", [], {}))
-    if not graphs_seen:
-        pytest.skip(f"{mech}: no graph in the first records scanned here")
-    return record_keys, graph_keys, node_keys, edge_keys
+
+def _range(schema_view, class_name: str, slot: str) -> str:
+    return schema_view.induced_slot(slot, class_name).range
 
 
 @pytest.mark.parametrize("mech", load_fleet_manifest().with_capability(CAPABILITY))
-def test_every_declared_graph_field_is_one_the_graphs_carry(mech):
-    """A misspelt scope_field zeroes the mechanistic headline without an error;
-    a misspelt grounding field reports every node ungrounded (#478)."""
+def test_every_declared_graph_field_is_one_the_schema_declares(mech):
+    """A misspelt `graphs_field` finds no graphs and reports 0% coverage with
+    exit 0; a misspelt scope_field zeroes the mechanistic headline. Both look
+    like data. Checked against the schema, so it holds whether or not the
+    corpus has graphs yet -- TaxonMech has none -- and costs no corpus scan
+    (#492)."""
+    from linkml_runtime.utils.schemaview import SchemaView
+
     root = _root_or_skip(mech)
-    config = CoverageConfig.from_settings(
-        load_fleet_manifest().mechs[mech].capabilities[CAPABILITY].settings
-    )
+    declaration = load_fleet_manifest().mechs[mech]
+    config = CoverageConfig.from_settings(declaration.capabilities[CAPABILITY].settings)
     shape = config.shape
-    _, graph_keys, node_keys, edge_keys = _graph_keys(mech, root, config)
-    expected = {
-        "graph": {config.scope_field, *config.graph_facets, shape.graph_id_field,
-                  shape.edges_field if shape.graphs_field else None} - {None},
-        "node": {shape.node_id_field, shape.node_type_field,
-                 shape.node_grounding_field} - {None},
-        "edge": {shape.edge_subject_field, shape.edge_object_field,
-                 shape.edge_predicate_field, shape.edge_evidence_field} - {None},
-    }
-    if shape.kind == "node_nested_edges":
-        expected["node"].add(shape.edges_field)
-    seen = {"graph": graph_keys, "node": node_keys, "edge": edge_keys}
-    missing = {part: sorted(fields - seen[part]) for part, fields in expected.items()
-               if fields - seen[part]}
-    assert not missing, f"{mech} declares {missing}, which no sampled graph carries"
+    schema_view = SchemaView(str(root / declaration.schema_paths[0]))
+
+    slot = shape.graphs_field or shape.nodes_field
+    records = [c for c in schema_view.all_classes() if slot in _slots(schema_view, c)]
+    assert records, f"{mech}: no class in the schema has a {slot!r} slot"
+    record_class = records[0]
+    if config.record_id_field:
+        assert config.record_id_field.split(".")[0] in _slots(schema_view, record_class)
+
+    if shape.graphs_field:
+        graph_class = _range(schema_view, record_class, shape.graphs_field)
+        graph = {shape.graph_id_field, shape.nodes_field, shape.edges_field,
+                 config.scope_field, *config.graph_facets} - {None}
+        missing = graph - _slots(schema_view, graph_class)
+        assert not missing, f"{mech}: {graph_class} has no {sorted(missing)}"
+        node_class = _range(schema_view, graph_class, shape.nodes_field)
+        edge_class = _range(schema_view, graph_class, shape.edges_field)
+        node = {shape.node_id_field, shape.node_type_field, shape.node_grounding_field}
+    else:
+        node_class = _range(schema_view, record_class, shape.nodes_field)
+        edge_class = _range(schema_view, node_class, shape.edges_field)
+        node = {shape.node_id_field, shape.node_type_field, shape.edges_field}
+    missing = (node - {None}) - _slots(schema_view, node_class)
+    assert not missing, f"{mech}: {node_class} has no {sorted(missing)}"
+    edge = {shape.edge_subject_field, shape.edge_object_field,
+            shape.edge_predicate_field, shape.edge_evidence_field} - {None}
+    missing = edge - _slots(schema_view, edge_class)
+    assert not missing, f"{mech}: {edge_class} has no {sorted(missing)}"
 
 
 # --------------------------------------------------------------------------
@@ -1135,8 +1124,26 @@ def test_a_regex_with_surrounding_whitespace_is_refused():
 
 def test_a_path_rule_that_names_only_directories_is_refused(tmp_path):
     root = _corpus(tmp_path, {"data/metpo/a.yaml": {"identifier": "A"}})
-    with pytest.raises(CoverageError, match="names directories"):
+    with pytest.raises(CoverageConfigError, match="names directories"):
         collect("m", root, GLOBS, _config(exempt_when=["path:data/metpo"]))
+    assert not issubclass(CoverageConfigError, CoverageError)
+
+
+def test_a_declaration_only_the_corpus_refutes_is_still_a_declaration_error(
+    monkeypatch, tmp_path, capsys
+):
+    """Exit 2, as for any declaration error -- not "unavailable", exit 1,
+    beside checkouts that are merely unconfigured (#497)."""
+    import kg_microbe_graph.__main__ as cli
+
+    root = _corpus(tmp_path, {"data/traits/metpo/a.yaml": {"identifier": "A"}})
+    real = cli.CoverageConfig.from_settings
+    monkeypatch.setattr(cli.CoverageConfig, "from_settings", staticmethod(
+        lambda settings: real({**settings, "exempt_when": ["path:data/traits/metpo"]})))
+    monkeypatch.setattr(cli, "resolve_mech_root", lambda key, **_: root)
+    assert cli.main(["coverage", "--mech", "traitmech", "--root", str(root)]) == 2
+    assert cli.main(["coverage", "--all"]) == 2
+    assert "declared incorrectly" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("spelling", ["true", "True", "yes", "on"])
@@ -1160,3 +1167,204 @@ def test_a_dotted_rule_reaches_every_list_element_not_just_the_first(tmp_path):
         exempt_when=["lineage.taxon_id=NCBITaxon:408169"],
     )
     assert report["exempt"]["records"] == 1
+
+
+# --------------------------------------------------------------------------
+# Third review round (#486-#498)
+# --------------------------------------------------------------------------
+
+
+def _far_reference_corpus(tmp_path: Path) -> Path:
+    """A referenced graphless record that sorts far from its referencer, so a
+    chunked walk puts them in different parts."""
+    root = _rich_corpus(tmp_path)
+    referencer = yaml.safe_load((root / "data/a/1.yaml").read_text())
+    referencer["causal_graphs"][0]["nodes"][0]["grounding"] = "T:far"
+    (root / "data/a/1.yaml").write_text(yaml.safe_dump(referencer))
+    (root / "data/z").mkdir()
+    (root / "data/z/far.yaml").write_text("identifier: T:far\nstatus: PROPOSED\n")
+    return root
+
+
+@pytest.mark.parametrize("jobs", [2, 3, 7])
+def test_a_reference_across_parts_of_a_parallel_walk_is_still_counted(tmp_path, monkeypatch, jobs):
+    """ProteinTraitsMech has 5,841 graphless records grounded elsewhere; a
+    per-part count would drop every pair a chunk boundary separates (#490)."""
+    import kg_microbe_graph.coverage as coverage
+
+    root = _far_reference_corpus(tmp_path)
+    config = _config(record_id_field="identifier", exempt_when=["status=DEPRECATED"])
+    sequential = collect("m", root, GLOBS, config).as_dict()
+    assert sequential["coverage"]["graphless_but_referenced_elsewhere"] == 2
+    monkeypatch.setattr(coverage, "PARALLEL_THRESHOLD", 0)
+    assert collect("m", root, GLOBS, config, jobs=jobs).as_dict() == sequential
+
+
+def _pool_spy(monkeypatch) -> list[int]:
+    import kg_microbe_graph.coverage as coverage
+
+    started: list[int] = []
+
+    class Spy(coverage.ProcessPoolExecutor):
+        def __init__(self, *args, **kwargs):
+            started.append(kwargs.get("max_workers", 0))
+            super().__init__(*args, **kwargs)
+
+    monkeypatch.setattr(coverage, "ProcessPoolExecutor", Spy)
+    return started
+
+
+def test_the_pool_is_used_from_the_threshold_up(tmp_path, monkeypatch):
+    """Equality alone passes if the pool never runs (#490)."""
+    import kg_microbe_graph.coverage as coverage
+
+    started = _pool_spy(monkeypatch)
+    monkeypatch.setattr(coverage, "PARALLEL_THRESHOLD", 3)
+    three = _corpus(tmp_path / "three", {f"data/{i}.yaml": {"identifier": str(i)} for i in range(3)})
+    two = _corpus(tmp_path / "two", {f"data/{i}.yaml": {"identifier": str(i)} for i in range(2)})
+
+    collect("m", two, GLOBS, _config(), jobs=2)
+    assert started == []
+    collect("m", three, GLOBS, _config(), jobs=2)
+    assert started == [2]
+    collect("m", three, GLOBS, _config(), jobs=1)
+    assert started == [2]
+
+
+def test_only_the_fields_that_are_not_sums_are_left_out_of_a_merge():
+    from kg_microbe_graph.coverage import _NOT_MERGED
+
+    assert _NOT_MERGED == {"mech", "config", "sampled", "parser", "referenced_elsewhere"}
+
+
+def test_predicates_are_counted_and_ranked_most_frequent_first(tmp_path):
+    graph = _graph("g", 3)
+    graph["edges"][0]["predicate"] = "inhibits"
+    report = _report(tmp_path, {"data/a.yaml": {"causal_graphs": [graph]}})
+    assert report["graphs"]["predicates"] == {
+        "distinct": 2, "top": [["causes", 2], ["inhibits", 1]],
+    }
+
+
+def test_undeclared_node_types_are_not_measured(tmp_path):
+    root = _corpus(tmp_path, {"data/a.yaml": {"ecological_interactions": [
+        {"name": "a", "interaction_type": "X", "downstream": [{"target": "b"}]}, {"name": "b"}]}})
+    config = CoverageConfig.from_settings({k: v for k, v in NESTED.items() if k != "node_type_field"})
+    assert collect("m", root, GLOBS, config).as_dict()["graphs"]["node_types"] is None
+
+
+@pytest.mark.parametrize("text", ["label~ grouping", "label~grouping ", "label~\tgrouping"])
+def test_a_regex_with_leading_or_trailing_whitespace_is_refused(text):
+    with pytest.raises(CoverageConfigError, match="whitespace"):
+        ExemptionRule.parse(text)
+
+
+@pytest.mark.parametrize("spelling", ["false", "False", "no", "off"])
+def test_a_false_boolean_matches_any_spelling(tmp_path, spelling):
+    report = _report(
+        tmp_path,
+        {"data/a.yaml": {"abstract": True}, "data/b.yaml": {"abstract": False}},
+        exempt_when=[f"abstract={spelling}"],
+    )
+    assert report["exempt"]["records"] == 1
+
+
+@pytest.mark.parametrize("rule", ["abstract~^yes$", "abstract~(?i)^TRUE$", "abstract~on"])
+def test_a_regex_rule_matches_a_boolean_by_any_spelling(tmp_path, rule):
+    """`abstract: yes` is read as True; a regex that names `yes` must still
+    see it (#496)."""
+    report = _report(
+        tmp_path,
+        {"data/a.yaml": "abstract: yes\n", "data/b.yaml": "abstract: no\n"},
+        exempt_when=[rule],
+    )
+    assert report["exempt"]["records"] == 1
+
+
+def test_an_anchor_needs_node_types_to_anchor_on():
+    with pytest.raises(CoverageConfigError, match="node_type_field"):
+        CoverageConfig.from_settings({
+            **{k: v for k, v in NESTED.items() if k != "node_type_field"},
+            "anchor_node_types": ["X"],
+        })
+
+
+def test_an_impossible_date_is_one_unreadable_record_not_a_failed_run(tmp_path):
+    report = _report(tmp_path, {
+        "data/good.yaml": {"identifier": "A"},
+        "data/bad_date.yaml": "identifier: B\nreviewed: 2025-06-31\n",
+    })
+    assert report["unreadable"] == ["data/bad_date.yaml"]
+    assert report["records"] == 1
+
+
+def test_a_recursive_alias_is_one_malformed_record_not_a_failed_run(tmp_path):
+    report = _report(
+        tmp_path,
+        {"data/good.yaml": {"identifier": "A", "tags": ["x"]},
+         "data/loop.yaml": "identifier: B\ntags: &t [x, *t]\n"},
+        exempt_when=["tags=never"], strata=["tags"],
+    )
+    assert report["records"] == 1
+    assert report["malformed"] == ["data/loop.yaml: a value refers to itself (recursive alias)"]
+    assert set(report["strata"]["tags"]) == {"x"}
+
+
+def test_a_bare_null_document_is_empty(tmp_path):
+    report = _report(tmp_path, {"data/a.yaml": {"identifier": "A"}, "data/null.yaml": "~\n"})
+    assert report["empty"] == ["data/null.yaml"]
+
+
+def test_a_checkout_spelt_another_way_is_still_that_checkout(tmp_path):
+    """Case-insensitive file systems (macOS) reach one checkout by several
+    spellings; comparing path strings called it a snapshot (#493)."""
+    from kg_microbe_graph.__main__ import SNAPSHOT, _revision
+
+    _git_init(tmp_path / "mech")
+    variant = tmp_path / "MECH"
+    if not variant.exists():
+        pytest.skip("case-sensitive file system: one spelling per directory")
+    assert _revision(variant, GLOBS).startswith("HEAD ")
+    (tmp_path / "mech" / "data").mkdir()
+    assert _revision(tmp_path / "mech" / "data", GLOBS) == SNAPSHOT
+
+
+def test_the_revision_probe_ignores_an_inherited_repository(monkeypatch, tmp_path):
+    """Run from a git hook, GIT_DIR would name the hook's repository."""
+    import subprocess
+
+    import kg_microbe_graph.__main__ as cli
+
+    calls = []
+
+    def record(command, **kwargs):
+        calls.append((command, kwargs.get("env", {})))
+        raise subprocess.CalledProcessError(128, command)
+
+    monkeypatch.setenv("GIT_DIR", str(tmp_path / "elsewhere.git"))
+    monkeypatch.setattr(cli.subprocess, "run", record)
+    cli._revision(tmp_path, GLOBS)
+    command, env = calls[0]
+    assert "core.fsmonitor=false" in command
+    assert "GIT_DIR" not in env
+
+
+def test_many_excluded_files_are_named_up_to_a_limit(tmp_path):
+    from kg_microbe_graph.__main__ import MAX_NAMED, _excluded
+
+    root = _corpus(tmp_path, {"data/good.yaml": {"identifier": "A"},
+                              **{f"data/b{i}.yaml": "" for i in range(MAX_NAMED + 2)}})
+    line = _excluded("m", collect("m", root, GLOBS, _config()))
+    assert line is not None and line.endswith("; and 2 more")
+    assert line.count("holds no document") == MAX_NAMED
+
+
+def test_a_summary_row_with_excluded_files_is_marked(tmp_path, capsys):
+    from kg_microbe_graph.__main__ import main
+
+    root = _traitmech_root(tmp_path, {"a.yaml": {"mapping_status": "REVIEWED"}, "b.yaml": ""})
+    assert main(["coverage", "--mech", "traitmech", "--root", str(root), "--summary"]) == 1
+    out = capsys.readouterr().out
+    row = next(line for line in out.splitlines() if line.startswith("traitmech"))
+    assert row.split()[1] == "1!"
+    assert "! traitmech: 1 file(s) excluded from every count" in out

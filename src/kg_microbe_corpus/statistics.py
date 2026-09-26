@@ -71,7 +71,8 @@ class _EmptyDocument:
 
 
 # What `iter_records(..., distinguish_empty=True)` yields for a file that
-# holds nothing: empty, or only whitespace and comments. It parsed fine, so
+# holds no document: empty, only whitespace and comments, or a bare `~` /
+# `null` (#498). It parsed fine, so
 # calling it unreadable sent a reader looking for a syntax error that is not
 # there; it is still not a record, and is still excluded from every count.
 EMPTY_DOCUMENT = _EmptyDocument()
@@ -250,9 +251,11 @@ def iter_records(
             parsed = yaml.load(  # noqa: S506 - loader is judged, not guessed
                 path.read_text(encoding="utf-8"), Loader=loader
             )
-        # UnicodeDecodeError is a ValueError, not an OSError: without it one
-        # non-UTF-8 file ended the walk instead of being named (#476).
-        except (OSError, UnicodeDecodeError, yaml.YAMLError):
+        # ValueError covers a non-UTF-8 file (UnicodeDecodeError, #476) and an
+        # impossible date such as 2025-06-31, which the date constructor
+        # rejects (#491); RecursionError a pathologically nested document.
+        # Each ended the walk instead of naming one file.
+        except (OSError, ValueError, RecursionError, yaml.YAMLError):
             yield path, None
             continue
         yield path, EMPTY_DOCUMENT if parsed is None and distinguish_empty else parsed

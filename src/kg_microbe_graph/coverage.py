@@ -107,6 +107,12 @@ class CoverageConfigError(ValueError):
     """A `causal_graph_coverage` declaration cannot be applied as written."""
 
 
+class CoverageDeclarationError(CoverageConfigError):
+    """A declaration that only the corpus shows cannot mean anything, such as
+    a path rule reaching directories and no file. Still the manifest's error,
+    not the checkout's (#497)."""
+
+
 class _Malformed(Exception):
     """A record whose graph slot does not have the declared shape."""
 
@@ -198,9 +204,15 @@ class ExemptionRule:
         for candidate in _values_at(record, self.field.split(".")):
             if candidate is None or isinstance(candidate, (dict, list)):
                 continue
-            if self.kind == "equals" and isinstance(candidate, bool):
+            if isinstance(candidate, bool):
+                # YAML reads true/yes/on as one value; a rule may name any of
+                # them, whichever operator it uses (#496).
                 spellings = TRUE_SPELLINGS if candidate else FALSE_SPELLINGS
-                if any(value.lower() in spellings for value in self.values):
+                if self.kind == "equals" and any(v.lower() in spellings for v in self.values):
+                    return True
+                if self.kind == "matches" and self.pattern is not None and any(
+                    self.pattern.search(spelling) for spelling in spellings
+                ):
                     return True
                 continue
             text = _scalar(candidate)
@@ -340,6 +352,13 @@ class CoverageConfig:
             if name is not None and not _KEY.match(name):
                 raise CoverageConfigError(f"{name!r} must be a single graph key")
 
+        anchors = tuple(settings.get("anchor_node_types", ()))
+        if anchors and not shape.node_type_field:
+            raise CoverageConfigError(
+                "anchor_node_types needs node_type_field: without node types no "
+                "node can be an anchor, and every graph would read NO_ANCHOR_NODE"
+            )
+
         check = bool(settings.get("duplicate_grounding_check", False))
         if check and not shape.node_grounding_field:
             raise CoverageConfigError(
@@ -365,7 +384,7 @@ class CoverageConfig:
             scope_field=scope_field,
             mechanistic_scopes=frozenset(mechanistic) if mechanistic is not None else None,
             graph_facets=facets,
-            anchor_node_types=tuple(settings.get("anchor_node_types", ())),
+            anchor_node_types=anchors,
             duplicate_grounding_check=check,
             exempt_when=rules,
             strata=strata,
@@ -621,7 +640,8 @@ class CoverageReport:
         """Every file left out of every count, and why (#481)."""
         return (
             [f"{path}: unreadable" for path in sorted(self.unreadable)]
-            + [f"{path}: holds no document" for path in sorted(self.empty)]
+            + [f"{path}: holds no document (empty, comments only, or null)"
+               for path in sorted(self.empty)]
             + sorted(self.malformed)
         )
 
@@ -859,7 +879,7 @@ def _path_rule_matches(mech: str, root: Path, config: CoverageConfig) -> dict[st
         matches = list(root.glob(rule.glob))
         files = {path.relative_to(root).as_posix() for path in matches if path.is_file()}
         if not files and any(path.is_dir() for path in matches):
-            raise CoverageError(
+            raise CoverageDeclarationError(
                 f"{mech}: exempt_when {rule.text!r} names directories, never a "
                 f"record file; end the glob with the files, e.g. {rule.glob}/*.yaml"
             )
@@ -877,7 +897,6 @@ def _walk(
     """One contiguous part of the walk: a partial report, the groundings its
     edge-bearing graphs carry, and the ids of its eligible graphless records."""
     report = CoverageReport(mech=mech, config=config)
-    mechanistic_scopes = config.mechanistic_scopes
     referenced: set[str] = set()
     graphless_ids: list[str] = []
 
@@ -895,70 +914,92 @@ def _walk(
             report.malformed.append(f"{relative}: the record is not a mapping")
             continue
         try:
-            graphs = _graphs(record, config)
+            _account(report, record, relative, config, globbed, referenced, graphless_ids)
         except _Malformed as exc:
             report.malformed.append(f"{relative}: {exc}")
-            continue
-
-        report.records += 1
-        report.graphs_per_record[len(graphs)] += 1
-        edge_bearing = [g for g in graphs if g.graph.edges]
-        mechanistic = [
-            g for g in edge_bearing
-            if mechanistic_scopes is None or g.scope in mechanistic_scopes
-        ]
-        bucket = "with_graph" if edge_bearing else ("edgeless_only" if graphs else "no_graph")
-
-        rule = next(
-            (r for r in config.exempt_when
-             if r.matches(record, relative, globbed.get(r.text, set()))),
-            None,
-        )
-        if rule is not None:
-            report.exempt_by_rule[rule.text] = report.exempt_by_rule.get(rule.text, 0) + 1
-            if edge_bearing:
-                report.exempt_with_graph += 1
-        else:
-            report.buckets[bucket] += 1
-            if mechanistic_scopes is not None and mechanistic:
-                report.with_mechanistic_graph += 1
-            if not edge_bearing and config.record_id_field:
-                own = resolve_value(record, config.record_id_field)
-                if _populated(own) and not isinstance(own, (dict, list)):
-                    graphless_ids.append(_scalar(own))
-
-        for stratum in config.strata:
-            counts = report.strata.setdefault(stratum, {}).setdefault(
-                _stratum_value(record, stratum, relative),
-                _counts(mechanistic_scopes is not None),
-            )
-            counts["records"] += 1
-            if rule is not None:
-                counts["exempt"] += 1
-                continue
-            counts["eligible"] += 1
-            counts[bucket] += 1
-            if mechanistic_scopes is not None and mechanistic:
-                counts["with_mechanistic_graph"] += 1
-
-        seen_ids: Counter[str] = Counter(g.graph_id for g in graphs)
-
-        for facet in config.graph_facets:
-            values = {g.facets[facet] for g in graphs}
-            report.facet_graphs.setdefault(facet, Counter()).update(
-                g.facets[facet] for g in graphs
-            )
-            if values:
-                report.facet_combinations.setdefault(facet, Counter())[
-                    "+".join(sorted(values))
-                ] += 1
-
-        for parsed in graphs:
-            _measure(report, parsed, config, relative, seen_ids[parsed.graph_id] > 1)
-            if parsed.graph.edges:
-                referenced.update(parsed.groundings.values())
+        except RecursionError:
+            # A self-referencing YAML alias parses, then never ends when a rule
+            # or stratum walks it; name the file rather than end the run (#491).
+            report.malformed.append(f"{relative}: a value refers to itself (recursive alias)")
 
     return report, referenced, graphless_ids
+
+
+def _account(
+    report: CoverageReport,
+    record: Mapping[str, Any],
+    relative: str,
+    config: CoverageConfig,
+    globbed: Mapping[str, set[str]],
+    referenced: set[str],
+    graphless_ids: list[str],
+) -> None:
+    """Add one record to a partial report.
+
+    Everything that can fail on a strange record -- reading its graphs,
+    matching rules, keying strata -- happens before anything is counted, so
+    a record that raises is excluded whole rather than half-counted.
+    """
+    mechanistic_scopes = config.mechanistic_scopes
+    graphs = _graphs(record, config)
+    rule = next(
+        (r for r in config.exempt_when
+         if r.matches(record, relative, globbed.get(r.text, set()))),
+        None,
+    )
+    strata = [
+        (stratum, _stratum_value(record, stratum, relative)) for stratum in config.strata
+    ]
+    own = resolve_value(record, config.record_id_field) if config.record_id_field else None
+
+    report.records += 1
+    report.graphs_per_record[len(graphs)] += 1
+    edge_bearing = [g for g in graphs if g.graph.edges]
+    mechanistic = [
+        g for g in edge_bearing
+        if mechanistic_scopes is None or g.scope in mechanistic_scopes
+    ]
+    bucket = "with_graph" if edge_bearing else ("edgeless_only" if graphs else "no_graph")
+
+    if rule is not None:
+        report.exempt_by_rule[rule.text] = report.exempt_by_rule.get(rule.text, 0) + 1
+        if edge_bearing:
+            report.exempt_with_graph += 1
+    else:
+        report.buckets[bucket] += 1
+        if mechanistic_scopes is not None and mechanistic:
+            report.with_mechanistic_graph += 1
+        if not edge_bearing and _populated(own) and not isinstance(own, (dict, list)):
+            graphless_ids.append(_scalar(own))
+
+    for stratum, value in strata:
+        counts = report.strata.setdefault(stratum, {}).setdefault(
+            value, _counts(mechanistic_scopes is not None)
+        )
+        counts["records"] += 1
+        if rule is not None:
+            counts["exempt"] += 1
+            continue
+        counts["eligible"] += 1
+        counts[bucket] += 1
+        if mechanistic_scopes is not None and mechanistic:
+            counts["with_mechanistic_graph"] += 1
+
+    seen_ids: Counter[str] = Counter(g.graph_id for g in graphs)
+    for facet in config.graph_facets:
+        values = {g.facets[facet] for g in graphs}
+        report.facet_graphs.setdefault(facet, Counter()).update(
+            g.facets[facet] for g in graphs
+        )
+        if values:
+            report.facet_combinations.setdefault(facet, Counter())[
+                "+".join(sorted(values))
+            ] += 1
+
+    for parsed in graphs:
+        _measure(report, parsed, config, relative, seen_ids[parsed.graph_id] > 1)
+        if parsed.graph.edges:
+            referenced.update(parsed.groundings.values())
 
 
 def _measure(
