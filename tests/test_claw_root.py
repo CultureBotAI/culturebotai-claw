@@ -19,7 +19,12 @@ from pathlib import Path
 import pytest
 
 import kg_microbe_fleet.roots as roots
-from kg_microbe_fleet.roots import claw_root, is_claw_checkout, resolve_mech_root
+from kg_microbe_fleet.roots import (
+    NO_CLAW_CHECKOUT,
+    claw_root,
+    is_claw_checkout,
+    resolve_mech_root,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -31,6 +36,15 @@ def _claw_like(path: Path) -> Path:
     return path
 
 
+def _mech_like(path: Path) -> Path:
+    """A Python project that is not claw -- what every Mech checkout looks
+    like -- so `is_claw_checkout` must tell the two apart (#500)."""
+    path.mkdir(parents=True, exist_ok=True)
+    (path / "pyproject.toml").write_text("[project]\nname = 'some-mech'\n")
+    (path / "src" / "somemech").mkdir(parents=True)
+    return path
+
+
 def _installed(monkeypatch, venv: Path) -> Path:
     """Make this module look as it does in a wheel installed into `venv`."""
     site = venv / "lib" / "python3.13" / "site-packages" / "kg_microbe_fleet"
@@ -38,6 +52,16 @@ def _installed(monkeypatch, venv: Path) -> Path:
     monkeypatch.setattr(roots, "__file__", str(site / "roots.py"))
     monkeypatch.setattr(roots.sys, "prefix", str(venv))
     return site.parent.parent  # what parents[2] of roots.py now is
+
+
+def test_a_mech_checkout_is_not_claw(tmp_path):
+    """Both markers, not either: every Mech is a Python project too (#500)."""
+    assert is_claw_checkout(_claw_like(tmp_path / "claw"))
+    assert not is_claw_checkout(_mech_like(tmp_path / "mech"))
+    fleet_only = tmp_path / "fleet-only"
+    (fleet_only / "src" / "kg_microbe_fleet").mkdir(parents=True)
+    (fleet_only / "src" / "kg_microbe_fleet" / "fleet.yaml").write_text("version: 1\n")
+    assert not is_claw_checkout(fleet_only)
 
 
 # --------------------------------------------------------------------------
@@ -75,26 +99,40 @@ def test_an_installed_command_finds_the_checkout_it_is_run_from(monkeypatch, tmp
 
 
 def test_a_virtualenv_inside_claw_belongs_to_that_checkout(monkeypatch, tmp_path):
-    """`uv sync --no-editable` in claw: the venv says whose install it is,
-    wherever the command is run from."""
-    claw = _claw_like(tmp_path / "claw")
-    _installed(monkeypatch, claw / ".venv")
-    elsewhere = tmp_path / "elsewhere"
-    elsewhere.mkdir()
-    monkeypatch.chdir(elsewhere)
-    assert claw_root() == claw
+    """`uv sync --no-editable` in claw A, run inside claw B: the venv says
+    whose install it is, over the working directory (#500)."""
+    claw_a = _claw_like(tmp_path / "claw-a")
+    claw_b = _claw_like(tmp_path / "claw-b")
+    _installed(monkeypatch, claw_a / ".venv")
+    monkeypatch.chdir(claw_b)
+    assert claw_root() == claw_a
 
 
-def test_outside_any_checkout_it_falls_back_to_the_packages_own_location(monkeypatch, tmp_path):
-    """Not the working directory: its `.env` would be read as claw's (#486)."""
+def test_outside_any_checkout_it_answers_with_a_path_that_holds_no_env(monkeypatch, tmp_path):
+    """Not the working directory -- a Mech here, with a `.env` of its own,
+    would be read as claw (#486)."""
     packaged = _installed(monkeypatch, tmp_path / "venv")
-    elsewhere = tmp_path / "elsewhere"
-    elsewhere.mkdir()
-    (elsewhere / ".env").write_text(f"TRAITMECH_ROOT={tmp_path / 'stale'}\n")
-    monkeypatch.chdir(elsewhere)
+    mech = _mech_like(tmp_path / "some-mech")
+    (mech / ".env").write_text(f"TRAITMECH_ROOT={tmp_path / 'stale'}\n")
+    monkeypatch.chdir(mech)
 
-    assert claw_root() == packaged
-    assert not is_claw_checkout(claw_root())
+    assert claw_root() == packaged / NO_CLAW_CHECKOUT
+    assert not claw_root().exists()
+
+
+def test_a_target_install_does_not_read_its_parent_directorys_env(monkeypatch, tmp_path):
+    """`pip install --target DIR`: the package location's parents[2] is DIR's
+    parent, an ordinary directory whose `.env` the old fallback read (#502)."""
+    project = tmp_path / "project"
+    target = project / "vendor" / "kg_microbe_fleet"
+    target.mkdir(parents=True)
+    (project / ".env").write_text(f"TRAITMECH_ROOT={tmp_path / 'wrong'}\n")
+    monkeypatch.setattr(roots, "__file__", str(target / "roots.py"))
+    monkeypatch.setattr(roots.sys, "prefix", str(tmp_path / "python"))
+    monkeypatch.chdir(tmp_path)
+
+    root = claw_root()
+    assert root != project and not (root / ".env").exists()
 
 
 def test_a_deleted_working_directory_does_not_break_the_command(monkeypatch, tmp_path):
@@ -104,7 +142,7 @@ def test_a_deleted_working_directory_does_not_break_the_command(monkeypatch, tmp
         raise FileNotFoundError("the working directory was deleted")
 
     monkeypatch.setattr(roots.Path, "cwd", staticmethod(gone))
-    assert claw_root() == packaged
+    assert claw_root() == packaged / NO_CLAW_CHECKOUT
 
 
 def test_an_installed_command_reads_the_checkouts_env(monkeypatch, tmp_path):
@@ -126,8 +164,7 @@ def test_health_refuses_to_measure_a_repository_that_is_not_claw(monkeypatch, tm
 
     import kg_microbe_health.__main__ as health
 
-    other = tmp_path / "some-mech"
-    other.mkdir()
+    other = _mech_like(tmp_path / "some-mech")
     subprocess.run(["git", "init", "-q", str(other)], check=True)
     monkeypatch.setattr(health, "CLAW_ROOT", other)
     assert health.main(["report", "--mech", "claw"]) == 2

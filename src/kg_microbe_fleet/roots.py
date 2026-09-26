@@ -99,6 +99,11 @@ def looks_like(root: Path, package_path: str) -> bool:
     return (Path(root) / package_path).is_dir()
 
 
+# Answered when no claw checkout can be found: a name that is never created,
+# so it holds no `.env` and no `.git` wherever the package is installed (#502).
+NO_CLAW_CHECKOUT = ".no-claw-checkout-found"
+
+
 def is_claw_checkout(path: Path) -> bool:
     """Whether `path` is the top of a claw checkout."""
     return (Path(path) / "pyproject.toml").is_file() and (
@@ -122,12 +127,15 @@ def claw_root(start: Path | None = None) -> Path:
     claw); then the working directory or its nearest claw ancestor, which is
     how an installed command is run.
 
-    Failing all three it returns the package's own location, the answer the
-    old expression gave. That directory has no `.env` and no `.git`, so every
-    consumer refuses -- `resolve_mech_root` falls through to a verified
-    sibling guess, and `kg-microbe-health --mech claw` finds no checkout to
-    measure. Returning the working directory instead would read an unrelated
-    `.env` as claw's and measure an unrelated repository as claw (#486).
+    Failing all three it returns a path beneath the package's own location
+    that is never created (`NO_CLAW_CHECKOUT`). It holds no `.env` and no
+    `.git`, so every consumer refuses: `resolve_mech_root` falls through to a
+    sibling guess that `looks_like` verifies, and `kg-microbe-health --mech
+    claw` finds no checkout to measure. The working directory would read an
+    unrelated `.env` as claw's and measure an unrelated repository as claw
+    (#486); the package location itself is `lib/pythonX.Y` in a virtualenv,
+    but an ordinary directory, `.env` and all, under `pip install --target`
+    (#502).
     """
     packaged = Path(__file__).resolve().parents[2]
     if is_claw_checkout(packaged):
@@ -136,15 +144,16 @@ def claw_root(start: Path | None = None) -> Path:
     for candidate in (prefix, *prefix.parents):
         if is_claw_checkout(candidate):
             return candidate
+    nowhere = packaged / NO_CLAW_CHECKOUT
     try:
         here = (start or Path.cwd()).resolve()
     except OSError:
         # A working directory deleted under the shell; `--help` must still work.
-        return packaged
+        return nowhere
     for candidate in (here, *here.parents):
         if is_claw_checkout(candidate):
             return candidate
-    return packaged
+    return nowhere
 
 
 # kg-microbe is a corpus this fleet reads, not a Mech, so the manifest has no

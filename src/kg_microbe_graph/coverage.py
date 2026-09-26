@@ -139,9 +139,11 @@ class ExemptionRule:
     deliberately wider than `kg_microbe_corpus.resolve_value`, which takes the
     first list element carrying the key (#483): whether a record is exempt is
     a question any lineage entry or any tag can answer, and a rule that looked
-    only at the first would match or not depending on list order. A boolean
-    matches any usual spelling (`true`/`yes`/`on`), since YAML itself reads
-    all three as the same value.
+    only at the first would match or not depending on list order. Under `=`
+    a boolean matches any usual spelling in any case (`true`/`yes`/`on`),
+    since YAML itself reads them all as one value; a `~` pattern that meets a
+    boolean is refused, because the record's spelling is no longer there to
+    match (#499).
     """
 
     text: str
@@ -205,14 +207,21 @@ class ExemptionRule:
             if candidate is None or isinstance(candidate, (dict, list)):
                 continue
             if isinstance(candidate, bool):
-                # YAML reads true/yes/on as one value; a rule may name any of
-                # them, whichever operator it uses (#496).
+                if self.kind == "matches":
+                    # The record's spelling is gone by the time the value is
+                    # read, so a pattern over it cannot mean what its author
+                    # wrote: searched against one canonical spelling it misses
+                    # `^yes$`; against every spelling it inverts `^(?!true$)`
+                    # (#496, #499). Say so rather than count zero.
+                    raise CoverageDeclarationError(
+                        f"exempt_when {self.text!r}: {self.field} holds a boolean, "
+                        f"which a pattern cannot match reliably; use "
+                        f"{self.field}=true or {self.field}=false"
+                    )
+                # YAML reads true/yes/on (any case) as one value; a rule may
+                # name any of them (#496).
                 spellings = TRUE_SPELLINGS if candidate else FALSE_SPELLINGS
-                if self.kind == "equals" and any(v.lower() in spellings for v in self.values):
-                    return True
-                if self.kind == "matches" and self.pattern is not None and any(
-                    self.pattern.search(spelling) for spelling in spellings
-                ):
+                if any(value.lower() in spellings for value in self.values):
                     return True
                 continue
             text = _scalar(candidate)
@@ -920,7 +929,9 @@ def _walk(
         except RecursionError:
             # A self-referencing YAML alias parses, then never ends when a rule
             # or stratum walks it; name the file rather than end the run (#491).
-            report.malformed.append(f"{relative}: a value refers to itself (recursive alias)")
+            report.malformed.append(
+                f"{relative}: a value is nested too deeply or refers to itself"
+            )
 
     return report, referenced, graphless_ids
 

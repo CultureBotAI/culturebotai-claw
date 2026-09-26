@@ -371,7 +371,7 @@ and writers -- finds claw through `kg_microbe_fleet.roots.claw_root()`, never
 `Path(__file__).parents[2]`, which points into the virtualenv once the package
 is installed from a wheel. The source checkout wins, then the checkout holding
 the virtualenv, then the working directory; failing all three it answers with
-the package's own location, where every consumer refuses. `kg-microbe-skills`
+a path that is never created, so no `.env` is read and every consumer refuses. `kg-microbe-skills`
 is the exception: it finds the checkout being checked from the working
 directory (`find_claw_root`), and its catalogue still derives `.claude/skills`
 from `parents[2]` (#489).

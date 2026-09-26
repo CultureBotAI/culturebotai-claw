@@ -219,9 +219,10 @@ When a kind of record genuinely takes no graph:
    - `path:GLOB` — the record's path, with record-glob semantics (`*` does not
      cross a directory; a glob that reaches only directories is refused)
    A dotted path reaches every element of every list on the way, so
-   `lineage.taxon_id=X` matches wherever X sits in the lineage. A boolean
-   matches `true`, `yes` or `on` (or `false`, `no`, `off`) in any case, under
-   either operator. Prefer a field the curators set
+   `lineage.taxon_id=X` matches wherever X sits in the lineage. Under `=` a
+   boolean matches `true`, `yes` or `on` (or `false`, `no`, `off`) in any case;
+   a `~` rule that meets a boolean is refused, since the record's spelling is
+   gone once YAML has read it -- write `field=true`. Prefer a field the curators set
    over a path or a label pattern.
 3. Run the report before and after. The rule's count, and `exempt.with_graph`,
    are the review evidence: a rule that exempts records carrying graphs is

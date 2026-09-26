@@ -806,7 +806,8 @@ def test_every_declared_graph_field_is_one_the_schema_declares(mech):
     else:
         node_class = _range(schema_view, record_class, shape.nodes_field)
         edge_class = _range(schema_view, node_class, shape.edges_field)
-        node = {shape.node_id_field, shape.node_type_field, shape.edges_field}
+        node = {shape.node_id_field, shape.node_type_field, shape.node_grounding_field,
+                shape.edges_field}
     missing = (node - {None}) - _slots(schema_view, node_class)
     assert not missing, f"{mech}: {node_class} has no {sorted(missing)}"
     edge = {shape.edge_subject_field, shape.edge_object_field,
@@ -1269,15 +1270,24 @@ def test_a_false_boolean_matches_any_spelling(tmp_path, spelling):
     assert report["exempt"]["records"] == 1
 
 
-@pytest.mark.parametrize("rule", ["abstract~^yes$", "abstract~(?i)^TRUE$", "abstract~on"])
-def test_a_regex_rule_matches_a_boolean_by_any_spelling(tmp_path, rule):
-    """`abstract: yes` is read as True; a regex that names `yes` must still
-    see it (#496)."""
-    report = _report(
-        tmp_path,
-        {"data/a.yaml": "abstract: yes\n", "data/b.yaml": "abstract: no\n"},
-        exempt_when=[rule],
-    )
+@pytest.mark.parametrize(
+    "rule", ["abstract~^yes$", "abstract~^True$", "abstract~^(?!true$)", "abstract~^no$"]
+)
+def test_a_regex_rule_that_meets_a_boolean_is_a_declaration_error(tmp_path, rule):
+    """By the time a boolean is read its spelling is gone: one canonical
+    spelling misses `^yes$`, every spelling inverts `^(?!true$)`. A silent
+    zero was #496; an inverted match #499. Refuse, and point to `=`."""
+    with pytest.raises(CoverageConfigError, match="use abstract=true"):
+        _report(
+            tmp_path,
+            {"data/a.yaml": "abstract: Yes\n", "data/b.yaml": "abstract: no\n"},
+            exempt_when=[rule],
+        )
+
+
+def test_a_regex_rule_on_text_is_unaffected_by_the_boolean_refusal(tmp_path):
+    report = _report(tmp_path, {"data/a.yaml": {"label": "yes-like"}},
+                     exempt_when=["label~^yes"])
     assert report["exempt"]["records"] == 1
 
 
@@ -1306,8 +1316,25 @@ def test_a_recursive_alias_is_one_malformed_record_not_a_failed_run(tmp_path):
         exempt_when=["tags=never"], strata=["tags"],
     )
     assert report["records"] == 1
-    assert report["malformed"] == ["data/loop.yaml: a value refers to itself (recursive alias)"]
+    assert report["malformed"] == [
+        "data/loop.yaml: a value is nested too deeply or refers to itself"
+    ]
     assert set(report["strata"]["tags"]) == {"x"}
+
+
+def test_a_recursive_stratum_alone_excludes_the_record_whole(tmp_path):
+    """No rule reads the field, only a stratum: the record must still be
+    excluded before anything is counted, not counted then named (#501)."""
+    report = _report(
+        tmp_path,
+        {"data/good.yaml": {"identifier": "A", "tags": ["x"]},
+         "data/loop.yaml": "identifier: B\ntags: &t [x, *t]\n"},
+        strata=["tags"],
+    )
+    assert report["records"] == 1
+    assert report["coverage"]["eligible"] == 1
+    assert report["graphs"]["per_record"] == {"0": 1}
+    assert len(report["malformed"]) == 1
 
 
 def test_a_bare_null_document_is_empty(tmp_path):
@@ -1327,6 +1354,28 @@ def test_a_checkout_spelt_another_way_is_still_that_checkout(tmp_path):
     assert _revision(variant, GLOBS).startswith("HEAD ")
     (tmp_path / "mech" / "data").mkdir()
     assert _revision(tmp_path / "mech" / "data", GLOBS) == SNAPSHOT
+
+
+@pytest.mark.parametrize(("prefix", "checkout"), [("", True), ("data/", False)])
+def test_the_checkout_top_is_what_git_says_not_how_the_path_is_spelt(
+    monkeypatch, tmp_path, prefix, checkout
+):
+    """Platform-independent #493: git says whether the root is the top; a
+    differently spelt toplevel must not turn a checkout into a snapshot."""
+    import kg_microbe_graph.__main__ as cli
+
+    answers = {
+        ("rev-parse", "--show-prefix"): prefix,
+        ("rev-parse", "--show-toplevel"): "/SOME/Other/Spelling",
+        ("rev-parse", "--short", "HEAD"): "abc1234",
+    }
+
+    def git(root, *args, timeout):
+        return answers.get(args[:3], answers.get(args[:2], ""))
+
+    monkeypatch.setattr(cli, "_git", git)
+    result = cli._revision(tmp_path, GLOBS)
+    assert result == ("HEAD abc1234" if checkout else cli.SNAPSHOT)
 
 
 def test_the_revision_probe_ignores_an_inherited_repository(monkeypatch, tmp_path):
