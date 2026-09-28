@@ -334,10 +334,10 @@ def _load_search_gene(payload: Any, index: int) -> SearchGeneHit:
     raw = _mapping(payload, context)
     return SearchGeneHit(
         gene_id=_required_string(raw, "gene_id", context),
-        gene_name=_optional_string(raw, "gene_name", context),
-        gene_product=_optional_string(raw, "gene_product", context),
+        gene_name=_optional_display_string(raw, "gene_name", context),
+        gene_product=_optional_display_string(raw, "gene_product", context),
         matched_field=_optional_string(raw, "matched_field", context),
-        matched_value=_optional_string(raw, "matched_value", context),
+        matched_value=_optional_display_string(raw, "matched_value", context),
     )
 
 
@@ -346,17 +346,19 @@ def _load_search_imodulon(payload: Any, index: int) -> SearchImodulonHit:
     raw = _mapping(payload, context)
     return SearchImodulonHit(
         k=_required_int(raw, "k", context),
-        name=_optional_string(raw, "name", context),
+        name=_optional_display_string(raw, "name", context),
         regulator=tuple(
-            _string_value(regulator, f"{context}.regulator[{regulator_index}]")
+            _display_value(
+                _string_value(regulator, f"{context}.regulator[{regulator_index}]")
+            )
             for regulator_index, regulator in enumerate(
                 _sequence(raw.get("regulator", ()), f"{context}.regulator")
             )
         ),
-        function=_optional_string(raw, "function", context),
-        category=_optional_string(raw, "category", context),
+        function=_optional_display_string(raw, "function", context),
+        category=_optional_display_string(raw, "category", context),
         matched_field=_optional_string(raw, "matched_field", context),
-        matched_value=_optional_string(raw, "matched_value", context),
+        matched_value=_optional_display_string(raw, "matched_value", context),
     )
 
 
@@ -391,6 +393,19 @@ def _optional_string(raw: Mapping[str, Any], key: str, context: str) -> str | No
     if value is None:
         return None
     return _string_value(value, f"{context}.{key}")
+
+
+def _optional_display_string(
+    raw: Mapping[str, Any], key: str, context: str
+) -> str | None:
+    value = _optional_string(raw, key, context)
+    if value is None:
+        return None
+    return _display_value(value)
+
+
+def _display_value(value: str) -> str:
+    return urllib.parse.unquote(value)
 
 
 def _required_bool(raw: Mapping[str, Any], key: str, context: str) -> bool:

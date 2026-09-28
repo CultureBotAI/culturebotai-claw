@@ -102,7 +102,7 @@ SEARCH: dict[str, Any] = {
         {
             "gene_id": "b0683",
             "gene_name": "fur",
-            "gene_product": "DNA-binding transcriptional dual regulator Fur",
+            "gene_product": "DNA-binding%2C transcriptional dual regulator Fur",
             "matched_field": "gene_name",
             "matched_value": "fur",
         }
@@ -154,6 +154,9 @@ def test_search_results_keep_component_numbers_dataset_local():
     results = load_search_results(SEARCH)
 
     assert results.genes[0].gene_id == "b0683"
+    assert results.genes[0].gene_product == (
+        "DNA-binding, transcriptional dual regulator Fur"
+    )
     assert results.imodulons[0].k == 54
     assert results.imodulons[0].regulator == ("Fur",)
     assert (
