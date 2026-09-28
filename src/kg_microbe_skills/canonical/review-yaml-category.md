@@ -94,16 +94,21 @@ boundary depends on genes, locus tags, UniProt accessions, regulators, pathways,
 stress responses, traits, or transcriptomics datasets that may already be
 represented in a shared database.
 
-For iModulonDB candidates:
+For iModulonDB candidates, first resolve the runner. In the commands below,
+`<kg-microbe-sources>` means either an installed `kg-microbe-sources` console
+script or `uv run --project <claw-root> kg-microbe-sources` from a local
+`culturebotai-claw` checkout. If neither runner is available, record the
+structured adapter as unavailable and fall back to inspected iModulonDB source
+pages or open web search.
 
-- Run `kg-microbe-sources imodulondb datasets` to find covered
+- Run `<kg-microbe-sources> imodulondb datasets` to find covered
   organism/dataset keys.
-- Run `kg-microbe-sources imodulondb search --organism <organism> --dataset
+- Run `<kg-microbe-sources> imodulondb search --organism <organism> --dataset
   <dataset> --query <term>` for member genes, loci, regulators, protein names,
   stress-response terms, or iModulon names that match covered organisms.
-- Run `kg-microbe-sources imodulondb summarize --organism <organism> --dataset
-  <dataset> --k <component>` for iModulon hits that explain a repeated evidence
-  or membership pattern.
+- Run `<kg-microbe-sources> imodulondb summarize --organism <organism>
+  --dataset <dataset> --k <component>` for iModulon hits that explain a
+  repeated evidence or membership pattern.
 - Record useful `organism/dataset/component` and `organism/dataset/gene` keys
   under **Evidence Patterns** or **Additional Notes**, and keep any copied
   summary tables small enough to justify why the cohort boundary is or is not
