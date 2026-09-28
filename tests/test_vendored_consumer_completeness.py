@@ -78,9 +78,10 @@ INCOMPLETE_CONSUMERS: dict[str, IncompleteConsumer] = {
         # admission: 12 of the 14 artifacts that apply to it are absent. Two
         # more are tracked but are not the canonical files -- its own
         # prompts/backlog-loop-goal.md and scripts/deep_research_contract.py
-        # (a report-heading checker its tests use) -- which this presence
-        # check cannot see and fleet-audit's byte comparison will; vendoring
-        # must replace or rename them.
+        # (a wrapper around its own report-heading checker; no test imports
+        # it, and its QC gate calls the checker directly) -- which this
+        # presence check cannot see and fleet-audit's byte comparison will;
+        # vendoring must replace or rename them.
         expected_missing=frozenset({
             ".github/workflows/pr-shepherd.yml",
             "scripts/chem_formula.py",
@@ -97,8 +98,8 @@ INCOMPLETE_CONSUMERS: dict[str, IncompleteConsumer] = {
         }),
         reason=(
             "Admitted before vendoring: PathwayMech gained its LinkML schema and CI "
-            "in #189/#190 and has not yet vendored the governed artifacts or pinned "
-            "a claw commit."
+            "in PathwayMech PRs 189 and 190 and has not yet vendored the governed "
+            "artifacts or pinned a claw commit (#510)."
         ),
     ),
 }

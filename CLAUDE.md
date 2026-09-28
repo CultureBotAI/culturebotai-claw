@@ -39,6 +39,7 @@ manifest when no source checkout is present:
 - TraitMech (`TRAITMECH_ROOT`)
 - ProteinTraitsMech (`PROTEINTRAITSMECH_ROOT`) — note the GitHub slug is
   lowercase `proteintraitsmech`
+- AntibioticMech (`ANTIBIOTICMECH_ROOT`)
 - CellStructureMech (`CELLSTRUCTUREMECH_ROOT`)
 - HabitatMech (`HABITATMECH_ROOT`)
 - NaturalProductMech (`NATURALPRODUCTMECH_ROOT`)

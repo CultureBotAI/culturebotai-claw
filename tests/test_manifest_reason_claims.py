@@ -244,7 +244,7 @@ def test_a_declared_claim_holds_against_the_repository(mech, cap, reason, capabi
 
 
 def test_the_claw_prefixed_claims_are_checked_even_with_no_mech_checkout():
-    """`claw:` paths live in this repository, so they never skip. All four
+    """`claw:` paths live in this repository, so they never skip. Five
     unmapped_inventory_input reasons name a claw script, and HabitatMech's
     environment_coverage reason names the dashboard that lacks a loader for it;
     if that check could skip, the only always-runnable case would be the one

@@ -37,9 +37,10 @@ audit, and rollback.
 
 ## Fleet adoption
 
-Every Mech vendors the governed schema. Seven of the eight also carry the
-repository-local workflow that makes it usable; AntibioticMech is the exception
-and has the schema alone.
+Every Mech vendors the governed schema except PathwayMech, which was admitted
+before vendoring it (#510). Of the Mechs below that have the schema, all but
+AntibioticMech also carry the repository-local workflow that makes it usable;
+AntibioticMech has the schema alone.
 
 | Repo | Governed schema | Recipes | Validity checked in |
 |---|:--:|:--:|---|
@@ -51,6 +52,7 @@ and has the schema alone.
 | CellStructureMech | yes | yes | the qc runner, `scripts/run_qc.py` |
 | HabitatMech | yes | yes | the qc runner, `scripts/run_qc.py` |
 | AntibioticMech | yes | no | nothing yet — CultureBotAI/AntibioticMech#205 |
+| PathwayMech | no | no | nothing yet — #510 |
 
 Where validity is checked differs on purpose. A repository whose qc runner is
 the single authoritative gate puts it there; one that already separates

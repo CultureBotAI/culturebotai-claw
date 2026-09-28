@@ -1816,9 +1816,9 @@ mechs:
       verified: false
       reason: >-
         No PyYAML option set reproduces this mixed-style corpus. The best of 48
-        measured sets round-trips 41 of 148 records, all importer-emitted
-        GO-CAM records; 79 use block scalars or indented sequences that
-        safe_dump never emits. Measured on joining.
+        measured sets round-trips 41 of 148 records, all GO-CAM records
+        already written in safe_dump's style; 79 use block scalars or
+        indented sequences that safe_dump never emits. Measured on joining.
     capabilities:
       id_label_validation:
         status: disabled
@@ -1901,12 +1901,15 @@ mechs:
         reason_claims:
           present: ["src/pathwaymech/schema/pathwaymech.yaml"]
           absent: ["conf/kgscan_config.yaml"]
+      # An authoritative consumer must sync; the loader rejects anything else.
+      # PathwayMech has none of the vendored artifacts or a pin yet; until
+      # they land (#510), the fleet audit reports the gap.
       vendored_sync:
         status: enabled
       corpus_statistics:
         status: enabled
         settings:
-          # pathway_type is free text (46 values at admission); each record
+          # pathway_type is free text (48 values at admission); each record
           # names exactly one taxon, so taxa.id is that taxon.
           fields:
             - pathway_type
@@ -1932,7 +1935,8 @@ mechs:
         status: disabled
         reason: >-
           Has no scripts/audit_writers.py, and no tracked script writes a
-          record: the importers print YAML drafts to stdout. Adopting it applies
+          record: the importers print to stdout, either YAML drafts or TSV
+          seed rows. Adopting it applies
           once a script writes records; the settings are the repository's to
           declare.
         reason_claims:
