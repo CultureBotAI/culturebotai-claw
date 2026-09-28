@@ -74,6 +74,12 @@ repositories:
     package_manager: uv
     task_runner: just
     description: "Microbial taxon and strain identities, taxonomy mappings and genome links"
+  pathwaymech:
+    path: ${PATHWAYMECH_ROOT}
+    type: python
+    package_manager: uv
+    task_runner: just
+    description: "Pathway-level microbial mechanisms: participants, reactions and evidence-backed causal edges"
 
 agents:
   discovery_paths:

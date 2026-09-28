@@ -186,5 +186,10 @@
     ".github/workflows/label-correspondence.yaml": [
       "label-correspondence"
     ]
+  },
+  "pathwaymech": {
+    ".github/workflows/main.yaml": [
+      "qc"
+    ]
   }
 }
