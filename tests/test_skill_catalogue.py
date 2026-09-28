@@ -278,6 +278,18 @@ def test_review_yaml_record_selects_documented_validators():
     assert "narrowest documented validator" in text
 
 
+def test_review_yaml_record_guides_imodulondb_structured_checks():
+    text = canonical_text("review-yaml-record")
+
+    assert "kg-microbe-sources imodulondb datasets" in text
+    assert "kg-microbe-sources imodulondb search --organism <organism>" in text
+    assert "kg-microbe-sources imodulondb summarize --organism <organism>" in text
+    assert "organism/dataset/component" in text
+    assert "not direct proof of a phenotype" in text
+    assert "absence from iModulonDB" in text
+    assert "negative evidence" in text
+
+
 def test_review_yaml_record_writes_timestamped_structured_markdown():
     text = canonical_text("review-yaml-record")
 
@@ -322,6 +334,17 @@ def test_review_yaml_category_has_lump_and_split_boundary_review():
     assert "Preserve legitimate variants" in text
     assert "duplicate identities" in text
     assert "over-broad groups" in text
+
+
+def test_review_yaml_category_guides_imodulondb_structured_checks():
+    text = canonical_text("review-yaml-category")
+
+    assert "kg-microbe-sources imodulondb datasets" in text
+    assert "kg-microbe-sources imodulondb search --organism <organism>" in text
+    assert "kg-microbe-sources imodulondb summarize --organism <organism>" in text
+    assert "Evidence Patterns" in text
+    assert "cohort boundary" in text
+    assert "not direct proof of a phenotype" in text
 
 
 def test_review_yaml_category_writes_timestamped_structured_markdown():
