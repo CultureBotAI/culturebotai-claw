@@ -426,10 +426,11 @@ mechs:
         status: disabled
         reason: >-
           Builds a KGX ingredient graph with
-          src/mediaingredientmech/export/kgx.py and publishes the reviewed
-          subset as a release asset, but declares no nodes and edges for this
-          contract to judge. KGX export applies here, as to every Mech (#503);
-          adoption is pending (MediaIngredientMech#778).
+          src/mediaingredientmech/export/kgx.py. Its one KGX release,
+          mim-supported-2026-09-21, is a snapshot its own notes mark superseded,
+          with a new KGX publication pending, and it declares no nodes and
+          edges for this contract to judge. KGX export applies here, as to
+          every Mech (#503); adoption is pending (MediaIngredientMech#778).
         reason_claims:
           present:
             - src/mediaingredientmech/export/kgx.py
@@ -563,9 +564,14 @@ mechs:
       sssom_export:
         status: disabled
         reason: >-
-          Publishes KGX nodes and edges but no term mappings, so there is no
-          SSSOM file for this contract to judge. SSSOM export applies here, as
-          to every Mech (#503); adoption is pending (CommunityMech#1137).
+          Keeps its term groundings, with SKOS predicates, in
+          mappings/community_term_grounding.tsv rather than as SSSOM, so there
+          is no SSSOM file for this contract to judge. SSSOM export applies
+          here, as to every Mech (#503); adoption is pending
+          (CommunityMech#1137).
+        reason_claims:
+          present:
+            - mappings/community_term_grounding.tsv
       metpo_proposal:
         status: enabled
         settings:
@@ -867,10 +873,16 @@ mechs:
       sssom_export:
         status: disabled
         reason: >-
-          Grounds protein traits directly in its own records rather than
-          publishing a mapping set, so there is no SSSOM file for this contract
-          to judge. SSSOM export applies here, as to every Mech (#503);
-          adoption is pending (proteintraitsmech#805).
+          Keeps its equivalences as a Biolink mapping overlay under
+          data/equivalence/ and a ChEBI crosswalk in
+          data/mappings/cofactor_crosswalk.tsv rather than as SSSOM, so there
+          is no SSSOM file for this contract to judge. SSSOM export applies
+          here, as to every Mech (#503); adoption is pending
+          (proteintraitsmech#805).
+        reason_claims:
+          present:
+            - data/equivalence
+            - data/mappings/cofactor_crosswalk.tsv
       metpo_proposal:
         status: disabled
         reason: >-
@@ -883,8 +895,8 @@ mechs:
       kgx_export:
         status: disabled
         reason: >-
-          Publishes protein-trait records, not yet a graph. KGX export applies
-          here, as to every Mech (#503); adoption is pending
+          Publishes protein-trait records, not yet a KGX graph. KGX export
+          applies here, as to every Mech (#503); adoption is pending
           (proteintraitsmech#805).
       source_queue:
         status: disabled

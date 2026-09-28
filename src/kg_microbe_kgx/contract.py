@@ -1,9 +1,12 @@
 """What a KGX node/edge TSV must hold to, checked once for the fleet.
 
 The companion to `kg_microbe_sssom`. Where SSSOM had three producers to
-generalise from, KGX has one: CommunityMech exports `output/kgx/{nodes,edges}.tsv`
-and validates them with a 184-line `validate_kgx.py`. Building a shared
-*exporter* from a single implementation is the trap #180 named, so this is a
+generalise from, KGX had one when this was written: CommunityMech exports
+`output/kgx/{nodes,edges}.tsv` and validates them with a 184-line
+`validate_kgx.py`. MediaIngredientMech has since added its own exporter
+(`src/mediaingredientmech/export/kgx.py`, MediaIngredientMech#722), written
+independently of CommunityMech's. Building a shared *exporter* from a single
+implementation is the trap #180 named, so this is a
 shared *validator* -- and unlike an exporter, a validator can be proved against
 artifacts nobody wrote for it, which is what makes it worth having.
 
