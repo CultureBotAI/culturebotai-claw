@@ -200,6 +200,11 @@ its own. In outline:
 - **CultureMech** (`not_applicable`) and **MediaIngredientMech** (`disabled`)
   have no causal-graph slot; each declaration says what their similarly named
   tooling measures instead.
+- **PathwayMech** (`disabled`) keeps one graph per record in yet another
+  shape: nodes in the record-level taxa, participants and reactions lists (and
+  the record itself), edges in one record-level `mechanistic_edges` list. The
+  reader has no such shape yet, so it would report no record covered; the
+  declaration says so rather than publishing 0%.
 
 ## Declaring that a graph is not relevant
 

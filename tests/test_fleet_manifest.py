@@ -33,6 +33,7 @@ EXPECTED_MECHS = (
     "habitatmech",
     "naturalproductmech",
     "taxonmech",
+    "pathwaymech",
 )
 
 

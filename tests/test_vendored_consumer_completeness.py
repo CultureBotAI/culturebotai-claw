@@ -73,6 +73,35 @@ INCOMPLETE_CONSUMERS: dict[str, IncompleteConsumer] = {
     # HabitatMech left it when CultureBotAI/HabitatMech#255 vendored all 13
     # artifacts that apply to it and pinned 69c3abb7, the commit of #360 that
     # declares it.
+    "pathwaymech": IncompleteConsumer(
+        # Measured with git ls-tree against PathwayMech origin/main c9971e5f on
+        # admission: 12 of the 14 artifacts that apply to it are absent. Two
+        # more are tracked but are not the canonical files -- its own
+        # prompts/backlog-loop-goal.md and scripts/deep_research_contract.py
+        # (a wrapper around its own report-heading checker; no test imports
+        # it, and its QC gate calls the checker directly) -- which this
+        # presence check cannot see and fleet-audit's byte comparison will;
+        # vendoring must replace or rename them.
+        expected_missing=frozenset({
+            ".github/workflows/pr-shepherd.yml",
+            "scripts/chem_formula.py",
+            "scripts/check_vendored_sync.py",
+            "scripts/check_vendored_sync.sh",
+            "scripts/validate_id_label_correspondence.py",
+            "src/pathwaymech/schema/history.yaml",
+            "src/pathwaymech/schema/mech_shared.yaml",
+            "tests/test_curation_timestamp_schema.py",
+            "tests/test_id_label_empty_adapter.py",
+            "tests/test_id_label_plausibility.py",
+            "tests/test_id_label_unknown_prefix.py",
+            "tests/test_skill_frontmatter.py",
+        }),
+        reason=(
+            "Admitted before vendoring: PathwayMech gained its LinkML schema and CI "
+            "in PathwayMech PRs 189 and 190 and has not yet vendored the governed "
+            "artifacts or pinned a claw commit (#510)."
+        ),
+    ),
 }
 
 
@@ -168,6 +197,7 @@ def test_the_manifest_declares_the_consumers_the_fleet_expects():
         "habitatmech",
         "mediaingredientmech",
         "naturalproductmech",
+        "pathwaymech",
         "proteintraitsmech",
         "taxonmech",
         "traitmech",

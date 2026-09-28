@@ -15,9 +15,10 @@ not: **which model, using which tool, changed what, why, and under which issue?*
 This follows the same shape as `kg_microbe_kgscan`: claw owns one
 implementation and each Mech exposes thin repository-specific recipes.
 
-The schema is **vendored** into every Mech; the scaffolder is **not**. Each Mech
-validates its local schema copy so its correctness gate is self-contained and
-pinned rather than dependent on another repository's current branch:
+The schema is **vendored** into a Mech; the scaffolder is **not**. PathwayMech,
+admitted before vendoring, has no copy yet (see [Fleet adoption](#fleet-adoption)).
+A Mech validates its local schema copy so its correctness gate is self-contained
+and pinned rather than dependent on another repository's current branch:
 
 ```bash
 kg-microbe-history validate history \
@@ -37,9 +38,10 @@ audit, and rollback.
 
 ## Fleet adoption
 
-Every Mech vendors the governed schema. Seven of the eight also carry the
-repository-local workflow that makes it usable; AntibioticMech is the exception
-and has the schema alone.
+Every Mech vendors the governed schema except PathwayMech, which was admitted
+before vendoring it (#510). Of the Mechs below that have the schema, all but
+AntibioticMech also carry the repository-local workflow that makes it usable;
+AntibioticMech has the schema alone.
 
 | Repo | Governed schema | Recipes | Validity checked in |
 |---|:--:|:--:|---|
@@ -51,6 +53,7 @@ and has the schema alone.
 | CellStructureMech | yes | yes | the qc runner, `scripts/run_qc.py` |
 | HabitatMech | yes | yes | the qc runner, `scripts/run_qc.py` |
 | AntibioticMech | yes | no | nothing yet — CultureBotAI/AntibioticMech#205 |
+| PathwayMech | no | no | nothing yet — the schema arrives with #510; recipes and a check, #515 |
 
 Where validity is checked differs on purpose. A repository whose qc runner is
 the single authoritative gate puts it there; one that already separates

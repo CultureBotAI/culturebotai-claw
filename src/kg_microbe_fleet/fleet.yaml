@@ -1828,3 +1828,206 @@ mechs:
         reason: >-
           The unmapped inventory reconciles ingredient names across media
           corpora; taxon identity records are not one of its inputs.
+
+  pathwaymech:
+    # Inspected on joining, 2026-09-28, at committed main c9971e5f: 148
+    # curated pathway records, a closed LinkML schema validated in CI on every
+    # pull request, and a site-only Pages deploy (PathwayMech #189, #190).
+    display_name: PathwayMech
+    github: CultureBotAI/PathwayMech
+    environment_variable: PATHWAYMECH_ROOT
+    package_path: src/pathwaymech
+    schema_paths:
+      - src/pathwaymech/schema/pathwaymech.yaml
+    record_globs:
+      - data/pathways/**/*.yaml
+    vendored_role: consumer
+    serialization:
+      verified: false
+      reason: >-
+        No PyYAML option set reproduces this mixed-style corpus. The best of 48
+        measured sets round-trips 41 of 148 records, all GO-CAM records
+        already written in safe_dump's style; 79 use block scalars or
+        indented sequences that safe_dump never emits. Measured on joining.
+    capabilities:
+      id_label_validation:
+        status: disabled
+        reason: >-
+          Every taxon, participant and reaction pairs a CURIE with a label
+          (CHEBI, NCBITaxon, RHEA, EC, SGD and others), so the check applies.
+          There is no vendored scripts/validate_id_label_correspondence.py, no
+          conf/id_label_targets.yaml telling it which id and label slots to
+          read, and no recipe or workflow that compares an id with its ontology
+          label. Enable once the vendored validator runs over data/pathways/ on
+          every pull request.
+        reason_claims:
+          present: ["data/pathways"]
+          absent:
+            - "scripts/validate_id_label_correspondence.py"
+            - "conf/id_label_targets.yaml"
+      curation_history:
+        status: disabled
+        reason: >-
+          No record carries curation history: there is no vendored
+          src/pathwaymech/schema/history.yaml, no new-history recipe, and
+          history/ holds only a README. Adopting applies once the history
+          schema is vendored and a recipe appends events, checked in CI.
+        reason_claims:
+          present: ["history"]
+          absent: ["src/pathwaymech/schema/history.yaml"]
+      # Closed-mode LinkML validation (pathwaymech-validate-strict) runs in
+      # `just validate` and in the "Build and test" workflow on every pull
+      # request (PathwayMech #190).
+      strict_validation:
+        status: enabled
+      schema_sync:
+        status: enabled
+      # These declare eligibility for shared orchestration, as for the other
+      # consumers; they do not assert that local hook copies are installed.
+      release_management:
+        status: enabled
+      build_coordination:
+        status: enabled
+      documentation:
+        status: enabled
+      testing:
+        status: enabled
+      refactoring:
+        status: enabled
+      coordination_hooks:
+        status: enabled
+      deep_research:
+        status: disabled
+        reason: >-
+          Research so far is source-discovery notes under research/; there is
+          no conf/deep_research_provider.yaml and no provider recipe. Its
+          scripts/deep_research_contract.py is a local report-heading checker,
+          not the vendored contract of that name. Enable once a provider is
+          configured and exercised under the shared contract.
+        reason_claims:
+          present: ["research", "scripts/deep_research_contract.py"]
+          absent: ["conf/deep_research_provider.yaml"]
+      edison_key_discovery:
+        status: not_applicable
+        reason: >-
+          PathwayMech has no Edison integration or Edison research-provider key.
+      environment_coverage:
+        status: not_applicable
+        reason: >-
+          Environment coverage compares culture media, ingredients and
+          microbial communities. Pathway mechanism records carry organism scope
+          as NCBITaxon and no environment terms, so they are not one of its
+          inputs.
+      knowledge_gap_scan:
+        status: disabled
+        reason: >-
+          Records have no Discussion slot: the closed schema in
+          src/pathwaymech/schema/pathwaymech.yaml declares none, so there are
+          no Discussions to index, and the block the scan appends under --apply
+          would fail strict validation. There is also no conf/kgscan_config.yaml
+          or scan recipe. The records are curated mechanisms with edge-level
+          evidence, so the scan applies; enable once the schema declares
+          Discussions and a window has been chosen.
+        reason_claims:
+          present: ["src/pathwaymech/schema/pathwaymech.yaml"]
+          absent: ["conf/kgscan_config.yaml"]
+      # An authoritative consumer must sync; the loader rejects anything else.
+      # PathwayMech has none of the vendored artifacts or a pin yet; until
+      # they land (#510), the fleet audit reports the gap.
+      vendored_sync:
+        status: enabled
+      corpus_statistics:
+        status: enabled
+        settings:
+          # pathway_type is free text (48 values at admission); each record
+          # names exactly one taxon, so taxa.id is that taxon.
+          fields:
+            - pathway_type
+            - taxa.id
+      page_budgets:
+        status: disabled
+        reason: >-
+          Publishes pages/, rendered from the records (152 files, 385 KB at
+          admission), through a site-only Pages deploy, but declares no
+          size or file-count budgets, so there is no conf/pages_budgets.json for
+          the audit to read. The limits are the repository's to set.
+        reason_claims:
+          present: ["pages"]
+          absent: ["conf/pages_budgets.json"]
+      kgx_export:
+        status: disabled
+        reason: >-
+          Records are already node-and-edge graphs -- evidenced
+          subject/predicate/object edges between CURIE nodes -- but there is no
+          exporter and no nodes or edges file for the contract to judge.
+          Adopting KGX applies once an exporter emits them.
+      writer_audit:
+        status: disabled
+        reason: >-
+          Has no scripts/audit_writers.py, and no tracked script writes a
+          record: the importers print to stdout, either YAML drafts or TSV
+          seed rows. Adopting it applies
+          once a script writes records; the settings are the repository's to
+          declare.
+        reason_claims:
+          absent: ["scripts/audit_writers.py"]
+      sssom_export:
+        status: disabled
+        reason: >-
+          Records carry ChEBI, SGD, EC, UniProtKB and NCBITaxon identifiers
+          inline rather than through a mapping file, and local-identifier
+          exceptions are logged in curation/decisions.tsv, a curator decision
+          log rather than a mapping set. Adopting SSSOM applies once a mapping
+          product exists.
+        reason_claims:
+          present: ["curation/decisions.tsv"]
+      metpo_proposal:
+        status: disabled
+        reason: >-
+          No proposals/ directory and no METPO grounding; pathways are
+          identified by GO-CAM model, MetaCyc and WikiPathways identifiers.
+          Adopting applies once a pathway-level phenotype needs a METPO term.
+        reason_claims:
+          absent: ["proposals"]
+      source_queue:
+        status: disabled
+        reason: >-
+          Has no curation/source_queue.tsv; its source-triage skill ranks
+          candidates by priority in conf/sources.yaml, with evidence under
+          research/source_discovery/. Adopting the queue means recording each
+          source's licence verification and adoption date.
+        reason_claims:
+          present: ["conf/sources.yaml", "research/source_discovery"]
+          absent: ["curation/source_queue.tsv"]
+      site_contract:
+        status: enabled
+        settings:
+          site_path: pages
+      source_catalogue:
+        status: disabled
+        reason: >-
+          Declares its sources in conf/sources.yaml, whose rows carry priority,
+          ingest status, role and homepage but no per-file url or licence, and
+          imports local exports; there is no download.yaml in the fleet's
+          catalogue shape. Adopting applies once each source has its fetchable,
+          licensed half.
+        reason_claims:
+          present: ["conf/sources.yaml"]
+          absent: ["download.yaml"]
+      unmapped_inventory_input:
+        status: not_applicable
+        reason: >-
+          The unmapped-ingredient inventory reads culture-media and ingredient
+          corpora; pathway participants are metabolites, enzymes and gene
+          products rather than medium ingredients, so
+          scripts/inventory_unmapped_ingredients.py defines no loader for it.
+        reason_claims:
+          present: ["claw:scripts/inventory_unmapped_ingredients.py"]
+      causal_graph_coverage:
+        status: disabled
+        reason: >-
+          Every record is one causal graph: CURIE nodes in the record-level
+          taxa, participants and reactions lists plus the record itself, and one
+          record-level mechanistic_edges list. That is neither graph_list nor
+          node_nested_edges, so the coverage reader would report no record
+          covered. Enable once the reader has a record-level shape.

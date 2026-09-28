@@ -529,6 +529,7 @@ BASELINES = {
     "antibioticmech": set(),
     "naturalproductmech": set(),
     "taxonmech": set(),  # 104 HTML pages checked at onboarding; no findings.
+    "pathwaymech": set(),
 }
 
 
@@ -571,9 +572,12 @@ def test_the_measured_corpora_are_the_ones_declared():
     at (AntibioticMech#171). NaturalProductMech on joining (2026-09-11): 3,128
     pages and one stylesheet, reporting four UNEXAMINED_FOREGROUND -- --causal,
     --link, --tooltip-fg and --weak, each set as a colour with no pairing that
-    says what it sits on; NaturalProductMech#100 tracks them.
+    says what it sits on; NaturalProductMech#100 tracks them. PathwayMech on
+    joining (2026-09-28, c9971e5f): 150 pages and one stylesheet, no page
+    findings; two UNEXAMINED_FOREGROUND -- --link and --text, drawn on the
+    body's --background with no pairing that says so.
 
-    What is asserted is the membership, not the numbers. If a sixth is enabled
+    What is asserted is the membership, not the numbers. If another is enabled
     the prose above stops describing what the check runs on until someone
     re-measures it."""
     assert _ENABLED == [
@@ -581,6 +585,7 @@ def test_the_measured_corpora_are_the_ones_declared():
         "cellstructuremech",
         "communitymech",
         "naturalproductmech",
+        "pathwaymech",
         "taxonmech",
         "traitmech",
     ]
