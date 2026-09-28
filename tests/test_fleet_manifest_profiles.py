@@ -62,6 +62,11 @@ EXPECTED_PROFILES = {
         ("src/habitatmech/schema/habitatmech.yaml",),
         ("data/habitats/**/*.yaml",),
     ),
+    "pathwaymech": (
+        "src/pathwaymech",
+        ("src/pathwaymech/schema/pathwaymech.yaml",),
+        ("data/pathways/**/*.yaml",),
+    ),
 }
 
 EXPECTED_CAPABILITIES = {

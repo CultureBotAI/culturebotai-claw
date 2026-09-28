@@ -66,6 +66,8 @@ def test_fleet_audit_cli_parses_repeated_roots_and_reports_success(
             "naturalproductmech=/tmp/npm",
             "--target-root",
             "taxonmech=/tmp/taxon",
+            "--target-root",
+            "pathwaymech=/tmp/pathway",
         ]
     ) == 0
 
@@ -81,10 +83,11 @@ def test_fleet_audit_cli_parses_repeated_roots_and_reports_success(
             "habitatmech": Path("/tmp/habitat"),
             "naturalproductmech": Path("/tmp/npm"),
             "taxonmech": Path("/tmp/taxon"),
+            "pathwaymech": Path("/tmp/pathway"),
         },
         "ref": REF,
     }
-    assert "OK: all 10 Mechs match" in capsys.readouterr().out
+    assert "OK: all 11 Mechs match" in capsys.readouterr().out
 
 
 def test_fleet_audit_cli_rejects_malformed_or_duplicate_root_values(capsys) -> None:

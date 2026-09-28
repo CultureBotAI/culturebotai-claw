@@ -42,6 +42,10 @@
     "taxonmech": {
       "github": "CultureBotAI/TaxonMech",
       "package_path": "src/taxonmech"
+    },
+    "pathwaymech": {
+      "github": "CultureBotAI/PathwayMech",
+      "package_path": "src/pathwaymech"
     }
   },
   "artifacts": [
