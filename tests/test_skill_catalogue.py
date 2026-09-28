@@ -278,6 +278,18 @@ def test_review_yaml_record_selects_documented_validators():
     assert "narrowest documented validator" in text
 
 
+def test_review_yaml_record_guides_imodulondb_structured_checks():
+    text = canonical_text("review-yaml-record")
+
+    assert "kg-microbe-sources imodulondb datasets" in text
+    assert "kg-microbe-sources imodulondb search --organism <organism>" in text
+    assert "kg-microbe-sources imodulondb summarize --organism <organism>" in text
+    assert "organism/dataset/component" in text
+    assert "not direct proof of a phenotype" in text
+    assert "absence from iModulonDB" in text
+    assert "negative evidence" in text
+
+
 def test_review_yaml_record_writes_timestamped_structured_markdown():
     text = canonical_text("review-yaml-record")
 
@@ -295,6 +307,64 @@ def test_review_yaml_record_writes_timestamped_structured_markdown():
         "## Identity and Grounding",
         "## Evidence",
         "## Completeness",
+        "## Findings",
+        "## Recommended Edits",
+        "## Follow-up Checks",
+    ):
+        assert heading in text
+
+
+def test_review_yaml_category_resolves_cohorts_before_reporting():
+    text = canonical_text("review-yaml-category")
+
+    assert "Resolve at least one bounded, coherent target category" in text
+    assert "Record the selection rule for each cohort" in text
+    assert "Do not write a" in text
+    assert "report for an ambiguous or unbounded set" in text
+    assert "If the request needs disambiguation" in text
+    assert "without creating a report" in text
+
+
+def test_review_yaml_category_has_lump_and_split_boundary_review():
+    text = canonical_text("review-yaml-category")
+
+    assert "lump them before reviewing" in text
+    assert "split it into coherent cohorts" in text
+    assert "Lump and Split Review" in text
+    assert "Preserve legitimate variants" in text
+    assert "duplicate identities" in text
+    assert "over-broad groups" in text
+
+
+def test_review_yaml_category_guides_imodulondb_structured_checks():
+    text = canonical_text("review-yaml-category")
+
+    assert "kg-microbe-sources imodulondb datasets" in text
+    assert "kg-microbe-sources imodulondb search --organism <organism>" in text
+    assert "kg-microbe-sources imodulondb summarize --organism <organism>" in text
+    assert "Evidence Patterns" in text
+    assert "cohort boundary" in text
+    assert "not direct proof of a phenotype" in text
+
+
+def test_review_yaml_category_writes_timestamped_structured_markdown():
+    text = canonical_text("review-yaml-category")
+
+    assert "reports/yaml_category_review/<YYYYMMDDTHHMMSSZ>-<category-slug>.md" in text
+    assert "After resolving at least one coherent target category" in text
+    assert "Create `reports/yaml_category_review/` if it does not exist" in text
+    assert "date -u +%Y%m%dT%H%M%SZ" in text
+    assert "Do not overwrite or append to a prior review" in text
+    assert "Use tables, bullets, or prose inside those headings" in text
+    assert "verdict must say `sampled`" in text
+    for heading in (
+        "## Target Category",
+        "## Selection and Membership",
+        "## Validation",
+        "## Lump and Split Review",
+        "## Identity and Grounding",
+        "## Evidence Patterns",
+        "## Completeness Patterns",
         "## Findings",
         "## Recommended Edits",
         "## Follow-up Checks",
