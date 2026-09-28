@@ -1959,8 +1959,9 @@ mechs:
         reason: >-
           Records are already node-and-edge graphs -- evidenced
           subject/predicate/object edges between CURIE nodes -- but there is no
-          exporter and no nodes or edges file for the contract to judge.
-          Adopting KGX applies once an exporter emits them.
+          exporter and no nodes or edges file for the contract to judge. KGX
+          export applies here, as to every Mech (#503); adoption is pending
+          (PathwayMech#203).
       writer_audit:
         status: disabled
         reason: >-
@@ -1977,8 +1978,8 @@ mechs:
           Records carry ChEBI, SGD, EC, UniProtKB and NCBITaxon identifiers
           inline rather than through a mapping file, and local-identifier
           exceptions are logged in curation/decisions.tsv, a curator decision
-          log rather than a mapping set. Adopting SSSOM applies once a mapping
-          product exists.
+          log rather than a mapping set. SSSOM export applies here, as to every
+          Mech (#503); adoption is pending (PathwayMech#203).
         reason_claims:
           present: ["curation/decisions.tsv"]
       metpo_proposal:
