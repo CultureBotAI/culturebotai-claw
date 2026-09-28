@@ -140,6 +140,7 @@ def test_the_reasons_that_make_checkable_claims_are_the_ones_declared():
         "habitatmech.unmapped_inventory_input",
         "habitatmech.writer_audit",
         "mediaingredientmech.causal_graph_coverage",
+        "mediaingredientmech.kgx_export",
         "mediaingredientmech.page_budgets",
         "mediaingredientmech.source_catalogue",
         "mediaingredientmech.source_queue",
