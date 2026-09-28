@@ -86,16 +86,21 @@ names a gene, locus tag, UniProt accession, regulator, pathway, stress response,
 trait, or transcriptomics dataset that may already be represented in a shared
 database.
 
-For iModulonDB candidates:
+For iModulonDB candidates, first resolve the runner. In the commands below,
+`<kg-microbe-sources>` means either an installed `kg-microbe-sources` console
+script or `uv run --project <claw-root> kg-microbe-sources` from a local
+`culturebotai-claw` checkout. If neither runner is available, record the
+structured adapter as unavailable and fall back to inspected iModulonDB source
+pages or open web search.
 
-- Run `kg-microbe-sources imodulondb datasets` to find covered
+- Run `<kg-microbe-sources> imodulondb datasets` to find covered
   organism/dataset keys.
-- Run `kg-microbe-sources imodulondb search --organism <organism> --dataset
+- Run `<kg-microbe-sources> imodulondb search --organism <organism> --dataset
   <dataset> --query <term>` for a record gene, locus, regulator, protein name,
   stress-response term, or iModulon name that matches a covered organism.
-- Run `kg-microbe-sources imodulondb summarize --organism <organism> --dataset
-  <dataset> --k <component>` for any iModulon hit that would inform the record
-  verdict.
+- Run `<kg-microbe-sources> imodulondb summarize --organism <organism>
+  --dataset <dataset> --k <component>` for any iModulon hit that would inform
+  the record verdict.
 - Record useful `organism/dataset/component` and `organism/dataset/gene` keys
   under **Evidence** or **Additional Notes**, and keep any copied summary table
   small enough to justify why the record is or is not supported.
