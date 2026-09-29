@@ -37,6 +37,14 @@ jobs:
           python-version: "3.13"
           enable-cache: true
 
+      # tests/test_claude_workflows.py runs the .claude/workflows/*.js scripts
+      # through tests/workflow_harness.mjs. It fails, rather than skips, under CI
+      # when node is missing, so pin the version it runs on.
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - name: Sync environment
         # --extra dev here AND on the `uv run` below: uv re-syncs to the DEFAULT
         # groups on each run and prunes what an extra brought in, so syncing once
