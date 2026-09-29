@@ -1826,9 +1826,11 @@ mechs:
           Every taxon, participant and reaction pairs a CURIE with a label
           (CHEBI, NCBITaxon, RHEA, EC, SGD and others), so the check applies.
           The vendored scripts/validate_id_label_correspondence.py is present,
-          but there is no conf/id_label_targets.yaml telling it which id and
-          label slots to read, and no recipe or workflow runs it. Enable once
-          it runs over data/pathways/ on every pull request.
+          but nothing runs it over the records: there is no
+          conf/id_label_targets.yaml telling it which id and label slots to
+          read, and its only callers are the vendored tests, on synthetic
+          fixtures. Enable once it runs over data/pathways/ on every pull
+          request.
         reason_claims:
           present:
             - "data/pathways"
