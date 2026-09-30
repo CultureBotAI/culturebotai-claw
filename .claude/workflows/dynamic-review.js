@@ -395,7 +395,7 @@ const dedup = (list) => {
 }
 const deduped = dedup(verified.filter((f) => f.verdict.status === 'confirmed'))
 const undecided = dedup(verified.filter((f) => f.verdict.status === 'unverified' || f.verdict.status === 'split'))
-const refutedCount = verified.filter((f) => f.verdict.status === 'refuted').length
+const refutedCount = dedup(verified.filter((f) => f.verdict.status === 'refuted')).length
 log(`Confirmed ${deduped.length} finding(s), refuted ${refutedCount}, left ${undecided.length} unverified or split; ${gateFailures.length} static-gate failure(s) (gate ${gateStatus}).`)
 
 // Every stage whose agents returned nothing, so the report cannot read as clean.

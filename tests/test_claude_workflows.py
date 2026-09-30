@@ -213,6 +213,18 @@ def test_an_evenly_divided_vote_is_split_not_refuted() -> None:
     assert result["undecidedFindings"] == 1
 
 
+def test_one_finding_reported_twice_counts_once_whatever_its_verdict() -> None:
+    """Two reviewers can report the same file|line|title. Each bucket must count
+    it once, or the counts in one return value disagree (#532)."""
+    same = _finding("Same", "bugs", "high")
+    both = {**RESPONSES, "review:bugs": {"findings": [same]},
+            "review:conventions": {"findings": [dict(same, dimension="conventions")]}}
+    held = review(responses={**both, "verify:": {"refuted": False, "reason": "holds"}})["result"]
+    refuted = review(responses={**both, "verify:": {"refuted": True, "reason": "no"}})["result"]
+    assert held["confirmedFindings"] == 1
+    assert refuted["refutedFindings"] == 1
+
+
 def test_a_failed_synthesis_keeps_the_verified_findings() -> None:
     result = review(nullLabels=["synthesize"])["result"]
     assert "synthesize" in result["failedStages"]
