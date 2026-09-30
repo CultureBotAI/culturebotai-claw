@@ -1,145 +1,112 @@
 ---
 name: metpo-aggregate
-description: "Merge every Mech's METPO proposal cohorts into one aggregate ROBOT template, and report where the fleet's shared METPO ID space contradicts itself. Runs scripts/fleet_metpo_aggregate.py, which resolves the proposing Mechs from the manifest's metpo_proposal capability and always reports its coverage. Read-only: it writes an aggregate into claw's workspace and never touches a Mech or submits anything upstream."
-category: cross-repo
-requires_database: false
-requires_internet: false
-version: 1.0.0
-tags: [metpo, ontology, proposal, cross-repo, fleet, aggregate, robot, read-only]
+description: "Survey and merge METPO proposals across the Mech fleet into class/property ROBOT templates, provenance, and a review narrative. Use for a combined or unified fleet proposal, coverage audit, or collision check. Resolves proposing Mechs through the manifest; writes only to CLAW's workspace."
+metadata:
+  category: cross-repo
+  requires_database: false
+  requires_internet: false
+  version: 2.0.0
+  tags: [metpo, ontology, proposal, cross-repo, fleet, aggregate, robot, read-only]
 ---
 
 # METPO aggregate
 
-## Purpose
+Use the shared merger in `scripts/fleet_metpo_aggregate.py`. It gathers all
+cohorts declared by the `metpo_proposal` capability in
+`src/kg_microbe_fleet/fleet.yaml`. Local cohort authoring remains in each
+proposer's `metpo-proposal` skill; this skill owns the combined review bundle.
 
-Answer **what would the fleet propose to METPO if it proposed once?** — and,
-more usefully, **does one METPO identifier mean one thing across the fleet?**
+## Survey before calling the result fleet-wide
 
-Each Mech mints METPO IDs in its own repository, from one shared numeric space.
-The canonical rules in kg-microbe say to "pick the next unused `1007NNN` slot",
-which is only satisfiable by someone who can see every slot already taken. No
-Mech can see another's, and until this existed nothing looked at two cohorts at
-once.
+Resolve all Mechs through the fleet root resolver. Read each capability's
+status and reason, then inspect the local proposal files, authoring skills,
+ground-or-propose commands, and verification recipes. Search with
+`rg --no-ignore --hidden` when establishing absence, including ignored files.
+Check Git HEAD, working-tree changes, and current remote default branch before describing
+remote state; label unavailable remote checks and local-only results explicitly.
 
-## Run it
+Disabled means excluded by the manifest, not proven absent. If an excluded Mech
+has begun producing cohorts, inspect their compatibility and update its manifest
+capability within the authorized task. Do not quietly skip discovered proposals
+or enable domains merely because they consume METPO. The merger reports all
+manifest declarations but only reads enabled proposers.
+
+## Run from CLAW
 
 ```bash
-uv run python scripts/fleet_metpo_aggregate.py            # merge + report
-uv run python scripts/fleet_metpo_aggregate.py --check    # report only
-uv run python scripts/fleet_metpo_aggregate.py --json
-uv run python scripts/fleet_metpo_aggregate.py --out DIR
+uv run python scripts/fleet_metpo_aggregate.py --check
+uv run python scripts/fleet_metpo_aggregate.py --check --json
+uv run python scripts/fleet_metpo_aggregate.py --out workspace/metpo/review
 ```
 
-Exit codes: `0` merged with no collision, `1` a collision or an incomplete
-read, `2` bad usage or an unresolvable repository. **Exit 1 means the aggregate
-must not be submitted.**
+The default output directory is `workspace/metpo/`. Prefer a distinct directory
+for a review that should remain reproducible. `--check` writes nothing.
 
-## Reading the report
+| Output | Purpose |
+|---|---|
+| `metpo_fleet_aggregate_classes_robot.tsv` | Combined class declarations |
+| `metpo_fleet_aggregate_properties_robot.tsv` | Combined property declarations |
+| `metpo_fleet_aggregate_provenance.tsv` | Every accepted input row's Mech, cohort, and source file |
+| `metpo_fleet_aggregate_report.json` | Coverage, conflicts, errors, input SHA-256 fingerprints, and merge status |
+| `proposal.md` | Review entry point with totals, findings, and remaining submission checks |
 
-### The collision section is the point
+Exit `0`: mechanical merge is clean. Exit `1`: conflicting or incomplete input;
+review outputs are diagnostic drafts. Exit `2`: usage, manifest, or output error.
+Neither exit zero nor a generated TSV certifies an upstream-ready proposal.
 
-The merged file is the deliverable; the collisions are the reason to build it.
-Two distinct defects, and they are not interchangeable:
+## Merge contract
 
-- **ID MEANS TWO THINGS** — one identifier, two labels. Submitting both hands
-  METPO contradictory definitions for one term. This is the one that is
-  already true: the fleet carries eight, all CommunityMech's, split across its
-  `metpo_communitymech_v1` and `metpo_communitymech_interaction_semantics_v1`
-  cohorts. `METPO:1007214` is both `interspecies electron transfer` and
-  `direct interspecies electron transfer community`.
-- **LABEL HAS TWO IDS** — one term, two identifiers. Nothing is contradictory,
-  but downstream data splits across identifiers that will never be reconciled.
+- Cohorts are additive unless a curated lifecycle explicitly supersedes them.
+  A version suffix alone is not a supersession rule. The merger does not filter
+  accepted or rejected proposals; reconcile lifecycle before submission.
+- Each TSV has a human header and a ROBOT directive row. The aggregate carries
+  the directive row once. Reject malformed widths, duplicate columns, missing
+  identities, and repeated header rows.
+- The supported class formats share OWL directives: legacy `synonyms` and newer
+  `exact_synonyms` both denote exact synonyms. Normalize that alias and retain
+  an optional `related_synonyms` column with its distinct related-synonym
+  directive. Never promote related synonyms to exact synonyms.
+- Other incompatible shapes are reported. A strict majority shape may be
+  retained for diagnostic output; excluded inputs make the run incomplete.
+  A plurality or tie does not choose a winner.
+- Deduplicate only complete identical rows. Keep differing definitions,
+  citations, parents, mappings, or other columns visible and report the
+  disagreement. Do not silently select the first or newest cohort.
+- Report one ID with multiple labels, one label with multiple IDs, differing
+  rows for one ID/label, and class/property reuse of the same ID. Do not
+  automatically renumber or choose the winning meaning.
 
-A run with neither says so explicitly. Silence is not how "clean" is reported.
+## Complete the review
 
-### Cohorts are additive, not successive
+Read every source cohort's narrative and any SSSOM mapping sidecar. These carry
+curation rationale and external matches; they remain source artifacts, not
+additional ontology assertions inserted by the merger. Use their evidence to
+expand the generated narrative with scope and hierarchy decisions when the user
+asks for a submission proposal.
 
-A version number here is **provenance, not supersession**. Measured across
-TraitMech's eleven cohorts, the union of class IDs equals the sum of the
-per-cohort counts and no two consecutive cohorts share an ID. Keeping only the
-newest cohort would drop 145 of its 160 proposed classes.
+Reconcile with the current upstream METPO release and pending kg-microbe
+proposals. kg-microbe is outside the fleet manifest and is not silently included
+in the merge; it still shares the identifier space. Read its local
+`metpo-proposal` skill and authoritative proposal/alias/placeholder ledgers.
+Check current release IDs, labels and exact synonyms, not just a local numeric
+block. Record accepted, pending, superseded, and rejected terms explicitly.
+Keep placeholder migrations coordinated with consumers; proposed IDs are not
+proof of upstream acceptance.
 
-So do not read `metpo_traitmech_v11` as "the current proposal". It is the
-eleventh batch.
+For an upstream-ready deliverable, resolve conflicts and lifecycle decisions,
+verify parents/domain/range against released or retained terms, review definition
+citations, and run ROBOT template ingestion plus ELK reasoning. Bind `METPO:` to the release namespace
+`https://w3id.org/metpo/`; older examples using the OBO-style METPO prefix
+create different IRIs and cannot validate against the released ontology. Record the
+release version, checks actually run, and anything still unverified.
 
-### Coverage
+The merger writes only local review artifacts. For authorized downstream fixes,
+follow the cross-repository checklist in `CLAUDE.md`. Upstream submission or
+posting requires user authorization for that action.
 
-`declared by the manifest` and `read` are printed separately on purpose. A Mech
-that declares the capability and could not be read appears in the first and not
-the second, and the report says INCOMPLETE — its collision list is then a lower
-bound, because a collision needs both halves to be visible.
+## Maintenance
 
-## Who proposes
-
-Membership comes from the `metpo_proposal` capability in
-`src/kg_microbe_fleet/fleet.yaml`, not from a list in this skill. Two Mechs
-enable it today. The rest declare `disabled` or `not_applicable` with a reason,
-so a Mech that starts proposing is picked up by flipping one declaration.
-
-MediaIngredientMech is `not_applicable` rather than `disabled`: it grounds
-ingredients in ChEBI and FOODON, and METPO models phenotypes and processes,
-which is not the axis that corpus curates.
-
-## The ROBOT template shape
-
-Every cohort's file carries a header row and a **template row** — line two,
-holding the OWL mapping for each column (`A IAO:0000115`, `SC %`). It is not
-data. The aggregate carries it exactly once, at line two, because ROBOT would
-read a second copy as a class.
-
-All fourteen cohorts agree on both rows today. If one ever disagrees, the
-**majority shape wins** and the deviating cohort is named and excluded rather
-than merged, because merging misaligned columns produces a file that looks fine
-and means something else. If no shape has a majority the run refuses, since
-there is then no basis for calling either one the deviation.
-
-## Boundaries
-
-- **It does not submit anything upstream.** The aggregate lands in
-  `workspace/metpo/` (gitignored). Opening a METPO pull request is a human
-  action against a repository outside this fleet.
-- **It does not edit a Mech.** Fixing a collision means editing the cohort that
-  is wrong, which is a downstream mutation under the cross-repository checklist
-  in `CLAUDE.md`.
-- **It does not decide which side of a collision is right.** It reports both
-  labels and the cohorts they came from; which term keeps the ID is a curation
-  judgement.
-- **It is not the proposal-authoring skill.** TraitMech and CommunityMech each
-  carry a `metpo-proposal` skill for writing a cohort, and the canonical rules
-  live in `kg-microbe/.claude/skills/metpo-proposal/SKILL.md`. This aggregates
-  what those produce.
-
-## Related
-
-- `metpo-proposal` in TraitMech and CommunityMech — authoring a cohort. The two
-  copies have drifted from each other and neither is canonical.
-- `kg-microbe/.claude/skills/metpo-proposal/SKILL.md` — the upstream contract,
-  in a repository that is not a fleet manifest member.
-- `fleet-pr-status`, `fleet-branch-status` — the other manifest-resolved fleet
-  inventories, and the source of this one's coverage conventions.
-
-## Tests
-
-`tests/test_fleet_metpo_aggregate.py` covers disagreement rather than the happy
-path, and every guard is mutation-checked — each of these turns at least one
-test red when removed:
-
-| mutation | tests red |
-|---|---:|
-| read the ROBOT template row as data | 4 |
-| stop detecting one ID with two labels | 2 |
-| stop detecting one label with two IDs | 1 |
-| let a later cohort overwrite an earlier one | 1 |
-| let the first file seen define the template shape | 1 |
-| drop an unresolvable Mech silently | 1 |
-| pick a shape when no majority exists | 1 |
-| exit zero on a collision | 1 |
-| write files under `--check` | 1 |
-| read Mechs the manifest has not enabled | 1 |
-
-Two of those rows exist because the first version of the test did not earn
-them. The additivity test used two different IDs, so every dedup policy passed
-it; it now uses one identity with differing columns, which is the only input
-where first-wins and last-wins diverge. And the template-shape test had a
-single deviating cohort sorting first, which crowned the deviation — the fix
-was in the script, not the test.
+Run `tests/test_fleet_metpo_aggregate.py` after merger changes. Preserve the
+shared implementation rather than distributing divergent mergers to Mechs.
+Keep dated infrastructure surveys under `workspace/reports/`; use GitHub issues
+for remaining shared-contract or release work.

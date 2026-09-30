@@ -482,6 +482,12 @@ because they carry literal data the path rules would misread.
 
 ## Prompts and review workflow
 
+- [Fleet issue review](.claude/skills/fleet-issue-review/SKILL.md) reviews the
+  published manifest's Mech issue queues, prioritizes shared themes, and plans
+  parallel work around dependencies and ownership.
+- [Review open issues](.claude/skills/review-open-issues/SKILL.md) triages claw's
+  complete issue queue against the current default branch. Reviews report locally;
+  explicitly requested follow-up actions retain their existing authorization.
 - `src/kg_microbe_governance/artifacts/prompts/backlog-loop-goal.md` is the
   canonical hand-over prompt for the native `/goal` and the source vendored to
   each Mech.

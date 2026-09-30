@@ -67,6 +67,9 @@ skills:
     reason: >-
       One row per repository of open issues and open PRs across claw and the
       manifest-defined Mechs, reading membership from the manifest.
+  fleet-issue-review:
+    scope: fleet
+    reason: Reviews the complete manifest-defined Mech backlog with thematic prioritization and dependency-aware parallel planning.
   fleet-pr-review:
     scope: fleet
     reason: Reviews open PRs across the manifest-defined control plane.
