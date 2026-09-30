@@ -6,7 +6,8 @@
 **Consolidates:** #276 (standardize the KGX transform), #275 (serialisation and
 predicate modelling), #461 (versioned release assets), #358 (which Mechs feed
 kg-microbe), #503 / #517 (every Mech's `kgx_export` declaration), and the
-per-Mech adoption issues they cite.
+per-Mech adoption issues they cite. New work items: #539 (category and
+predicate maps), #540 (release-asset contract), #541 (kg-microbe transform).
 
 ## The problem, measured
 
@@ -71,7 +72,7 @@ have only a record-local id such as `n3`.
 
 ## Design
 
-### 1. One exporter in claw: `kg-microbe-kgx export --mech X`
+### 1. One exporter in claw: `kg-microbe-kgx export --mech X` (#276)
 
 It reads the corpus through the existing `causal_graph_coverage` declaration
 (the same shape, globs and fields, so the graph that is measured is the graph
@@ -95,7 +96,7 @@ that is exported) and writes `nodes.tsv`, `edges.tsv` and a manifest:
   its own output and exits nonzero on any finding, so a written graph is a
   checked graph.
 
-### 2. Declared maps, shared where the fleet already agrees
+### 2. Declared maps, shared where the fleet already agrees (#539)
 
 The `kgx_export` capability gains settings: `infores`, `category_map` and
 `predicate_map`, and optionally a `node_id_namespace`.
@@ -114,7 +115,7 @@ The `kgx_export` capability gains settings: `infores`, `category_map` and
 - METPO predicates (#275) are declared per Mech: kept with `extra_prefixes`, or
   mapped, rather than decided here.
 
-### 3. Released as artifacts, checked as artifacts
+### 3. Released as artifacts, checked as artifacts (#540, #461)
 
 The capability today can only judge a committed `nodes`/`edges` path, which is
 why MediaIngredientMech (built in CI) and CommunityMech (release workflow)
@@ -128,7 +129,7 @@ cannot enable it with graphs that exist. Two changes:
 - The `kgx_export` contract accepts either a committed path or a **release
   asset**, and the fleet check reads the latest release's assets.
 
-### 4. One kg-microbe transform for every Mech
+### 4. One kg-microbe transform for every Mech (#541, #358)
 
 kg-microbe gets a single `mech_kgx` transform that downloads each opted-in
 Mech's release assets by versioned URL and passes them to the merge unchanged
