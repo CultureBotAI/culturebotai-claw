@@ -488,7 +488,14 @@ because they carry literal data the path rules would misread.
   Do not recreate a project command named `/goal`.
 - `.claude/workflows/dynamic-review.js` is the version-controlled source for
   `/dynamic-review`. It reports to the session by default and posts PR comments
-  only when explicitly requested.
+  only when explicitly requested, and never for an incomplete review. Run it by
+  name, or by `scriptPath` to this file, rather than writing a review workflow
+  inline: per-review specifics go in `context`, already-filed findings in
+  `exclude`. A stage whose agent returns nothing marks the run `degraded`, and
+  its findings are `unverified`, never confirmed (#529).
+- `tests/test_claude_workflows.py` checks every `.claude/workflows/*.js` offline,
+  through `tests/workflow_harness.mjs`: stubbed agents, no model calls. It needs
+  Node; locally it skips without it, in CI it fails.
 - `.claude/commands/curate.md` coordinates the curation stages and must stop for
   confirmation before downstream mutations.
 
