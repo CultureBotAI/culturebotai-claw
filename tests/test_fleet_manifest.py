@@ -135,6 +135,24 @@ def test_knowledge_gap_scan_is_not_applicable_to_proteintraitsmech_with_a_reason
     assert not manifest.get("proteintraitsmech").supports("knowledge_gap_scan")
 
 
+@pytest.mark.parametrize("capability_name", ["kgx_export", "sssom_export"])
+def test_the_exports_apply_to_every_mech(capability_name):
+    """#503: KGX and SSSOM export apply fleet-wide, so a Mech without one has
+    adoption pending (`disabled`), and none declares it `not_applicable`."""
+    manifest = load_fleet_manifest(MANIFEST_PATH)
+
+    not_applicable = sorted(
+        name
+        for name, mech in manifest.mechs.items()
+        if (capability := mech.capability(capability_name)) is not None
+        and capability.status == "not_applicable"
+    )
+    assert not not_applicable, (
+        f"{capability_name} applies to every Mech (#503); declare it disabled, "
+        f"pending adoption, not not_applicable: {not_applicable}"
+    )
+
+
 def test_every_non_enabled_capability_states_a_reason():
     manifest = load_fleet_manifest(MANIFEST_PATH)
 

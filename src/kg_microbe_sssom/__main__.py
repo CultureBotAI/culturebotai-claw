@@ -39,7 +39,8 @@ def main(argv: list[str] | None = None) -> int:
     capability = manifest.mechs[args.mech].capabilities.get("sssom_export")
     if capability is None or not capability.is_enabled:
         reason = getattr(capability, "reason", "") or "not declared in the manifest"
-        print(f"{args.mech} publishes no SSSOM: {reason}")
+        status = getattr(capability, "status", "undeclared")
+        print(f"{args.mech}: sssom_export is {status}, so there is nothing to check: {reason}")
         return 0
 
     paths = list(args.path or [])

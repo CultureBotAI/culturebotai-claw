@@ -83,11 +83,12 @@ EXPECTED_CAPABILITIES = {
     # language, alt text, heading order and references that resolve -- and
     # which third-party host each of them has deliberately taken on.
     "site_contract",
-    # Whose term mappings are checked against the shared SSSOM contract, and
-    # why the two that publish none have decided rather than forgotten.
+    # Whose term mappings are checked against the shared SSSOM contract. It
+    # applies to every Mech (#503), so the rest are disabled, pending adoption.
     "sssom_export",
     # Whose exported graph is checked against the shared KGX contract; only
-    # CommunityMech emits one today, and the rest say why not.
+    # CommunityMech declares one today. It applies to every Mech (#503), so the
+    # rest are disabled, pending adoption.
     "kgx_export",
     # Who mints METPO terms. Two Mechs propose into one shared numeric ID
     # space from separate repositories, and the aggregate that finally reads

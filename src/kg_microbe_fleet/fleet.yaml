@@ -283,8 +283,9 @@ mechs:
         status: disabled
         reason: >-
           scripts/export_kgx.py writes to output/kgx but has produced nothing
-          tracked, so there is no graph for this contract to judge. Adopting it
-          means running the exporter first; the check applies here once it does.
+          tracked, so there is no graph for this contract to judge. KGX export
+          applies here, as to every Mech (#503); adoption is pending
+          (CultureMech#490): run the exporter and declare its nodes and edges.
         reason_claims:
           present:
             - scripts/export_kgx.py
@@ -424,9 +425,15 @@ mechs:
       kgx_export:
         status: disabled
         reason: >-
-          Publishes term mappings rather than a graph; its contribution to
-          kg-microbe is SSSOM. Adopting KGX would apply here only if it starts
-          emitting nodes and edges.
+          Builds a KGX ingredient graph with
+          src/mediaingredientmech/export/kgx.py. Its one KGX release,
+          mim-supported-2026-09-21, is a snapshot its own notes mark superseded,
+          with a new KGX publication pending, and it declares no nodes and
+          edges for this contract to judge. KGX export applies here, as to
+          every Mech (#503); adoption is pending (MediaIngredientMech#778).
+        reason_claims:
+          present:
+            - src/mediaingredientmech/export/kgx.py
       source_queue:
         status: disabled
         reason: >-
@@ -555,11 +562,16 @@ mechs:
           curation_markers: [record_curation_event]
           exclude: [scripts/audit_writers.py]
       sssom_export:
-        status: not_applicable
+        status: disabled
         reason: >-
-          Publishes KGX nodes and edges rather than term mappings; its
-          contribution to kg-microbe is a graph, not a mapping set, so there
-          is no SSSOM file for this contract to judge.
+          Keeps its term groundings, with SKOS predicates, in
+          mappings/community_term_grounding.tsv rather than as SSSOM, so there
+          is no SSSOM file for this contract to judge. SSSOM export applies
+          here, as to every Mech (#503); adoption is pending
+          (CommunityMech#1137).
+        reason_claims:
+          present:
+            - mappings/community_term_grounding.tsv
       metpo_proposal:
         status: enabled
         settings:
@@ -711,7 +723,9 @@ mechs:
       kgx_export:
         status: disabled
         reason: >-
-          Publishes trait records and METPO mapping proposals, not a KGX graph.
+          Publishes trait records and METPO mapping proposals, not yet a KGX
+          graph. KGX export applies here, as to every Mech (#503); adoption is
+          pending (TraitMech#1331).
       source_queue:
         status: disabled
         reason: >-
@@ -859,9 +873,16 @@ mechs:
       sssom_export:
         status: disabled
         reason: >-
-          Grounds protein traits directly in its own records rather than
-          publishing a mapping set. Adopting one would apply here; none has
-          been written.
+          Keeps its equivalences as a Biolink mapping overlay under
+          data/equivalence/ and a ChEBI crosswalk in
+          data/mappings/cofactor_crosswalk.tsv rather than as SSSOM, so there
+          is no SSSOM file for this contract to judge. SSSOM export applies
+          here, as to every Mech (#503); adoption is pending
+          (proteintraitsmech#805).
+        reason_claims:
+          present:
+            - data/equivalence
+            - data/mappings/cofactor_crosswalk.tsv
       metpo_proposal:
         status: disabled
         reason: >-
@@ -874,7 +895,9 @@ mechs:
       kgx_export:
         status: disabled
         reason: >-
-          Publishes protein-trait records rather than a graph.
+          Publishes protein-trait records, not yet a KGX graph. KGX export
+          applies here, as to every Mech (#503); adoption is pending
+          (proteintraitsmech#805).
       source_queue:
         status: disabled
         reason: >-
@@ -1047,7 +1070,9 @@ mechs:
         status: disabled
         reason: >-
           Records carry ChEBI and ARO identifiers inline rather than through a
-          mapping file. Adopting SSSOM applies once a mapping product exists.
+          mapping file, so there is no SSSOM file for this contract to judge.
+          SSSOM export applies here, as to every Mech (#503); adoption is
+          pending (AntibioticMech#794).
       metpo_proposal:
         status: disabled
         reason: >-
@@ -1059,8 +1084,8 @@ mechs:
       kgx_export:
         status: disabled
         reason: >-
-          No exporter and no graph product yet; adopting KGX applies once the
-          corpus is consumed as a graph.
+          No exporter and no graph product yet. KGX export applies here, as to
+          every Mech (#503); adoption is pending (AntibioticMech#794).
     # Measured, not copied (#187): PyYAML's default width round-trips this
     # corpus byte-for-byte over ALL 2,909 records, not a sample. Widths 100,
     # 120 and 4096 score 8%, 8% and 7%, so the value is the corpus's, not a
@@ -1195,8 +1220,9 @@ mechs:
         status: disabled
         reason: >-
           Records carry GO cellular-component identifiers inline rather than
-          through a mapping file, and the corpus is four records. Adopting one
-          applies once it grows.
+          through a mapping file, so there is no SSSOM file for this contract
+          to judge. SSSOM export applies here, as to every Mech (#503);
+          adoption is pending (CellStructureMech#1642).
       metpo_proposal:
         status: disabled
         reason: >-
@@ -1208,8 +1234,8 @@ mechs:
       kgx_export:
         status: disabled
         reason: >-
-          Four structure records and no exporter; adopting KGX applies once the
-          corpus grows.
+          No exporter and no graph product yet. KGX export applies here, as to
+          every Mech (#503); adoption is pending (CellStructureMech#1642).
       source_queue:
         status: enabled
         settings:
@@ -1386,7 +1412,8 @@ mechs:
           Grounds each habitat inline on the record (ENVO, UBERON, FOODON,
           BTO) and keeps its ontology requests as curation/term_requests.tsv
           rather than publishing a mapping set; there is no SSSOM file for
-          this contract to judge. Adopting one would apply here.
+          this contract to judge. SSSOM export applies here, as to every Mech
+          (#503); adoption is pending (HabitatMech#852).
         reason_claims:
           present:
             - curation/term_requests.tsv
@@ -1404,8 +1431,8 @@ mechs:
         reason: >-
           Consumes kg-microbe's KGX as an input -- conf/sources.yaml names
           the checkout that supplies ENVO, UBERON, FOODON and BTO -- and
-          publishes habitat records, not a graph. Adopting KGX would apply
-          here only if it starts emitting nodes and edges.
+          publishes habitat records, not yet a graph. KGX export applies here,
+          as to every Mech (#503); adoption is pending (HabitatMech#852).
         reason_claims:
           present:
             - conf/sources.yaml
@@ -1597,8 +1624,9 @@ mechs:
         status: disabled
         reason: >-
           Records carry ChEBI, NPAtlas and PubChem identifiers inline rather
-          than through a mapping file. Adopting SSSOM applies once a mapping
-          product exists.
+          than through a mapping file, so there is no SSSOM file for this
+          contract to judge. SSSOM export applies here, as to every Mech
+          (#503); adoption is pending (NaturalProductMech#223).
       metpo_proposal:
         status: disabled
         reason: >-
@@ -1610,8 +1638,8 @@ mechs:
       kgx_export:
         status: disabled
         reason: >-
-          No exporter and no graph product yet; adopting KGX applies once the
-          corpus is consumed as a graph.
+          No exporter and no graph product yet. KGX export applies here, as to
+          every Mech (#503); adoption is pending (NaturalProductMech#223).
       source_queue:
         status: enabled
         settings:
@@ -1757,7 +1785,8 @@ mechs:
         status: disabled
         reason: >-
           Stores taxonomy mappings and cross-references inline; no SSSOM
-          mapping product is emitted. Enable once a validated export exists.
+          mapping product is emitted. SSSOM export applies here, as to every
+          Mech (#503); adoption is pending (TaxonMech#78).
       metpo_proposal:
         status: disabled
         reason: >-
@@ -1769,8 +1798,9 @@ mechs:
       kgx_export:
         status: disabled
         reason: >-
-          Consumes kg-microbe KGX as an input but does not emit a graph product.
-          Enable when an exporter produces validated nodes and edges.
+          Consumes kg-microbe KGX as an input but does not yet emit a graph
+          product. KGX export applies here, as to every Mech (#503); adoption
+          is pending (TaxonMech#78).
       source_queue:
         status: disabled
         reason: >-
@@ -1932,8 +1962,9 @@ mechs:
         reason: >-
           Records are already node-and-edge graphs -- evidenced
           subject/predicate/object edges between CURIE nodes -- but there is no
-          exporter and no nodes or edges file for the contract to judge.
-          Adopting KGX applies once an exporter emits them.
+          exporter and no nodes or edges file for the contract to judge. KGX
+          export applies here, as to every Mech (#503); adoption is pending
+          (PathwayMech#203).
       writer_audit:
         status: disabled
         reason: >-
@@ -1950,8 +1981,8 @@ mechs:
           Records carry ChEBI, SGD, EC, UniProtKB and NCBITaxon identifiers
           inline rather than through a mapping file, and local-identifier
           exceptions are logged in curation/decisions.tsv, a curator decision
-          log rather than a mapping set. Adopting SSSOM applies once a mapping
-          product exists.
+          log rather than a mapping set. SSSOM export applies here, as to every
+          Mech (#503); adoption is pending (PathwayMech#203).
         reason_claims:
           present: ["curation/decisions.tsv"]
       metpo_proposal:
