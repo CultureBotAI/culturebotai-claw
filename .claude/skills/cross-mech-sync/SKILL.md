@@ -239,6 +239,13 @@ Because `set -o pipefail` is active and each object is checked with `cat-file`,
 a failed fleet query, locked fetch, or missing path aborts instead of hashing
 empty input.
 
+For a **re-pin**, also run `uv run kg-microbe-governance pin-coupling --old-ref
+<outgoing pin>` with one `--target-root` per consumer. A governance dry run
+that plans only `scripts/.vendored_canon_ref` does not mean the re-pin is one
+file: a Mech can hard-code the pin in a workflow or commit a snapshot of
+claw's manifest, and each reported file belongs in that Mech's re-pin commit.
+See `docs/guides/VENDORED_GOVERNANCE.md`.
+
 ### D. Make the change in an isolated worktree (per laggard repo)
 
 ```bash
