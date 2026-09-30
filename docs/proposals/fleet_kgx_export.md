@@ -108,7 +108,9 @@ The `kgx_export` capability gains settings: `infores`, `category_map` and
   ...). A Mech's `category_map` extends or overrides it.
 - A **shared predicate normaliser** maps the recurring free-text phrasings
   ("is part of" / "part of" → `biolink:part_of`, "has input" →
-  `biolink:has_input`, "inhibits" → `biolink:negatively_regulates`...). The
+  `biolink:has_input`...). Biolink 4.3.6 has no `inhibits`, `activates` or
+  `negatively_regulates` slot -- direction is a qualifier on `regulates` -- so
+  those phrasings stay in `original_predicate` rather than being forced. The
   long tail stays `biolink:related_to` with the original preserved, and the
   manifest reports what fraction of edges were normalised -- a number each
   Mech can raise by curating predicates, not a silent loss.
@@ -142,9 +144,10 @@ capability. This is kg-microbe work and lands there, not in claw.
 - The three hand-written exporters. CultureMech's and MediaIngredientMech's
   are not graph-shaped reads of a causal-graph slot -- they model media
   composition and ingredient identity -- so they stay as they are and are
-  released through the same workflow, reported alongside. CommunityMech's is
-  the parity canary: the shared exporter must reproduce its node and edge
-  counts, category and predicate distributions, before it replaces it.
+  released through the same workflow, reported alongside. CommunityMech's
+  stays too: its coverage shape reads ecological *interactions* as nodes and
+  declares no predicate, so the graph walk is not its KGX model (measured in
+  #543: 0% of predicates mapped, every node minted).
 - Eleven per-Mech exporters that #503's adoption issues would otherwise each
   write.
 
@@ -157,11 +160,32 @@ capability. This is kg-microbe work and lands there, not in claw.
 3. **Canary: PathwayMech.** Its predicates are a closed enum and its node ids
    are CURIEs, so its export tests the plumbing without the modelling gaps.
    Enable `kgx_export` there first.
-4. **Parity: CommunityMech** against its own exporter.
+4. **CommunityMech keeps its own exporter** (see above) and joins through the
+   release workflow.
 5. **Normalisation for the `graph_list` Mechs**, reporting the normalised
    fraction per Mech; enable where the output passes the contract.
 6. **Release workflow and artifact contract** (#461), canary on one Mech.
 7. **kg-microbe transform** (#358), outside claw.
+
+## First results (#543)
+
+The exporter core landed as `kg-microbe-kgx export`, with every shaped Mech
+exported contract-clean on 2026-09-30:
+
+| Mech | nodes | edges | predicates mapped |
+|---|---:|---:|---:|
+| ProteinTraitsMech | 91,653 | 372,250 | 93.9% |
+| PathwayMech | 1,866 | 4,632 | 100% |
+| TraitMech | 4,338 | 4,684 | 46.8% (the rest is mostly METPO, #275) |
+| CellStructureMech | 2,607 | 3,085 | 37.2% |
+| NaturalProductMech | 518 | 467 | 32.6% |
+| HabitatMech | 406 | 427 | 18.5% |
+| AntibioticMech | 81 | 75 | 40.0% |
+
+The PathwayMech canary found two data defects before any release:
+PathwayMech#215 (every `consumes` edge is reversed against its schema) and
+PathwayMech#216 (627 quotes are GPML XML). Edge provenance is `not_provided`
+unless a Mech declares it (#542).
 
 ## Open questions
 
