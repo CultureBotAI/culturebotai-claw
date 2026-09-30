@@ -12,6 +12,8 @@ for provenance; they do not describe the supported interface.
 
 Other maintained references:
 
+- [`proposals/MECH_EMBEDDING_MAP_CONTRACT.md`](proposals/MECH_EMBEDDING_MAP_CONTRACT.md) —
+  shared pinned BGE text maps, retained specialty views, cache provenance and PaCMAP rollout.
 - [`guides/PYTHON_RUNTIME.md`](guides/PYTHON_RUNTIME.md) — the shared Python 3.13
   runtime, single-version CI, and requirements for compatibility exceptions.
 - [`guides/MECH_STANDARD.md`](guides/MECH_STANDARD.md) — the measured Mech
