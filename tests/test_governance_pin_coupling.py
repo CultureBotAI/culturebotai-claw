@@ -58,9 +58,14 @@ def test_a_workflow_checking_claw_out_at_the_old_pin_is_found(tmp_path: Path) ->
     assert _found(root) == [(".github/workflows/qc-evidence.yaml", "pin-reference")]
 
 
-@pytest.mark.parametrize("length", [8, 12, 40])
+@pytest.mark.parametrize("length", [7, 8, 12, 40])
 def test_an_abbreviated_pin_is_found(tmp_path: Path, length: int) -> None:
     root = _repo(tmp_path, {"docs/pin.md": f"pinned at `{OLD[:length]}`\n"})
+    assert _found(root) == [("docs/pin.md", "pin-reference")]
+
+
+def test_an_uppercase_pin_is_found(tmp_path: Path) -> None:
+    root = _repo(tmp_path, {"docs/pin.md": f"ref: {OLD.upper()}\n"})
     assert _found(root) == [("docs/pin.md", "pin-reference")]
 
 

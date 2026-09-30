@@ -68,7 +68,7 @@ uv run kg-microbe-governance pin-coupling \
   --target-root culturemech=/path/to/CultureMech ...   # one per consumer
 ```
 
-It reports the pin in full or abbreviated to eight or more characters
+It reports the pin in full or abbreviated to seven or more characters, in either case
 (`pin-reference`), and any committed snapshot of claw's manifest
 (`manifest-snapshot`), outside the pin file and dated `reports/`; it exits 1
 when it finds one and never writes. Put each reported file in that Mech's

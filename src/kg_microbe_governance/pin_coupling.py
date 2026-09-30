@@ -9,7 +9,8 @@ hard-coded `ref:` that a test requires to equal the pin, and NaturalProductMech
 committed claw's manifest as it was at the pin.
 
 This reads the committed tree (``origin/main`` by default, never the worktree)
-for the outgoing pin in full or abbreviated to eight or more characters. The pin
+for the outgoing pin in full or abbreviated to seven or more characters, in
+either case. The pin
 file itself is the change a re-pin makes and is not reported; ``reports/`` holds
 dated records, which quote the commit they were made against. A snapshot of
 claw content is not found this way -- it quotes no SHA -- so snapshot files the
@@ -25,7 +26,9 @@ from pathlib import Path
 
 from . import GovernanceError, _validate_ref
 
-MIN_ABBREVIATION = 8
+# Seven is git's default `--short`, so `git log --oneline` output names a pin
+# this way (#534).
+MIN_ABBREVIATION = 7
 DATED_RECORD_PREFIXES = ("reports/",)
 _HEX_RUN = re.compile(r"[0-9a-f]{%d,40}" % MIN_ABBREVIATION)
 _SNAPSHOT_NAME = re.compile(r"(^|/)\.?vendored[_-]?manifest[^/]*$", re.IGNORECASE)
@@ -68,7 +71,7 @@ def find_pin_couplings(
 
     found: list[Coupling] = []
     output = _git(
-        root, "grep", "-n", "-I", "-F", "-e", old_ref[:MIN_ABBREVIATION], treeish, "--"
+        root, "grep", "-n", "-I", "-i", "-F", "-e", old_ref[:MIN_ABBREVIATION], treeish, "--"
     )
     prefix = f"{treeish}:"
     for row in output.splitlines():
@@ -78,7 +81,7 @@ def find_pin_couplings(
         line, _, text = rest.partition(":")
         if path == pin_path or path.startswith(DATED_RECORD_PREFIXES):
             continue
-        # A hex run that merely starts with the same eight characters is some
+        # A hex run that merely starts with the same characters is some
         # other commit; only a prefix of the retiring pin is a reference to it.
         for token in _HEX_RUN.findall(text.lower()):
             if old_ref.startswith(token):
