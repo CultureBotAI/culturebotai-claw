@@ -45,6 +45,30 @@ def _parser() -> argparse.ArgumentParser:
     )
     fleet_parser.add_argument("--json", action="store_true", dest="as_json")
 
+    coupling_parser = subparsers.add_parser(
+        "pin-coupling",
+        help=(
+            "Before a re-pin, find files outside the pin that still name the "
+            "outgoing claw commit, or snapshot claw's manifest (read-only)"
+        ),
+    )
+    coupling_parser.add_argument(
+        "--old-ref", required=True, help="Full SHA of the claw pin being retired"
+    )
+    coupling_parser.add_argument(
+        "--target-root",
+        action="append",
+        required=True,
+        metavar="MECH=PATH",
+        help="One manifest key and its checkout; repeat per Mech",
+    )
+    coupling_parser.add_argument(
+        "--treeish",
+        default="origin/main",
+        help="Committed tree to search (default origin/main; the worktree is never read)",
+    )
+    coupling_parser.add_argument("--json", action="store_true", dest="as_json")
+
     for command, help_text in (
         ("check", "Fail if a target differs from the packaged canonical bytes"),
         ("sync", "Plan or apply canonical artifacts and an immutable pin"),
@@ -187,6 +211,34 @@ def _fleet_audit(args: argparse.Namespace) -> int:
     return 0 if result.ok else 1
 
 
+def _pin_coupling(args: argparse.Namespace) -> int:
+    from .pin_coupling import find_pin_couplings
+
+    manifest = load_governance_manifest()
+    roots = _fleet_roots(args.target_root)
+    for key in roots:
+        manifest.consumer_for(key)
+    report = {
+        key: find_pin_couplings(
+            root, args.old_ref, pin_path=manifest.pin_path, treeish=args.treeish
+        )
+        for key, root in roots.items()
+    }
+    if args.as_json:
+        print(json.dumps(
+            {key: [coupling.__dict__ for coupling in found] for key, found in report.items()},
+            sort_keys=True,
+        ))
+    else:
+        for key, found in report.items():
+            if not found:
+                print(f"OK\t{key}\tonly {manifest.pin_path} names the outgoing pin")
+            for coupling in found:
+                where = f"{coupling.path}:{coupling.line}" if coupling.line else coupling.path
+                print(f"COUPLED\t{key}\t{coupling.kind}\t{where}\t{coupling.token}")
+    return 1 if any(report.values()) else 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
@@ -194,6 +246,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _list(args)
         if args.command == "fleet-audit":
             return _fleet_audit(args)
+        if args.command == "pin-coupling":
+            return _pin_coupling(args)
         return _changes(args)
     except GovernanceError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)

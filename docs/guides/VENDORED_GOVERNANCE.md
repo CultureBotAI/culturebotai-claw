@@ -56,6 +56,27 @@ uv run kg-microbe-governance sync \
   --ref <full-claw-commit>
 ```
 
+A re-pin plans one file, `scripts/.vendored_canon_ref`, in a consumer that is
+otherwise current, but a Mech can keep its own copy of the pin elsewhere. The
+synchronizer does not know about it and the re-pin then breaks that Mech's CI
+while every governance check passes (#526). Before fanning out, search every
+consumer's committed `origin/main` for the outgoing pin:
+
+```bash
+uv run kg-microbe-governance pin-coupling \
+  --old-ref <outgoing-full-claw-commit> \
+  --target-root culturemech=/path/to/CultureMech ...   # one per consumer
+```
+
+It reports the pin in full or abbreviated to eight or more characters
+(`pin-reference`), and any committed snapshot of claw's manifest
+(`manifest-snapshot`), outside the pin file and dated `reports/`; it exits 1
+when it finds one and never writes. Put each reported file in that Mech's
+re-pin commit. The rollout to `cb83def3` had two: MediaIngredientMech's
+`.github/workflows/qc-evidence.yaml` checks claw out at a `ref:` a test
+requires to equal the pin, and NaturalProductMech's
+`scripts/.vendored_manifest.json` must equal claw's manifest at the pin.
+
 Review the `WOULD_WRITE` rows, then explicitly apply the same plan:
 
 ```bash
