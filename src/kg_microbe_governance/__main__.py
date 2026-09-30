@@ -212,7 +212,7 @@ def _fleet_audit(args: argparse.Namespace) -> int:
 
 
 def _pin_coupling(args: argparse.Namespace) -> int:
-    from .pin_coupling import find_pin_couplings
+    from .pin_coupling import committed_pin, find_pin_couplings
 
     manifest = load_governance_manifest()
     roots = _fleet_roots(args.target_root)
@@ -224,19 +224,38 @@ def _pin_coupling(args: argparse.Namespace) -> int:
         )
         for key, root in roots.items()
     }
+    # A consumer that does not pin the outgoing commit means a mistyped
+    # --old-ref or a Mech already moved on; say so rather than report OK (#536).
+    pins = {
+        key: committed_pin(root, pin_path=manifest.pin_path, treeish=args.treeish)
+        for key, root in roots.items()
+    }
     if args.as_json:
         print(json.dumps(
-            {key: [coupling.__dict__ for coupling in found] for key, found in report.items()},
+            {
+                key: {
+                    "pin": pins[key],
+                    "pins_outgoing": pins[key] == args.old_ref,
+                    "couplings": [coupling.__dict__ for coupling in found],
+                }
+                for key, found in report.items()
+            },
             sort_keys=True,
         ))
     else:
         for key, found in report.items():
+            if pins[key] != args.old_ref:
+                print(
+                    f"PIN\t{key}\t{manifest.pin_path} is {pins[key] or '(absent)'}, "
+                    "not the outgoing pin"
+                )
             if not found:
-                print(f"OK\t{key}\tonly {manifest.pin_path} names the outgoing pin")
+                print(f"OK\t{key}\tno file outside {manifest.pin_path} names the outgoing pin")
             for coupling in found:
                 where = f"{coupling.path}:{coupling.line}" if coupling.line else coupling.path
                 print(f"COUPLED\t{key}\t{coupling.kind}\t{where}\t{coupling.token}")
-    return 1 if any(report.values()) else 0
+    mismatched = any(pins[key] != args.old_ref for key in roots)
+    return 1 if any(report.values()) or mismatched else 0
 
 
 def main(argv: Sequence[str] | None = None) -> int:

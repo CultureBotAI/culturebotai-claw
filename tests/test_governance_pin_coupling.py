@@ -112,7 +112,8 @@ def test_the_command_exits_one_on_a_coupling_and_zero_without(tmp_path: Path, ca
     assert main(["pin-coupling", "--old-ref", OLD, "--json",
                  "--target-root", f"culturemech={coupled}"]) == 1
     report = json.loads(capsys.readouterr().out)
-    assert report["culturemech"][0]["path"] == ".github/workflows/qc.yaml"
+    assert report["culturemech"]["couplings"][0]["path"] == ".github/workflows/qc.yaml"
+    assert report["culturemech"]["pins_outgoing"] is True
     assert main(["pin-coupling", "--old-ref", OLD,
                  "--target-root", f"culturemech={clean / 'r'}"]) == 0
 
@@ -120,3 +121,17 @@ def test_the_command_exits_one_on_a_coupling_and_zero_without(tmp_path: Path, ca
 def test_an_unknown_mech_key_is_refused(tmp_path: Path) -> None:
     root = _repo(tmp_path, {})
     assert main(["pin-coupling", "--old-ref", OLD, "--target-root", f"notamech={root}"]) == 2
+
+
+def test_a_consumer_not_pinning_the_outgoing_commit_is_not_ok(tmp_path: Path, capsys) -> None:
+    """A mistyped --old-ref, or a Mech already re-pinned, read as OK (#536)."""
+    root = _repo(tmp_path, {})
+    other = "cb83def3a6b5af2aff24a0e50cc411f26c820f7c"
+    assert main(["pin-coupling", "--old-ref", other,
+                 "--target-root", f"culturemech={root}"]) == 1
+    out = capsys.readouterr().out
+    assert f"is {OLD}, not the outgoing pin" in out
+    assert main(["pin-coupling", "--old-ref", OLD,
+                 "--target-root", f"culturemech={root}"]) == 0
+    assert "not the outgoing pin" not in capsys.readouterr().out
+

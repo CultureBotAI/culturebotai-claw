@@ -57,6 +57,13 @@ def _git(root: Path, *arguments: str) -> str:
     return completed.stdout
 
 
+def committed_pin(root: Path, *, pin_path: str, treeish: str = "origin/main") -> str:
+    """The pin as committed in ``treeish``, or "" when the file is absent."""
+    return _git(root, "show", f"{treeish}:{pin_path}").strip() if _git(
+        root, "ls-tree", "--name-only", treeish, "--", pin_path
+    ).strip() else ""
+
+
 def find_pin_couplings(
     root: Path,
     old_ref: str,

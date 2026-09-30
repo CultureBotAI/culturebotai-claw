@@ -70,8 +70,10 @@ uv run kg-microbe-governance pin-coupling \
 
 It reports the pin in full or abbreviated to seven or more characters, in either case
 (`pin-reference`), and any committed snapshot of claw's manifest
-(`manifest-snapshot`), outside the pin file and dated `reports/`; it exits 1
-when it finds one and never writes. Put each reported file in that Mech's
+(`manifest-snapshot`), outside the pin file and dated `reports/`. A consumer
+whose committed pin is not `--old-ref` is reported as `PIN`, since that means
+a mistyped ref or a Mech already moved on. It exits 1 on either and never
+writes. Put each reported file in that Mech's
 re-pin commit. The rollout to `cb83def3` had two: MediaIngredientMech's
 `.github/workflows/qc-evidence.yaml` checks claw out at a `ref:` a test
 requires to equal the pin, and NaturalProductMech's
