@@ -1825,26 +1825,28 @@ mechs:
         reason: >-
           Every taxon, participant and reaction pairs a CURIE with a label
           (CHEBI, NCBITaxon, RHEA, EC, SGD and others), so the check applies.
-          There is no vendored scripts/validate_id_label_correspondence.py, no
+          The vendored scripts/validate_id_label_correspondence.py is present,
+          but nothing runs it over the records: there is no
           conf/id_label_targets.yaml telling it which id and label slots to
-          read, and no recipe or workflow that compares an id with its ontology
-          label. Enable once the vendored validator runs over data/pathways/ on
-          every pull request.
+          read, and its only callers are the vendored tests, on synthetic
+          fixtures. Enable once it runs over data/pathways/ on every pull
+          request.
         reason_claims:
-          present: ["data/pathways"]
-          absent:
+          present:
+            - "data/pathways"
             - "scripts/validate_id_label_correspondence.py"
-            - "conf/id_label_targets.yaml"
+          absent: ["conf/id_label_targets.yaml"]
       curation_history:
         status: disabled
         reason: >-
-          No record carries curation history: there is no vendored
-          src/pathwaymech/schema/history.yaml, no new-history recipe, and
-          history/ holds only a README. Adopting applies once the history
-          schema is vendored and a recipe appends events, checked in CI.
+          No record carries curation history yet. The governed
+          src/pathwaymech/schema/history.yaml is vendored and records may
+          carry an optional curation_history of CurationEvent, but no recipe
+          appends events and nothing in CI validates history records; history/
+          holds only a README. Enable once a recipe appends events, checked in
+          CI (#515).
         reason_claims:
-          present: ["history"]
-          absent: ["src/pathwaymech/schema/history.yaml"]
+          present: ["history", "src/pathwaymech/schema/history.yaml"]
       # Closed-mode LinkML validation (pathwaymech-validate-strict) runs in
       # `just validate` and in the "Build and test" workflow on every pull
       # request (PathwayMech #190).
@@ -1870,9 +1872,10 @@ mechs:
         status: disabled
         reason: >-
           Research so far is source-discovery notes under research/; there is
-          no conf/deep_research_provider.yaml and no provider recipe. Its
-          scripts/deep_research_contract.py is a local report-heading checker,
-          not the vendored contract of that name. Enable once a provider is
+          no conf/deep_research_provider.yaml and no provider recipe. The
+          vendored scripts/deep_research_contract.py is present but nothing
+          runs it; the pathwaymech-deep-research-contract command is a
+          separate, local report-heading checker. Enable once a provider is
           configured and exercised under the shared contract.
         reason_claims:
           present: ["research", "scripts/deep_research_contract.py"]
@@ -1902,8 +1905,8 @@ mechs:
           present: ["src/pathwaymech/schema/pathwaymech.yaml"]
           absent: ["conf/kgscan_config.yaml"]
       # An authoritative consumer must sync; the loader rejects anything else.
-      # PathwayMech has none of the vendored artifacts or a pin yet; until
-      # they land (#510), the fleet audit reports the gap.
+      # PathwayMech vendored all 14 applicable artifacts and pinned claw in
+      # CultureBotAI/PathwayMech#204; its vendored-sync workflow checks them.
       vendored_sync:
         status: enabled
       corpus_statistics:

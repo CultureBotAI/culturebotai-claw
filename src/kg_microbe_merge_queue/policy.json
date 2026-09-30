@@ -190,6 +190,9 @@
   "pathwaymech": {
     ".github/workflows/main.yaml": [
       "qc"
+    ],
+    ".github/workflows/vendored-sync.yaml": [
+      "vendored-sync"
     ]
   }
 }
