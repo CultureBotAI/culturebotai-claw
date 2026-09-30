@@ -121,8 +121,8 @@ def repository_definitions(
 ) -> "dict[str, RepositoryDefinition]":
     """Derive the repository registry from the canonical fleet manifest.
 
-    The registry used to be a literal here, which is how it drifted to three
-    Mechs while other components knew four or five. Deriving it means adding a
+    The registry used to be a literal here, which is how it drifted to fewer
+    repositories than other components knew. Deriving it means adding a
     repository to the manifest is sufficient.
 
     ``display_name`` is carried for consumers that need presentation metadata.
