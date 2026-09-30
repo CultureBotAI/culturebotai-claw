@@ -170,6 +170,33 @@ def test_an_edge_to_an_undeclared_node_is_skipped_and_counted(tmp_path):
     assert findings == []
 
 
+def test_edges_claim_no_provenance_the_mech_did_not_declare(tmp_path):
+    """Seeded and curated edges must not both read as a curator's assertion (#542)."""
+    record = {"r.yaml": _graph_record([_edge()])}
+    default = _export(tmp_path / "a", record)[3][0]
+    declared = _export(tmp_path / "b", record, _settings(
+        knowledge_level="knowledge_assertion", agent_type="manual_agent"))[3][0]
+    assert (default["knowledge_level"], default["agent_type"]) == ("not_provided", "not_provided")
+    assert (declared["knowledge_level"], declared["agent_type"]) == (
+        "knowledge_assertion", "manual_agent")
+
+
+@pytest.mark.parametrize("setting", ["knowledge_level", "agent_type"])
+def test_a_provenance_value_outside_biolink_is_refused(setting):
+    class Capability:
+        def __init__(self, enabled, settings):
+            self.is_enabled, self.settings = enabled, settings
+
+    class Declaration:
+        capabilities = {
+            "causal_graph_coverage": Capability(True, {"graph_shape": "graph_list"}),
+            "kgx_export": Capability(False, {setting: "curated"}),
+        }
+
+    with pytest.raises(ExportError, match="not a Biolink value"):
+        ExportSettings.from_manifest("m", Declaration())
+
+
 def test_edge_ids_are_stable_across_exports(tmp_path):
     record = {"r.yaml": _graph_record([_edge()])}
     first = _export(tmp_path / "a", record)[3][0]["id"]

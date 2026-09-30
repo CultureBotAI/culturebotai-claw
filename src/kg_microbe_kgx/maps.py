@@ -28,6 +28,17 @@ from typing import Iterable, Mapping
 BIOLINK_VERSION = "4.3.6"
 FALLBACK_CATEGORY = "biolink:NamedThing"
 FALLBACK_PREDICATE = "biolink:related_to"
+# Biolink 4.3.6 KnowledgeLevelEnum and AgentTypeEnum. An edge says only what
+# its Mech declares; the default is `not_provided`, never a guess (#542).
+KNOWLEDGE_LEVELS = frozenset({
+    "knowledge_assertion", "logical_entailment", "not_provided", "observation",
+    "prediction", "statistical_association",
+})
+AGENT_TYPES = frozenset({
+    "automated_agent", "computational_model", "data_analysis_pipeline",
+    "image_processing_agent", "manual_agent", "manual_validation_of_automated_agent",
+    "not_provided", "text_mining_agent",
+})
 
 # Node types the Mechs share because the graph_list Mechs copied TraitMech's
 # schema; measured across the fleet on 2026-09-30. Types with no honest single

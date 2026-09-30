@@ -151,6 +151,12 @@ capability_catalogue:
         type: string
       node_label_field:
         type: string
+      # Biolink KnowledgeLevelEnum / AgentTypeEnum values for every edge this
+      # Mech exports; left out, both are `not_provided`.
+      knowledge_level:
+        type: string
+      agent_type:
+        type: string
   source_queue:
     settings:
       queue_path:

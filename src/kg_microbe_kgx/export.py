@@ -59,6 +59,8 @@ class ExportSettings:
     node_label_field: str = "label"
     node_description_field: str = "description"
     edge_predicate_id_field: str = "predicate_id"
+    knowledge_level: str = "not_provided"
+    agent_type: str = "not_provided"
 
     @classmethod
     def from_manifest(cls, mech: str, declaration: Any) -> ExportSettings:
@@ -80,6 +82,12 @@ class ExportSettings:
             raise ExportError(
                 f"{mech}: not Biolink {maps.BIOLINK_VERSION} terms: {', '.join(unknown)}"
             )
+        knowledge_level = str(settings.get("knowledge_level") or "not_provided")
+        agent_type = str(settings.get("agent_type") or "not_provided")
+        if knowledge_level not in maps.KNOWLEDGE_LEVELS:
+            raise ExportError(f"{mech}: knowledge_level {knowledge_level!r} is not a Biolink value")
+        if agent_type not in maps.AGENT_TYPES:
+            raise ExportError(f"{mech}: agent_type {agent_type!r} is not a Biolink value")
         return cls(
             mech=mech,
             coverage=CoverageConfig.from_settings(coverage.settings),
@@ -89,6 +97,8 @@ class ExportSettings:
             predicate_map=predicate_map,
             extra_prefixes=tuple(settings.get("extra_prefixes", ())),
             node_label_field=str(settings.get("node_label_field") or "label"),
+            knowledge_level=knowledge_level,
+            agent_type=agent_type,
         )
 
 
@@ -253,7 +263,7 @@ def export(root: Path, globs: Sequence[str], settings: ExportSettings,
                 )
                 edges.append([
                     f"urn:uuid:{edge_id}", subject, resolution.value, obj,
-                    settings.infores, "knowledge_assertion", "manual_agent",
+                    settings.infores, settings.knowledge_level, settings.agent_type,
                     _multi(publications), _multi(texts),
                     _clean(resolution.original) if resolution.original else "",
                     settings.infores,
