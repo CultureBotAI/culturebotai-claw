@@ -284,6 +284,116 @@ def _digest(manifest: Path, workflow: Path) -> None:
     manifest.write_text(json.dumps(data, indent=2) + "\n")
 
 
+@pytest.fixture
+def deterministic(canonical):
+    """A real hourly infrastructure schedule alongside the model-agent cadence."""
+    import hashlib
+    import json
+
+    config_path, agent, manifest = canonical
+    workflow = agent.with_name("queue.yaml")
+    workflow.write_text(WF.replace("0 7 * * *", "13 * * * *"))
+    data = json.loads(manifest.read_text())
+    data["artifacts"].append(
+        {
+            **data["artifacts"][0],
+            "id": "queue_workflow",
+            "source": str(workflow.relative_to(cron_profiles.REPO_ROOT)),
+            "target": ".github/workflows/queue.yaml",
+            "sha256": hashlib.sha256(workflow.read_bytes()).hexdigest(),
+        }
+    )
+    manifest.write_text(json.dumps(data, indent=2) + "\n")
+    config = cron_profiles.load_config(config_path)
+    config["deterministic_targets"] = {
+        "queue": {"artifact": "queue_workflow", "reason": "Queue admission uses no model."}
+    }
+    config_path.write_text(yaml.safe_dump(config, sort_keys=False))
+    return workflow
+
+
+@pytest.mark.parametrize("profile", ["off", "slow"])
+def test_agent_profiles_preserve_deterministic_bytes_and_hourly_schedule(
+    canonical, deterministic, profile
+) -> None:
+    import json
+
+    config_path, agent, manifest = canonical
+    original = deterministic.read_bytes()
+    original_artifact = json.loads(manifest.read_text())["artifacts"][1]
+    assert cron_profiles.main([profile, "--config", str(config_path)]) == 0
+    assert deterministic.read_bytes() == original
+    assert schedule_crons(deterministic.read_text()) == ["13 * * * *"]
+    assert json.loads(manifest.read_text())["artifacts"][1] == original_artifact
+    config = cron_profiles.load_config(config_path)
+    assert "queue" not in managed_workflows(config)
+    assert set(cron_profiles.resolve_targets(config)) == {"agent"}
+    assert check_active_profile(config) == []
+
+
+def test_deterministic_classification_cannot_be_omitted(canonical, deterministic) -> None:
+    config_path, _, _ = canonical
+    config = cron_profiles.load_config(config_path)
+    del config["deterministic_targets"]
+    config_path.write_text(yaml.safe_dump(config))
+    originals = {p: p.read_bytes() for p in (*canonical, deterministic)}
+    assert cron_profiles.main(["off", "--config", str(config_path)]) == 1
+    assert {p: p.read_bytes() for p in originals} == originals
+
+
+def test_agent_cannot_also_be_classified_deterministic(canonical) -> None:
+    config_path, _, _ = canonical
+    config = cron_profiles.load_config(config_path)
+    config["deterministic_targets"] = {
+        "agent": {"artifact": "agent_workflow", "reason": "Conflicting classification."}
+    }
+    config_path.write_text(yaml.safe_dump(config))
+    originals = {p: p.read_bytes() for p in canonical}
+    assert cron_profiles.main(["off", "--config", str(config_path)]) == 1
+    assert {p: p.read_bytes() for p in originals} == originals
+
+
+@pytest.mark.parametrize(
+    "declaration",
+    [None, [], {"queue": {"artifact": "missing", "reason": "Not registered."}},
+     {"queue": {"artifact": "queue_workflow", "reason": " "}},
+     {"queue": {"artifact": "queue_workflow", "reason": "No model.", "planned": True}}],
+)
+def test_invalid_deterministic_classification_fails_before_writes(
+    canonical, deterministic, declaration
+) -> None:
+    config_path, _, _ = canonical
+    config = cron_profiles.load_config(config_path)
+    config["deterministic_targets"] = declaration
+    config_path.write_text(yaml.safe_dump(config))
+    originals = {p: p.read_bytes() for p in (*canonical, deterministic)}
+    assert cron_profiles.main(["off", "--config", str(config_path)]) == 1
+    assert {p: p.read_bytes() for p in originals} == originals
+
+
+@pytest.mark.parametrize("damage", ["missing", "checksum"])
+def test_deterministic_sources_are_validated_under_agent_off(
+    canonical, deterministic, damage
+) -> None:
+    config_path, _, _ = canonical
+    assert cron_profiles.main(["off", "--config", str(config_path)]) == 0
+    if damage == "missing":
+        deterministic.unlink()
+    else:
+        deterministic.write_text(deterministic.read_text() + "# unreviewed infrastructure\n")
+    assert cron_profiles.main(["--check-active", "--config", str(config_path)]) == 1
+
+
+def test_local_deterministic_copy_must_match_canonical(canonical, deterministic) -> None:
+    config_path, _, _ = canonical
+    cron_profiles.WORKFLOW_DIR.mkdir(parents=True)
+    local = cron_profiles.WORKFLOW_DIR / "queue.yaml"
+    local.write_bytes(deterministic.read_bytes())
+    assert cron_profiles.main(["off", "--config", str(config_path)]) == 0
+    local.write_text(local.read_text().replace("13 * * * *", "13 */2 * * *"))
+    assert cron_profiles.main(["--check-active", "--config", str(config_path)]) == 1
+
+
 def test_real_off_profile_reaches_existing_governed_workflow(config) -> None:
     targets = cron_profiles.resolve_targets(config)
     assert "pr-shepherd" in targets

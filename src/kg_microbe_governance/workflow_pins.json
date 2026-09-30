@@ -12,6 +12,10 @@
     "anthropics/claude-code-action": {
       "sha": "0a8d3c9443bbff909ab973b6a17a340b913f229f",
       "version": "v1.0.221"
+    },
+    "actions/create-github-app-token": {
+      "sha": "bcd2ba49218906704ab6c1aa796996da409d3eb1",
+      "version": "v3.2.0"
     }
   },
   "uv_version": "0.12.5"
