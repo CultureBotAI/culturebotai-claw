@@ -34,6 +34,9 @@
 #     claims it is off.
 #
 # SCOPE: agent workflows ONLY — anything that spends model tokens.
+# Governed infrastructure workflows must instead appear in deterministic_targets
+# with a reason. Their canonical files and checksums are still validated, but
+# applying any model-agent profile, including off, preserves their schedules.
 # `knowledge-gap-scan` is deliberately NOT managed here. It is deterministic
 # Python with no model in the loop, and putting it under an agent kill switch
 # would mean `off` silently disabled a wanted, benign nightly job. The future
@@ -57,6 +60,14 @@ targets:
   stale-claim-sweep:
     state: planned
     reason: Stale-agent assignment loop has not been implemented or admitted to governance.
+
+deterministic_targets:
+  merge-queue-admission:
+    artifact: merge_queue_admission_workflow
+    reason: Deterministic queue admission and bounded retries consume no model tokens.
+  verify-merge-integrity:
+    artifact: merge_integrity_workflow
+    reason: Deterministic squash-tree verification runs after main pushes without a model.
 
 profiles:
 

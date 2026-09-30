@@ -187,6 +187,38 @@
       "consumers": "all",
       "sha256": "3230756053abfa76afb6f65c3615106617273246a00598758d1b37ded82d687b",
       "mode": "0644"
+    },
+    {
+      "id": "merge_queue_admission_controller",
+      "source": "src/kg_microbe_governance/artifacts/scripts/auto_merge_ready_prs.py",
+      "target": "scripts/auto_merge_ready_prs.py",
+      "consumers": "all",
+      "sha256": "b8d77dc73422c3fa84b6636d32533d21d5ed11aa3e9bcc42d1c9aa6cf60f49f1",
+      "mode": "0644"
+    },
+    {
+      "id": "merge_integrity_verifier",
+      "source": "src/kg_microbe_governance/artifacts/scripts/verify_merge_integrity.py",
+      "target": "scripts/verify_merge_integrity.py",
+      "consumers": "all",
+      "sha256": "2aaa757523d4400288dd1657c13ed4e0d123a252c30ea59c69c9d353e6efebae",
+      "mode": "0644"
+    },
+    {
+      "id": "merge_queue_admission_workflow",
+      "source": "src/kg_microbe_governance/artifacts/workflows/merge-queue-admission.yaml",
+      "target": ".github/workflows/merge-queue-admission.yaml",
+      "consumers": "all",
+      "sha256": "3a1fd0320ccb4e056b9733edaf107fd9c3c3e9728291ac7095601bfbb6e0f598",
+      "mode": "0644"
+    },
+    {
+      "id": "merge_integrity_workflow",
+      "source": "src/kg_microbe_governance/artifacts/workflows/verify-merge-integrity.yaml",
+      "target": ".github/workflows/verify-merge-integrity.yaml",
+      "consumers": "all",
+      "sha256": "eace81f16c9e29aa2139ac4b750620fea6d33ab97182dc502c3dc52d0a3e3b50",
+      "mode": "0644"
     }
   ]
 }

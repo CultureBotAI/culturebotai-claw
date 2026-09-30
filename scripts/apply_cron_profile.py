@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Apply a named cadence profile from .github/cron-profiles.yaml to the workflows.
 
-Rewrites ONLY the `on.schedule:` block of each canonical governed workflow,
-and updates its manifest checksum. Downstream copies require the normal re-pin.
+Rewrites ONLY the `on.schedule:` block of each canonical governed agent workflow,
+and updates its manifest checksum. Explicitly classified deterministic workflows
+are validated but never edited. Downstream copies require the normal re-pin.
 Inputs, jobs and every comment outside that block are left byte-for-byte alone,
 which is why this
 edits lines rather than round-tripping through a YAML dumper — a dumper would
@@ -71,7 +72,8 @@ def resolve_targets(config: dict) -> dict[str, Target]:
     """Resolve implemented workflows only through the canonical manifest.
 
     Planned names may have future cadences, but cannot conceal an existing
-    workflow. Every canonical workflow needs an explicit profile declaration.
+    workflow. Every canonical workflow needs an explicit agent or deterministic
+    classification. Only agent targets belong to cadence profiles.
     Directory walks include ignored/untracked payloads so a new workflow cannot
     acquire a schedule outside the manifest and silently pass the kill switch.
     """
@@ -80,6 +82,12 @@ def resolve_targets(config: dict) -> dict[str, Target]:
         raise ValueError("targets must explicitly classify every managed workflow")
     if set(declarations) != managed_workflows(config):
         raise ValueError("targets and profile workflow names must match exactly")
+    deterministic = config.get("deterministic_targets", {})
+    if not isinstance(deterministic, dict):
+        raise ValueError("deterministic_targets must be a mapping")
+    overlap = set(declarations) & set(deterministic)
+    if overlap:
+        raise ValueError(f"workflows cannot be both agent and deterministic: {sorted(overlap)}")
     manifest = parse_manifest(MANIFEST_PATH.read_bytes())
     workflows = {
         artifact.artifact_id: artifact
@@ -88,14 +96,29 @@ def resolve_targets(config: dict) -> dict[str, Target]:
         and PurePosixPath(artifact.target).suffix in {".yaml", ".yml"}
     }
     targets = {}
-    for stem, declaration in declarations.items():
+    classified = {}
+    for stem, declaration in {**declarations, **deterministic}.items():
         if not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", stem):
             raise ValueError(f"invalid workflow stem: {stem!r}")
         if not isinstance(declaration, dict):
             raise ValueError(f"{stem}: target must be an object")
-        if any((WORKFLOW_DIR / f"{stem}{ext}").exists() for ext in (".yaml", ".yml")):
+        is_deterministic = stem in deterministic
+        local_paths = [
+            WORKFLOW_DIR / f"{stem}{ext}"
+            for ext in (".yaml", ".yml")
+            if (WORKFLOW_DIR / f"{stem}{ext}").exists()
+            or (WORKFLOW_DIR / f"{stem}{ext}").is_symlink()
+        ]
+        if local_paths and not is_deterministic:
             raise ValueError(f"{stem}: local workflow bypasses canonical governance")
-        if declaration.get("state") == "planned":
+        if is_deterministic:
+            if (
+                set(declaration) != {"artifact", "reason"}
+                or not isinstance(declaration["reason"], str)
+                or not declaration["reason"].strip()
+            ):
+                raise ValueError(f"{stem}: deterministic target requires an artifact and reason")
+        elif declaration.get("state") == "planned":
             if (
                 set(declaration) != {"state", "reason"}
                 or not isinstance(declaration["reason"], str)
@@ -103,7 +126,7 @@ def resolve_targets(config: dict) -> dict[str, Target]:
             ):
                 raise ValueError(f"{stem}: planned target requires a reason and no artifact")
             continue
-        if set(declaration) != {"state", "artifact"} or declaration.get("state") != "governed":
+        elif set(declaration) != {"state", "artifact"} or declaration.get("state") != "governed":
             raise ValueError(f"{stem}: target must be governed with an artifact, or planned")
         if not isinstance(declaration["artifact"], str):
             raise ValueError(f"{stem}: artifact must be an identifier string")
@@ -118,15 +141,28 @@ def resolve_targets(config: dict) -> dict[str, Target]:
         actual = hashlib.sha256(path.read_bytes()).hexdigest()
         if actual != artifact.sha256:
             raise ValueError(f"{stem}: canonical workflow checksum differs from manifest")
-        targets[stem] = Target(artifact, path)
-    resolved_ids = {target.artifact.artifact_id for target in targets.values()}
+        # Deterministic infrastructure also runs in claw itself. Its local copy
+        # must be the governed payload, never an alternate schedule or symlink.
+        for local in local_paths:
+            if (
+                local != REPO_ROOT / artifact.target
+                or local.is_symlink()
+                or not local.resolve().is_relative_to(REPO_ROOT.resolve())
+                or not local.is_file()
+                or local.read_bytes() != path.read_bytes()
+            ):
+                raise ValueError(f"{stem}: local deterministic workflow differs from canon")
+        classified[stem] = Target(artifact, path)
+        if not is_deterministic:
+            targets[stem] = classified[stem]
+    resolved_ids = {target.artifact.artifact_id for target in classified.values()}
     if resolved_ids != set(workflows):
         raise ValueError(
-            f"canonical workflows lack governed targets: {sorted(set(workflows) - resolved_ids)}"
+            f"canonical workflows lack explicit classification: {sorted(set(workflows) - resolved_ids)}"
         )
     if not targets:
         raise ValueError("no implemented governed workflow targets")
-    registered_paths = {target.path.resolve() for target in targets.values()}
+    registered_paths = {target.path.resolve() for target in classified.values()}
     discovered = {
         path.resolve()
         for path in CANONICAL_WORKFLOW_DIR.rglob("*")

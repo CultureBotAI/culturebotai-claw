@@ -62,19 +62,18 @@ class IncompleteConsumer:
 # Consumers known to be mid-adoption, with the exact gaps and reason. A new
 # missing path fails rather than inheriting the waiver. When the repository
 # finishes vendoring, this test says so and the entry comes out.
+_MERGE_AUTOMATION_GAP = frozenset({
+    "scripts/auto_merge_ready_prs.py",
+    "scripts/verify_merge_integrity.py",
+    ".github/workflows/merge-queue-admission.yaml",
+    ".github/workflows/verify-merge-integrity.yaml",
+})
 INCOMPLETE_CONSUMERS: dict[str, IncompleteConsumer] = {
-    # Entries leave this list because the test below fails when a repository
-    # becomes complete. CellStructureMech left it when
-    # CultureBotAI/CellStructureMech#53 merged; CultureMech, MediaIngredientMech
-    # and ProteinTraitsMech left it when they vendored
-    # scripts/deep_research_contract.py (#270); and AntibioticMech left it when
-    # CultureBotAI/AntibioticMech#177 vendored all 13 artifacts that apply to it
-    # and pinned 0a3252d4, the claw commit that declares it (#279 step 2 of 3);
-    # HabitatMech left it when CultureBotAI/HabitatMech#255 vendored all 13
-    # artifacts that apply to it and pinned 69c3abb7, the commit of #360 that
-    # declares it; PathwayMech left it when CultureBotAI/PathwayMech#204
-    # vendored all 14 artifacts that apply to it and pinned cb83def3, the
-    # commit of #511 that declares it.
+    consumer: IncompleteConsumer(
+        expected_missing=_MERGE_AUTOMATION_GAP,
+        reason="#550: bootstrap canonical merge automation before the coordinated fleet release",
+    )
+    for consumer in MANIFEST["consumers"]
 }
 
 
