@@ -121,6 +121,8 @@ kg_microbe_config = ["openclaw_config.yaml"]
 kg_microbe_agents = ["definitions/**/*.yaml"]
 kg_microbe_qc = ["templates/*.j2"]
 kg_microbe_discussions = ["templates/*.html"]
+# The Biolink snapshot the KGX exporter maps to (scripts/snapshot_biolink.py).
+kg_microbe_kgx = ["data/*.json"]
 
 [tool.uv]
 package = true
