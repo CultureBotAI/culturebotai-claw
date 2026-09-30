@@ -62,19 +62,7 @@ class IncompleteConsumer:
 # Consumers known to be mid-adoption, with the exact gaps and reason. A new
 # missing path fails rather than inheriting the waiver. When the repository
 # finishes vendoring, this test says so and the entry comes out.
-_MERGE_AUTOMATION_GAP = frozenset({
-    "scripts/auto_merge_ready_prs.py",
-    "scripts/verify_merge_integrity.py",
-    ".github/workflows/merge-queue-admission.yaml",
-    ".github/workflows/verify-merge-integrity.yaml",
-})
-INCOMPLETE_CONSUMERS: dict[str, IncompleteConsumer] = {
-    consumer: IncompleteConsumer(
-        expected_missing=_MERGE_AUTOMATION_GAP,
-        reason="#550: bootstrap canonical merge automation before the coordinated fleet release",
-    )
-    for consumer in MANIFEST["consumers"]
-}
+INCOMPLETE_CONSUMERS: dict[str, IncompleteConsumer] = {}
 
 
 def _applicable(consumer: str) -> list[str]:
