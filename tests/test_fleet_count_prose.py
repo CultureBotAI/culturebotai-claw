@@ -18,6 +18,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
+
 from kg_microbe_fleet import load_fleet_manifest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -52,10 +54,16 @@ EXCLUDED = ("docs/archive", "docs/reviews", "docs/proposals")
 # "N repos" is the same claim as "N Mechs" and was missed by a pattern that
 # only looked for the word Mech: `unmapped-inventory` said "all four repos"
 # twice while its script read the set from a capability.
-_NUMBER = r"(?:two|three|four|five|six|[2-9]|\d\d+)"
+# Spelled out to twenty: stopping at "six" let "all eight Mechs" and "ten
+# Mechs" through for as long as the fleet was bigger than six (#514).
+_NUMBER = (
+    r"(?:two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen"
+    r"|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|[2-9]|\d\d+)"
+)
 _COUNT = re.compile(
-    # "N Mechs" is always a claim about the fleet.
-    rf"\b{_NUMBER}[- ](?:Mechs?)\b"
+    # "N Mechs" is always a claim about the fleet. `\s+` rather than a space:
+    # prose wraps, and "all eight\nMechs" was invisible to a per-line search.
+    rf"\b{_NUMBER}(?:-|\s+)(?:Mechs?)\b"
     # "N repos" is only one when it says ALL of them. boss/SKILL.md warns
     # against "modifying two repos at once from the same worktree", which is a
     # claim about an action, not about how many exist.
@@ -99,24 +107,60 @@ def _maintained_files() -> list[Path]:
     ]
 
 
+def _offenders(name: object, text: str) -> list[str]:
+    """Every count in ``text`` with no basis nearby, as ``name:line: text``.
+
+    The whole text is searched, not each line, so a count that wraps onto the
+    next line is still a count.
+    """
+    lines = text.splitlines()
+    found: list[str] = []
+    for match in _COUNT.finditer(text):
+        number = text.count("\n", 0, match.start()) + 1
+        claim = " ".join(match.group(0).split())
+        # The comparison exemption reads the phrase and what follows it.
+        if _COMPARISON.search(" ".join(text[match.start() : match.end() + 40].split())):
+            continue
+        window = "\n".join(lines[max(0, number - 4) : number + 3])
+        if not _BASIS.search(window):
+            found.append(f"{name}:{number}: {claim}")
+    return found
+
+
 def test_maintained_prose_states_the_basis_of_any_mech_count():
     offenders: list[str] = []
     for path in _maintained_files():
-        lines = path.read_text(encoding="utf-8").splitlines()
-        for number, line in enumerate(lines, start=1):
-            if not _COUNT.search(line):
-                continue
-            if _COMPARISON.search(line):
-                continue
-            window = "\n".join(lines[max(0, number - 4) : number + 3])
-            if not _BASIS.search(window):
-                offenders.append(f"{path.relative_to(ROOT)}:{number}: {line.strip()}")
+        offenders.extend(_offenders(path.relative_to(ROOT), path.read_text(encoding="utf-8")))
 
     assert not offenders, (
         "a Mech count is stated without its basis; say which capability or "
         "input set it describes, or point at the manifest:\n  "
         + "\n  ".join(offenders)
     )
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "coordinate that immutable pin across all eight\nMechs.",  # wraps (#514)
+        "the fleet has ten Mechs",  # above six (#514)
+        "all eleven repositories re-pin",
+    ],
+)
+def test_a_count_the_old_guard_missed_is_caught(text: str) -> None:
+    assert _offenders("prose.md", text), text
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "every Mech re-pins",
+        "two Mechs have no such option set",
+        "the eight Mechs that declare the capability",
+    ],
+)
+def test_prose_that_is_not_a_bare_fleet_count_passes(text: str) -> None:
+    assert not _offenders("prose.md", text), text
 
 
 def test_the_guard_examines_a_non_trivial_number_of_files():
