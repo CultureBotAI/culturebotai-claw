@@ -328,23 +328,29 @@ canonical:
       globs, its schema, the variable naming its checkout -- comes from the
       manifest, which is exactly what a rendered adapter is for.
   review-yaml-category:
-    capability: testing
+    capability: curation_history
     reason: >-
       The record reviewer handles exactly one YAML target. ProteinTraitsMech's
       older sample reviewer exposed the next shared verb: resolve a category or
       cohort, judge its member boundary, and decide which apparent duplicates
-      should be lumped or split before a curator edits anything. Every
-      testing-capable Mech has YAML record categories that need that read-only
-      cohort pass, and the testing capability is the same stand-in used by
-      review-yaml-record until the manifest grows an exact record-review
-      capability (#316).
+      should be lumped or split before a curator edits anything.
+
+      The generic category reviewer cites review-yaml-record and
+      curate-yaml-record's per-Mech checklist, so it applies only to Mechs
+      where the generic curation-history-backed record skill also renders.
+      Keep this in lockstep with review-yaml-record and curate-yaml-record
+      until the manifest grows an exact record-review capability (#316).
   review-yaml-record:
-    capability: testing
+    capability: curation_history
     reason: >-
       ProteinTraitsMech had the only explicit record-review skill, and that
       one samples records by axis and category rather than taking one named
-      target. Every testing-capable Mech curates YAML records and should have a
-      read-only skill for inspecting one record before a curation edit. The
-      testing capability is a stand-in until the manifest grows an exact
-      record-review capability (#316), matching the way fetch-source and
-      manage-identifiers select all current Mechs.
+      target. Every curation-history-capable Mech curates YAML records and
+      should have a read-only skill for inspecting one record before a curation
+      edit.
+
+      The generic reviewer cites curate-yaml-record's per-Mech checklist to
+      describe how future edits should be staged, so it applies only to Mechs
+      where the generic curation-history-backed record skill also renders.
+      Keep this in lockstep with curate-yaml-record until the manifest grows an
+      exact record-review capability (#316).

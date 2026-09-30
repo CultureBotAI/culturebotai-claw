@@ -76,6 +76,13 @@ _PLACEHOLDER = re.compile(
     r"NNNN|XXXX|<[^>]+>|\{[^}]+\}|owner/repository|_N\b|/N\b"
 )
 
+# Source-native identifier shapes, not repository paths. These are concrete
+# enough to be useful in reviewer instructions but intentionally name scoped
+# keys such as iModulonDB's organism/dataset/component.
+_SOURCE_KEY_SHAPE = re.compile(
+    r"^organism/dataset/(?:component|gene)$"
+)
+
 # `origin/main` is a git ref and `www.ebi.ac.uk/chebi` is a bare URL. Both are
 # path-shaped and neither is a file, so they are rejected before resolution
 # rather than reported as missing.
@@ -88,6 +95,7 @@ _HOSTNAME = re.compile(r"^(www\.|[\w-]+(\.[\w-]+)*\.(com|org|net|edu|gov|io|ac\.
 # Counted and not judged -- asserting these exist would fail on a clean
 # checkout for every skill that works.
 _OUTPUT_ROOT = "workspace"
+_SKILL_OUTPUT = re.compile(r"^reports/yaml_(?:record|category)_review(?:/.*)?$")
 
 # This repository, by the name a sibling checkout would use for it.
 _CLAW_LABEL = "culturebotai-claw"
@@ -195,7 +203,7 @@ def extract_references(path: Path, text: str | None = None) -> list[Reference]:
             if _SLASH_REFERENCE.match(token):
                 references.append(Reference("command", token, path, number))
                 continue
-            if _PLACEHOLDER.search(token):
+            if _PLACEHOLDER.search(token) or _SOURCE_KEY_SHAPE.match(token):
                 continue
             # A URL, a flag, or an absolute path is not a repository-relative
             # reference; neither is anything with a space in it.
@@ -335,7 +343,12 @@ def _shell_references(
     for word in words:
         if word.startswith(("http", "/", "-", "~", "..")) or "$" in word or "*" in word:
             continue
-        if _PLACEHOLDER.search(word) or _GIT_REF.match(word) or _HOSTNAME.match(word):
+        if (
+            _PLACEHOLDER.search(word)
+            or _SOURCE_KEY_SHAPE.match(word)
+            or _GIT_REF.match(word)
+            or _HOSTNAME.match(word)
+        ):
             continue
         if _LABEL_PAIR.match(word) and "." not in word:
             continue
@@ -436,6 +449,8 @@ def _resolve_path(
 
     if head == _OUTPUT_ROOT:
         return Finding(reference, "output", "runtime artifact under workspace/")
+    if _SKILL_OUTPUT.match(reference.text):
+        return Finding(reference, "output", "timestamped skill report output")
 
     # An explicit repository prefix answers the question the rest of this
     # function otherwise has to guess at: the path is relative to *that*

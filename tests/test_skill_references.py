@@ -56,6 +56,8 @@ def _skill(tmp_path: Path, name: str, body: str, frontmatter: str = "") -> Path:
         "owner/repository",  # a shape, not a name
         "data/ingredients/unmapped/UNMAPPED_NNNN.yaml",
         "workspace/shards/sssom_review/shard_N.tsv",
+        "organism/dataset/component",
+        "organism/dataset/gene",
         "{package_path}/schema/history.yaml",
         "scripts/aggregate_*",  # a glob
         "--require-sources",
@@ -65,6 +67,23 @@ def _skill(tmp_path: Path, name: str, body: str, frontmatter: str = "") -> Path:
 def test_things_that_are_not_repository_paths_are_not_references(tmp_path, token):
     path = _skill(tmp_path, "s", f"See `{token}` for details.\n")
     assert [r.text for r in extract_references(path) if r.kind == "path"] == []
+
+
+@pytest.mark.parametrize(
+    "token",
+    [
+        "organism/dataset/component",
+        "organism/dataset/gene",
+    ],
+)
+def test_imodulondb_source_keys_in_shell_fences_are_not_references(tmp_path, token):
+    path = _skill(
+        tmp_path,
+        "s",
+        f"```bash\nkg-microbe-sources imodulondb get {token}\n```\n",
+    )
+
+    assert extract_references(path) == []
 
 
 def test_a_repository_path_is_a_reference(tmp_path):
@@ -108,6 +127,23 @@ def test_a_workspace_path_is_an_output_not_a_missing_file(tmp_path):
     """Skills name the artifacts they write. workspace/ is gitignored runtime
     state, so asserting it exists would fail on every clean checkout."""
     _skill(tmp_path, "s", "Writes `workspace/reports/thing.tsv`.\n")
+
+    findings = check(tmp_path)
+
+    assert [f.verdict for f in findings] == ["output"]
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "reports/yaml_record_review",
+        "reports/yaml_record_review/20260101T000000Z-record.md",
+        "reports/yaml_category_review",
+        "reports/yaml_category_review/20260101T000000Z-category.md",
+    ],
+)
+def test_yaml_review_report_paths_are_outputs(tmp_path, path):
+    _skill(tmp_path, "s", f"Writes `{path}`.\n")
 
     findings = check(tmp_path)
 

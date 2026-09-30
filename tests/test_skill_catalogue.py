@@ -180,6 +180,15 @@ def test_the_applicable_mechs_come_from_the_manifest():
         )
 
 
+def test_yaml_review_templates_follow_the_generic_curation_skill():
+    """The review templates cite curate-yaml-record's per-Mech checklist."""
+    canonical = load_canonical()
+    curation_capability = canonical["curate-yaml-record"].capability
+
+    assert canonical["review-yaml-record"].capability == curation_capability
+    assert canonical["review-yaml-category"].capability == curation_capability
+
+
 # --------------------------------------------------------------------------
 # Rendering — the Phase 4 acceptance criteria
 # --------------------------------------------------------------------------
