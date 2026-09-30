@@ -120,6 +120,10 @@ class _Malformed(Exception):
     """A record whose graph slot does not have the declared shape."""
 
 
+# The public name for callers outside this module, such as the KGX exporter.
+MalformedGraph = _Malformed
+
+
 # --------------------------------------------------------------------------
 # Configuration
 # --------------------------------------------------------------------------
@@ -597,7 +601,38 @@ def _assemble(
     )
 
 
-def _graphs(record: Mapping[str, Any], config: CoverageConfig) -> list[_Parsed]:
+@dataclass(frozen=True)
+class GraphParts:
+    """One graph as the shape reads it, before anything is counted.
+
+    Each node is ``(Node, grounding, raw)`` and each edge ``(Edge, evidenced,
+    raw)``, where ``raw`` is the mapping it was read from (``None`` for the
+    record node under ``record_is_node``). The coverage report and the KGX
+    exporter both start here, so the graph that is measured is the graph that
+    is exported.
+    """
+
+    graph_id: str
+    nodes: tuple[tuple[Node, str | None, Mapping[str, Any] | None], ...]
+    edges: tuple[tuple[Edge, bool, Mapping[str, Any]], ...]
+    scope: str | None
+    facets: dict[str, str]
+
+
+def _node_part(raw: Any, shape: GraphShape, what: str, node_type: str | None = None):
+    node, grounding = _node(raw, shape, what)
+    if node_type is not None:
+        node = Node(node.id, node_type)
+    return node, grounding, raw
+
+
+def _edge_part(raw: Any, subject: Any, shape: GraphShape, what: str):
+    edge, evidenced = _edge(raw, subject, shape, what)
+    return edge, evidenced, raw
+
+
+def graph_parts(record: Mapping[str, Any], config: CoverageConfig) -> list[GraphParts]:
+    """Every graph in ``record`` under ``config``'s shape; raises ``_Malformed``."""
     shape = config.shape
     if shape.kind == NODE_NESTED_EDGES:
         raw_nodes = _list(record.get(shape.nodes_field), shape.nodes_field)
@@ -606,29 +641,28 @@ def _graphs(record: Mapping[str, Any], config: CoverageConfig) -> list[_Parsed]:
         nodes, edges = [], []
         for i, raw in enumerate(raw_nodes):
             what = f"{shape.nodes_field}[{i}]"
-            node = _node(raw, shape, what)
+            node = _node_part(raw, shape, what)
             nodes.append(node)
             for j, raw_edge in enumerate(_list(raw.get(shape.edges_field), f"{what}.{shape.edges_field}")):
-                edges.append(_edge(raw_edge, node[0].id, shape, f"{what}.{shape.edges_field}[{j}]"))
-        return [_assemble(shape.nodes_field, nodes, edges, None, {})]
+                edges.append(_edge_part(raw_edge, node[0].id, shape, f"{what}.{shape.edges_field}[{j}]"))
+        return [GraphParts(shape.nodes_field, tuple(nodes), tuple(edges), None, {})]
 
     if shape.kind == RECORD_GRAPH:
         nodes = []
         if shape.record_is_node:
             own = _identifier(record.get(shape.node_id_field), "the record")
-            nodes.append((Node(own, RECORD_NODE_TYPE), None))
+            nodes.append((Node(own, RECORD_NODE_TYPE), None, None))
         for list_field in shape.node_list_fields:
             for j, raw in enumerate(_list(record.get(list_field), list_field)):
-                node, grounding = _node(raw, shape, f"{list_field}[{j}]")
-                nodes.append((Node(node.id, list_field), grounding))
+                nodes.append(_node_part(raw, shape, f"{list_field}[{j}]", node_type=list_field))
         edges = [
-            _edge(e, None, shape, f"{shape.edges_field}[{j}]")
+            _edge_part(e, None, shape, f"{shape.edges_field}[{j}]")
             for j, e in enumerate(_list(record.get(shape.edges_field), shape.edges_field))
         ]
         listed = len(nodes) - (1 if shape.record_is_node else 0)
         if not listed and not edges:
             return []
-        return [_assemble(shape.edges_field, nodes, edges, None, {})]
+        return [GraphParts(shape.edges_field, tuple(nodes), tuple(edges), None, {})]
 
     assert shape.graphs_field is not None and shape.graph_id_field is not None
     parsed = []
@@ -639,17 +673,30 @@ def _graphs(record: Mapping[str, Any], config: CoverageConfig) -> list[_Parsed]:
         graph_id = raw.get(shape.graph_id_field)
         graph_id = str(graph_id) if _populated(graph_id) else f"#{i}"
         nodes = [
-            _node(n, shape, f"{what}.{shape.nodes_field}[{j}]")
+            _node_part(n, shape, f"{what}.{shape.nodes_field}[{j}]")
             for j, n in enumerate(_list(raw.get(shape.nodes_field), f"{what}.{shape.nodes_field}"))
         ]
         edges = [
-            _edge(e, None, shape, f"{what}.{shape.edges_field}[{j}]")
+            _edge_part(e, None, shape, f"{what}.{shape.edges_field}[{j}]")
             for j, e in enumerate(_list(raw.get(shape.edges_field), f"{what}.{shape.edges_field}"))
         ]
         scope = _key(raw.get(config.scope_field)) if config.scope_field else None
         facets = {facet: _key(raw.get(facet)) for facet in config.graph_facets}
-        parsed.append(_assemble(graph_id, nodes, edges, scope, facets))
+        parsed.append(GraphParts(graph_id, tuple(nodes), tuple(edges), scope, facets))
     return parsed
+
+
+def _graphs(record: Mapping[str, Any], config: CoverageConfig) -> list[_Parsed]:
+    return [
+        _assemble(
+            part.graph_id,
+            [(n, g) for n, g, _ in part.nodes],
+            [(e, ev) for e, ev, _ in part.edges],
+            part.scope,
+            part.facets,
+        )
+        for part in graph_parts(record, config)
+    ]
 
 
 # --------------------------------------------------------------------------

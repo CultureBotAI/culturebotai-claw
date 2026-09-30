@@ -137,6 +137,20 @@ capability_catalogue:
         required_when_enabled: true
       extra_prefixes:
         type: string_list
+      # Read by `kg-microbe-kgx export` (#276), which builds the graph from the
+      # causal_graph_coverage shape. Maps are KEY=biolink:Term pairs that extend
+      # the shared ones in kg_microbe_kgx.maps; every target must be a term of
+      # the pinned Biolink snapshot.
+      infores:
+        type: string
+      category_map:
+        type: string_list
+      predicate_map:
+        type: string_list
+      node_namespace:
+        type: string
+      node_label_field:
+        type: string
   source_queue:
     settings:
       queue_path:
