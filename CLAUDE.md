@@ -482,6 +482,9 @@ because they carry literal data the path rules would misread.
 
 ## Prompts and review workflow
 
+- [Fleet repository cleanup](.claude/skills/fleet-repo-crud-cleanup/SKILL.md)
+  inventories ignored/untracked clutter across current Mechs, preserves research
+  and recovery state, and separates review from authorized file/Git actions.
 - [Fleet issue review](.claude/skills/fleet-issue-review/SKILL.md) reviews the
   published manifest's Mech issue queues, prioritizes shared themes, and plans
   parallel work around dependencies and ownership.
