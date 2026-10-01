@@ -157,7 +157,6 @@ def test_the_reasons_that_make_checkable_claims_are_the_ones_declared():
         "pathwaymech.page_budgets",
         "pathwaymech.source_catalogue",
         "pathwaymech.source_queue",
-        "pathwaymech.sssom_export",
         "pathwaymech.unmapped_inventory_input",
         "pathwaymech.writer_audit",
         "proteintraitsmech.metpo_proposal",

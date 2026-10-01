@@ -1944,15 +1944,9 @@ mechs:
         reason_claims:
           absent: ["scripts/audit_writers.py"]
       sssom_export:
-        status: disabled
-        reason: >-
-          Records carry ChEBI, SGD, EC, UniProtKB and NCBITaxon identifiers
-          inline rather than through a mapping file, and local-identifier
-          exceptions are logged in curation/decisions.tsv, a curator decision
-          log rather than a mapping set. Adopting SSSOM applies once a mapping
-          product exists.
-        reason_claims:
-          present: ["curation/decisions.tsv"]
+        status: enabled
+        settings:
+          mapping_globs: ["output/sssom/*.sssom.tsv"]
       metpo_proposal:
         status: disabled
         reason: >-
