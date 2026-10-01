@@ -1928,12 +1928,11 @@ mechs:
           present: ["pages"]
           absent: ["conf/pages_budgets.json"]
       kgx_export:
-        status: disabled
-        reason: >-
-          Records are already node-and-edge graphs -- evidenced
-          subject/predicate/object edges between CURIE nodes -- but there is no
-          exporter and no nodes or edges file for the contract to judge.
-          Adopting KGX applies once an exporter emits them.
+        status: enabled
+        settings:
+          nodes_path: output/kgx/nodes.tsv
+          edges_path: output/kgx/edges.tsv
+          extra_prefixes: ["pathwaymech"]
       writer_audit:
         status: disabled
         reason: >-
