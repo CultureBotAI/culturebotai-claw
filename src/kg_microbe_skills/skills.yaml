@@ -70,6 +70,9 @@ skills:
   fleet-issue-review:
     scope: fleet
     reason: Reviews the complete manifest-defined Mech backlog with thematic prioritization and dependency-aware parallel planning.
+  fleet-repo-crud-cleanup:
+    scope: fleet
+    reason: Inventories local clutter across manifest-resolved Mechs and explicit new targets, then guides evidence-backed cleanup within the user-authorized scope.
   fleet-pr-review:
     scope: fleet
     reason: Reviews open PRs across the manifest-defined control plane.
