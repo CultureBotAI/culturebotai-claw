@@ -1,6 +1,6 @@
 ---
 name: fleet-pull
-description: "Preview or pull remote updates across the manifest-defined Mech checkouts. Fast-forward each clean current branch from its existing origin upstream; report dirty, detached, diverged, locked, or unconfigured repositories. Use to update local Mech clones, rather than propagate a shared code change."
+description: "Preview or pull remote updates across claw and the manifest-defined Mech checkouts. Fast-forward each clean current branch from its existing origin upstream; report dirty, detached, diverged, locked, or unconfigured repositories. Use to update local fleet clones, rather than propagate a shared code change."
 metadata:
   category: cross-repo
   requires_database: false
@@ -11,15 +11,16 @@ metadata:
 
 # Fleet pull
 
-Run from the CLAW checkout. `scripts/fleet_pull.py` resolves the fleet through
-`src/kg_microbe_fleet/fleet.yaml` and validates configured roots and GitHub origins
-through `RepositorySettings`. It loads CLAW's `.env` when present; exported
-variables take precedence. Missing roots stay visible in the report.
+Run from the CLAW checkout. `scripts/fleet_pull.py` pulls the explicit `claw`
+control-plane checkout plus the Mech fleet from `src/kg_microbe_fleet/fleet.yaml`,
+then validates configured roots and GitHub origins through `RepositorySettings`.
+It loads CLAW's `.env` when present; exported variables take precedence. Missing
+Mech roots stay visible in the report.
 
 ```bash
 just fleet-pull                         # offline preview
 just fleet-pull --apply                 # fetch and fast-forward eligible repos
-just fleet-pull --mech traitmech --apply # select one; repeat --mech for several
+just fleet-pull --mech claw --apply     # select one; repeat --mech for several
 just fleet-pull --json                  # machine-readable preview
 ```
 
@@ -54,8 +55,8 @@ remain after a completed rebase; it is preserved and does not by itself block
 a pull. Other operation markers and checkout safeguards still apply.
 
 The current branch can be a feature branch. The command does not switch to main
-or change upstream configuration. CLAW and kg-microbe are outside this Mech-only
-scope. Do not add either implicitly.
+or change upstream configuration. kg-microbe is outside this fleet scope. Do not
+add it implicitly.
 
 ## Interpret results
 
@@ -65,7 +66,7 @@ scope. Do not add either implicitly.
 - `skipped_*`: dirty/untracked/submodule changes, detached HEAD, missing or
   non-origin/symbolic tracking, diverged history, an operation marker, or an unavailable
   lock. Preserve the checkout and report the reason.
-- `not_configured`, `error`: coverage is incomplete; report the affected Mech.
+- `not_configured`, `error`: coverage is incomplete; report the affected repository.
 
 Error results retain the branch, upstream, initial HEAD and fetched target when
 those were observed. After a failed fetch or merge, `after: null` means the final

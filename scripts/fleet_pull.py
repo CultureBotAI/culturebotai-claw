@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Preview or fast-forward the current origin-tracking branch in each Mech.
+"""Preview or fast-forward the current origin-tracking branch in claw and each Mech.
 
 Default execution is offline and read-only. --apply fetches under a repository
 lock and uses a fast-forward-only merge, with no branch switching or stashing.
@@ -20,11 +20,14 @@ from kg_microbe_fleet import FleetManifestError, load_fleet_manifest
 from plugins.lock_manager import LockManager
 from plugins.repository_settings import (
     RepositoryConfigurationError,
+    RepositoryTarget,
     RepositorySettings,
     merged_repository_environment,
 )
 
 CLAW_ROOT = Path(__file__).resolve().parents[1]
+CONTROL_PLANE_KEY = "claw"
+CONTROL_PLANE_REPOSITORY = "CultureBotAI/culturebotai-claw"
 SUCCESS = {"would_update", "updated", "up_to_date", "ahead"}
 # REBASE_HEAD is a commit pointer that can survive a finished rebase. The
 # rebase state directories identify an active operation, including paused ones.
@@ -81,6 +84,28 @@ class Git:
                 # failing operation and code without exposing credential text.
                 raise GitError(f"git {args[0]} failed (exit {process.returncode})")
             return stdout.rstrip("\n")
+
+
+class FleetPullSettings:
+    """RepositorySettings plus the explicit claw control-plane checkout."""
+
+    def __init__(self, settings, claw_root: Path = CLAW_ROOT) -> None:
+        self._settings = settings
+        self._claw = RepositoryTarget(
+            CONTROL_PLANE_KEY,
+            claw_root,
+            CONTROL_PLANE_REPOSITORY,
+        )
+
+    @property
+    def unconfigured(self) -> tuple[str, ...]:
+        return self._settings.unconfigured
+
+    def get_target(self, key: str) -> RepositoryTarget:
+        if key == CONTROL_PLANE_KEY:
+            self._claw.open()
+            return self._claw
+        return self._settings.get_target(key)
 
 
 def inspect(git: Git) -> dict:
@@ -211,6 +236,16 @@ def _timeout(value: str) -> int:
     return parsed
 
 
+def selected_keys(requested: list[str] | None, manifest) -> list[str]:
+    keys = list(dict.fromkeys(requested or [CONTROL_PLANE_KEY, *manifest.mechs]))
+    known = {CONTROL_PLANE_KEY, *manifest.mechs}
+    unknown = set(keys) - known
+    if unknown:
+        names = ", ".join(sorted(unknown))
+        raise argparse.ArgumentTypeError(f"unknown repository key(s): {names}")
+    return keys
+
+
 def render_table(results: list[dict]) -> str:
     """Show updates first, followed by every repository that was not updated."""
     lines = ["| Repository | Branch | Result | Details |",
@@ -241,22 +276,28 @@ def main(argv=None) -> int:
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--apply", action="store_true", help="fetch and fast-forward eligible checkouts")
     mode.add_argument("--dry-run", action="store_true", help="offline preview (the default)")
-    parser.add_argument("--mech", action="append", help="select a manifest key; repeat to select several")
+    parser.add_argument(
+        "--mech",
+        action="append",
+        help="select a repository key, including claw; repeat to select several",
+    )
     parser.add_argument("--dotenv", type=Path, help="repository configuration (default: CLAW .env if present)")
     parser.add_argument("--timeout", type=_timeout, default=60, help="seconds per repository (default: 60)")
     parser.add_argument("--json", action="store_true", help="machine-readable report")
     args = parser.parse_args(argv)
     try:
         manifest = load_fleet_manifest()
-        keys = list(dict.fromkeys(args.mech or manifest.mechs))
-        unknown = set(keys) - set(manifest.mechs)
-        if unknown:
-            parser.error("unknown Mech(s): " + ", ".join(sorted(unknown)))
+        try:
+            keys = selected_keys(args.mech, manifest)
+        except argparse.ArgumentTypeError as exc:
+            parser.error(str(exc))
         dotenv = args.dotenv
         if dotenv is None and (CLAW_ROOT / ".env").exists():
             dotenv = CLAW_ROOT / ".env"
-        settings = RepositorySettings.from_environment(
-            manifest=manifest, environ=merged_repository_environment(dotenv),
+        settings = FleetPullSettings(
+            RepositorySettings.from_environment(
+                manifest=manifest, environ=merged_repository_environment(dotenv),
+            )
         )
         results = run_fleet(settings, keys, apply=args.apply, timeout=args.timeout)
     except (FleetManifestError, RepositoryConfigurationError, OSError, ValueError) as exc:

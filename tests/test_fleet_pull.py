@@ -650,6 +650,29 @@ def test_preview_comparison_failure_retains_inspected_state(fleet: LocalFleet):
     assert git_files(fleet.checkout) == before
 
 
+def test_claw_is_a_first_class_fleet_pull_target(tmp_path: Path, fleet: LocalFleet):
+    claw = tmp_path / "claw"
+    git(tmp_path, "init", "--initial-branch=main", str(claw))
+    commit(claw, "tracked.txt", "initial\n")
+    git(
+        claw,
+        "remote",
+        "add",
+        "origin",
+        "https://github.com/CultureBotAI/culturebotai-claw.git",
+    )
+    git(claw, "update-ref", "refs/remotes/origin/main", "HEAD")
+    git(claw, "branch", "--set-upstream-to", "origin/main")
+    settings = fleet_pull.FleetPullSettings(fleet.settings, claw)
+
+    results = fleet_pull.run_fleet(
+        settings, ["claw", "culturemech"], locks=fleet.locks
+    )
+
+    assert [row["key"] for row in results] == ["claw", "culturemech"]
+    assert [row["status"] for row in results] == ["up_to_date", "up_to_date"]
+
+
 @pytest.mark.parametrize("apply", [False, True])
 def test_cli_selects_manifest_repositories_and_reports_coverage(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture, apply: bool
@@ -659,7 +682,11 @@ def test_cli_selects_manifest_repositories_and_reports_coverage(
     monkeypatch.setattr(
         fleet_pull.RepositorySettings, "from_environment", lambda **_kwargs: selected_settings
     )
-    selected = ["culturemech", "traitmech"] if apply else list(fleet_pull.load_fleet_manifest().mechs)
+    selected = (
+        ["claw", "traitmech", "culturemech"]
+        if apply
+        else ["claw", *fleet_pull.load_fleet_manifest().mechs]
+    )
     observed = []
 
     def record_fleet(settings, keys, **kwargs):
@@ -669,13 +696,19 @@ def test_cli_selects_manifest_repositories_and_reports_coverage(
     monkeypatch.setattr(fleet_pull, "run_fleet", record_fleet)
     argv = ["--json"]
     if apply:
-        argv.extend(["--apply", "--mech", "culturemech", "--mech", "traitmech",
+        argv.extend(["--apply", "--mech", "claw", "--mech", "traitmech",
+                     "--mech", "claw",
                      "--mech", "culturemech"])
 
     assert fleet_pull.main(argv) == 0
 
     report = json.loads(capsys.readouterr().out)
-    assert observed == [(selected_settings, selected, {"apply": apply, "timeout": 60})]
+    assert len(observed) == 1
+    settings, keys, kwargs = observed[0]
+    assert isinstance(settings, fleet_pull.FleetPullSettings)
+    assert settings._settings is selected_settings
+    assert keys == selected
+    assert kwargs == {"apply": apply, "timeout": 60}
     assert report["selected"] == selected
     assert report["mode"] == ("apply" if apply else "dry_run")
     assert report["comparison"] == ("fetch_eligible_only" if apply else "cached_refs")
@@ -701,8 +734,12 @@ def test_cli_incomplete_report_has_nonzero_exit(
 
 @pytest.mark.parametrize(
     "argv",
-    [["--mech", "not-a-mech"], ["--timeout", "0"], ["--timeout", "301"],
-     ["--apply", "--dry-run"]],
+    [
+        ["--mech", "not-a-repo"],
+        ["--timeout", "0"],
+        ["--timeout", "301"],
+        ["--apply", "--dry-run"],
+    ],
 )
 def test_invalid_cli_usage_never_runs_git(monkeypatch: pytest.MonkeyPatch, argv: list[str]):
     def unexpected_run(*_args, **_kwargs):
