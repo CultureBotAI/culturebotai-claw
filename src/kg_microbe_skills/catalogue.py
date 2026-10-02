@@ -246,8 +246,8 @@ def render_adapter(
         "github": mech.github,
         "environment_variable": mech.environment_variable,
         "package_path": mech.package_path,
-        "schema_paths": ", ".join(f"`{p}`" for p in mech.schema_paths),
-        "record_globs": ", ".join(f"`{p}`" for p in mech.record_globs),
+        "schema_paths": ", ".join(f"`{p}`" for p in mech.schema_paths) or "not yet defined",
+        "record_globs": ", ".join(f"`{p}`" for p in mech.record_globs) or "future curated YAML records",
     }
 
     unknown = skill_placeholders(text) - set(values)

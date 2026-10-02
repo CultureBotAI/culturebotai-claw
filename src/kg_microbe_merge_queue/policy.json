@@ -194,5 +194,8 @@
     ".github/workflows/vendored-sync.yaml": [
       "vendored-sync"
     ]
+  },
+  "dufmech": {
+    "blocked": "DUFMech main 0e33ce007b04c8494b7eb1b3c6dd691f414b9726 has no GitHub Actions workflows. Add queue-ready CI and verify exact passing job contexts before replacing this entry with a workflow mapping."
   }
 }

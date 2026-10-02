@@ -10,9 +10,9 @@
 # configuration and `.env.example` agree. Domain-specific pipelines may name
 # scientific inputs, but those names never redefine fleet membership.
 #
-# Package, schema, and record paths below were checked against each local Mech
-# checkout on 2026-08-25. They are repository-relative POSIX paths so consumers
-# never need to infer a sibling-checkout layout.
+# Original package, schema, and record paths were checked on 2026-08-25;
+# later admissions record their own evidence and incomplete profiles below.
+# Paths are repository-relative so consumers never infer a checkout layout.
 
 version: 1
 
@@ -1997,3 +1997,146 @@ mechs:
           record-level mechanistic_edges list. That is neither graph_list nor
           node_nested_edges, so the coverage reader would report no record
           covered. Enable once the reader has a record-level shape.
+
+  dufmech:
+    # Inspected main 0e33ce007b04c8494b7eb1b3c6dd691f414b9726 on admission:
+    # DUF/Pfam worklists and source snapshots, before curated YAML or CI.
+    display_name: DUFMech
+    github: CultureBotAI/DUFMech
+    environment_variable: DUFMECH_ROOT
+    package_path: src/dufmech
+    # Source worklists are not a curated YAML corpus or a LinkML schema.
+    schema_paths: []
+    record_globs: []
+    vendored_role: consumer
+    serialization:
+      verified: false
+      reason: No curated YAML corpus exists yet to measure serialization against.
+    capabilities:
+      id_label_validation:
+        status: disabled
+        reason: >-
+          No curated YAML corpus or conf/id_label_targets.yaml exists yet.
+          Enable once family records pair CURIE identifiers with labels and
+          the shared validator checks them.
+        reason_claims:
+          absent: ["conf/id_label_targets.yaml"]
+      curation_history:
+        status: disabled
+        reason: >-
+          No history/ directory or src/dufmech/schema/history.yaml exists yet.
+          Enable once curated records carry events validated by the contract.
+        reason_claims:
+          absent: ["history", "src/dufmech/schema/history.yaml"]
+      strict_validation:
+        status: disabled
+        reason: >-
+          No src/dufmech/schema/ or curated YAML corpus exists. Current tests
+          cover source tooling, not closed-mode validation of family records.
+        reason_claims:
+          absent: ["src/dufmech/schema"]
+      schema_sync:
+        status: disabled
+        reason: >-
+          No src/dufmech/schema/ exists yet.
+          Enable once a LinkML schema is available to synchronize and audit.
+        reason_claims:
+          absent: ["src/dufmech/schema"]
+      # General orchestration eligibility, not claims of installed hooks.
+      release_management:
+        status: enabled
+      build_coordination:
+        status: enabled
+      documentation:
+        status: enabled
+      testing:
+        status: enabled
+      refactoring:
+        status: enabled
+      coordination_hooks:
+        status: enabled
+      deep_research:
+        status: disabled
+        reason: >-
+          Source reports exist, but no conf/deep_research_provider.yaml does.
+          Enable once a provider exercises the shared research contract.
+        reason_claims:
+          absent: ["conf/deep_research_provider.yaml"]
+      edison_key_discovery:
+        status: not_applicable
+        reason: DUFMech has no Edison research-provider integration.
+      environment_coverage:
+        status: not_applicable
+        reason: >-
+          DUF/Pfam family evidence is not a culture-media, ingredient or
+          microbial-community environment inventory.
+      knowledge_gap_scan:
+        status: disabled
+        reason: >-
+          No curated Discussions or conf/kgscan_config.yaml exist yet.
+          Enable once records support Discussions and a scan window is chosen.
+        reason_claims:
+          absent: ["conf/kgscan_config.yaml"]
+      # Required of consumers; actual missing copies are tracked in the
+      # exact-path INCOMPLETE_CONSUMERS admission ledger until first rollout.
+      vendored_sync:
+        status: enabled
+      corpus_statistics:
+        status: disabled
+        reason: >-
+          Only source worklists exist; there is no curated YAML corpus whose
+          fields can be selected for the shared statistics report.
+      page_budgets:
+        status: disabled
+        reason: >-
+          No pages/ tree or conf/pages_budgets.json exists. Enable once a
+          generated site and repository-selected limits exist.
+        reason_claims:
+          absent: ["pages", "conf/pages_budgets.json"]
+      kgx_export:
+        status: disabled
+        reason: No curated graph or KGX exporter exists yet.
+      writer_audit:
+        status: disabled
+        reason: >-
+          Scripts freeze source snapshots and worklists, not curated YAML.
+          No scripts/audit_writers.py exists; enable with curated-record writers.
+        reason_claims:
+          absent: ["scripts/audit_writers.py"]
+      sssom_export:
+        status: disabled
+        reason: No SSSOM mapping product exists yet.
+      metpo_proposal:
+        status: disabled
+        reason: >-
+          No proposals/ directory exists. Enable when family mechanisms need
+          new METPO terms and the repository adopts the proposal contract.
+        reason_claims:
+          absent: ["proposals"]
+      source_queue:
+        status: disabled
+        reason: >-
+          Sources are captured in freeze tooling and provenance reports, with
+          no curation/source_queue.tsv recording licence and adoption decisions.
+        reason_claims:
+          absent: ["curation/source_queue.tsv"]
+      site_contract:
+        status: disabled
+        reason: No pages/ tree exists for the shared site contract to audit.
+        reason_claims:
+          absent: ["pages"]
+      source_catalogue:
+        status: disabled
+        reason: >-
+          Retrieval lives in source-freeze tooling; no download.yaml in the
+          fleet catalogue shape exists yet.
+        reason_claims:
+          absent: ["download.yaml"]
+      unmapped_inventory_input:
+        status: not_applicable
+        reason: Protein-family evidence is not a culture-medium ingredient corpus.
+      causal_graph_coverage:
+        status: disabled
+        reason: >-
+          No curated record schema defines causal graphs yet. Enable once
+          family records adopt a supported graph shape.

@@ -301,8 +301,8 @@ canonical:
       Seven copies across two colliding names -- schema-gap-analysis in claw and
       three Mechs, audit-schema-gaps in two of those three. Not a stand-in
       capability this time: claw's own copy already resolves its audience with
-      `--capability schema_sync`, and that selects every declared Mech, which is the
-      right audience.
+      `--capability schema_sync`, which selects Mechs with a schema to audit.
+      Admissions without a schema remain outside that scope.
 
       The three Mech copies share one skeleton -- validate, histogram,
       cross-check generator drift, re-validate -- and defer to claw's three-axis
@@ -333,6 +333,11 @@ canonical:
       same task in every Mech. What differs -- the repository, its corpus
       globs, its schema, the variable naming its checkout -- comes from the
       manifest, which is exactly what a rendered adapter is for.
+
+      The skill deliberately rides the general testing capability because it is
+      enabled for every manifest-declared Mech and pinned as an all-Mech
+      capability by the fleet-agent scope tests. If that stops being true,
+      review-open-issues must move to another all-Mech selector.
   review-yaml-category:
     capability: curation_history
     reason: >-

@@ -189,6 +189,26 @@ def test_yaml_review_templates_follow_the_generic_curation_skill():
     assert canonical["review-yaml-category"].capability == curation_capability
 
 
+def test_review_open_issues_renders_for_every_mech():
+    manifest = load_fleet_manifest()
+
+    assert applicable_mechs(load_canonical()["review-open-issues"]) == sorted(
+        manifest.keys
+    )
+
+
+def test_pre_corpus_mech_adapter_has_no_invented_schema_reference(tmp_path):
+    mech_root = tmp_path / "dufmech"
+    (mech_root / "src/dufmech").mkdir(parents=True)
+    adapter = render_adapter(canonical_text("review-open-issues"), "dufmech")
+    assert "Schema: not yet defined" in adapter
+    assert "future curated YAML records" in adapter
+    written = tmp_path / "SKILL.md"
+    written.write_text(adapter, encoding="utf-8")
+    findings = check(mech_root, {"dufmech": mech_root}, files=[written], mech_labels={"dufmech"})
+    assert not [finding for finding in findings if finding.verdict in ("missing", "ambiguous")]
+
+
 # --------------------------------------------------------------------------
 # Rendering — the Phase 4 acceptance criteria
 # --------------------------------------------------------------------------
