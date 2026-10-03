@@ -62,8 +62,10 @@ capability_catalogue:
   # enabled declaration.
   causal_graph_coverage:
     settings:
-      # graph_list (a record holds a list of graphs) or node_nested_edges
-      # (the record is one graph; each node lists its outgoing edges).
+      # graph_list (a record holds a list of graphs), node_nested_edges (the
+      # record is one graph; each node lists its outgoing edges) or
+      # record_graph (the record is one graph: nodes in node_list_fields, one
+      # record-level edge list).
       graph_shape:
         type: string
         required_when_enabled: true
@@ -89,6 +91,12 @@ capability_catalogue:
         type: string
       edge_evidence_field:
         type: string
+      # record_graph only: the record-level lists holding nodes, and whether
+      # the record itself is a node edges may name.
+      node_list_fields:
+        type: string_list
+      record_is_node:
+        type: boolean
       # The record's own id, to count graphless records grounded inside
       # another record's graph.
       record_id_field:
@@ -1989,11 +1997,21 @@ mechs:
           scripts/inventory_unmapped_ingredients.py defines no loader for it.
         reason_claims:
           present: ["claw:scripts/inventory_unmapped_ingredients.py"]
+      # Every record is one causal graph (#509). Its mechanism is the
+      # participants and reactions: measured at PathwayMech 71037cc, no edge in
+      # any of the 148 records names a taxon or the record itself, so those are
+      # organism scope rather than nodes, and declaring them would report every
+      # graph fragmented. An edge that does name one reads as DANGLING_EDGE.
       causal_graph_coverage:
-        status: disabled
-        reason: >-
-          Every record is one causal graph: CURIE nodes in the record-level
-          taxa, participants and reactions lists plus the record itself, and one
-          record-level mechanistic_edges list. That is neither graph_list nor
-          node_nested_edges, so the coverage reader would report no record
-          covered. Enable once the reader has a record-level shape.
+        status: enabled
+        settings:
+          graph_shape: record_graph
+          node_list_fields:
+            - participants
+            - reactions
+          node_id_field: id
+          edges_field: mechanistic_edges
+          edge_subject_field: subject
+          edge_object_field: object
+          edge_predicate_field: predicate
+          edge_evidence_field: evidence
