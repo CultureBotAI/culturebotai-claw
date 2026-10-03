@@ -67,6 +67,11 @@ EXPECTED_PROFILES = {
         ("src/pathwaymech/schema/pathwaymech.yaml",),
         ("data/pathways/**/*.yaml",),
     ),
+    "dufmech": (
+        "src/dufmech",
+        (),
+        (),
+    ),
 }
 
 EXPECTED_CAPABILITIES = {
@@ -140,7 +145,7 @@ def _parse(document: dict):
     return parse_fleet_manifest(document, Path("synthetic-fleet.yaml"))
 
 
-def test_shipped_profiles_are_verified_and_complete() -> None:
+def test_shipped_profiles_are_declared_and_complete() -> None:
     manifest = load_fleet_manifest(MANIFEST_PATH)
 
     assert set(manifest.capability_catalogue) == EXPECTED_CAPABILITIES
@@ -260,6 +265,42 @@ def test_required_profile_fields_cannot_be_omitted(document: dict, field: str) -
     del document["mechs"]["culturemech"][field]
 
     with pytest.raises(FleetManifestError, match=field):
+        _parse(document)
+
+
+@pytest.mark.parametrize("capability", ["strict_validation", "schema_sync"])
+def test_empty_schema_profile_cannot_enable_schema_operations(document, capability):
+    document["mechs"]["dufmech"]["capabilities"][capability] = {"status": "enabled"}
+    with pytest.raises(FleetManifestError, match="schema_paths must be a non-empty list"):
+        _parse(document)
+
+
+@pytest.mark.parametrize("capability", [
+    "id_label_validation", "curation_history", "strict_validation",
+    "environment_coverage", "knowledge_gap_scan", "corpus_statistics",
+    "writer_audit", "causal_graph_coverage", "unmapped_inventory_input",
+])
+def test_empty_record_profile_cannot_enable_record_operations(document, capability):
+    mech = document["mechs"]["dufmech"]
+    # Borrow a complete declaration so missing settings cannot mask this guard.
+    mech["capabilities"][capability] = next(
+        other["capabilities"][capability]
+        for other in document["mechs"].values()
+        if other["capabilities"][capability]["status"] == "enabled"
+    )
+    mech["schema_paths"] = ["src/dufmech/schema/example.yaml"]
+    with pytest.raises(FleetManifestError, match="record_globs must be a non-empty list"):
+        _parse(document)
+
+
+@pytest.mark.parametrize("serialization", [None, {"verified": True, "options": {"sort_keys": False}}])
+def test_empty_corpus_cannot_claim_verified_serialization(document, serialization):
+    mech = document["mechs"]["dufmech"]
+    if serialization is None:
+        del mech["serialization"]
+    else:
+        mech["serialization"] = serialization
+    with pytest.raises(FleetManifestError, match="empty record_globs requires an unverified"):
         _parse(document)
 
 

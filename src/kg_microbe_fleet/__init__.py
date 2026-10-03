@@ -385,9 +385,11 @@ def _require_path_sequence(
     label: str,
     *,
     glob: bool = False,
+    allow_empty: bool = False,
 ) -> tuple[str, ...]:
-    if not isinstance(value, list) or not value:
-        raise FleetManifestError(f"{label} must be a non-empty list")
+    if not isinstance(value, list) or (not value and not allow_empty):
+        kind = "list" if allow_empty else "non-empty list"
+        raise FleetManifestError(f"{label} must be a {kind}")
     paths = tuple(
         _require_relative_path(item, f"{label}[{index}]", glob=glob)
         for index, item in enumerate(value)
@@ -791,8 +793,27 @@ def _parse_mech(
         if "serialization" in mapping
         else None
     )
+    capabilities = _parse_capabilities(
+        mapping.get("capabilities"),
+        key,
+        catalogue,
+        require_exact=True,
+    )
+    # Admission can precede the first curated corpus, but an empty profile
+    # must never select schema/record operations that would silently do nothing.
+    schema_required = any(
+        name in capabilities and capabilities[name].is_enabled
+        for name in ("strict_validation", "schema_sync")
+    )
+    records_required = any(
+        name in capabilities and capabilities[name].is_enabled for name in (
+            "id_label_validation", "curation_history", "strict_validation",
+            "environment_coverage", "knowledge_gap_scan", "corpus_statistics",
+            "writer_audit", "causal_graph_coverage", "unmapped_inventory_input",
+        )
+    )
     schema_paths = _require_path_sequence(
-        mapping.get("schema_paths"), f"{label}.schema_paths"
+        mapping.get("schema_paths"), f"{label}.schema_paths", allow_empty=not schema_required
     )
     for index, schema_path in enumerate(schema_paths):
         if not schema_path.lower().endswith((".yaml", ".yml")):
@@ -800,14 +821,13 @@ def _parse_mech(
                 f"{label}.schema_paths[{index}] must identify a YAML schema"
             )
     record_globs = _require_path_sequence(
-        mapping.get("record_globs"), f"{label}.record_globs", glob=True
+        mapping.get("record_globs"), f"{label}.record_globs", glob=True,
+        allow_empty=not records_required,
     )
-    capabilities = _parse_capabilities(
-        mapping.get("capabilities"),
-        key,
-        catalogue,
-        require_exact=True,
-    )
+    if not record_globs and (serialization is None or serialization.verified):
+        raise FleetManifestError(
+            f"{label}: empty record_globs requires an unverified serialization profile with a reason"
+        )
     coverage = capabilities.get("environment_coverage")
     if coverage is not None and "record_globs" in coverage.settings:
         coverage_globs = tuple(

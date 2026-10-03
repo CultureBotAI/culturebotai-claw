@@ -81,6 +81,13 @@ repositories:
     task_runner: just
     description: "Pathway-level microbial mechanisms: participants, reactions and evidence-backed causal edges"
 
+  dufmech:
+    path: ${DUFMECH_ROOT}
+    type: python
+    package_manager: uv
+    task_runner: just
+    description: "Domain of Unknown Function mechanism knowledge base"
+
 agents:
   discovery_paths:
     - kg_microbe_agents/definitions
