@@ -112,6 +112,12 @@ skills:
   mapping-taxonomy:
     scope: domain
     reason: Documents the MIM to kg-microbe mapping cases.
+  mechcheck:
+    scope: fleet
+    reason: >-
+      Audits a manifest-resolved or explicitly named Mech against refreshed
+      DisMech features and the published X-Mech capability matrix, preserving
+      declaration, implementation, and source-freshness differences.
   publish-sssom:
     scope: domain
     reason: Builds and promotes MIM's canonical SSSOM product.
