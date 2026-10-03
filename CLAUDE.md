@@ -482,6 +482,9 @@ because they carry literal data the path rules would misread.
 
 ## Prompts and review workflow
 
+- [Mech HTML design](.claude/skills/mech-html-design/SKILL.md) compares applicable
+  data-display, navigation and interaction patterns across current Mech sites,
+  and guides source-level fixes with rendered desktop, mobile and keyboard checks.
 - [Fleet repository cleanup](.claude/skills/fleet-repo-crud-cleanup/SKILL.md)
   inventories ignored/untracked clutter across current Mechs, preserves research
   and recovery state, and separates review from authorized file/Git actions.
