@@ -4,7 +4,7 @@ description: Review or improve Mech HTML data browsers, record pages, navigation
 metadata:
   category: cross-repo
   requires_internet: true
-  version: 1.0.0
+  version: 1.0.1
   tags: [fleet, html, design, accessibility, navigation]
 ---
 
@@ -109,6 +109,15 @@ category, or map. Test narrow and desktop widths, keyboard-only operation,
 search/filter/reset, zero results, literal markup in queries, failed data loads,
 and theme continuity where relevant. Check console errors and broken requests.
 For regressions, show that the test or reproduction fails on the baseline.
+
+For deferred record views, wait for the expected record identifier and populated
+scientific sections or tables before measuring layout or accepting a detail-page
+check. Assert that the expected content actually appeared; checking a loading
+shell proves only the shell. Wait for styles and fonts to settle as well. Exercise
+later pagination or disclosure updates that install more content, and check that
+their tables remain readable and keyboard-scrollable. Where JavaScript is
+disabled, verify the site's supported fallback rather than expecting fetched
+record content.
 
 Use the shared site check on actual built output when the capability is enabled:
 
