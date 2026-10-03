@@ -112,6 +112,12 @@ skills:
   mapping-taxonomy:
     scope: domain
     reason: Documents the MIM to kg-microbe mapping cases.
+  mech-html-design:
+    scope: fleet
+    reason: >-
+      Resolves current Mech sites from the published fleet manifest, compares
+      applicable data-display, navigation and interaction patterns, and guides
+      source-level changes with rendered behavior checks.
   publish-sssom:
     scope: domain
     reason: Builds and promotes MIM's canonical SSSOM product.
