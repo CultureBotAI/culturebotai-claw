@@ -21,6 +21,7 @@ import argparse
 import csv
 import os
 import sys
+import unicodedata
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -394,27 +395,85 @@ def scan_culturemech(culturemech_root: Path) -> dict:
 # Step 3: Join and resolve
 # ---------------------------------------------------------------------------
 
+# MIM's label-index verdicts under which the first row may be trusted
+# (docs/LABEL_INDEX_CONTRACT.md); the same set CultureMech's resolver honours.
+SAFE_LABEL_AMBIGUITIES = frozenset({'unique', 'resolved:owned', 'agree:same_substance'})
+
+
+def _label_key(s: str) -> str:
+    """The label index's exact key: NFC, trimmed, case-folded."""
+    return unicodedata.normalize('NFC', s).strip().casefold()
+
+
+def load_mim_label_index(mim_root: Path) -> dict:
+    """First row per label of MIM's published docs/data/label_index.csv.
+
+    The contract is "take the first row for a label"; rows for one label are
+    contiguous and ordered most-significant first. A missing file yields an
+    empty index, which leaves resolution exactly as it was.
+    """
+    path = mim_root / 'docs' / 'data' / 'label_index.csv'
+    first: dict = {}
+    if not path.is_file():
+        return first
+    with path.open(newline='', encoding='utf-8') as fh:
+        for row in csv.DictReader(fh):
+            first.setdefault(_label_key(row['label']), row)
+    return first
+
+
+def live_records_by_identifier(*indexes: dict) -> dict:
+    """identifier → live MAPPED record, from the loaded MIM indexes."""
+    live: dict = {}
+    for index in indexes:
+        for record in index.values():
+            if record.get('mapping_status') == 'MAPPED' and record.get('mim_id'):
+                live.setdefault(record['mim_id'], record)
+    return live
+
+
 def resolve_mim_record(
     name: str,
     term_id: str,
     name_index: dict,
     chebi_index: dict,
     ontology_index: dict,
+    *,
+    label_index: Optional[dict] = None,
+    live_index: Optional[dict] = None,
 ) -> Optional[dict]:
     """
     Find best MIM record for this ingredient name + optional term_id.
 
     Priority:
       0. Explicit MIM nonidentity/refusal → no identity
-      1. CultureMech CHEBI term.id → direct CHEBI index lookup
-      2. Any CultureMech term.id (FOODON/ENVO) → ontology index lookup
-      3. Name/synonym → name index lookup
+      1. MIM's published label-index answer for this exact name, when its
+         ambiguity verdict is safe and it names a live record
+      2. CultureMech CHEBI term.id → direct CHEBI index lookup
+      3. Any CultureMech term.id (FOODON/ENVO) → ontology index lookup
+      4. Name/synonym → name index lookup
+
+    Step 1 is MIM's own ruling on the label. Without it a recipe's stale
+    ``term.id`` outranked it: ``K2HPO4 x 3 H2O`` and ``Na2HPO4 x 7 H2O`` were
+    published on their anhydrous CHEBI terms although MIM resolves both to
+    hydrate records (MIM #808) -- the same defect CultureMech retired for KGX by
+    resolving through the label index (CultureMech #260).
     """
     named = name_index.get(_normalize(name))
     if named and _is_mim_nonidentity(named):
         return named
     if term_id in (named or {}).get('_retired_source_ids', ()):
         return named
+
+    answer = (label_index or {}).get(_label_key(name))
+    if (
+        answer
+        and answer.get('ambiguity') in SAFE_LABEL_AMBIGUITIES
+        and not answer.get('identifier', '').startswith('UNMAPPED')
+    ):
+        ruled = (live_index or {}).get(answer['identifier'])
+        if ruled is not None:
+            return ruled
 
     if term_id:
         if term_id in chebi_index:
@@ -496,6 +555,7 @@ def build_unified_rows(
     chebi_index: dict,
     ontology_index: dict,
     rejections: dict | None = None,
+    label_index: dict | None = None,
 ) -> list:
     """
     Join CultureMech occurrences with MIM records.
@@ -508,6 +568,7 @@ def build_unified_rows(
     """
     rows = []
     matched = unmatched = 0
+    live_index = live_records_by_identifier(name_index, chebi_index, ontology_index)
 
     for name, info in occurrences.items():
         term_id = info['term_id']
@@ -519,7 +580,10 @@ def build_unified_rows(
             # Do not let a rejected source ID select another MIM record before
             # the curated name can resolve (e.g. a real detergent record).
             term_id = ''
-        mim = resolve_mim_record(name, term_id, name_index, chebi_index, ontology_index)
+        mim = resolve_mim_record(
+            name, term_id, name_index, chebi_index, ontology_index,
+            label_index=label_index, live_index=live_index,
+        )
         if expected_id and (not mim or mim['mim_id'] != expected_id):
             raise ValueError(f'{name}: rejected source ID has no matching curated identity')
 
@@ -686,7 +750,10 @@ def main():
     occurrences = scan_culturemech(args.culturemech)
 
     # Join
-    rows = build_unified_rows(occurrences, name_index, chebi_index, ontology_index, rejections)
+    label_index = load_mim_label_index(args.mim)
+    rows = build_unified_rows(
+        occurrences, name_index, chebi_index, ontology_index, rejections, label_index,
+    )
 
     # Print coverage report
     print_coverage_report(rows)
