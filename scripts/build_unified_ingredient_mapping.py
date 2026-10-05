@@ -60,7 +60,7 @@ def load_mapping_rejections(
     name_index: dict,
     *,
     label_index: Optional[dict] = None,
-    live: Optional[tuple[dict, dict]] = None,
+    live: Optional[tuple] = None,
 ) -> dict:
     """Read reviewed source-ID rejections; never infer them from prefix alone.
 
@@ -306,6 +306,12 @@ def load_mim_index(mim_root: Path) -> tuple[dict, dict, dict]:
         if canonical and '_retired_source_ids' in canonical[0]:
             record['_retired_source_ids'] = canonical[0]['_retired_source_ids']
 
+    # A live record's refused labels travel with it, so a tombstone's label-index
+    # row cannot hand the survivor a name the survivor itself rejects.
+    for _, record, rejected_names in name_records:
+        if record.get('mapping_status') == 'MAPPED' and rejected_names:
+            record.setdefault('_rejected_names', set()).update(rejected_names)
+
     # Active names come first, followed by aliases of resolved tombstones.
     # Explicit nonidentities must survive competing synonyms, and a retired
     # alias cannot undo a REJECTED_LABEL decision on its representative.
@@ -439,51 +445,69 @@ def load_mim_label_index(mim_root: Path) -> dict:
     return first
 
 
-def live_records(*indexes: dict) -> tuple[dict, dict]:
-    """Live MAPPED records keyed by identifier, and by (identifier, preferred_term).
+def live_records(*indexes: dict) -> tuple[dict, dict, dict]:
+    """MIM records the label index can name, in three lookups.
 
-    `identifier` is not a unique record key -- several live records can share
-    one -- so a label-index answer is matched to the record it names, not to
-    whichever record holding that identifier happened to load first.
+    - live MAPPED records by identifier;
+    - live MAPPED records by (identifier, preferred_term) -- `identifier` is not
+      a unique record key, so a label-index answer is matched to the record it
+      names, not to whichever record holding that identifier loaded first;
+    - explicit nonidentity records by their ``UNMAPPED_NNNN`` identifier.
     """
     by_id: dict = {}
     by_id_term: dict = {}
+    nonidentity: dict = {}
     for index in indexes:
         for record in index.values():
-            if record.get('mapping_status') == 'MAPPED' and record.get('mim_id'):
-                by_id.setdefault(record['mim_id'], record)
-                by_id_term.setdefault((record['mim_id'], record.get('preferred_term')), record)
-    return by_id, by_id_term
+            mim_id = record.get('mim_id') or ''
+            if record.get('mapping_status') == 'MAPPED' and mim_id:
+                by_id.setdefault(mim_id, record)
+                by_id_term.setdefault((mim_id, record.get('preferred_term')), record)
+            elif mim_id.startswith('UNMAPPED') and _is_mim_nonidentity(record):
+                nonidentity.setdefault(mim_id, record)
+    return by_id, by_id_term, nonidentity
 
 
 def label_ruling(
     name: str,
     named: Optional[dict],
     label_index: Optional[dict],
-    live: Optional[tuple[dict, dict]],
+    live: Optional[tuple],
 ) -> Optional[dict]:
-    """The live MIM record MIM's label index rules for ``name``, if trusted.
+    """MIM's published ruling on the exact label ``name``, or None to defer.
 
-    Trusted means: the exact label's first row has a verdict in
-    ``TRUSTED_LABEL_AMBIGUITIES`` and names a live MAPPED record. A REJECTED
-    first row is followed, since a tombstone carries its survivor's
-    identifier. When the name index already found a record with that
-    identifier, that record is kept, so record-level columns (CAS, KG node,
-    synonyms) come from the record the name actually denotes.
+    Only a first row whose verdict is in ``TRUSTED_LABEL_AMBIGUITIES`` rules:
+
+    - an ``UNMAPPED_NNNN`` row is MIM explicitly leaving the label without an
+      identity, so the nonidentity record is returned;
+    - a MAPPED row, or a REJECTED tombstone row (which carries its survivor's
+      identifier), returns that live record -- the record whose own row it is
+      when one shares the identifier, else the record the name index found for
+      that identifier, else the first live holder. A tombstone row is not
+      followed when the survivor rejects the label (REJECTED_LABEL);
+    - an undecided curation status (PENDING_REVIEW, IN_PROGRESS, NEEDS_EXPERT,
+      AMBIGUOUS) never rules.
     """
     answer = (label_index or {}).get(_label_key(name))
-    if (
-        not answer
-        or answer.get('ambiguity') not in TRUSTED_LABEL_AMBIGUITIES
-        or answer.get('identifier', '').startswith('UNMAPPED')
-        or not live
-    ):
+    if not answer or answer.get('ambiguity') not in TRUSTED_LABEL_AMBIGUITIES or not live:
         return None
-    identifier = answer['identifier']
-    if named and named.get('mapping_status') == 'MAPPED' and named.get('mim_id') == identifier:
-        return named
-    by_id, by_id_term = live
-    return by_id_term.get((identifier, answer.get('preferred_term'))) or by_id.get(identifier)
+    by_id, by_id_term, nonidentity = live
+    identifier = answer.get('identifier') or ''
+    status = answer.get('mapping_status') or ''
+    if identifier.startswith('UNMAPPED'):
+        return nonidentity.get(identifier)
+    if status not in ('MAPPED', 'REJECTED'):
+        return None
+    record = by_id_term.get((identifier, answer.get('preferred_term')))
+    if record is None and named and named.get('mapping_status') == 'MAPPED' \
+            and named.get('mim_id') == identifier:
+        record = named
+    if record is None:
+        record = by_id.get(identifier)
+    if record is not None and status == 'REJECTED' \
+            and _normalize(answer.get('label') or '') in record.get('_rejected_names', ()):
+        return None
+    return record
 
 
 def resolve_mim_record(
@@ -494,18 +518,18 @@ def resolve_mim_record(
     ontology_index: dict,
     *,
     label_index: Optional[dict] = None,
-    live: Optional[tuple[dict, dict]] = None,
+    live: Optional[tuple] = None,
 ) -> Optional[dict]:
     """
     Find best MIM record for this ingredient name + optional term_id.
 
     Priority:
-      0. Explicit MIM nonidentity/refusal → no identity
-      1. MIM's published label-index answer for this exact name, when its
-         verdict is trusted and it names a live record (``label_ruling``)
-      2. CultureMech CHEBI term.id → direct CHEBI index lookup
-      3. Any CultureMech term.id (FOODON/ENVO) → ontology index lookup
-      4. Name/synonym → name index lookup
+      1. MIM's published ruling on this exact label (``label_ruling``): a
+         live record, or MIM's explicit nonidentity for the label
+      2. A nonidentity record the loose name index lands on → no identity
+      3. CultureMech CHEBI term.id → direct CHEBI index lookup
+      4. Any CultureMech term.id (FOODON/ENVO) → ontology index lookup
+      5. Name/synonym → name index lookup
 
     Step 1 is MIM's own ruling on the label. Without it a recipe's stale
     ``term.id`` outranked it: ``K2HPO4 x 3 H2O`` and ``Na2HPO4 x 7 H2O`` were
@@ -514,14 +538,13 @@ def resolve_mim_record(
     resolving through the label index (CultureMech #260).
     """
     named = name_index.get(_normalize(name))
+    ruled = label_ruling(name, named, label_index, live)
+    if ruled is not None:
+        return ruled
     if named and _is_mim_nonidentity(named):
         return named
     if term_id in (named or {}).get('_retired_source_ids', ()):
         return named
-
-    ruled = label_ruling(name, named, label_index, live)
-    if ruled is not None:
-        return ruled
 
     if term_id:
         if term_id in chebi_index:
@@ -601,17 +624,15 @@ def _anchor_record(
     name: str,
     name_index: dict,
     label_index: Optional[dict],
-    live: Optional[tuple[dict, dict]],
+    live: Optional[tuple],
 ) -> Optional[dict]:
     """The record a name resolves to before any source term.id is consulted.
 
     The rejection ledger is keyed on this record, so ledger validation and the
-    builder agree on it: an explicit MIM nonidentity, else MIM's trusted
-    label-index ruling, else the name index's own match.
+    builder agree on it: MIM's trusted ruling on the exact label (an identity
+    or an explicit nonidentity), else the name index's own match.
     """
     named = name_index.get(_normalize(name))
-    if named and _is_mim_nonidentity(named):
-        return named
     return label_ruling(name, named, label_index, live) or named
 
 

@@ -152,13 +152,98 @@ def test_a_rejected_first_row_is_followed_to_its_live_survivor():
     assert row["mim_id"] == "CHEBI:2"
 
 
-def test_an_explicit_mim_nonidentity_still_beats_the_label_index():
+def test_a_loose_name_refusal_applies_only_when_the_label_index_does_not_decide():
     refusal, live = _rec("UNMAPPED_0009", "Mystery mix", status="UNMAPPED"), _rec("CHEBI:1", "One")
     names = {"mystery mix": refusal, "one": live}
-    labels = _labels(_row("Mystery mix", "CHEBI:1", "One"))
-    row = _build(names, {"CHEBI:1": live}, labels, "Mystery mix", "CHEBI:1")
+    # No row for the exact label: the loose-name refusal stands.
+    row = _build(names, {"CHEBI:1": live}, _labels(), "Mystery mix", "CHEBI:1")
     assert row["mim_id"] == "UNMAPPED_0009"
     assert row["chebi_id"] == row["culturemech_term_id"] == ""
+
+
+def test_an_exact_live_owner_beats_a_loose_name_refusal():
+    """The 45-row case (11,577 occurrences): the hydrate-canonical name index
+    lands on a refusal, while MIM's label index has a live owner for the exact label."""
+    refusal = _rec("UNMAPPED_0042", "Na2MoO4 x 2 H2O (stock)", status="UNMAPPED")
+    owner = _rec("CHEBI:75213", "Na2MoO4 x 2 H2O")
+    names = {b._normalize("Na2MoO4 x 2 H2O"): refusal}
+    labels = _labels(_row("Na2MoO4 x 2 H2O", "CHEBI:75213", "Na2MoO4 x 2 H2O", match="preferred_term"))
+    row = _build(names | {"owner": owner}, {"CHEBI:75213": owner}, labels, "Na2MoO4 x 2 H2O", "")
+    assert row["mim_id"] == row["chebi_id"] == "CHEBI:75213"
+
+
+def test_an_exact_unmapped_owner_is_mims_refusal_even_against_a_term_id():
+    refusal, live = _rec("UNMAPPED_0007", "Soil extract", status="UNMAPPED"), _rec("CHEBI:1", "One")
+    names = {"one": live, "soil extract (alt)": refusal}
+    labels = _labels(_row("Soil extract", "UNMAPPED_0007", "Soil extract", status="UNMAPPED",
+                          match="preferred_term"))
+    row = _build(names, {"CHEBI:1": live}, labels, "Soil extract", "CHEBI:1")
+    assert row["mim_id"] == "UNMAPPED_0007"
+    assert row["chebi_id"] == row["culturemech_term_id"] == ""
+
+
+@pytest.mark.parametrize("status", ["PENDING_REVIEW", "IN_PROGRESS", "NEEDS_EXPERT", "AMBIGUOUS"])
+def test_an_undecided_first_row_never_rules(status):
+    live, term = _rec("CHEBI:2", "Two"), _rec("CHEBI:9", "Nine")
+    labels = _labels(_row("Thing", "CHEBI:2", "Two", status=status))
+    row = _build({"two": live}, {"CHEBI:2": live, "CHEBI:9": term}, labels, "Thing", "CHEBI:9")
+    assert row["mim_id"] == "CHEBI:9"
+
+
+def test_a_tombstone_row_is_not_followed_to_a_survivor_that_rejects_the_label():
+    survivor = _rec("CHEBI:32142", "Na3-citrate x 2 H2O")
+    survivor["_rejected_names"] = {b._normalize("Trisodium citrate·3H2O")}
+    trihydrate = _rec("CHEBI:9999", "Trisodium citrate trihydrate")
+    labels = _labels(_row("Trisodium citrate·3H2O", "CHEBI:32142", "Old tombstone", status="REJECTED"))
+    row = _build({"na3-citrate x 2 h2o": survivor}, {"CHEBI:32142": survivor, "CHEBI:9999": trihydrate},
+                 labels, "Trisodium citrate·3H2O", "CHEBI:9999")
+    assert row["mim_id"] == "CHEBI:9999"
+
+
+def test_the_label_owner_beats_a_loose_name_match_with_the_same_identifier():
+    bacto = _rec("MICRO:0000178", "Bacto peptone")
+    bacto["synonyms"] = ["Bacto"]
+    peptone = _rec("MICRO:0000178", "Peptone")
+    peptone["synonyms"] = ["Peptone, generic"]
+    names = {"peptone": bacto, "bacto peptone": bacto, "peptone owner": peptone}
+    labels = _labels(_row("Peptone", "MICRO:0000178", "Peptone", match="preferred_term"))
+    row = _build(names, {}, labels, "Peptone", "")
+    assert row["synonyms"] == "Peptone, generic"
+
+
+def test_label_keys_match_across_unicode_normalization_forms():
+    owner = _rec("CHEBI:5", "Café extract")
+    nfd = "Cafe\u0301 extract"  # decomposed e + combining acute
+    labels = _labels(_row("Caf\u00e9 extract", "CHEBI:5", "Café extract", match="preferred_term"))
+    row = _build({"other": owner}, {}, labels, nfd, "")
+    assert row["mim_id"] == "CHEBI:5"
+
+
+def test_builder_ledger_lookup_uses_the_anchor_for_a_different_prefix_rejection(tmp_path):
+    """A rejected ID with a different prefix is not withheld by _published_ids,
+    so only the anchor-keyed ledger lookup keeps it out of the row."""
+    beta, lactose = _rec("CHEBI:36218", "Beta-Lactose"), _rec("CHEBI:17716", "Lactose")
+    names = {"lactose": beta, "milk sugar": lactose}
+    labels = _labels(_row("Lactose", "CHEBI:17716", "Lactose", match="preferred_term",
+                          ambiguity="resolved:owned"))
+    live = b.live_records(names)
+    path = tmp_path / b.REJECTIONS_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("ingredient_name\trejected_id\tmim_id\treason\n"
+                    "Lactose\tFOODON:00001234\tCHEBI:17716\tReviewed\n", encoding="utf-8")
+    rejected = b.load_mapping_rejections(tmp_path, names, label_index=labels, live=live)
+    row = _build(names, {}, labels, "Lactose", "FOODON:00001234", rejected)
+    assert row["mim_id"] == "CHEBI:17716"
+    assert "FOODON:00001234" not in row.values()
+
+
+def test_a_term_id_retired_into_the_anchor_record_is_cleared():
+    survivor = _rec("CHEBI:17716", "Lactose")
+    survivor["_retired_source_ids"] = {"FOODON:00000042"}
+    labels = _labels(_row("Milk sugar", "CHEBI:17716", "Lactose"))
+    row = _build({"lactose": survivor}, {}, labels, "Milk sugar", "FOODON:00000042")
+    assert row["mim_id"] == "CHEBI:17716"
+    assert row["culturemech_term_id"] == ""
 
 
 def test_rejection_ledger_is_keyed_on_the_same_record_the_builder_resolves(tmp_path):
