@@ -55,7 +55,13 @@ STRUCTURED_MIM_SYNONYM_MARKERS = (
 REJECTIONS_PATH = Path('mappings/unified_mapping_rejections.tsv')
 
 
-def load_mapping_rejections(mim_root: Path, name_index: dict) -> dict:
+def load_mapping_rejections(
+    mim_root: Path,
+    name_index: dict,
+    *,
+    label_index: Optional[dict] = None,
+    live: Optional[tuple[dict, dict]] = None,
+) -> dict:
     """Read reviewed source-ID rejections; never infer them from prefix alone.
 
     The ledger preserves the rejected source ID and its curation reason outside
@@ -79,7 +85,7 @@ def load_mapping_rejections(mim_root: Path, name_index: dict) -> dict:
             key = (row['mim_id'], row['rejected_id'])
             if key in rejections or ':' not in row['rejected_id']:
                 raise ValueError(f'{path}:{line}: duplicate or invalid rejection')
-            mim = name_index.get(_normalize(row['ingredient_name']))
+            mim = _anchor_record(row['ingredient_name'], name_index, label_index, live)
             if (not mim or mim['mim_id'] != row['mim_id']
                     or mim['mapping_status'] not in ('MAPPED', 'REJECTED')
                     or row['rejected_id'] == row['mim_id']):
@@ -395,9 +401,15 @@ def scan_culturemech(culturemech_root: Path) -> dict:
 # Step 3: Join and resolve
 # ---------------------------------------------------------------------------
 
-# MIM's label-index verdicts under which the first row may be trusted
-# (docs/LABEL_INDEX_CONTRACT.md); the same set CultureMech's resolver honours.
-SAFE_LABEL_AMBIGUITIES = frozenset({'unique', 'resolved:owned', 'agree:same_substance'})
+# MIM label-index verdicts under which this builder lets the label's first row
+# outrank a recipe's own term.id. `agree:same_substance` is deliberately left
+# out although LABEL_INDEX_CONTRACT.md calls either pick right: it compares
+# element totals, so it cannot tell stereoisomers apart -- `Histidine` would go
+# to L-histidine over the recipe's correct stereo-unspecified CHEBI:27570.
+# Under that verdict the recipe's term.id decides, as it always did.
+TRUSTED_LABEL_AMBIGUITIES = frozenset({'unique', 'resolved:owned'})
+LABEL_INDEX_COLUMNS = frozenset(
+    {'label', 'identifier', 'preferred_term', 'mapping_status', 'ambiguity'})
 
 
 def _label_key(s: str) -> str:
@@ -409,27 +421,69 @@ def load_mim_label_index(mim_root: Path) -> dict:
     """First row per label of MIM's published docs/data/label_index.csv.
 
     The contract is "take the first row for a label"; rows for one label are
-    contiguous and ordered most-significant first. A missing file yields an
-    empty index, which leaves resolution exactly as it was.
+    contiguous and ordered most-significant first. A MIM checkout without the
+    file yields an empty index (``main`` says so); a file without the columns
+    this builder reads is an error, not a silent fallback.
     """
     path = mim_root / 'docs' / 'data' / 'label_index.csv'
     first: dict = {}
     if not path.is_file():
         return first
     with path.open(newline='', encoding='utf-8') as fh:
-        for row in csv.DictReader(fh):
+        reader = csv.DictReader(fh)
+        missing = LABEL_INDEX_COLUMNS - set(reader.fieldnames or ())
+        if missing:
+            raise ValueError(f'{path}: missing label-index column(s) {sorted(missing)}')
+        for row in reader:
             first.setdefault(_label_key(row['label']), row)
     return first
 
 
-def live_records_by_identifier(*indexes: dict) -> dict:
-    """identifier → live MAPPED record, from the loaded MIM indexes."""
-    live: dict = {}
+def live_records(*indexes: dict) -> tuple[dict, dict]:
+    """Live MAPPED records keyed by identifier, and by (identifier, preferred_term).
+
+    `identifier` is not a unique record key -- several live records can share
+    one -- so a label-index answer is matched to the record it names, not to
+    whichever record holding that identifier happened to load first.
+    """
+    by_id: dict = {}
+    by_id_term: dict = {}
     for index in indexes:
         for record in index.values():
             if record.get('mapping_status') == 'MAPPED' and record.get('mim_id'):
-                live.setdefault(record['mim_id'], record)
-    return live
+                by_id.setdefault(record['mim_id'], record)
+                by_id_term.setdefault((record['mim_id'], record.get('preferred_term')), record)
+    return by_id, by_id_term
+
+
+def label_ruling(
+    name: str,
+    named: Optional[dict],
+    label_index: Optional[dict],
+    live: Optional[tuple[dict, dict]],
+) -> Optional[dict]:
+    """The live MIM record MIM's label index rules for ``name``, if trusted.
+
+    Trusted means: the exact label's first row has a verdict in
+    ``TRUSTED_LABEL_AMBIGUITIES`` and names a live MAPPED record. A REJECTED
+    first row is followed, since a tombstone carries its survivor's
+    identifier. When the name index already found a record with that
+    identifier, that record is kept, so record-level columns (CAS, KG node,
+    synonyms) come from the record the name actually denotes.
+    """
+    answer = (label_index or {}).get(_label_key(name))
+    if (
+        not answer
+        or answer.get('ambiguity') not in TRUSTED_LABEL_AMBIGUITIES
+        or answer.get('identifier', '').startswith('UNMAPPED')
+        or not live
+    ):
+        return None
+    identifier = answer['identifier']
+    if named and named.get('mapping_status') == 'MAPPED' and named.get('mim_id') == identifier:
+        return named
+    by_id, by_id_term = live
+    return by_id_term.get((identifier, answer.get('preferred_term'))) or by_id.get(identifier)
 
 
 def resolve_mim_record(
@@ -440,7 +494,7 @@ def resolve_mim_record(
     ontology_index: dict,
     *,
     label_index: Optional[dict] = None,
-    live_index: Optional[dict] = None,
+    live: Optional[tuple[dict, dict]] = None,
 ) -> Optional[dict]:
     """
     Find best MIM record for this ingredient name + optional term_id.
@@ -448,7 +502,7 @@ def resolve_mim_record(
     Priority:
       0. Explicit MIM nonidentity/refusal → no identity
       1. MIM's published label-index answer for this exact name, when its
-         ambiguity verdict is safe and it names a live record
+         verdict is trusted and it names a live record (``label_ruling``)
       2. CultureMech CHEBI term.id → direct CHEBI index lookup
       3. Any CultureMech term.id (FOODON/ENVO) → ontology index lookup
       4. Name/synonym → name index lookup
@@ -465,15 +519,9 @@ def resolve_mim_record(
     if term_id in (named or {}).get('_retired_source_ids', ()):
         return named
 
-    answer = (label_index or {}).get(_label_key(name))
-    if (
-        answer
-        and answer.get('ambiguity') in SAFE_LABEL_AMBIGUITIES
-        and not answer.get('identifier', '').startswith('UNMAPPED')
-    ):
-        ruled = (live_index or {}).get(answer['identifier'])
-        if ruled is not None:
-            return ruled
+    ruled = label_ruling(name, named, label_index, live)
+    if ruled is not None:
+        return ruled
 
     if term_id:
         if term_id in chebi_index:
@@ -549,6 +597,24 @@ def _published_ids(term_id: str, mim: dict | None) -> tuple[str, str]:
     return chebi_id, cm_term_id
 
 
+def _anchor_record(
+    name: str,
+    name_index: dict,
+    label_index: Optional[dict],
+    live: Optional[tuple[dict, dict]],
+) -> Optional[dict]:
+    """The record a name resolves to before any source term.id is consulted.
+
+    The rejection ledger is keyed on this record, so ledger validation and the
+    builder agree on it: an explicit MIM nonidentity, else MIM's trusted
+    label-index ruling, else the name index's own match.
+    """
+    named = name_index.get(_normalize(name))
+    if named and _is_mim_nonidentity(named):
+        return named
+    return label_ruling(name, named, label_index, live) or named
+
+
 def build_unified_rows(
     occurrences: dict,
     name_index: dict,
@@ -568,21 +634,24 @@ def build_unified_rows(
     """
     rows = []
     matched = unmatched = 0
-    live_index = live_records_by_identifier(name_index, chebi_index, ontology_index)
+    live = live_records(name_index, chebi_index, ontology_index)
 
     for name, info in occurrences.items():
         term_id = info['term_id']
         named_mim = name_index.get(_normalize(name))
-        if term_id in (named_mim or {}).get('_retired_source_ids', ()):
+        anchor = _anchor_record(name, name_index, label_index, live)
+        if term_id in (named_mim or {}).get('_retired_source_ids', ()) or term_id in (
+            anchor or {}
+        ).get('_retired_source_ids', ()):
             term_id = ''
-        expected_id = (rejections or {}).get(((named_mim or {}).get('mim_id'), term_id))
+        expected_id = (rejections or {}).get(((anchor or {}).get('mim_id'), term_id))
         if expected_id:
             # Do not let a rejected source ID select another MIM record before
             # the curated name can resolve (e.g. a real detergent record).
             term_id = ''
         mim = resolve_mim_record(
             name, term_id, name_index, chebi_index, ontology_index,
-            label_index=label_index, live_index=live_index,
+            label_index=label_index, live=live,
         )
         if expected_id and (not mim or mim['mim_id'] != expected_id):
             raise ValueError(f'{name}: rejected source ID has no matching curated identity')
@@ -744,13 +813,19 @@ def main():
 
     # Load MIM index
     name_index, chebi_index, ontology_index = load_mim_index(args.mim)
-    rejections = load_mapping_rejections(args.mim, name_index)
+    label_index = load_mim_label_index(args.mim)
+    if label_index:
+        print(f"  {len(label_index)} MIM label-index labels (trusted verdicts outrank recipe term.ids)")
+    else:
+        print("  WARNING: no MIM docs/data/label_index.csv; recipe term.ids outrank MIM's label rulings")
+    live = live_records(name_index, chebi_index, ontology_index)
+    rejections = load_mapping_rejections(
+        args.mim, name_index, label_index=label_index, live=live)
 
     # Scan CultureMech
     occurrences = scan_culturemech(args.culturemech)
 
     # Join
-    label_index = load_mim_label_index(args.mim)
     rows = build_unified_rows(
         occurrences, name_index, chebi_index, ontology_index, rejections, label_index,
     )
