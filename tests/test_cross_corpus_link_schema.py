@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import jsonschema
 import pytest
 import yaml
-from linkml.generators.jsonschemagen import JsonSchemaGenerator
 
 SCHEMA = (
     Path(__file__).resolve().parents[1]
@@ -23,10 +24,25 @@ LEGACY_LINK = {
 
 
 def _validator(path: Path, target: str) -> jsonschema.Draft201909Validator:
-    schema = json.loads(
-        JsonSchemaGenerator(str(path), top_class=target, not_closed=False).serialize()
+    # Coverage's dotted-source discovery can damage PyYAML's C loader in this
+    # process (#233/#263). Generate with real LinkML in a fresh interpreter so
+    # these schema assertions do not inherit that import-order defect.
+    generated = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from linkml.generators.jsonschemagen import JsonSchemaGenerator\n"
+            "import sys\n"
+            "print(JsonSchemaGenerator(sys.argv[1], top_class=sys.argv[2], "
+            "not_closed=False).serialize())\n",
+            str(path),
+            target,
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
     )
-    return jsonschema.Draft201909Validator(schema)
+    return jsonschema.Draft201909Validator(json.loads(generated.stdout))
 
 
 @pytest.fixture(scope="module")
@@ -64,6 +80,24 @@ def test_link_fields_remain_strings(validator, field) -> None:
 
 def test_unknown_fields_are_rejected(validator) -> None:
     assert not validator.is_valid({**LEGACY_LINK, "confidence": 0.9})
+
+
+def test_schema_generation_is_isolated_from_a_damaged_parent_loader(monkeypatch) -> None:
+    """Model CI's null-tag loader even on platforms where libyaml is sound."""
+    import importlib
+
+    class NullTagLoader(yaml.SafeLoader):
+        def resolve(self, kind, value, implicit):
+            return None
+
+    with pytest.raises(yaml.constructor.ConstructorError, match="tag None"):
+        yaml.load("id: broken", Loader=NullTagLoader)
+    loader = importlib.import_module("linkml_runtime.loaders.yaml_loader")
+    monkeypatch.setattr(loader, "DupCheckYamlLoader", NullTagLoader)
+
+    isolated = _validator(SCHEMA, "CrossCorpusLink")
+    isolated.validate(LEGACY_LINK)
+    assert not isolated.is_valid({key: value for key, value in LEGACY_LINK.items() if key != "basis"})
 
 
 def test_consumer_subclass_retains_its_relation_enum(tmp_path) -> None:
