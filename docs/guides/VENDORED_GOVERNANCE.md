@@ -40,6 +40,42 @@ pins itself.
 
 ## Synchronizing a Mech
 
+### Cross-corpus record links
+
+The governed `mech_shared.yaml` provides `CrossCorpusLink` with four required
+string fields (`corpus`, `identifier`, `relation`, `basis`) and the optional
+string `source_version`. These field names retain NaturalProductMech's existing
+serialized links. The shared module deliberately leaves domain vocabularies,
+target validation, organism scope and evidentiary rules to each consumer.
+
+A consumer can narrow the relation without duplicating the shared class:
+
+```yaml
+classes:
+  NaturalProductCrossCorpusLink:
+    is_a: CrossCorpusLink
+    slot_usage:
+      relation:
+        range: CrossCorpusRelationEnum
+```
+
+Point the record's `related_records` range at that subclass and keep the local
+enum. New consumer slots should be optional, multivalued and `inlined_as_list`.
+For new links, record the full immutable commit checked in `source_version` and
+verify the target identifier against that revision. A shared protein or reaction
+is a review lead and cannot establish a stronger mechanistic or equivalence
+relation by itself. Source-owned records must emit links through their maintained
+extractor/seeder path; curated links must survive subsequent seeding.
+
+Roll out a canonical class change by updating its manifest digest, committing
+the canonical revision, and then synchronizing every consumer to that immutable
+revision before adding consumer-specific links. A locally prepared commit is
+not yet available to the remote provenance checker: publish the reviewed claw
+revision before claiming the ordinary synchronization gate passed. Keep consumer
+schema and data changes in their own repositories.
+
+### Synchronization commands
+
 Run the installed command from claw. It validates that `--target-root` is the
 exact Git worktree root and that its `origin` matches the selected manifest
 consumer. Before planning or writing, it fetches the manifest and every payload
