@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 import yaml
 from git import Repo
 
@@ -82,6 +83,92 @@ def test_knowledge_gap_matrix_is_capability_scoped_and_carries_windows(capsys):
     ]
     assert all(isinstance(row["window"], int) and row["window"] > 0 for row in rows)
     assert all(row["checkout_path"] == row["workdir"] for row in rows)
+
+
+def test_scheduled_matrix_preserves_default_eligibility(tmp_path, monkeypatch, capsys):
+    document = yaml.safe_load(load_fleet_manifest().source.read_text())
+    document["mechs"]["dufmech"]["capabilities"]["knowledge_gap_scan"] = {
+        "status": "enabled", "settings": {"window": 25, "scheduled": False},
+    }
+    # Model legacy absence even after the shipped fleet gains explicit opt-outs.
+    for mech in document["mechs"].values():
+        for declaration in mech["capabilities"].values():
+            declaration.get("settings", {}).pop("scheduled", None)
+    path = tmp_path / "legacy-scheduling.yaml"
+    path.write_text(yaml.safe_dump(document))
+    monkeypatch.setenv("KG_MICROBE_FLEET_MANIFEST", str(path))
+    args = ["matrix", "--capability", "knowledge_gap_scan", "--setting", "window"]
+    assert main(args) == 0
+    expected = json.loads(capsys.readouterr().out)
+    assert any(row["mech"] == "DUFMech" for row in expected["include"])
+    assert main([*args, "--scheduled-only"]) == 0
+    assert json.loads(capsys.readouterr().out) == expected
+
+
+@pytest.mark.parametrize("scheduled", [True, False])
+def test_explicit_scheduling_controls_only_the_live_scan_matrix(
+    tmp_path, monkeypatch, capsys, scheduled,
+):
+    document = yaml.safe_load(load_fleet_manifest().source.read_text())
+    for mech in document["mechs"].values():
+        mech["capabilities"]["knowledge_gap_scan"].get("settings", {}).pop("scheduled", None)
+    document["mechs"]["culturemech"]["capabilities"]["knowledge_gap_scan"] = {
+        "status": "enabled", "settings": {"window": 25, "scheduled": True},
+    }
+    document["mechs"]["dufmech"]["capabilities"]["knowledge_gap_scan"] = {
+        "status": "enabled", "settings": {"window": 25, "scheduled": scheduled},
+    }
+    path = tmp_path / "explicit-scheduling.yaml"
+    path.write_text(yaml.safe_dump(document))
+    monkeypatch.setenv("KG_MICROBE_FLEET_MANIFEST", str(path))
+    args = ["matrix", "--capability", "knowledge_gap_scan", "--setting", "window"]
+    assert main(args) == 0
+    complete = json.loads(capsys.readouterr().out)["include"]
+    assert any(r["mech"] == "DUFMech" for r in complete)
+    assert main([*args, "--scheduled-only"]) == 0
+    live = json.loads(capsys.readouterr().out)["include"]
+    assert any(row["mech"] == "CultureMech" for row in live)
+    assert live == [row for row in complete if scheduled or row["mech"] != "DUFMech"]
+
+
+def test_empty_scheduled_matrix_fails_closed(tmp_path, monkeypatch, capsys):
+    document = yaml.safe_load(load_fleet_manifest().source.read_text())
+    for mech in document["mechs"].values():
+        declaration = mech["capabilities"]["knowledge_gap_scan"]
+        if declaration["status"] == "enabled":
+            declaration["settings"]["scheduled"] = False
+    path = tmp_path / "offline-only.yaml"
+    path.write_text(yaml.safe_dump(document))
+    monkeypatch.setenv("KG_MICROBE_FLEET_MANIFEST", str(path))
+    assert main(["matrix", "--capability", "knowledge_gap_scan", "--scheduled-only"]) == 2
+    result = capsys.readouterr()
+    assert not result.out
+    assert "no enabled Mechs eligible for scheduling" in result.err
+
+
+@pytest.mark.parametrize("value", ["false", 0, None])
+def test_scheduling_opt_out_requires_a_real_boolean(tmp_path, monkeypatch, capsys, value):
+    document = yaml.safe_load(load_fleet_manifest().source.read_text())
+    document["mechs"]["culturemech"]["capabilities"]["knowledge_gap_scan"]["settings"][
+        "scheduled"
+    ] = value
+    path = tmp_path / "invalid-schedule.yaml"
+    path.write_text(yaml.safe_dump(document))
+    monkeypatch.setenv("KG_MICROBE_FLEET_MANIFEST", str(path))
+    assert main(["matrix", "--capability", "knowledge_gap_scan", "--scheduled-only"]) == 2
+    assert "must be a boolean" in capsys.readouterr().err
+
+
+def test_scheduled_only_requires_a_declared_boolean_setting(capsys):
+    assert main(["matrix", "--capability", "strict_validation", "--scheduled-only"]) == 2
+    assert "no boolean scheduled setting" in capsys.readouterr().err
+
+
+def test_live_scan_workflow_uses_explicit_scheduling_filter():
+    workflow = Path(__file__).resolve().parents[1] / ".github/workflows/knowledge-gap-scan.yaml"
+    document = yaml.safe_load(workflow.read_text())
+    matrix_step = next(s for s in document["jobs"]["prepare"]["steps"] if s.get("id") == "matrix")
+    assert "--capability knowledge_gap_scan --setting window --scheduled-only" in matrix_step["run"]
 
 
 def test_show_vendored_hub_fails_explicitly_for_authoritative_fleet(capsys):

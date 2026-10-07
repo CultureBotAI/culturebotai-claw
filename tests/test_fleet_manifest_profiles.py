@@ -169,11 +169,26 @@ def test_dufmech_keeps_generated_inventory_and_native_serialization() -> None:
         "schema_sync", "strict_validation", "curation_history",
         "corpus_statistics", "source_catalogue", "source_queue",
         "writer_audit", "site_contract", "page_budgets",
+        "id_label_validation", "knowledge_gap_scan", "kgx_export", "sssom_export",
     ):
         assert mech.supports(capability)
-    assert not mech.supports("id_label_validation")
     assert "Pfam" in mech.capability("id_label_validation").reason
     assert "OAK" in mech.capability("id_label_validation").reason
+    assert mech.capability("knowledge_gap_scan").settings == {
+        "window": 25, "scheduled": False,
+    }
+    assert mech.capability("kgx_export").settings == {
+        "nodes_path": "exports/kgx/nodes.tsv",
+        "edges_path": "exports/kgx/edges.tsv",
+    }
+    assert mech.capability("sssom_export").settings["mapping_globs"] == (
+        "exports/sssom/*.sssom.tsv",
+    )
+    assert {
+        name for name, capability in mech.capabilities.items()
+        if capability.status == "disabled"
+    } == {"deep_research", "metpo_proposal", "causal_graph_coverage"}
+    assert "execution is refused" in mech.capability("deep_research").reason
     assert mech.capability("corpus_statistics").settings["fields"] == (
         "id", "name", "seed_status", "characterization_status",
         "curation_status", "provenance",
@@ -194,6 +209,7 @@ def test_capability_subsets_and_settings_are_manifest_driven() -> None:
         "mediaingredientmech",
         "communitymech",
         "traitmech",
+        "dufmech",
     )
     assert manifest.with_capability("environment_coverage") == (
         "culturemech",
@@ -214,6 +230,7 @@ def test_capability_subsets_and_settings_are_manifest_driven() -> None:
         "mediaingredientmech": 300,
         "communitymech": 305,
         "traitmech": 300,
+        "dufmech": 25,
     }
     assert {
         key: manifest.get(key)

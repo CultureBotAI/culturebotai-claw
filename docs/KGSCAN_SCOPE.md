@@ -4,6 +4,22 @@ The scheduled Europe PMC knowledge-gap scan covers CultureMech, TraitMech,
 MediaIngredientMech, and CommunityMech. Each has a `Discussion` slot and a
 bounded corpus where rotating windows converge.
 
+Capability availability is separate from eligibility for this live schedule.
+An offline adapter that requires an explicitly retained abstract cache declares
+`knowledge_gap_scan.settings.scheduled: false`. It remains visible in ordinary
+capability queries and matrices but is excluded by the nightly workflow's
+`matrix --capability knowledge_gap_scan --setting window --scheduled-only`.
+Omitting `scheduled` preserves legacy eligibility; explicit `true` also opts in.
+The setting must be a real boolean. A filtered matrix with no eligible Mechs
+fails closed instead of emitting an unusable job matrix.
+
+DUFMech adopts this offline mode with a 25-family window. Its native adapter
+scores retained abstracts, saves timestamped YAML/Markdown review packets, and
+requires digest-bound review before explicit overlay acceptance. It does not
+call Europe PMC or join the nightly scan. Provider-backed research, METPO
+proposals, and causal-graph coverage remain disabled pending their separate
+scientific and execution prerequisites.
+
 ProteinTraitsMech is intentionally excluded. Its 424,000-plus records are
 ontology-derived trait classes, not individually curated biological entities;
 they have no `discussions` field in the schema. At the current 300-record window,
