@@ -13,6 +13,13 @@ Omitting `scheduled` preserves legacy eligibility; explicit `true` also opts in.
 The setting must be a real boolean. A filtered matrix with no eligible Mechs
 fails closed instead of emitting an unusable job matrix.
 
+DUFMech adopts this offline mode with a 25-family window. Its native adapter
+scores retained abstracts, saves timestamped YAML/Markdown review packets, and
+requires digest-bound review before explicit overlay acceptance. It does not
+call Europe PMC or join the nightly scan. Provider-backed research, METPO
+proposals, and causal-graph coverage remain disabled pending their separate
+scientific and execution prerequisites.
+
 ProteinTraitsMech is intentionally excluded. Its 424,000-plus records are
 ontology-derived trait classes, not individually curated biological entities;
 they have no `discussions` field in the schema. At the current 300-record window,

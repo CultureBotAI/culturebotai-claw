@@ -2003,7 +2003,7 @@ mechs:
           covered. Enable once the reader has a record-level shape.
 
   dufmech:
-    # Verified main 658dc8c9e4ed2587f7bf1c62ee59563f327706de (PR #109).
+    # Verified main 1dccc4ff61998e78f12448c52f37e4d370fe7299 (PR #129).
     # Profiles describe native seed projections, not scientific completeness.
     display_name: DUFMech
     github: CultureBotAI/DUFMech
@@ -2019,15 +2019,14 @@ mechs:
       reason: Generated family projections use native seeding and reproduction gates; shared writers must not reserialize them.
     capabilities:
       id_label_validation:
-        status: disabled
+        status: enabled
         reason: >-
-          Native src/dufmech/records.py checks identity and labels against retained
-          frozen Pfam source rows, not an external ontology. No shared OAK adapter or
-          conf/id_label_targets.yaml is adopted; native validation does not
-          establish shared OAK correspondence capability.
+          conf/id_label_targets.yaml uses genuine OAK against a verified frozen
+          Pfam reference, captured independently from family record labels by
+          src/dufmech/id_labels.py. This checks retained-source correspondence,
+          not live ontology freshness or scientific characterization.
         reason_claims:
-          present: ["src/dufmech/records.py"]
-          absent: ["conf/id_label_targets.yaml"]
+          present: ["conf/id_label_targets.yaml", "src/dufmech/id_labels.py"]
       curation_history:
         status: enabled
       strict_validation:
@@ -2050,10 +2049,11 @@ mechs:
       deep_research:
         status: disabled
         reason: >-
-          Source reports exist, but no conf/deep_research_provider.yaml does.
-          Enable once a provider exercises the shared research contract.
+          conf/deep_research_provider.yaml and src/dufmech/research.py support
+          offline planning and retained simulated results only. Provider
+          execution is refused; enable after reviewed provider-backed adoption.
         reason_claims:
-          absent: ["conf/deep_research_provider.yaml"]
+          present: ["conf/deep_research_provider.yaml", "src/dufmech/research.py"]
       edison_key_discovery:
         status: not_applicable
         reason: DUFMech has no Edison research-provider integration.
@@ -2063,13 +2063,17 @@ mechs:
           DUF/Pfam family evidence is not a culture-media, ingredient or
           microbial-community environment inventory.
       knowledge_gap_scan:
-        status: disabled
+        status: enabled
         reason: >-
-          The schema supports Discussions, but no conf/kgscan_config.yaml or
-          shared scan window is adopted. Enable after the native generated
-          record pipeline can preserve and validate shared scan output.
+          conf/kgscan_config.yaml and src/dufmech/knowledge_gaps.py use shared
+          sentence scoring over retained abstracts and emit timestamped review
+          packets. Explicit digest-bound review is required before native
+          overlay acceptance. This offline adapter is not a live scheduled scan.
         reason_claims:
-          absent: ["conf/kgscan_config.yaml"]
+          present: ["conf/kgscan_config.yaml", "src/dufmech/knowledge_gaps.py"]
+        settings:
+          window: 25
+          scheduled: false
       # All 18 applicable artifacts are committed at canonical pin 59aead1.
       vendored_sync:
         status: enabled
@@ -2085,8 +2089,10 @@ mechs:
           site_path: pages
           budgets_path: conf/pages_budgets.json
       kgx_export:
-        status: disabled
-        reason: Native JSON exports exist, but no KGX node/edge product is adopted.
+        status: enabled
+        settings:
+          nodes_path: exports/kgx/nodes.tsv
+          edges_path: exports/kgx/edges.tsv
       writer_audit:
         status: enabled
         settings:
@@ -2099,8 +2105,9 @@ mechs:
           # Generated projections validate existing history, not new events.
           curation_markers: ['new_history\(']
       sssom_export:
-        status: disabled
-        reason: No SSSOM mapping product exists yet.
+        status: enabled
+        settings:
+          mapping_globs: [exports/sssom/*.sssom.tsv]
       metpo_proposal:
         status: disabled
         reason: >-
@@ -2126,5 +2133,6 @@ mechs:
       causal_graph_coverage:
         status: disabled
         reason: >-
-          Family records have scientific assertions but no adopted causal-graph
-          projection in a supported shared coverage shape.
+          The schema supports scientific assertions, but the seeded corpus has
+          no curated mechanistic assertions or adopted causal-graph projection
+          in a supported shared coverage shape.
