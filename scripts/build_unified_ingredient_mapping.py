@@ -166,6 +166,18 @@ def _mim_record_files(ingredients_dir: Path) -> list:
     return files
 
 
+class MIMNameIndex(dict):
+    """Name lookup plus every source row and its validated resolved record.
+
+    Lookup collisions must not discard an exact-label owner or the evidence
+    distinguishing a merged tombstone from an identity-free rejection.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.source_records: list[tuple[dict, dict]] = []
+
+
 def load_mim_index(mim_root: Path) -> tuple[dict, dict, dict]:
     """
     Load only direct mapped/unmapped records. Retired labels resolve through
@@ -179,7 +191,7 @@ def load_mim_index(mim_root: Path) -> tuple[dict, dict, dict]:
             the same ingredient under a CHEBI ID.
     """
     ingredients_dir = mim_root / 'data' / 'ingredients'
-    name_index: Dict[str, dict] = {}
+    name_index = MIMNameIndex()
     chebi_index: Dict[str, dict] = {}
     ontology_index: Dict[str, dict] = {}
     live_by_id: dict[str, tuple[dict, set[str]]] = {}
@@ -341,6 +353,7 @@ def load_mim_index(mim_root: Path) -> tuple[dict, dict, dict]:
             )
         ]
 
+    name_index.source_records = [(data, record) for data, record, _ in name_records]
     print(f"  {count} MIM records → {len(name_index)} name entries, "
           f"{len(chebi_index)} CHEBI, {len(ontology_index)} ontology IDs\n")
     return name_index, chebi_index, ontology_index
@@ -445,27 +458,46 @@ def load_mim_label_index(mim_root: Path) -> dict:
     return first
 
 
-def live_records(*indexes: dict) -> tuple[dict, dict, dict]:
-    """MIM records the label index can name, in three lookups.
+def live_records(*indexes: dict) -> tuple[dict, dict, dict, dict]:
+    """MIM records the label index can name, without losing source owners.
 
     - live MAPPED records by identifier;
     - live MAPPED records by (identifier, preferred_term) -- `identifier` is not
       a unique record key, so a label-index answer is matched to the record it
       names, not to whichever record holding that identifier loaded first;
     - explicit nonidentity records by their ``UNMAPPED_NNNN`` identifier.
+    - rejected source rows by (CSV identifier, preferred_term), retaining the
+      loader's validated survivor or identity-free refusal. Reused identifiers
+      alone never establish that a rejected row was merged.
+
+    The loader's complete catalogue precedes the lossy lookup dictionaries.
+    Plain dictionaries still support live-record lookups, but cannot establish
+    a rejected source row's merge disposition.
     """
     by_id: dict = {}
     by_id_term: dict = {}
     nonidentity: dict = {}
+    retired_by_owner: dict = {}
     for index in indexes:
-        for record in index.values():
+        sources = index.source_records if isinstance(index, MIMNameIndex) else []
+        for data, record in sources:
+            if data.get('mapping_status') != 'REJECTED':
+                continue
+            # Exporters may name either the original ID or its survivor. Both
+            # must resolve through this source row's recorded disposition.
+            for identifier in ((data.get('identifier') or '').strip(), record.get('mim_id')):
+                if identifier:
+                    retired_by_owner.setdefault(
+                        (identifier, data['preferred_term'].strip()), record)
+        records = [record for _, record in sources] if sources else index.values()
+        for record in records:
             mim_id = record.get('mim_id') or ''
             if record.get('mapping_status') == 'MAPPED' and mim_id:
                 by_id.setdefault(mim_id, record)
                 by_id_term.setdefault((mim_id, record.get('preferred_term')), record)
             elif mim_id.startswith('UNMAPPED') and _is_mim_nonidentity(record):
                 nonidentity.setdefault(mim_id, record)
-    return by_id, by_id_term, nonidentity
+    return by_id, by_id_term, nonidentity, retired_by_owner
 
 
 def label_ruling(
@@ -480,23 +512,30 @@ def label_ruling(
 
     - an ``UNMAPPED_NNNN`` row is MIM explicitly leaving the label without an
       identity, so the nonidentity record is returned;
-    - a MAPPED row, or a REJECTED tombstone row (which carries its survivor's
-      identifier), returns that live record -- the record whose own row it is
-      when one shares the identifier, else the record the name index found for
-      that identifier, else the first live holder. A tombstone row is not
-      followed when the survivor rejects the label (REJECTED_LABEL);
+    - a MAPPED row returns its exact owner from the complete loaded catalogue,
+      else the record the name index found for that identifier, else the first
+      live holder;
+    - a REJECTED row follows only that source row's validated merge disposition.
+      A non-merge rejection remains an identity-free refusal. A tombstone row
+      is not followed when its survivor rejects the label (REJECTED_LABEL);
     - an undecided curation status (PENDING_REVIEW, IN_PROGRESS, NEEDS_EXPERT,
       AMBIGUOUS) never rules.
     """
     answer = (label_index or {}).get(_label_key(name))
     if not answer or answer.get('ambiguity') not in TRUSTED_LABEL_AMBIGUITIES or not live:
         return None
-    by_id, by_id_term, nonidentity = live
+    by_id, by_id_term, nonidentity, retired_by_owner = live
     identifier = answer.get('identifier') or ''
     status = answer.get('mapping_status') or ''
+    if status == 'REJECTED':
+        record = retired_by_owner.get((identifier, answer.get('preferred_term')))
+        if record is not None and not _is_mim_nonidentity(record) \
+                and _normalize(answer.get('label') or '') in record.get('_rejected_names', ()):
+            return None
+        return record
     if identifier.startswith('UNMAPPED'):
         return nonidentity.get(identifier)
-    if status not in ('MAPPED', 'REJECTED'):
+    if status != 'MAPPED':
         return None
     record = by_id_term.get((identifier, answer.get('preferred_term')))
     if record is None and named and named.get('mapping_status') == 'MAPPED' \
@@ -504,9 +543,6 @@ def label_ruling(
         record = named
     if record is None:
         record = by_id.get(identifier)
-    if record is not None and status == 'REJECTED' \
-            and _normalize(answer.get('label') or '') in record.get('_rejected_names', ()):
-        return None
     return record
 
 

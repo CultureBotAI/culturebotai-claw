@@ -144,11 +144,14 @@ def test_records_sharing_an_identifier_keep_the_one_the_name_denotes():
     assert (unnamed["cas_rn"], unnamed["kg_microbe_node_id"]) == ("91079-40-2", "MICRO:0000182")
 
 
-def test_a_rejected_first_row_is_followed_to_its_live_survivor():
-    survivor, stale = _rec("CHEBI:2", "New name"), _rec("CHEBI:9", "Stale")
-    names = {"new name": survivor}
-    labels = _labels(_row("Old name", "CHEBI:2", "Old name", status="REJECTED", match="preferred_term"))
-    row = _build(names, {"CHEBI:2": survivor, "CHEBI:9": stale}, labels, "Old name", "CHEBI:9")
+def test_a_rejected_first_row_is_followed_to_its_live_survivor(tmp_path):
+    _write(tmp_path, "mapped/survivor.yaml", "CHEBI:2", "New name")
+    _write(tmp_path, "mapped/stale.yaml", "CHEBI:9", "Stale")
+    _write(tmp_path, "mapped/retired.yaml", "CHEBI:8", "Old name", "REJECTED",
+           representative="CHEBI:2")
+    _label_index(tmp_path, [["Old name", "preferred_term", "CHEBI:2", "Old name", "",
+                             "REJECTED", "unique"]])
+    row = _rows(tmp_path, "Old name", "CHEBI:9")
     assert row["mim_id"] == "CHEBI:2"
 
 
