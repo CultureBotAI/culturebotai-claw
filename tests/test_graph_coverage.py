@@ -672,6 +672,7 @@ def test_every_mech_decides_whether_it_has_a_causal_graph_to_cover():
     assert set(manifest.with_capability(CAPABILITY)) == {
         "communitymech", "traitmech", "proteintraitsmech", "antibioticmech",
         "cellstructuremech", "habitatmech", "naturalproductmech", "taxonmech",
+        "pathwaymech",
     }
     for key, mech in manifest.mechs.items():
         capability = mech.capabilities[CAPABILITY]
@@ -787,14 +788,30 @@ def test_every_declared_graph_field_is_one_the_schema_declares(mech):
     shape = config.shape
     schema_view = SchemaView(str(root / declaration.schema_paths[0]))
 
-    slot = shape.graphs_field or shape.nodes_field
+    slot = (
+        shape.edges_field if shape.kind == "record_graph"
+        else shape.graphs_field or shape.nodes_field
+    )
     records = [c for c in schema_view.all_classes() if slot in _slots(schema_view, c)]
     assert records, f"{mech}: no class in the schema has a {slot!r} slot"
     record_class = records[0]
     if config.record_id_field:
         assert config.record_id_field.split(".")[0] in _slots(schema_view, record_class)
 
-    if shape.graphs_field:
+    if shape.kind == "record_graph":
+        # Each node list is a record slot, and each list's class has the node id.
+        missing = set(shape.node_list_fields) - _slots(schema_view, record_class)
+        assert not missing, f"{mech}: {record_class} has no {sorted(missing)}"
+        node = {shape.node_id_field, shape.node_grounding_field} - {None}
+        for list_field in shape.node_list_fields:
+            node_class = _range(schema_view, record_class, list_field)
+            gaps = node - _slots(schema_view, node_class)
+            assert not gaps, f"{mech}: {node_class} ({list_field}) has no {sorted(gaps)}"
+        if shape.record_is_node:
+            assert shape.node_id_field in _slots(schema_view, record_class)
+        edge_class = _range(schema_view, record_class, shape.edges_field)
+        node_class, node = record_class, set()
+    elif shape.graphs_field:
         graph_class = _range(schema_view, record_class, shape.graphs_field)
         graph = {shape.graph_id_field, shape.nodes_field, shape.edges_field,
                  config.scope_field, *config.graph_facets} - {None}
@@ -1417,3 +1434,126 @@ def test_a_summary_row_with_excluded_files_is_marked(tmp_path, capsys):
     row = next(line for line in out.splitlines() if line.startswith("traitmech"))
     assert row.split()[1] == "1!"
     assert "! traitmech: 1 file(s) excluded from every count" in out
+
+
+# --------------------------------------------------------------------------
+# record_graph: the record is one graph with record-level node lists (#509)
+# --------------------------------------------------------------------------
+
+_RECORD_GRAPH = {
+    "graph_shape": "record_graph",
+    "node_list_fields": ["participants", "reactions"],
+    "node_id_field": "id",
+    "edges_field": "mechanistic_edges",
+    "edge_subject_field": "subject",
+    "edge_object_field": "object",
+    "edge_predicate_field": "predicate",
+    "edge_evidence_field": "evidence",
+}
+
+
+def _pathway(edges: list[tuple[str, str]], **extra: object) -> dict:
+    """A PathwayMech-shaped record: CHEBI participants, one RHEA reaction."""
+    return {
+        "id": "MetaCyc:PWY-1",
+        "taxa": [{"id": "NCBITaxon:562", "label": "E. coli"}],
+        "participants": [{"id": "CHEBI:1", "label": "a"}, {"id": "CHEBI:2", "label": "b"}],
+        "reactions": [{"id": "RHEA:10", "label": "r"}],
+        "mechanistic_edges": [
+            {"id": f"e{i}", "subject": s, "predicate": "consumes", "object": o,
+             "evidence": [{"reference_id": "PMID:1", "quote": "q"}]}
+            for i, (s, o) in enumerate(edges)
+        ],
+        **extra,
+    }
+
+
+def _record_report(tmp_path: Path, record: dict, **settings: object) -> dict:
+    root = _corpus(tmp_path, {"data/pathways/p.yaml": record})
+    config = CoverageConfig.from_settings({**_RECORD_GRAPH, **settings})
+    return collect("m", root, GLOBS, config).as_dict()
+
+
+def test_a_record_level_graph_is_read_where_the_other_shapes_see_none(tmp_path):
+    """The same record: no graph under graph_list, one under record_graph. This
+    is the disagreement that made PathwayMech read 0% (#509)."""
+    record = _pathway([("RHEA:10", "CHEBI:1"), ("RHEA:10", "CHEBI:2")])
+    as_list = _report(tmp_path / "a", {"data/pathways/p.yaml": record})
+    as_record = _record_report(tmp_path / "b", record)
+    assert as_list["coverage"]["no_graph"] == 1
+    assert as_record["coverage"]["with_graph"] == 1
+    graphs = as_record["graphs"]
+    assert (graphs["nodes"], graphs["edges"], graphs["edges_with_evidence"]) == (3, 2, 2)
+
+
+def test_a_record_graph_node_type_is_the_list_it_came_from(tmp_path):
+    report = _record_report(tmp_path, _pathway([("RHEA:10", "CHEBI:1"), ("RHEA:10", "CHEBI:2")]))
+    assert report["graphs"]["node_types"] == {"participants": 2, "reactions": 1}
+
+
+def test_an_edge_to_a_node_in_no_declared_list_dangles(tmp_path):
+    """The taxon is not a declared node list, so an edge to it is a finding."""
+    record = _pathway([("RHEA:10", "CHEBI:1"), ("RHEA:10", "CHEBI:2"),
+                       ("RHEA:10", "NCBITaxon:562")])
+    assert "DANGLING_EDGE" in _record_report(tmp_path / "a", record)["structure"]["findings"]
+    declared = _record_report(tmp_path / "b", record,
+                              node_list_fields=["taxa", "participants", "reactions"])
+    assert "DANGLING_EDGE" not in declared["structure"]["findings"]
+
+
+def test_the_record_itself_is_a_node_only_when_declared(tmp_path):
+    record = _pathway([("MetaCyc:PWY-1", "RHEA:10"), ("RHEA:10", "CHEBI:1"),
+                       ("RHEA:10", "CHEBI:2")])
+    without = _record_report(tmp_path / "a", record)
+    with_record = _record_report(tmp_path / "b", record, record_is_node=True)
+    assert "DANGLING_EDGE" in without["structure"]["findings"]
+    assert "DANGLING_EDGE" not in with_record["structure"]["findings"]
+    assert with_record["graphs"]["node_types"]["record"] == 1
+
+
+def test_a_record_graph_with_nodes_and_no_edge_is_edgeless_and_with_neither_no_graph(tmp_path):
+    edgeless = _record_report(tmp_path / "a", _pathway([]))
+    empty = _record_report(tmp_path / "b", _pathway([], participants=[], reactions=[]))
+    assert edgeless["coverage"]["edgeless_only"] == 1
+    assert empty["coverage"]["no_graph"] == 1
+
+
+def test_record_is_node_alone_does_not_make_a_graph(tmp_path):
+    """The record's own node is not content: a record with nothing else stays
+    no_graph rather than reading as an edgeless graph."""
+    empty = _record_report(tmp_path, _pathway([], participants=[], reactions=[]),
+                           record_is_node=True)
+    assert empty["coverage"]["no_graph"] == 1
+
+
+@pytest.mark.parametrize("missing", ["node_list_fields", "edge_subject_field", "edges_field"])
+def test_the_record_graph_shape_defaults_nothing(missing):
+    settings = {k: v for k, v in _RECORD_GRAPH.items() if k != missing}
+    with pytest.raises(CoverageConfigError, match="nothing is defaulted"):
+        CoverageConfig.from_settings(settings)
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [{"graphs_field": "causal_graphs"}, {"nodes_field": "participants"},
+     {"node_type_field": "kind"}, {"scope_field": "scope"}, {"graph_facets": ["kind"]}],
+)
+def test_the_record_graph_shape_refuses_what_it_does_not_read(extra):
+    with pytest.raises(CoverageConfigError):
+        CoverageConfig.from_settings({**_RECORD_GRAPH, **extra})
+
+
+@pytest.mark.parametrize("shape", ["graph_list", "node_nested_edges"])
+def test_node_lists_belong_to_the_record_graph_shape(shape):
+    nested = {"nodes_field": "n", "edges_field": "e", "node_id_field": "id",
+              "edge_object_field": "o"} if shape == "node_nested_edges" else {}
+    with pytest.raises(CoverageConfigError, match="belong to record_graph"):
+        CoverageConfig.from_settings(
+            {"graph_shape": shape, "node_list_fields": ["participants"], **nested}
+        )
+
+
+def test_a_record_graph_can_anchor_on_a_list(tmp_path):
+    """Node types exist without node_type_field, so anchors are allowed."""
+    config = CoverageConfig.from_settings({**_RECORD_GRAPH, "anchor_node_types": ["reactions"]})
+    assert config.anchor_node_types == ("reactions",)
