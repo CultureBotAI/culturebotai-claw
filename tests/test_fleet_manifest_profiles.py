@@ -17,6 +17,11 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = REPOSITORY_ROOT / "src" / "kg_microbe_fleet" / "fleet.yaml"
 
 EXPECTED_PROFILES = {
+    "dufmech": (
+        "src/dufmech",
+        ("src/dufmech/schema/dufmech.yaml",),
+        ("data/families/*.yaml",),
+    ),
     "taxonmech": (
         "src/taxonmech",
         ("src/taxonmech/schema/taxonmech.yaml",),
@@ -150,6 +155,19 @@ def test_shipped_profiles_are_verified_and_complete() -> None:
         assert mech.schema_paths == schema_paths
         assert mech.record_globs == record_globs
         assert set(mech.capabilities) == EXPECTED_CAPABILITIES
+
+
+def test_dufmech_keeps_generated_inventory_and_native_serialization() -> None:
+    mech = load_fleet_manifest(MANIFEST_PATH).get("dufmech")
+    assert mech.record_globs == ("data/families/*.yaml",)
+    assert mech.serialization is not None
+    assert not mech.serialization.verified
+    assert not mech.serialization.options
+    assert "native" in mech.serialization.reason
+    assert mech.supports("vendored_sync")
+    for capability in ("schema_sync", "strict_validation", "curation_history"):
+        assert not mech.supports(capability)
+        assert mech.capability(capability).reason
 
 
 def test_capability_subsets_and_settings_are_manifest_driven() -> None:
