@@ -113,7 +113,17 @@ def test_blocked_policy_requires_a_reason_and_cannot_mix_workflows(tmp_path, mon
         queue.load_policy(path)
 
 
-def test_dufmech_queue_adoption_is_blocked_before_any_api_call(tmp_path):
+def test_dufmech_policy_uses_native_validation_not_pages():
+    assert queue.load_policy()["dufmech"] == {
+        ".github/workflows/validate.yaml": ["qc"],
+    }
+
+
+def test_blocked_adoption_is_rejected_before_any_api_call(tmp_path, monkeypatch):
+    monkeypatch.setattr(queue, "identities", lambda: {"example": "CultureBotAI/example"})
+    monkeypatch.setattr(queue, "load_policy", lambda: {
+        "example": {"blocked": "queue-ready CI pending"},
+    })
     class NoAPI:
         def request(self, *args, **kwargs):
             pytest.fail("An explicitly blocked policy must not contact GitHub")
@@ -121,9 +131,9 @@ def test_dufmech_queue_adoption_is_blocked_before_any_api_call(tmp_path):
         pages = request
 
     api = NoAPI()
-    saved = queue.plan(api, ["dufmech"])
+    saved = queue.plan(api, ["example"])
     row = saved["repositories"][0]
-    assert row["repository"] == "CultureBotAI/DUFMech"
+    assert row["repository"] == "CultureBotAI/example"
     assert row["status"] == "blocked"
     assert row["desired"] is None
     assert "queue-ready CI" in row["errors"][0]

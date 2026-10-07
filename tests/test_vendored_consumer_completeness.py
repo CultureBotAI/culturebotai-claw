@@ -62,34 +62,7 @@ class IncompleteConsumer:
 # Consumers known to be mid-adoption, with the exact gaps and reason. A new
 # missing path fails rather than inheriting the waiver. When the repository
 # finishes vendoring, this test says so and the entry comes out.
-INCOMPLETE_CONSUMERS: dict[str, IncompleteConsumer] = {
-    "dufmech": IncompleteConsumer(
-        expected_missing=frozenset({
-            ".github/workflows/merge-queue-admission.yaml",
-            ".github/workflows/pr-shepherd.yml",
-            ".github/workflows/verify-merge-integrity.yaml",
-            "prompts/backlog-loop-goal.md",
-            "scripts/auto_merge_ready_prs.py",
-            "scripts/check_vendored_sync.py",
-            "scripts/check_vendored_sync.sh",
-            "scripts/chem_formula.py",
-            "scripts/deep_research_contract.py",
-            "scripts/validate_id_label_correspondence.py",
-            "scripts/verify_merge_integrity.py",
-            "src/dufmech/schema/history.yaml",
-            "src/dufmech/schema/mech_shared.yaml",
-            "tests/test_curation_timestamp_schema.py",
-            "tests/test_id_label_empty_adapter.py",
-            "tests/test_id_label_plausibility.py",
-            "tests/test_id_label_unknown_prefix.py",
-            "tests/test_skill_frontmatter.py",
-        }),
-        reason=(
-            "DUFMech main 0793aeb9d6770d4f1fb12120efb9c8baa08d262f has not "
-            "adopted vendored governance; its first coordinated rollout is pending."
-        ),
-    ),
-}
+INCOMPLETE_CONSUMERS: dict[str, IncompleteConsumer] = {}
 
 
 def _applicable(consumer: str) -> list[str]:

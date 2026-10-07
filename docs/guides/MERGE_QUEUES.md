@@ -7,9 +7,15 @@ job contexts and their source workflows live in
 
 A Mech admitted before its CI exists instead declares only
 `{"blocked": "reason"}`. Planning reports it as blocked without constructing
-a ruleset, and applying a saved plan refuses it. DUFMech uses this state until
-queue-ready workflows and exact passing job contexts have been verified.
+a ruleset, and applying a saved plan refuses it until queue-ready workflows and
+exact passing job contexts have been verified.
 Replace the blocked entry with the measured workflow mapping to begin adoption.
+
+DUFMech's measured mapping is `.github/workflows/validate.yaml: [qc]`, verified
+on main `658dc8c9e4ed2587f7bf1c62ee59563f327706de` after PR #109. Its separate
+Pages publisher is not a required context. This mapping permits a fresh supported
+plan; it does not assert that remote rules have been applied or a PR has executed
+through the queue. Retain those operational receipts separately.
 
 The managed ruleset is named **CLAW merge queue** and targets only
 `refs/heads/main`. It requires a pull request and the declared Actions checks

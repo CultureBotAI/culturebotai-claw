@@ -165,9 +165,25 @@ def test_dufmech_keeps_generated_inventory_and_native_serialization() -> None:
     assert not mech.serialization.options
     assert "native" in mech.serialization.reason
     assert mech.supports("vendored_sync")
-    for capability in ("schema_sync", "strict_validation", "curation_history"):
-        assert not mech.supports(capability)
-        assert mech.capability(capability).reason
+    for capability in (
+        "schema_sync", "strict_validation", "curation_history",
+        "corpus_statistics", "source_catalogue", "source_queue",
+        "writer_audit", "site_contract", "page_budgets",
+    ):
+        assert mech.supports(capability)
+    assert not mech.supports("id_label_validation")
+    assert "Pfam" in mech.capability("id_label_validation").reason
+    assert "OAK" in mech.capability("id_label_validation").reason
+    assert mech.capability("corpus_statistics").settings["fields"] == (
+        "id", "name", "seed_status", "characterization_status",
+        "curation_status", "provenance",
+    )
+    assert mech.capability("source_queue").settings["required_when_adopted"] == (
+        "script", "artifacts", "license_url", "review_basis",
+    )
+    assert mech.capability("writer_audit").settings["validators"] == (
+        r"validate_record\(", r"_validate_record\(", r"_validate_content\(",
+    )
 
 
 def test_capability_subsets_and_settings_are_manifest_driven() -> None:

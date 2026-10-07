@@ -334,16 +334,33 @@ def test_every_mech_decides_about_the_writer_audit():
             assert capability.reason.strip(), f"{name} declines without a reason"
 
 
-def test_the_enabled_set_is_the_four_that_carry_a_copy():
-    """ProteinTraitsMech's file shares the name and nothing else, and
-    CellStructureMech has none. Naming the set keeps the corpus expectations
-    below meaningful."""
+def test_the_enabled_set_has_measured_profiles():
+    """The four original copies plus DUF's native multi-format writers.
+
+    DUF uses the shared heuristic for inspection, not as a replacement for its
+    native guards. Naming the set keeps the corpus expectations meaningful.
+    """
     assert ENABLED == [
         "communitymech",
         "culturemech",
+        "dufmech",
         "mediaingredientmech",
         "traitmech",
     ]
+
+
+def test_duf_profile_recognizes_actual_guards_without_inventing_history():
+    try:
+        root = resolve_mech_root("dufmech", claw_root=CLAW_ROOT)
+    except MechRootError as exc:
+        pytest.skip(f"needs a dufmech checkout: {exc}")
+    profile = profile_for(MANIFEST.get("dufmech").capability("writer_audit").settings)
+    rows = {row.path: row for row in audit(root, profile)}
+    assert rows["src/dufmech/reviews.py"].validates_before_write
+    assert rows["src/dufmech/history.py"].appends_curation_history
+    assert rows["src/dufmech/records.py"].has_write_safeguard
+    assert rows["src/dufmech/records.py"].validates_before_write
+    assert not rows["src/dufmech/records.py"].appends_curation_history
 
 
 @pytest.mark.parametrize("mech", ENABLED)
