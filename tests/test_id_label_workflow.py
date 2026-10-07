@@ -1,7 +1,9 @@
 """Offline structural checks for the authoritative id-label workflow."""
 
 import json
+import runpy
 import shlex
+import sys
 from pathlib import Path
 
 import yaml
@@ -60,6 +62,36 @@ def test_id_label_contract_remains_a_nightly_dependency_canary() -> None:
     text = ID_LABEL_WORKFLOW.read_text(encoding="utf-8")
     assert "schedule:" in text
     assert 'cron: "51 6 * * *"' in text
+
+
+def test_dependency_canary_imports_real_oak_before_offline_behavioral_tests() -> None:
+    steps = _steps(ID_LABEL_WORKFLOW, "id-label-contract")
+    install = next(
+        index for index, step in enumerate(steps)
+        if "pip install" in step.get("run", "") and "oaklib" in step["run"]
+    )
+    smoke = next(
+        index for index, step in enumerate(steps)
+        if step.get("run")
+        == 'python -c "from oaklib import get_adapter; assert callable(get_adapter)"'
+    )
+    behavioral = next(
+        index for index, step in enumerate(steps)
+        if "python -m pytest" in step.get("run", "")
+    )
+    assert install < smoke < behavioral
+    assert "if" not in steps[smoke]
+    assert not steps[smoke].get("continue-on-error", False)
+
+
+def test_empty_adapter_fixture_runs_with_real_oak_import_blocked(monkeypatch, tmp_path) -> None:
+    monkeypatch.setitem(sys.modules, "oaklib", None)
+    contract = runpy.run_path(str(
+        ROOT / "src/kg_microbe_governance/artifacts/tests/test_id_label_empty_adapter.py"
+    ))
+    with monkeypatch.context() as fixture:
+        contract["test_pool_get_returns_empty_sentinel"](fixture, tmp_path)
+    assert sys.modules["oaklib"] is None
 
 
 def test_fleet_and_governance_manifests_define_the_same_consumers() -> None:
