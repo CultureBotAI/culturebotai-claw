@@ -64,7 +64,7 @@ def test_general_agents_use_validated_manifest_capability_scopes():
         assert document["workspace"]["allowed_paths"]["source"] == (
             "repository_scope"
         )
-        assert manifest.with_capability(capability) == manifest.keys
+        assert set(manifest.with_capability(capability)) == set(manifest.keys)
         assert all(
             capability in mech.capabilities for mech in manifest.mechs.values()
         )

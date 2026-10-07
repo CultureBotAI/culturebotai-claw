@@ -97,6 +97,78 @@ def test_claw_required_workflows_are_queue_ready():
         assert queue.workflow_errors((root / path).read_text()) == [], path
 
 
+@pytest.mark.parametrize("entry", [
+    {"blocked": ""},
+    {"blocked": "  "},
+    {"blocked": None},
+    {"blocked": ["reason"]},
+    {"blocked": "CI pending", ".github/workflows/ci.yml": ["qc"]},
+    {},
+])
+def test_blocked_policy_requires_a_reason_and_cannot_mix_workflows(tmp_path, monkeypatch, entry):
+    monkeypatch.setattr(queue, "identities", lambda: {"example": "CultureBotAI/example"})
+    path = tmp_path / "policy.json"
+    path.write_text(json.dumps({"example": entry}))
+    with pytest.raises(queue.QueueError):
+        queue.load_policy(path)
+
+
+def test_dufmech_policy_uses_native_validation_not_pages():
+    assert queue.load_policy()["dufmech"] == {
+        ".github/workflows/validate.yaml": ["qc"],
+    }
+
+
+def test_blocked_adoption_is_rejected_before_any_api_call(tmp_path, monkeypatch):
+    monkeypatch.setattr(queue, "identities", lambda: {"example": "CultureBotAI/example"})
+    monkeypatch.setattr(queue, "load_policy", lambda: {
+        "example": {"blocked": "queue-ready CI pending"},
+    })
+    class NoAPI:
+        def request(self, *args, **kwargs):
+            pytest.fail("An explicitly blocked policy must not contact GitHub")
+
+        pages = request
+
+    api = NoAPI()
+    saved = queue.plan(api, ["example"])
+    row = saved["repositories"][0]
+    assert row["repository"] == "CultureBotAI/example"
+    assert row["status"] == "blocked"
+    assert row["desired"] is None
+    assert "queue-ready CI" in row["errors"][0]
+    receipt = tmp_path / "receipt.json"
+    for status in ("blocked", "planned", "unchanged"):
+        row.update(status=status, errors=[])
+        with pytest.raises(queue.QueueError, match="Queue adoption blocked"):
+            queue.apply(api, saved, receipt)
+    assert not receipt.exists()
+
+
+def test_blocked_admission_does_not_abort_other_repository_plans(setup, monkeypatch):
+    monkeypatch.setattr(queue, "identities", lambda: {
+        "newcomer": "CultureBotAI/newcomer", "example": "CultureBotAI/example",
+    })
+    monkeypatch.setattr(queue, "load_policy", lambda: {
+        "newcomer": {"blocked": "CI readiness pending"},
+        "example": {".github/workflows/ci.yml": ["qc"]},
+    })
+    inspected = []
+
+    def snapshot(_api, repo, _policy):
+        inspected.append(repo)
+        return copy.deepcopy(setup)
+
+    monkeypatch.setattr(queue, "snapshot", snapshot)
+    api = API(setup)
+    blocked, ready = queue.plan(api)["repositories"]
+    assert blocked["status"] == "blocked"
+    assert blocked["desired"] is None
+    assert ready["status"] == "planned"
+    assert inspected == ["CultureBotAI/example"]
+    assert api.calls == []
+
+
 def test_plan_is_read_only_and_apply_is_idempotent(setup, tmp_path):
     api = API(setup)
     saved = queue.plan(api)

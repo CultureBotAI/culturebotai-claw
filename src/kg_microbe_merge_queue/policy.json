@@ -187,6 +187,11 @@
       "label-correspondence"
     ]
   },
+  "dufmech": {
+    ".github/workflows/validate.yaml": [
+      "qc"
+    ]
+  },
   "pathwaymech": {
     ".github/workflows/main.yaml": [
       "qc"

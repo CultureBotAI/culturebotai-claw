@@ -46,6 +46,10 @@
     "pathwaymech": {
       "github": "CultureBotAI/PathwayMech",
       "package_path": "src/pathwaymech"
+    },
+    "dufmech": {
+      "github": "CultureBotAI/DUFMech",
+      "package_path": "src/dufmech"
     }
   },
   "artifacts": [
@@ -129,7 +133,7 @@
       "source": "src/kg_microbe_governance/artifacts/tests/test_id_label_empty_adapter.py",
       "target": "tests/test_id_label_empty_adapter.py",
       "consumers": "all",
-      "sha256": "55a432e04c402939c3fdc985524e749b7d7d09b58ccbd036874865bc4250b115",
+      "sha256": "070b741cd0ee036a66e0ce1dc1b22ee34aa8e1869bda1c5a8fd209c0cc19d991",
       "mode": "0644"
     },
     {
@@ -161,7 +165,7 @@
       "source": "src/kg_microbe_governance/artifacts/schema/mech_shared.yaml",
       "target": "{package_path}/schema/mech_shared.yaml",
       "consumers": "all",
-      "sha256": "1a5e21eb2ee9f3584ff6af3a6906b1d442e18c41de405b1bf907c20f44eafa2a",
+      "sha256": "c2e7054fd32635e380c698282bd886a9105861009b9f0474f02bb1b80865e895",
       "mode": "0644"
     },
     {

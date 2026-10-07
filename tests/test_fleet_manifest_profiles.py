@@ -17,6 +17,11 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = REPOSITORY_ROOT / "src" / "kg_microbe_fleet" / "fleet.yaml"
 
 EXPECTED_PROFILES = {
+    "dufmech": (
+        "src/dufmech",
+        ("src/dufmech/schema/dufmech.yaml",),
+        ("data/families/*.yaml",),
+    ),
     "taxonmech": (
         "src/taxonmech",
         ("src/taxonmech/schema/taxonmech.yaml",),
@@ -150,6 +155,35 @@ def test_shipped_profiles_are_verified_and_complete() -> None:
         assert mech.schema_paths == schema_paths
         assert mech.record_globs == record_globs
         assert set(mech.capabilities) == EXPECTED_CAPABILITIES
+
+
+def test_dufmech_keeps_generated_inventory_and_native_serialization() -> None:
+    mech = load_fleet_manifest(MANIFEST_PATH).get("dufmech")
+    assert mech.record_globs == ("data/families/*.yaml",)
+    assert mech.serialization is not None
+    assert not mech.serialization.verified
+    assert not mech.serialization.options
+    assert "native" in mech.serialization.reason
+    assert mech.supports("vendored_sync")
+    for capability in (
+        "schema_sync", "strict_validation", "curation_history",
+        "corpus_statistics", "source_catalogue", "source_queue",
+        "writer_audit", "site_contract", "page_budgets",
+    ):
+        assert mech.supports(capability)
+    assert not mech.supports("id_label_validation")
+    assert "Pfam" in mech.capability("id_label_validation").reason
+    assert "OAK" in mech.capability("id_label_validation").reason
+    assert mech.capability("corpus_statistics").settings["fields"] == (
+        "id", "name", "seed_status", "characterization_status",
+        "curation_status", "provenance",
+    )
+    assert mech.capability("source_queue").settings["required_when_adopted"] == (
+        "script", "artifacts", "license_url", "review_basis",
+    )
+    assert mech.capability("writer_audit").settings["validators"] == (
+        r"validate_record\(", r"_validate_record\(", r"_validate_content\(",
+    )
 
 
 def test_capability_subsets_and_settings_are_manifest_driven() -> None:

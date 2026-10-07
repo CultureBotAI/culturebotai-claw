@@ -1997,3 +1997,130 @@ mechs:
           record-level mechanistic_edges list. That is neither graph_list nor
           node_nested_edges, so the coverage reader would report no record
           covered. Enable once the reader has a record-level shape.
+
+  dufmech:
+    # Verified main 658dc8c9e4ed2587f7bf1c62ee59563f327706de (PR #109).
+    # Profiles describe native seed projections, not scientific completeness.
+    display_name: DUFMech
+    github: CultureBotAI/DUFMech
+    environment_variable: DUFMECH_ROOT
+    package_path: src/dufmech
+    schema_paths:
+      - src/dufmech/schema/dufmech.yaml
+    record_globs:
+      - data/families/*.yaml
+    vendored_role: consumer
+    serialization:
+      verified: false
+      reason: Generated family projections use native seeding and reproduction gates; shared writers must not reserialize them.
+    capabilities:
+      id_label_validation:
+        status: disabled
+        reason: >-
+          Native src/dufmech/records.py checks identity and labels against retained
+          frozen Pfam source rows, not an external ontology. No shared OAK adapter or
+          conf/id_label_targets.yaml is adopted; native validation does not
+          establish shared OAK correspondence capability.
+        reason_claims:
+          present: ["src/dufmech/records.py"]
+          absent: ["conf/id_label_targets.yaml"]
+      curation_history:
+        status: enabled
+      strict_validation:
+        status: enabled
+      schema_sync:
+        status: enabled
+      # General orchestration eligibility, not claims of installed hooks.
+      release_management:
+        status: enabled
+      build_coordination:
+        status: enabled
+      documentation:
+        status: enabled
+      testing:
+        status: enabled
+      refactoring:
+        status: enabled
+      coordination_hooks:
+        status: enabled
+      deep_research:
+        status: disabled
+        reason: >-
+          Source reports exist, but no conf/deep_research_provider.yaml does.
+          Enable once a provider exercises the shared research contract.
+        reason_claims:
+          absent: ["conf/deep_research_provider.yaml"]
+      edison_key_discovery:
+        status: not_applicable
+        reason: DUFMech has no Edison research-provider integration.
+      environment_coverage:
+        status: not_applicable
+        reason: >-
+          DUF/Pfam family evidence is not a culture-media, ingredient or
+          microbial-community environment inventory.
+      knowledge_gap_scan:
+        status: disabled
+        reason: >-
+          The schema supports Discussions, but no conf/kgscan_config.yaml or
+          shared scan window is adopted. Enable after the native generated
+          record pipeline can preserve and validate shared scan output.
+        reason_claims:
+          absent: ["conf/kgscan_config.yaml"]
+      # All 18 applicable artifacts are committed at canonical pin 59aead1.
+      vendored_sync:
+        status: enabled
+      corpus_statistics:
+        status: enabled
+        settings:
+          # Seed census only. Optional assertions/discussions remain zero in
+          # the native census, rather than implying scientific completeness.
+          fields: [id, name, seed_status, characterization_status, curation_status, provenance]
+      page_budgets:
+        status: enabled
+        settings:
+          site_path: pages
+          budgets_path: conf/pages_budgets.json
+      kgx_export:
+        status: disabled
+        reason: Native JSON exports exist, but no KGX node/edge product is adopted.
+      writer_audit:
+        status: enabled
+        settings:
+          # Availability of this heuristic is not complete guarded-write proof.
+          # Native conf/writer_audit.yaml covers multiple formats. Module-based
+          # just recipes are not recognized by the shared filename heuristic.
+          search_dirs: [src/dufmech, scripts]
+          save_helpers: [write_records, new_history]
+          validators: ['validate_record\(', '_validate_record\(', '_validate_content\(']
+          # Generated projections validate existing history, not new events.
+          curation_markers: ['new_history\(']
+      sssom_export:
+        status: disabled
+        reason: No SSSOM mapping product exists yet.
+      metpo_proposal:
+        status: disabled
+        reason: >-
+          No proposals/ directory exists. Enable when family mechanisms need
+          new METPO terms and the repository adopts the proposal contract.
+        reason_claims:
+          absent: ["proposals"]
+      source_queue:
+        status: enabled
+        settings:
+          queue_path: curation/source_queue.tsv
+          extensions: [implementation, reviewed_on, review_basis, script, artifacts, license_url]
+          required_when_adopted: [script, artifacts, license_url, review_basis]
+      site_contract:
+        status: enabled
+        settings:
+          site_path: pages
+      source_catalogue:
+        status: enabled
+      unmapped_inventory_input:
+        status: not_applicable
+        reason: Protein-family evidence is not a culture-medium ingredient corpus.
+      causal_graph_coverage:
+        status: disabled
+        reason: >-
+          Family records have scientific assertions but no adopted causal-graph
+          projection in a supported shared coverage shape.

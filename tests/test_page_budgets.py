@@ -240,13 +240,12 @@ def test_the_legacy_flat_keys_are_refused_with_the_group_form(tmp_path):
 # --------------------------------------------------------------------------
 
 
-def test_only_the_mech_with_budgets_declares_them():
-    """Four Mechs generate a site and declare none. Saying so with a reason is
-    what makes the gap visible rather than assumed."""
+def test_only_the_mechs_with_measured_budgets_declare_them():
+    """Other sites must keep their absence of budgets visible with a reason."""
     manifest = load_fleet_manifest()
     enabled = set(manifest.with_capability("page_budgets"))
 
-    assert enabled == {"proteintraitsmech"}
+    assert enabled == {"proteintraitsmech", "dufmech"}
     for key, mech in manifest.mechs.items():
         capability = mech.capabilities["page_budgets"]
         if key in enabled:
