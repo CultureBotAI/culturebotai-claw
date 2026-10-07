@@ -188,7 +188,9 @@
     ]
   },
   "dufmech": {
-    "blocked": "DUFMech main 0793aeb9d6770d4f1fb12120efb9c8baa08d262f has Pages qc but lacks queue-ready CI. Land merge_group support and verify exact passing required contexts before replacing this entry."
+    ".github/workflows/validate.yaml": [
+      "qc"
+    ]
   },
   "pathwaymech": {
     ".github/workflows/main.yaml": [
