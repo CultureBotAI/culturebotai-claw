@@ -97,6 +97,44 @@ def test_claw_required_workflows_are_queue_ready():
         assert queue.workflow_errors((root / path).read_text()) == [], path
 
 
+@pytest.mark.parametrize("entry", [
+    {"blocked": ""},
+    {"blocked": "  "},
+    {"blocked": None},
+    {"blocked": ["reason"]},
+    {"blocked": "CI pending", ".github/workflows/ci.yml": ["qc"]},
+    {},
+])
+def test_blocked_policy_requires_a_reason_and_cannot_mix_workflows(tmp_path, monkeypatch, entry):
+    monkeypatch.setattr(queue, "identities", lambda: {"example": "CultureBotAI/example"})
+    path = tmp_path / "policy.json"
+    path.write_text(json.dumps({"example": entry}))
+    with pytest.raises(queue.QueueError):
+        queue.load_policy(path)
+
+
+def test_dufmech_queue_adoption_is_blocked_before_any_api_call(tmp_path):
+    class NoAPI:
+        def request(self, *args, **kwargs):
+            pytest.fail("An explicitly blocked policy must not contact GitHub")
+
+        pages = request
+
+    api = NoAPI()
+    saved = queue.plan(api, ["dufmech"])
+    row = saved["repositories"][0]
+    assert row["repository"] == "CultureBotAI/DUFMech"
+    assert row["status"] == "blocked"
+    assert row["desired"] is None
+    assert "no GitHub Actions workflows" in row["errors"][0]
+    receipt = tmp_path / "receipt.json"
+    for status in ("blocked", "planned", "unchanged"):
+        row.update(status=status, errors=[])
+        with pytest.raises(queue.QueueError, match="Queue adoption blocked"):
+            queue.apply(api, saved, receipt)
+    assert not receipt.exists()
+
+
 def test_plan_is_read_only_and_apply_is_idempotent(setup, tmp_path):
     api = API(setup)
     saved = queue.plan(api)
@@ -112,6 +150,29 @@ def test_plan_is_read_only_and_apply_is_idempotent(setup, tmp_path):
     api.calls.clear()
     queue.apply(api, second, tmp_path / "second.json")
     assert api.calls == []
+
+
+@pytest.mark.parametrize("keys", [["example", "newcomer"], ["newcomer", "example"]])
+def test_blocked_admission_preserves_other_plans_but_prevents_partial_apply(
+    setup, tmp_path, monkeypatch, keys,
+):
+    monkeypatch.setattr(queue, "identities", lambda: {
+        "example": "CultureBotAI/example", "newcomer": "CultureBotAI/newcomer",
+    })
+    monkeypatch.setattr(queue, "load_policy", lambda: {
+        "example": {".github/workflows/ci.yml": ["qc"]},
+        "newcomer": {"blocked": "CI is not implemented yet"},
+    })
+    api = API(setup)
+    saved = queue.plan(api, keys)
+    rows = {row["key"]: row for row in saved["repositories"]}
+    assert rows["example"]["status"] == "planned"
+    assert rows["newcomer"]["status"] == "blocked"
+    receipt = tmp_path / "receipt.json"
+    with pytest.raises(queue.QueueError, match="Queue adoption blocked"):
+        queue.apply(api, saved, receipt)
+    assert api.calls == []
+    assert not receipt.exists()
 
 
 @pytest.mark.parametrize("mutation", [

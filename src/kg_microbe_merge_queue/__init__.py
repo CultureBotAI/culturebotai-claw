@@ -83,6 +83,11 @@ def load_policy(path: Path | None = None) -> dict:
     for key, workflows in policy.items():
         if not isinstance(workflows, dict) or not workflows:
             raise QueueError(f"{key}: empty workflow policy")
+        if "blocked" in workflows:
+            reason = workflows["blocked"]
+            if set(workflows) != {"blocked"} or not isinstance(reason, str) or not reason.strip():
+                raise QueueError(f"{key}: blocked policy must contain only a non-empty reason")
+            continue
         names = []
         for workflow, contexts in workflows.items():
             if not workflow.startswith(".github/workflows/") or ".." in workflow.split("/"):
@@ -98,6 +103,8 @@ def load_policy(path: Path | None = None) -> dict:
 
 
 def desired_ruleset(workflows: dict) -> dict:
+    if "blocked" in workflows:
+        raise QueueError(f"Queue adoption blocked: {workflows['blocked']}")
     contexts = sorted(name for names in workflows.values() for name in names)
     return {
         "name": RULESET_NAME, "target": "branch", "enforcement": "active",
@@ -405,8 +412,9 @@ def plan(api: GitHub, keys: list[str] | None = None) -> dict:
     rows = []
     for key in selected:
         repo = repos[key]
-        row: dict = {"key": key, "repository": repo, "desired": desired_ruleset(policy[key])}
+        row: dict = {"key": key, "repository": repo, "desired": None}
         try:
+            row["desired"] = desired_ruleset(policy[key])
             state = snapshot(api, repo, policy[key])
             errors = readiness_errors(state, repo, policy[key])
             row.update(before=state, fingerprint=fingerprint(state), errors=errors)

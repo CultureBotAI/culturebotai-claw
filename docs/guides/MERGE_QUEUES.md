@@ -5,6 +5,12 @@ manifest. Repository identities come from `kg_microbe_fleet`; exact GitHub Actio
 job contexts and their source workflows live in
 `src/kg_microbe_merge_queue/policy.json`. A newly admitted Mech must add its mapping.
 
+A Mech admitted before its CI exists instead declares only
+`{"blocked": "reason"}`. Planning reports it as blocked without constructing
+a ruleset, and applying a saved plan refuses it. DUFMech uses this state until
+queue-ready workflows and exact passing job contexts have been verified.
+Replace the blocked entry with the measured workflow mapping to begin adoption.
+
 The managed ruleset is named **CLAW merge queue** and targets only
 `refs/heads/main`. It requires a pull request and the declared Actions checks
 (app ID 15368), with no bypass actors. The queue uses squash merges, ALLGREEN,

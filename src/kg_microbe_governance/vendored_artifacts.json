@@ -46,6 +46,10 @@
     "pathwaymech": {
       "github": "CultureBotAI/PathwayMech",
       "package_path": "src/pathwaymech"
+    },
+    "dufmech": {
+      "github": "CultureBotAI/DUFMech",
+      "package_path": "src/dufmech"
     }
   },
   "artifacts": [

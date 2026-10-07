@@ -243,7 +243,8 @@ uv run kg-microbe-governance fleet-audit \
   --target-root habitatmech=/path/to/HabitatMech-worktree \
   --target-root naturalproductmech=/path/to/NaturalProductMech-worktree \
   --target-root taxonmech=/path/to/TaxonMech-worktree \
-  --target-root pathwaymech=/path/to/PathwayMech-worktree
+  --target-root pathwaymech=/path/to/PathwayMech-worktree \
+  --target-root dufmech=/path/to/DUFMech-worktree
 ```
 
 It requires exactly the manifest keys, distinct exact Git roots, clean
@@ -251,6 +252,22 @@ trees, `HEAD == refs/remotes/origin/main`, one expected pin, and successful
 checks for every applicable artifact. It reads bytes and executable modes from
 each repository's committed `HEAD`, so ignored files and `skip-worktree` flags
 cannot substitute working-tree state.
+
+DUFMech is registered ahead of its first governed release. Its inspected main,
+`0e33ce007b04c8494b7eb1b3c6dd691f414b9726`, has source worklists and snapshot
+tooling but none of the applicable vendored artifacts. The exact outstanding
+paths are recorded in `tests/test_vendored_consumer_completeness.py`; this
+admission exception does not make a release audit pass. Initial vendoring and
+the coordinated fleet re-pin remain required before claiming deployment.
+The PR audit reads the previously deployed fleet from its trusted base, but
+after merge the main audit includes DUFMech and will report an incomplete
+rollout until its pin and every existing consumer's pin converge. Coordinate
+that rollout with admission; the test exception does not waive the main audit.
+DUFMech's schema and record path lists are explicitly empty. The loader permits
+this only while dependent capabilities are disabled and record serialization
+is unverified with a reason. Populate the lists from the first real schema and
+curated corpus before enabling their capabilities. `DUFMECH_ROOT` selects its
+local checkout.
 
 Do not change canonical payload bytes as part of an authority-only migration.
 A later pinned release can evolve a shared contract through the same bootstrap,
