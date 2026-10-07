@@ -96,7 +96,17 @@ def _capability_settings(mech: MechDefinition, capability: str) -> Mapping[str, 
 
 def _matrix_command(args: argparse.Namespace, manifest: FleetManifest) -> None:
     rows: list[dict[str, Any]] = []
-    for mech in _select(manifest, args.capability):
+    mechs = _select(manifest, args.capability)
+    if args.scheduled_only:
+        definition = manifest.capability_catalogue[args.capability].settings.get("scheduled")
+        if definition is None or definition.value_type != "boolean":
+            raise FleetManifestError(
+                f"Capability '{args.capability}' has no boolean scheduled setting"
+            )
+    for mech in mechs:
+        settings = _capability_settings(mech, args.capability)
+        if args.scheduled_only and settings.get("scheduled", True) is False:
+            continue
         repository_name = mech.github.rsplit("/", 1)[-1]
         row: dict[str, Any] = {
             "mech": mech.display_name,
@@ -104,7 +114,6 @@ def _matrix_command(args: argparse.Namespace, manifest: FleetManifest) -> None:
             "checkout_path": repository_name,
             "workdir": repository_name,
         }
-        settings = _capability_settings(mech, args.capability)
         for name in args.setting:
             if name not in settings:
                 raise FleetManifestError(
@@ -113,8 +122,9 @@ def _matrix_command(args: argparse.Namespace, manifest: FleetManifest) -> None:
             row[name] = settings[name]
         rows.append(row)
     if not rows:
+        qualifier = " eligible for scheduling" if args.scheduled_only else ""
         raise FleetManifestError(
-            f"Capability '{args.capability}' has no enabled Mechs"
+            f"Capability '{args.capability}' has no enabled Mechs{qualifier}"
         )
     print(json.dumps({"include": rows}, separators=(",", ":"), sort_keys=True))
 
@@ -267,6 +277,10 @@ def _parser() -> argparse.ArgumentParser:
     )
     matrix_parser.add_argument("--capability", required=True)
     matrix_parser.add_argument("--setting", action="append", default=[])
+    matrix_parser.add_argument(
+        "--scheduled-only", action="store_true",
+        help="omit explicit scheduled:false declarations; absent settings retain legacy eligibility",
+    )
 
     show_parser = subparsers.add_parser("show", help="show one manifest value")
     show_parser.add_argument("--field", choices=("vendored_hub",), required=True)

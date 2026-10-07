@@ -40,6 +40,10 @@ capability_catalogue:
         required_when_enabled: true
   knowledge_gap_scan:
     settings:
+      # Native offline adapters can require retained input instead of live API queries.
+      # Omitted preserves existing scheduling; false excludes the nightly live matrix.
+      scheduled:
+        type: boolean
       window:
         type: integer
         required_when_enabled: true
