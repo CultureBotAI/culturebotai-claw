@@ -302,8 +302,8 @@ Native validation uses `scripts/check.py` and the `check`/`validate` recipes,
 not the fleet validation agent's recipe contract. At admission, the native schema
 and commands did not integrate canonical curation history. Timestamped record-review
 Markdown and copied shared schemas are not substitutes for that integration.
-Those capabilities remain disabled with explicit reasons; general orchestration
-eligibility does not claim installed local coordination hooks.
+Those capabilities were disabled at admission with explicit reasons; general
+orchestration eligibility does not claim installed local coordination hooks.
 
 The queue policy maps `.github/workflows/validate-strict.yaml` to the actual
 `validate-strict` check, verified in successful Actions run `37709261918` at the
@@ -339,8 +339,28 @@ schema, with closed shape and strict timestamp, curator, action and summary
 validation. Existing scientific records and reviews are unchanged. Both canonical
 timestamp guards run unmodified; an absence-driven skip proposal was rejected
 by adversarial review and removed because it could mask deletion of an adopted
-model. Shared history authoring commands and sidecar adapters remain unimplemented,
-so the shared history capability stays disabled with an updated reason.
+model. That bootstrap did not yet implement shared history authoring or sidecars.
+
+A separate, concurrent
+[`CMMMech#11`](https://github.com/CultureBotAI/CMMMech/pull/11) then merged at
+`905388523b6e9184783989484896e4cc20297832`. Its native adapter now authors and
+validates canonical sidecars through `new-history` and `validate-history`, links
+them from records with `history_refs`, and enforces append-only history against
+the trusted CI event base. The refreshed main passed 215 tests with three
+empty-command skips, validated three records and three history sessions, and
+retained all 18 governed artifacts at `849f336`. Its merge-group validation,
+post-merge native validation and merge-integrity checks passed. The independent
+PR's adopted record provenance is preserved; it is not attributed to the earlier
+bootstrap or rewritten here.
+
+The shared `curation_history` capability also gates rendered record/category
+review and curation skills. Enabling it against that exact CMMMech main failed
+two real rendered-reference checks because the shared `curate-yaml-record`
+skill/checklist and `review-yaml-record` adapter are absent. The declaration
+therefore remains disabled for shared skill eligibility, with explicit checked
+paths, while acknowledging the complete native history implementation. No test
+is skipped or weakened to conceal those missing adapters; their adoption is a
+separate downstream change. Other unverified capabilities remain disabled.
 
 The completed CMMMech artifact-admission exception is removed in the convergence
 follow-up. The coordinated release and its final committed-main audit are tracked

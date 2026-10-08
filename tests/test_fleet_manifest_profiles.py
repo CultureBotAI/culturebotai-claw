@@ -181,11 +181,17 @@ def test_cmmmech_admission_preserves_records_and_defers_unverified_adapters() ->
         assert "cmmmech" not in manifest.with_capability(capability)
         assert mech.capability(capability).reason
     history = mech.capability("curation_history")
-    assert "Native inline curation_history events are modeled" in history.reason
-    assert "no shared history authoring commands" in history.reason
-    assert not history.reason_claims.absent
-    assert "src/cmmmech/schema/cmmmech.yaml" in history.reason_claims.present
-    assert "justfile" in history.reason_claims.present
+    assert "Native inline events and canonical sidecars are implemented" in history.reason
+    assert "Shared skill eligibility remains disabled" in history.reason
+    assert "append-only" in history.reason
+    assert set(history.reason_claims.absent) == {
+        ".claude/skills/curate-yaml-record/SKILL.md",
+        ".claude/skills/curate-yaml-record/references/review-checklist.md",
+        ".claude/skills/review-yaml-record/SKILL.md",
+    }
+    assert set(history.reason_claims.present) == {
+        "justfile", "src/cmmmech/history.py", "history",
+    }
 
 
 def test_dufmech_keeps_generated_inventory_and_native_serialization() -> None:

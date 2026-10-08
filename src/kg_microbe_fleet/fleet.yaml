@@ -2139,7 +2139,7 @@ mechs:
 
   cmmmech:
     # Inspected main c32d78e26a15bb67a737700668badaed7da10597 on admission.
-    # Native validation and three records exist; shared adapters remain unverified.
+    # Native history verified at 905388523b6e9184783989484896e4cc20297832.
     display_name: CMMMech
     github: CultureBotAI/CMMMech
     environment_variable: CMMMECH_ROOT
@@ -2166,12 +2166,19 @@ mechs:
       curation_history:
         status: disabled
         reason: >-
-          Native inline curation_history events are modeled and strictly validated
-          in src/cmmmech/schema/cmmmech.yaml, but justfile has no shared history
-          authoring commands and no sidecar adapter has been verified. Inline events,
-          retained review Markdown and vendored schemas do not establish that contract.
+          Native inline events and canonical sidecars are implemented through
+          src/cmmmech/history.py and justfile, with history/ validated as append-only
+          in CI. Shared skill eligibility remains disabled because
+          .claude/skills/curate-yaml-record/SKILL.md,
+          .claude/skills/curate-yaml-record/references/review-checklist.md and
+          .claude/skills/review-yaml-record/SKILL.md are absent; enabling this
+          capability produces broken rendered record/category skill references.
         reason_claims:
-          present: ["src/cmmmech/schema/cmmmech.yaml", "justfile"]
+          present: ["justfile", "src/cmmmech/history.py", "history"]
+          absent:
+            - ".claude/skills/curate-yaml-record/SKILL.md"
+            - ".claude/skills/curate-yaml-record/references/review-checklist.md"
+            - ".claude/skills/review-yaml-record/SKILL.md"
       strict_validation:
         status: disabled
         reason: >-
