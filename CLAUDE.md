@@ -484,6 +484,9 @@ because they carry literal data the path rules would misread.
 
 ## Prompts and review workflow
 
+- [Mech HTML review](.claude/skills/mech-html-review/SKILL.md) audits published
+  Mech interfaces against the current DisMech UI and the X-Mech Website features
+  matrix, saving timestamped reports without changing sites or repositories.
 - [Mech HTML design](.claude/skills/mech-html-design/SKILL.md) compares applicable
   data-display, navigation and interaction patterns across current Mech sites,
   and guides source-level fixes with rendered desktop, mobile and keyboard checks.
