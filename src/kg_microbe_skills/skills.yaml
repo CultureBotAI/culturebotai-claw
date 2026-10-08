@@ -118,6 +118,12 @@ skills:
       Resolves current Mech sites from the published fleet manifest, compares
       applicable data-display, navigation and interaction patterns, and guides
       source-level changes with rendered behavior checks.
+  mech-html-review:
+    scope: fleet
+    reason: >-
+      Reviews manifest-resolved or explicitly named Mech websites against the
+      current DisMech UI and published X-Mech Website features matrix, with
+      separate evidence-backed verdicts and timestamped local reports.
   mechcheck:
     scope: fleet
     reason: >-
