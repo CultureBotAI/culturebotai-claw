@@ -17,6 +17,11 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = REPOSITORY_ROOT / "src" / "kg_microbe_fleet" / "fleet.yaml"
 
 EXPECTED_PROFILES = {
+    "cmmmech": (
+        "src/cmmmech",
+        ("src/cmmmech/schema/cmmmech.yaml",),
+        ("data/records/**/*.yaml",),
+    ),
     "dufmech": (
         "src/dufmech",
         ("src/dufmech/schema/dufmech.yaml",),
@@ -155,6 +160,26 @@ def test_shipped_profiles_are_verified_and_complete() -> None:
         assert mech.schema_paths == schema_paths
         assert mech.record_globs == record_globs
         assert set(mech.capabilities) == EXPECTED_CAPABILITIES
+
+
+def test_cmmmech_admission_keeps_unimplemented_capabilities_disabled() -> None:
+    """Registration must not claim that the coordinated rollout is deployed."""
+    mech = load_fleet_manifest(MANIFEST_PATH).get("cmmmech")
+    assert mech.serialization is not None
+    assert not mech.serialization.verified
+    assert not mech.serialization.options
+    assert mech.supports("strict_validation")
+    assert mech.supports("corpus_statistics")
+    assert mech.capability("corpus_statistics").settings["fields"] == (
+        "id", "name", "material_kind", "criticality.jurisdiction",
+        "criticality.edition", "mechanisms.process",
+    )
+    for capability in (
+        "curation_history", "id_label_validation", "deep_research",
+        "knowledge_gap_scan", "source_catalogue", "source_queue", "writer_audit",
+    ):
+        assert mech.capability(capability).status == "disabled"
+    assert "obligation" in mech.capability("vendored_sync").reason
 
 
 def test_dufmech_keeps_generated_inventory_and_native_serialization() -> None:

@@ -35,6 +35,7 @@ EXPECTED_MECHS = (
     "taxonmech",
     "pathwaymech",
     "dufmech",
+    "cmmmech",
 )
 
 

@@ -88,6 +88,13 @@ repositories:
     task_runner: just
     description: "Domain of Unknown Function mechanism knowledge base"
 
+  cmmmech:
+    path: ${CMMMECH_ROOT}
+    type: python
+    package_manager: uv
+    task_runner: just
+    description: "Critical materials and microbial extraction, transformation and recovery"
+
 agents:
   discovery_paths:
     - kg_microbe_agents/definitions

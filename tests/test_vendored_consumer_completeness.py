@@ -62,7 +62,38 @@ class IncompleteConsumer:
 # Consumers known to be mid-adoption, with the exact gaps and reason. A new
 # missing path fails rather than inheriting the waiver. When the repository
 # finishes vendoring, this test says so and the entry comes out.
-INCOMPLETE_CONSUMERS: dict[str, IncompleteConsumer] = {}
+INCOMPLETE_CONSUMERS: dict[str, IncompleteConsumer] = {
+    "cmmmech": IncompleteConsumer(
+        expected_missing=frozenset({
+            "scripts/check_vendored_sync.py",
+            "scripts/check_vendored_sync.sh",
+            "scripts/validate_id_label_correspondence.py",
+            "scripts/chem_formula.py",
+            "tests/test_skill_frontmatter.py",
+            "tests/test_curation_timestamp_schema.py",
+            "tests/test_id_label_empty_adapter.py",
+            "tests/test_id_label_unknown_prefix.py",
+            "tests/test_id_label_plausibility.py",
+            "prompts/backlog-loop-goal.md",
+            "src/cmmmech/schema/mech_shared.yaml",
+            "src/cmmmech/schema/history.yaml",
+            "scripts/deep_research_contract.py",
+            ".github/workflows/pr-shepherd.yml",
+            "scripts/auto_merge_ready_prs.py",
+            "scripts/verify_merge_integrity.py",
+            ".github/workflows/merge-queue-admission.yaml",
+            ".github/workflows/verify-merge-integrity.yaml",
+        }),
+        reason=(
+            "CMMMech admission at committed main "
+            "c32d78e26a15bb67a737700668badaed7da10597: all 18 applicable "
+            "artifacts are absent according to git ls-tree. Publication of "
+            "this authority revision precedes supported synchronization and "
+            "the coordinated all-consumer re-pin; remove this exact-gap "
+            "entry after the CMMMech integration merges."
+        ),
+    ),
+}
 
 
 def _applicable(consumer: str) -> list[str]:
@@ -152,6 +183,7 @@ def test_the_manifest_declares_the_consumers_the_fleet_expects():
     assert CONSUMERS == [
         "antibioticmech",
         "cellstructuremech",
+        "cmmmech",
         "communitymech",
         "culturemech",
         "dufmech",

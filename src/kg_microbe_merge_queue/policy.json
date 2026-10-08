@@ -199,5 +199,10 @@
     ".github/workflows/vendored-sync.yaml": [
       "vendored-sync"
     ]
+  },
+  "cmmmech": {
+    ".github/workflows/validate-strict.yaml": [
+      "validate-strict"
+    ]
   }
 }

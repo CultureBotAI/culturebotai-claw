@@ -1,4 +1,4 @@
-"""CLI contracts for the five-Mech governance pin audit."""
+"""CLI contracts for the manifest-defined governance pin audit."""
 
 from pathlib import Path
 
@@ -70,6 +70,8 @@ def test_fleet_audit_cli_parses_repeated_roots_and_reports_success(
             "pathwaymech=/tmp/pathway",
             "--target-root",
             "dufmech=/tmp/duf",
+            "--target-root",
+            "cmmmech=/tmp/cmm",
         ]
     ) == 0
 
@@ -87,10 +89,11 @@ def test_fleet_audit_cli_parses_repeated_roots_and_reports_success(
             "taxonmech": Path("/tmp/taxon"),
             "pathwaymech": Path("/tmp/pathway"),
             "dufmech": Path("/tmp/duf"),
+            "cmmmech": Path("/tmp/cmm"),
         },
         "ref": REF,
     }
-    assert "OK: all 12 Mechs match" in capsys.readouterr().out
+    assert "OK: all 13 Mechs match" in capsys.readouterr().out
 
 
 def test_fleet_audit_cli_rejects_malformed_or_duplicate_root_values(capsys) -> None:

@@ -217,6 +217,7 @@ assert manifest.keys == (
     "taxonmech",
     "pathwaymech",
     "dufmech",
+    "cmmmech",
 )
 assert default_manifest_path() == module_path.parent / "fleet.yaml"
 # Importing an editable package or merely declaring package-data can hide a

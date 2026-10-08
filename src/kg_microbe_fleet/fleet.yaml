@@ -2136,3 +2136,176 @@ mechs:
           The schema supports scientific assertions, but the seeded corpus has
           no curated mechanistic assertions or adopted causal-graph projection
           in a supported shared coverage shape.
+
+  cmmmech:
+    # Bootstrap inspected at committed main c32d78e26a15bb67a737700668badaed7da10597.
+    # New consumer admission precedes the coordinated governing release.
+    display_name: CMMMech
+    github: CultureBotAI/CMMMech
+    environment_variable: CMMMECH_ROOT
+    package_path: src/cmmmech
+    schema_paths:
+      - src/cmmmech/schema/cmmmech.yaml
+    record_globs:
+      - data/records/**/*.yaml
+    vendored_role: consumer
+    serialization:
+      verified: false
+      reason: >-
+        All 32 measured PyYAML safe_dump option sets round-trip zero of the
+        three committed records at c32d78e. Their folded block scalars are not
+        retained by safe_dump; shared writers must not rewrite them through
+        generic serialization.
+    capabilities:
+      id_label_validation:
+        status: disabled
+        reason: >-
+          data/records/ pairs material and organism CURIEs with labels, but
+          src/cmmmech/validation.py checks identifier syntax rather than
+          ontology correspondence. Enable
+          once an OAK-backed conf/id_label_targets.yaml profile is adopted.
+        reason_claims:
+          present: [src/cmmmech/validation.py, data/records]
+          absent: [conf/id_label_targets.yaml]
+      curation_history:
+        status: disabled
+        reason: >-
+          Admission baseline c32d78e has timestamped reviews under
+          reviews/records/, but no src/cmmmech/history.py adapter, recipe or
+          record history references. Enable after the native adapter and
+          validated initial events land.
+        reason_claims:
+          present: [reviews/records]
+          absent: [src/cmmmech/history.py]
+      strict_validation:
+        status: enabled
+      schema_sync:
+        status: enabled
+      # Shared orchestration eligibility; not assertions of installed hooks.
+      release_management:
+        status: enabled
+      build_coordination:
+        status: enabled
+      documentation:
+        status: enabled
+      testing:
+        status: enabled
+      refactoring:
+        status: enabled
+      coordination_hooks:
+        status: enabled
+      deep_research:
+        status: disabled
+        reason: >-
+          .claude/skills/cmmmech-discover-sources/SKILL.md produces reviewed
+          research handoffs; no conf/deep_research_provider.yaml configures the shared provider
+          contract. Enable after a provider-backed adapter is reviewed.
+        reason_claims:
+          present: [.claude/skills/cmmmech-discover-sources/SKILL.md]
+          absent: [conf/deep_research_provider.yaml]
+      edison_key_discovery:
+        status: not_applicable
+        reason: CMMMech has no Edison research-provider integration.
+      environment_coverage:
+        status: not_applicable
+        reason: >-
+          Material records describe experimental microbial contexts, not a
+          culture-media, ingredient or microbial-community environment inventory.
+      knowledge_gap_scan:
+        status: disabled
+        reason: >-
+          src/cmmmech/schema/cmmmech.yaml has no Discussion slot and no
+          conf/kgscan_config.yaml configures a shared scan. Enable after a
+          compatible evidence-review adapter is adopted.
+        reason_claims:
+          present: [src/cmmmech/schema/cmmmech.yaml]
+          absent: [conf/kgscan_config.yaml]
+      vendored_sync:
+        # Authoritative membership requires this obligation. The exact missing
+        # artifacts remain in INCOMPLETE_CONSUMERS until the published rollout;
+        # enabled here does not assert that a sync gate is already deployed.
+        status: enabled
+        reason: >-
+          Required consumer obligation during supported bootstrap admission;
+          deployment is pending the coordinated immutable release and exact-main
+          audit. The exact-gap ledger in claw's
+          tests/test_vendored_consumer_completeness.py measures outstanding files.
+        reason_claims:
+          present: [claw:tests/test_vendored_consumer_completeness.py]
+      corpus_statistics:
+        status: enabled
+        settings:
+          fields:
+            - id
+            - name
+            - material_kind
+            - criticality.jurisdiction
+            - criticality.edition
+            - mechanisms.process
+      causal_graph_coverage:
+        status: disabled
+        reason: >-
+          src/cmmmech/schema/cmmmech.yaml models evidence and experimental
+          context but no graph_list or node_nested_edges projection for shared
+          coverage.
+        reason_claims:
+          present: [src/cmmmech/schema/cmmmech.yaml]
+      page_budgets:
+        status: not_applicable
+        reason: >-
+          No generated pages/ or site/ product and no conf/pages_budgets.json
+          exist. Adopt a site profile and explicit limits if publication is
+          introduced.
+        reason_claims:
+          absent: [pages, site, conf/pages_budgets.json]
+      kgx_export:
+        status: disabled
+        reason: >-
+          Curated material records have no KGX export product. Enable after an
+          exporter emits validated material, organism and mechanism edges.
+      source_queue:
+        status: disabled
+        reason: >-
+          Source discovery has report-template.md, but no
+          curation/source_queue.tsv records source licences and adoption
+          decisions.
+        reason_claims:
+          present: [.claude/skills/cmmmech-discover-sources/references/report-template.md]
+          absent: [curation/source_queue.tsv]
+      metpo_proposal:
+        status: disabled
+        reason: >-
+          No proposals/ directory carries a METPO proposal cohort. Enable when
+          microbial process terms require the shared numeric-ID contract.
+        reason_claims:
+          absent: [proposals]
+      sssom_export:
+        status: disabled
+        reason: >-
+          Material identifiers remain inline; no SSSOM mapping product is
+          emitted. Enable when the repository adopts a validated mapping export.
+      writer_audit:
+        status: disabled
+        reason: >-
+          The admission baseline validates manually curated records and has no
+          shared writer-audit profile. Adopt a measured profile when automated
+          writers are introduced; a recipe name alone does not prove coverage.
+      site_contract:
+        status: not_applicable
+        reason: >-
+          The repository publishes Markdown documentation; no pages/ or site/
+          directory holds generated HTML for the shared site contract to judge.
+        reason_claims:
+          absent: [pages, site]
+      source_catalogue:
+        status: disabled
+        reason: >-
+          Citation URLs and the discovery skill are not a download catalogue;
+          no download.yaml declares fetchable licensed source files.
+        reason_claims:
+          absent: [download.yaml]
+      unmapped_inventory_input:
+        status: not_applicable
+        reason: >-
+          Material identity records are not a culture-medium ingredient corpus
+          and do not supply the shared unmapped-ingredient inventory.
