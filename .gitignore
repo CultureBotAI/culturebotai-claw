@@ -54,3 +54,7 @@ htmlcov/
 
 # Local ontology/name lookup cache (grounding scripts) — never commit
 cache/
+
+# Local source cache for the archived Pavlidis 2026 analysis
+/data/pdfs/2026.07.30.741874v1.full.pdf
+/data/pdfs/2026.07.30.741874v1.full.txt
