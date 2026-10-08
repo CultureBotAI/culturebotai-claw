@@ -244,7 +244,8 @@ uv run kg-microbe-governance fleet-audit \
   --target-root naturalproductmech=/path/to/NaturalProductMech-worktree \
   --target-root taxonmech=/path/to/TaxonMech-worktree \
   --target-root pathwaymech=/path/to/PathwayMech-worktree \
-  --target-root dufmech=/path/to/DUFMech-worktree
+  --target-root dufmech=/path/to/DUFMech-worktree \
+  --target-root cmmmech=/path/to/CMMMech-worktree
 ```
 
 It requires exactly the manifest keys, distinct exact Git roots, clean
@@ -288,6 +289,40 @@ consumers. `DUFMECH_ROOT` selects the verified local checkout; published readine
 does not imply local hooks are installed or that a dirty CLAW checkout was
 fast-forwarded. The queue mapping permits scoped adoption after CI readiness;
 remote rules and an actual queue merge require separate execution evidence.
+
+### CMMMech Admission
+
+CMMMech's inspected main is `c32d78e26a15bb67a737700668badaed7da10597`.
+It contains three material records, a packaged LinkML schema and native strict
+validation. `CMMMECH_ROOT` selects its identity-verified checkout. Shared
+serialization remains unverified; the existence of records does not establish
+round-trip options or a corpus-statistics field selection.
+
+Native validation uses `scripts/check.py` and the `check`/`validate` recipes,
+not the fleet validation agent's recipe contract. The native schema and commands
+do not yet integrate canonical curation history. Timestamped record-review
+Markdown and copied shared schemas are not substitutes for that integration.
+Those capabilities remain disabled with explicit reasons; general orchestration
+eligibility does not claim installed local coordination hooks.
+
+The queue policy maps `.github/workflows/validate-strict.yaml` to the actual
+`validate-strict` check, verified in successful Actions run `37709261918` at the
+inspected SHA. Its PR trigger is unconditional and it supports `merge_group`.
+This mapping does not enable remote rules or prove an actual queue merge.
+
+All 18 applicable governed artifacts and the canonical pin are missing at this
+inspected revision. The exact artifact paths are recorded in the temporary
+`INCOMPLETE_CONSUMERS` ledger in `tests/test_vendored_consumer_completeness.py`;
+its bidirectional checks must reject new gaps and require removal when adoption
+finishes. This admission exception does not make a deployed fleet audit pass.
+
+Adding CMMMech changes the canonical consumer manifest even though the governed
+payload bytes are unchanged. Release completion therefore requires a published
+immutable CLAW revision containing this admission, supported synchronization
+into CMMMech, coordinated re-pinning of every manifest consumer, removal of the
+completed admission exception, and the exact committed-main fleet audit above.
+Do not report this registration alone as a completed governing release or merge
+it without an authorized plan to complete that rollout.
 
 Do not change canonical payload bytes as part of an authority-only migration.
 A later pinned release can evolve a shared contract through the same bootstrap,

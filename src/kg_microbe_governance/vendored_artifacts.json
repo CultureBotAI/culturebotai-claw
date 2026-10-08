@@ -50,6 +50,10 @@
     "dufmech": {
       "github": "CultureBotAI/DUFMech",
       "package_path": "src/dufmech"
+    },
+    "cmmmech": {
+      "github": "CultureBotAI/CMMMech",
+      "package_path": "src/cmmmech"
     }
   },
   "artifacts": [

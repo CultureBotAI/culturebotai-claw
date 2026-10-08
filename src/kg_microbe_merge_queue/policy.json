@@ -192,6 +192,11 @@
       "qc"
     ]
   },
+  "cmmmech": {
+    ".github/workflows/validate-strict.yaml": [
+      "validate-strict"
+    ]
+  },
   "pathwaymech": {
     ".github/workflows/main.yaml": [
       "qc"

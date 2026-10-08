@@ -17,6 +17,11 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = REPOSITORY_ROOT / "src" / "kg_microbe_fleet" / "fleet.yaml"
 
 EXPECTED_PROFILES = {
+    "cmmmech": (
+        "src/cmmmech",
+        ("src/cmmmech/schema/cmmmech.yaml",),
+        ("data/records/**/*.yaml", "data/records/**/*.yml"),
+    ),
     "dufmech": (
         "src/dufmech",
         ("src/dufmech/schema/dufmech.yaml",),
@@ -145,7 +150,7 @@ def _parse(document: dict):
     return parse_fleet_manifest(document, Path("synthetic-fleet.yaml"))
 
 
-def test_shipped_profiles_are_verified_and_complete() -> None:
+def test_shipped_profiles_are_declared_and_complete() -> None:
     manifest = load_fleet_manifest(MANIFEST_PATH)
 
     assert set(manifest.capability_catalogue) == EXPECTED_CAPABILITIES
@@ -155,6 +160,30 @@ def test_shipped_profiles_are_verified_and_complete() -> None:
         assert mech.schema_paths == schema_paths
         assert mech.record_globs == record_globs
         assert set(mech.capabilities) == EXPECTED_CAPABILITIES
+
+
+def test_cmmmech_admission_preserves_records_and_defers_unverified_adapters() -> None:
+    manifest = load_fleet_manifest(MANIFEST_PATH)
+    mech = manifest.get("cmmmech")
+    assert mech.github == "CultureBotAI/CMMMech"
+    assert mech.environment_variable == "CMMMECH_ROOT"
+    assert mech.serialization is not None
+    assert not mech.serialization.verified
+    assert not mech.serialization.options
+    assert "Material records exist" in mech.serialization.reason
+    assert "Material records exist" in mech.capability("corpus_statistics").reason
+    assert mech.supports("testing")
+    assert mech.supports("vendored_sync")
+    for capability in (
+        "strict_validation", "schema_sync", "curation_history",
+        "id_label_validation", "deep_research", "corpus_statistics",
+    ):
+        assert "cmmmech" not in manifest.with_capability(capability)
+        assert mech.capability(capability).reason
+    history = mech.capability("curation_history")
+    assert not history.reason_claims.absent
+    assert "src/cmmmech/schema/cmmmech.yaml" in history.reason_claims.present
+    assert "justfile" in history.reason_claims.present
 
 
 def test_dufmech_keeps_generated_inventory_and_native_serialization() -> None:
