@@ -181,6 +181,8 @@ def test_cmmmech_admission_preserves_records_and_defers_unverified_adapters() ->
         assert "cmmmech" not in manifest.with_capability(capability)
         assert mech.capability(capability).reason
     history = mech.capability("curation_history")
+    assert "Native inline curation_history events are modeled" in history.reason
+    assert "no shared history authoring commands" in history.reason
     assert not history.reason_claims.absent
     assert "src/cmmmech/schema/cmmmech.yaml" in history.reason_claims.present
     assert "justfile" in history.reason_claims.present

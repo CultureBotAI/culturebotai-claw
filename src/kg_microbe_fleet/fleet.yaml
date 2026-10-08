@@ -2166,9 +2166,10 @@ mechs:
       curation_history:
         status: disabled
         reason: >-
-          src/cmmmech/schema/cmmmech.yaml does not model canonical curation_history,
-          and justfile has no history commands. Retained review Markdown and
-          vendored schema files alone do not establish native history integration.
+          Native inline curation_history events are modeled and strictly validated
+          in src/cmmmech/schema/cmmmech.yaml, but justfile has no shared history
+          authoring commands and no sidecar adapter has been verified. Inline events,
+          retained review Markdown and vendored schemas do not establish that contract.
         reason_claims:
           present: ["src/cmmmech/schema/cmmmech.yaml", "justfile"]
       strict_validation:
@@ -2221,7 +2222,7 @@ mechs:
           the native schema does not yet model curated Discussions.
         reason_claims:
           absent: ["conf/kgscan_config.yaml"]
-      # Required consumer contract; missing artifacts are tracked in the admission ledger.
+      # Required consumer contract, enforced against the published canonical pin.
       vendored_sync:
         status: enabled
       corpus_statistics:
