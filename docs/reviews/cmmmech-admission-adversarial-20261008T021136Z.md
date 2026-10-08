@@ -118,3 +118,22 @@ issue solely to populate the review process. Existing issue #3 already requires:
 **Accept the bootstrap admission as reviewed.** No actionable review defect was
 confirmed. The coordinated release, final capability update, operational queue
 receipts and closure criteria remain the parent integration task's work.
+
+## Follow-up: full-suite admission-count regression
+
+At 2026-10-08T02:18:21Z, the registration implementer recorded a finding from
+full local validation of published bootstrap `a805075` that the targeted review
+above did not cover. The prose contract test still pinned the fleet size to 12,
+so CMMMech admission produced an assertion failure (`13 != 12`). This is a
+blocking validation defect, tracked as
+[CLAW #584](https://github.com/CultureBotAI/culturebotai-claw/issues/584).
+
+The correction changes only the expected inventory count from 12 to 13 in
+`tests/test_fleet_count_prose.py`. It retains the bare-count prose detector, the
+module hardcoding guard and exact governance/fleet equality checks. The complete
+affected file now passes: **11 passed in 4.02s**, including the failing test and
+its negative detector cases. `git diff --check` also passes. The full-suite run
+started before this correction is continuing to detect other findings; its
+previous failure is not represented as a clean rerun. This addendum records the
+implementer's correction evidence, not an independent approval of the changed
+revision.
