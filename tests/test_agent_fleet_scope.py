@@ -64,7 +64,9 @@ def test_general_agents_use_validated_manifest_capability_scopes():
         assert document["workspace"]["allowed_paths"]["source"] == (
             "repository_scope"
         )
-        assert set(manifest.with_capability(capability)) == set(manifest.keys)
+        # Native CMM validation is not a verified fleet recipe adapter.
+        excluded = {"cmmmech"} if capability in {"strict_validation", "schema_sync"} else set()
+        assert set(manifest.with_capability(capability)) == set(manifest.keys) - excluded
         assert all(
             capability in mech.capabilities for mech in manifest.mechs.values()
         )

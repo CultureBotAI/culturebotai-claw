@@ -83,6 +83,7 @@ enums:
       TaxonMech:
       PathwayMech:
       DUFMech:
+      CMMMech:
 
   ProviderEnum:
     description: >-

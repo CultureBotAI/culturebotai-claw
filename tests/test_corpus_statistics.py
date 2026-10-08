@@ -225,12 +225,30 @@ def _declared() -> list[tuple[str, tuple[str, ...]]]:
     ]
 
 
-def test_every_mech_declares_the_fields_its_report_tabulates():
+def test_every_enabled_mech_declares_the_fields_its_report_tabulates():
     declared = _declared()
 
-    assert {key for key, _ in declared} == set(load_fleet_manifest().keys)
+    assert declared, "the fleet must retain its verified corpus-statistics adapters"
     for key, fields in declared:
         assert fields, f"{key} enables corpus_statistics without naming fields"
+
+
+def test_disabled_cmm_statistics_explain_the_gap_without_reading_records(monkeypatch, capsys):
+    import kg_microbe_corpus.__main__ as cli
+
+    capability = load_fleet_manifest().mechs["cmmmech"].capabilities["corpus_statistics"]
+    assert not capability.is_enabled
+    assert "cmmmech" not in {key for key, _ in _declared()}
+
+    def unexpected(*args, **kwargs):
+        pytest.fail("a disabled statistics adapter must not resolve or read the corpus")
+
+    monkeypatch.setattr(cli, "resolve_mech_root", unexpected)
+    monkeypatch.setattr(cli, "collect", unexpected)
+    assert cli.main(["report", "--mech", "cmmmech"]) == 0
+    output = capsys.readouterr()
+    assert output.out == f"cmmmech reports no corpus statistics: {capability.reason}\n"
+    assert output.err == ""
 
 
 @pytest.mark.parametrize(("mech", "fields"), _declared(), ids=lambda v: v if isinstance(v, str) else "")

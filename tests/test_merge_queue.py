@@ -119,6 +119,12 @@ def test_dufmech_policy_uses_native_validation_not_pages():
     }
 
 
+def test_cmmmech_policy_uses_verified_native_validation_context():
+    assert queue.load_policy()["cmmmech"] == {
+        ".github/workflows/validate-strict.yaml": ["validate-strict"],
+    }
+
+
 def test_blocked_adoption_is_rejected_before_any_api_call(tmp_path, monkeypatch):
     monkeypatch.setattr(queue, "identities", lambda: {"example": "CultureBotAI/example"})
     monkeypatch.setattr(queue, "load_policy", lambda: {
