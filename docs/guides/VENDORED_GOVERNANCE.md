@@ -292,26 +292,26 @@ remote rules and an actual queue merge require separate execution evidence.
 
 ### CMMMech Admission
 
-CMMMech's inspected main is `c32d78e26a15bb67a737700668badaed7da10597`.
-It contains three material records, a packaged LinkML schema and native strict
+CMMMech's admission inspection used main `c32d78e26a15bb67a737700668badaed7da10597`.
+It contained three material records, a packaged LinkML schema and native strict
 validation. `CMMMECH_ROOT` selects its identity-verified checkout. Shared
 serialization remains unverified; the existence of records does not establish
 round-trip options or a corpus-statistics field selection.
 
 Native validation uses `scripts/check.py` and the `check`/`validate` recipes,
-not the fleet validation agent's recipe contract. The native schema and commands
-do not yet integrate canonical curation history. Timestamped record-review
+not the fleet validation agent's recipe contract. At admission, the native schema
+and commands did not integrate canonical curation history. Timestamped record-review
 Markdown and copied shared schemas are not substitutes for that integration.
-Those capabilities remain disabled with explicit reasons; general orchestration
-eligibility does not claim installed local coordination hooks.
+Those capabilities were disabled at admission with explicit reasons; general
+orchestration eligibility does not claim installed local coordination hooks.
 
 The queue policy maps `.github/workflows/validate-strict.yaml` to the actual
 `validate-strict` check, verified in successful Actions run `37709261918` at the
 inspected SHA. Its PR trigger is unconditional and it supports `merge_group`.
 This mapping does not enable remote rules or prove an actual queue merge.
 
-All 18 applicable governed artifacts and the canonical pin are missing at this
-inspected revision. The exact artifact paths are recorded in the temporary
+All 18 applicable governed artifacts and the canonical pin were missing at that
+inspected revision. The exact artifact paths were recorded in the temporary
 `INCOMPLETE_CONSUMERS` ledger in `tests/test_vendored_consumer_completeness.py`;
 its bidirectional checks must reject new gaps and require removal when adoption
 finishes. This admission exception does not make a deployed fleet audit pass.
@@ -323,6 +323,50 @@ into CMMMech, coordinated re-pinning of every manifest consumer, removal of the
 completed admission exception, and the exact committed-main fleet audit above.
 Do not report this registration alone as a completed governing release or merge
 it without an authorized plan to complete that rollout.
+
+Registration was published in
+[`claw#581`](https://github.com/CultureBotAI/culturebotai-claw/pull/581), canonical
+`849f336e025510316a5f235eb0af8547b8bd50cc`. Native bootstrap then merged through
+[`CMMMech#9`](https://github.com/CultureBotAI/CMMMech/pull/9), main
+`842edc17fc603831c6ab56fd0ef1d813416d3ea5`, with all 18 exact governed artifacts
+and that pin. Its native gate passed 165 tests, three empty-command
+parametrizations were skipped, and all three existing material records validated.
+The native CI also passed the canonical-byte check; post-merge validation and
+merge-integrity runs both succeeded at that exact main.
+
+The bootstrap adds real optional inline `curation_history` events to the native
+schema, with closed shape and strict timestamp, curator, action and summary
+validation. Existing scientific records and reviews are unchanged. Both canonical
+timestamp guards run unmodified; an absence-driven skip proposal was rejected
+by adversarial review and removed because it could mask deletion of an adopted
+model. That bootstrap did not yet implement shared history authoring or sidecars.
+
+A separate, concurrent
+[`CMMMech#11`](https://github.com/CultureBotAI/CMMMech/pull/11) then merged at
+`905388523b6e9184783989484896e4cc20297832`. Its native adapter now authors and
+validates canonical sidecars through `new-history` and `validate-history`, links
+them from records with `history_refs`, and enforces append-only history against
+the trusted CI event base. The refreshed main passed 215 tests with three
+empty-command skips, validated three records and three history sessions, and
+retained all 18 governed artifacts at `849f336`. Its merge-group validation,
+post-merge native validation and merge-integrity checks passed. The independent
+PR's adopted record provenance is preserved; it is not attributed to the earlier
+bootstrap or rewritten here.
+
+The shared `curation_history` capability also gates rendered record/category
+review and curation skills. Enabling it against that exact CMMMech main failed
+two real rendered-reference checks because the shared `curate-yaml-record`
+skill/checklist and `review-yaml-record` adapter are absent. The declaration
+therefore remains disabled for shared skill eligibility, with explicit checked
+paths, while acknowledging the complete native history implementation. No test
+is skipped or weakened to conceal those missing adapters; their adoption is a
+separate downstream change. Other unverified capabilities remain disabled.
+
+The completed CMMMech artifact-admission exception is removed in the convergence
+follow-up. The coordinated release and its final committed-main audit are tracked
+in [claw#580](https://github.com/CultureBotAI/culturebotai-claw/issues/580). This
+follow-up changes no canonical artifact manifest or payload bytes: `849f336`
+remains the governing pin, without another re-pin.
 
 Do not change canonical payload bytes as part of an authority-only migration.
 A later pinned release can evolve a shared contract through the same bootstrap,
