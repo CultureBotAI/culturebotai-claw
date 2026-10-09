@@ -132,6 +132,7 @@ def project_set(item: dict, root: Path) -> dict:
         "set_id": item["id"],
         "label": item["label"],
         "modality": item["modality"],
+        **({"representation": item["representation"]} if "representation" in item else {}),
         "entity_type": item["entity_type"],
         "encoder": item["encoder"],
         "source": item["source"],
@@ -192,6 +193,8 @@ def build(registry: Path, output: Path) -> dict:
         entries = []
         for item in doc["sets"]:
             entry = {key: item[key] for key in ("id", "label", "modality", "entity_type", "status")}
+            if "representation" in item:
+                entry["representation"] = item["representation"]
             if item["status"] == "ready":
                 payload = project_set(item, registry.parent)
                 relative = f"sets/{item['id']}.json"

@@ -11,7 +11,6 @@ from typing import Any
 
 from kg_microbe_fleet import load_fleet_manifest
 
-MODALITIES = frozenset({"text", "protein_language_model", "graph", "chemical", "trait_profile"})
 STATUSES = frozenset({"ready", "planned", "blocked"})
 PREPROCESSING = frozenset({"none", "l2", "center_l2"})
 
@@ -79,7 +78,7 @@ def choice(value: Any, allowed: set | frozenset, where: str) -> str:
 
 def identifier(value: Any, where: str) -> str:
     if not isinstance(value, str) or not re.fullmatch(r"[a-z][a-z0-9_-]{0,79}", value):
-        raise EmbeddingError(f"{where} must be a lowercase set identifier")
+        raise EmbeddingError(f"{where} must be a lowercase identifier")
     return value
 
 
@@ -147,17 +146,22 @@ def projection_config(value: Any) -> dict:
 def validate_set(item: Any) -> None:
     base = {"id", "label", "modality", "entity_type", "status"}
     ready = {"encoder", "source", "ids", "vectors", "coverage", "projection"}
-    fields(item, base, ready | {"reason"}, "embedding set")
+    optional = {"representation"}
+    fields(item, base, ready | optional | {"reason"}, "embedding set")
     identifier(item["id"], "set.id")
     for key in ("label", "entity_type"):
         nonblank(item[key], f"set.{key}")
-    choice(item["modality"], MODALITIES, "set.modality")
+    # Modality describes the input space; it does not select an encoder or
+    # reducer. New domains can register dense vectors without a code change.
+    identifier(item["modality"], "set.modality")
+    if "representation" in item:
+        identifier(item["representation"], "set.representation")
     choice(item["status"], STATUSES, "set.status")
     if item["status"] != "ready":
-        fields(item, base | {"reason"}, set(), item["id"])
+        fields(item, base | {"reason"}, optional, item["id"])
         nonblank(item["reason"], "set.reason")
         return
-    fields(item, base | ready, set(), item["id"])
+    fields(item, base | ready, optional, item["id"])
     encoder = fields(
         item["encoder"],
         {"name", "revision", "dimension", "input_recipe", "parameters", "library_versions"},

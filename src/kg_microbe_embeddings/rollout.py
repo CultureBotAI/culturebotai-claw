@@ -8,7 +8,7 @@ import yaml
 
 from kg_microbe_fleet import UniqueKeySafeLoader, load_fleet_manifest
 
-from .registry import MODALITIES, EmbeddingError, choice, fields, hexadecimal, identifier, nonblank
+from .registry import EmbeddingError, choice, fields, hexadecimal, identifier, nonblank
 
 
 def load_rollout(path: Path | None = None) -> dict:
@@ -47,17 +47,18 @@ def load_rollout(path: Path | None = None) -> dict:
                 nonblank(value, f"{key}.{name}")
         if not isinstance(plan["sets"], dict) or not plan["sets"]:
             raise EmbeddingError(f"{key}: declare intended embedding sets")
-        modalities = set()
         for name, item in plan["sets"].items():
             identifier(name, "planned set ID")
-            fields(item, {"modality", "entity_type", "state", "notes"}, set(), f"{key}.{name}")
-            choice(item["modality"], MODALITIES, "modality")
+            fields(
+                item,
+                {"modality", "entity_type", "state", "notes"},
+                {"representation"},
+                f"{key}.{name}",
+            )
+            identifier(item["modality"], "modality")
+            if "representation" in item:
+                identifier(item["representation"], "representation")
             choice(item["state"], {"native", "planned", "conditional"}, "state")
             nonblank(item["entity_type"], "entity_type")
             nonblank(item["notes"], "notes")
-            modalities.add(item["modality"])
-        if not {"text", "protein_language_model"} <= modalities:
-            raise EmbeddingError(
-                f"{key}: explicitly disposition text and protein-language-model sets"
-            )
     return doc
