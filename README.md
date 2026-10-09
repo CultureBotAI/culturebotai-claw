@@ -98,6 +98,7 @@ console-script forms are available:
 ```bash
 uv run kg-microbe-history --help
 uv run kg-microbe-research --help
+uv run kg-microbe-reviews --help
 uv run kg-microbe-governance --help
 uv run kg-microbe-kgscan --help
 uv run kg-microbe-qc --help
@@ -105,6 +106,7 @@ uv run kg-microbe-discussions --help
 
 uv run python -m kg_microbe_history --help
 uv run python -m kg_microbe_research --help
+uv run python -m kg_microbe_reviews --help
 uv run python -m kg_microbe_governance --help
 uv run python -m kg_microbe_kgscan --help
 uv run python -m kg_microbe_qc --help
@@ -124,6 +126,14 @@ documented in
 The separately governed provider execution and non-billing canary boundary is
 documented in
 [`docs/guides/DEEP_RESEARCH_EXECUTION.md`](docs/guides/DEEP_RESEARCH_EXECUTION.md).
+
+Structured record reviews share a LinkML schema, immutable timestamped YAML and
+Markdown bundles, and fleet triage. Run `uv run kg-microbe-reviews fleet --all`
+for JSON or add `--format markdown` or `--format tsv`. This reads local cached
+`origin/main` without fetching; missing repositories and missing review coverage
+remain visible. Findings close only through explicit, evidence-backed lineage,
+not merely because a later report omits them. See
+[`docs/guides/RECORD_REVIEWS.md`](docs/guides/RECORD_REVIEWS.md).
 
 ## Safety model
 

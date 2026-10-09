@@ -49,6 +49,8 @@ dependencies = [
     # pair and every schema check dies with "AttributeError: JSON" — which reads
     # like a data problem and is not one.
     "linkml>=1.10",
+    "linkml-runtime>=1.10",
+    "jsonschema>=4",
     # kg_microbe_qc imports both at module scope. They are runtime dependencies
     # because src/kg_microbe_qc is now an installed package and console tool.
     "matplotlib>=3.8",
@@ -64,6 +66,7 @@ kg-microbe-merge-queue = "kg_microbe_merge_queue.__main__:main"
 kg-microbe-fleet = "kg_microbe_fleet.__main__:main"
 kg-microbe-consistency = "kg_microbe_consistency.__main__:main"
 kg-microbe-research = "kg_microbe_research.__main__:main"
+kg-microbe-reviews = "kg_microbe_reviews.__main__:main"
 kg-microbe-skills = "kg_microbe_skills.__main__:main"
 kg-microbe-sources = "kg_microbe_sources.__main__:main"
 kg-microbe-corpus = "kg_microbe_corpus.__main__:main"
