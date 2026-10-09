@@ -1,0 +1,420 @@
+version: 1
+checked_on: '2026-10-09'
+reference: https://github.com/CultureBotAI/proteintraitsmech/tree/9c563d320b0b39548daf119812a5e25298236b63
+coordination:
+- https://github.com/CultureBotAI/culturebotai-claw/issues/426
+- https://github.com/CultureBotAI/culturebotai-claw/pull/432
+policy:
+  primary_projection: pacmap
+  multiple_sets: true
+  registry_adoption: planned
+acceptance:
+- Add a versioned registry with unique set IDs, exact encoder/input recipe, immutable source/model revisions, ordered
+  ID/vector hashes and per-set coverage. Export existing vectors through the shared projection adapter; retain verified
+  existing text bundles from PR 432 where appropriate.
+- Use a named-set selector with separate caches, labels, point populations and original-space neighbour indexes.
+  Lazy-load only the chosen set; show planned/blocked reasons and preserve valid record links when switching.
+- Run an offline two-set contract test and a real bounded PaCMAP canary. Require finite coordinates, source/ID alignment,
+  actual method/version/parameters, corruption rejection and honest displayed/eligible/total coverage before publication.
+- Integrate through the existing rollout and native gates. Verify current-source artifacts and live desktop/mobile
+  behavior before changing the X-Mech website support verdict or declaring registry adoption complete.
+mechs:
+  culturemech:
+    revision: 0c789cd979bae23d0e7899bfffc65a46a3b98f5e
+    native: pacmap
+    evidence:
+    - src/culturemech/embedding/dimensionality.py
+    - src/culturemech/visualization/ingredient_umap_generator.py
+    sets:
+      record-text:
+        modality: text
+        entity_type: record
+        state: planned
+        notes: Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
+          1024 dimensions; adopting it requires real vectors, not a metadata rename.
+      protein-sequence:
+        modality: protein_language_model
+        entity_type: protein
+        state: conditional
+        notes: Separate protein-entity set, following ProteinTraitsMech ESM-2 with pinned sequence/model revisions,
+          residue-mean pooling and overlap-corrected long-sequence windows. Require explicit, provenance-backed
+          record-to-protein bindings; where unavailable, report blocked with a reason. Do not infer sequences from
+          names or mix proteins into record-text rows.
+      kg-microbe-graph:
+        modality: graph
+        entity_type: medium
+        state: native
+        notes: Preserve the source KG-Microbe release, vector lookup/aggregation recipe and missing-vector coverage;
+          select a separate PaCMAP artifact.
+      ingredient-graph:
+        modality: graph
+        entity_type: ingredient
+        state: native
+        notes: Ingredient vectors are a different point population from media/recipe vectors; use independent IDs,
+          coverage and links.
+    actions:
+    - Preserve recipe-level and ingredient-level KG-Microbe spaces as distinct sets with their actual entity types
+      and aggregation rules.
+    tracking:
+    - https://github.com/CultureBotAI/culturebotai-claw/issues/426
+  mediaingredientmech:
+    revision: a0d2c07811a4753230c03fe28982a622948cf7fc
+    native: pacmap
+    evidence:
+    - scripts/generate_ingredient_umap.py
+    sets:
+      record-text:
+        modality: text
+        entity_type: record
+        state: planned
+        notes: Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
+          1024 dimensions; adopting it requires real vectors, not a metadata rename.
+      protein-sequence:
+        modality: protein_language_model
+        entity_type: protein
+        state: conditional
+        notes: Separate protein-entity set, following ProteinTraitsMech ESM-2 with pinned sequence/model revisions,
+          residue-mean pooling and overlap-corrected long-sequence windows. Require explicit, provenance-backed
+          record-to-protein bindings; where unavailable, report blocked with a reason. Do not infer sequences from
+          names or mix proteins into record-text rows.
+      kg-microbe-graph:
+        modality: graph
+        entity_type: ingredient
+        state: native
+        notes: Preserve the source KG-Microbe release, vector lookup/aggregation recipe and missing-vector coverage;
+          select a separate PaCMAP artifact.
+    actions:
+    - Register KG-Microbe ingredient vectors separately from semantic text; disclose lookup coverage and exclude
+      unsupported synthetic vectors (issues 678 and 681).
+    tracking:
+    - https://github.com/CultureBotAI/culturebotai-claw/issues/426
+  communitymech:
+    revision: fa6783454fe1391dcae5195b002159a31b12cda8
+    native: pacmap
+    evidence:
+    - src/communitymech/embedding/dimensionality.py
+    sets:
+      record-text:
+        modality: text
+        entity_type: record
+        state: planned
+        notes: Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
+          1024 dimensions; adopting it requires real vectors, not a metadata rename.
+      protein-sequence:
+        modality: protein_language_model
+        entity_type: protein
+        state: conditional
+        notes: Separate protein-entity set, following ProteinTraitsMech ESM-2 with pinned sequence/model revisions,
+          residue-mean pooling and overlap-corrected long-sequence windows. Require explicit, provenance-backed
+          record-to-protein bindings; where unavailable, report blocked with a reason. Do not infer sequences from
+          names or mix proteins into record-text rows.
+      kg-microbe-graph:
+        modality: graph
+        entity_type: community
+        state: native
+        notes: Preserve the source KG-Microbe release, vector lookup/aggregation recipe and missing-vector coverage;
+          select a separate PaCMAP artifact.
+    actions:
+    - Keep aggregated community KG vectors distinct from record text and report the matched community denominator;
+      do not treat sfdp as an encoder.
+    tracking:
+    - https://github.com/CultureBotAI/culturebotai-claw/issues/426
+  traitmech:
+    revision: 9c7ae6a992f89c25a194f5b61d7d85d0ce1f9f88
+    native: pacmap
+    evidence:
+    - scripts/build_embedding_index.py
+    sets:
+      record-text:
+        modality: text
+        entity_type: record
+        state: planned
+        notes: Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
+          1024 dimensions; adopting it requires real vectors, not a metadata rename.
+      protein-sequence:
+        modality: protein_language_model
+        entity_type: protein
+        state: conditional
+        notes: Separate protein-entity set, following ProteinTraitsMech ESM-2 with pinned sequence/model revisions,
+          residue-mean pooling and overlap-corrected long-sequence windows. Require explicit, provenance-backed
+          record-to-protein bindings; where unavailable, report blocked with a reason. Do not infer sequences from
+          names or mix proteins into record-text rows.
+      kg-microbe-graph:
+        modality: graph
+        entity_type: trait
+        state: native
+        notes: Preserve the source KG-Microbe release, vector lookup/aggregation recipe and missing-vector coverage;
+          select a separate PaCMAP artifact.
+    actions:
+    - Bind the KG-Microbe source and exact selected trait IDs to each map; preserve original-space neighbours and
+      address issue 917 before claiming full coverage.
+    tracking:
+    - https://github.com/CultureBotAI/culturebotai-claw/issues/426
+  proteintraitsmech:
+    revision: 9c563d320b0b39548daf119812a5e25298236b63
+    native: pacmap
+    evidence:
+    - scripts/embed_map.py
+    - scripts/embed_sequences.py
+    - scripts/build_sequence_map.py
+    - scripts/build_protein_map.py
+    - docs/map.html
+    sets:
+      record-text:
+        modality: text
+        entity_type: record
+        state: native
+        notes: Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
+          1024 dimensions; adopting it requires real vectors, not a metadata rename.
+      protein-sequence:
+        modality: protein_language_model
+        entity_type: protein
+        state: native
+        notes: Separate protein-entity set, following ProteinTraitsMech ESM-2 with pinned sequence/model revisions,
+          residue-mean pooling and overlap-corrected long-sequence windows. Require explicit, provenance-backed
+          record-to-protein bindings; where unavailable, report blocked with a reason. Do not infer sequences from
+          names or mix proteins into record-text rows.
+      definition-text:
+        modality: text
+        entity_type: record
+        state: native
+        notes: Definition-only BGE vectors remain distinct from full-record vectors, with an independent content
+          hash and vector file.
+      protein-traits:
+        modality: trait_profile
+        entity_type: protein
+        state: native
+        notes: Preserve the trait-profile feature vocabulary, weighting/SVD configuration and exclusions; this space
+          does not encode amino-acid sequence.
+    actions:
+    - Expose full-record text, definition-only text, protein trait profiles and ESM-2 sequences through the registry;
+      preserve the existing selector and its record-versus-protein semantics.
+    tracking:
+    - https://github.com/CultureBotAI/culturebotai-claw/issues/426
+    - https://github.com/CultureBotAI/proteintraitsmech/issues/700
+  antibioticmech:
+    revision: 0ce9bebaa01afd8df6fd34a1e682c1f56a3cc828
+    native: pacmap
+    evidence:
+    - scripts/embed_map.py
+    - scripts/embed_records.py
+    - src/antibioticmech/chemical_embedding.py
+    sets:
+      record-text:
+        modality: text
+        entity_type: record
+        state: native
+        notes: Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
+          1024 dimensions; adopting it requires real vectors, not a metadata rename.
+      protein-sequence:
+        modality: protein_language_model
+        entity_type: protein
+        state: conditional
+        notes: Separate protein-entity set, following ProteinTraitsMech ESM-2 with pinned sequence/model revisions,
+          residue-mean pooling and overlap-corrected long-sequence windows. Require explicit, provenance-backed
+          record-to-protein bindings; where unavailable, report blocked with a reason. Do not infer sequences from
+          names or mix proteins into record-text rows.
+      chemical-fingerprint:
+        modality: chemical
+        entity_type: compound
+        state: native
+        notes: Current projection is UMAP over chiral chemical distances. PaCMAP adoption needs a chemistry-appropriate
+          feature/metric adapter and quality comparison; never relabel existing coordinates as PaCMAP.
+    actions:
+    - Register text separately from chiral chemical fingerprints. Add a validated PaCMAP chemical projection before
+      replacing the current UMAP default; retain Tanimoto/fingerprint semantics and the labelled legacy comparison.
+    tracking:
+    - https://github.com/CultureBotAI/culturebotai-claw/issues/426
+  cellstructuremech:
+    revision: 49b8ed117bce10ce4b9768e7574901ea54612b6b
+    native: pca
+    evidence:
+    - scripts/build_text_embedding_map.py
+    - src/cellstructuremech/templates/embedding_map.html
+    sets:
+      record-text:
+        modality: text
+        entity_type: record
+        state: native
+        notes: Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
+          1024 dimensions; adopting it requires real vectors, not a metadata rename.
+      protein-sequence:
+        modality: protein_language_model
+        entity_type: protein
+        state: conditional
+        notes: Separate protein-entity set, following ProteinTraitsMech ESM-2 with pinned sequence/model revisions,
+          residue-mean pooling and overlap-corrected long-sequence windows. Require explicit, provenance-backed
+          record-to-protein bindings; where unavailable, report blocked with a reason. Do not infer sequences from
+          names or mix proteins into record-text rows.
+    actions:
+    - 'Complete issue 910: project existing pinned MiniLM vectors with PaCMAP and add the common BGE text set, retaining
+      the labelled PCA comparison and original-space cosine neighbours.'
+    tracking:
+    - https://github.com/CultureBotAI/culturebotai-claw/issues/426
+    - https://github.com/CultureBotAI/CellStructureMech/issues/910
+  habitatmech:
+    revision: ce35eefa1fbef8c3c31c06cba05f079f50943f2e
+    native: pacmap
+    evidence:
+    - scripts/embedding_pipeline.py
+    - src/habitatmech/templates/text_map.html
+    sets:
+      record-text:
+        modality: text
+        entity_type: record
+        state: native
+        notes: Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
+          1024 dimensions; adopting it requires real vectors, not a metadata rename.
+      protein-sequence:
+        modality: protein_language_model
+        entity_type: protein
+        state: conditional
+        notes: Separate protein-entity set, following ProteinTraitsMech ESM-2 with pinned sequence/model revisions,
+          residue-mean pooling and overlap-corrected long-sequence windows. Require explicit, provenance-backed
+          record-to-protein bindings; where unavailable, report blocked with a reason. Do not infer sequences from
+          names or mix proteins into record-text rows.
+    actions:
+    - Adapt the existing immutable BGE/PaCMAP bundle into a named record-text entry without weakening its cache,
+      source hash or publication-pointer checks.
+    tracking:
+    - https://github.com/CultureBotAI/culturebotai-claw/issues/426
+  naturalproductmech:
+    revision: 46837550f8903f16ac8a84de836908f5ce947929
+    native: pacmap
+    evidence:
+    - scripts/embed_map.py
+    - scripts/embed_records.py
+    - src/naturalproductmech/chemical_embedding.py
+    sets:
+      record-text:
+        modality: text
+        entity_type: record
+        state: native
+        notes: Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
+          1024 dimensions; adopting it requires real vectors, not a metadata rename.
+      protein-sequence:
+        modality: protein_language_model
+        entity_type: protein
+        state: conditional
+        notes: Separate protein-entity set, following ProteinTraitsMech ESM-2 with pinned sequence/model revisions,
+          residue-mean pooling and overlap-corrected long-sequence windows. Require explicit, provenance-backed
+          record-to-protein bindings; where unavailable, report blocked with a reason. Do not infer sequences from
+          names or mix proteins into record-text rows.
+      chemical-fingerprint:
+        modality: chemical
+        entity_type: compound
+        state: native
+        notes: Current projection is UMAP over chiral chemical distances. PaCMAP adoption needs a chemistry-appropriate
+          feature/metric adapter and quality comparison; never relabel existing coordinates as PaCMAP.
+    actions:
+    - Register text separately from chiral chemical fingerprints. Validate a PaCMAP projection for the chemical
+      space without silently replacing Tanimoto geometry with cosine; preserve the labelled UMAP comparison.
+    tracking:
+    - https://github.com/CultureBotAI/culturebotai-claw/issues/426
+  taxonmech:
+    revision: a2f7afd3d2fe88b01962dd7531b1747e6f70d5d1
+    native: no_pipeline_in_audited_source
+    evidence:
+    - src/taxonmech/corpus.py
+    - scripts/render_pages.py
+    sets:
+      record-text:
+        modality: text
+        entity_type: record
+        state: planned
+        notes: Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
+          1024 dimensions; adopting it requires real vectors, not a metadata rename.
+      protein-sequence:
+        modality: protein_language_model
+        entity_type: protein
+        state: conditional
+        notes: Separate protein-entity set, following ProteinTraitsMech ESM-2 with pinned sequence/model revisions,
+          residue-mean pooling and overlap-corrected long-sequence windows. Require explicit, provenance-backed
+          record-to-protein bindings; where unavailable, report blocked with a reason. Do not infer sequences from
+          names or mix proteins into record-text rows.
+    actions:
+    - Complete issue 58 using streaming taxon text and resumable vectors; avoid an all-taxa pairwise matrix. Keep
+      complete search/detail coverage and disclose any sampled overview.
+    tracking:
+    - https://github.com/CultureBotAI/culturebotai-claw/issues/426
+    - https://github.com/CultureBotAI/TaxonMech/issues/58
+  pathwaymech:
+    revision: 2133fcb1b3d7e80d02f6ef646d814a8689f84eb2
+    native: no_pipeline_in_audited_source
+    evidence:
+    - src/pathwaymech/schema/pathwaymech.yaml
+    - pyproject.toml
+    sets:
+      record-text:
+        modality: text
+        entity_type: record
+        state: planned
+        notes: Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
+          1024 dimensions; adopting it requires real vectors, not a metadata rename.
+      protein-sequence:
+        modality: protein_language_model
+        entity_type: protein
+        state: conditional
+        notes: Separate protein-entity set, following ProteinTraitsMech ESM-2 with pinned sequence/model revisions,
+          residue-mean pooling and overlap-corrected long-sequence windows. Require explicit, provenance-backed
+          record-to-protein bindings; where unavailable, report blocked with a reason. Do not infer sequences from
+          names or mix proteins into record-text rows.
+    actions:
+    - Add a versioned adapter for pathway name, definition and labelled participants/reactions, then pinned text
+      vectors and PaCMAP with record links and coverage. Keep pathway and participant-protein entities distinct.
+    tracking:
+    - https://github.com/CultureBotAI/culturebotai-claw/issues/426
+  dufmech:
+    revision: 3617561fac9e7bfff1f84f5be08543192ccda813
+    native: no_pipeline_in_audited_source
+    evidence:
+    - src/dufmech/schema/dufmech.yaml
+    - docs/records.md
+    sets:
+      record-text:
+        modality: text
+        entity_type: record
+        state: planned
+        notes: Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
+          1024 dimensions; adopting it requires real vectors, not a metadata rename.
+      protein-sequence:
+        modality: protein_language_model
+        entity_type: protein
+        state: conditional
+        notes: Separate protein-entity set, following ProteinTraitsMech ESM-2 with pinned sequence/model revisions,
+          residue-mean pooling and overlap-corrected long-sequence windows. Require explicit, provenance-backed
+          record-to-protein bindings; where unavailable, report blocked with a reason. Do not infer sequences from
+          names or mix proteins into record-text rows.
+    actions:
+    - Keep curated family records and seed-worklist entries explicitly distinguished. Text encodes family descriptions;
+      any PLM set requires release-pinned domain/protein sequences, accession/sequence hashes and an explicit family-to-protein
+      binding.
+    tracking:
+    - https://github.com/CultureBotAI/culturebotai-claw/issues/426
+  cmmmech:
+    revision: 905388523b6e9184783989484896e4cc20297832
+    native: no_pipeline_in_audited_source
+    evidence:
+    - src/cmmmech/schema/cmmmech.yaml
+    - pyproject.toml
+    sets:
+      record-text:
+        modality: text
+        entity_type: record
+        state: planned
+        notes: Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
+          1024 dimensions; adopting it requires real vectors, not a metadata rename.
+      protein-sequence:
+        modality: protein_language_model
+        entity_type: protein
+        state: conditional
+        notes: Separate protein-entity set, following ProteinTraitsMech ESM-2 with pinned sequence/model revisions,
+          residue-mean pooling and overlap-corrected long-sequence windows. Require explicit, provenance-backed
+          record-to-protein bindings; where unavailable, report blocked with a reason. Do not infer sequences from
+          names or mix proteins into record-text rows.
+    actions:
+    - Add a critical-material record-text adapter and cached vectors. With only three pilot records at the audit
+      revision, leave projection blocked under the minimum-cohort policy and keep repository links until a real
+      site and valid cohort exist.
+    tracking:
+    - https://github.com/CultureBotAI/culturebotai-claw/issues/426

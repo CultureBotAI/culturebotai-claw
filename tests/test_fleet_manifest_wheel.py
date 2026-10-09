@@ -54,6 +54,7 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path, review)
     with tarfile.open(source_archives[0], "r:gz") as source_archive:
         source_names = {name.split("/", 1)[1] for name in source_archive.getnames() if "/" in name}
     assert "src/kg_microbe_fleet/fleet.yaml" in source_names
+    assert "src/kg_microbe_embeddings/rollout.yaml" in source_names
     assert "src/kg_microbe_merge_queue/__init__.py" in source_names
     assert "src/kg_microbe_merge_queue/__main__.py" in source_names
     assert "src/kg_microbe_merge_queue/policy.json" in source_names
@@ -108,6 +109,9 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path, review)
     with zipfile.ZipFile(wheels[0]) as wheel:
         names = set(wheel.namelist())
         assert "kg_microbe_fleet/fleet.yaml" in names
+        assert wheel.read("kg_microbe_embeddings/rollout.yaml") == (
+            REPOSITORY_ROOT / "src/kg_microbe_embeddings/rollout.yaml"
+        ).read_bytes()
         assert "kg_microbe_merge_queue/__init__.py" in names
         assert "kg_microbe_merge_queue/__main__.py" in names
         assert "kg_microbe_merge_queue/policy.json" in names
@@ -137,6 +141,7 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path, review)
         )
         entry_points = wheel.read(entry_points_path).decode("utf-8")
         assert "kg-microbe-fleet = kg_microbe_fleet.__main__:main" in entry_points
+        assert "kg-microbe-embeddings = kg_microbe_embeddings.__main__:main" in entry_points
         assert "kg-microbe-merge-queue = kg_microbe_merge_queue.__main__:main" in entry_points
         assert "kg-microbe-governance = kg_microbe_governance.__main__:main" in entry_points
         assert "kg-microbe-history = kg_microbe_history.__main__:main" in entry_points

@@ -76,6 +76,14 @@ until the OpenClaw execution integration is implemented.
 
 ## Shared Mech tools
 
+Inspect the complete PaCMAP adoption plan with
+`uv run kg-microbe-embeddings rollout`. The shared vector-set builder preserves
+separate text, protein language model, graph and other feature spaces, with
+per-set provenance and coverage. It builds local map assets from existing
+vectors; downstream registry and website adoption remain explicit rollout
+work. See [embedding sets](docs/guides/EMBEDDING_SETS.md) for validation,
+projection commands and the repository-specific adoption gates.
+
 Update local Mech checkouts with `just fleet-pull --apply`, or preview with
 `just fleet-pull`. The preview is offline and compares cached upstream refs.
 The updater fetches each clean current branch's existing `origin` upstream and
@@ -97,6 +105,7 @@ console-script forms are available:
 
 ```bash
 uv run kg-microbe-history --help
+uv run kg-microbe-embeddings --help
 uv run kg-microbe-research --help
 uv run kg-microbe-reviews --help
 uv run kg-microbe-governance --help
@@ -171,6 +180,7 @@ uv run --extra dev mypy \
   cli/main.py plugins/repository_settings.py plugins/lock_manager.py \
   plugins/git_integration.py plugins/just_runner.py \
   src/kg_microbe_history src/kg_microbe_kgscan src/kg_microbe_fleet \
+  src/kg_microbe_embeddings \
   src/kg_microbe_merge_queue src/kg_microbe_research src/kg_microbe_write \
   src/kg_microbe_consistency src/kg_microbe_patches \
   src/kg_microbe_governance/__init__.py \
