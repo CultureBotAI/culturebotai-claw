@@ -1487,11 +1487,8 @@ mechs:
         width: 80
 
   naturalproductmech:
-    # Joined 2026-09-11. Every decision below was measured against this
-    # repository's tracked files on origin/main at that date; each disabled or
-    # not_applicable status names what would flip it. One Tier 1 item is
-    # honestly absent rather than declared: no history/ directory (the
-    # new-history recipe exists, the tree does not).
+    # Joined 2026-09-11. Capability reasons are refreshed against published
+    # main; native inline history and canonical sidecar CI are distinct gates.
     display_name: NaturalProductMech
     github: CultureBotAI/NaturalProductMech
     environment_variable: NATURALPRODUCTMECH_ROOT
@@ -1518,12 +1515,14 @@ mechs:
       curation_history:
         status: disabled
         reason: >-
-          Vendors the governed curation-history schema and carries a
-          new-history recipe, but has no history directory yet, so no record
-          can append an event. Adopting applies once the tree exists and the recipe is
-          wired into CI.
+          Native inline and component history exists, history/ contains canonical
+          sidecars, and justfile provides new-history. The scripts/run_qc.py
+          command list does not include canonical sidecar validation or
+          append-only checking. Shared curation-history adoption remains disabled
+          pending verified CI enforcement of that separate corpus; record_review
+          does not enable curation.
         reason_claims:
-          absent: ["history"]
+          present: ["history", "justfile", "scripts/run_qc.py"]
       # Closed-schema validation (scripts/validate_strict.py, closed=True) and
       # ruff both run on every PR through scripts/run_qc.py from main.yaml. The
       # fleet convention names that workflow validate-strict.yaml; the gate is
