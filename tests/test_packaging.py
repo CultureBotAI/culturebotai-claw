@@ -7,6 +7,7 @@ from importlib.resources import files
 from pathlib import Path
 
 PACKAGES = (
+    "kg_microbe_embeddings",
     "kg_microbe_discussions",
     "kg_microbe_history",
     "kg_microbe_kgscan",
@@ -33,6 +34,7 @@ def test_shared_console_scripts_are_installed():
     scripts = {entry.name for entry in entry_points(group="console_scripts")}
 
     assert {
+        "kg-microbe-embeddings",
         "kg-microbe-discussions",
         "kg-microbe-history",
         "kg-microbe-kgscan",

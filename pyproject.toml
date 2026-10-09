@@ -64,6 +64,7 @@ dependencies = [
 openclaw-cli = "cli.main:cli"
 kg-microbe-merge-queue = "kg_microbe_merge_queue.__main__:main"
 kg-microbe-fleet = "kg_microbe_fleet.__main__:main"
+kg-microbe-embeddings = "kg_microbe_embeddings.__main__:main"
 kg-microbe-consistency = "kg_microbe_consistency.__main__:main"
 kg-microbe-research = "kg_microbe_research.__main__:main"
 kg-microbe-reviews = "kg_microbe_reviews.__main__:main"
@@ -85,6 +86,10 @@ kg-microbe-qc = "kg_microbe_qc.generator:cli"
 kg-microbe-discussions = "kg_microbe_discussions.export:main"
 
 [project.optional-dependencies]
+embeddings = [
+    "pacmap==0.9.1",
+    "numpy>=2.0,<3",
+]
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
@@ -105,6 +110,7 @@ namespaces = false
 # The fleet manifest is imported at package-import time, so it must ship in
 # the wheel; `conf/` at the repository root would not be packaged.
 kg_microbe_fleet = ["fleet.yaml"]
+kg_microbe_embeddings = ["rollout.yaml"]
 kg_microbe_merge_queue = ["policy.json"]
 kg_microbe_write = ["writers.yaml"]
 kg_microbe_research = ["schema/*.yaml"]

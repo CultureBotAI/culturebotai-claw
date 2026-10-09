@@ -12,6 +12,8 @@ for provenance; they do not describe the supported interface.
 
 Other maintained references:
 
+- [`guides/EMBEDDING_SETS.md`](guides/EMBEDDING_SETS.md) — PaCMAP projections,
+  independent text/protein/graph sets and the complete fleet adoption plan.
 - [`guides/PYTHON_RUNTIME.md`](guides/PYTHON_RUNTIME.md) — the shared Python 3.13
   runtime, single-version CI, and requirements for compatibility exceptions.
 - [`guides/MECH_STANDARD.md`](guides/MECH_STANDARD.md) — the measured Mech

@@ -65,6 +65,7 @@ jobs:
           src/kg_microbe_history
           src/kg_microbe_kgscan
           src/kg_microbe_fleet
+          src/kg_microbe_embeddings
           src/kg_microbe_merge_queue
           src/kg_microbe_research
           src/kg_microbe_write
@@ -103,6 +104,24 @@ jobs:
           uv run --extra dev coverage report
           --include=cli/main.py,plugins/repository_settings.py,plugins/lock_manager.py,plugins/git_integration.py,plugins/just_runner.py
           --fail-under=60
+
+  embedding-projection:
+    # Real numerical canary from local synthetic vectors; no model download,
+    # inference, corpus access, downstream writes or publication.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      NUMBA_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13"
+          enable-cache: true
+      - run: uv sync --locked --extra dev --extra embeddings
+      - run: uv run --locked --extra dev --extra embeddings python -m pytest -q tests/test_embeddings.py
 
   history-round-trip:
     # The history layer's own guarantee, exercised end to end rather than trusted:
