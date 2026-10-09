@@ -92,13 +92,16 @@ class _LinkMLLoader(yaml.SafeLoader):
         return mapping
 
 
-_LINKML_LOADER_LOCK = threading.RLock()
+_linkml_yaml_loader = importlib.import_module("linkml_runtime.loaders.yaml_loader")
+# Vendored copies and the research contract mutate the same process-global loader.
+_LINKML_LOADER_LOCK = vars(_linkml_yaml_loader).setdefault(
+    "_claw_linkml_loader_lock", threading.RLock()
+)
 
 
 @contextmanager
 def _pure_linkml_loader():
-    # The research-result contract uses the same scoped workaround for PyYAML 6 C-loader damage.
-    loader = importlib.import_module("linkml_runtime.loaders.yaml_loader")
+    loader = _linkml_yaml_loader
     with _LINKML_LOADER_LOCK:
         original = loader.DupCheckYamlLoader
         loader.DupCheckYamlLoader = _LinkMLLoader

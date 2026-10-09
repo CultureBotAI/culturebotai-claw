@@ -441,6 +441,43 @@ def test_native_duf_snapshot_row_digest_is_preserved(review):
     assert "Scientific review: false" in rendered
 
 
+@pytest.mark.parametrize("first_contract", ["review", "research"])
+def test_review_and_research_loader_contexts_serialize_and_restore(monkeypatch, first_contract):
+    import importlib
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    from kg_microbe_governance.artifacts.scripts import record_review as contract
+    from kg_microbe_research import records as research
+
+    loader = importlib.import_module("linkml_runtime.loaders.yaml_loader")
+
+    class DamagedLoader(yaml.SafeLoader):
+        def get_single_data(self):
+            raise RuntimeError("damaged global loader became active")
+
+    monkeypatch.setattr(loader, "DupCheckYamlLoader", DamagedLoader)
+    first, second = ((contract, research) if first_contract == "review"
+                     else (research, contract))
+    attempting, entered, first_exited = (threading.Event() for _ in range(3))
+
+    def overlapping_operation():
+        attempting.set()
+        with second._pure_linkml_loader():
+            entered.set()
+            assert first_exited.wait(5)
+            return yaml.load("value: 1\n", Loader=loader.DupCheckYamlLoader)
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        with first._pure_linkml_loader():
+            future = executor.submit(overlapping_operation)
+            assert attempting.wait(5)
+            entered.wait(0.1)
+        first_exited.set()
+        assert future.result(timeout=5) == {"value": 1}
+    assert loader.DupCheckYamlLoader is DamagedLoader
+
+
 def test_cmm_provenance_only_scope_does_not_become_scientific_acceptance(review):
     review["scope"]["description"] = "Review only the linked history event, not criticality or mechanism evidence."
     review["reviewer"].update(kind="agent", independence="self_review",
