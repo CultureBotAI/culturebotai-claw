@@ -5,6 +5,9 @@ support multiple, separately identified embedding sets. The machine-checked
 [rollout](../../src/kg_microbe_embeddings/rollout.yaml) covers all thirteen
 members at the recorded October 9, 2026 source revisions. A new fleet member
 without a rollout entry fails the contract tests.
+Each Mech chooses sets appropriate to its entities and available inputs.
+Multiple-set support does not require every modality, or even two populated
+sets, in every repository. Protein embeddings apply to a subset of the fleet.
 
 PaCMAP projects existing vectors into a map. Text encoders, protein language
 models, graph embeddings and chemical features produce different vectors and
@@ -13,6 +16,23 @@ retain their own identities. The reference is
 full-record text, definition-only text, protein trait profiles, and ESM-2
 sequence embeddings. Protein points and record points have different identities
 and denominators, even when they appear in the same application.
+
+Modality, representation and encoder describe different parts of a set:
+
+| Modality | Example representation | Distinct named sets |
+| --- | --- | --- |
+| `text` | `definition`, `whole_record` | Definition-only text and whole-record semantic text, even with the same model |
+| `chemical` | `molecular_fingerprint` | Chemical structure features; future molecular encoders can add separate sets |
+| `protein_language_model` | `amino_acid_sequence` | Verified protein/domain sequence cohorts where relevant |
+| `graph` | `graph_features` | Entity or aggregated KG features with their own input recipes |
+| A future modality | A domain-specific representation | New vector spaces registered with independent provenance |
+
+ProteinTraitsMech supplies the existing sequence view; DUFMech has a conditional
+protein/domain plan, and PathwayMech may add a verified protein-participant view.
+Chemical structure views already exist in AntibioticMech and NaturalProductMech.
+Other repositories can add either kind when appropriate; unrelated modalities
+are omitted, rather than shown as blocked work. Existing chemical UMAP views
+retain their actual projection labels during the planned PaCMAP migration.
 
 ## Current implementation and rollout
 
@@ -85,8 +105,22 @@ lowercase names, such as `record-text-bge`, `definition-text-bge`,
 modality use different set IDs and independent vector files.
 
 Each set declares `id`, `label`, `modality`, `entity_type` and `status`.
-Supported modalities are `text`, `protein_language_model`, `graph`, `chemical`
-and `trait_profile`. `ready` means the registered vectors exist; it does not
+`modality` is an extensible lowercase identifier, with common values `text`,
+`protein_language_model`, `graph`, `chemical` and `trait_profile`. It is metadata,
+not a fixed list of encoders implemented by this package. New modalities use the
+same validated vector contract; they do not select a different projection method.
+
+Use `representation` to distinguish input scopes within a modality, such as
+`definition` versus `whole_record`. It uses the same identifier syntax and is
+preserved in both the catalogue and map asset. The field is optional for
+compatibility with existing version-1 registries; an omitted scope is never
+guessed. Whole-record semantic text follows the adapter's versioned include/
+exclude recipe, rather than indiscriminately embedding every serialized field.
+The ready set's `encoder.input_recipe` records the precise selection and
+preprocessing. Different text scopes, models or cohorts need separate set IDs,
+input hashes and vector artifacts even if their dimensions and entity IDs match.
+
+`ready` means the registered vectors exist; it does not
 mean the map has been built or deployed. `planned` and `blocked` entries carry
 a nonempty `reason` and no artifact claims. They remain visible in the output
 catalogue. If any set is ready, the default must name a ready set.
@@ -101,14 +135,9 @@ A minimal plan, valid before there are any vectors, is:
   "sets": [
     {
       "id": "record-text", "label": "Record text", "modality": "text",
+      "representation": "whole_record",
       "entity_type": "record", "status": "planned",
       "reason": "Text adapter and encoder output are pending."
-    },
-    {
-      "id": "protein-sequence", "label": "Protein sequence",
-      "modality": "protein_language_model", "entity_type": "protein",
-      "status": "blocked",
-      "reason": "No verified sequence cohort is registered."
     }
   ]
 }
@@ -182,25 +211,28 @@ relative `path` and SHA-256 for each ready map. Each `sets/<id>.json` contains
 `[entity_id, x, y]` points, the set ID, entity type, encoder/source metadata,
 input hashes, measured coverage and actual reducer settings/software versions.
 A site must verify the asset hash against the index and lazy-load the selected
-set. Key browser caches and neighbour indexes by set identity and source/model
-fingerprint, not just by entity ID. Preserve set selection in navigation and
-use the selected entity type's record/protein links.
+set. Key browser caches and neighbour indexes by set identity and the source,
+model and input-recipe fingerprint, including the representation when supplied.
+Preserve set selection in navigation and use the selected entity type's record,
+compound or protein links.
 
-Text vectors and protein-language-model vectors are independent spaces. Do
-not concatenate them, average them, compare coordinates across maps, or reuse
-neighbours from a different space. Compute semantic neighbours in the selected
-original vector space. Cross-space protein-to-record associations require
-explicit provenance-backed bindings; they are not coordinate equivalences.
+Definition text, whole-record text, chemical structures, protein sequences and
+other representations are independent spaces. Do not concatenate them, average
+them, compare coordinates across maps, or reuse neighbours from a different
+space. Compute neighbours in the selected original vector space. Cross-space
+entity associations require explicit provenance-backed bindings; they are not
+coordinate equivalences.
 
-Every Mech must be able to describe additional sets, including conditional
-protein sets. That does not require manufacturing protein embeddings for a
-corpus without grounded sequences. Such a set remains blocked with its reason.
-For real sequences, preserve ProteinTraitsMech's pinned model revision,
+Every Mech can add applicable sets later, including new modalities and multiple
+representations or models within one modality. A modality that is irrelevant to
+its current scope needs no registry entry. Use planned/blocked entries only for
+an intended, relevant set whose inputs or implementation are still pending.
+For a chosen protein set, preserve ProteinTraitsMech's pinned model revision,
 sequence checksums, residue-mean pooling and overlap-corrected long-sequence
 windows, or document and validate a different model's recipe.
 
 Complete each repository's rollout actions and shared acceptance gates before
-claiming adoption. Run a two-set offline test, a bounded real PaCMAP canary,
+claiming adoption. Run a two-set offline fixture test, a bounded real PaCMAP canary,
 the native repository checks, current-input artifact verification, and live
 desktop/mobile/keyboard checks for selection, coverage and links. Keep ordinary
 CI free of model inference. Update repository and X-Mech web support only after

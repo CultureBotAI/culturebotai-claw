@@ -78,8 +78,9 @@ until the OpenClaw execution integration is implemented.
 
 Inspect the complete PaCMAP adoption plan with
 `uv run kg-microbe-embeddings rollout`. The shared vector-set builder preserves
-separate text, protein language model, graph and other feature spaces, with
-per-set provenance and coverage. It builds local map assets from existing
+separate definition and whole-record text, chemical structure, applicable protein,
+graph and future feature spaces, with per-set provenance and coverage. Each Mech
+chooses relevant sets. The builder creates local map assets from existing
 vectors; downstream registry and website adoption remain explicit rollout
 work. See [embedding sets](docs/guides/EMBEDDING_SETS.md) for validation,
 projection commands and the repository-specific adoption gates.

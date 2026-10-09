@@ -102,6 +102,7 @@ def test_two_sets_keep_dimensions_entities_coverage_and_provenance(tmp_path, fak
         "id": "future-text",
         "label": "Next model",
         "modality": "text",
+        "representation": "whole_record",
         "entity_type": "record",
         "status": "planned",
         "reason": "No vectors for this model yet",
@@ -126,6 +127,7 @@ def test_two_sets_keep_dimensions_entities_coverage_and_provenance(tmp_path, fak
         assert digest(artifact) == entry["sha256"]
         data = json.loads(artifact.read_text())
         assert data["set_id"] == spec["id"] and data["entity_type"] == spec["entity_type"]
+        assert "representation" not in entry and "representation" not in data
         assert data["encoder"] == spec["encoder"] and data["source"] == spec["source"]
         assert data["coverage"]["total"] != data["coverage"]["shown"]
         assert data["coverage"]["shown"] == data["coverage"]["embedded"]
@@ -136,12 +138,53 @@ def test_two_sets_keep_dimensions_entities_coverage_and_provenance(tmp_path, fak
         assert data["projection"]["effective_further_pairs"] == 6
 
 
+def test_text_variants_chemistry_and_future_modality_build_without_proteins(tmp_path, fake_pacmap):
+    whole = fixture_set(tmp_path, "whole-record-text")
+    definition = fixture_set(tmp_path, "definition-text")
+    chemical = fixture_set(tmp_path, "chemical-structure", modality="chemical", rows=24, dims=16)
+    future = fixture_set(tmp_path, "abundance-profile", modality="metabolomic", rows=14, dims=5)
+    specs = [whole, definition, chemical, future]
+    for spec, representation in zip(
+        specs,
+        ["whole_record", "definition", "molecular_fingerprint", "abundance_profile"],
+        strict=True,
+    ):
+        spec["representation"] = representation
+        spec["encoder"]["input_recipe"] = f"fixture/{representation}/v1"
+    chemical["entity_type"] = "compound"
+    future["entity_type"] = "sample"
+    # Same text model, entity IDs and dimensions, but different selected input
+    # fields and vectors. Grouping either by model or modality would lose a view.
+    definition_path = tmp_path / definition["vectors"]["path"]
+    np.save(definition_path, np.random.default_rng(55).normal(size=(32, 8)))
+    definition["vectors"]["sha256"] = digest(definition_path)
+    definition["source"]["input_sha256"] = "d" * 64
+    output = tmp_path / "release"
+    result = project.build(registry(tmp_path, specs), output)
+    assert len(fake_pacmap) == len(result["sets"]) == 4
+    payloads = []
+    for entry, spec in zip(result["sets"], specs, strict=True):
+        data = json.loads((output / entry["path"]).read_text())
+        payloads.append(data)
+        assert entry["representation"] == data["representation"] == spec["representation"]
+        assert entry["modality"] == data["modality"] == spec["modality"]
+        assert data["encoder"] == spec["encoder"] and data["source"] == spec["source"]
+        assert data["inputs"]["vectors"] == spec["vectors"]
+        assert data["projection"]["method"] == "pacmap"
+    assert payloads[0]["points"] != payloads[1]["points"]
+    assert payloads[0]["encoder"]["name"] == payloads[1]["encoder"]["name"]
+
+
 @pytest.mark.parametrize(
     "change",
     [
         lambda s: s.update(id="../escape"),
         lambda s: s.update(status="published"),
         lambda s: s.update(modality=[]),
+        lambda s: s.update(modality=""),
+        lambda s: s.update(modality="protein language model"),
+        lambda s: s.update(representation=[]),
+        lambda s: s.update(representation=""),
         lambda s: s["projection"].update(method="umap"),
         lambda s: s["projection"].update(seed=True),
         lambda s: s["projection"].update(seed=2**32),
@@ -204,6 +247,7 @@ def test_planned_sets_require_a_reason_and_cannot_publish(tmp_path):
         "id": "record-text",
         "label": "Text",
         "modality": "text",
+        "representation": "definition",
         "entity_type": "record",
         "status": "planned",
         "reason": "Awaiting vectors",
@@ -316,12 +360,50 @@ def test_fleet_rollout_covers_canonical_members_and_retains_pending_work():
     doc = load_rollout()
     assert set(doc["mechs"]) == set(load_fleet_manifest().keys)
     assert doc["mechs"]["proteintraitsmech"]["sets"]["protein-sequence"]["state"] == "native"
-    assert doc["mechs"]["cmmmech"]["sets"]["protein-sequence"]["state"] == "conditional"
+    assert doc["mechs"]["dufmech"]["sets"]["protein-sequence"]["state"] == "conditional"
+    assert "protein-sequence" not in doc["mechs"]["cmmmech"]["sets"]
+    assert "protein-sequence" not in doc["mechs"]["habitatmech"]["sets"]
+    for key in ("antibioticmech", "naturalproductmech"):
+        chemical = doc["mechs"][key]["sets"]["chemical-fingerprint"]
+        assert chemical["state"] == "native" and chemical["modality"] == "chemical"
+        assert chemical["representation"] == "molecular_fingerprint"
+    text_sets = doc["mechs"]["proteintraitsmech"]["sets"]
+    assert text_sets["record-text"]["representation"] == "whole_record"
+    assert text_sets["definition-text"]["representation"] == "definition"
     assert doc["policy"]["registry_adoption"] == "planned"
 
 
+def test_rollout_accepts_domain_specific_sets_and_future_modalities(tmp_path):
+    doc = load_rollout()
+    # A corpus may choose only chemical structure, or a new domain. Neither a
+    # text set nor a placeholder protein set is required by the infrastructure.
+    for key, modality in [("cmmmech", "chemical"), ("habitatmech", "metabolomic")]:
+        doc["mechs"][key]["sets"] = {
+            "domain-view": {
+                "modality": modality,
+                "representation": "domain_features",
+                "entity_type": "record",
+                "state": "planned",
+                "notes": "Test applicability",
+            }
+        }
+    path = tmp_path / "rollout.yaml"
+    path.write_text(yaml.safe_dump(doc))
+    assert load_rollout(path) == doc
+
+
 @pytest.mark.parametrize(
-    "defect", ["missing_mech", "extra_mech", "method", "multiple", "protein", "revision"]
+    "defect",
+    [
+        "missing_mech",
+        "extra_mech",
+        "method",
+        "multiple",
+        "empty_sets",
+        "revision",
+        "modality",
+        "representation",
+    ],
 )
 def test_rollout_cannot_silently_drop_a_mech_or_multi_set_requirement(tmp_path, defect):
     doc = load_rollout()
@@ -333,10 +415,12 @@ def test_rollout_cannot_silently_drop_a_mech_or_multi_set_requirement(tmp_path, 
         doc["policy"]["primary_projection"] = "umap"
     if defect == "multiple":
         doc["policy"]["multiple_sets"] = False
-    if defect == "protein":
-        doc["mechs"]["cmmmech"]["sets"].pop("protein-sequence")
+    if defect == "empty_sets":
+        doc["mechs"]["cmmmech"]["sets"].clear()
     if defect == "revision":
         doc["mechs"]["cmmmech"]["revision"] = "main"
+    if defect in {"modality", "representation"}:
+        doc["mechs"]["cmmmech"]["sets"]["record-text"][defect] = []
     path = tmp_path / "rollout.yaml"
     path.write_text(yaml.safe_dump(doc))
     with pytest.raises(EmbeddingError):

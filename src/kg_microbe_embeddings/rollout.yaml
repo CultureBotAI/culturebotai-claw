@@ -9,6 +9,13 @@ policy:
   multiple_sets: true
   registry_adoption: planned
 acceptance:
+- Choose sets by corpus and entity applicability. Protein language models are relevant only to sequence-bearing
+  entities; chemical structure sets need grounded compounds. Omit unrelated modalities instead of creating blocked
+  placeholders. Additional modalities and representations can be added without changing the projection contract.
+- Keep definition-only and whole-record text as independently identified representations of the text modality, even
+  when they share an encoder, entity IDs and dimensions. Preserve each versioned input recipe, source hash, vectors,
+  coverage and neighbours. Multiple-set support does not require every Mech to populate every type or a minimum
+  number of sets.
 - Add a versioned registry with unique set IDs, exact encoder/input recipe, immutable source/model revisions, ordered
   ID/vector hashes and per-set coverage. Export existing vectors through the shared projection adapter; retain verified
   existing text bundles from PR 432 where appropriate.
@@ -30,28 +37,24 @@ mechs:
         modality: text
         entity_type: record
         state: planned
-        notes: Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
+        notes: Whole-record semantic text follows a versioned include/exclude recipe, distinct from a definition-only
+          set. Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
           1024 dimensions; adopting it requires real vectors, not a metadata rename.
-      protein-sequence:
-        modality: protein_language_model
-        entity_type: protein
-        state: conditional
-        notes: Separate protein-entity set, following ProteinTraitsMech ESM-2 with pinned sequence/model revisions,
-          residue-mean pooling and overlap-corrected long-sequence windows. Require explicit, provenance-backed
-          record-to-protein bindings; where unavailable, report blocked with a reason. Do not infer sequences from
-          names or mix proteins into record-text rows.
+        representation: whole_record
       kg-microbe-graph:
         modality: graph
         entity_type: medium
         state: native
         notes: Preserve the source KG-Microbe release, vector lookup/aggregation recipe and missing-vector coverage;
           select a separate PaCMAP artifact.
+        representation: graph_features
       ingredient-graph:
         modality: graph
         entity_type: ingredient
         state: native
         notes: Ingredient vectors are a different point population from media/recipe vectors; use independent IDs,
           coverage and links.
+        representation: graph_features
     actions:
     - Preserve recipe-level and ingredient-level KG-Microbe spaces as distinct sets with their actual entity types
       and aggregation rules.
@@ -67,22 +70,17 @@ mechs:
         modality: text
         entity_type: record
         state: planned
-        notes: Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
+        notes: Whole-record semantic text follows a versioned include/exclude recipe, distinct from a definition-only
+          set. Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
           1024 dimensions; adopting it requires real vectors, not a metadata rename.
-      protein-sequence:
-        modality: protein_language_model
-        entity_type: protein
-        state: conditional
-        notes: Separate protein-entity set, following ProteinTraitsMech ESM-2 with pinned sequence/model revisions,
-          residue-mean pooling and overlap-corrected long-sequence windows. Require explicit, provenance-backed
-          record-to-protein bindings; where unavailable, report blocked with a reason. Do not infer sequences from
-          names or mix proteins into record-text rows.
+        representation: whole_record
       kg-microbe-graph:
         modality: graph
         entity_type: ingredient
         state: native
         notes: Preserve the source KG-Microbe release, vector lookup/aggregation recipe and missing-vector coverage;
           select a separate PaCMAP artifact.
+        representation: graph_features
     actions:
     - Register KG-Microbe ingredient vectors separately from semantic text; disclose lookup coverage and exclude
       unsupported synthetic vectors (issues 678 and 681).
@@ -98,22 +96,17 @@ mechs:
         modality: text
         entity_type: record
         state: planned
-        notes: Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
+        notes: Whole-record semantic text follows a versioned include/exclude recipe, distinct from a definition-only
+          set. Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
           1024 dimensions; adopting it requires real vectors, not a metadata rename.
-      protein-sequence:
-        modality: protein_language_model
-        entity_type: protein
-        state: conditional
-        notes: Separate protein-entity set, following ProteinTraitsMech ESM-2 with pinned sequence/model revisions,
-          residue-mean pooling and overlap-corrected long-sequence windows. Require explicit, provenance-backed
-          record-to-protein bindings; where unavailable, report blocked with a reason. Do not infer sequences from
-          names or mix proteins into record-text rows.
+        representation: whole_record
       kg-microbe-graph:
         modality: graph
         entity_type: community
         state: native
         notes: Preserve the source KG-Microbe release, vector lookup/aggregation recipe and missing-vector coverage;
           select a separate PaCMAP artifact.
+        representation: graph_features
     actions:
     - Keep aggregated community KG vectors distinct from record text and report the matched community denominator;
       do not treat sfdp as an encoder.
@@ -129,22 +122,17 @@ mechs:
         modality: text
         entity_type: record
         state: planned
-        notes: Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
+        notes: Whole-record semantic text follows a versioned include/exclude recipe, distinct from a definition-only
+          set. Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
           1024 dimensions; adopting it requires real vectors, not a metadata rename.
-      protein-sequence:
-        modality: protein_language_model
-        entity_type: protein
-        state: conditional
-        notes: Separate protein-entity set, following ProteinTraitsMech ESM-2 with pinned sequence/model revisions,
-          residue-mean pooling and overlap-corrected long-sequence windows. Require explicit, provenance-backed
-          record-to-protein bindings; where unavailable, report blocked with a reason. Do not infer sequences from
-          names or mix proteins into record-text rows.
+        representation: whole_record
       kg-microbe-graph:
         modality: graph
         entity_type: trait
         state: native
         notes: Preserve the source KG-Microbe release, vector lookup/aggregation recipe and missing-vector coverage;
           select a separate PaCMAP artifact.
+        representation: graph_features
     actions:
     - Bind the KG-Microbe source and exact selected trait IDs to each map; preserve original-space neighbours and
       address issue 917 before claiming full coverage.
@@ -164,8 +152,10 @@ mechs:
         modality: text
         entity_type: record
         state: native
-        notes: Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
+        notes: Whole-record semantic text follows a versioned include/exclude recipe, distinct from a definition-only
+          set. Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
           1024 dimensions; adopting it requires real vectors, not a metadata rename.
+        representation: whole_record
       protein-sequence:
         modality: protein_language_model
         entity_type: protein
@@ -174,18 +164,21 @@ mechs:
           residue-mean pooling and overlap-corrected long-sequence windows. Require explicit, provenance-backed
           record-to-protein bindings; where unavailable, report blocked with a reason. Do not infer sequences from
           names or mix proteins into record-text rows.
+        representation: amino_acid_sequence
       definition-text:
         modality: text
         entity_type: record
         state: native
         notes: Definition-only BGE vectors remain distinct from full-record vectors, with an independent content
           hash and vector file.
+        representation: definition
       protein-traits:
         modality: trait_profile
         entity_type: protein
         state: native
         notes: Preserve the trait-profile feature vocabulary, weighting/SVD configuration and exclusions; this space
           does not encode amino-acid sequence.
+        representation: trait_profile
     actions:
     - Expose full-record text, definition-only text, protein trait profiles and ESM-2 sequences through the registry;
       preserve the existing selector and its record-versus-protein semantics.
@@ -204,22 +197,17 @@ mechs:
         modality: text
         entity_type: record
         state: native
-        notes: Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
+        notes: Whole-record semantic text follows a versioned include/exclude recipe, distinct from a definition-only
+          set. Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
           1024 dimensions; adopting it requires real vectors, not a metadata rename.
-      protein-sequence:
-        modality: protein_language_model
-        entity_type: protein
-        state: conditional
-        notes: Separate protein-entity set, following ProteinTraitsMech ESM-2 with pinned sequence/model revisions,
-          residue-mean pooling and overlap-corrected long-sequence windows. Require explicit, provenance-backed
-          record-to-protein bindings; where unavailable, report blocked with a reason. Do not infer sequences from
-          names or mix proteins into record-text rows.
+        representation: whole_record
       chemical-fingerprint:
         modality: chemical
         entity_type: compound
         state: native
         notes: Current projection is UMAP over chiral chemical distances. PaCMAP adoption needs a chemistry-appropriate
           feature/metric adapter and quality comparison; never relabel existing coordinates as PaCMAP.
+        representation: molecular_fingerprint
     actions:
     - Register text separately from chiral chemical fingerprints. Add a validated PaCMAP chemical projection before
       replacing the current UMAP default; retain Tanimoto/fingerprint semantics and the labelled legacy comparison.
@@ -236,16 +224,10 @@ mechs:
         modality: text
         entity_type: record
         state: native
-        notes: Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
+        notes: Whole-record semantic text follows a versioned include/exclude recipe, distinct from a definition-only
+          set. Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
           1024 dimensions; adopting it requires real vectors, not a metadata rename.
-      protein-sequence:
-        modality: protein_language_model
-        entity_type: protein
-        state: conditional
-        notes: Separate protein-entity set, following ProteinTraitsMech ESM-2 with pinned sequence/model revisions,
-          residue-mean pooling and overlap-corrected long-sequence windows. Require explicit, provenance-backed
-          record-to-protein bindings; where unavailable, report blocked with a reason. Do not infer sequences from
-          names or mix proteins into record-text rows.
+        representation: whole_record
     actions:
     - 'Complete issue 910: project existing pinned MiniLM vectors with PaCMAP and add the common BGE text set, retaining
       the labelled PCA comparison and original-space cosine neighbours.'
@@ -263,16 +245,10 @@ mechs:
         modality: text
         entity_type: record
         state: native
-        notes: Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
+        notes: Whole-record semantic text follows a versioned include/exclude recipe, distinct from a definition-only
+          set. Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
           1024 dimensions; adopting it requires real vectors, not a metadata rename.
-      protein-sequence:
-        modality: protein_language_model
-        entity_type: protein
-        state: conditional
-        notes: Separate protein-entity set, following ProteinTraitsMech ESM-2 with pinned sequence/model revisions,
-          residue-mean pooling and overlap-corrected long-sequence windows. Require explicit, provenance-backed
-          record-to-protein bindings; where unavailable, report blocked with a reason. Do not infer sequences from
-          names or mix proteins into record-text rows.
+        representation: whole_record
     actions:
     - Adapt the existing immutable BGE/PaCMAP bundle into a named record-text entry without weakening its cache,
       source hash or publication-pointer checks.
@@ -290,22 +266,17 @@ mechs:
         modality: text
         entity_type: record
         state: native
-        notes: Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
+        notes: Whole-record semantic text follows a versioned include/exclude recipe, distinct from a definition-only
+          set. Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
           1024 dimensions; adopting it requires real vectors, not a metadata rename.
-      protein-sequence:
-        modality: protein_language_model
-        entity_type: protein
-        state: conditional
-        notes: Separate protein-entity set, following ProteinTraitsMech ESM-2 with pinned sequence/model revisions,
-          residue-mean pooling and overlap-corrected long-sequence windows. Require explicit, provenance-backed
-          record-to-protein bindings; where unavailable, report blocked with a reason. Do not infer sequences from
-          names or mix proteins into record-text rows.
+        representation: whole_record
       chemical-fingerprint:
         modality: chemical
         entity_type: compound
         state: native
         notes: Current projection is UMAP over chiral chemical distances. PaCMAP adoption needs a chemistry-appropriate
           feature/metric adapter and quality comparison; never relabel existing coordinates as PaCMAP.
+        representation: molecular_fingerprint
     actions:
     - Register text separately from chiral chemical fingerprints. Validate a PaCMAP projection for the chemical
       space without silently replacing Tanimoto geometry with cosine; preserve the labelled UMAP comparison.
@@ -322,16 +293,10 @@ mechs:
         modality: text
         entity_type: record
         state: planned
-        notes: Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
+        notes: Whole-record semantic text follows a versioned include/exclude recipe, distinct from a definition-only
+          set. Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
           1024 dimensions; adopting it requires real vectors, not a metadata rename.
-      protein-sequence:
-        modality: protein_language_model
-        entity_type: protein
-        state: conditional
-        notes: Separate protein-entity set, following ProteinTraitsMech ESM-2 with pinned sequence/model revisions,
-          residue-mean pooling and overlap-corrected long-sequence windows. Require explicit, provenance-backed
-          record-to-protein bindings; where unavailable, report blocked with a reason. Do not infer sequences from
-          names or mix proteins into record-text rows.
+        representation: whole_record
     actions:
     - Complete issue 58 using streaming taxon text and resumable vectors; avoid an all-taxa pairwise matrix. Keep
       complete search/detail coverage and disclose any sampled overview.
@@ -349,16 +314,18 @@ mechs:
         modality: text
         entity_type: record
         state: planned
-        notes: Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
+        notes: Whole-record semantic text follows a versioned include/exclude recipe, distinct from a definition-only
+          set. Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
           1024 dimensions; adopting it requires real vectors, not a metadata rename.
+        representation: whole_record
       protein-sequence:
         modality: protein_language_model
         entity_type: protein
         state: conditional
-        notes: Separate protein-entity set, following ProteinTraitsMech ESM-2 with pinned sequence/model revisions,
-          residue-mean pooling and overlap-corrected long-sequence windows. Require explicit, provenance-backed
-          record-to-protein bindings; where unavailable, report blocked with a reason. Do not infer sequences from
-          names or mix proteins into record-text rows.
+        notes: Optional protein-participant view, separate from pathway records. The schema distinguishes protein
+          participants and provider-local accessions; project only a verified sequence cohort with explicit pathway-to-protein
+          bindings and encoder provenance. A pathway text map does not depend on this view.
+        representation: amino_acid_sequence
     actions:
     - Add a versioned adapter for pathway name, definition and labelled participants/reactions, then pinned text
       vectors and PaCMAP with record links and coverage. Keep pathway and participant-protein entities distinct.
@@ -375,16 +342,18 @@ mechs:
         modality: text
         entity_type: record
         state: planned
-        notes: Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
+        notes: Whole-record semantic text follows a versioned include/exclude recipe, distinct from a definition-only
+          set. Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
           1024 dimensions; adopting it requires real vectors, not a metadata rename.
+        representation: whole_record
       protein-sequence:
         modality: protein_language_model
         entity_type: protein
         state: conditional
-        notes: Separate protein-entity set, following ProteinTraitsMech ESM-2 with pinned sequence/model revisions,
-          residue-mean pooling and overlap-corrected long-sequence windows. Require explicit, provenance-backed
-          record-to-protein bindings; where unavailable, report blocked with a reason. Do not infer sequences from
-          names or mix proteins into record-text rows.
+        notes: Applicable to verified protein/domain sequences linked to DUF families, not to family identifiers
+          or seed descriptions alone. Require release-pinned sequences, accession/sequence hashes, family-to-protein
+          bindings and an explicit pooling/window recipe before creating vectors.
+        representation: amino_acid_sequence
     actions:
     - Keep curated family records and seed-worklist entries explicitly distinguished. Text encodes family descriptions;
       any PLM set requires release-pinned domain/protein sequences, accession/sequence hashes and an explicit family-to-protein
@@ -402,16 +371,10 @@ mechs:
         modality: text
         entity_type: record
         state: planned
-        notes: Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
+        notes: Whole-record semantic text follows a versioned include/exclude recipe, distinct from a definition-only
+          set. Keep the actual encoder identity. The common BGE model is BAAI/bge-large-en-v1.5 at d4aa6901d3a41ba39fb536a557fa166f842b0e09,
           1024 dimensions; adopting it requires real vectors, not a metadata rename.
-      protein-sequence:
-        modality: protein_language_model
-        entity_type: protein
-        state: conditional
-        notes: Separate protein-entity set, following ProteinTraitsMech ESM-2 with pinned sequence/model revisions,
-          residue-mean pooling and overlap-corrected long-sequence windows. Require explicit, provenance-backed
-          record-to-protein bindings; where unavailable, report blocked with a reason. Do not infer sequences from
-          names or mix proteins into record-text rows.
+        representation: whole_record
     actions:
     - Add a critical-material record-text adapter and cached vectors. With only three pilot records at the audit
       revision, leave projection blocked under the minimum-cohort policy and keep repository links until a real
