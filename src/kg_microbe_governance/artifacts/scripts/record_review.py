@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import html
+import importlib
 import json
 import math
 import os
@@ -18,6 +19,7 @@ import secrets
 import stat
 import subprocess
 import sys
+import threading
 from collections.abc import Sequence
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -74,6 +76,38 @@ class _ReviewLoader(yaml.SafeLoader):
         return result
 
 
+class _LinkMLLoader(yaml.SafeLoader):
+    """Keep LinkML parsing independent of C-loader import order and foreign resolvers."""
+
+    yaml_path_resolvers: dict[Any, Any] = {}
+
+    def construct_mapping(self, node, deep=False):
+        self.flatten_mapping(node)
+        mapping = {}
+        for key_node, value_node in node.value:
+            key = self.construct_object(key_node, deep=deep)
+            if key in mapping:
+                raise ReviewError(f"duplicate LinkML YAML key: {key!r}")
+            mapping[key] = self.construct_object(value_node, deep=deep)
+        return mapping
+
+
+_LINKML_LOADER_LOCK = threading.RLock()
+
+
+@contextmanager
+def _pure_linkml_loader():
+    # The research-result contract uses the same scoped workaround for PyYAML 6 C-loader damage.
+    loader = importlib.import_module("linkml_runtime.loaders.yaml_loader")
+    with _LINKML_LOADER_LOCK:
+        original = loader.DupCheckYamlLoader
+        loader.DupCheckYamlLoader = _LinkMLLoader
+        try:
+            yield
+        finally:
+            loader.DupCheckYamlLoader = original
+
+
 def load_document(raw: str | bytes) -> dict:
     """Read YAML/JSON with duplicate-key and non-finite-number rejection."""
     try:
@@ -115,10 +149,11 @@ def _schema_validator(schema_text: str):
     schema = load_document(schema_text)
     if schema.get("imports"):
         raise ReviewError("review schema must be self-contained; remote imports are forbidden")
-    generated = json.loads(JsonSchemaGenerator(
-        SchemaDefinition(**schema), topClass="RecordReview", not_closed=False,
-        include_null=False,
-    ).serialize())
+    with _pure_linkml_loader():
+        generated = json.loads(JsonSchemaGenerator(
+            SchemaDefinition(**schema), topClass="RecordReview", not_closed=False,
+            include_null=False,
+        ).serialize())
     validator = validator_for(generated)
     validator.check_schema(generated)
     return validator(generated)

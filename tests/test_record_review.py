@@ -86,6 +86,30 @@ def test_closed_schema_accepts_explicit_empty_findings(review):
         validate_review(review, SCHEMA)
 
 
+def test_linkml_generation_isolated_from_damaged_yaml_loader(review, monkeypatch):
+    import importlib
+
+    from linkml.utils.generator import _resolved_metamodel
+
+    from kg_microbe_governance.artifacts.scripts import record_review as contract
+
+    loader = importlib.import_module("linkml_runtime.loaders.yaml_loader")
+
+    class DamagedLoader(yaml.SafeLoader):
+        def get_single_data(self):
+            raise yaml.constructor.ConstructorError(None, None, "null tag after C-loader import damage", None)
+
+    monkeypatch.setattr(loader, "DupCheckYamlLoader", DamagedLoader)
+    contract._schema_validator.cache_clear()
+    _resolved_metamodel.cache_clear()
+    try:
+        validate_review(review, SCHEMA)
+        assert loader.DupCheckYamlLoader is DamagedLoader
+    finally:
+        contract._schema_validator.cache_clear()
+        _resolved_metamodel.cache_clear()
+
+
 @pytest.mark.parametrize("raw", [
     "verdict: pass\nverdict: blocked\n",
     "nested: {verdict: pass, verdict: blocked}\n",
