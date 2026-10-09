@@ -124,7 +124,10 @@ class _PureLinkMLYamlLoader(yaml.SafeLoader):
 
 
 _linkml_yaml_loader = importlib.import_module("linkml_runtime.loaders.yaml_loader")
-_LINKML_LOADER_LOCK = threading.RLock()
+# Share ownership with standalone review helpers that replace this same loader.
+_LINKML_LOADER_LOCK = vars(_linkml_yaml_loader).setdefault(
+    "_claw_linkml_loader_lock", threading.RLock()
+)
 
 
 @contextmanager

@@ -11,10 +11,12 @@ import tarfile
 import zipfile
 from pathlib import Path
 
+from test_record_review import review as review  # noqa: F401
+
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path) -> None:
+def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path, review) -> None:
     """Installed CLIs must start without a source checkout or override."""
 
     uv = shutil.which("uv")
@@ -67,6 +69,10 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path) -> None
     assert "src/kg_microbe_research/__init__.py" in source_names
     assert "src/kg_microbe_research/__main__.py" in source_names
     assert "src/kg_microbe_research/schema/research.yaml" in source_names
+    assert "src/kg_microbe_reviews/__main__.py" in source_names
+    assert "src/kg_microbe_governance/artifacts/schema/record_review.yaml" in source_names
+    assert "src/kg_microbe_governance/artifacts/docs/record-reviews.md" in source_names
+    assert "src/kg_microbe_governance/artifacts/tests/test_record_review_contract.py" in source_names
     assert not any(name.startswith("agents/") for name in source_names)
     assert not any(name.startswith("conf/") for name in source_names)
     assert not any(name.startswith("build/") for name in source_names)
@@ -115,6 +121,10 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path) -> None
         assert "kg_microbe_research/__init__.py" in names
         assert "kg_microbe_research/__main__.py" in names
         assert "kg_microbe_research/schema/research.yaml" in names
+        assert "kg_microbe_reviews/__main__.py" in names
+        assert wheel.read("kg_microbe_governance/artifacts/schema/record_review.yaml") == (
+            REPOSITORY_ROOT / "src/kg_microbe_governance/artifacts/schema/record_review.yaml"
+        ).read_bytes()
         assert "kg_microbe_agents/definitions/dev_workflow/validation_agent.yaml" in names
         assert "conf/fleet.yaml" not in names
         assert "openclaw_config.yaml" not in names
@@ -131,6 +141,7 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path) -> None
         assert "kg-microbe-governance = kg_microbe_governance.__main__:main" in entry_points
         assert "kg-microbe-history = kg_microbe_history.__main__:main" in entry_points
         assert "kg-microbe-research = kg_microbe_research.__main__:main" in entry_points
+        assert "kg-microbe-reviews = kg_microbe_reviews.__main__:main" in entry_points
         wheel.extractall(unpacked)
 
     smoke_environment = os.environ.copy()
@@ -162,6 +173,9 @@ import kg_microbe_merge_queue
 import kg_microbe_merge_queue.__main__
 import kg_microbe_research
 import kg_microbe_research.__main__
+import kg_microbe_reviews
+import kg_microbe_reviews.__main__
+import kg_microbe_reviews.aggregate
 import plugins
 from click.testing import CliRunner
 from cli.main import cli
@@ -197,6 +211,9 @@ runtime_modules = (
     kg_microbe_merge_queue.__main__,
     kg_microbe_research,
     kg_microbe_research.__main__,
+    kg_microbe_reviews,
+    kg_microbe_reviews.__main__,
+    kg_microbe_reviews.aggregate,
     plugins,
 )
 for module in runtime_modules:
@@ -248,6 +265,16 @@ with redirect_stdout(queue_help):
     else:
         raise AssertionError("queue CLI help did not exit through its parser")
 assert "{plan,check,apply}" in queue_help.getvalue()
+review_entry = next(
+    entry for entry in distribution("kg-microbe-orchestration").entry_points
+    if entry.group == "console_scripts" and entry.name == "kg-microbe-reviews"
+)
+assert review_entry.load() is kg_microbe_reviews.__main__.main
+assert kg_microbe_reviews.SCHEMA_PATH.resolve() == (
+    unpacked / "kg_microbe_governance/artifacts/schema/record_review.yaml"
+)
+assert review_entry.load()(["validate", sys.argv[3]]) == 0
+assert review_entry.load()(["render", "--content", sys.argv[3]]) == 0
 assert default_config_path().is_relative_to(unpacked)
 governance = load_governance_manifest(fleet_manifest=manifest)
 assert len(governance.artifacts) == 20
@@ -342,6 +369,8 @@ assert ran.exit_code == 0, ran.output
 validated = runner.invoke(cli, ["config", "validate"])
 assert validated.exit_code == 0, validated.output
 """
+    review_input = tmp_path / "synthetic-wheel-review.json"
+    review_input.write_text(json.dumps(review), encoding="utf-8")
     smoked = subprocess.run(
         [
             sys.executable,
@@ -349,6 +378,7 @@ assert validated.exit_code == 0, validated.output
             smoke_code,
             str(unpacked),
             str(tmp_path / "wheel-history"),
+            str(review_input),
         ],
         cwd=tmp_path,
         env=smoke_environment,

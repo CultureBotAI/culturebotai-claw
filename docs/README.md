@@ -21,6 +21,8 @@ Other maintained references:
   shared-artifact manifest, synchronization, rollout, and rollback.
 - [`guides/CURATION_HISTORY.md`](guides/CURATION_HISTORY.md) — append-only
   curation-history schema, CLI, vendoring, and enforcement model.
+- [`guides/RECORD_REVIEWS.md`](guides/RECORD_REVIEWS.md) — shared structured
+  record reviews, evidence-linked findings, fleet triage, and planning inputs.
 - [`guides/DEEP_RESEARCH_RESULTS.md`](guides/DEEP_RESEARCH_RESULTS.md) — strict,
   append-only deep-research result capture shared by every Mech.
 - [`AUTONOMOUS_LOOPS.md`](AUTONOMOUS_LOOPS.md) — goal-loop workflow guidance.
