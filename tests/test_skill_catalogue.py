@@ -180,13 +180,16 @@ def test_the_applicable_mechs_come_from_the_manifest():
         )
 
 
-def test_yaml_review_templates_follow_the_generic_curation_skill():
-    """The review templates cite curate-yaml-record's per-Mech checklist."""
+def test_review_eligibility_is_independent_of_scientific_curation():
     canonical = load_canonical()
-    curation_capability = canonical["curate-yaml-record"].capability
-
-    assert canonical["review-yaml-record"].capability == curation_capability
-    assert canonical["review-yaml-category"].capability == curation_capability
+    manifest = load_fleet_manifest()
+    assert canonical["review-yaml-record"].capability == "record_review"
+    assert canonical["review-yaml-category"].capability == "record_review"
+    assert canonical["curate-yaml-record"].capability == "curation_history"
+    assert set(manifest.with_capability("record_review")) == set(manifest.mechs)
+    for key in ("cmmmech", "pathwaymech", "naturalproductmech"):
+        assert not manifest.mechs[key].supports("curation_history")
+        assert key in applicable_mechs(canonical["review-yaml-record"])
 
 
 # --------------------------------------------------------------------------
@@ -275,8 +278,9 @@ def test_review_yaml_record_keeps_generated_records_read_only():
     text = canonical_text("review-yaml-record")
 
     assert "Review only maintained YAML records" not in text
-    assert "record is generated from a maintained table, overlay, or source transform" in text
-    assert "report the maintained upstream input that owns any future fix" in text
+    assert "For a generated record, identify the maintained table" in text
+    assert "owns a future fix" in text
+    assert "docs/record-review-profile.md" in text
 
 
 def test_review_yaml_record_selects_documented_validators():
@@ -302,28 +306,18 @@ def test_review_yaml_record_guides_imodulondb_structured_checks():
     assert "negative evidence" in text
 
 
-def test_review_yaml_record_writes_timestamped_structured_markdown():
-    text = canonical_text("review-yaml-record")
-
-    assert "reports/yaml_record_review/<YYYYMMDDTHHMMSSZ>-<record-stem>.md" in text
-    assert "After resolving exactly one target and completing a review" in text
-    assert "Create `reports/yaml_record_review/` if it does not exist" in text
-    assert "without creating a report" in text
-    assert "date -u +%Y%m%dT%H%M%SZ" in text
-    assert "Do not overwrite or append to a prior review" in text
-    assert "Use tables, bullets, or prose inside those headings" in text
-    assert "Additional Notes" in text
-    for heading in (
-        "## Target",
-        "## Validation",
-        "## Identity and Grounding",
-        "## Evidence",
-        "## Completeness",
-        "## Findings",
-        "## Recommended Edits",
-        "## Follow-up Checks",
-    ):
-        assert heading in text
+@pytest.mark.parametrize("name", ["review-yaml-record", "review-yaml-category"])
+def test_review_templates_route_output_to_the_shared_contract(name):
+    text = canonical_text(name)
+    assert "docs/record-reviews.md" in text
+    assert "schema/record_review.yaml" in text
+    assert "scripts/record_review.py inspect --targets" in text
+    assert "save --content <completed-review.yaml>" in text
+    assert "reviews/structured/<YYYYMMDDTHHMMSSZ>-<slug>/review.yaml" in text
+    assert "previous_occurrences" in text
+    assert "reports/yaml_record_review/" not in text
+    assert "reports/yaml_category_review/" not in text
+    assert "session-only prose is not a saved review" in text
 
 
 def test_review_yaml_category_resolves_cohorts_before_reporting():
@@ -333,8 +327,7 @@ def test_review_yaml_category_resolves_cohorts_before_reporting():
     assert "Record the selection rule for each cohort" in text
     assert "Do not write a" in text
     assert "report for an ambiguous or unbounded set" in text
-    assert "If the request needs disambiguation" in text
-    assert "without creating a report" in text
+    assert "Do not create a report for an unresolved ambiguous target" in text
 
 
 def test_review_yaml_category_has_lump_and_split_boundary_review():
@@ -342,9 +335,9 @@ def test_review_yaml_category_has_lump_and_split_boundary_review():
 
     assert "lump them before reviewing" in text
     assert "split it into coherent cohorts" in text
-    assert "Lump and Split Review" in text
+    assert "lump/split/retain/defer" in text
     assert "Preserve legitimate variants" in text
-    assert "duplicate identities" in text
+    assert "duplicates" in text
     assert "over-broad groups" in text
 
 
@@ -362,29 +355,11 @@ def test_review_yaml_category_guides_imodulondb_structured_checks():
     assert "not direct proof of a phenotype" in text
 
 
-def test_review_yaml_category_writes_timestamped_structured_markdown():
+def test_category_output_retains_sample_scope_and_boundaries():
     text = canonical_text("review-yaml-category")
-
-    assert "reports/yaml_category_review/<YYYYMMDDTHHMMSSZ>-<category-slug>.md" in text
-    assert "After resolving at least one coherent target category" in text
-    assert "Create `reports/yaml_category_review/` if it does not exist" in text
-    assert "date -u +%Y%m%dT%H%M%SZ" in text
-    assert "Do not overwrite or append to a prior review" in text
-    assert "Use tables, bullets, or prose inside those headings" in text
-    assert "verdict must say `sampled`" in text
-    for heading in (
-        "## Target Category",
-        "## Selection and Membership",
-        "## Validation",
-        "## Lump and Split Review",
-        "## Identity and Grounding",
-        "## Evidence Patterns",
-        "## Completeness Patterns",
-        "## Findings",
-        "## Recommended Edits",
-        "## Follow-up Checks",
-    ):
-        assert heading in text
+    assert "Use `kind: category`" in text
+    assert "enumerate reviewed members, population and selection" in text
+    assert "Sampled" in text and "uninspected remainder" in text
 
 
 def test_the_adapter_reference_check_is_not_vacuous():

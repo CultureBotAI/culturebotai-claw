@@ -23,6 +23,7 @@ version: 1
 capability_catalogue:
   id_label_validation: {}
   curation_history: {}
+  record_review: {}
   strict_validation: {}
   schema_sync: {}
   release_management: {}
@@ -208,6 +209,8 @@ mechs:
     capabilities:
       id_label_validation:
         status: enabled
+      record_review:
+        status: enabled
       curation_history:
         status: enabled
       strict_validation:
@@ -351,6 +354,8 @@ mechs:
     capabilities:
       id_label_validation:
         status: enabled
+      record_review:
+        status: enabled
       curation_history:
         status: enabled
       strict_validation:
@@ -483,6 +488,8 @@ mechs:
     vendored_role: consumer
     capabilities:
       id_label_validation:
+        status: enabled
+      record_review:
         status: enabled
       curation_history:
         status: enabled
@@ -618,6 +625,8 @@ mechs:
     vendored_role: consumer
     capabilities:
       id_label_validation:
+        status: enabled
+      record_review:
         status: enabled
       curation_history:
         status: enabled
@@ -772,6 +781,8 @@ mechs:
     vendored_role: consumer
     capabilities:
       id_label_validation:
+        status: enabled
+      record_review:
         status: enabled
       curation_history:
         status: enabled
@@ -936,6 +947,8 @@ mechs:
       # and the fleet audit reports the real gap either way.
       id_label_validation:
         status: enabled
+      record_review:
+        status: enabled
       curation_history:
         status: enabled
       vendored_sync:
@@ -1096,6 +1109,8 @@ mechs:
       # no claim to falsify and lets the fleet audit report the real gap, which
       # is the same choice vendored_sync makes below.
       id_label_validation:
+        status: enabled
+      record_review:
         status: enabled
       curation_history:
         status: enabled
@@ -1273,6 +1288,8 @@ mechs:
     vendored_role: consumer
     capabilities:
       id_label_validation:
+        status: enabled
+      record_review:
         status: enabled
       curation_history:
         status: enabled
@@ -1470,11 +1487,8 @@ mechs:
         width: 80
 
   naturalproductmech:
-    # Joined 2026-09-11. Every decision below was measured against this
-    # repository's tracked files on origin/main at that date; each disabled or
-    # not_applicable status names what would flip it. One Tier 1 item is
-    # honestly absent rather than declared: no history/ directory (the
-    # new-history recipe exists, the tree does not).
+    # Joined 2026-09-11. Capability reasons are refreshed against published
+    # main; native inline history and canonical sidecar CI are distinct gates.
     display_name: NaturalProductMech
     github: CultureBotAI/NaturalProductMech
     environment_variable: NATURALPRODUCTMECH_ROOT
@@ -1496,15 +1510,19 @@ mechs:
     capabilities:
       id_label_validation:
         status: enabled
+      record_review:
+        status: enabled
       curation_history:
         status: disabled
         reason: >-
-          Vendors the governed curation-history schema and carries a
-          new-history recipe, but has no history directory yet, so no record
-          can append an event. Adopting applies once the tree exists and the recipe is
-          wired into CI.
+          Native inline and component history exists, history/ contains canonical
+          sidecars, and justfile provides new-history. The scripts/run_qc.py
+          command list does not include canonical sidecar validation or
+          append-only checking. Shared curation-history adoption remains disabled
+          pending verified CI enforcement of that separate corpus; record_review
+          does not enable curation.
         reason_claims:
-          absent: ["history"]
+          present: ["history", "justfile", "scripts/run_qc.py"]
       # Closed-schema validation (scripts/validate_strict.py, closed=True) and
       # ruff both run on every PR through scripts/run_qc.py from main.yaml. The
       # fleet convention names that workflow validate-strict.yaml; the gate is
@@ -1662,6 +1680,8 @@ mechs:
         reproduction gate.
     capabilities:
       id_label_validation:
+        status: enabled
+      record_review:
         status: enabled
       curation_history:
         status: enabled
@@ -1840,6 +1860,8 @@ mechs:
             - "data/pathways"
             - "scripts/validate_id_label_correspondence.py"
           absent: ["conf/id_label_targets.yaml"]
+      record_review:
+        status: enabled
       curation_history:
         status: disabled
         reason: >-
@@ -2027,6 +2049,8 @@ mechs:
           not live ontology freshness or scientific characterization.
         reason_claims:
           present: ["conf/id_label_targets.yaml", "src/dufmech/id_labels.py"]
+      record_review:
+        status: enabled
       curation_history:
         status: enabled
       strict_validation:
@@ -2163,22 +2187,23 @@ mechs:
           No conf/id_label_targets.yaml configures the shared correspondence gate.
         reason_claims:
           absent: ["conf/id_label_targets.yaml"]
+      record_review:
+        status: enabled
       curation_history:
         status: disabled
         reason: >-
           Native inline events and canonical sidecars are implemented through
           src/cmmmech/history.py and justfile, with history/ validated as append-only
-          in CI. Shared skill eligibility remains disabled because
-          .claude/skills/curate-yaml-record/SKILL.md,
-          .claude/skills/curate-yaml-record/references/review-checklist.md and
-          .claude/skills/review-yaml-record/SKILL.md are absent; enabling this
-          capability produces broken rendered record/category skill references.
+          in CI. Generic curation remains disabled because neither
+          .claude/skills/curate-yaml-record/SKILL.md nor
+          .claude/skills/curate-yaml-record/references/review-checklist.md exists
+          to implement that write contract. Read-only structured review has its own record_review capability
+          and does not enable curation.
         reason_claims:
           present: ["justfile", "src/cmmmech/history.py", "history"]
           absent:
             - ".claude/skills/curate-yaml-record/SKILL.md"
             - ".claude/skills/curate-yaml-record/references/review-checklist.md"
-            - ".claude/skills/review-yaml-record/SKILL.md"
       strict_validation:
         status: disabled
         reason: >-

@@ -282,7 +282,7 @@ assert review_entry.load()(["validate", sys.argv[3]]) == 0
 assert review_entry.load()(["render", "--content", sys.argv[3]]) == 0
 assert default_config_path().is_relative_to(unpacked)
 governance = load_governance_manifest(fleet_manifest=manifest)
-assert len(governance.artifacts) == 20
+assert len(governance.artifacts) == 24
 assert load_pin_contract()["uv_version"]
 assert governance_main(["list", "--repository", "proteintraitsmech", "--json"]) == 0
 history_schema = Path(_default_schema_path()).resolve()
