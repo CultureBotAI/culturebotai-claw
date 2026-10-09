@@ -183,14 +183,16 @@ def triage(repositories: list[dict]) -> dict:
         errors = []
         for key in keys:
             item = occurrences[key]
-            if item["source_provenance"]["status"] in {"unverified", "invalid"}:
+            candidates = set()
+            invalid = False
+            if item["source_provenance"]["status"] not in {"working_tree_attestation", "git_commit_verified"}:
                 errors.append({"review_id": key[1], "finding_id": key[2],
                                "error": "source provenance " + item["source_provenance"]["status"]})
             for previous in item["finding"].get("previous_occurrences", []):
                 predecessor = _occurrence_key(previous["repository"], previous["review_id"], previous["finding_id"])
                 prior = occurrences.get(predecessor)
                 error = None
-                if item["source_provenance"]["status"] in {"unverified", "invalid"}:
+                if item["source_provenance"]["status"] not in {"working_tree_attestation", "git_commit_verified"}:
                     error = "unverified successor provenance cannot supersede an occurrence"
                 elif prior is None:
                     error = "previous occurrence is unavailable"
@@ -201,15 +203,21 @@ def triage(repositories: list[dict]) -> dict:
                 elif not set(prior["finding"]["target_ids"]) <= set(item["finding"]["target_ids"]):
                     error = "superseding occurrence does not cover the previous affected targets"
                 if error:
+                    invalid = True
                     errors.append({"review_id": key[1], "finding_id": key[2], "error": error})
                 else:
-                    parents[key].add(predecessor)
+                    candidates.add(predecessor)
+            if not invalid:
+                parents[key].update(candidates)
+                for predecessor in candidates:
                     children[predecessor].add(key)
         pending = {key: set(parents[key]) for key in keys}
         while pending:
             ready = {key for key, predecessors in pending.items() if not predecessors}
             if not ready:
                 errors.append({"review_id": "multiple", "finding_id": "multiple", "error": "cyclic disposition lineage"})
+                # A cycle makes supersession unreliable; preserve every observation's work.
+                children.clear()
                 break
             pending = {key: predecessors - ready for key, predecessors in pending.items() if key not in ready}
         heads = [occurrences[key] for key in keys if not children[key]]

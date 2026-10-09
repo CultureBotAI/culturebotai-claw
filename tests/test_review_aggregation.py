@@ -253,6 +253,41 @@ def test_unreviewed_targets_cannot_be_resolved(review, completion):
         contract.validate_review(later)
 
 
+@pytest.mark.parametrize("reverse", [False, True])
+def test_mixed_invalid_lineage_preserves_valid_predecessor_and_plan(review, reverse):
+    prior = observation(review, "prior")
+    later = observation(review, "later", status="resolved", previous=[prior])
+    later["findings"][0]["previous_occurrences"].append({
+        "repository": review["repository"], "review_id": "20261008T010000Z-missing", "finding_id": "f1"})
+    if reverse:
+        later["findings"][0]["previous_occurrences"].reverse()
+    result = triage([surface(prior, later)])
+    assert result["issues"][0]["status"] == "unverified_lineage"
+    assert prior["review_id"] in {head["review_id"] for head in result["issues"][0]["heads"]}
+    assert any(plan["review_id"] == prior["review_id"] for plan in result["planning_inputs"])
+
+
+def test_cyclic_lineage_with_terminal_descendant_preserves_open_plans(review):
+    first = observation(review, "first")
+    second = observation(review, "second", previous=[first])
+    first["findings"][0]["previous_occurrences"] = [{
+        "repository": second["repository"], "review_id": second["review_id"], "finding_id": "f1"}]
+    last = observation(review, "last", status="resolved", previous=[second])
+    result = triage([surface(first, second, last)])
+    assert result["issues"][0]["status"] == "unverified_lineage"
+    assert any("cyclic" in error["error"] for error in result["lineage_diagnostics"])
+    assert {first["review_id"], second["review_id"]} <= {
+        plan["review_id"] for plan in result["planning_inputs"]}
+
+
+def test_failed_but_otherwise_assessed_review_cannot_resolve(review):
+    prior = observation(review, "prior")
+    later = observation(review, "later", status="resolved", previous=[prior])
+    later.update(completion="failed", verdict="blocked", limitations=["Execution failed after assessment."])
+    with pytest.raises(contract.ReviewError, match="terminal findings"):
+        contract.validate_review(later)
+
+
 def test_partial_review_can_resolve_a_target_it_actually_assessed(review):
     prior = observation(review)
     later = observation(review, "later", status="resolved", previous=[prior])
@@ -317,11 +352,12 @@ def test_mixed_terminal_heads_remain_distinguishable(review):
     assert "mixed: matches_observed_surface, unknown" in render_summary(result, "tsv")
 
 
-def test_unverified_resolution_cannot_replace_open_head_or_planning(review):
+@pytest.mark.parametrize("status", ["unverified", "invalid", "unexpected"])
+def test_unverified_resolution_cannot_replace_open_head_or_planning(review, status):
     prior = observation(review)
     resolved = observation(review, "resolved", status="resolved", previous=[prior])
     observed = surface(prior, resolved)
-    observed["reports"][1]["source_provenance"] = {"status": "unverified", "reason": "Unavailable Git commit."}
+    observed["reports"][1]["source_provenance"] = {"status": status, "reason": "Unusable provenance."}
     result = triage([observed])
     assert result["issues"][0]["status"] == "unverified_lineage"
     assert result["planning_inputs"]

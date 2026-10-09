@@ -179,6 +179,13 @@ def test_plain_pass_cannot_hide_an_unknown_assessment(review):
     validate_review(review)
 
 
+@pytest.mark.parametrize("support", ["refutes", "partial", "context_only", "unknown"])
+def test_positive_assessment_requires_supporting_not_opposing_evidence(review, support):
+    review["evidence"][0]["support"] = support
+    with pytest.raises(ReviewError, match="positive evidence-linked"):
+        validate_review(review)
+
+
 @pytest.mark.parametrize("suffix", ["\n", "\r", "\t", "/escape", "\x00"])
 def test_unsafe_ids_cannot_be_saved_or_poison_inventory(repository, review, suffix):
     review["review_id"] += suffix
