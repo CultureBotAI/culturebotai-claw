@@ -2195,9 +2195,10 @@ mechs:
         reason: >-
           Native inline events and canonical sidecars are implemented through
           src/cmmmech/history.py and justfile, with history/ validated as append-only
-          in CI. Generic curation remains disabled because no shared
-          curate-yaml-record adapter or curation checklist implements that write
-          contract. Read-only structured review has its own record_review capability
+          in CI. Generic curation remains disabled because neither
+          .claude/skills/curate-yaml-record/SKILL.md nor
+          .claude/skills/curate-yaml-record/references/review-checklist.md exists
+          to implement that write contract. Read-only structured review has its own record_review capability
           and does not enable curation.
         reason_claims:
           present: ["justfile", "src/cmmmech/history.py", "history"]
