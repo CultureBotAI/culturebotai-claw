@@ -114,6 +114,7 @@ EXPECTED_CAPABILITIES = {
     "causal_graph_coverage",
     "id_label_validation",
     "curation_history",
+    "record_review",
     "strict_validation",
     "schema_sync",
     "release_management",
@@ -182,12 +183,12 @@ def test_cmmmech_admission_preserves_records_and_defers_unverified_adapters() ->
         assert mech.capability(capability).reason
     history = mech.capability("curation_history")
     assert "Native inline events and canonical sidecars are implemented" in history.reason
-    assert "Shared skill eligibility remains disabled" in history.reason
+    assert "does not enable curation" in history.reason
     assert "append-only" in history.reason
+    assert mech.supports("record_review")
     assert set(history.reason_claims.absent) == {
         ".claude/skills/curate-yaml-record/SKILL.md",
         ".claude/skills/curate-yaml-record/references/review-checklist.md",
-        ".claude/skills/review-yaml-record/SKILL.md",
     }
     assert set(history.reason_claims.present) == {
         "justfile", "src/cmmmech/history.py", "history",

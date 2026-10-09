@@ -23,6 +23,7 @@ version: 1
 capability_catalogue:
   id_label_validation: {}
   curation_history: {}
+  record_review: {}
   strict_validation: {}
   schema_sync: {}
   release_management: {}
@@ -208,6 +209,8 @@ mechs:
     capabilities:
       id_label_validation:
         status: enabled
+      record_review:
+        status: enabled
       curation_history:
         status: enabled
       strict_validation:
@@ -351,6 +354,8 @@ mechs:
     capabilities:
       id_label_validation:
         status: enabled
+      record_review:
+        status: enabled
       curation_history:
         status: enabled
       strict_validation:
@@ -483,6 +488,8 @@ mechs:
     vendored_role: consumer
     capabilities:
       id_label_validation:
+        status: enabled
+      record_review:
         status: enabled
       curation_history:
         status: enabled
@@ -618,6 +625,8 @@ mechs:
     vendored_role: consumer
     capabilities:
       id_label_validation:
+        status: enabled
+      record_review:
         status: enabled
       curation_history:
         status: enabled
@@ -772,6 +781,8 @@ mechs:
     vendored_role: consumer
     capabilities:
       id_label_validation:
+        status: enabled
+      record_review:
         status: enabled
       curation_history:
         status: enabled
@@ -936,6 +947,8 @@ mechs:
       # and the fleet audit reports the real gap either way.
       id_label_validation:
         status: enabled
+      record_review:
+        status: enabled
       curation_history:
         status: enabled
       vendored_sync:
@@ -1096,6 +1109,8 @@ mechs:
       # no claim to falsify and lets the fleet audit report the real gap, which
       # is the same choice vendored_sync makes below.
       id_label_validation:
+        status: enabled
+      record_review:
         status: enabled
       curation_history:
         status: enabled
@@ -1273,6 +1288,8 @@ mechs:
     vendored_role: consumer
     capabilities:
       id_label_validation:
+        status: enabled
+      record_review:
         status: enabled
       curation_history:
         status: enabled
@@ -1496,6 +1513,8 @@ mechs:
     capabilities:
       id_label_validation:
         status: enabled
+      record_review:
+        status: enabled
       curation_history:
         status: disabled
         reason: >-
@@ -1662,6 +1681,8 @@ mechs:
         reproduction gate.
     capabilities:
       id_label_validation:
+        status: enabled
+      record_review:
         status: enabled
       curation_history:
         status: enabled
@@ -1840,6 +1861,8 @@ mechs:
             - "data/pathways"
             - "scripts/validate_id_label_correspondence.py"
           absent: ["conf/id_label_targets.yaml"]
+      record_review:
+        status: enabled
       curation_history:
         status: disabled
         reason: >-
@@ -2027,6 +2050,8 @@ mechs:
           not live ontology freshness or scientific characterization.
         reason_claims:
           present: ["conf/id_label_targets.yaml", "src/dufmech/id_labels.py"]
+      record_review:
+        status: enabled
       curation_history:
         status: enabled
       strict_validation:
@@ -2163,22 +2188,22 @@ mechs:
           No conf/id_label_targets.yaml configures the shared correspondence gate.
         reason_claims:
           absent: ["conf/id_label_targets.yaml"]
+      record_review:
+        status: enabled
       curation_history:
         status: disabled
         reason: >-
           Native inline events and canonical sidecars are implemented through
           src/cmmmech/history.py and justfile, with history/ validated as append-only
-          in CI. Shared skill eligibility remains disabled because
-          .claude/skills/curate-yaml-record/SKILL.md,
-          .claude/skills/curate-yaml-record/references/review-checklist.md and
-          .claude/skills/review-yaml-record/SKILL.md are absent; enabling this
-          capability produces broken rendered record/category skill references.
+          in CI. Generic curation remains disabled because no shared
+          curate-yaml-record adapter or curation checklist implements that write
+          contract. Read-only structured review has its own record_review capability
+          and does not enable curation.
         reason_claims:
           present: ["justfile", "src/cmmmech/history.py", "history"]
           absent:
             - ".claude/skills/curate-yaml-record/SKILL.md"
             - ".claude/skills/curate-yaml-record/references/review-checklist.md"
-            - ".claude/skills/review-yaml-record/SKILL.md"
       strict_validation:
         status: disabled
         reason: >-

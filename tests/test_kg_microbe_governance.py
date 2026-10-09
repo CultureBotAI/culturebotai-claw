@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import stat
 import subprocess
@@ -77,7 +78,7 @@ def test_shipped_manifest_is_complete_aligned_and_checksum_valid() -> None:
     fleet = load_fleet_manifest()
 
     assert set(manifest.consumers) == set(fleet.keys)
-    assert len(manifest.artifacts) == 20
+    assert len(manifest.artifacts) == 24
     assert {
         artifact.artifact_id for artifact in manifest.artifacts
     } >= {
@@ -130,6 +131,54 @@ def test_downstream_targets_resolve_to_nested_canonical_payloads() -> None:
         assert artifact["source"] == source
         assert artifact["target"] == target
         assert _asset_bytes(source)
+
+
+@pytest.mark.parametrize(
+    ("artifact_id", "source", "target"),
+    [
+        (
+            "record_review_schema",
+            "src/kg_microbe_governance/artifacts/schema/record_review.yaml",
+            "schema/record_review.yaml",
+        ),
+        (
+            "record_review_helper",
+            "src/kg_microbe_governance/artifacts/scripts/record_review.py",
+            "scripts/record_review.py",
+        ),
+        (
+            "record_review_guide",
+            "src/kg_microbe_governance/artifacts/docs/record-reviews.md",
+            "docs/record-reviews.md",
+        ),
+        (
+            "record_review_contract",
+            "src/kg_microbe_governance/artifacts/tests/test_record_review_contract.py",
+            "tests/test_record_review_contract.py",
+        ),
+    ],
+)
+def test_record_review_artifacts_are_exactly_mapped_for_every_consumer(
+    artifact_id: str, source: str, target: str
+) -> None:
+    manifest = load_governance_manifest()
+    fleet = load_fleet_manifest()
+    artifact = next(
+        item for item in manifest.artifacts if item.artifact_id == artifact_id
+    )
+    declaration = next(
+        item for item in _document()["artifacts"] if item["id"] == artifact_id
+    )
+
+    assert artifact.source == source
+    assert artifact.target == target
+    assert artifact.mode == 0o644
+    assert artifact.sha256 == hashlib.sha256(_asset_bytes(source)).hexdigest()
+    assert declaration["consumers"] == "all"
+    assert {
+        key for key in fleet.keys
+        if artifact in manifest.artifacts_for(manifest.consumer_for(key))
+    } == set(fleet.keys)
 
 
 def test_manifest_rejects_duplicate_json_keys() -> None:
@@ -197,7 +246,7 @@ def test_packaged_loader_rejects_manifest_checksum_drift(tmp_path: Path) -> None
 
 @pytest.mark.parametrize(
     ("repository", "expected"),
-    [("culturemech", 21), ("CultureBotAI/proteintraitsmech", 20)],
+    [("culturemech", 25), ("CultureBotAI/proteintraitsmech", 24)],
 )
 def test_sync_is_dry_run_by_default_then_applies_with_atomic_file_replacement(
     tmp_path: Path, repository: str, expected: int
@@ -273,7 +322,7 @@ def test_standalone_checker_uses_pin_and_remote_manifest_without_network(
     checked, problems = check_repository(
         root, "CultureBotAI/proteintraitsmech", fetch=_fake_fetch
     )
-    assert checked == 19
+    assert checked == 23
     assert problems == ()
 
     target = root / "tests/test_provider_triage_contract.py"
@@ -281,7 +330,7 @@ def test_standalone_checker_uses_pin_and_remote_manifest_without_network(
     checked, problems = check_repository(
         root, "proteintraitsmech", fetch=_fake_fetch
     )
-    assert checked == 19
+    assert checked == 23
     assert any("DRIFT: tests/test_provider_triage_contract.py" in item for item in problems)
 
 
