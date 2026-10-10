@@ -150,6 +150,7 @@ CONSUMERS = sorted(MANIFEST["consumers"])
 def test_the_manifest_declares_the_consumers_the_fleet_expects():
     """Offline, so it runs everywhere. Names the set rather than counting it."""
     assert CONSUMERS == [
+        "aimech",
         "antibioticmech",
         "cellstructuremech",
         "cmmmech",

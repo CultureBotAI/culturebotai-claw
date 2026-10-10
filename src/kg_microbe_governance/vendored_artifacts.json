@@ -54,6 +54,10 @@
     "cmmmech": {
       "github": "CultureBotAI/CMMMech",
       "package_path": "src/cmmmech"
+    },
+    "aimech": {
+      "github": "CultureBotAI/AIMech",
+      "package_path": "src/aimech"
     }
   },
   "artifacts": [

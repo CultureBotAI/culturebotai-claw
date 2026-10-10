@@ -1,5 +1,5 @@
 version: 1
-checked_on: '2026-10-09'
+checked_on: '2026-10-10'
 reference: https://github.com/CultureBotAI/proteintraitsmech/tree/9c563d320b0b39548daf119812a5e25298236b63
 coordination:
 - https://github.com/CultureBotAI/culturebotai-claw/issues/426
@@ -380,4 +380,27 @@ mechs:
       revision, leave projection blocked under the minimum-cohort policy and keep repository links until a real
       site and valid cohort exist.
     tracking:
+    - https://github.com/CultureBotAI/culturebotai-claw/issues/426
+  aimech:
+    revision: 38594d6436195e7fdb0882613e9004a0132dd4fc
+    native: no_pipeline_in_audited_source
+    evidence:
+    - src/aimech/schema/aimech.yaml
+    - src/aimech/importer.py
+    - sources/aio/source.yaml
+    - pyproject.toml
+    sets:
+      record-text:
+        modality: text
+        representation: whole_record
+        entity_type: record
+        state: planned
+        notes: AIConcept text can encode identity, definition and ontology context under a versioned input recipe.
+          Preserve the pinned AIO source and NOT_REVIEWED status; semantic proximity is not evidence of efficacy,
+          benchmark performance or causal mechanism. No encoder, vectors or projection are implemented at this revision.
+    actions:
+    - Add a versioned concept-text adapter and pinned encoder/vector artifacts before a PaCMAP projection. Keep
+      imported ontology relations distinct from scientific claims and preserve exact concept IDs and source coverage.
+    tracking:
+    - https://github.com/CultureBotAI/AIMech/pull/1
     - https://github.com/CultureBotAI/culturebotai-claw/issues/426
