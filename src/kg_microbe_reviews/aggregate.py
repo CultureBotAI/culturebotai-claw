@@ -143,7 +143,10 @@ def triage(repositories: list[dict]) -> dict:
     review_summaries = []
     diagnostics = []
     provenance_diagnostics = []
+    repository_names = {}
     for repository in repositories:
+        # Keep the first inventory spelling even across case-variant input groups.
+        name = repository_names.setdefault(repository["repository"].lower(), repository["repository"])
         for report in repository.get("reports", []):
             review = report["record"]
             contract.validate_review(review)
@@ -156,12 +159,13 @@ def triage(repositories: list[dict]) -> dict:
             review_records[review_key] = review
             provenance = report.get("source_provenance", {"status": "unverified", "reason": "not evaluated"})
             if provenance["status"] not in {"working_tree_attestation", "git_commit_verified"}:
-                provenance_diagnostics.append({"repository": review["repository"],
+                provenance_diagnostics.append({"repository": name,
                                                "review_id": review["review_id"], **provenance})
             review_summaries.append({
                 "record": review,
+                "repository": name,
                 "source_provenance": provenance,
-                **{key: review[key] for key in ("repository", "review_id", "kind", "finished_at",
+                **{key: review[key] for key in ("review_id", "kind", "finished_at",
                                                 "completion", "verdict", "scientific_review", "scope")},
                 **{key: report[key] for key in ("path", "sha256", "source_currentness",
                                                 "changed_inputs", "unavailable_inputs")},
@@ -169,7 +173,7 @@ def triage(repositories: list[dict]) -> dict:
             for finding in review["findings"]:
                 key = _occurrence_key(review["repository"], review["review_id"], finding["finding_id"])
                 occurrences[key] = {
-                    "repository": review["repository"], "review_id": review["review_id"],
+                    "repository": name, "review_id": review["review_id"],
                     "finished_at": review["finished_at"], "path": report["path"],
                     "source_currentness": report["source_currentness"], "finding": finding,
                     "source_provenance": provenance,
@@ -235,7 +239,7 @@ def triage(repositories: list[dict]) -> dict:
         severity = min((item["finding"]["severity"] for item in heads), key=SEVERITY_ORDER.__getitem__)
         history = sorted((occurrences[key] for key in keys),
                          key=lambda item: (contract.timestamp(item["finished_at"]), item["review_id"]))
-        issues.append({"repository": history[-1]["repository"], "issue_key": issue_key,
+        issues.append({"repository": repository_names[repo], "issue_key": issue_key,
                        "status": status, "severity": severity,
                        "title": history[-1]["finding"]["title"],
                        "categories": sorted({item["finding"]["category"] for item in heads}),
@@ -247,7 +251,7 @@ def triage(repositories: list[dict]) -> dict:
                                   "source_provenance": item["source_provenance"]}
                                  for item in heads],
                        "occurrences": history, "lineage_errors": errors})
-        diagnostics.extend({"repository": repo, "issue_key": issue_key, **error} for error in errors)
+        diagnostics.extend({"repository": repository_names[repo], "issue_key": issue_key, **error} for error in errors)
     issues.sort(key=lambda item: (SEVERITY_ORDER[item["severity"]], item["repository"].lower(), item["issue_key"]))
     proposals = {}
     for issue in issues:
@@ -276,7 +280,8 @@ def triage(repositories: list[dict]) -> dict:
                     proposal["for_issues"].append(issue["issue_key"])
                 pending.extend(action.get("depends_on", []))
     repository_rows = [{key: item[key] for key in ("repository", "surface", "ref", "revision", "remote_freshness", "status", "error")}
-                       | {"review_count": len(item.get("reports", []))} for item in repositories]
+                       | {"repository": repository_names[item["repository"].lower()],
+                          "review_count": len(item.get("reports", []))} for item in repositories]
     return {"format_version": 1, "repositories": repository_rows,
             "reviews": sorted(review_summaries, key=lambda r: (r["repository"].lower(), r["finished_at"], r["review_id"])),
             "issues": issues, "planning_inputs": [proposals[key] for key in sorted(proposals)],
