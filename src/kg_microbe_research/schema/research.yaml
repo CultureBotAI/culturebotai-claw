@@ -84,6 +84,7 @@ enums:
       PathwayMech:
       DUFMech:
       CMMMech:
+      AIMech:
 
   ProviderEnum:
     description: >-

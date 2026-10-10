@@ -2,8 +2,8 @@
 
 Every Mech in the canonical fleet must have a PaCMAP adoption disposition and
 support multiple, separately identified embedding sets. The machine-checked
-[rollout](../../src/kg_microbe_embeddings/rollout.yaml) covers all thirteen
-members at the recorded October 9, 2026 source revisions. A new fleet member
+[rollout](../../src/kg_microbe_embeddings/rollout.yaml) covers the manifest-defined
+members at their individually recorded source revisions. A new fleet member
 without a rollout entry fails the contract tests.
 Each Mech chooses sets appropriate to its entities and available inputs.
 Multiple-set support does not require every modality, or even two populated
@@ -59,6 +59,7 @@ separately for each repository.
 | PathwayMech | No pipeline found in audited source | Add pathway text adapter, vectors, projection and viewer |
 | DUFMech | No pipeline found in audited source | Separate family text from any verified sequence cohort |
 | CMMMech | No pipeline found in audited source; three records | Add text adapter; retain a blocked map for the small cohort |
+| AIMech | Pinned AIO concepts; no pipeline found in audited source | Add a concept-text adapter and pinned vectors; retain ontology provenance and review status |
 
 The audit used fresh sparse checkouts of each main revision, full tracked file
 name inventories, and ignored-inclusive searches of checked-out source,

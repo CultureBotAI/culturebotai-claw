@@ -26,6 +26,15 @@ The strict/up-to-date PR option is false because the queue validates against
 current main. Auto-merge is enabled so the CLI can schedule queue admission while
 required PR checks finish.
 
+AIMech's admission maps `.github/workflows/validate-strict.yaml` to the
+`validate-strict` job, which calls `just check`. Main
+`38594d6436195e7fdb0882613e9004a0132dd4fc` declares unconditional PR and
+`merge_group` triggers; its bootstrap PR passed that exact job in
+[run 38035359449](https://github.com/CultureBotAI/AIMech/actions/runs/38035359449).
+Recheck readiness before applying a scoped queue plan. Registration is not
+remote queue activation; retain the configuration receipt and an actual
+queue-merge receipt separately.
+
 Required validation workflows run on every PR and on
 `merge_group: {types: [checks_requested]}`. Their default checkout validates the
 combined event commit. Path filters may remain on pushes, never on required PR

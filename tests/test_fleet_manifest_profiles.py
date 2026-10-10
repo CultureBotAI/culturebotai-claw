@@ -17,6 +17,11 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = REPOSITORY_ROOT / "src" / "kg_microbe_fleet" / "fleet.yaml"
 
 EXPECTED_PROFILES = {
+    "aimech": (
+        "src/aimech",
+        ("src/aimech/schema/aimech.yaml",),
+        ("data/aio/*.yaml",),
+    ),
     "cmmmech": (
         "src/cmmmech",
         ("src/cmmmech/schema/cmmmech.yaml",),
@@ -161,6 +166,35 @@ def test_shipped_profiles_are_declared_and_complete() -> None:
         assert mech.schema_paths == schema_paths
         assert mech.record_globs == record_globs
         assert set(mech.capabilities) == EXPECTED_CAPABILITIES
+
+
+def test_aimech_admission_preserves_native_generated_records() -> None:
+    manifest = load_fleet_manifest(MANIFEST_PATH)
+    mech = manifest.get("aimech")
+    assert mech.github == "CultureBotAI/AIMech"
+    assert mech.environment_variable == "AIMECH_ROOT"
+    assert mech.serialization is not None
+    assert not mech.serialization.verified
+    assert not mech.serialization.options
+    assert "native" in mech.serialization.reason
+    assert "pinned OBO JSON" in mech.serialization.reason
+    assert mech.supports("record_review")
+    assert mech.supports("testing")
+    assert mech.supports("vendored_sync")
+    assert mech.capability("corpus_statistics").settings["fields"] == (
+        "id", "name", "definition", "branches", "review_status",
+        "provenance.source_commit", "provenance.source_sha256",
+        "provenance.source_version", "provenance.source_node",
+    )
+    for capability in (
+        "strict_validation", "schema_sync", "curation_history",
+        "id_label_validation", "deep_research",
+        "causal_graph_coverage",
+    ):
+        assert "aimech" not in manifest.with_capability(capability)
+        assert mech.capability(capability).reason
+    assert mech.capability("environment_coverage").status == "not_applicable"
+    assert mech.capability("metpo_proposal").status == "not_applicable"
 
 
 def test_cmmmech_admission_preserves_records_and_defers_unverified_adapters() -> None:

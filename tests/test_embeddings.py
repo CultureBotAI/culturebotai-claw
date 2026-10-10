@@ -362,6 +362,11 @@ def test_fleet_rollout_covers_canonical_members_and_retains_pending_work():
     assert doc["mechs"]["proteintraitsmech"]["sets"]["protein-sequence"]["state"] == "native"
     assert doc["mechs"]["dufmech"]["sets"]["protein-sequence"]["state"] == "conditional"
     assert "protein-sequence" not in doc["mechs"]["cmmmech"]["sets"]
+    aimech = doc["mechs"]["aimech"]
+    assert aimech["native"] == "no_pipeline_in_audited_source"
+    assert set(aimech["sets"]) == {"record-text"}
+    assert aimech["sets"]["record-text"]["state"] == "planned"
+    assert aimech["sets"]["record-text"]["representation"] == "whole_record"
     assert "protein-sequence" not in doc["mechs"]["habitatmech"]["sets"]
     for key in ("antibioticmech", "naturalproductmech"):
         chemical = doc["mechs"][key]["sets"]["chemical-fingerprint"]

@@ -72,6 +72,8 @@ def test_fleet_audit_cli_parses_repeated_roots_and_reports_success(
             "dufmech=/tmp/duf",
             "--target-root",
             "cmmmech=/tmp/cmm",
+            "--target-root",
+            "aimech=/tmp/ai",
         ]
     ) == 0
 
@@ -90,6 +92,7 @@ def test_fleet_audit_cli_parses_repeated_roots_and_reports_success(
             "pathwaymech": Path("/tmp/pathway"),
             "dufmech": Path("/tmp/duf"),
             "cmmmech": Path("/tmp/cmm"),
+            "aimech": Path("/tmp/ai"),
         },
         "ref": REF,
     }

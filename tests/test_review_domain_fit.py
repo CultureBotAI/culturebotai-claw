@@ -13,6 +13,7 @@ from kg_microbe_governance.artifacts.scripts.record_review import (
 
 # Domains are test cases, never a runtime fleet-membership registry.
 CASES = {
+    "aimech": ("provenance", "ontology-release", "Synthetic pinned AIO release", "concept", "Imported ontology assertion, not experimental evidence"),
     "culturemech": ("quantity", "medium-variant", "Synthetic variant", "g/L", "Ingredient concentration"),
     "mediaingredientmech": ("identity", "hydration-state", "Synthetic salt hydrate", "percent", "Local mapping score"),
     "communitymech": ("graph", "interaction-context", "Synthetic community", "edge", "Inspected causal edges"),
