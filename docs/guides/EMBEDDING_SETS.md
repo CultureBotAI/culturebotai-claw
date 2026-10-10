@@ -3,7 +3,7 @@
 Every Mech in the canonical fleet must have a PaCMAP adoption disposition and
 support multiple, separately identified embedding sets. The machine-checked
 [rollout](../../src/kg_microbe_embeddings/rollout.yaml) covers the manifest-defined
-members at the recorded October 9, 2026 source revisions. A new fleet member
+members at their individually recorded source revisions. A new fleet member
 without a rollout entry fails the contract tests.
 Each Mech chooses sets appropriate to its entities and available inputs.
 Multiple-set support does not require every modality, or even two populated
