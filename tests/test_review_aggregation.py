@@ -195,6 +195,87 @@ def test_duplicate_reviews_fail_and_issue_keys_are_repository_scoped(review):
     assert result["counts"]["by_status"] == {"open": 2}
 
 
+@pytest.mark.parametrize("grouped", [False, True])
+def test_inventory_spelling_unifies_case_variant_reviews_and_planning(review, grouped):
+    canonical = review["repository"]
+    initial = observation(review, "initial")
+    initial["repository"] = canonical.lower()
+    resolved = observation(review, "resolved", status="resolved", previous=[initial])
+    resolved["repository"] = canonical.upper()
+    resolved["findings"][0]["previous_occurrences"][0]["repository"] = canonical.swapcase()
+    remaining = observation(review, "remaining")
+    remaining["repository"] = canonical.swapcase()
+    remaining["findings"][0]["issue_key"] = "remaining-evidence-gap"
+    remaining["actions"][0]["depends_on"] = ["prepare"]
+    remaining["actions"].append({**action(), "action_id": "prepare", "finding_ids": []})
+    inputs = ([surface(initial), surface(resolved, remaining)] if grouped
+              else [surface(initial, resolved, remaining)])
+    inputs[0]["repository"] = canonical
+    before = deepcopy(inputs)
+
+    result = triage(inputs)
+
+    assert result["counts"]["by_repository"] == {canonical: 2}
+    assert result["counts"]["by_status"] == {"open": 1, "resolved": 1}
+    assert result["counts"]["reviews"] == result["counts"]["finding_occurrences"] == 3
+    assert result["counts"]["distinct_issues"] == 2
+    assert result["lineage_diagnostics"] == result["provenance_diagnostics"] == []
+    closed, opened = result["issues"]
+    assert closed["heads"][0]["review_id"] == resolved["review_id"]
+    assert len(closed["heads"]) == 1
+    assert len(closed["occurrences"]) == 2
+    assert opened["heads"][0]["review_id"] == remaining["review_id"]
+    assert {p["action"]["action_id"] for p in result["planning_inputs"]} == {"a1", "prepare"}
+    assert {p["review_id"] for p in result["planning_inputs"]} == {remaining["review_id"]}
+    assert all(p["for_issues"] == ["remaining-evidence-gap"] for p in result["planning_inputs"])
+    assert {p["execution_status"] for p in result["planning_inputs"]} == {"not_established"}
+    for section in ("repositories", "reviews", "issues", "planning_inputs"):
+        assert {item["repository"] for item in result[section]} == {canonical}
+    assert {o["repository"] for i in result["issues"] for o in i["occurrences"]} == {canonical}
+    summaries = {item["review_id"]: item for item in result["reviews"]}
+    for report in [r for item in inputs for r in item["reports"]]:
+        summary = summaries[report["record"]["review_id"]]
+        assert summary["record"] is report["record"]
+        assert summary["source_provenance"] is report["source_provenance"]
+    rows = list(csv.reader(io.StringIO(render_summary(result, "tsv")), delimiter="\t"))
+    assert {row[0] for row in rows[1:]} == {canonical}
+    assert canonical.swapcase() not in render_summary(result, "markdown")
+    assert inputs == before
+
+
+@pytest.mark.parametrize("damage", ["missing_predecessor", "unverified_provenance"])
+def test_inventory_spelling_labels_case_variant_diagnostics(review, damage):
+    initial = observation(review, "initial")
+    later = observation(review, "later", status="resolved", previous=[initial])
+    later["repository"] = review["repository"].swapcase()
+    later["findings"][0]["previous_occurrences"][0]["repository"] = review["repository"].upper()
+    observed = surface(initial, later)
+    if damage == "missing_predecessor":
+        later["findings"][0]["previous_occurrences"][0]["review_id"] = "20261008T010000Z-missing"
+    else:
+        observed["reports"][1]["source_provenance"] = {"status": "unverified", "reason": "Not verified."}
+    before = deepcopy(observed)
+
+    result = triage([observed])
+
+    assert result["counts"]["by_repository"] == {review["repository"]: 1}
+    assert result["counts"]["by_status"] == {"unverified_lineage": 1}
+    assert {d["repository"] for d in result["lineage_diagnostics"]} == {review["repository"]}
+    if damage == "unverified_provenance":
+        assert {d["repository"] for d in result["provenance_diagnostics"]} == {review["repository"]}
+    assert {p["review_id"] for p in result["planning_inputs"]} == {initial["review_id"]}
+    assert {p["repository"] for p in result["planning_inputs"]} == {review["repository"]}
+    assert observed == before
+
+
+def test_case_variant_inventory_groups_still_refuse_duplicate_review_identity(review):
+    initial = observation(review)
+    duplicate = deepcopy(initial)
+    duplicate["repository"] = initial["repository"].swapcase()
+    with pytest.raises(contract.ReviewError, match="duplicate review identity"):
+        triage([surface(initial), surface(duplicate)])
+
+
 def test_summary_formats_preserve_text_without_table_injection(review):
     initial = observation(review)
     initial["findings"][0]["title"] = 'A\t"quoted" title\n<script>bad</script>|cell'
