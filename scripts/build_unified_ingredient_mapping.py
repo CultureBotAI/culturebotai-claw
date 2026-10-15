@@ -393,11 +393,12 @@ def _solution_term_id(record: dict) -> str:
 def _references_scanned_record(solution: dict, scanned_records, solution_records) -> bool:
     """Whether a nested solution names a record that this scan counts on its own.
 
-    CultureMech's precedence (``kgx_export.nested_solution_target``): a
-    ``culturemech_term`` naming a scanned record, then a ``term.id`` that a
-    scanned solution record carries. A ``culturemech_term`` naming no scanned
-    record falls back to the ``term.id``, so a stale local link cannot count a
-    stock's components a second time.
+    The rule of CultureMech#605's scanner: a ``culturemech_term`` naming a
+    scanned record, then a ``term.id`` that a scanned solution record carries.
+    A ``culturemech_term`` naming no scanned record falls back to the
+    ``term.id``, so a stale local link cannot count a stock's components a
+    second time. CultureMech's KGX export checks the same two links in the same
+    order, but takes any ``CultureMech:`` id as given (#610).
     """
     local = solution.get('culturemech_term')
     if isinstance(local, dict) and str(local.get('id', '')) in scanned_records:
@@ -405,6 +406,42 @@ def _references_scanned_record(solution: dict, scanned_records, solution_records
     term = solution.get('term')
     term_id = term.get('id') if isinstance(term, dict) else None
     return isinstance(term_id, str) and term_id in solution_records
+
+
+def _component_errors(record: dict, field: str) -> list:
+    """Where ``record``'s components are not lists of mappings, as ``path problem``.
+
+    Checks the root ``field`` and every ``solutions[]`` and nested
+    ``composition`` below it, references included. CultureMech's scanner and
+    schema refuse such a record, so counting around it would publish numbers
+    CultureMech never produces (#607).
+    """
+    def collection(value, path: str) -> list:
+        if not isinstance(value, list):
+            got = 'missing or null' if value is None else type(value).__name__
+            return [f'{path} must be a list (got {got})']
+        return [f'{path}/{index} must be a mapping'
+                for index, item in enumerate(value) if not isinstance(item, dict)]
+
+    errors = collection(record.get(field), field)
+
+    def walk(owner: dict, prefix: str) -> None:
+        solutions = owner.get('solutions')
+        if solutions is None:
+            return
+        errors.extend(collection(solutions, f'{prefix}solutions'))
+        if not isinstance(solutions, list):
+            return
+        for index, solution in enumerate(solutions):
+            if not isinstance(solution, dict):
+                continue
+            path = f'{prefix}solutions/{index}'
+            if 'composition' in solution:
+                errors.extend(collection(solution['composition'], f'{path}/composition'))
+            walk(solution, f'{path}/')
+
+    walk(record, '')
+    return errors
 
 
 def _inline_solution_compositions(owner: dict, is_reference, prefix: str = '') -> list:
@@ -447,36 +484,36 @@ def scan_culturemech(culturemech_root: Path) -> dict:
 
     Inline stocks are counted after every file has been read, so whether a
     nested solution is a reference does not depend on which file sorts first.
-    A component list that is not a list, or a component that is not a mapping,
-    raises rather than being skipped: either would silently drop occurrences.
 
-    A medium's components, in its root ``ingredients`` or its inline stocks,
-    outrank a solution record's when a name's ``term_id`` and example media are
-    chosen; within a rank the first in file order wins, as before. Almost every
-    solution-record component carries MediaDive's raw ``mediadive.compound:`` id
-    where media carry their curated grounding, so letting whichever file sorts
-    first decide would trade a CHEBI id for a registry id -- DNA's CHEBI:16991
-    for mediadive.compound:958.
+    Raises ``ValueError``, listing every problem, instead of counting around a
+    record CultureMech's scanner would refuse: a file that is unreadable, empty
+    or not a mapping; a missing or repeated ``id``; components that are not
+    lists of mappings; or no records at all (#607). Skipping such a record
+    would also change other records' counts, because a reference to it would
+    no longer be recognised. CultureMech's schema validation is not repeated.
+
+    Root components are counted before inline stocks, each in file order. A
+    medium's components, root or inline, outrank a solution record's when a
+    name's ``term_id`` and example media are chosen, and within a rank the first
+    one met wins (#609). Counting roots first keeps the identity each name had
+    when only root components were read. Ranking media first matters because
+    almost every solution-record component carries MediaDive's raw
+    ``mediadive.compound:`` id where media carry their curated grounding: by
+    file order alone, DNA would trade CHEBI:16991 for mediadive.compound:958.
     """
     normalized_yaml = culturemech_root / 'data' / 'normalized_yaml'
     occurrences: Dict[str, dict] = {}
-    scanned_records: set = set()
+    errors: list = []
+    record_sources: Dict[str, str] = {}
     solution_records: set = set()
     pending = []
     medium_rank, solution_rank = 0, 1
     term_ranks: Dict[str, int] = {}
     examples: Dict[str, tuple] = {}
 
-    def count(media_id, source: Path, field: str, components, rank: int) -> int:
-        if components is None:
-            return 0
-        if not isinstance(components, list):
-            raise ValueError(
-                f'{source}: {field} must be a list, not {type(components).__name__}')
+    def count(media_id, components: list, rank: int) -> int:
         counted = 0
-        for index, ing in enumerate(components):
-            if not isinstance(ing, dict):
-                raise ValueError(f'{source}: {field}/{index} must be a mapping')
+        for ing in components:
             name = ing.get('preferred_term')
             name = name.strip() if isinstance(name, str) else ''
             if not name:
@@ -509,35 +546,56 @@ def scan_culturemech(culturemech_root: Path) -> dict:
     print("Scanning CultureMech ingredient occurrences...")
     file_count = root_count = 0
     for yaml_file in sorted(normalized_yaml.rglob('*.yaml')):
+        source = yaml_file.relative_to(normalized_yaml).as_posix()
         try:
-            data = yaml.safe_load(yaml_file.read_text())
-        except Exception:
+            data = yaml.safe_load(yaml_file.read_text(encoding='utf-8'))
+        except (OSError, ValueError, yaml.YAMLError) as exc:
+            errors.append(f'{source}: unreadable ({type(exc).__name__})')
             continue
-        if not data or not isinstance(data, dict):
+        if not isinstance(data, dict):
+            got = 'nothing' if data is None else type(data).__name__
+            errors.append(f'{source}: the root must be a mapping (got {got})')
             continue
-
-        media_id = data.get('id', yaml_file.stem)
-        file_count += 1
+        media_id = data.get('id')
+        if not isinstance(media_id, str) or not media_id.strip():
+            errors.append(f'{source}: no id')
+            continue
+        record_id = media_id.strip()
+        if record_id in record_sources:
+            errors.append(f'{source}: id {record_id} is also used by {record_sources[record_id]}')
+            continue
+        record_sources[record_id] = source
 
         solution_id = _solution_term_id(data)
         field = 'composition' if solution_id else 'ingredients'
+        problems = _component_errors(data, field)
+        if problems:
+            errors.extend(f'{source}: {problem}' for problem in problems)
+            continue
+        file_count += 1
         rank = solution_rank if solution_id else medium_rank
-        root_count += count(media_id, yaml_file, field, data.get(field), rank)
-        record_id = data.get('id')
-        if isinstance(record_id, str) and record_id.strip():
-            scanned_records.add(record_id.strip())
+        root_count += count(media_id, data[field], rank)
         if solution_id:
             solution_records.add(solution_id)
         if data.get('solutions'):
-            pending.append((media_id, yaml_file, data, rank))
+            # Only the stocks are needed later; the rest of the record can go.
+            pending.append((media_id, {'solutions': data['solutions']}, rank))
+
+    if not file_count and not errors:
+        errors.append('no CultureMech records')
+    if errors:
+        shown = '\n  '.join(errors[:25])
+        more = f'\n  ... and {len(errors) - 25} more' if len(errors) > 25 else ''
+        raise ValueError(f'{len(errors)} problem(s) under {normalized_yaml}, so nothing '
+                         f'was counted:\n  {shown}{more}')
 
     def is_reference(solution: dict) -> bool:
-        return _references_scanned_record(solution, scanned_records, solution_records)
+        return _references_scanned_record(solution, record_sources, solution_records)
 
     inline_count = 0
-    for media_id, yaml_file, data, rank in pending:
-        for field, components in _inline_solution_compositions(data, is_reference):
-            inline_count += count(media_id, yaml_file, field, components, rank)
+    for media_id, owner, rank in pending:
+        for _path, components in _inline_solution_compositions(owner, is_reference):
+            inline_count += count(media_id, components, rank)
 
     for name, entry in occurrences.items():
         medium_examples, solution_examples = examples[name]
