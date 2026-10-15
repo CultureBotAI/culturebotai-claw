@@ -10,7 +10,8 @@ annotated with all available identifiers from MIM:
   - CAS-RN
   - KG-Microbe node ID
   - mapping status
-  - occurrence count in CultureMech
+  - occurrence count in CultureMech: media ingredients, solution-record
+    composition, and the composition of inline stocks (see scan_culturemech)
   - source ontology term ID (as used in CultureMech media files)
 
 Usage:
@@ -369,28 +370,115 @@ def _normalize(s: str) -> str:
 # Step 2: Scan CultureMech for all ingredient occurrences
 # ---------------------------------------------------------------------------
 
+# CultureMech's record contract, as its own occurrence table reads it
+# (CultureMech scripts/record_kinds.py and scripts/ingredient_occurrences.py,
+# CultureMech#605). A record whose upstream term.id is a solution id is shaped as
+# a SolutionRecipe and keeps its components in `composition`; any other record
+# is a MediaRecipe and keeps them in `ingredients`. Reading the field a record's
+# shape does not own is wrong both ways: a MediaDive solution record carries its
+# real components in `composition` and only a "See source for composition"
+# placeholder in `ingredients`.
+SOLUTION_TERM_PREFIXES = ('mediadive.solution:', 'MediaIngredientMech:')
+
+
+def _solution_term_id(record: dict) -> str:
+    """The upstream solution id that makes ``record`` SolutionRecipe-shaped, else ''."""
+    term = record.get('term')
+    term_id = term.get('id') if isinstance(term, dict) else None
+    if isinstance(term_id, str) and term_id.startswith(SOLUTION_TERM_PREFIXES):
+        return term_id
+    return ''
+
+
+def _references_scanned_record(solution: dict, scanned_records, solution_records) -> bool:
+    """Whether a nested solution names a record that this scan counts on its own.
+
+    CultureMech's precedence (``kgx_export.nested_solution_target``): a
+    ``culturemech_term`` naming a scanned record, then a ``term.id`` that a
+    scanned solution record carries. A ``culturemech_term`` naming no scanned
+    record falls back to the ``term.id``, so a stale local link cannot count a
+    stock's components a second time.
+    """
+    local = solution.get('culturemech_term')
+    if isinstance(local, dict) and str(local.get('id', '')) in scanned_records:
+        return True
+    term = solution.get('term')
+    term_id = term.get('id') if isinstance(term, dict) else None
+    return isinstance(term_id, str) and term_id in solution_records
+
+
+def _inline_solution_compositions(owner: dict, is_reference, prefix: str = '') -> list:
+    """``(path, composition)`` for every stock written inline in ``owner``'s ``solutions[]``.
+
+    Since CultureMech#577 a recipe's inline stocks hold components that exist
+    nowhere else, so they are occurrences of that recipe. The walk stops at a
+    reference to a scanned record, together with everything below it: that
+    record's components are counted once where it is scanned, and expanding
+    the reference would count them again for every medium that uses it
+    (CultureMech#312).
+    """
+    found = []
+    solutions = owner.get('solutions')
+    if not isinstance(solutions, list):
+        return found
+    for index, solution in enumerate(solutions):
+        if not isinstance(solution, dict) or is_reference(solution):
+            continue
+        path = f'{prefix}solutions/{index}'
+        if 'composition' in solution:
+            found.append((f'{path}/composition', solution.get('composition')))
+        found.extend(_inline_solution_compositions(solution, is_reference, f'{path}/'))
+    return found
+
+
 def scan_culturemech(culturemech_root: Path) -> dict:
     """
-    Returns: name → {'count': N, 'term_id': str, 'media': [list]}
+    Returns: name → {'count': N, 'term_id': str, 'example_media': [list]}
+
+    Counts the components CultureMech's own occurrence table counts, so the two
+    cannot disagree about what a recipe contains (#604):
+
+    - each record's root ``composition`` if it is SolutionRecipe-shaped, else
+      its root ``ingredients`` -- one field, never both;
+    - the ``composition`` of every stock written inline in ``solutions[]``, at
+      any depth;
+    - except a nested solution that references a record in the same scan, and
+      everything below it, because that record counts its own components.
+
+    Inline stocks are counted after every file has been read, so whether a
+    nested solution is a reference does not depend on which file sorts first.
+    A component list that is not a list, or a component that is not a mapping,
+    raises rather than being skipped: either would silently drop occurrences.
+
+    A medium's components, in its root ``ingredients`` or its inline stocks,
+    outrank a solution record's when a name's ``term_id`` and example media are
+    chosen; within a rank the first in file order wins, as before. Almost every
+    solution-record component carries MediaDive's raw ``mediadive.compound:`` id
+    where media carry their curated grounding, so letting whichever file sorts
+    first decide would trade a CHEBI id for a registry id -- DNA's CHEBI:16991
+    for mediadive.compound:958.
     """
     normalized_yaml = culturemech_root / 'data' / 'normalized_yaml'
     occurrences: Dict[str, dict] = {}
+    scanned_records: set = set()
+    solution_records: set = set()
+    pending = []
+    medium_rank, solution_rank = 0, 1
+    term_ranks: Dict[str, int] = {}
+    examples: Dict[str, tuple] = {}
 
-    print("Scanning CultureMech ingredient occurrences...")
-    file_count = 0
-    for yaml_file in sorted(normalized_yaml.rglob('*.yaml')):
-        try:
-            data = yaml.safe_load(yaml_file.read_text())
-        except Exception:
-            continue
-        if not data or not isinstance(data, dict):
-            continue
-
-        media_id = data.get('id', yaml_file.stem)
-        file_count += 1
-
-        for ing in data.get('ingredients', []) or []:
-            name = ing.get('preferred_term', '').strip()
+    def count(media_id, source: Path, field: str, components, rank: int) -> int:
+        if components is None:
+            return 0
+        if not isinstance(components, list):
+            raise ValueError(
+                f'{source}: {field} must be a list, not {type(components).__name__}')
+        counted = 0
+        for index, ing in enumerate(components):
+            if not isinstance(ing, dict):
+                raise ValueError(f'{source}: {field}/{index} must be a mapping')
+            name = ing.get('preferred_term')
+            name = name.strip() if isinstance(name, str) else ''
             if not name:
                 continue
 
@@ -403,16 +491,60 @@ def scan_culturemech(culturemech_root: Path) -> dict:
                     'term_id': term_id,
                     'example_media': [],
                 }
+                term_ranks[name] = rank
+                examples[name] = ([], [])
 
             entry = occurrences[name]
             entry['count'] += 1
-            # Prefer entries that have a term_id
-            if term_id and not entry['term_id']:
+            counted += 1
+            # Prefer entries that have a term_id, and a medium's to a solution record's
+            if term_id and (not entry['term_id'] or rank < term_ranks[name]):
                 entry['term_id'] = term_id
-            if len(entry['example_media']) < 3:
-                entry['example_media'].append(media_id)
+                term_ranks[name] = rank
+            listed = examples[name][rank]
+            if len(listed) < 3:
+                listed.append(media_id)
+        return counted
 
-    print(f"  {file_count} media files → {len(occurrences)} unique ingredient names\n")
+    print("Scanning CultureMech ingredient occurrences...")
+    file_count = root_count = 0
+    for yaml_file in sorted(normalized_yaml.rglob('*.yaml')):
+        try:
+            data = yaml.safe_load(yaml_file.read_text())
+        except Exception:
+            continue
+        if not data or not isinstance(data, dict):
+            continue
+
+        media_id = data.get('id', yaml_file.stem)
+        file_count += 1
+
+        solution_id = _solution_term_id(data)
+        field = 'composition' if solution_id else 'ingredients'
+        rank = solution_rank if solution_id else medium_rank
+        root_count += count(media_id, yaml_file, field, data.get(field), rank)
+        record_id = data.get('id')
+        if isinstance(record_id, str) and record_id.strip():
+            scanned_records.add(record_id.strip())
+        if solution_id:
+            solution_records.add(solution_id)
+        if data.get('solutions'):
+            pending.append((media_id, yaml_file, data, rank))
+
+    def is_reference(solution: dict) -> bool:
+        return _references_scanned_record(solution, scanned_records, solution_records)
+
+    inline_count = 0
+    for media_id, yaml_file, data, rank in pending:
+        for field, components in _inline_solution_compositions(data, is_reference):
+            inline_count += count(media_id, yaml_file, field, components, rank)
+
+    for name, entry in occurrences.items():
+        medium_examples, solution_examples = examples[name]
+        entry['example_media'] = (medium_examples + solution_examples)[:3]
+
+    print(f"  {file_count} records → {root_count} root and {inline_count} inline-stock "
+          f"occurrences, {len(occurrences)} unique ingredient names\n")
     return occurrences
 
 
