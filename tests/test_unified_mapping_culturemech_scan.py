@@ -271,6 +271,23 @@ def test_a_mediums_term_id_is_not_a_reference_target(tmp_path):
     assert _counts(tmp_path) == {"Agar": 1, "Peptone": 1}
 
 
+@pytest.mark.parametrize("nested", [
+    {"culturemech_term": {"id": "CM:2"}, "composition": None},
+    {"term": {"id": "mediadive.solution:7"}, "composition": None},
+    {"culturemech_term": {"id": "CM:2"}, "solutions": [{"composition": None}]},
+], ids=["culturemech_term reference", "term.id reference", "below a reference"])
+def test_a_stock_named_only_by_reference_may_leave_composition_null(tmp_path, nested):
+    # CultureMech's schema makes a SolutionDescriptor's composition optional
+    # "when the solution is referenced by name only", and its scanner never
+    # walks into a reference, so it accepts all three (#614).
+    _write(tmp_path, "solution.yaml", _solution("CM:2", "mediadive.solution:7", "Glucose"))
+    _write(tmp_path, "medium.yaml", {
+        "id": "CM:1", "name": "M", "ingredients": _items("Agar"), "solutions": [nested],
+    })
+
+    assert _counts(tmp_path) == {"Agar": 1, "Glucose": 1}
+
+
 def test_blank_and_non_text_names_are_not_occurrences(tmp_path):
     _write(tmp_path, "medium.yaml", {"id": "CM:1", "name": "Medium", "ingredients": [
         {"preferred_term": None}, {"preferred_term": "  "}, {"preferred_term": 5},
@@ -281,6 +298,8 @@ def test_blank_and_non_text_names_are_not_occurrences(tmp_path):
 
 
 _MEDIUM = {"id": "CM:1", "name": "M", "ingredients": []}
+# A directory named like a record: reading it raises an OSError.
+_DIRECTORY = object()
 _REFUSED = [
     ("root list", {"medium.yaml": {**_MEDIUM, "ingredients": "Agar"}},
      "medium.yaml: ingredients must be a list (got str)"),
@@ -299,6 +318,8 @@ _REFUSED = [
      "medium.yaml: solutions/0/solutions/0/composition/0 must be a mapping"),
     ("solutions not a list", {"medium.yaml": {**_MEDIUM, "solutions": {"composition": []}}},
      "medium.yaml: solutions must be a list (got dict)"),
+    ("solutions empty mapping", {"medium.yaml": {**_MEDIUM, "solutions": {}}},
+     "medium.yaml: solutions must be a list (got dict)"),
     ("solution not a mapping", {"medium.yaml": {**_MEDIUM, "solutions": ["Stock A"]}},
      "medium.yaml: solutions/0 must be a mapping"),
     ("below a reference", {
@@ -315,12 +336,20 @@ _REFUSED = [
         "medium.yaml": {**_MEDIUM, "ingredients": _items("Agar"), "solutions": [
             {"culturemech_term": {"id": "CM:2"}, "composition": _items("Glucose")}]},
     }, "solution.yaml: composition must be a list (got missing or null)"),
-    ("unparsable", {"medium.yaml": "id: CM:1\nname: [unclosed\n"}, "medium.yaml: unreadable"),
+    ("unparsable", {"medium.yaml": "id: CM:1\nname: [unclosed\n"},
+     "medium.yaml: unreadable ("),
+    ("not UTF-8", {"medium.yaml": b"id: CM:1\nname: Gew\xfcrz\ningredients: []\n"},
+     "medium.yaml: unreadable (UnicodeDecodeError)"),
+    ("not readable", {"medium.yaml": _DIRECTORY}, "medium.yaml: unreadable (IsADirectoryError)"),
     ("empty file", {"medium.yaml": ""}, "medium.yaml: the root must be a mapping (got nothing)"),
     ("root not a mapping", {"medium.yaml": "- CM:1\n"},
      "medium.yaml: the root must be a mapping (got list)"),
     ("no id", {"medium.yaml": {"name": "M", "ingredients": _items("Agar")}}, "medium.yaml: no id"),
+    ("id not text", {"medium.yaml": {**_MEDIUM, "id": 123}}, "medium.yaml: no id"),
     ("repeated id", {"a.yaml": _MEDIUM, "b.yaml": {**_MEDIUM, "name": "Other"}},
+     "b.yaml: id CM:1 is also used by a.yaml"),
+    # CultureMech compares stripped ids, so padding does not make a new record.
+    ("repeated id once stripped", {"a.yaml": _MEDIUM, "b.yaml": {**_MEDIUM, "id": "CM:1 "}},
      "b.yaml: id CM:1 is also used by a.yaml"),
 ]
 
@@ -329,9 +358,13 @@ _REFUSED = [
                          ids=[case[0] for case in _REFUSED])
 def test_records_culturemech_would_refuse_stop_the_scan(tmp_path, files, message):
     for relative, content in files.items():
-        if isinstance(content, str):
-            path = tmp_path / "data" / "normalized_yaml" / relative
-            path.parent.mkdir(parents=True, exist_ok=True)
+        path = tmp_path / "data" / "normalized_yaml" / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if content is _DIRECTORY:
+            path.mkdir()
+        elif isinstance(content, bytes):
+            path.write_bytes(content)
+        elif isinstance(content, str):
             path.write_text(content, encoding="utf-8")
         else:
             _write(tmp_path, relative, content)

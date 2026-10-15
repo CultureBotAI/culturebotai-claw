@@ -414,7 +414,9 @@ def _component_errors(record: dict, field: str) -> list:
     Checks the root ``field`` and every ``solutions[]`` and nested
     ``composition`` below it, references included. CultureMech's scanner and
     schema refuse such a record, so counting around it would publish numbers
-    CultureMech never produces (#607).
+    CultureMech never produces (#607). A nested ``composition`` may be null:
+    CultureMech's schema allows that on a stock named only by reference, and
+    whether a stock is one is known only once every file is read (#614).
     """
     def collection(value, path: str) -> list:
         if not isinstance(value, list):
@@ -436,7 +438,7 @@ def _component_errors(record: dict, field: str) -> list:
             if not isinstance(solution, dict):
                 continue
             path = f'{prefix}solutions/{index}'
-            if 'composition' in solution:
+            if solution.get('composition') is not None:
                 errors.extend(collection(solution['composition'], f'{path}/composition'))
             walk(solution, f'{path}/')
 
@@ -485,12 +487,15 @@ def scan_culturemech(culturemech_root: Path) -> dict:
     Inline stocks are counted after every file has been read, so whether a
     nested solution is a reference does not depend on which file sorts first.
 
-    Raises ``ValueError``, listing every problem, instead of counting around a
-    record CultureMech's scanner would refuse: a file that is unreadable, empty
-    or not a mapping; a missing or repeated ``id``; components that are not
-    lists of mappings; or no records at all (#607). Skipping such a record
-    would also change other records' counts, because a reference to it would
-    no longer be recognised. CultureMech's schema validation is not repeated.
+    Raises ``ValueError``, naming the problems found (at most 25 in the message),
+    instead of counting around a record CultureMech's scanner would refuse: a
+    file that is unreadable, empty or not a mapping; a missing or repeated
+    ``id``; components that are not lists of mappings; an inline stock whose
+    ``composition`` is null; or no records at all (#607). Skipping such a record
+    would also change other records' counts, because a reference to it would no
+    longer be recognised. A stock named only by reference may leave its
+    ``composition`` null, as CultureMech's schema allows (#614). CultureMech's
+    schema validation is not otherwise repeated.
 
     Root components are counted before inline stocks, each in file order. A
     medium's components, root or inline, outrank a solution record's when a
@@ -579,23 +584,35 @@ def scan_culturemech(culturemech_root: Path) -> dict:
             solution_records.add(solution_id)
         if data.get('solutions'):
             # Only the stocks are needed later; the rest of the record can go.
-            pending.append((media_id, {'solutions': data['solutions']}, rank))
+            pending.append((media_id, source, {'solutions': data['solutions']}, rank))
+
+    def refuse_if_any() -> None:
+        if errors:
+            shown = '\n  '.join(errors[:25])
+            more = f'\n  ... and {len(errors) - 25} more' if len(errors) > 25 else ''
+            raise ValueError(f'{len(errors)} problem(s) under {normalized_yaml}, so nothing '
+                             f'was counted:\n  {shown}{more}')
 
     if not file_count and not errors:
         errors.append('no CultureMech records')
-    if errors:
-        shown = '\n  '.join(errors[:25])
-        more = f'\n  ... and {len(errors) - 25} more' if len(errors) > 25 else ''
-        raise ValueError(f'{len(errors)} problem(s) under {normalized_yaml}, so nothing '
-                         f'was counted:\n  {shown}{more}')
+    refuse_if_any()
 
     def is_reference(solution: dict) -> bool:
         return _references_scanned_record(solution, record_sources, solution_records)
 
+    inline = []
+    for media_id, source, owner, rank in pending:
+        for path, components in _inline_solution_compositions(owner, is_reference):
+            if components is None:
+                # Walked, so not a reference: CultureMech refuses a null here (#614).
+                errors.append(f'{source}: {path} must be a list (got missing or null)')
+            else:
+                inline.append((media_id, components, rank))
+    refuse_if_any()
+
     inline_count = 0
-    for media_id, owner, rank in pending:
-        for _path, components in _inline_solution_compositions(owner, is_reference):
-            inline_count += count(media_id, components, rank)
+    for media_id, components, rank in inline:
+        inline_count += count(media_id, components, rank)
 
     for name, entry in occurrences.items():
         medium_examples, solution_examples = examples[name]
