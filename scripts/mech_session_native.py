@@ -220,13 +220,19 @@ def native_goal_declaration(payload):
 
 
 def terminal_marker(visible):
-    # Require an unquoted final standalone marker, not a snippet quoted in an explanation.
+    """Accept only a column-zero native marker outside recognized code fences.
+
+    Trailing horizontal whitespace and blank lines are harmless. Indented or
+    container-prefixed marker lines are never control messages, including those
+    inside list-item fences. This intentionally accepts less than general
+    Markdown: ambiguous fence/container combinations remain nonterminal.
+    """
     lines = visible.splitlines()
     while lines and not lines[-1].strip():
         lines.pop()
     if not lines:
         return None
-    marker = re.fullmatch(r" {0,3}(<!-- GOAL_(?:COMPLETE|CANCELLED) -->)[ \t]*", lines[-1])
+    marker = re.fullmatch(r"(<!-- GOAL_(?:COMPLETE|CANCELLED) -->)[ \t]*", lines[-1])
     if not marker:
         return None
     fence = None

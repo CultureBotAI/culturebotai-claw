@@ -79,6 +79,33 @@ def test_quoted_or_nonterminal_markers_do_not_finish_goal(text):
     assert native.terminal_marker(text) is None
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "- ```\n  <!-- GOAL_COMPLETE -->",
+        "1. ```\n   <!-- GOAL_COMPLETE -->",
+        "- ```text\n  <!-- GOAL_CANCELLED -->",
+        "+ ~~~text\n  <!-- GOAL_COMPLETE -->",
+        "* ```\n  <!-- GOAL_CANCELLED -->",
+        "1) ~~~\n   <!-- GOAL_CANCELLED -->",
+        "- outer\n  - ```\n    <!-- GOAL_COMPLETE -->",
+        "> ```\n> <!-- GOAL_COMPLETE -->",
+        "> - ```\n>   <!-- GOAL_CANCELLED -->",
+        " <!-- GOAL_COMPLETE -->",
+        "  <!-- GOAL_CANCELLED -->",
+        "   <!-- GOAL_COMPLETE -->",
+    ],
+)
+def test_container_or_indented_markers_are_not_control_messages(text):
+    assert native.terminal_marker(text) is None
+
+
+def test_column_zero_marker_after_plain_list_is_terminal():
+    assert native.terminal_marker(
+        "- Finished item\n\n<!-- GOAL_COMPLETE --> \t\n\n"
+    ) == native.COMPLETE
+
+
 def test_exact_marker_after_closed_code_fence_is_terminal():
     assert (
         native.terminal_marker("```\ncommand\n```\n\n<!-- GOAL_COMPLETE -->")
