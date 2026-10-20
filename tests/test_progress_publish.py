@@ -185,3 +185,19 @@ def test_fifo_lock_fails_without_mutating_state(tmp_path):
     with pytest.raises(publisher.PublishError, match="regular file"):
         publisher.collect_once([], tmp_path)
     assert not (tmp_path / "bundle.json").exists()
+
+
+def test_refresh_skips_known_merged_bindings_but_checks_new_and_reopenable_prs():
+    history = {"pr_events": [
+        {"pr_id": "merged", "number": 1, "state": "merged"},
+        {"pr_id": "closed", "number": 2, "state": "closed"}],
+        "associations": [
+            {"pr_id": name, "repository_key": "traitmech", "run_key": publisher.run_key("run"),
+             "cycle": 1, "stage_number": 1} for name in ("merged", "closed")]}
+    old = {"repository_key": "traitmech", "run_id": "run", "cycle": 1, "stage": 1, "pr_number": 1}
+    new_binding = {**old, "stage": 2}
+    refresh = publisher.refresh_associations([old, new_binding], history)
+    assert len(refresh) == 2
+    assert new_binding in refresh
+    assert any(item["pr_number"] == 2 for item in refresh)
+    assert old not in refresh

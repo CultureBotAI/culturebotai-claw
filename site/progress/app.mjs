@@ -54,7 +54,7 @@ function renderTotals() {
   $("metric-goals").textContent = formatNumber.format(snapshot.totals.completed_goals);
   $("metric-no-change").textContent = `${formatNumber.format(snapshot.totals.no_change_goals)} verified no-change ${snapshot.totals.no_change_goals === 1 ? "outcome" : "outcomes"}`;
   $("metric-prs").textContent = formatNumber.format(snapshot.totals.merged_prs);
-  $("metric-open-prs").textContent = `${formatNumber.format(snapshot.totals.open_prs)} open · ${formatNumber.format(snapshot.totals.closed_prs)} closed without merge`;
+  $("metric-open-prs").textContent = `${formatNumber.format(snapshot.totals.unique_prs)} tracked · ${formatNumber.format(snapshot.totals.open_prs)} open · ${formatNumber.format(snapshot.totals.closed_prs)} closed without merge`;
   $("metric-cycles").textContent = formatNumber.format(snapshot.totals.completed_cycles);
 }
 

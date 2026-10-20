@@ -11,17 +11,23 @@ import base64
 import fcntl
 import json
 import os
-from pathlib import Path
 import signal
 import stat
 import subprocess
 import tempfile
 import time
+from pathlib import Path
 from typing import Any
 
-from kg_microbe_progress import collect_progress, validate_extension, validate_history, validate_bundle
+from kg_microbe_progress import (
+    collect_progress,
+    run_key,
+    validate_bundle,
+    validate_extension,
+    validate_history,
+)
 from kg_microbe_progress import read_json as read_progress_json
-from kg_microbe_progress.prs import gather_associations, fetch_pr_observations
+from kg_microbe_progress.prs import fetch_pr_observations, gather_associations
 
 REPOSITORY = "CultureBotAI/culturebotai-claw"
 BRANCH = "mech-progress-data"
@@ -58,7 +64,9 @@ def atomic_json(path: Path, value: dict) -> None:
     fd, temporary = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")
     try:
         with os.fdopen(fd, "wb") as stream:
-            stream.write(encode(value)); stream.flush(); os.fsync(stream.fileno())
+            stream.write(encode(value))
+            stream.flush()
+            os.fsync(stream.fileno())
         os.replace(temporary, path)
         directory_fd = os.open(path.parent, os.O_RDONLY)
         try:
@@ -153,6 +161,32 @@ def publish(bundle: dict, previous_head: str | None, previous: dict | None, *, i
     return head
 
 
+def refresh_associations(associations: list[dict], history: dict | None) -> list[dict]:
+    """Refresh mutable PRs and new bindings; preserve verified terminal facts."""
+    if history is None:
+        return associations
+    latest = {event["pr_id"]: event for event in history["pr_events"]}
+    terminal = set()
+    candidates = list(associations)
+    for association in history["associations"]:
+        event = latest[association["pr_id"]]
+        identity = (association["repository_key"], association["run_key"],
+                    association["cycle"], association["stage_number"], event["number"])
+        if event["state"] == "merged":
+            terminal.add(identity)
+        else:
+            candidates.append({"repository_key": association["repository_key"],
+                "run_key": association["run_key"], "cycle": association["cycle"],
+                "stage_number": association["stage_number"], "pr_number": event["number"]})
+    pending = {}
+    for item in candidates:
+        identity = (item["repository_key"], run_key(item["run_id"]) if "run_id" in item else item["run_key"],
+                    item["cycle"], item.get("stage", item.get("stage_number")), item["pr_number"])
+        if identity not in terminal:
+            pending[identity] = item
+    return list(pending.values())
+
+
 def collect_once(runtime_dirs: list[Path], state_dir: Path, *, apply=False, initialize=False, api=gh) -> dict:
     state_dir.mkdir(parents=True, exist_ok=True)
     lock_path = state_dir / "publisher.lock"
@@ -166,14 +200,7 @@ def collect_once(runtime_dirs: list[Path], state_dir: Path, *, apply=False, init
         head, remote = read_remote(api) if apply else (None, None)
         prior = newest_history(local["history"] if local else None, remote["history"] if remote else None)
         associations = gather_associations(runtime_dirs)
-        if prior:
-            latest = {event["pr_id"]: event for event in prior["pr_events"]}
-            for association in prior["associations"]:
-                event = latest[association["pr_id"]]
-                associations.append({"repository_key": association["repository_key"],
-                    "run_key": association["run_key"], "cycle": association["cycle"],
-                    "stage_number": association["stage_number"], "pr_number": event["number"]})
-        observations = fetch_pr_observations(associations)
+        observations = fetch_pr_observations(refresh_associations(associations, prior))
         history, snapshot = collect_progress(runtime_dirs, prior, verified_pr_observations=observations)
         bundle = {"history": history, "snapshot": snapshot}
         # A failed remote write never discards newly observed durable history.

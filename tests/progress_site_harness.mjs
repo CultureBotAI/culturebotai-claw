@@ -26,6 +26,13 @@ if (process.argv[3]) {
 }
 
 validateSnapshot(snapshot);
+const offsetSnapshot = structuredClone(snapshot);
+offsetSnapshot.generated_at = "2026-10-20T04:59:00-07:00";
+offsetSnapshot.repositories[0].last_observed_at = "2026-10-20T13:59:00+02:00";
+offsetSnapshot.repositories[0].current.observed_at = "2026-10-20T04:59:00-07:00";
+validateSnapshot(offsetSnapshot);
+assert.equal(isStale(offsetSnapshot.repositories[0].current.observed_at, now), false);
+assert.equal(relativeTime(offsetSnapshot.generated_at, now), "1m ago");
 const unobserved = structuredClone(row);
 delete unobserved.current;
 delete unobserved.last_observed_at;
