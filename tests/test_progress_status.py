@@ -21,7 +21,9 @@ STAMP = NOW.isoformat()
 
 
 @pytest.fixture
-def status(monkeypatch):
+def status(monkeypatch, tmp_path):
+    # Default-source tests must not read the operator's live publisher pin.
+    monkeypatch.chdir(tmp_path)
     monkeypatch.syspath_prepend(str(ROOT / "scripts"))
     spec = importlib.util.spec_from_file_location(
         "mech_progress_status", ROOT / "scripts/mech_progress_status.py"
