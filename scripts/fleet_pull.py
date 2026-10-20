@@ -30,6 +30,12 @@ from kg_microbe_fleet import (
     default_fleet_pull_schema_path,
     load_fleet_manifest,
 )
+from kg_microbe_fleet.roots import (
+    CULTUREBOTAI_SITE_DIRECTORY,
+    CULTUREBOTAI_SITE_MARKER,
+    CULTUREBOTAI_SITE_REPOSITORY,
+    CULTUREBOTAI_SITE_VARIABLE,
+)
 from plugins.lock_manager import LockManager
 from plugins.repository_settings import (
     RepositoryConfigurationError,
@@ -41,6 +47,9 @@ from plugins.repository_settings import (
 CLAW_ROOT = Path(__file__).resolve().parents[1]
 CONTROL_PLANE_KEY = "claw"
 CONTROL_PLANE_REPOSITORY = "CultureBotAI/culturebotai-claw"
+SUITE_SITE_KEY = "site"
+SUITE_SITE_REPOSITORY = CULTUREBOTAI_SITE_REPOSITORY
+SUITE_SITE_VARIABLE = CULTUREBOTAI_SITE_VARIABLE
 SUCCESS = {"would_update", "updated", "up_to_date", "ahead"}
 # REBASE_HEAD is a commit pointer that can survive a finished rebase. The
 # rebase state directories identify an active operation, including paused ones.
@@ -107,25 +116,61 @@ class Git:
 
 
 class FleetPullSettings:
-    """RepositorySettings plus the explicit claw control-plane checkout."""
+    """RepositorySettings plus the explicit claw control-plane and optional site checkouts."""
 
-    def __init__(self, settings, claw_root: Path = CLAW_ROOT) -> None:
+    def __init__(
+        self,
+        settings,
+        claw_root: Path = CLAW_ROOT,
+        site_root: Path | None = None,
+    ) -> None:
         self._settings = settings
         self._claw = RepositoryTarget(
             CONTROL_PLANE_KEY,
             claw_root,
             CONTROL_PLANE_REPOSITORY,
         )
+        self._site = (
+            RepositoryTarget(
+                SUITE_SITE_KEY,
+                site_root,
+                SUITE_SITE_REPOSITORY,
+            )
+            if site_root is not None
+            else None
+        )
 
     @property
     def unconfigured(self) -> tuple[str, ...]:
-        return self._settings.unconfigured
+        base = tuple(getattr(self._settings, "unconfigured", ()))
+        if self._site is None and SUITE_SITE_KEY not in base:
+            return (*base, SUITE_SITE_KEY)
+        return base
 
     def get_target(self, key: str) -> RepositoryTarget:
         if key == CONTROL_PLANE_KEY:
             self._claw.open()
             return self._claw
+        if key == SUITE_SITE_KEY:
+            if self._site is None:
+                raise RepositoryConfigurationError(
+                    f"{SUITE_SITE_VARIABLE} is not configured"
+                )
+            self._site.open()
+            return self._site
         return self._settings.get_target(key)
+
+
+def _resolve_site_root(
+    environ: Mapping[str, str], claw_root: Path = CLAW_ROOT
+) -> Path | None:
+    configured = (environ.get(SUITE_SITE_VARIABLE) or "").strip()
+    if configured:
+        return Path(configured).expanduser()
+    sibling = Path(claw_root).resolve().parent / CULTUREBOTAI_SITE_DIRECTORY
+    if (sibling / CULTUREBOTAI_SITE_MARKER).is_file():
+        return sibling.resolve()
+    return None
 
 
 def inspect(git: Git) -> dict:
@@ -284,9 +329,17 @@ def _timeout(value: str) -> int:
     return parsed
 
 
-def selected_keys(requested: list[str] | None, manifest) -> list[str]:
-    keys = list(dict.fromkeys(requested or [CONTROL_PLANE_KEY, *manifest.mechs]))
-    known = {CONTROL_PLANE_KEY, *manifest.mechs}
+def selected_keys(
+    requested: list[str] | None,
+    manifest,
+    *,
+    include_site: bool = False,
+) -> list[str]:
+    default_keys = [CONTROL_PLANE_KEY, *manifest.mechs]
+    if include_site:
+        default_keys.append(SUITE_SITE_KEY)
+    keys = list(dict.fromkeys(requested or default_keys))
+    known = {CONTROL_PLANE_KEY, SUITE_SITE_KEY, *manifest.mechs}
     unknown = set(keys) - known
     if unknown:
         names = ", ".join(sorted(unknown))
@@ -486,7 +539,7 @@ def main(argv=None) -> int:
     parser.add_argument(
         "--mech",
         action="append",
-        help="select a repository key, including claw; repeat to select several",
+        help="select a repository key, including claw or site; repeat to select several",
     )
     parser.add_argument("--dotenv", type=Path, help="repository configuration (default: CLAW .env if present)")
     parser.add_argument("--timeout", type=_timeout, default=60, help="seconds per repository (default: 60)")
@@ -495,16 +548,22 @@ def main(argv=None) -> int:
     try:
         manifest = load_fleet_manifest()
         try:
-            keys = selected_keys(args.mech, manifest)
+            selected_keys(args.mech, manifest)
         except argparse.ArgumentTypeError as exc:
             parser.error(str(exc))
         dotenv = args.dotenv
         if dotenv is None and (CLAW_ROOT / ".env").exists():
             dotenv = CLAW_ROOT / ".env"
+        environ = merged_repository_environment(dotenv)
+        site_root = _resolve_site_root(environ, claw_root=CLAW_ROOT)
+        keys = selected_keys(
+            args.mech, manifest, include_site=site_root is not None
+        )
         settings = FleetPullSettings(
             RepositorySettings.from_environment(
-                manifest=manifest, environ=merged_repository_environment(dotenv),
-            )
+                manifest=manifest, environ=environ,
+            ),
+            site_root=site_root,
         )
         results = run_fleet(settings, keys, apply=args.apply, timeout=args.timeout)
         incomplete = any(row.get("status") not in SUCCESS for row in results)

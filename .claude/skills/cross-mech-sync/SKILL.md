@@ -434,6 +434,12 @@ but refuses if that ref moved after review.
 - Update only tracking artifacts explicitly declared by the governing manifest
   or named in the task. Do not introduce or mutate a `NEXT_TASKS.md` merely
   because another Mech happens to carry one.
+- When the synced change affects fleet membership, schemas, record counts, prefix/subset
+  overlap, or published Mech Pages sites, check the companion X-Mech Suite checkout
+  (`$CULTUREBOTAI_SITE_ROOT`, `CultureBotAI.github.io/scripts/fleet/check_updates.py`)
+  and refresh `CultureBotAI.github.io/_fleet/mechs.yaml` and
+  `CultureBotAI.github.io/mechs/index.html` per
+  `CultureBotAI.github.io/.claude/skills/update-xmech-page/SKILL.md` when requested.
 - Comment + close the tracking issue (often in `culturebotai-claw`); record any
   **decision** made (e.g. "TraitMech deferred — net-new adoption, not a sync").
 

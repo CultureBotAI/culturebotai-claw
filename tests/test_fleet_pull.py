@@ -678,6 +678,47 @@ def test_claw_is_a_first_class_fleet_pull_target(tmp_path: Path, fleet: LocalFle
     assert [row["status"] for row in results] == ["up_to_date", "up_to_date"]
 
 
+def test_site_is_a_fleet_pull_target_when_configured_or_selected(
+    tmp_path: Path, fleet: LocalFleet
+):
+    site = tmp_path / "CultureBotAI.github.io"
+    git(tmp_path, "init", "--initial-branch=main", str(site))
+    commit(site, "tracked.txt", "initial\n")
+    git(
+        site,
+        "remote",
+        "add",
+        "origin",
+        "https://github.com/CultureBotAI/CultureBotAI.github.io.git",
+    )
+    git(site, "update-ref", "refs/remotes/origin/main", "HEAD")
+    git(site, "branch", "--set-upstream-to", "origin/main")
+
+    unconfigured = fleet_pull.FleetPullSettings(fleet.settings)
+    unconfigured_results = fleet_pull.run_fleet(
+        unconfigured, ["site", "culturemech"], locks=fleet.locks
+    )
+    assert [row["status"] for row in unconfigured_results] == [
+        "not_configured",
+        "up_to_date",
+    ]
+
+    configured = fleet_pull.FleetPullSettings(fleet.settings, site_root=site)
+    configured_results = fleet_pull.run_fleet(
+        configured, ["site", "culturemech"], locks=fleet.locks
+    )
+    assert [row["key"] for row in configured_results] == ["site", "culturemech"]
+    assert [row["status"] for row in configured_results] == [
+        "up_to_date",
+        "up_to_date",
+    ]
+
+    manifest = fleet_pull.load_fleet_manifest()
+    assert "site" not in fleet_pull.selected_keys(None, manifest, include_site=False)
+    assert "site" in fleet_pull.selected_keys(None, manifest, include_site=True)
+    assert fleet_pull.selected_keys(["site"], manifest) == ["site"]
+
+
 @pytest.mark.parametrize("apply", [False, True])
 def test_cli_selects_manifest_repositories_and_reports_coverage(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture, apply: bool
@@ -818,7 +859,7 @@ def test_fleet_pull_schema_repository_keys_match_manifest():
     enum_keys = set(
         schema_doc["enums"]["FleetRepositoryKeyEnum"]["permissible_values"].keys()
     )
-    expected_keys = {"claw", *load_fleet_manifest().mechs}
+    expected_keys = {"claw", "site", *load_fleet_manifest().mechs}
     assert enum_keys == expected_keys
 
 

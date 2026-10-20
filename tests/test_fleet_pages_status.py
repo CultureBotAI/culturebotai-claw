@@ -8,8 +8,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from fleet_pages_status import (  # noqa: E402
     FLEET_PATTERN,
+    SUITE_SITE_REPO,
     _classify_comparison,
     check_repo,
+    collect,
     discover_repos,
     render,
     report_is_healthy,
@@ -334,3 +336,30 @@ def test_the_served_path_is_a_prefix_not_a_substring():
     result = check_repo(FakeClient(responses), "Org", _repo(), 20)
     assert result.site_files_changed == 0
     assert result.freshness == "CURRENT_CONTENT"
+
+
+def test_collect_and_render_include_companion_suite_site_without_non_member_warning():
+    repos = [_repo("TraitMech"), _repo(SUITE_SITE_REPO)]
+    responses = [("/orgs/", repos), *_responses(source_path="/")]
+    client = FakeClient(
+        responses, live=(200, "https://culturebotai.github.io/mechs/", None)
+    )
+    data = collect(client, org="CultureBotAI")
+
+    assert data["repos_discovered"] == 1
+    assert data["publishing_non_members"] == []
+    assert data["suite_site"] is not None
+    assert data["suite_site"]["repo"] == SUITE_SITE_REPO
+    assert data["suite_site"]["site_url"] == "https://example.test/mechs/"
+    assert report_is_healthy(data) is True
+
+    text = render(data)
+    assert "Suite site (X-Mech overview)" in text
+    assert SUITE_SITE_REPO in text
+
+    data["suite_site"]["freshness"] = "STALE"
+    data["suite_site"]["commits_behind"] = 1
+    data["suite_site"]["detail"] = "main is 1 commit(s) ahead of the published site"
+    assert report_is_healthy(data) is False
+    stale_text = render(data)
+    assert f"  {SUITE_SITE_REPO}: main is 1 commit(s) ahead" in stale_text

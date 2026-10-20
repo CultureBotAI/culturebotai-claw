@@ -56,10 +56,12 @@ enums:
         description: Ran git fetch on eligible repositories before comparing refs.
 
   FleetRepositoryKeyEnum:
-    description: Canonical repository key in the fleet pull report (claw plus fleet.yaml keys).
+    description: Canonical repository key in the fleet pull report (claw, optional site, plus fleet.yaml keys).
     permissible_values:
       claw:
         description: The culturebotai-claw control-plane repository.
+      site:
+        description: The CultureBotAI.github.io X-Mech Suite companion repository.
       culturemech:
         description: CultureMech repository.
       mediaingredientmech:
