@@ -27,6 +27,40 @@ Counts are lower bounds for explicitly tracked activity. Earlier history is
 tracker verified stages one through three. Scientific corpus round numbers and
 commit messages are not imported as workflow-cycle counts.
 
+## One-line progress report
+
+Run `just mech-progress` from the CLAW checkout, or invoke the
+`mech-progress-status` skill:
+
+```bash
+uv run python scripts/mech_progress_status.py
+uv run python scripts/mech_progress_status.py --published
+```
+
+The first reads the local atomic publisher bundle; `--published` reads both
+documents at one pinned commit on the GitHub data branch through `gh`. An
+alternate local bundle can be selected with `--bundle PATH`.
+
+If the publisher uses a pinned release newer than the local checkout, keep an
+exact copy of that release's fleet manifest as `fleet.yaml` beside the local
+bundle, or pass `--manifest PATH`. The report validates against that manifest;
+when no pin exists it uses the packaged fleet. Invalid pins and fleet
+mismatches fail rather than changing the active fleet configuration.
+
+Example output (`N` is the tracked fleet size; other counts are illustrative):
+
+```text
+N Mechs, 8 PRs (5 merged, 3 open), 1 completed goal, 0 completed cycles
+```
+
+Closed PRs without a merge are included in the parentheses when nonzero. The
+command validates the history and snapshot before reporting counts. Exit 0
+means observations are fresh; exit 3 prints the last verified counts and warns
+on stderr about a snapshot or Mech observation older than 15 minutes, missing
+observations, or timestamps more than one minute in the future. Retain those
+warnings when quoting a stale summary. Exit 1 means data could not be verified
+and prints no counts; exit 2 means invalid arguments.
+
 ## Register every PR in the coding session
 
 As soon as a goal opens a PR, including every follow-up PR, register it using the
