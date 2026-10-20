@@ -437,8 +437,9 @@ but refuses if that ref moved after review.
 - When the synced change affects fleet membership, schemas, record counts, prefix/subset
   overlap, or published Mech Pages sites, check the companion X-Mech Suite checkout
   (`$CULTUREBOTAI_SITE_ROOT`, `CultureBotAI.github.io/scripts/fleet/check_updates.py`)
-  and refresh `CultureBotAI.github.io/_fleet/mechs.yaml` and
-  `CultureBotAI.github.io/mechs/index.html` per
+  and refresh `CultureBotAI.github.io/_fleet/data/manifest.json`,
+  `CultureBotAI.github.io/_fleet/data/site_audit.json`, and
+  `CultureBotAI.github.io/mechs.md` per
   `CultureBotAI.github.io/.claude/skills/update-xmech-page/SKILL.md` when requested.
 - Comment + close the tracking issue (often in `culturebotai-claw`); record any
   **decision** made (e.g. "TraitMech deferred — net-new adoption, not a sync").

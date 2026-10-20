@@ -75,9 +75,12 @@ the working tree. Before concluding a path or feature is absent, search with
    and maintained setup documentation. Record Tier 1 gaps and deferred capability
    work with evidence; registration alone does not implement missing features.
 7. When the companion X-Mech Suite repository (`CultureBotAI/CultureBotAI.github.io`,
-   `CULTUREBOTAI_SITE_ROOT`) is in scope, refresh `CultureBotAI.github.io/_fleet/mechs.yaml`,
-   card copy (`CultureBotAI.github.io/_fleet/cards.yaml`), and generated suite
-   artifacts via `CultureBotAI.github.io/.claude/skills/update-xmech-page/SKILL.md`
+   `CULTUREBOTAI_SITE_ROOT`) is in scope, refresh `CultureBotAI.github.io/_fleet/data/manifest.json`,
+   card copy (`CultureBotAI.github.io/_fleet/mechs_template.md` and
+   `CultureBotAI.github.io/_fleet/fleet_fragment.html`), and generated suite
+   artifacts (`CultureBotAI.github.io/_fleet/data/site_audit.json` and
+   `CultureBotAI.github.io/mechs.md`) via
+   `CultureBotAI.github.io/.claude/skills/update-xmech-page/SKILL.md`
    so `https://culturebotai.github.io/mechs/` stays synchronized with
    `src/kg_microbe_fleet/fleet.yaml`.
 

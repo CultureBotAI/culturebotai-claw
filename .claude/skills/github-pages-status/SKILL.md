@@ -24,7 +24,7 @@ GitHub rather than local clones, so a newly created or uncloned Mech cannot
 disappear from an "all Mechs" answer. The checker also inspects the companion
 X-Mech Suite site (`CultureBotAI/CultureBotAI.github.io`, published at
 `https://culturebotai.github.io/mechs/`) and reports its deployment and live
-status under `X-Mech Suite site` (`suite_site` in `--json`) without counting it
+status under `Suite site (X-Mech overview)` (`suite_site` in `--json`) without counting it
 as an unmanifested Mech.
 
 ## Interpret the result

@@ -713,6 +713,35 @@ def test_site_is_a_fleet_pull_target_when_configured_or_selected(
         "up_to_date",
     ]
 
+    symlinked = tmp_path / "site-link"
+    symlinked.symlink_to(site)
+    resolved_via_env = fleet_pull._resolve_site_root(
+        {fleet_pull.SUITE_SITE_VARIABLE: str(symlinked)},
+        claw_root=tmp_path / "claw",
+    )
+    assert resolved_via_env == site.resolve()
+    symlinked_settings = fleet_pull.FleetPullSettings(
+        fleet.settings, site_root=symlinked
+    )
+    symlinked_results = fleet_pull.run_fleet(
+        symlinked_settings, ["site"], locks=fleet.locks
+    )
+    assert symlinked_results[0]["status"] == "up_to_date"
+
+    sibling_parent = tmp_path / "sibling-parent"
+    sibling_claw = sibling_parent / "culturebotai-claw"
+    sibling_site = sibling_parent / "CultureBotAI.github.io"
+    sibling_claw.mkdir(parents=True)
+    sibling_site.mkdir(parents=True)
+    assert fleet_pull._resolve_site_root({}, claw_root=sibling_claw) is None
+    marker = sibling_site / "_fleet" / "mechs_template.md"
+    marker.parent.mkdir(parents=True)
+    marker.write_text("# X-Mech Suite\n", encoding="utf-8")
+    assert (
+        fleet_pull._resolve_site_root({}, claw_root=sibling_claw)
+        == sibling_site.resolve()
+    )
+
     manifest = fleet_pull.load_fleet_manifest()
     assert "site" not in fleet_pull.selected_keys(None, manifest, include_site=False)
     assert "site" in fleet_pull.selected_keys(None, manifest, include_site=True)

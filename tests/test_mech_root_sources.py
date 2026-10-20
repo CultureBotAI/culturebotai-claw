@@ -310,11 +310,12 @@ def test_culturebotai_site_is_resolved_from_claws_dotenv_and_sibling_marker(tmp_
     claw.mkdir()
     sibling = tmp_path / CULTUREBOTAI_SITE_DIRECTORY
     sibling.mkdir()
+    assert CULTUREBOTAI_SITE_MARKER == "_fleet/mechs_template.md"
     assert resolve_culturebotai_site_root(claw_root=claw, environ={}) is None
 
     marker = sibling / CULTUREBOTAI_SITE_MARKER
     marker.parent.mkdir(parents=True)
-    marker.write_text("mechs: []\n", encoding="utf-8")
+    marker.write_text("# X-Mech Suite\n", encoding="utf-8")
     assert (
         resolve_culturebotai_site_root(claw_root=claw, environ={})
         == sibling.resolve()

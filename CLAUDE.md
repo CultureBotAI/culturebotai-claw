@@ -63,7 +63,8 @@ published at `https://culturebotai.github.io/mechs/`, configured via
 `CULTUREBOTAI_SITE_ROOT` or resolved through
 `kg_microbe_fleet.roots.resolve_culturebotai_site_root()`) aggregates fleet
 metadata, record counts, prefix/subset overlap, and Pages audit pins from
-`src/kg_microbe_fleet/fleet.yaml` into `_fleet/mechs.yaml` and `mechs/index.html`.
+`src/kg_microbe_fleet/fleet.yaml` into `_fleet/data/manifest.json`,
+`_fleet/data/site_audit.json`, and `mechs.md`.
 Keep it synchronized when fleet membership, Mech schemas/corpora, or published
 Mech Pages sites change.
 

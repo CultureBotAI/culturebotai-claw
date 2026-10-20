@@ -127,13 +127,13 @@ class FleetPullSettings:
         self._settings = settings
         self._claw = RepositoryTarget(
             CONTROL_PLANE_KEY,
-            claw_root,
+            claw_root.expanduser().resolve(),
             CONTROL_PLANE_REPOSITORY,
         )
         self._site = (
             RepositoryTarget(
                 SUITE_SITE_KEY,
-                site_root,
+                site_root.expanduser().resolve(),
                 SUITE_SITE_REPOSITORY,
             )
             if site_root is not None
@@ -166,7 +166,7 @@ def _resolve_site_root(
 ) -> Path | None:
     configured = (environ.get(SUITE_SITE_VARIABLE) or "").strip()
     if configured:
-        return Path(configured).expanduser()
+        return Path(configured).expanduser().resolve()
     sibling = Path(claw_root).resolve().parent / CULTUREBOTAI_SITE_DIRECTORY
     if (sibling / CULTUREBOTAI_SITE_MARKER).is_file():
         return sibling.resolve()

@@ -169,7 +169,7 @@ KG_MICROBE_PACKAGE = "kg_microbe"
 # corpus repository in `fleet.yaml`.
 CULTUREBOTAI_SITE_VARIABLE = "CULTUREBOTAI_SITE_ROOT"
 CULTUREBOTAI_SITE_DIRECTORY = "CultureBotAI.github.io"
-CULTUREBOTAI_SITE_MARKER = "_fleet/mechs.yaml"
+CULTUREBOTAI_SITE_MARKER = "_fleet/mechs_template.md"
 CULTUREBOTAI_SITE_REPOSITORY = "CultureBotAI/CultureBotAI.github.io"
 
 
@@ -223,7 +223,7 @@ def resolve_culturebotai_site_root(
 
     Follows the same precedence as `resolve_kg_microbe_root`: exported
     `CULTUREBOTAI_SITE_ROOT` first, then claw's `.env`, then a sibling
-    `CultureBotAI.github.io` directory verified by `_fleet/mechs.yaml`.
+    `CultureBotAI.github.io` directory verified by `_fleet/mechs_template.md`.
     """
     env = os.environ if environ is None else environ
     configured = (env.get(CULTUREBOTAI_SITE_VARIABLE) or "").strip()
