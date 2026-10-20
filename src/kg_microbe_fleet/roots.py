@@ -164,6 +164,14 @@ KG_MICROBE_VARIABLE = "KGMICROBE_ROOT"
 KG_MICROBE_DIRECTORY = "kg-microbe"
 KG_MICROBE_PACKAGE = "kg_microbe"
 
+# CultureBotAI.github.io is the companion site repository hosting the X-Mech
+# Suite overview page (`https://culturebotai.github.io/mechs/`), not a Mech
+# corpus repository in `fleet.yaml`.
+CULTUREBOTAI_SITE_VARIABLE = "CULTUREBOTAI_SITE_ROOT"
+CULTUREBOTAI_SITE_DIRECTORY = "CultureBotAI.github.io"
+CULTUREBOTAI_SITE_MARKER = "_fleet/mechs_template.md"
+CULTUREBOTAI_SITE_REPOSITORY = "CultureBotAI/CultureBotAI.github.io"
+
 
 def resolve_kg_microbe_root(
     *,
@@ -203,6 +211,31 @@ def resolve_kg_microbe_root(
     # component, which can be a symlink -- and two functions of the same shape
     # handing back different paths for one checkout is how a caller ends up
     # with two roots where there is one (#330).
+    return guess.resolve()
+
+
+def resolve_culturebotai_site_root(
+    *,
+    claw_root: Path,
+    environ: Mapping[str, str] | None = None,
+) -> Path | None:
+    """CultureBotAI.github.io's checkout, or None when it cannot be resolved.
+
+    Follows the same precedence as `resolve_kg_microbe_root`: exported
+    `CULTUREBOTAI_SITE_ROOT` first, then claw's `.env`, then a sibling
+    `CultureBotAI.github.io` directory verified by `_fleet/mechs_template.md`.
+    """
+    env = os.environ if environ is None else environ
+    configured = (env.get(CULTUREBOTAI_SITE_VARIABLE) or "").strip()
+    if not configured:
+        configured = dotenv_value(claw_root, CULTUREBOTAI_SITE_VARIABLE)
+    if configured:
+        root = Path(configured).expanduser()
+        return root.resolve() if root.is_dir() else None
+
+    guess = Path(claw_root).resolve().parent / CULTUREBOTAI_SITE_DIRECTORY
+    if not (guess / CULTUREBOTAI_SITE_MARKER).is_file():
+        return None
     return guess.resolve()
 
 

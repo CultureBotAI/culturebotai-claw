@@ -52,6 +52,8 @@ DEFAULT_ORG = "CultureBotAI"
 DEFAULT_REPO_LIMIT = 300
 DEFAULT_DEPLOYMENT_LIMIT = 20
 FLEET_PATTERN = re.compile(r"(?i)mech$")
+SUITE_SITE_REPO = "CultureBotAI.github.io"
+SUITE_SITE_PAGE_PATH = "mechs/"
 PREFERRED_ORDER = (
     "CultureMech",
     "MediaIngredientMech",
@@ -170,10 +172,7 @@ def manifest_repo_names() -> set[str]:
     return {mech.github.split("/")[-1].casefold() for mech in manifest.mechs.values()}
 
 
-def discover_repos(
-    client: GitHubClient, org: str, repo_limit: int
-) -> tuple[list[dict[str, Any]], bool]:
-    """Return Mech repositories and whether org discovery exceeded the limit."""
+def _list_org_repos(client: GitHubClient, org: str) -> list[dict[str, Any]]:
     found: list[dict[str, Any]] = []
     page = 1
     # Paginate the entire organization before applying the Mech limit. Stopping
@@ -190,9 +189,32 @@ def discover_repos(
         if len(batch) < 100:
             break
         page += 1
+    return found
+
+
+def _filter_mech_repos(
+    found: list[dict[str, Any]], repo_limit: int
+) -> tuple[list[dict[str, Any]], bool]:
     mechs = [repo for repo in found if FLEET_PATTERN.search(repo.get("name", ""))]
     mechs.sort(key=lambda repo: _repo_order(repo["name"]))
     return mechs[:repo_limit], len(mechs) > repo_limit
+
+
+def _find_suite_repo(
+    found: list[dict[str, Any]], org: str
+) -> dict[str, Any] | None:
+    candidates = {f"{org}.github.io".casefold(), SUITE_SITE_REPO.casefold()}
+    for repo in found:
+        if str(repo.get("name", "")).casefold() in candidates:
+            return repo
+    return None
+
+
+def discover_repos(
+    client: GitHubClient, org: str, repo_limit: int
+) -> tuple[list[dict[str, Any]], bool]:
+    """Return Mech repositories and whether org discovery exceeded the limit."""
+    return _filter_mech_repos(_list_org_repos(client, org), repo_limit)
 
 
 def _status_for_deployment(
@@ -244,6 +266,7 @@ def check_repo(
     repo_data: dict[str, Any],
     deployment_limit: int,
     check_live: bool = True,
+    live_subpath: str = "",
 ) -> RepoStatus:
     repo = repo_data["name"]
     branch = repo_data.get("default_branch") or "main"
@@ -315,9 +338,13 @@ def check_repo(
         result.deployment_state = status.get("state")
         result.published_sha = deployment.get("sha")
         result.published_at = status.get("updated_at") or deployment.get("updated_at")
-        result.site_url = status.get("environment_url") or (
+        base_url = status.get("environment_url") or result.site_url or (
             f"https://{org.casefold()}.github.io/{repo}/"
         )
+        if live_subpath:
+            result.site_url = base_url.rstrip("/") + "/" + live_subpath.lstrip("/")
+        else:
+            result.site_url = base_url
 
         if result.published_sha == result.main_sha:
             result.freshness = "CURRENT"
@@ -371,7 +398,9 @@ def collect(
     deployment_limit: int = DEFAULT_DEPLOYMENT_LIMIT,
     check_live: bool = True,
 ) -> dict[str, Any]:
-    repos, truncated = discover_repos(client, org, repo_limit)
+    all_repos = _list_org_repos(client, org)
+    repos, truncated = _filter_mech_repos(all_repos, repo_limit)
+    suite_repo = _find_suite_repo(all_repos, org)
     members = manifest_repo_names()
     for repo in repos:
         repo["_manifest_member"] = repo["name"].casefold() in members
@@ -379,6 +408,18 @@ def collect(
         check_repo(client, org, repo, deployment_limit, check_live)
         for repo in repos
     ]
+    suite_status = (
+        check_repo(
+            client,
+            org,
+            suite_repo,
+            deployment_limit,
+            check_live,
+            live_subpath=SUITE_SITE_PAGE_PATH,
+        )
+        if suite_repo is not None
+        else None
+    )
     return {
         "org": org,
         "repo_limit": repo_limit,
@@ -389,6 +430,7 @@ def collect(
             repo["name"] for repo in repos
             if not repo["_manifest_member"] and repo.get("has_pages")
         ),
+        "suite_site": asdict(suite_status) if suite_status is not None else None,
         "results": [asdict(result) for result in results],
     }
 
@@ -406,9 +448,54 @@ def result_is_healthy(result: dict[str, Any], check_live: bool = True) -> bool:
 
 
 def report_is_healthy(data: dict[str, Any], check_live: bool = True) -> bool:
-    return bool(data["results"]) and not data["repo_listing_truncated"] and all(
-        result_is_healthy(result, check_live) for result in data["results"]
+    suite_site = data.get("suite_site")
+    suite_ok = suite_site is None or result_is_healthy(suite_site, check_live)
+    return (
+        bool(data["results"])
+        and not data["repo_listing_truncated"]
+        and suite_ok
+        and all(result_is_healthy(result, check_live) for result in data["results"])
     )
+
+
+def _format_row(result: dict[str, Any], check_live: bool) -> str:
+    if result["live_http"] is not None:
+        live = str(result["live_http"])
+    elif check_live:
+        live = "ERR"
+    else:
+        live = "SKIP"
+    deploy = result["latest_attempt_state"] or "-"
+    freshness = result["freshness"]
+    behind = result["commits_behind"]
+    touched = result["site_files_changed"]
+    if freshness == "CURRENT_CONTENT":
+        freshness = f"current ({behind} behind)"
+    elif freshness == "STALE" and touched:
+        freshness = f"STALE ({touched} file(s))"
+    elif behind:
+        freshness += f" ({behind})"
+    sha = (result["published_sha"] or "-")[:8]
+    url = result["live_url"] or result["site_url"] or "-"
+    return f"{result['repo']:<23} {live:<5} {deploy:<12} {freshness:<22} {sha:<10} {url}"
+
+
+def _format_notes(result: dict[str, Any]) -> str | None:
+    notes = []
+    if result["error"]:
+        notes.append(f"ERROR: {result['error']}")
+    if result["detail"]:
+        notes.append(result["detail"])
+    if result["latest_attempt_state"] not in (None, "success", "queued", "in_progress"):
+        notes.append(f"latest deployment attempt is {result['latest_attempt_state']}")
+    if result["freshness"] == "STALE" and not result["site_paths_known"]:
+        notes.append(
+            "built by a workflow, so the change set could not be narrowed to "
+            "site sources -- treat the commit count as an upper bound"
+        )
+    if not notes:
+        return None
+    return f"  {result['repo']}: " + "; ".join(notes)
 
 
 def render(data: dict[str, Any], check_live: bool = True) -> str:
@@ -419,27 +506,11 @@ def render(data: dict[str, Any], check_live: bool = True) -> str:
         f"{'REPO':<23} {'LIVE':<5} {'DEPLOY':<12} {'SITE VS MAIN':<22} {'PUBLISHED':<10} URL",
     ]
     for result in results:
-        if result["live_http"] is not None:
-            live = str(result["live_http"])
-        elif check_live:
-            live = "ERR"
-        else:
-            live = "SKIP"
-        deploy = result["latest_attempt_state"] or "-"
-        freshness = result["freshness"]
-        behind = result["commits_behind"]
-        touched = result["site_files_changed"]
-        if freshness == "CURRENT_CONTENT":
-            freshness = f"current ({behind} behind)"
-        elif freshness == "STALE" and touched:
-            freshness = f"STALE ({touched} file(s))"
-        elif behind:
-            freshness += f" ({behind})"
-        sha = (result["published_sha"] or "-")[:8]
-        url = result["live_url"] or result["site_url"] or "-"
-        lines.append(
-            f"{result['repo']:<23} {live:<5} {deploy:<12} {freshness:<22} {sha:<10} {url}"
-        )
+        lines.append(_format_row(result, check_live))
+
+    suite_site = data.get("suite_site")
+    if suite_site is not None:
+        lines.extend(["", "Suite site (X-Mech overview)", _format_row(suite_site, check_live)])
 
     lines.extend(["", "Coverage"])
     outside = data.get("publishing_non_members") or []
@@ -463,21 +534,11 @@ def render(data: dict[str, Any], check_live: bool = True) -> str:
             f"  WARNING: discovery exceeded --repo-limit ({data['repo_limit']}); "
             "entire Mech repos may be missing"
         )
-    for result in results:
-        notes = []
-        if result["error"]:
-            notes.append(f"ERROR: {result['error']}")
-        if result["detail"]:
-            notes.append(result["detail"])
-        if result["latest_attempt_state"] not in (None, "success", "queued", "in_progress"):
-            notes.append(f"latest deployment attempt is {result['latest_attempt_state']}")
-        if result["freshness"] == "STALE" and not result["site_paths_known"]:
-            notes.append(
-                "built by a workflow, so the change set could not be narrowed to "
-                "site sources -- treat the commit count as an upper bound"
-            )
-        if notes:
-            lines.append(f"  {result['repo']}: " + "; ".join(notes))
+    all_rows = [*results, *([suite_site] if suite_site is not None else [])]
+    for result in all_rows:
+        note = _format_notes(result)
+        if note:
+            lines.append(note)
     return "\n".join(lines)
 
 

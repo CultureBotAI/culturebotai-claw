@@ -58,6 +58,16 @@ Each Mech declares its capabilities in the manifest as `enabled`, `disabled`,
 or `not_applicable`; the latter two require a recorded reason. Consult the
 declaration rather than assuming a capability applies fleet-wide.
 
+The companion X-Mech Suite site repository (`CultureBotAI/CultureBotAI.github.io`,
+published at `https://culturebotai.github.io/mechs/`, configured via
+`CULTUREBOTAI_SITE_ROOT` or resolved through
+`kg_microbe_fleet.roots.resolve_culturebotai_site_root()`) aggregates fleet
+metadata, record counts, prefix/subset overlap, and Pages audit pins from
+`src/kg_microbe_fleet/fleet.yaml` into `_fleet/data/manifest.json`,
+`_fleet/data/site_audit.json`, and `mechs.md`.
+Keep it synchronized when fleet membership, Mech schemas/corpora, or published
+Mech Pages sites change.
+
 This repository owns orchestration, cross-repository safety primitives, shared
 Mech utilities, fleet checks, and curation support. Do not edit a downstream
 repository directly from an ad hoc path. Resolve and verify it through the

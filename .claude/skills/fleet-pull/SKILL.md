@@ -12,10 +12,13 @@ metadata:
 # Fleet pull
 
 Run from the CLAW checkout. `scripts/fleet_pull.py` pulls the explicit `claw`
-control-plane checkout plus the Mech fleet from `src/kg_microbe_fleet/fleet.yaml`,
-then validates configured roots and GitHub origins through `RepositorySettings`.
-It loads CLAW's `.env` when present; exported variables take precedence. Missing
-Mech roots stay visible in the report.
+control-plane checkout plus the Mech fleet from `src/kg_microbe_fleet/fleet.yaml`
+(and the companion `site` checkout for `CultureBotAI/CultureBotAI.github.io` when
+`CULTUREBOTAI_SITE_ROOT` or a verified sibling `CultureBotAI.github.io` checkout
+is present, or when `--mech site` is passed), then validates configured roots
+and GitHub origins through `RepositorySettings`. It loads CLAW's `.env` when
+present; exported variables take precedence. Missing Mech roots stay visible in
+the report.
 
 ```bash
 just fleet-pull                         # offline preview

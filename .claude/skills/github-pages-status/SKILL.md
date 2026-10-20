@@ -21,7 +21,11 @@ The organization is *also* listed, and any Mech-named repository publishing a
 site without being a manifest member is reported under Coverage rather than
 quietly folded in — that gap is a finding, not a detail. Discovery is from
 GitHub rather than local clones, so a newly created or uncloned Mech cannot
-disappear from an "all Mechs" answer.
+disappear from an "all Mechs" answer. The checker also inspects the companion
+X-Mech Suite site (`CultureBotAI/CultureBotAI.github.io`, published at
+`https://culturebotai.github.io/mechs/`) and reports its deployment and live
+status under `Suite site (X-Mech overview)` (`suite_site` in `--json`) without counting it
+as an unmanifested Mech.
 
 ## Interpret the result
 
@@ -51,11 +55,12 @@ Treat these as separate evidence:
   change set cannot be narrowed — the report says so and the commit count is an
   **upper bound**. Quote it that way rather than as a stale-page count.
 
-Exit `0` means every discovered Mech has Pages enabled, its newest deployment
-attempt succeeded or is still running, the served content matches main, the
-site is reachable, and fleet discovery was not truncated. Exit `1` means
-the printed findings need attention or coverage is incomplete. Exit `2` means
-fleet discovery or command usage failed.
+Exit `0` means every discovered Mech (and the companion X-Mech Suite site when
+present in the org listing) has Pages enabled, its newest deployment attempt
+succeeded or is still running, the served content matches main, the site is
+reachable, and fleet discovery was not truncated. Exit `1` means the printed
+findings need attention or coverage is incomplete. Exit `2` means fleet
+discovery or command usage failed.
 
 Report the table and Coverage section together. Never quote the current count
 without the discovered-repository denominator or suppress a nonzero exit.
@@ -88,3 +93,8 @@ This skill is read-only. A stale, failed, or unreachable result authorizes
 diagnosis only—not a workflow dispatch, rebuild, configuration edit, or deploy.
 If remediation is requested later, inspect the failing repository's Pages
 workflow and obtain any authorization required for cross-repository changes.
+When Mech Pages sites or corpora advance and a companion X-Mech Suite refresh is
+requested, check `CultureBotAI.github.io/scripts/fleet/check_updates.py` (see
+`CultureBotAI.github.io/.claude/skills/check-xmech-updates/SKILL.md` and
+`CultureBotAI.github.io/.claude/skills/update-xmech-page/SKILL.md` in
+`$CULTUREBOTAI_SITE_ROOT`).
