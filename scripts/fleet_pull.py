@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import importlib
 import json
 import os
 import re
@@ -18,15 +19,10 @@ import threading
 import time
 from contextlib import contextmanager
 from functools import lru_cache
-import importlib
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 import yaml
-
-if not os.access(Path.home() / ".gitconfig", os.R_OK):
-    os.environ.setdefault("GIT_CONFIG_GLOBAL", "/dev/null")
-    os.environ.setdefault("GIT_CONFIG_NOSYSTEM", "1")
 
 from kg_microbe_fleet import (
     FleetManifestError,
@@ -37,8 +33,8 @@ from kg_microbe_fleet import (
 from plugins.lock_manager import LockManager
 from plugins.repository_settings import (
     RepositoryConfigurationError,
-    RepositoryTarget,
     RepositorySettings,
+    RepositoryTarget,
     merged_repository_environment,
 )
 
@@ -51,7 +47,7 @@ SUCCESS = {"would_update", "updated", "up_to_date", "ahead"}
 IN_PROGRESS = ("MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD",
                "rebase-merge", "rebase-apply", "sequencer", "BISECT_START", "index.lock")
 PR_NUMBER_RE = re.compile(
-    r"(?:Merge pull request #(\d+)|\(#(\d+)\)|\bPR\s+#(\d+))",
+    r"(?:Merge pull request #([1-9]\d*)|\(#([1-9]\d*)\)|\bPR\s+#([1-9]\d*))",
     re.IGNORECASE,
 )
 
@@ -76,6 +72,9 @@ class Git:
         for name in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR",
                      "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES"):
             env.pop(name, None)
+        if not os.access(Path.home() / ".gitconfig", os.R_OK):
+            env.setdefault("GIT_CONFIG_GLOBAL", "/dev/null")
+            env.setdefault("GIT_CONFIG_NOSYSTEM", "1")
         env.update(GIT_TERMINAL_PROMPT="0", GIT_OPTIONAL_LOCKS="0")
         command = ["git", "-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false",
                    "-c", "submodule.recurse=false", *args]
@@ -165,7 +164,7 @@ def inspect(git: Git) -> dict:
 def extract_commits_and_prs(
     git: Git, before: str, target: str
 ) -> tuple[list[dict[str, str]], list[str]]:
-    log_output = git.run("log", "--format=%h%x09%s", f"{before}..{target}")
+    log_output = git.run("log", "--reverse", "--format=%h%x09%s", f"{before}..{target}")
     commits: list[dict[str, str]] = []
     prs: list[str] = []
     seen_prs: set[str] = set()
@@ -388,14 +387,75 @@ def _report_validator(schema_path: Path):
 def validate_report(
     report: Mapping[str, Any], schema_path: Path | None = None
 ) -> None:
-    """Validate a fleet-pull JSON report dict against the LinkML schema."""
+    """Validate a fleet-pull JSON report dict against the LinkML schema and invariants."""
     resolved_schema = schema_path or default_fleet_pull_schema_path()
+    payload = dict(report)
     validation = _report_validator(resolved_schema).validate(
-        dict(report), target_class="FleetPullReport"
+        payload, target_class="FleetPullReport"
     )
     if validation.results:
         messages = "; ".join(result.message for result in validation.results)
         raise ValueError(f"Invalid FleetPullReport payload: {messages}")
+
+    mode = payload.get("mode")
+    expected_comparison = "fetch_eligible_only" if mode == "apply" else "cached_refs"
+    if payload.get("comparison") != expected_comparison:
+        raise ValueError(
+            "Invalid FleetPullReport payload: "
+            f"mode={mode!r} requires comparison={expected_comparison!r}"
+        )
+
+    selected = list(payload.get("selected") or [])
+    if len(selected) != len(set(selected)):
+        raise ValueError(
+            "Invalid FleetPullReport payload: selected contains duplicate repository keys"
+        )
+    results = list(payload.get("results") or [])
+    result_keys = [row.get("key") for row in results]
+    if result_keys != selected:
+        raise ValueError(
+            "Invalid FleetPullReport payload: results keys must match selected order"
+        )
+
+    expected_complete = all(row.get("status") in SUCCESS for row in results)
+    if payload.get("complete") != expected_complete:
+        raise ValueError(
+            "Invalid FleetPullReport payload: complete flag disagrees with results statuses"
+        )
+
+    for row in results:
+        status = row.get("status")
+        if mode == "dry_run" and status == "updated":
+            raise ValueError(
+                "Invalid FleetPullReport payload: dry_run report cannot contain updated status"
+            )
+        if mode == "apply" and status == "would_update":
+            raise ValueError(
+                "Invalid FleetPullReport payload: apply report cannot contain would_update status"
+            )
+        if status in {"updated", "would_update"}:
+            behind = row.get("behind")
+            commits = row.get("commits") or []
+            if not isinstance(behind, int) or behind < 1:
+                raise ValueError(
+                    f"Invalid FleetPullReport payload: {status} row requires behind >= 1"
+                )
+            if len(commits) != behind:
+                raise ValueError(
+                    f"Invalid FleetPullReport payload: {status} row commits count must match behind"
+                )
+            if not row.get("before") or not row.get("target"):
+                raise ValueError(
+                    f"Invalid FleetPullReport payload: {status} row requires before and target SHAs"
+                )
+            if status == "updated" and row.get("after") != row.get("target"):
+                raise ValueError(
+                    "Invalid FleetPullReport payload: updated row requires after == target"
+                )
+            if status == "would_update" and row.get("after") != row.get("before"):
+                raise ValueError(
+                    "Invalid FleetPullReport payload: would_update row requires after == before"
+                )
 
 
 def build_report(
@@ -446,14 +506,16 @@ def main(argv=None) -> int:
             )
         )
         results = run_fleet(settings, keys, apply=args.apply, timeout=args.timeout)
+        incomplete = any(row.get("status") not in SUCCESS for row in results)
+        if args.json:
+            report = build_report(
+                keys, results, apply=args.apply, incomplete=incomplete
+            )
+            validate_report(report)
     except (FleetManifestError, RepositoryConfigurationError, OSError, ValueError) as exc:
         print(f"fleet-pull: {exc}", file=sys.stderr)
         return 2
-    incomplete = any(row["status"] not in SUCCESS for row in results)
     if args.json:
-        report = build_report(
-            keys, results, apply=args.apply, incomplete=incomplete
-        )
         print(json.dumps(report, indent=2))
     else:
         print("Fleet pull: " + ("apply" if args.apply else "offline preview; upstream refs may be stale"))

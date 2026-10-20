@@ -781,28 +781,29 @@ def test_updated_and_preview_rows_report_merged_commits_and_prs_in_table(fleet: 
 
     preview = fleet.run(apply=False)
     assert preview["status"] == "would_update"
-    assert preview["prs"] == ["#908", "#879"]
-    assert [c["sha"] for c in preview["commits"]] == [second_sha, first_sha]
+    assert preview["prs"] == ["#879", "#908"]
+    assert [c["sha"] for c in preview["commits"]] == [first_sha, second_sha]
     fleet_pull.validate_report(
-        fleet_pull.build_report(["culturemech"], [preview], apply=False, incomplete= False)
+        fleet_pull.build_report(["culturemech"], [preview], apply=False, incomplete=False)
     )
     preview_table = fleet_pull.render_table([preview])
     assert "| Repository | Branch | Result | Merged Commits | Merged PRs | Details |" in preview_table
-    assert "| culturemech | main | would_update | 2 | #908, #879 |" in preview_table
+    assert "| culturemech | main | would_update | 2 | #879, #908 |" in preview_table
 
     applied = fleet.run(apply=True)
     assert applied["status"] == "updated"
-    assert applied["prs"] == ["#908", "#879"]
-    assert [c["sha"] for c in applied["commits"]] == [second_sha, first_sha]
+    assert applied["prs"] == ["#879", "#908"]
+    assert [c["sha"] for c in applied["commits"]] == [first_sha, second_sha]
     fleet_pull.validate_report(
         fleet_pull.build_report(["culturemech"], [applied], apply=True, incomplete=False)
     )
     applied_table = fleet_pull.render_table([applied])
-    assert "| culturemech | main | updated | 2 | #908, #879 |" in applied_table
+    assert "| culturemech | main | updated | 2 | #879, #908 |" in applied_table
 
 
 def test_fleet_pull_schema_repository_keys_match_manifest():
     import yaml
+
     from kg_microbe_fleet import (
         UniqueKeySafeLoader,
         default_fleet_pull_schema_path,
@@ -904,12 +905,56 @@ def test_fleet_pull_schema_validates_all_statuses_and_rejects_malformed_payloads
     with pytest.raises(ValueError, match="Invalid FleetPullReport payload"):
         fleet_pull.validate_report({**valid_report, "mode": "force_push"})
 
+    with pytest.raises(ValueError, match="requires comparison="):
+        fleet_pull.validate_report({**valid_report, "comparison": "cached_refs"})
+
+    with pytest.raises(ValueError, match="results keys must match selected order"):
+        fleet_pull.validate_report({**valid_report, "selected": ["claw"]})
+
+    with pytest.raises(ValueError, match="complete flag disagrees"):
+        fleet_pull.validate_report({**valid_report, "complete": True})
+
+    with pytest.raises(ValueError, match="dry_run report cannot contain updated"):
+        fleet_pull.validate_report(
+            {**valid_report, "mode": "dry_run", "comparison": "cached_refs"}
+        )
+
+    bad_behind_row = {**valid_report["results"][0], "behind": 2}
+    with pytest.raises(ValueError, match="commits count must match behind"):
+        fleet_pull.validate_report(
+            {**valid_report, "results": [bad_behind_row, *valid_report["results"][1:]]}
+        )
+
     bad_pr_row = {**valid_report["results"][0], "prs": ["910"]}
     with pytest.raises(ValueError, match="Invalid FleetPullReport payload"):
-        fleet_pull.validate_report({**valid_report, "results": [bad_pr_row]})
+        fleet_pull.validate_report(
+            {**valid_report, "results": [bad_pr_row, *valid_report["results"][1:]]}
+        )
 
     bad_sha_row = {**valid_report["results"][0], "before": "not-a-sha"}
     with pytest.raises(ValueError, match="Invalid FleetPullReport payload"):
-        fleet_pull.validate_report({**valid_report, "results": [bad_sha_row]})
+        fleet_pull.validate_report(
+            {**valid_report, "results": [bad_sha_row, *valid_report["results"][1:]]}
+        )
+
+
+def test_cli_json_fails_closed_when_report_violates_schema(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+):
+    monkeypatch.setattr(fleet_pull, "merged_repository_environment", lambda _path: {})
+    monkeypatch.setattr(
+        fleet_pull.RepositorySettings, "from_environment", lambda **_kwargs: object()
+    )
+    monkeypatch.setattr(
+        fleet_pull,
+        "run_fleet",
+        lambda *_args, **_kwargs: [{"key": "culturemech", "status": "bogus_status"}],
+    )
+
+    assert fleet_pull.main(["--json", "--mech", "culturemech"]) == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "Invalid FleetPullReport payload" in captured.err
+
 
 
