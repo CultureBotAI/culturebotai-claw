@@ -36,6 +36,8 @@ __all__ = [
     "FleetManifest",
     "load_fleet_manifest",
     "default_manifest_path",
+    "default_fleet_pull_schema_path",
+    "FLEET_PULL_SCHEMA_FILENAME",
     "CAPABILITY_STATUSES",
     "STATUSES_REQUIRING_REASON",
     "VENDORED_ROLES",
@@ -49,6 +51,7 @@ __all__ = [
 # command time and may inject that same object into repository settings.
 MANIFEST_ENVIRONMENT_VARIABLE = "KG_MICROBE_FLEET_MANIFEST"
 MANIFEST_FILENAME = "fleet.yaml"
+FLEET_PULL_SCHEMA_FILENAME = "schema/fleet_pull.yaml"
 
 CAPABILITY_STATUSES = frozenset({"enabled", "disabled", "not_applicable"})
 # A capability that is off must say why. Without this, "absent" and
@@ -319,6 +322,12 @@ def default_manifest_path() -> Path:
     if override:
         return Path(override).expanduser()
     return Path(__file__).resolve().parent / MANIFEST_FILENAME
+
+
+def default_fleet_pull_schema_path() -> Path:
+    """Return the path to the packaged fleet-pull LinkML schema."""
+
+    return Path(__file__).resolve().parent / FLEET_PULL_SCHEMA_FILENAME
 
 
 def _require_mapping(value: Any, label: str) -> Mapping[str, Any]:

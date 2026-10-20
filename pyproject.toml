@@ -109,7 +109,7 @@ namespaces = false
 [tool.setuptools.package-data]
 # The fleet manifest is imported at package-import time, so it must ship in
 # the wheel; `conf/` at the repository root would not be packaged.
-kg_microbe_fleet = ["fleet.yaml"]
+kg_microbe_fleet = ["fleet.yaml", "schema/*.yaml"]
 kg_microbe_embeddings = ["rollout.yaml"]
 kg_microbe_merge_queue = ["policy.json"]
 kg_microbe_write = ["writers.yaml"]
