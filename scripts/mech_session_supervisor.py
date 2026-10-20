@@ -520,7 +520,7 @@ def goal_output_data(receipt: dict, ledger: dict, target: dict) -> dict | None:
     if ledger["stage"] == 5 and previous is None:
         raise SupervisorError("stage 5 requires the exact verified stage-4 review evidence from this cycle")
     previous_data = previous.get("goal_evidence_snapshot") if previous else None
-    for artifact in historical_output_artifacts(ledger):
+    for artifact in historical_output_artifacts(ledger, root):
         errors = artifact_errors({"artifact": artifact["path"], "sha256": artifact["sha256"]}, [root], "archived workflow evidence")
         if errors:
             raise SupervisorError("; ".join(errors))
@@ -560,13 +560,17 @@ def goal_output_data(receipt: dict, ledger: dict, target: dict) -> dict | None:
     return data
 
 
-def historical_output_artifacts(ledger: dict) -> list[dict]:
+def historical_output_artifacts(ledger: dict, repository_root: Path) -> list[dict]:
     """Every closed report stays immutable, including prior infrastructure plans."""
     artifacts = []
     for record in ledger["completed_stages"]:
         if record.get("goal_evidence"):
             artifacts.append(record["goal_evidence"])
-            artifacts.extend(record.get("goal_evidence_snapshot", {}).get("artifacts", []))
+            from kg_microbe_workflows import evidence_artifacts
+            try:
+                artifacts.extend(evidence_artifacts(record["goal_evidence_snapshot"], repository_root=repository_root))
+            except Exception as error:
+                raise SupervisorError("archived workflow evidence: " + str(error)) from error
     return artifacts
 
 
@@ -584,7 +588,7 @@ def verify_versioned_artifacts(receipt: dict, ledger: dict, target: dict, runner
     if receipt.get("schema_version") == 1 and ledger.get("legacy_receipt_stage") == ledger["stage"] and ledger["stage"] < 4:
         return
     evidence = goal_output_data(receipt, ledger, target)
-    artifacts = output_artifacts(receipt, evidence) + historical_output_artifacts(ledger)
+    artifacts = output_artifacts(receipt, evidence) + historical_output_artifacts(ledger, Path(target["root"]))
     if evidence:
         from kg_microbe_workflows import evidence_artifacts
         previous = previous_evidence(ledger, ledger["stage"])

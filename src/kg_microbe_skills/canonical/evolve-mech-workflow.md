@@ -76,8 +76,11 @@ IDs, reviewed input hashes, evidence, reviewer identity and independence,
 coverage, limitations, and dispositions. Use the parent-defined revision paths
 under reviews/workflow, including an evidence manifest and file hashes. Commit
 these outputs. Do not overwrite a prior review, reuse a cycle ID, or substitute
-a terminal summary for the report. Later assessments create linked revisions;
-open or deferred findings retain their IDs across cycles.
+a terminal summary for the report. A later revision requires supersedes_evidence
+pointing to the exact immediately preceding revision, with its path and hash;
+previous_evidence separately pins the prior-stage or prior-cycle input and stays
+fixed across corrections. Preserve all ancestor manifests and artifact bytes.
+Open or deferred findings retain their IDs across revisions and cycles.
 
 Update the tracked latest-review index only during a subsequent goal, using the
 supervisor's verified-evidence-index.json identified in status.json. Carry only
@@ -113,7 +116,9 @@ the final commit containing the output. Never copy an example as a live receipt.
 Use `python -m kg_microbe_workflows validate-evidence <evidence.yaml> --root <repo>`
 from the verified CLAW environment. For stage 5, add
 `--previous <verified-stage-4-evidence.yaml>`; carry later-cycle finding history
-through the parent-defined predecessor references. The Python helper
+through the parent-defined predecessor references. Add `--required-output <kind>`
+for every output kind required by the active effective stage, including any
+requirements beyond the base contract. The Python helper
 `save_goal_evidence(repository_root, data, previous=None)` validates and creates
 the manifest atomically only when its revision path is absent. It does not create
 the supporting report, findings, issue map, validation or infrastructure files:

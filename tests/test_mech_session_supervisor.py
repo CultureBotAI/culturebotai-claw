@@ -1258,3 +1258,38 @@ def test_local_candidate_cannot_relabel_canonical_parent_provenance(cycle_setup,
     with pytest.raises(supervisor.SupervisorError, match="parent provenance"):
         instance.advance(setup.target, setup.ledger, receipt, {"status": "merged"}, "native_completed")
     assert setup.ledger["cycle"] == 1
+
+
+@pytest.mark.parametrize("damage", ["untracked", "overwritten"])
+def test_early_stage_preserves_superseded_ancestors_of_archived_infrastructure(cycle_setup, monkeypatch, damage):
+    setup = cycle_setup
+    instance = cycle_instance(setup, monkeypatch)
+    setup.ledger["stage"] = 6
+    receipt = write_goal_evidence(setup, setup.ledger)
+    first_ref = copy.deepcopy(receipt["goal_outputs"]["goal_evidence"])
+    first = json.loads((setup.repo / first_ref["path"]).read_text())
+    second = copy.deepcopy(first)
+    second.update(revision=2, supersedes_evidence=first_ref)
+    for artifact in second["artifacts"]:
+        original = setup.repo / artifact["path"]
+        artifact["path"] = artifact["path"].replace("revision-0001/", "revision-0002/")
+        destination = setup.repo / artifact["path"]
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(original.read_bytes())
+    second_path = setup.repo / first_ref["path"].replace("revision-0001/", "revision-0002/")
+    second_path.write_text(json.dumps(second))
+    receipt["goal_outputs"]["goal_evidence"] = {"path": str(second_path.relative_to(setup.repo)),
+                                                "sha256": hashlib.sha256(second_path.read_bytes()).hexdigest()}
+    assert supervisor.validate_receipt(receipt, setup.ledger, setup.target, setup.runtime) == []
+    setup.remote.snapshot()
+    ledger = instance.advance(setup.target, setup.ledger, receipt, {"status": "merged"}, "native_completed")
+    early = write_goal_evidence(setup, ledger)
+    assert "goal_evidence" not in early["goal_outputs"]
+    ancestor = first["artifacts"][0]["path"]
+    if damage == "untracked":
+        setup.remote.tree.pop(ancestor)
+    else:
+        (setup.repo / ancestor).write_text("Overwritten superseded infrastructure report\n")
+        setup.remote.snapshot()
+    with pytest.raises(supervisor.SupervisorError, match="not versioned|archived workflow evidence"):
+        supervisor.verify_remote_receipt(early, ledger, setup.target, setup.remote)
