@@ -1,0 +1,21 @@
+schema_version: 1.0.0
+repository_key: examplemech
+github_repository: example/Mech
+run_id: example-run
+cycle: 1
+stage: 4
+revision: 1
+outcome: no_findings
+summary: Illustrative empty outcome; this is not a completed live goal.
+source_revision: f3c7684bedeecf4af707b1b3b9c484e6f1a4fba6
+artifacts:
+- path: reviews/workflow/example-run/cycle-000001/stage-04/revision-0001/review_report.md
+  sha256: 89fd696eed15320d16a9e1d9d223d6c3b132d2b600c435ceda7f98e5d37603f0
+  kind: review_report
+- path: reviews/workflow/example-run/cycle-000001/stage-04/revision-0001/review_findings.md
+  sha256: 89fd696eed15320d16a9e1d9d223d6c3b132d2b600c435ceda7f98e5d37603f0
+  kind: review_findings
+findings: []
+groups: []
+carry_forward_ids: []
+infra_tasks: []

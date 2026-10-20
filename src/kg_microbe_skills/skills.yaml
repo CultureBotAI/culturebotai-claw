@@ -48,6 +48,9 @@ skills:
       kg-microbe, which is not a Mech at all. It does not resolve the fleet
       from the manifest, which is what `fleet` means here and what the skill's
       own `fleet` tag asserts.
+  evolve-mech-workflow:
+    scope: fleet
+    reason: Maintains the shared goal-cycle contract and prepares repository-specific profile and skill adaptations from the manifest.
   evidence-curation:
     scope: domain
     reason: Proposes PMID evidence for MIM ingredient claims.
@@ -169,6 +172,16 @@ skills:
 # Mechs those are -- from the manifest, so the set cannot drift the way a list
 # written here would the moment a Mech gained or lost the capability.
 canonical:
+  evolve-mech-workflow:
+    capability: testing
+    reason: >-
+      Every manifest Mech participates in the recurring goal cycle and needs its
+      own adapter for native skills, applicability and local schema evolution.
+      The shared regions preserve parent closure, review-versioning and
+      infrastructure-intake invariants; local knowledge remains outside them.
+      Testing is an explicit stand-in capability until workflow participation
+      has its own declaration, as with the other universal templates (#316).
+
   manage-identifiers:
     capability: testing
     reason: >-

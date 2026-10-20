@@ -183,6 +183,7 @@ uv run --extra dev mypy \
   src/kg_microbe_history src/kg_microbe_kgscan src/kg_microbe_fleet \
   src/kg_microbe_embeddings \
   src/kg_microbe_merge_queue src/kg_microbe_research src/kg_microbe_write \
+  src/kg_microbe_workflows \
   src/kg_microbe_consistency src/kg_microbe_patches \
   src/kg_microbe_governance/__init__.py \
   src/kg_microbe_governance/__main__.py \
