@@ -115,6 +115,7 @@ kg_microbe_embeddings = ["rollout.yaml"]
 kg_microbe_merge_queue = ["policy.json"]
 kg_microbe_write = ["writers.yaml"]
 kg_microbe_research = ["schema/*.yaml"]
+kg_microbe_progress = ["schema/*.yaml"]
 kg_microbe_workflows = ["schema/*.yaml", "templates/*.yaml", "examples/**/*.yaml", "examples/**/*.md", "examples/README.md"]
 # The catalogue and its canonical templates are read at runtime, so an
 # installed package without them renders nothing while importing fine.

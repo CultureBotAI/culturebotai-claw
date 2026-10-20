@@ -1,0 +1,446 @@
+id: https://w3id.org/culturebotai/claw/mech-progress
+name: mech_progress
+title: Public Mech goal and pull request progress
+version: 1.0.0
+description: An allowlisted public projection of supervisor-verified closures and
+  explicitly associated GitHub PRs. Earlier history is unknown. Schema validation
+  is supplemented by semantic identity, monotonicity and count checks.
+prefixes:
+  progress: https://w3id.org/culturebotai/claw/mech-progress/
+  xsd: http://www.w3.org/2001/XMLSchema#
+default_prefix: progress
+default_range: string
+types:
+  string:
+    base: str
+    uri: xsd:string
+  integer:
+    base: int
+    uri: xsd:integer
+  boolean:
+    base: Bool
+    uri: xsd:boolean
+  SHA256:
+    typeof: string
+    pattern: ^[0-9a-f]{64}$
+  GitSHA:
+    typeof: string
+    pattern: ^[0-9a-f]{40}$
+  RunKey:
+    typeof: string
+    pattern: ^[0-9a-f]{24}$
+  Timestamp:
+    typeof: string
+    pattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$
+  RepositoryKey:
+    typeof: string
+    pattern: ^[a-z][a-z0-9_]*$
+enums:
+  Phase:
+    permissible_values:
+      assessment: {}
+      unavailable: {}
+      requires_migration: {}
+      blocked: {}
+      waiting: {}
+      awaiting_native_acceptance: {}
+      ready_to_dispatch: {}
+      requires_intervention: {}
+      closure_blocked: {}
+      awaiting_closure_receipt: {}
+      unknown: {}
+  Blocker:
+    permissible_values:
+      none: {}
+      closure_repairs_exhausted: {}
+      agent_busy: {}
+      composer_unavailable: {}
+      working_tree_changes: {}
+      goal_cancelled: {}
+      goal_identity_changed: {}
+      review_required: {}
+  Outcome:
+    permissible_values:
+      merged: {}
+      no_changes: {}
+  PRState:
+    permissible_values:
+      open: {}
+      closed: {}
+      merged: {}
+  Source:
+    permissible_values:
+      github: {}
+      supervisor_closure: {}
+  StageState:
+    permissible_values:
+      completed: {}
+      current: {}
+      pending: {}
+      unverified: {}
+  Coverage:
+    permissible_values:
+      partial: {}
+      unobserved: {}
+  HistoryScope:
+    permissible_values:
+      verified_goal_associations: {}
+  EarlierHistory:
+    permissible_values:
+      unknown: {}
+  StageKey:
+    permissible_values:
+      add_records: {}
+      causal_graphs: {}
+      protein_examples: {}
+      record_review: {}
+      resolve_review_findings: {}
+      infrastructure: {}
+classes:
+  GoalAssociation:
+    attributes:
+      run_key:
+        range: RunKey
+        required: true
+      cycle:
+        range: integer
+        required: true
+        minimum_value: 1
+      stage_number:
+        range: integer
+        required: true
+        minimum_value: 1
+        maximum_value: 6
+  Association:
+    attributes:
+      id:
+        range: SHA256
+        required: true
+      pr_id:
+        range: SHA256
+        required: true
+      repository_key:
+        range: RepositoryKey
+        required: true
+      run_key:
+        range: RunKey
+        required: true
+      cycle:
+        range: integer
+        required: true
+        minimum_value: 1
+      stage_number:
+        range: integer
+        required: true
+        minimum_value: 1
+        maximum_value: 6
+  Closure:
+    attributes:
+      id:
+        range: SHA256
+        required: true
+      repository_key:
+        range: RepositoryKey
+        required: true
+      run_key:
+        range: RunKey
+        required: true
+      cycle:
+        range: integer
+        required: true
+        minimum_value: 1
+      stage_number:
+        range: integer
+        required: true
+        minimum_value: 1
+        maximum_value: 6
+      stage_id:
+        range: StageKey
+        required: true
+      outcome:
+        range: Outcome
+        required: true
+      verified_at:
+        range: Timestamp
+        required: true
+      receipt_sha256:
+        range: SHA256
+        required: true
+      pr_number:
+        range: integer
+        minimum_value: 1
+      pr_url:
+        range: string
+      merge_commit_sha:
+        range: GitSHA
+  PREvent:
+    attributes:
+      id:
+        range: SHA256
+        required: true
+      pr_id:
+        range: SHA256
+        required: true
+      sequence:
+        range: integer
+        required: true
+        minimum_value: 1
+      repository_key:
+        range: RepositoryKey
+        required: true
+      number:
+        range: integer
+        required: true
+        minimum_value: 1
+      url:
+        range: string
+        required: true
+      state:
+        range: PRState
+        required: true
+      head_sha:
+        range: GitSHA
+        required: true
+      observed_at:
+        range: Timestamp
+        required: true
+      source:
+        range: Source
+        required: true
+      merged_at:
+        range: Timestamp
+      merge_commit_sha:
+        range: GitSHA
+  PullRequest:
+    attributes:
+      id:
+        range: SHA256
+        required: true
+      repository_key:
+        range: RepositoryKey
+        required: true
+      number:
+        range: integer
+        required: true
+        minimum_value: 1
+      url:
+        range: string
+        required: true
+      state:
+        range: PRState
+        required: true
+      head_sha:
+        range: GitSHA
+        required: true
+      observed_at:
+        range: Timestamp
+        required: true
+      source:
+        range: Source
+        required: true
+      merged_at:
+        range: Timestamp
+      merge_commit_sha:
+        range: GitSHA
+      associations:
+        range: GoalAssociation
+        required: true
+        multivalued: true
+        inlined_as_list: true
+  Current:
+    attributes:
+      run_key:
+        range: RunKey
+        required: true
+      cycle:
+        range: integer
+        required: true
+        minimum_value: 1
+      stage_number:
+        range: integer
+        required: true
+        minimum_value: 1
+        maximum_value: 6
+      stage_id:
+        range: StageKey
+        required: true
+      phase:
+        range: Phase
+        required: true
+      blocker_code:
+        range: Blocker
+        required: true
+      observed_at:
+        range: Timestamp
+        required: true
+  Cursor:
+    attributes:
+      repository_key:
+        range: RepositoryKey
+        required: true
+      run_key:
+        range: RunKey
+        required: true
+      cycle:
+        range: integer
+        required: true
+        minimum_value: 1
+      stage_number:
+        range: integer
+        required: true
+        minimum_value: 1
+        maximum_value: 6
+      stage_id:
+        range: StageKey
+        required: true
+      phase:
+        range: Phase
+        required: true
+      blocker_code:
+        range: Blocker
+        required: true
+      observed_at:
+        range: Timestamp
+        required: true
+      started_at:
+        range: Timestamp
+        required: true
+  Counters:
+    attributes:
+      completed_cycles:
+        range: integer
+        required: true
+        minimum_value: 0
+      completed_goals:
+        range: integer
+        required: true
+        minimum_value: 0
+      unique_prs:
+        range: integer
+        required: true
+        minimum_value: 0
+      merged_prs:
+        range: integer
+        required: true
+        minimum_value: 0
+      open_prs:
+        range: integer
+        required: true
+        minimum_value: 0
+      closed_prs:
+        range: integer
+        required: true
+        minimum_value: 0
+      no_change_goals:
+        range: integer
+        required: true
+        minimum_value: 0
+  Stage:
+    attributes:
+      number:
+        range: integer
+        required: true
+        minimum_value: 1
+        maximum_value: 6
+      key:
+        range: StageKey
+        required: true
+      state:
+        range: StageState
+        required: true
+  Tracking:
+    attributes:
+      history_scope:
+        range: HistoryScope
+        required: true
+      earlier_history:
+        range: EarlierHistory
+        required: true
+      counts_are_lower_bounds:
+        range: boolean
+        required: true
+  RepositoryProgress:
+    attributes:
+      key:
+        range: RepositoryKey
+        required: true
+      name:
+        range: string
+        required: true
+      github_url:
+        range: string
+        required: true
+      current:
+        range: Current
+        inlined: true
+      last_observed_at:
+        range: Timestamp
+      counters:
+        range: Counters
+        required: true
+        inlined: true
+      stages:
+        range: Stage
+        required: true
+        multivalued: true
+        inlined_as_list: true
+      closures:
+        range: Closure
+        required: true
+        multivalued: true
+        inlined_as_list: true
+      pull_requests:
+        range: PullRequest
+        required: true
+        multivalued: true
+        inlined_as_list: true
+      history_coverage:
+        range: Coverage
+        required: true
+  ProgressHistory:
+    attributes:
+      schema_version:
+        range: string
+        required: true
+      closures:
+        range: Closure
+        required: true
+        multivalued: true
+        inlined_as_list: true
+      pr_events:
+        range: PREvent
+        required: true
+        multivalued: true
+        inlined_as_list: true
+      associations:
+        range: Association
+        required: true
+        multivalued: true
+        inlined_as_list: true
+      cursors:
+        range: Cursor
+        required: true
+        multivalued: true
+        inlined_as_list: true
+  ProgressSnapshot:
+    attributes:
+      schema_version:
+        range: string
+        required: true
+      generated_at:
+        range: Timestamp
+        required: true
+      tracking:
+        range: Tracking
+        required: true
+        inlined: true
+      totals:
+        range: Counters
+        required: true
+        inlined: true
+      repositories:
+        range: RepositoryProgress
+        required: true
+        multivalued: true
+        inlined_as_list: true
+    tree_root: true

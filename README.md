@@ -14,6 +14,11 @@ You do not need every repository cloned to work here — set only the roots you
 use, and `openclaw-cli config validate` will report the rest as "not
 configured locally" instead of failing.
 
+[Mech progress dashboard](https://culturebotai.github.io/culturebotai-claw/) tracks
+current goals, verified six-goal cycles, and distinct PR rounds across the fleet.
+See the [progress accounting and publication guide](docs/guides/MECH_PROGRESS.md)
+for evidence rules, historical coverage, and automatic refresh.
+
 ## Current support status
 
 | Surface | Status |
@@ -183,7 +188,7 @@ uv run --extra dev mypy \
   src/kg_microbe_history src/kg_microbe_kgscan src/kg_microbe_fleet \
   src/kg_microbe_embeddings \
   src/kg_microbe_merge_queue src/kg_microbe_research src/kg_microbe_write \
-  src/kg_microbe_workflows \
+  src/kg_microbe_workflows src/kg_microbe_progress \
   src/kg_microbe_consistency src/kg_microbe_patches \
   src/kg_microbe_governance/__init__.py \
   src/kg_microbe_governance/__main__.py \

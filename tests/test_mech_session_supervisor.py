@@ -135,6 +135,15 @@ def test_goal_identity_survives_amended_text(setup):
     assert supervisor.goal_identity(native) == before == GOAL
 
 
+def test_goal_messages_register_every_pr_without_granting_completion(setup):
+    decision = {"action": "finalize", "action_id": "example"}
+    message = supervisor.message_for(setup.target, setup.ledger, decision, setup.runtime / "traitmech")
+    assert "including follow-up PRs" in message
+    assert "-m kg_microbe_progress.prs register" in message
+    assert "--number NUMBER" in message
+    assert "does not complete a goal" in message
+
+
 def test_default_helpers_are_committed_siblings_and_overrides_remain_supported(setup, monkeypatch):
     monkeypatch.setattr(supervisor, "ROOT", setup.runtime.parents[1])
     config = copy.deepcopy(setup.config)

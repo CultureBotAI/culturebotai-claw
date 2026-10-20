@@ -15,6 +15,7 @@ import importlib.util
 import json
 import os
 import re
+import shlex
 import signal
 import stat
 import subprocess
@@ -403,6 +404,8 @@ def message_for(target: dict, ledger: dict, decision: dict, repository_runtime: 
     marker = "MECH-WORKFLOW-" + decision["action_id"]
     effective = ledger.get("workflow", {}).get("effective")
     instruction = repository_runtime / "effective-workflow.json" if effective else Path(target["workflow_prompt_path"])
+    register = shlex.join(["env", f"PYTHONPATH={ROOT / 'src'}", str(ROOT / ".venv/bin/python"), "-m", "kg_microbe_progress.prs",
+                           "register", "--session-dir", str(repository_runtime), "--number", "NUMBER"])
     context = (f"[{marker}] Read {instruction} and {repository_runtime / 'status.json'}. "
                "Repository-local .claude/skills is the skill source of truth. "
                f"This is run {ledger['run_id']}, cycle {ledger.get('cycle', 1)}, stage {ledger['stage']}. "
@@ -411,6 +414,9 @@ def message_for(target: dict, ledger: dict, decision: dict, repository_runtime: 
                f"After prior closure is verified, update the tracked review latest index from {repository_runtime / 'verified-evidence-index.json'} in this goal. "
                "Record-review goal findings are separate from the PR adversarial review; stage 5 resolves the former. "
                "For stage 6, use the exact supervisor-frozen infra_scope content/hash/time in status.json. "
+               f"As soon as each goal PR is opened, including follow-up PRs, register it with {register}, "
+               "replacing NUMBER with its PR number. Registration only records the PR-to-goal association; "
+               "it does not complete a goal or replace the verified closure receipt. "
                "Do not start another goal: the supervisor verifies closure and chooses the next goal. ")
     if decision["action"] == "policy_update":
         return (context + "Your existing native goal and its identity are unchanged. Adopt the reviewed six-stage workflow "
