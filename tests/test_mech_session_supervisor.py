@@ -3,8 +3,10 @@ import copy
 import hashlib
 import importlib.util
 import json
+import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -552,3 +554,179 @@ Application.currentApplication = () => system;
     actual = json.loads(result.stdout)
     assert actual == ({"outcome": "sent", "sent": [expected["message"]]} if matching_cwd
                       else {"outcome": "identity-changed", "sent": []})
+
+
+@pytest.mark.parametrize("receipt_error", [False, True])
+def test_cancelled_goal_blocks_repairs_after_accepted_instruction(setup, receipt_error):
+    setup.observation.update(goal_state="cancelled")
+    setup.observation["native"]["last_step"] = {"index": 99}
+    setup.ledger["actions"]["initial"] = {"kind": "assess_and_finalize", "stage": 1, "state": "accepted",
+        "reserved_epoch_ms": 1, "native_step_index": 80}
+    decision = (supervisor.repair_decision(setup.ledger, setup.observation, "invalid receipt")
+                if receipt_error else supervisor.decide(setup.ledger, setup.observation))
+    assert decision["phase"] == "blocked" and "action" not in decision
+    assert "cancelled" in decision["reason"]
+
+
+def test_definitively_unsent_repair_retries_without_waiting_for_acceptance(setup, monkeypatch):
+    monkeypatch.setattr(supervisor.time, "time", lambda: 1000)
+    setup.observation["native"]["last_step"] = {"index": 99}
+    setup.ledger["actions"]["initial"] = {"kind": "finalize", "stage": 1, "state": "accepted",
+        "reserved_epoch_ms": 1, "native_step_index": 80}
+    outcomes = iter(["screen-changed", "sent"])
+    instance = make_instance(setup, monkeypatch, lambda *_: next(outcomes))
+    first = supervisor.decide(setup.ledger, setup.observation)
+    assert instance.dispatch(setup.target, setup.ledger, first)["state"] == "not-sent"
+    # The UI rejected input definitively. No new native work or acceptance can
+    # occur because of this attempt, so the same repair must remain retryable.
+    retry = supervisor.decide(setup.ledger, setup.observation)
+    assert retry["action"] == "repair_closure" and retry["action_id"] == first["action_id"]
+    assert instance.dispatch(setup.target, setup.ledger, retry)["state"] == "sent"
+
+
+def test_definitively_unsent_repairs_do_not_exhaust_delivery_allowance(setup, monkeypatch):
+    monkeypatch.setattr(supervisor.time, "time", lambda: 1000)
+    setup.observation["native"]["last_step"] = {"index": 99}
+    setup.ledger["actions"]["initial"] = {"kind": "finalize", "stage": 1, "state": "accepted",
+        "reserved_epoch_ms": 1, "native_step_index": 80}
+    for index in range(3):
+        setup.ledger["actions"][f"unsent-{index}"] = {"kind": "repair_closure", "stage": 1, "state": "not-sent",
+            "reserved_epoch_ms": index + 2, "native_step_index": 99}
+    assert supervisor.decide(setup.ledger, setup.observation)["action"] == "repair_closure"
+
+
+@pytest.mark.parametrize("failure_point", ["archive", "baseline"])
+def test_closure_preparation_failure_does_not_persist_partial_transition(setup, monkeypatch, failure_point):
+    instance = make_instance(setup, monkeypatch, lambda *_: pytest.fail("observe must not type"))
+    instance.save(setup.target, setup.ledger)
+    directory = instance.directory(setup.target)
+    supervisor.atomic_json(directory / "completion.json", setup.receipt)
+    if failure_point == "archive":
+        original = instance.write
+
+        def fail_archive(path, value):
+            if path.parent.name == "receipts":
+                raise OSError("archive temporarily unavailable")
+            return original(path, value)
+
+        monkeypatch.setattr(instance, "write", fail_archive)
+    else:
+        original = instance.baseline
+
+        def fail_baseline(target, ledger):
+            if "baseline_head" not in ledger:
+                raise OSError("baseline temporarily unavailable")
+            return original(target, ledger)
+
+        monkeypatch.setattr(instance, "baseline", fail_baseline)
+    instance.sweep(apply=False)
+    saved = supervisor.read_json(directory / "ledger.json")
+    assert saved["stage"] == 1 and saved["completed_stages"] == []
+    assert saved["baseline_head"] == HEAD and saved["baseline_status"] == ""
+    monkeypatch.setattr(instance, "write" if failure_point == "archive" else "baseline", original)
+    assert instance.sweep(apply=False)["sessions"][0]["stage"] == 2
+    saved = supervisor.read_json(directory / "ledger.json")
+    assert len(saved["completed_stages"]) == 1 and saved["awaiting_goal"]
+
+
+def test_stop_file_blocks_direct_dispatch(setup, monkeypatch):
+    instance = make_instance(setup, monkeypatch, lambda *_: pytest.fail("STOP must prevent transport"))
+    (setup.runtime / "STOP").touch()
+    decision = supervisor.decide(setup.ledger, setup.observation)
+    assert instance.dispatch(setup.target, setup.ledger, decision)["state"] == "not-sent"
+    assert not setup.ledger["actions"]
+
+
+@pytest.mark.parametrize("stop_point", ["observation", "reservation"])
+def test_signal_stop_during_dispatch_prevents_transport(setup, monkeypatch, stop_point):
+    stopped = False
+    instance = make_instance(setup, monkeypatch, lambda *_: pytest.fail("signal must prevent transport"))
+    instance.stop_requested = lambda: stopped
+    if stop_point == "observation":
+        def observe(*args, **kwargs):
+            nonlocal stopped
+            stopped = True
+            return copy.deepcopy(setup.observation)
+        monkeypatch.setattr(instance, "observe", observe)
+    else:
+        original = instance.save
+
+        def save(target, ledger):
+            nonlocal stopped
+            original(target, ledger)
+            stopped = True
+
+        monkeypatch.setattr(instance, "save", save)
+    decision = supervisor.decide(setup.ledger, setup.observation)
+    result = instance.dispatch(setup.target, setup.ledger, decision)
+    assert result["state"] == "not-sent"
+    assert all(action["state"] == "not-sent" for action in setup.ledger["actions"].values())
+
+
+def test_stop_requested_mid_sweep_prevents_visiting_later_targets(setup, monkeypatch):
+    instance = make_instance(setup, monkeypatch, lambda *_: pytest.fail("no real transport"))
+    other = {**setup.target, "repository_key": "othermech"}
+    setup.config["targets"].append(other)
+    observed = []
+
+    def observe(target, **kwargs):
+        observed.append(target["repository_key"])
+        return copy.deepcopy(setup.observation)
+
+    def dispatch(*args):
+        (setup.runtime / "STOP").touch()
+        return {"state": "not-sent"}
+
+    monkeypatch.setattr(instance, "observe", observe)
+    monkeypatch.setattr(instance, "dispatch", dispatch)
+    dashboard = instance.sweep(apply=True)
+    assert observed == ["traitmech"]
+    assert [row["repository"] for row in dashboard["sessions"]] == ["traitmech"]
+
+
+def test_main_passes_signal_cancellation_to_supervisor(setup, monkeypatch):
+    handlers = {}
+    monkeypatch.setattr(supervisor.signal, "signal", lambda number, handler: handlers.setdefault(number, handler))
+    monkeypatch.setattr(supervisor, "validate_config", lambda config: config)
+    config_path = setup.runtime / "config.json"
+    supervisor.atomic_json(config_path, setup.config)
+
+    class SignalProbe:
+        def __init__(self, config, *, stop_requested):
+            self.runtime = Path(config["runtime_dir"])
+            self.stop_requested = stop_requested
+
+        def sweep(self, *, apply):
+            assert not self.stop_requested()
+            handlers[supervisor.signal.SIGTERM](supervisor.signal.SIGTERM, None)
+            assert self.stop_requested()
+            return {}
+
+        def write(self, *args):
+            pass
+
+    monkeypatch.setattr(supervisor, "Supervisor", SignalProbe)
+    assert supervisor.main(["--config", str(config_path), "--apply", "--loop", "--interval", "5"]) == 0
+
+
+def test_fifo_artifact_is_rejected_promptly_in_fresh_process(setup):
+    if not hasattr(os, "mkfifo"):
+        pytest.skip("FIFO regression requires Unix")
+    fifo = setup.repo / "coverage.pipe"
+    os.mkfifo(fifo)
+    probe = """
+import importlib.util,json,sys
+from pathlib import Path
+spec=importlib.util.spec_from_file_location("reviewed_supervisor",sys.argv[1])
+module=importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+print(json.dumps(module.artifact_errors(
+    {"artifact":sys.argv[2],"sha256":"a"*64},[Path(sys.argv[3])],"coverage")))
+"""
+    try:
+        result = subprocess.run([sys.executable, "-c", probe, str(Path(supervisor.__file__).resolve()),
+                                 str(fifo), str(setup.repo)], capture_output=True, text=True,
+                                check=True, timeout=3)
+    except subprocess.TimeoutExpired:
+        pytest.fail("FIFO evidence blocked the supervisor waiting for a writer")
+    assert "regular file" in json.loads(result.stdout)[0]

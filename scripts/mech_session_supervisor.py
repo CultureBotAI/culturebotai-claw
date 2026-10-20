@@ -8,6 +8,7 @@ closure receipts gate the next goal. Runtime artifacts belong in workspace/.
 from __future__ import annotations
 
 import argparse
+import copy
 import fcntl
 import hashlib
 import importlib.util
@@ -15,6 +16,7 @@ import json
 import os
 import re
 import signal
+import stat
 import subprocess
 import sys
 import tempfile
@@ -207,6 +209,8 @@ def decide(ledger: dict, observation: dict) -> dict:
         return {"phase": "pipeline_complete"}
     if not observation.get("ready"):
         return {"phase": "waiting", "reason": observation.get("readiness_reason", "not ready")}
+    if observation.get("goal_state") == "cancelled":
+        return {"phase": "blocked", "reason": "native goal is cancelled; cannot infer continuation intent"}
     if ledger.get("awaiting_goal"):
         if observation.get("goal_identity") != ledger["adopted_goal"]:
             return {"phase": "blocked", "reason": "a different native goal appeared before next-goal dispatch"}
@@ -253,7 +257,12 @@ def repair_decision(ledger: dict, observation: dict, reason: str, receipt_hash=N
         return {"phase": "requires_intervention", "reason": "agent reports blocked: " + progress.get("summary", reason)}
     if not observation.get("ready") or observation.get("goal_identity") != ledger["adopted_goal"]:
         return {"phase": "waiting", "reason": reason}
-    actions = [action for action in ledger["actions"].values() if action["stage"] == ledger["stage"]]
+    if observation.get("goal_state") == "cancelled":
+        return {"phase": "blocked", "reason": "native goal is cancelled; cannot infer continuation intent"}
+    # A definitive pre-send rejection cannot acquire native acceptance. It
+    # neither supersedes the last delivered instruction nor consumes a repair.
+    actions = [action for action in ledger["actions"].values()
+               if action["stage"] == ledger["stage"] and action["state"] != "not-sent"]
     if not actions:
         return {"phase": "closure_blocked", "reason": reason}
     last = max(actions, key=lambda action: action.get("reserved_epoch_ms", 0))
@@ -332,7 +341,12 @@ def artifact_errors(item: dict, allowed_roots: list[Path], label: str) -> list[s
     if not isinstance(expected, str) or not DIGEST.fullmatch(expected):
         return [f"{label}: valid SHA256 required"]
     try:
-        with resolved.open("rb") as stream:
+        # O_NONBLOCK prevents FIFO opens from waiting for a writer. Inspect the
+        # opened descriptor, not a racy pre-open path check, before reading it.
+        flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0)
+        with os.fdopen(os.open(resolved, flags), "rb") as stream:
+            if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+                return [f"{label}: artifact must be a regular file"]
             actual = hashlib.file_digest(stream, "sha256").hexdigest()
     except (OSError, ValueError) as error:
         return [f"{label}: artifact unreadable ({error})"]
@@ -531,13 +545,17 @@ function run(argv) {
 
 
 class Supervisor:
-    def __init__(self, config: dict, *, native=None, notifier=None, runner=command):
+    def __init__(self, config: dict, *, native=None, notifier=None, runner=command, stop_requested=None):
         self.config = config
         self.runtime = Path(config["runtime_dir"])
         self.native = native or import_file(Path(config["native_reader_path"]), "supervisor_native")
         self.notifier = notifier or import_file(Path(config["notifier_path"]), "supervisor_terminal")
         self.runner = runner
+        self.stop_requested = stop_requested or (lambda: False)
         self.native_cache: dict[str, tuple[tuple, dict]] = {}
+
+    def stopping(self) -> bool:
+        return self.stop_requested() or (self.runtime / "STOP").exists()
 
     def directory(self, target: dict) -> Path:
         directory = self.runtime / target["repository_key"]
@@ -692,9 +710,13 @@ class Supervisor:
             return {"authority": "ignored", "error": str(error)[:300]}
 
     def dispatch(self, target: dict, ledger: dict, decision: dict) -> dict:
+        if self.stopping():
+            return {"state": "not-sent", "reason": "supervisor stop requested"}
         lock = Path(self.config["input_lock_dir"]) / (Path(target["tty"]).name + ".lock")
         with file_lock(lock):
             observation = self.observe(target, fresh=True)
+            if self.stopping():
+                return {"state": "not-sent", "reason": "supervisor stop requested"}
             observation["agent_progress"] = self.progress(target, ledger)
             if decision.get("action") == "repair_closure":
                 receipt_path = self.directory(target) / "completion.json"
@@ -725,9 +747,12 @@ class Supervisor:
             ledger["actions"][identifier] = action
             self.save(target, ledger)  # durable intent before any terminal input
             try:
-                result = self.notifier.jxa(SEND_JS, {**observation["tab"], "pid": target["pid"],
-                    "identity": target["process_identity"], "cwd": target["root"], "message": message})
-                action.update(state="sent" if result == "sent" else "not-sent", outcome=result, updated_at=now())
+                if self.stopping():
+                    action.update(state="not-sent", outcome="stop-requested", updated_at=now())
+                else:
+                    result = self.notifier.jxa(SEND_JS, {**observation["tab"], "pid": target["pid"],
+                        "identity": target["process_identity"], "cwd": target["root"], "message": message})
+                    action.update(state="sent" if result == "sent" else "not-sent", outcome=result, updated_at=now())
             except Exception as error:
                 action.update(state="uncertain", error=str(error)[:500], updated_at=now())
             self.save(target, ledger)
@@ -736,6 +761,8 @@ class Supervisor:
     def sweep(self, *, apply: bool = False) -> dict:
         rows = []
         for target in self.config["targets"]:
+            if self.stopping():
+                break
             directory = self.directory(target)
             ledger_path = directory / "ledger.json"
             if ledger_path.is_symlink():
@@ -744,6 +771,8 @@ class Supervisor:
             if ledger.get("run_id") != self.config["run_id"] or ledger.get("repository_key") != target["repository_key"]:
                 raise SupervisorError("runtime ledger belongs to another workflow")
             observation = self.observe(target)
+            if self.stopping():
+                break
             self.reconcile(target, ledger, observation)
             try:
                 self.baseline(target, ledger)
@@ -765,14 +794,18 @@ class Supervisor:
                         authority = completion_authority(target, ledger, observation)
                         verification = verify_remote_receipt(receipt, ledger, target, self.runner)
                         closed_stage = ledger["stage"]
-                        ledger["completed_stages"].append({"stage": closed_stage, "goal_identity": ledger["adopted_goal"],
+                        advanced = copy.deepcopy(ledger)
+                        advanced["completed_stages"].append({"stage": closed_stage, "goal_identity": ledger["adopted_goal"],
                             "receipt_sha256": digest(receipt), "verification": verification,
                             "completion_authority": authority})
+                        advanced.update(stage=closed_stage + 1, awaiting_goal=closed_stage < 4)
+                        advanced.pop("baseline_head", None)
+                        advanced.pop("baseline_status", None)
+                        self.baseline(target, advanced)
                         self.write(directory / "receipts" / f"stage-{closed_stage}-{digest(receipt)[:12]}.json", receipt)
-                        ledger.update(stage=closed_stage + 1, awaiting_goal=closed_stage < 4)
-                        ledger.pop("baseline_head", None)
-                        ledger.pop("baseline_status", None)
-                        self.baseline(target, ledger)
+                        # Publish the whole in-memory transition only after all
+                        # fallible preparation; the ledger is saved atomically.
+                        ledger = advanced
                         # Do not delete the producer's file; mismatched old receipts
                         # are ignored only while a new goal is awaiting acceptance.
                 except Exception as error:
@@ -847,8 +880,8 @@ def main(argv=None) -> int:
     if not 5 <= args.interval <= 60:
         parser.error("--interval must be between 5 and 60 seconds")
     config = validate_config(read_json(args.config))
-    supervisor = Supervisor(config)
     stopped = False
+    supervisor = Supervisor(config, stop_requested=lambda: stopped)
 
     def stop(_signal, _frame):
         nonlocal stopped

@@ -6,6 +6,7 @@ Minimal protobuf wire reader, constrained to installed schema fields and public 
 import argparse
 import hashlib
 import json
+import re
 import shutil
 import sqlite3
 import tempfile
@@ -108,38 +109,48 @@ def find_goals(b, path=()):
 def snapshot(p):
     # Copy database and any WAL/SHM, verify stable sizes and mtimes across copy.
     # Retry active writes; no native SQLite connection, therefore no sidecar writes.
+    def source_files():
+        result = {}
+        for suffix in ("", "-wal", "-shm"):
+            path = Path(str(p) + suffix)
+            try:
+                stat = path.stat()
+            except FileNotFoundError:
+                if not suffix:
+                    raise
+                continue
+            result[str(path)] = (
+                stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns
+            )
+        return result
+
     for attempt in range(5):
-        td = Path(tempfile.mkdtemp(prefix="agy-goal-read-"))
-        tmp = td / p.name
-        paths = [Path(str(p) + s) for s in ["", "-wal", "-shm"]]
-        before = {
-            str(x): (x.stat().st_size, x.stat().st_mtime_ns)
-            for x in paths
-            if x.exists()
-        }
-        for s in before:
-            shutil.copy2(s, td / Path(s).name)
-        after = {
-            str(x): (x.stat().st_size, x.stat().st_mtime_ns)
-            for x in paths
-            if x.exists()
-        }
-        if before == after:
-            break
-        shutil.rmtree(td)
-    else:
-        raise RuntimeError("native database changed during every snapshot attempt")
-    c = sqlite3.connect(str(tmp))
-    c.execute("PRAGMA query_only=ON")
-    try:
-        yield c, {
-            "snapshot_stable": True,
-            "native_files": before,
-            "attempts": attempt + 1,
-        }
-    finally:
-        c.close()
-        shutil.rmtree(td)
+        # Every exit path removes private copies, including copying, connecting,
+        # PRAGMA setup, and exceptions raised by the reader using the snapshot.
+        with tempfile.TemporaryDirectory(prefix="agy-goal-read-") as directory:
+            td = Path(directory)
+            try:
+                before = source_files()
+                for source in before:
+                    shutil.copy2(source, td / Path(source).name)
+                after = source_files()
+            except FileNotFoundError:
+                # SQLite may remove a WAL/SHM between stat and copy/checkpoint.
+                continue
+            if before != after:
+                continue
+            c = sqlite3.connect(str(td / p.name))
+            try:
+                c.execute("PRAGMA query_only=ON")
+                yield c, {
+                    "snapshot_stable": True,
+                    "native_files": before,
+                    "attempts": attempt + 1,
+                }
+                return
+            finally:
+                c.close()
+    raise RuntimeError("native database changed or disappeared during every snapshot attempt")
 
 
 STATUS_NAMES = {
@@ -188,16 +199,48 @@ def user_parts(payload):
     return parts
 
 
+def native_goal_declaration(payload):
+    # Installed schema: UserInput.items[3] -> TextOrScopeItem.item[2] ->
+    # ContextScopeItem.slash_command[27] -> SlashCommandScopeItem.info[1].
+    # SlashCommandInfo: name[1], model_facing_text[2], type[3] (SYSTEM=1).
+    # Public text and attached files may quote the same words without /goal.
+    for number, wire, item in fields(one(payload, 19, b"")):
+        if number != 3 or wire != 2:
+            continue
+        scope = one(item, 2, b"")
+        command = one(scope, 27, b"")
+        info = one(command, 1, b"")
+        if (
+            one(info, 1) == b"goal"
+            and one(info, 3) == 1
+            and one(info, 2, b"").startswith(GOAL_DECLARATION)
+        ):
+            return True
+    return False
+
+
 def terminal_marker(visible):
     # Require an unquoted final standalone marker, not a snippet quoted in an explanation.
-    lines = visible.strip().splitlines()
-    if not lines or lines[-1].strip() not in {COMPLETE, CANCELLED}:
+    lines = visible.splitlines()
+    while lines and not lines[-1].strip():
+        lines.pop()
+    if not lines:
         return None
-    fence = False
+    marker = re.fullmatch(r" {0,3}(<!-- GOAL_(?:COMPLETE|CANCELLED) -->)[ \t]*", lines[-1])
+    if not marker:
+        return None
+    fence = None
     for line in lines[:-1]:
-        if line.lstrip().startswith(("```", "~~~")):
-            fence = not fence
-    return None if fence else lines[-1].strip()
+        delimiter = re.match(r" {0,3}(`{3,}|~{3,})(.*)$", line)
+        if not delimiter:
+            continue
+        run, trailing = delimiter.groups()
+        if fence:
+            if run[0] == fence[0] and len(run) >= fence[1] and not trailing.strip():
+                fence = None
+        elif run[0] != "`" or "`" not in trailing:
+            fence = (run[0], len(run))
+    return None if fence else marker[1]
 
 
 def select_current_goal(
@@ -309,7 +352,7 @@ def inspect(repo, cid):
             "select idx,status,step_payload from steps where step_type=14 and status=3 and idx>? order by idx",
             (checkpoint_idx,),
         ):
-            if GOAL_DECLARATION in one(payload, 19, b""):
+            if native_goal_declaration(payload):
                 parts = user_parts(payload)
                 if parts:
                     goals[idx] = {
