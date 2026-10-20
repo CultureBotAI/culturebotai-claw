@@ -1,10 +1,15 @@
 """Exercise fleet updates against isolated Git remotes, never the live Mechs."""
 
 import json
+import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
+
+if not os.access(Path.home() / ".gitconfig", os.R_OK):
+    os.environ.setdefault("GIT_CONFIG_GLOBAL", "/dev/null")
+    os.environ.setdefault("GIT_CONFIG_NOSYSTEM", "1")
 
 import pytest
 from git import Repo
@@ -703,6 +708,7 @@ def test_cli_selects_manifest_repositories_and_reports_coverage(
     assert fleet_pull.main(argv) == 0
 
     report = json.loads(capsys.readouterr().out)
+    fleet_pull.validate_report(report)
     assert len(observed) == 1
     settings, keys, kwargs = observed[0]
     assert isinstance(settings, fleet_pull.FleetPullSettings)
@@ -729,7 +735,9 @@ def test_cli_incomplete_report_has_nonzero_exit(
 
     assert fleet_pull.main(["--json", "--mech", "culturemech"]) == 1
 
-    assert json.loads(capsys.readouterr().out)["complete"] is False
+    report = json.loads(capsys.readouterr().out)
+    fleet_pull.validate_report(report)
+    assert report["complete"] is False
 
 
 @pytest.mark.parametrize(
@@ -751,3 +759,231 @@ def test_invalid_cli_usage_never_runs_git(monkeypatch: pytest.MonkeyPatch, argv:
         fleet_pull.main(argv)
 
     assert exc.value.code == 2
+
+
+def test_updated_and_preview_rows_report_merged_commits_and_prs_in_table(fleet: LocalFleet):
+    (fleet.writer / "first.txt").write_text("first\n", encoding="utf-8")
+    git(fleet.writer, "add", "first.txt")
+    git(fleet.writer, "commit", "-m", "rebuild CultureMech recipe membership (#879)")
+    first_sha = git(fleet.writer, "rev-parse", "--short", "HEAD")
+
+    (fleet.writer / "second.txt").write_text("second\n", encoding="utf-8")
+    git(fleet.writer, "add", "second.txt")
+    git(
+        fleet.writer,
+        "commit",
+        "-m",
+        "Merge pull request #908 from CultureBotAI/feat/review-bundles",
+    )
+    second_sha = git(fleet.writer, "rev-parse", "--short", "HEAD")
+    git(fleet.writer, "push", "origin", "HEAD")
+    git(fleet.checkout, "fetch", "origin")
+
+    preview = fleet.run(apply=False)
+    assert preview["status"] == "would_update"
+    assert preview["prs"] == ["#879", "#908"]
+    assert [c["sha"] for c in preview["commits"]] == [first_sha, second_sha]
+    fleet_pull.validate_report(
+        fleet_pull.build_report(["culturemech"], [preview], apply=False, incomplete=False)
+    )
+    preview_table = fleet_pull.render_table([preview])
+    assert "| Repository | Branch | Result | Merged Commits | Merged PRs | Details |" in preview_table
+    assert "| culturemech | main | would_update | 2 | #879, #908 |" in preview_table
+
+    applied = fleet.run(apply=True)
+    assert applied["status"] == "updated"
+    assert applied["prs"] == ["#879", "#908"]
+    assert [c["sha"] for c in applied["commits"]] == [first_sha, second_sha]
+    fleet_pull.validate_report(
+        fleet_pull.build_report(["culturemech"], [applied], apply=True, incomplete=False)
+    )
+    applied_table = fleet_pull.render_table([applied])
+    assert "| culturemech | main | updated | 2 | #879, #908 |" in applied_table
+
+
+def test_fleet_pull_schema_repository_keys_match_manifest():
+    import yaml
+
+    from kg_microbe_fleet import (
+        UniqueKeySafeLoader,
+        default_fleet_pull_schema_path,
+        load_fleet_manifest,
+    )
+
+    schema_path = default_fleet_pull_schema_path()
+    assert schema_path.is_file()
+    schema_doc = yaml.load(
+        schema_path.read_text(encoding="utf-8"), Loader=UniqueKeySafeLoader
+    )
+    enum_keys = set(
+        schema_doc["enums"]["FleetRepositoryKeyEnum"]["permissible_values"].keys()
+    )
+    expected_keys = {"claw", *load_fleet_manifest().mechs}
+    assert enum_keys == expected_keys
+
+
+def test_fleet_pull_schema_validates_all_statuses_and_rejects_malformed_payloads():
+    sha_before = "a" * 40
+    sha_after = "b" * 40
+    valid_report = fleet_pull.build_report(
+        ["claw", "culturemech", "traitmech", "aimech"],
+        [
+            {
+                "key": "claw",
+                "status": "updated",
+                "detail": "",
+                "path": "/tmp/claw",
+                "branch": "main",
+                "upstream": "origin/main",
+                "remote_ref": "refs/remotes/origin/main",
+                "before": sha_before,
+                "after": sha_after,
+                "target": sha_after,
+                "ahead": 0,
+                "behind": 1,
+                "commits": [{"sha": "bbbbbbb", "subject": "feat: add schema (#910)"}],
+                "prs": ["#910"],
+            },
+            {
+                "key": "culturemech",
+                "status": "up_to_date",
+                "detail": "",
+                "path": "/tmp/CultureMech",
+                "branch": "main",
+                "upstream": "origin/main",
+                "remote_ref": "refs/remotes/origin/main",
+                "before": sha_before,
+                "after": sha_before,
+                "target": sha_before,
+                "ahead": 0,
+                "behind": 0,
+                "commits": [],
+                "prs": [],
+            },
+            {
+                "key": "traitmech",
+                "status": "skipped_dirty",
+                "detail": "dirty or untracked working tree",
+                "path": "/tmp/TraitMech",
+                "branch": "main",
+                "upstream": None,
+                "remote_ref": None,
+                "before": sha_before,
+                "after": sha_before,
+                "target": None,
+                "ahead": None,
+                "behind": None,
+                "commits": [],
+                "prs": [],
+            },
+            {
+                "key": "aimech",
+                "status": "not_configured",
+                "detail": "AIMECH_ROOT is not set",
+                "path": None,
+                "branch": None,
+                "upstream": None,
+                "remote_ref": None,
+                "before": None,
+                "after": None,
+                "target": None,
+                "ahead": None,
+                "behind": None,
+                "commits": [],
+                "prs": [],
+            },
+        ],
+        apply=True,
+        incomplete=True,
+        snapshot_utc="2026-10-18T21:00:00+00:00",
+    )
+    fleet_pull.validate_report(valid_report)
+
+    with pytest.raises(ValueError, match="Invalid FleetPullReport payload"):
+        fleet_pull.validate_report({**valid_report, "unexpected_field": True})
+
+    with pytest.raises(ValueError, match="Invalid FleetPullReport payload"):
+        fleet_pull.validate_report({**valid_report, "mode": "force_push"})
+
+    with pytest.raises(ValueError, match="requires comparison="):
+        fleet_pull.validate_report({**valid_report, "comparison": "cached_refs"})
+
+    with pytest.raises(ValueError, match="results keys must match selected order"):
+        fleet_pull.validate_report({**valid_report, "selected": ["claw"]})
+
+    with pytest.raises(ValueError, match="complete flag disagrees"):
+        fleet_pull.validate_report({**valid_report, "complete": True})
+
+    with pytest.raises(ValueError, match="dry_run report cannot contain updated"):
+        fleet_pull.validate_report(
+            {**valid_report, "mode": "dry_run", "comparison": "cached_refs"}
+        )
+
+    bad_behind_row = {**valid_report["results"][0], "behind": 2}
+    with pytest.raises(ValueError, match="commits count must match behind"):
+        fleet_pull.validate_report(
+            {**valid_report, "results": [bad_behind_row, *valid_report["results"][1:]]}
+        )
+
+    bad_pr_row = {**valid_report["results"][0], "prs": ["910"]}
+    with pytest.raises(ValueError, match="Invalid FleetPullReport payload"):
+        fleet_pull.validate_report(
+            {**valid_report, "results": [bad_pr_row, *valid_report["results"][1:]]}
+        )
+
+    bad_sha_row = {**valid_report["results"][0], "before": "not-a-sha"}
+    with pytest.raises(ValueError, match="Invalid FleetPullReport payload"):
+        fleet_pull.validate_report(
+            {**valid_report, "results": [bad_sha_row, *valid_report["results"][1:]]}
+        )
+
+
+def test_cli_json_fails_closed_when_report_violates_schema(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+):
+    monkeypatch.setattr(fleet_pull, "merged_repository_environment", lambda _path: {})
+    monkeypatch.setattr(
+        fleet_pull.RepositorySettings, "from_environment", lambda **_kwargs: object()
+    )
+    monkeypatch.setattr(
+        fleet_pull,
+        "run_fleet",
+        lambda *_args, **_kwargs: [{"key": "culturemech", "status": "bogus_status"}],
+    )
+
+    assert fleet_pull.main(["--json", "--mech", "culturemech"]) == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "Invalid FleetPullReport payload" in captured.err
+
+
+def test_validate_report_isolates_linkml_from_broken_default_yaml_loader(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    import importlib
+
+    import yaml
+
+    linkml_yaml_loader = importlib.import_module("linkml_runtime.loaders.yaml_loader")
+
+    class NullTagLoader(yaml.SafeLoader):
+        def compose_mapping_node(self, anchor):
+            node = super().compose_mapping_node(anchor)
+            node.tag = None
+            return node
+
+    fleet_pull._report_validator.cache_clear()
+    monkeypatch.setattr(linkml_yaml_loader, "DupCheckYamlLoader", NullTagLoader)
+    report = fleet_pull.build_report(
+        ["claw"],
+        [{"key": "claw", "status": "up_to_date"}],
+        apply=False,
+        incomplete=False,
+        snapshot_utc="2026-10-18T21:00:00+00:00",
+    )
+    fleet_pull.validate_report(report)
+    assert linkml_yaml_loader.DupCheckYamlLoader is NullTagLoader
+
+
+
+

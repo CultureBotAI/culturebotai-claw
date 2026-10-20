@@ -1,0 +1,232 @@
+id: https://w3id.org/kg-microbe/culturebotai-claw/fleet-pull
+name: kg_microbe_fleet_pull
+title: CultureBotAI Fleet Pull Report Schema
+description: >-
+  LinkML schema for the JSON report emitted by scripts/fleet_pull.py --json,
+  covering per-repository fast-forward pull status, merged commits, and merged
+  PR references across the claw and Mech repositories.
+license: BSD-3-Clause
+
+prefixes:
+  linkml: https://w3id.org/linkml/
+  fleet_pull: https://w3id.org/kg-microbe/culturebotai-claw/fleet-pull/
+
+default_prefix: fleet_pull
+default_range: string
+
+imports:
+  - linkml:types
+
+types:
+  NonNegativeInteger:
+    typeof: integer
+    minimum_value: 0
+    description: Integer greater than or equal to zero.
+
+  GitRevision:
+    typeof: string
+    pattern: "^([0-9a-f]{40}|[0-9a-f]{64})$"
+    description: Lowercase full Git object ID (40-hex SHA-1 or 64-hex SHA-256).
+
+  ShortGitRevision:
+    typeof: string
+    pattern: "^[0-9a-f]{7,64}$"
+    description: Abbreviated or full lowercase hex Git commit hash.
+
+  PullRequestRef:
+    typeof: string
+    pattern: "^#[1-9][0-9]*$"
+    description: Pull request reference in #NNN form.
+
+enums:
+  FleetPullModeEnum:
+    description: Execution mode for fleet_pull.py.
+    permissible_values:
+      dry_run:
+        description: Compare local branch and remote tracking ref without mutating worktrees.
+      apply:
+        description: Fast-forward eligible worktrees with git merge --ff-only.
+
+  FleetPullComparisonEnum:
+    description: How remote tracking refs were inspected.
+    permissible_values:
+      cached_refs:
+        description: Inspected local cached remote tracking refs without running git fetch.
+      fetch_eligible_only:
+        description: Ran git fetch on eligible repositories before comparing refs.
+
+  FleetRepositoryKeyEnum:
+    description: Canonical repository key in the fleet pull report (claw plus fleet.yaml keys).
+    permissible_values:
+      claw:
+        description: The culturebotai-claw control-plane repository.
+      culturemech:
+        description: CultureMech repository.
+      mediaingredientmech:
+        description: MediaIngredientMech repository.
+      communitymech:
+        description: CommunityMech repository.
+      traitmech:
+        description: TraitMech repository.
+      proteintraitsmech:
+        description: ProteinTraitsMech repository.
+      antibioticmech:
+        description: AntibioticMech repository.
+      cellstructuremech:
+        description: CellStructureMech repository.
+      habitatmech:
+        description: HabitatMech repository.
+      naturalproductmech:
+        description: NaturalProductMech repository.
+      taxonmech:
+        description: TaxonMech repository.
+      pathwaymech:
+        description: PathwayMech repository.
+      dufmech:
+        description: DUFMech repository.
+      cmmmech:
+        description: CMMMech repository.
+      aimech:
+        description: AIMech repository.
+
+  FleetPullStatusEnum:
+    description: Per-repository status returned by fleet_pull.py.
+    permissible_values:
+      updated:
+        description: Worktree was fast-forwarded to the upstream tracking commit.
+      would_update:
+        description: Dry-run found fast-forwardable upstream commits.
+      up_to_date:
+        description: Local HEAD matches the upstream tracking ref.
+      ahead:
+        description: Local HEAD is ahead of the upstream tracking ref (0 behind).
+      skipped_detached:
+        description: Skipped because HEAD is detached.
+      skipped_in_progress:
+        description: Skipped because a merge, rebase, cherry-pick, bisect, revert, or am is in progress.
+      skipped_dirty:
+        description: Skipped because tracked edits or untracked files are present.
+      skipped_no_upstream:
+        description: Skipped because the current branch has no configured upstream tracking ref.
+      skipped_non_origin:
+        description: Skipped because the upstream remote is not origin.
+      skipped_symbolic_upstream:
+        description: Skipped because the upstream ref is a symbolic ref such as refs/remotes/origin/HEAD.
+      skipped_diverged:
+        description: Skipped because local and upstream histories have diverged (both ahead and behind).
+      skipped_locked:
+        description: Skipped because a Git lockfile (.git/*.lock) is present.
+      not_configured:
+        description: Repository checkout path is not configured or does not exist.
+      error:
+        description: A git inspection, fetch, or fast-forward command failed.
+
+classes:
+  MergedCommit:
+    description: A single commit included in a fast-forward update (or pending in dry-run mode).
+    attributes:
+      sha:
+        range: ShortGitRevision
+        required: true
+        description: Abbreviated commit SHA from git log.
+      subject:
+        range: string
+        required: true
+        description: First-line commit subject.
+
+  RepositoryPullResult:
+    description: Inspection and fast-forward pull result for a single repository in the fleet.
+    attributes:
+      key:
+        range: FleetRepositoryKeyEnum
+        required: true
+        description: Canonical repository key (claw or a Mech key).
+      status:
+        range: FleetPullStatusEnum
+        required: true
+        description: Outcome status for this repository.
+      detail:
+        range: string
+        required: false
+        description: Human-readable explanation when skipped, unconfigured, or errored.
+      path:
+        range: string
+        required: false
+        description: Filesystem path to the repository worktree, if resolved.
+      branch:
+        range: string
+        required: false
+        description: Checked-out local branch name, if on a branch.
+      upstream:
+        range: string
+        required: false
+        description: Short upstream tracking ref (for example origin/main).
+      remote_ref:
+        range: string
+        required: false
+        description: Full upstream refname (for example refs/remotes/origin/main).
+      before:
+        range: GitRevision
+        required: false
+        description: Local HEAD commit SHA prior to any fast-forward.
+      after:
+        range: GitRevision
+        required: false
+        description: Local HEAD commit SHA after fast-forward (or unchanged in dry-run/up-to-date).
+      target:
+        range: GitRevision
+        required: false
+        description: Upstream tracking ref commit SHA.
+      ahead:
+        range: NonNegativeInteger
+        required: false
+        description: Number of commits local HEAD is ahead of upstream.
+      behind:
+        range: NonNegativeInteger
+        required: false
+        description: Number of commits local HEAD is behind upstream.
+      commits:
+        range: MergedCommit
+        multivalued: true
+        inlined_as_list: true
+        required: false
+        description: Commits in before..target order (oldest to newest) when behind > 0.
+      prs:
+        range: PullRequestRef
+        multivalued: true
+        required: false
+        description: Deduplicated pull request references (#NNN) extracted from commit subjects.
+
+  FleetPullReport:
+    tree_root: true
+    description: Top-level JSON report emitted by scripts/fleet_pull.py --json.
+    attributes:
+      snapshot_utc:
+        range: datetime
+        required: true
+        description: UTC ISO-8601 timestamp when the fleet pull report was generated.
+      mode:
+        range: FleetPullModeEnum
+        required: true
+        description: Whether the run was dry_run or apply.
+      comparison:
+        range: FleetPullComparisonEnum
+        required: true
+        description: Whether refs were compared using cached_refs or fetch_eligible_only.
+      selected:
+        range: FleetRepositoryKeyEnum
+        multivalued: true
+        minimum_cardinality: 1
+        required: true
+        description: Ordered list of repository keys selected for this run.
+      complete:
+        range: boolean
+        required: true
+        description: True when no selected repository ended in error (or not_configured under --strict).
+      results:
+        range: RepositoryPullResult
+        multivalued: true
+        inlined_as_list: true
+        minimum_cardinality: 1
+        required: true
+        description: Per-repository pull results in selection order.

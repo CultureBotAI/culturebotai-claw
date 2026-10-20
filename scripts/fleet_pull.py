@@ -8,20 +8,33 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import importlib
 import json
 import os
+import re
 import signal
 import subprocess
 import sys
+import threading
 import time
+from contextlib import contextmanager
+from functools import lru_cache
 from pathlib import Path
+from typing import Any, Mapping, Sequence
 
-from kg_microbe_fleet import FleetManifestError, load_fleet_manifest
+import yaml
+
+from kg_microbe_fleet import (
+    FleetManifestError,
+    UniqueKeySafeLoader,
+    default_fleet_pull_schema_path,
+    load_fleet_manifest,
+)
 from plugins.lock_manager import LockManager
 from plugins.repository_settings import (
     RepositoryConfigurationError,
-    RepositoryTarget,
     RepositorySettings,
+    RepositoryTarget,
     merged_repository_environment,
 )
 
@@ -33,6 +46,10 @@ SUCCESS = {"would_update", "updated", "up_to_date", "ahead"}
 # rebase state directories identify an active operation, including paused ones.
 IN_PROGRESS = ("MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD",
                "rebase-merge", "rebase-apply", "sequencer", "BISECT_START", "index.lock")
+PR_NUMBER_RE = re.compile(
+    r"(?:Merge pull request #([1-9]\d*)|\(#([1-9]\d*)\)|\bPR\s+#([1-9]\d*))",
+    re.IGNORECASE,
+)
 
 
 class GitError(RuntimeError):
@@ -55,6 +72,9 @@ class Git:
         for name in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR",
                      "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES"):
             env.pop(name, None)
+        if not os.access(Path.home() / ".gitconfig", os.R_OK):
+            env.setdefault("GIT_CONFIG_GLOBAL", "/dev/null")
+            env.setdefault("GIT_CONFIG_NOSYSTEM", "1")
         env.update(GIT_TERMINAL_PROMPT="0", GIT_OPTIONAL_LOCKS="0")
         command = ["git", "-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false",
                    "-c", "submodule.recurse=false", *args]
@@ -111,7 +131,7 @@ class FleetPullSettings:
 def inspect(git: Git) -> dict:
     state: dict = {"status": "eligible", "detail": "", "branch": None,
                    "upstream": None, "before": None, "after": None,
-                   "ahead": None, "behind": None}
+                   "ahead": None, "behind": None, "commits": [], "prs": []}
     branch_ref = git.run("symbolic-ref", "--quiet", "HEAD", allowed=(0, 1))
     state["before"] = git.run("rev-parse", "--verify", "HEAD^{commit}")
     state["after"] = state["before"]
@@ -141,14 +161,41 @@ def inspect(git: Git) -> dict:
     return state
 
 
+def extract_commits_and_prs(
+    git: Git, before: str, target: str
+) -> tuple[list[dict[str, str]], list[str]]:
+    log_output = git.run("log", "--reverse", "--format=%h%x09%s", f"{before}..{target}")
+    commits: list[dict[str, str]] = []
+    prs: list[str] = []
+    seen_prs: set[str] = set()
+    for line in log_output.splitlines():
+        if not line.strip():
+            continue
+        sha, _, subject = line.partition("\t")
+        subject = subject.strip()
+        commits.append({"sha": sha.strip(), "subject": subject})
+        for match in PR_NUMBER_RE.finditer(subject):
+            number = next(group for group in match.groups() if group is not None)
+            pr_ref = f"#{number}"
+            if pr_ref not in seen_prs:
+                seen_prs.add(pr_ref)
+                prs.append(pr_ref)
+    return commits, prs
+
+
 def compare(git: Git, state: dict) -> dict:
     target = git.run("rev-parse", "--verify", state["upstream"] + "^{commit}")
     ahead, behind = map(int, git.run("rev-list", "--left-right", "--count",
                                     state["before"] + "..." + target).split())
     status = ("skipped_diverged" if ahead and behind else "ahead" if ahead
               else "would_update" if behind else "up_to_date")
+    commits, prs = (
+        extract_commits_and_prs(git, state["before"], target)
+        if status == "would_update"
+        else ([], [])
+    )
     return {**state, "status": status, "ahead": ahead, "behind": behind,
-            "target": target,
+            "target": target, "commits": commits, "prs": prs,
             "detail": "local and upstream histories diverged" if ahead and behind else ""}
 
 
@@ -198,7 +245,8 @@ def update_one(settings, key: str, root: Path, *, timeout: float) -> dict:
 def run_fleet(settings, keys, *, apply=False, locks=None, timeout=60) -> list[dict]:
     results = []
     for key in keys:
-        result = {"key": key, "status": "error", "detail": "", "path": None}
+        result = {"key": key, "status": "error", "detail": "", "path": None,
+                  "commits": [], "prs": []}
         try:
             if key in getattr(settings, "unconfigured", ()):
                 result.update(status="not_configured", detail="repository root is not configured")
@@ -246,10 +294,26 @@ def selected_keys(requested: list[str] | None, manifest) -> list[str]:
     return keys
 
 
+def _format_commits(row: dict) -> str:
+    commits = row.get("commits")
+    if commits:
+        return str(len(commits))
+    behind = row.get("behind")
+    if isinstance(behind, int) and behind > 0:
+        return str(behind)
+    return "—"
+
+
+def _format_prs(prs: list) -> str:
+    if not prs:
+        return "—"
+    return ", ".join(str(pr).strip() for pr in prs if str(pr).strip()) or "—"
+
+
 def render_table(results: list[dict]) -> str:
     """Show updates first, followed by every repository that was not updated."""
-    lines = ["| Repository | Branch | Result | Details |",
-             "|---|---|---|---|"]
+    lines = ["| Repository | Branch | Result | Merged Commits | Merged PRs | Details |",
+             "|---|---|---|---|---|---|"]
     for row in sorted(results, key=lambda item: item["status"] != "updated"):
         detail = row.get("detail", "")
         if row["status"] == "updated":
@@ -262,13 +326,156 @@ def render_table(results: list[dict]) -> str:
             detail = f"Local branch is {row['ahead']} commits ahead"
         elif row["status"] == "would_update":
             detail = f"Preview: cached upstream is {row['behind']} commits ahead"
-        cells = (row["key"], row.get("branch") or "—", row["status"], detail)
+        show_changes = row["status"] in {"updated", "would_update"}
+        commits_cell = _format_commits(row) if show_changes else "—"
+        prs_cell = _format_prs(row.get("prs") or []) if show_changes else "—"
+        cells = (
+            row["key"],
+            row.get("branch") or "—",
+            row["status"],
+            commits_cell,
+            prs_cell,
+            detail,
+        )
         lines.append("| " + " | ".join(
             " ".join(str(cell).split()).replace("|", "\\|") for cell in cells
         ) + " |")
     updated = sum(row["status"] == "updated" for row in results)
     lines.append(f"\nUpdated: {updated}. Not updated: {len(results) - updated}.")
     return "\n".join(lines)
+
+
+class _PureLinkMLYamlLoader(UniqueKeySafeLoader):
+    """Pure-Python YAML loader isolating LinkML from C-loader import-order state."""
+
+    yaml_path_resolvers: dict[Any, Any] = {}
+
+
+@contextmanager
+def _pure_linkml_loader():
+    linkml_yaml_loader = importlib.import_module("linkml_runtime.loaders.yaml_loader")
+    lock = vars(linkml_yaml_loader).setdefault(
+        "_claw_linkml_loader_lock", threading.RLock()
+    )
+    with lock:
+        original = linkml_yaml_loader.DupCheckYamlLoader
+        linkml_yaml_loader.DupCheckYamlLoader = _PureLinkMLYamlLoader
+        try:
+            yield
+        finally:
+            linkml_yaml_loader.DupCheckYamlLoader = original
+
+
+@lru_cache(maxsize=4)
+def _report_validator(schema_path: Path):
+    from linkml.validator import Validator
+    from linkml.validator.plugins import JsonschemaValidationPlugin
+
+    schema_doc = yaml.load(
+        schema_path.read_text(encoding="utf-8"), Loader=UniqueKeySafeLoader
+    )
+    if not isinstance(schema_doc, dict):
+        raise ValueError("fleet_pull schema must be a YAML mapping")
+    with _pure_linkml_loader():
+        return Validator(
+            schema_doc,
+            validation_plugins=[JsonschemaValidationPlugin(closed=True)],
+            strict=True,
+        )
+
+
+def validate_report(
+    report: Mapping[str, Any], schema_path: Path | None = None
+) -> None:
+    """Validate a fleet-pull JSON report dict against the LinkML schema and invariants."""
+    resolved_schema = schema_path or default_fleet_pull_schema_path()
+    payload = dict(report)
+    with _pure_linkml_loader():
+        validation = _report_validator(resolved_schema).validate(
+            payload, target_class="FleetPullReport"
+        )
+    if validation.results:
+        messages = "; ".join(result.message for result in validation.results)
+        raise ValueError(f"Invalid FleetPullReport payload: {messages}")
+
+    mode = payload.get("mode")
+    expected_comparison = "fetch_eligible_only" if mode == "apply" else "cached_refs"
+    if payload.get("comparison") != expected_comparison:
+        raise ValueError(
+            "Invalid FleetPullReport payload: "
+            f"mode={mode!r} requires comparison={expected_comparison!r}"
+        )
+
+    selected = list(payload.get("selected") or [])
+    if len(selected) != len(set(selected)):
+        raise ValueError(
+            "Invalid FleetPullReport payload: selected contains duplicate repository keys"
+        )
+    results = list(payload.get("results") or [])
+    result_keys = [row.get("key") for row in results]
+    if result_keys != selected:
+        raise ValueError(
+            "Invalid FleetPullReport payload: results keys must match selected order"
+        )
+
+    expected_complete = all(row.get("status") in SUCCESS for row in results)
+    if payload.get("complete") != expected_complete:
+        raise ValueError(
+            "Invalid FleetPullReport payload: complete flag disagrees with results statuses"
+        )
+
+    for row in results:
+        status = row.get("status")
+        if mode == "dry_run" and status == "updated":
+            raise ValueError(
+                "Invalid FleetPullReport payload: dry_run report cannot contain updated status"
+            )
+        if mode == "apply" and status == "would_update":
+            raise ValueError(
+                "Invalid FleetPullReport payload: apply report cannot contain would_update status"
+            )
+        if status in {"updated", "would_update"}:
+            behind = row.get("behind")
+            commits = row.get("commits") or []
+            if not isinstance(behind, int) or behind < 1:
+                raise ValueError(
+                    f"Invalid FleetPullReport payload: {status} row requires behind >= 1"
+                )
+            if len(commits) != behind:
+                raise ValueError(
+                    f"Invalid FleetPullReport payload: {status} row commits count must match behind"
+                )
+            if not row.get("before") or not row.get("target"):
+                raise ValueError(
+                    f"Invalid FleetPullReport payload: {status} row requires before and target SHAs"
+                )
+            if status == "updated" and row.get("after") != row.get("target"):
+                raise ValueError(
+                    "Invalid FleetPullReport payload: updated row requires after == target"
+                )
+            if status == "would_update" and row.get("after") != row.get("before"):
+                raise ValueError(
+                    "Invalid FleetPullReport payload: would_update row requires after == before"
+                )
+
+
+def build_report(
+    keys: Sequence[str],
+    results: Sequence[Mapping[str, Any]],
+    *,
+    apply: bool,
+    incomplete: bool,
+    snapshot_utc: str | None = None,
+) -> dict[str, Any]:
+    """Build the top-level FleetPullReport JSON dictionary."""
+    return {
+        "snapshot_utc": snapshot_utc or dt.datetime.now(dt.timezone.utc).isoformat(),
+        "mode": "apply" if apply else "dry_run",
+        "comparison": "fetch_eligible_only" if apply else "cached_refs",
+        "selected": list(keys),
+        "complete": not incomplete,
+        "results": [dict(row) for row in results],
+    }
 
 
 def main(argv=None) -> int:
@@ -300,16 +507,17 @@ def main(argv=None) -> int:
             )
         )
         results = run_fleet(settings, keys, apply=args.apply, timeout=args.timeout)
+        incomplete = any(row.get("status") not in SUCCESS for row in results)
+        if args.json:
+            report = build_report(
+                keys, results, apply=args.apply, incomplete=incomplete
+            )
+            validate_report(report)
     except (FleetManifestError, RepositoryConfigurationError, OSError, ValueError) as exc:
         print(f"fleet-pull: {exc}", file=sys.stderr)
         return 2
-    incomplete = any(row["status"] not in SUCCESS for row in results)
     if args.json:
-        print(json.dumps({"snapshot_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
-                          "mode": "apply" if args.apply else "dry_run",
-                          "comparison": "fetch_eligible_only" if args.apply else "cached_refs",
-                          "selected": keys, "complete": not incomplete,
-                          "results": results}, indent=2))
+        print(json.dumps(report, indent=2))
     else:
         print("Fleet pull: " + ("apply" if args.apply else "offline preview; upstream refs may be stale"))
         print("\n" + render_table(results))

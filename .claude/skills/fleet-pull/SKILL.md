@@ -5,7 +5,7 @@ metadata:
   category: cross-repo
   requires_database: false
   requires_internet: true
-  version: 1.0.1
+  version: 1.0.2
   tags: [git, pull, fleet, cross-repo]
 ---
 
@@ -60,8 +60,10 @@ add it implicitly.
 
 ## Interpret results
 
-- `updated`: fast-forwarded to the reported fetched commit.
-- `would_update`: cached upstream is ahead; preview only.
+- `updated`: fast-forwarded to the reported fetched commit; includes `commits`
+  (`sha` and `subject`) and extracted `prs` (`#NNN`) brought in by the merge.
+- `would_update`: cached upstream is ahead; preview only, with incoming `commits`
+  and `prs`.
 - `up_to_date`, `ahead`: no local update needed relative to the compared ref.
 - `skipped_*`: dirty/untracked/submodule changes, detached HEAD, missing or
   non-origin/symbolic tracking, diverged history, an operation marker, or an unavailable
@@ -74,15 +76,20 @@ HEAD was not verified; do not interpret it as proof that the checkout was unchan
 
 Exit `0` means all selected repositories were assessed successfully. Exit `1`
 means at least one was skipped or failed. Exit `2` means invalid invocation or
-configuration. JSON includes the full selected denominator and one result per
-repository; do not omit skipped repositories from the final summary.
+configuration. JSON (`FleetPullReport` in `src/kg_microbe_fleet/schema/fleet_pull.yaml`)
+includes the full selected denominator and one result per repository; do not omit
+skipped repositories from the final summary.
 
-Always finish with a table listing every selected repository, its branch,
-result, and commit change or reason. Put successfully updated repositories
-first, then all repositories that were not updated at the end (including
-already-current, ahead, skipped, and failed checkouts). Include totals for
-updated and not updated. The command's default output uses this order; when
-using JSON, arrange the final response table the same way.
+Always provide the full report table output listing every selected repository with
+columns `| Repository | Branch | Result | Merged Commits | Merged PRs | Details |`.
+For `updated` (and `would_update`) rows, `Merged Commits` must give the count of
+merged commits and `Merged PRs` must list the merged pull request numbers (`#NNN`,
+or `—` when a direct commit has no PR reference). Put successfully updated
+repositories first, then all repositories that were not updated at the end
+(including already-current, ahead, skipped, and failed checkouts), followed by the
+totals for updated and not updated. The command's default output renders this exact
+table; when using `--json`, render the final response table with the same columns
+and row order.
 
 ## Boundaries
 
