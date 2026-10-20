@@ -957,4 +957,33 @@ def test_cli_json_fails_closed_when_report_violates_schema(
     assert "Invalid FleetPullReport payload" in captured.err
 
 
+def test_validate_report_isolates_linkml_from_broken_default_yaml_loader(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    import importlib
+
+    import yaml
+
+    linkml_yaml_loader = importlib.import_module("linkml_runtime.loaders.yaml_loader")
+
+    class NullTagLoader(yaml.SafeLoader):
+        def compose_mapping_node(self, anchor):
+            node = super().compose_mapping_node(anchor)
+            node.tag = None
+            return node
+
+    fleet_pull._report_validator.cache_clear()
+    monkeypatch.setattr(linkml_yaml_loader, "DupCheckYamlLoader", NullTagLoader)
+    report = fleet_pull.build_report(
+        ["claw"],
+        [{"key": "claw", "status": "up_to_date"}],
+        apply=False,
+        incomplete=False,
+        snapshot_utc="2026-10-18T21:00:00+00:00",
+    )
+    fleet_pull.validate_report(report)
+    assert linkml_yaml_loader.DupCheckYamlLoader is NullTagLoader
+
+
+
 

@@ -390,9 +390,10 @@ def validate_report(
     """Validate a fleet-pull JSON report dict against the LinkML schema and invariants."""
     resolved_schema = schema_path or default_fleet_pull_schema_path()
     payload = dict(report)
-    validation = _report_validator(resolved_schema).validate(
-        payload, target_class="FleetPullReport"
-    )
+    with _pure_linkml_loader():
+        validation = _report_validator(resolved_schema).validate(
+            payload, target_class="FleetPullReport"
+        )
     if validation.results:
         messages = "; ".join(result.message for result in validation.results)
         raise ValueError(f"Invalid FleetPullReport payload: {messages}")
