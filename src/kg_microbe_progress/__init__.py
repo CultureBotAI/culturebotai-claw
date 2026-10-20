@@ -135,7 +135,7 @@ def json_schema(class_name: str = "ProgressSnapshot") -> dict[str, Any]:
     if schema.get("imports") or class_name not in schema["classes"]:
         raise ProgressError("invalid progress schema")
     return json.loads(JsonSchemaGenerator(
-        SchemaDefinition(**schema), topClass=class_name,
+        SchemaDefinition(**schema), top_class=class_name,
         not_closed=False, include_null=False,
     ).serialize())
 

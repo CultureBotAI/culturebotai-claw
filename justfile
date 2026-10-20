@@ -11,6 +11,10 @@ kg_microbe_root := env_var_or_default("KG_MICROBE_ROOT", "../kg-microbe")
 default:
     @just --list
 
+# One-line tracked Mech, PR, goal, and cycle progress
+mech-progress:
+    @uv run python scripts/mech_progress_status.py
+
 # =============================================================================
 # FEBA Media Workflows
 # =============================================================================
