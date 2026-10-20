@@ -20,10 +20,10 @@ through authenticated `gh` instead of the local publisher bundle:
 uv run python scripts/mech_progress_status.py --published
 ```
 
-Return the command's stdout unchanged, for example:
+Return the command's stdout unchanged. Here `N` represents the tracked fleet size:
 
 ```text
-14 Mechs, 8 PRs (5 merged, 3 open), 1 completed goal, 0 completed cycles
+N Mechs, 8 PRs (5 merged, 3 open), 1 completed goal, 0 completed cycles
 ```
 
 Use newly read values, never this example or a previous response. The command

@@ -47,10 +47,10 @@ bundle, or pass `--manifest PATH`. The report validates against that manifest;
 when no pin exists it uses the packaged fleet. Invalid pins and fleet
 mismatches fail rather than changing the active fleet configuration.
 
-Example output (illustrative counts):
+Example output (`N` is the tracked fleet size; other counts are illustrative):
 
 ```text
-14 Mechs, 8 PRs (5 merged, 3 open), 1 completed goal, 0 completed cycles
+N Mechs, 8 PRs (5 merged, 3 open), 1 completed goal, 0 completed cycles
 ```
 
 Closed PRs without a merge are included in the parentheses when nonzero. The
