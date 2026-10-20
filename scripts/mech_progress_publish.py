@@ -84,7 +84,7 @@ def read_json(path: Path) -> dict:
     return read_progress_json(path)
 
 
-def read_remote(api=gh) -> tuple[str | None, dict | None]:
+def read_remote(api=gh, *, manifest=None) -> tuple[str | None, dict | None]:
     ref = api(f"repos/{REPOSITORY}/git/ref/heads/{BRANCH}")
     if ref is None:
         return None, None
@@ -108,7 +108,7 @@ def read_remote(api=gh) -> tuple[str | None, dict | None]:
             raise PublishError("Public data blob is too large")
         documents[name] = json.loads(raw)
     history, snapshot = documents["history.json"], documents["progress.json"]
-    validate_bundle(history, snapshot)
+    validate_bundle(history, snapshot, manifest)
     return head, {"history": history, "snapshot": snapshot}
 
 

@@ -33,6 +33,11 @@ activity; earlier history remains unknown. PRs are distinct repository/number
 pairs, goals require verified closure, and a cycle requires all six goals.
 Closed PRs that were not merged appear separately when present.
 
+For a tracker running a pinned release, the command uses its bundle-adjacent
+`fleet.yaml` when present, or an explicit `--manifest PATH`; otherwise it uses
+the checkout's packaged manifest. A mismatch is an error. Do not remove a pin
+or edit the active fleet configuration to force counts through validation.
+
 Exit 0 means fresh observations. Exit 3 still prints verified counts but reports
 stale, missing, or future-dated observations on stderr: retain that qualification
 after the summary. Exit 1 means unavailable or invalid evidence; report the error

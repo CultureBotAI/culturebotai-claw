@@ -41,6 +41,12 @@ The first reads the local atomic publisher bundle; `--published` reads both
 documents at one pinned commit on the GitHub data branch through `gh`. An
 alternate local bundle can be selected with `--bundle PATH`.
 
+If the publisher uses a pinned release newer than the local checkout, keep an
+exact copy of that release's fleet manifest as `fleet.yaml` beside the local
+bundle, or pass `--manifest PATH`. The report validates against that manifest;
+when no pin exists it uses the packaged fleet. Invalid pins and fleet
+mismatches fail rather than changing the active fleet configuration.
+
 Example output (illustrative counts):
 
 ```text

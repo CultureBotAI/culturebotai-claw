@@ -1,6 +1,7 @@
 """The short report must preserve evidence, freshness, and distinct PR counts."""
 from __future__ import annotations
 
+import base64
 import copy
 import importlib.util
 import json
@@ -9,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
+import yaml
 
 import kg_microbe_progress as progress
 from kg_microbe_fleet import load_fleet_manifest
@@ -207,17 +209,17 @@ def test_malformed_bundle_objects_report_unavailable(status, tmp_path, capsys, v
 def test_published_bundle_is_validated_and_network_failure_has_no_zero_fallback(
     status, bundle, monkeypatch, capsys
 ):
-    monkeypatch.setattr(status, "read_remote", lambda: ("a" * 40, bundle))
+    monkeypatch.setattr(status, "read_remote", lambda **kwargs: ("a" * 40, bundle))
     assert status.main(["--published"], now=NOW) == 0
     assert capsys.readouterr().out == status.format_summary(bundle["snapshot"]) + "\n"
     bundle["history"]["closures"] = []
     assert status.main(["--published"], now=NOW) == 1
     assert capsys.readouterr().out == ""
-    monkeypatch.setattr(status, "read_remote", lambda: (None, None))
+    monkeypatch.setattr(status, "read_remote", lambda **kwargs: (None, None))
     assert status.main(["--published"], now=NOW) == 1
     assert capsys.readouterr().out == ""
 
-    def unavailable():
+    def unavailable(**kwargs):
         raise OSError("offline")
 
     monkeypatch.setattr(status, "read_remote", unavailable)
@@ -225,3 +227,127 @@ def test_published_bundle_is_validated_and_network_failure_has_no_zero_fallback(
     output = capsys.readouterr()
     assert output.out == ""
     assert output.err
+
+
+def mismatch_default_manifest(tmp_path, monkeypatch):
+    """Model an older checkout while retaining the publisher's reviewed fleet."""
+    pinned_text = load_fleet_manifest().source.read_text()
+    older = yaml.safe_load(pinned_text)
+    older["mechs"].pop(next(reversed(older["mechs"])))
+    old_path = tmp_path / "older-fleet.yaml"
+    write(old_path, older)
+    monkeypatch.setenv("KG_MICROBE_FLEET_MANIFEST", str(old_path))
+    return pinned_text
+
+
+def test_mismatched_default_manifest_refuses_counts(status, tmp_path, bundle, monkeypatch, capsys):
+    mismatch_default_manifest(tmp_path, monkeypatch)
+    path = tmp_path / "bundle.json"
+    write(path, bundle)
+    assert status.main(["--bundle", str(path)], now=NOW) == 1
+    output = capsys.readouterr()
+    assert output.out == ""
+    assert output.err.startswith("Progress unavailable:")
+
+
+@pytest.mark.parametrize("selection", ["explicit", "adjacent"])
+def test_pinned_manifest_validates_publisher_fleet_without_changing_default(
+    status, tmp_path, bundle, monkeypatch, capsys, selection
+):
+    pinned_text = mismatch_default_manifest(tmp_path, monkeypatch)
+    path = tmp_path / "bundle.json"
+    write(path, bundle)
+    pin = tmp_path / ("explicit-fleet.yaml" if selection == "explicit" else "fleet.yaml")
+    pin.write_text(pinned_text)
+    arguments = ["--bundle", str(path)]
+    if selection == "explicit":
+        arguments.extend(["--manifest", str(pin)])
+    default_before = load_fleet_manifest()
+    assert status.main(arguments, now=NOW) == 0
+    output = capsys.readouterr()
+    assert output.out == status.format_summary(bundle["snapshot"]) + "\n"
+    assert output.err == ""
+    assert load_fleet_manifest().keys == default_before.keys
+    assert len(default_before.keys) + 1 == len(bundle["snapshot"]["repositories"])
+
+
+@pytest.mark.parametrize(
+    "selection", ["explicit", "adjacent", "missing", "broken_symlink", "directory"]
+)
+def test_invalid_manifest_pin_never_falls_back_to_matching_default(
+    status, tmp_path, bundle, capsys, selection
+):
+    path = tmp_path / "bundle.json"
+    write(path, bundle)
+    pin = tmp_path / ("explicit-fleet.yaml" if selection in {"explicit", "missing"} else "fleet.yaml")
+    if selection == "broken_symlink":
+        pin.symlink_to(tmp_path / "absent.yaml")
+    elif selection == "directory":
+        pin.mkdir()
+    elif selection != "missing":
+        pin.write_text("[]\n")
+    arguments = ["--bundle", str(path)]
+    if selection in {"explicit", "missing"}:
+        arguments.extend(["--manifest", str(pin)])
+    assert status.main(arguments, now=NOW) == 1
+    output = capsys.readouterr()
+    assert output.out == ""
+    assert output.err.startswith("Progress unavailable:")
+
+
+@pytest.mark.parametrize("selection", ["explicit", "adjacent"])
+def test_published_read_and_bundle_validation_use_pinned_manifest(
+    status, tmp_path, bundle, monkeypatch, capsys, selection
+):
+    pinned_text = mismatch_default_manifest(tmp_path, monkeypatch)
+    pin = tmp_path / (
+        "pinned-fleet.yaml" if selection == "explicit"
+        else "workspace/progress-publisher/fleet.yaml"
+    )
+    pin.parent.mkdir(parents=True, exist_ok=True)
+    pin.write_text(pinned_text)
+    monkeypatch.chdir(tmp_path)
+    seen = []
+
+    def remote(*, manifest):
+        seen.append(manifest)
+        return "a" * 40, bundle
+
+    monkeypatch.setattr(status, "read_remote", remote)
+    arguments = ["--published"]
+    if selection == "explicit":
+        arguments.extend(["--manifest", str(pin)])
+    assert status.main(arguments, now=NOW) == 0
+    output = capsys.readouterr()
+    assert output.out == status.format_summary(bundle["snapshot"]) + "\n"
+    assert output.err == ""
+    assert len(seen) == 1
+    assert seen[0].source == pin
+    assert list(seen[0].keys) == [row["key"] for row in bundle["snapshot"]["repositories"]]
+
+
+def test_remote_reader_validates_with_the_selected_manifest(status, tmp_path, bundle, monkeypatch):
+    pinned_text = mismatch_default_manifest(tmp_path, monkeypatch)
+    pin = tmp_path / "pinned-fleet.yaml"
+    pin.write_text(pinned_text)
+    prefix = "repos/CultureBotAI/culturebotai-claw/git/"
+    responses = {
+        prefix + "ref/heads/mech-progress-data": {"object": {"sha": "a" * 40}},
+        prefix + "commits/" + "a" * 40: {"tree": {"sha": "b" * 40}},
+    }
+    tree = []
+    for name, key, sha in (
+        ("history.json", "history", "c" * 40),
+        ("progress.json", "snapshot", "d" * 40),
+    ):
+        raw = json.dumps(bundle[key]).encode()
+        tree.append({"path": name, "sha": sha, "type": "blob", "mode": "100644", "size": len(raw)})
+        responses[prefix + "blobs/" + sha] = {
+            "encoding": "base64", "size": len(raw), "content": base64.b64encode(raw).decode(),
+        }
+    responses[prefix + "trees/" + "b" * 40] = {"tree": tree}
+    with pytest.raises(progress.ProgressError):
+        status.read_remote(api=responses.__getitem__)
+    assert status.read_remote(
+        api=responses.__getitem__, manifest=load_fleet_manifest(pin)
+    ) == ("a" * 40, bundle)
