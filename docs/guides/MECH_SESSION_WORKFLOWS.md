@@ -121,8 +121,9 @@ configuration. The active cycle retains an immutable effective-profile snapshot;
 scripts; explicit overrides remain supported for a reviewed local adapter.
 For other Mechs, assess native skills and domain applicability separately.
 Missing representations or writers should block a stage. A nonbiological domain
-can use an explicit `applicability_audit` profile with its appropriate local
-review skill and an evidence-backed no-change result. Do not invent graph fields
+can use `applicability: not_applicable` with an `applicability_reason`, an audit
+objective, its appropriate local review skill, and an evidence-backed no-change
+result. Do not invent graph fields
 or UniProt annotations to satisfy a generic sequence.
 
 ## Migrating an existing four-stage run

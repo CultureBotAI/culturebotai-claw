@@ -84,6 +84,12 @@ it does not overwrite an earlier report. Retain historical revisions and
 cross-reference superseded reports. A current-cycle index is a pointer, not a
 replacement for the history.
 
+Revision 1 omits `supersedes_evidence`. Every later revision pins the exact
+immediately preceding revision by path and hash in that field.
+`previous_evidence` separately retains the frozen prior-stage or prior-cycle
+source; revising a report does not change that source. Unresolved finding IDs
+and artifact bytes must survive both lines of history.
+
 After closure verification, the supervisor writes
 `verified-evidence-index.json` in the repository's runtime directory. The
 next goal uses that verified pointer to update tracked

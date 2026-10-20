@@ -467,6 +467,11 @@ classes:
         inlined: true
       scope_frozen_at:
         range: string
+      supersedes_evidence:
+        range: EvidenceReference
+        inlined: true
+        description: Exact immutable immediate previous revision of this same run/cycle/stage; required
+          for revision > 1.
   ReviewReport:
     is_a: GoalEvidence
     slot_usage:

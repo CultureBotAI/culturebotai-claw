@@ -17,3 +17,13 @@ Copy the structure, replace identity and source revision, create actual evidence
 then calculate exact SHA-256 values. Never reuse example claims or checksums.
 `source_revision` describes the source reviewed before committing the report;
 the final closure receipt separately binds the commit containing the report.
+
+For every additional output kind in the active cycle's immutable effective
+workflow, repeat `--required-output KIND`; for example
+`--required-output supporting --required-output validation`. Without these flags
+the CLI checks the canonical minimum outputs, not a customized active policy.
+
+Revision 1 has no `supersedes_evidence`. Every revision greater than 1 must pin
+the exact preceding revision with `supersedes_evidence: {path: ..., sha256: ...}`.
+Keep `previous_evidence` separately pinned to the same frozen stage/cycle source
+when revising a report. Carry unresolved IDs forward and retain all older files.

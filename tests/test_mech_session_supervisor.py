@@ -800,11 +800,12 @@ def write_goal_evidence(setup, ledger, *, findings=None, groups=None, infra_task
     receipt = copy.deepcopy(setup.receipt)
     receipt.update(stage=stage, cycle=cycle, goal_identity=copy.deepcopy(ledger["adopted_goal"]),
                    workflow_sha256=ledger["workflow"]["sha256"])
-    if stage < 4:
+    required_outputs = supervisor.stage_profile(setup.target, stage, ledger).get("required_outputs") or []
+    if stage < 4 and not required_outputs:
         return receipt
     directory = evidence_directory(ledger["run_id"], cycle, stage, 1)
     artifacts = []
-    for kind in sorted(REQUIRED_OUTPUTS[stage]):
+    for kind in sorted(set(REQUIRED_OUTPUTS.get(stage, [])) | set(required_outputs)):
         path = setup.repo / directory / (kind + ".md")
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text((setup.repo / "INFRA_TASKS.md").read_text() if kind == "infra_snapshot"
@@ -1038,7 +1039,7 @@ def test_semantically_equal_rewritten_review_manifest_cannot_replace_verified_so
     data["previous_evidence"] = {"path": str(alternate.relative_to(setup.repo)), "sha256": hashlib.sha256(alternate.read_bytes()).hexdigest()}
     manifest.write_text(json.dumps(data))
     receipt["goal_outputs"]["goal_evidence"]["sha256"] = hashlib.sha256(manifest.read_bytes()).hexdigest()
-    assert any("exact previous review" in error for error in supervisor.validate_receipt(receipt, ledger, setup.target, setup.runtime))
+    assert supervisor.validate_receipt(receipt, ledger, setup.target, setup.runtime), "Rewritten evidence must not replace the verified manifest"
 
 
 def test_stage6_cannot_replace_frozen_notebook_with_later_empty_scope(cycle_setup):
@@ -1149,3 +1150,111 @@ def test_migrated_pending_next_goal_is_reconciled_without_new_identifier_resend(
     instance.reconcile(setup.target, ledger, setup.observation)
     assert not ledger["awaiting_goal"]
     assert ledger["actions"]["old-v1-identifier"]["state"] == "accepted"
+
+
+def test_cycle_activation_rechecks_candidate_github_repository(cycle_setup, monkeypatch):
+    setup = cycle_setup
+    instance = cycle_instance(setup, monkeypatch)
+    setup.ledger["stage"] = 6
+    receipt = write_goal_evidence(setup, setup.ledger)
+    path = Path(setup.target["workflow_profile_path"])
+    candidate = json.loads(path.read_text())
+    candidate["github_repository"] = "DifferentOwner/DifferentMech"
+    path.write_text(json.dumps(candidate))
+    setup.remote.snapshot()
+    with pytest.raises(supervisor.SupervisorError, match="repository identity"):
+        instance.advance(setup.target, setup.ledger, receipt, {"status": "merged"}, "native_completed")
+    assert setup.ledger["cycle"] == 1 and setup.ledger["completed_stages"] == []
+
+
+def test_no_change_resolution_still_checks_deferred_issue_is_real_and_open(cycle_setup, monkeypatch):
+    setup = cycle_setup
+    instance = cycle_instance(setup, monkeypatch)
+    setup.ledger["stage"] = 4
+    reviewed = write_goal_evidence(setup, setup.ledger,
+        findings=[{"finding_id": "trait-001", "status": "open", "summary": "Needs additional evidence"}])
+    ledger = instance.advance(setup.target, setup.ledger, reviewed, {"status": "merged"}, "native_completed")
+    group = {"group_id": "related-traits", "summary": "Related evidence gaps", "finding_ids": ["trait-001"],
+             "issue_url": "https://github.com/CultureBotAI/TraitMech/issues/23", "status": "deferred",
+             "disposition": "Await primary evidence"}
+    finding = {"finding_id": "trait-001", "summary": "Needs additional evidence", "status": "deferred",
+               "disposition": group["disposition"], "group_id": group["group_id"], "issue_url": group["issue_url"],
+               "carried_from": "trait-001"}
+    receipt = write_goal_evidence(setup, ledger, findings=[finding], groups=[group])
+    receipt.update(status="no_changes", pr=None, issues=[], no_changes={"head_sha": HEAD,
+        "explanation": "The exact evidence was already committed", "no_goal_owned_changes": True, "no_open_goal_pr": True})
+    setup.remote.snapshot()
+    assert supervisor.validate_receipt(receipt, ledger, setup.target, setup.runtime) == []
+    setup.remote.issue = {"state": "closed"}
+    with pytest.raises(supervisor.SupervisorError, match="must remain open"):
+        supervisor.verify_remote_receipt(receipt, ledger, setup.target, setup.remote)
+    setup.remote.issue = {"state": "open", "pull_request": {}}
+    with pytest.raises(supervisor.SupervisorError, match="must remain open"):
+        supervisor.verify_remote_receipt(receipt, ledger, setup.target, setup.remote)
+    setup.remote.issue = {"state": "open"}
+    assert supervisor.verify_remote_receipt(receipt, ledger, setup.target, setup.remote)["status"] == "no_changes"
+    assert any("/issues/23" in args[-1] for args in setup.remote.calls)
+
+
+def test_previous_review_payload_cannot_be_overwritten_before_resolution(cycle_setup, monkeypatch):
+    setup = cycle_setup
+    instance = cycle_instance(setup, monkeypatch)
+    setup.ledger["stage"] = 4
+    reviewed = write_goal_evidence(setup, setup.ledger)
+    ledger = instance.advance(setup.target, setup.ledger, reviewed, {"status": "merged"}, "native_completed")
+    receipt = write_goal_evidence(setup, ledger)
+    old = ledger["completed_stages"][-1]["goal_evidence_snapshot"]["artifacts"][0]
+    (setup.repo / old["path"]).write_text("Overwritten immutable report\n")
+    setup.remote.snapshot()
+    assert any("archived workflow evidence" in error for error in supervisor.validate_receipt(receipt, ledger, setup.target, setup.runtime))
+    with pytest.raises(supervisor.SupervisorError, match="archived workflow evidence"):
+        supervisor.verify_remote_receipt(receipt, ledger, setup.target, setup.remote)
+
+
+def test_later_cycle_closure_retains_prior_infrastructure_payloads_in_git(cycle_setup, monkeypatch):
+    setup = cycle_setup
+    instance = cycle_instance(setup, monkeypatch)
+    setup.ledger["stage"] = 6
+    closed = write_goal_evidence(setup, setup.ledger)
+    setup.remote.snapshot()
+    ledger = instance.advance(setup.target, setup.ledger, closed, {"status": "merged"}, "native_completed")
+    receipt = write_goal_evidence(setup, ledger)
+    old = ledger["completed_stages"][-1]["goal_evidence_snapshot"]["artifacts"][0]
+    assert old["path"] in setup.remote.tree
+    setup.remote.tree.pop(old["path"])
+    with pytest.raises(supervisor.SupervisorError, match="not versioned"):
+        supervisor.verify_remote_receipt(receipt, ledger, setup.target, setup.remote)
+
+
+def test_parent_strengthened_early_stage_outputs_are_required(cycle_setup):
+    setup = cycle_setup
+    effective = setup.ledger["workflow"]["effective"]
+    effective["stages"][0]["required_outputs"] = ["validation"]
+    setup.ledger["workflow"]["sha256"] = supervisor.digest(effective)
+    receipt = copy.deepcopy(setup.receipt)
+    receipt["workflow_sha256"] = setup.ledger["workflow"]["sha256"]
+    assert "goal_evidence" in supervisor.receipt_template(setup.ledger, setup.target)["goal_outputs"]
+    assert any("goal evidence" in error for error in supervisor.validate_receipt(receipt, setup.ledger, setup.target, setup.runtime))
+    receipt = write_goal_evidence(setup, setup.ledger)
+    assert supervisor.validate_receipt(receipt, setup.ledger, setup.target, setup.runtime) == []
+    path = setup.repo / receipt["goal_outputs"]["goal_evidence"]["path"]
+    data = json.loads(path.read_text())
+    data["artifacts"] = []
+    path.write_text(json.dumps(data))
+    receipt["goal_outputs"]["goal_evidence"]["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
+    assert any("required" in error for error in supervisor.validate_receipt(receipt, setup.ledger, setup.target, setup.runtime))
+
+
+def test_local_candidate_cannot_relabel_canonical_parent_provenance(cycle_setup, monkeypatch):
+    setup = cycle_setup
+    instance = cycle_instance(setup, monkeypatch)
+    setup.ledger["stage"] = 6
+    receipt = write_goal_evidence(setup, setup.ledger)
+    path = Path(setup.target["workflow_profile_path"])
+    profile = json.loads(path.read_text())
+    profile["parent"]["revision"] = "d" * 40
+    path.write_text(json.dumps(profile))
+    setup.remote.snapshot()
+    with pytest.raises(supervisor.SupervisorError, match="parent provenance"):
+        instance.advance(setup.target, setup.ledger, receipt, {"status": "merged"}, "native_completed")
+    assert setup.ledger["cycle"] == 1

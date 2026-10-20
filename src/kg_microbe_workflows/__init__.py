@@ -198,7 +198,12 @@ def validate_parent(parent: dict, schema_path: Path = SCHEMA_PATH) -> None:
         raise WorkflowError("infrastructure notebook must be INFRA_TASKS.md")
     if parent["cycle_policy"]["restart_stage"] != 1:
         raise WorkflowError("the next cycle must restart at stage 1")
+    allowed_outputs = {"review_report", "review_findings", "issue_map", "infra_snapshot",
+                       "implementation_plan", "validation", "supporting"}
     for stage in parent["stages"]:
+        outputs = stage["required_outputs"]
+        if len(outputs) != len(set(outputs)) or not set(outputs) <= allowed_outputs:
+            raise WorkflowError("parent outputs must name unique supported artifact kinds")
         if not REQUIRED_OUTPUTS.get(stage["stage"], set()) <= set(stage["required_outputs"]):
             raise WorkflowError("parent cannot remove required review/infrastructure outputs")
 
@@ -307,9 +312,10 @@ def _resolved(item: dict, paths: set[str]) -> None:
         raise WorkflowError("deferred item needs an explicit disposition")
 
 
-def validate_goal_evidence(
+def _validate_evidence_record(
     data: dict, *, repository_root: Path | None = None, previous: dict | None = None,
     expected: dict | None = None, schema_path: Path = SCHEMA_PATH,
+    supersedes: dict | None = None, required_outputs: list[str] | None = None,
 ) -> None:
     """Validate immutable evidence, references and (when rooted) exact artifact bytes.
 
@@ -333,7 +339,8 @@ def validate_goal_evidence(
             if sha256(raw) != artifact["sha256"]:
                 raise WorkflowError(f"artifact checksum mismatch: {path}")
     kinds = {item["kind"] for item in artifacts.values()}
-    if not REQUIRED_OUTPUTS.get(data["stage"], set()) <= kinds:
+    required = REQUIRED_OUTPUTS.get(data["stage"], set()) | set(required_outputs or [])
+    if not required <= kinds:
         raise WorkflowError("required goal output artifacts are missing")
     findings, groups = _unique(data["findings"], "finding_id"), _unique(data["groups"], "group_id")
     tasks = _unique(data["infra_tasks"], "task_id")
@@ -374,16 +381,40 @@ def validate_goal_evidence(
             if findings[key].get("carried_from") != key:
                 raise WorkflowError("carried findings must preserve their stable identity")
         if data["stage"] == 4:
-            same_cycle_revision = (previous["stage"] == 4 and previous["cycle"] == data["cycle"]
-                                   and previous["revision"] < data["revision"])
             next_cycle = (previous["stage"] in {4, 5}
                           and previous["cycle"] == data["cycle"] - 1)
-            if previous["run_id"] != data["run_id"] or not (same_cycle_revision or next_cycle):
-                raise WorkflowError("review lineage must reference a prior revision or prior cycle")
+            if previous["run_id"] != data["run_id"] or not next_cycle:
+                raise WorkflowError("review lineage must reference the prior cycle")
     elif data["stage"] == 5:
         raise WorkflowError("review resolution requires the pinned stage-4 review evidence")
     elif data["stage"] == 4 and data["cycle"] > 1:
         raise WorkflowError("later-cycle review requires prior-cycle evidence")
+    if data["revision"] > 1:
+        if supersedes is None or "supersedes_evidence" not in data:
+            raise WorkflowError("later revisions require the immediate previous immutable revision")
+        if (any(supersedes[key] != data[key] for key in
+                ("repository_key", "github_repository", "run_id", "cycle", "stage"))
+                or supersedes["revision"] != data["revision"] - 1):
+            raise WorkflowError("supersedes must identify the immediate previous revision")
+        predecessor_path = evidence_directory(data["run_id"], data["cycle"], data["stage"],
+                                               data["revision"] - 1) + "/evidence.yaml"
+        if data["supersedes_evidence"]["path"] != predecessor_path:
+            raise WorkflowError("supersedes path must identify the immediate previous revision")
+        if supersedes.get("previous_evidence") != data.get("previous_evidence"):
+            raise WorkflowError("a revised report cannot replace its frozen source evidence")
+        for finding in supersedes["findings"]:
+            if finding["status"] in OPEN:
+                current = findings.get(finding["finding_id"], {})
+                if current.get("carried_from") != finding["finding_id"]:
+                    raise WorkflowError("unresolved finding disappeared from the preceding revision")
+        if data["stage"] == 6:
+            old_snapshot = [a["sha256"] for a in supersedes["artifacts"]
+                            if a["kind"] == "infra_snapshot"]
+            new_snapshot = [a["sha256"] for a in data["artifacts"] if a["kind"] == "infra_snapshot"]
+            if old_snapshot != new_snapshot or supersedes.get("scope_frozen_at") != data.get("scope_frozen_at"):
+                raise WorkflowError("infrastructure revisions must preserve their frozen input scope")
+    elif supersedes is not None or "supersedes_evidence" in data:
+        raise WorkflowError("revision 1 cannot supersede another revision")
     if data["stage"] in {5, 6}:
         frozen = data.get("scope_frozen_at", "")
         if not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z", frozen):
@@ -437,14 +468,113 @@ def validate_goal_evidence(
         raise WorkflowError("infrastructure tasks belong to stage 6")
 
 
+
+def _evidence_graph(data: dict, repository_root: Path) -> tuple[dict, dict]:
+    """Read a bounded, hash-pinned ancestry DAG without recursively trusting claims."""
+    def identity(document):
+        _shape(document, {4: "ReviewReport", 5: "FindingGroupResolution", 6: "InfrastructurePlan"}.get(
+            document.get("stage", 0), "GoalEvidence"))
+        return evidence_directory(document["run_id"], document["cycle"], document["stage"],
+                                  document["revision"]) + "/evidence.yaml"
+
+    first = identity(data)
+    documents: dict[str, dict] = {first: data}
+    references: dict[str, dict] = {}
+    pending = [first]
+    while pending:
+        path = pending.pop()
+        current = documents[path]
+        for field in ("previous_evidence", "supersedes_evidence"):
+            reference = current.get(field)
+            if reference is None:
+                continue
+            ancestor = str(relative_path(reference["path"]))
+            if ancestor == first:
+                raise WorkflowError("evidence lineage contains a cycle")
+            if ancestor in references and references[ancestor] != reference:
+                raise WorkflowError("conflicting immutable ancestor checksums")
+            references[ancestor] = reference
+            if ancestor in documents:
+                continue
+            raw = _read_regular(Path(repository_root) / ancestor, Path(repository_root))
+            if sha256(raw) != reference["sha256"]:
+                raise WorkflowError("ancestor evidence checksum mismatch")
+            document = load_document(raw)
+            if identity(document) != ancestor:
+                raise WorkflowError("ancestor manifest path does not match its immutable identity")
+            documents[ancestor] = document
+            if len(documents) > 10000:
+                raise WorkflowError("evidence lineage exceeds the validation bound")
+            pending.append(ancestor)
+    # A graph may point backwards without involving the current root. Check all nodes.
+    remaining = {path: {doc[field]["path"] for field in ("previous_evidence", "supersedes_evidence")
+                        if field in doc} for path, doc in documents.items()}
+    while remaining:
+        leaves = {path for path, dependencies in remaining.items() if not dependencies}
+        if not leaves:
+            raise WorkflowError("evidence lineage contains a cycle")
+        remaining = {path: dependencies - leaves for path, dependencies in remaining.items()
+                     if path not in leaves}
+    return documents, references
+
+
+def validate_goal_evidence(
+    data: dict, *, repository_root: Path | None = None, previous: dict | None = None,
+    expected: dict | None = None, schema_path: Path = SCHEMA_PATH,
+    required_outputs: list[str] | None = None,
+) -> None:
+    """Validate the goal and every pinned historical manifest and artifact payload."""
+    if repository_root is None:
+        _validate_evidence_record(data, previous=previous, expected=expected,
+                                  schema_path=schema_path, required_outputs=required_outputs)
+        return
+    documents, _ = _evidence_graph(data, Path(repository_root))
+    first = evidence_directory(data["run_id"], data["cycle"], data["stage"], data["revision"]) + "/evidence.yaml"
+    if previous is not None:
+        reference = data.get("previous_evidence", {})
+        if not reference or documents.get(reference.get("path")) != previous:
+            raise WorkflowError("supplied previous evidence differs from the pinned bytes")
+    for path, document in documents.items():
+        prior = documents.get(document.get("previous_evidence", {}).get("path"))
+        supersedes = documents.get(document.get("supersedes_evidence", {}).get("path"))
+        _validate_evidence_record(document, repository_root=repository_root, previous=prior,
+                                  supersedes=supersedes, schema_path=schema_path,
+                                  expected=expected if path == first else None,
+                                  required_outputs=required_outputs if path == first else None)
+
+
+def evidence_artifacts(
+    data: dict, *, repository_root: Path, previous: dict | None = None,
+    schema_path: Path = SCHEMA_PATH,
+) -> list[dict]:
+    """Return checked current/historical payloads and ancestor manifest descriptors.
+
+    The caller must additionally prove these exact files remain committed at its
+    reviewed final Git head. The current manifest is supplied by its receipt.
+    """
+    validate_goal_evidence(data, repository_root=repository_root, previous=previous,
+                           schema_path=schema_path)
+    documents, references = _evidence_graph(data, repository_root)
+    descriptors = {path: dict(reference) for path, reference in references.items()}
+    for document in documents.values():
+        for artifact in document["artifacts"]:
+            existing = descriptors.get(artifact["path"])
+            if existing and existing["sha256"] != artifact["sha256"]:
+                raise WorkflowError("conflicting immutable artifact checksums")
+            descriptors[artifact["path"]] = dict(artifact)
+    return list(descriptors.values())
+
+
 def read_goal_evidence(
     path: Path | str, *, repository_root: Path | None = None, previous: dict | None = None,
     expected: dict | None = None, schema_path: Path = SCHEMA_PATH,
+    required_outputs: list[str] | None = None,
 ) -> dict:
     raw = _read_regular(Path(path), repository_root)
     data = load_document(raw)
     validate_goal_evidence(data, repository_root=repository_root, previous=previous,
-                           expected=expected, schema_path=schema_path)
+                           expected=expected, schema_path=schema_path,
+                           required_outputs=required_outputs)
     if repository_root is not None:
         expected_path = (evidence_directory(data["run_id"], data["cycle"], data["stage"],
                                             data["revision"]) + "/evidence.yaml")
@@ -479,9 +609,13 @@ def validate_infra_notebook(raw: str | bytes, github_repository: str) -> dict:
     return data
 
 
-def save_goal_evidence(repository_root: Path, data: dict, *, previous: dict | None = None) -> Path:
+def save_goal_evidence(
+    repository_root: Path, data: dict, *, previous: dict | None = None,
+    required_outputs: list[str] | None = None,
+) -> Path:
     """Append a new immutable manifest; existing revisions can never be overwritten."""
-    validate_goal_evidence(data, repository_root=repository_root, previous=previous)
+    validate_goal_evidence(data, repository_root=repository_root, previous=previous,
+                           required_outputs=required_outputs)
     directory = evidence_directory(data["run_id"], data["cycle"], data["stage"], data["revision"])
     path = Path(repository_root) / directory / "evidence.yaml"
     if not path.parent.resolve().is_relative_to(Path(repository_root).resolve()):

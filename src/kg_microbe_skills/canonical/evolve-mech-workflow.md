@@ -145,9 +145,11 @@ criteria and validation, and create or reuse real issues for the plan. Implement
 the selected work, check its behavior, update the ledger with issue/PR outcomes,
 and save the snapshot, plan, validation and evidence manifest. Explicitly carry
 forward blocked or deferred work; do not erase it. New tasks discovered after
-the cutoff belong to the next intake unless a documented prerequisite requires
-revising the plan. An empty intake is a real no-op with evidence, not a reason to
-invent upgrades. Complete the commit sequence, write the required closure
+the cutoff belong to the next intake; never expand the frozen task-ID scope.
+If a new prerequisite blocks a selected task, retain both entries and explicitly
+defer that selected task with its issue and reason. Implementation details may
+change within an existing frozen task. An empty intake is a real no-op with
+evidence, not a reason to invent upgrades. Complete the commit sequence, write the required closure
 receipt, and stop. Only the supervisor verifies closure, activates a validated
 next-cycle profile, and dispatches the next /goal; never start it yourself.
 <!-- canonical:end infrastructure -->

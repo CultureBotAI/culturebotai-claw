@@ -435,3 +435,120 @@ def test_published_linkml_review_classes_have_distinct_stage_constraints(tmp_pat
     assert not list(_validator(SCHEMA_PATH.read_text(), "ReviewReport").iter_errors(data))
     assert list(_validator(SCHEMA_PATH.read_text(), "FindingGroupResolution").iter_errors(data))
     assert list(_validator(SCHEMA_PATH.read_text(), "InfrastructurePlan").iter_errors(data))
+
+
+@pytest.mark.parametrize("change", ["overwrite", "delete"])
+def test_prior_report_payloads_must_survive_resolution(tmp_path, change):
+    prior, data = resolution(tmp_path)
+    path = tmp_path / prior["artifacts"][0]["path"]
+    if change == "overwrite":
+        path.write_text("Changed an immutable previous review report")
+    else:
+        path.unlink()
+    with pytest.raises(WorkflowError):
+        validate_goal_evidence(data, repository_root=tmp_path, previous=prior)
+
+
+def revised_review(tmp_path):
+    prior = evidence(tmp_path)
+    prior.update(outcome="completed", findings=[{"finding_id": "F-1", "summary": "Open concern", "status": "open"}],
+                 carry_forward_ids=["F-1"])
+    path = save_evidence(tmp_path, prior)
+    data = evidence(tmp_path, revision=2)
+    data.update(outcome="completed", findings=[{"finding_id": "F-1", "summary": "Still open", "status": "open", "carried_from": "F-1"}],
+                carry_forward_ids=["F-1"], supersedes_evidence={"path": path.relative_to(tmp_path).as_posix(), "sha256": sha256(path.read_bytes())})
+    return prior, data
+
+
+def test_later_review_revision_needs_its_immediate_predecessor(tmp_path):
+    _, data = revised_review(tmp_path)
+    validate_goal_evidence(data, repository_root=tmp_path)
+    del data["supersedes_evidence"]
+    with pytest.raises(WorkflowError, match="immediate previous"):
+        validate_goal_evidence(data, repository_root=tmp_path)
+
+
+def test_later_review_revision_cannot_erase_unresolved_findings(tmp_path):
+    _, data = revised_review(tmp_path)
+    data.update(outcome="no_findings", findings=[], carry_forward_ids=[])
+    with pytest.raises(WorkflowError, match="preceding revision"):
+        validate_goal_evidence(data, repository_root=tmp_path)
+
+
+def test_later_review_revision_cannot_skip_revision_number(tmp_path):
+    prior, data = revised_review(tmp_path)
+    third = evidence(tmp_path, revision=3)
+    third["supersedes_evidence"] = data["supersedes_evidence"]
+    with pytest.raises(WorkflowError, match="immediate previous"):
+        validate_goal_evidence(third, repository_root=tmp_path)
+
+
+def test_recursive_artifact_inventory_includes_unclosed_older_revisions(tmp_path):
+    from kg_microbe_workflows import evidence_artifacts
+    prior, data = revised_review(tmp_path)
+    expected = {artifact["path"] for doc in (prior, data) for artifact in doc["artifacts"]}
+    expected.add(data["supersedes_evidence"]["path"])
+    assert {item["path"] for item in evidence_artifacts(data, repository_root=tmp_path)} == expected
+    (tmp_path / prior["artifacts"][0]["path"]).unlink()
+    with pytest.raises(WorkflowError):
+        evidence_artifacts(data, repository_root=tmp_path)
+
+
+def test_full_transitive_review_payloads_are_retained_across_cycles(tmp_path):
+    prior, resolved = resolution(tmp_path)
+    path = save_evidence(tmp_path, resolved)
+    data = evidence(tmp_path, cycle=2)
+    data["previous_evidence"] = {"path": path.relative_to(tmp_path).as_posix(), "sha256": sha256(path.read_bytes())}
+    validate_goal_evidence(data, repository_root=tmp_path, previous=resolved)
+    (tmp_path / prior["artifacts"][0]["path"]).write_text("Erased two levels back")
+    with pytest.raises(WorkflowError, match="checksum mismatch"):
+        validate_goal_evidence(data, repository_root=tmp_path, previous=resolved)
+
+
+@pytest.mark.parametrize("stage", [1, 4])
+def test_effective_parent_output_requirements_are_enforced(tmp_path, stage):
+    data = evidence(tmp_path, stage=stage)
+    with pytest.raises(WorkflowError, match="required goal output"):
+        validate_goal_evidence(data, repository_root=tmp_path, required_outputs=["supporting"])
+    artifact = data["artifacts"][0].copy()
+    old = tmp_path / artifact["path"]
+    artifact["path"] = str(Path(artifact["path"]).parent / "supporting.md")
+    artifact["kind"] = "supporting"
+    (tmp_path / artifact["path"]).write_bytes(old.read_bytes())
+    data["artifacts"].append(artifact)
+    validate_goal_evidence(data, repository_root=tmp_path, required_outputs=["supporting"])
+
+
+def test_parent_rejects_unsupported_or_ambiguous_output_kinds():
+    parent = load_document(PARENT_PATH.read_bytes())
+    parent["stages"][3]["required_outputs"].append("invented_output")
+    with pytest.raises(WorkflowError, match="supported artifact"):
+        validate_parent(parent)
+    parent["stages"][3]["required_outputs"][-1] = "review_report"
+    with pytest.raises(WorkflowError, match="unique supported"):
+        validate_parent(parent)
+
+
+def test_existing_stage5_revision_keeps_both_frozen_review_and_supersedes(tmp_path):
+    _, old = resolution(tmp_path)
+    old_path = save_evidence(tmp_path, old)
+    data = evidence(tmp_path, stage=5, revision=2)
+    data.update(outcome="completed", findings=copy_dict(old["findings"]), groups=copy_dict(old["groups"]),
+                previous_evidence=old["previous_evidence"],
+                supersedes_evidence={"path": old_path.relative_to(tmp_path).as_posix(), "sha256": sha256(old_path.read_bytes())})
+    data["groups"][0]["resolution_evidence"] = [data["artifacts"][1]["path"]]
+    validate_goal_evidence(data, repository_root=tmp_path)
+
+
+def copy_dict(value):
+    return json.loads(json.dumps(value))
+
+
+def test_cli_enforces_supplied_effective_stage_outputs(tmp_path, capsys):
+    data = evidence(tmp_path)
+    path = save_evidence(tmp_path, data)
+    assert main(["validate-evidence", str(path), "--root", str(tmp_path),
+                 "--required-output", "supporting"]) == 1
+    assert "required goal output" in capsys.readouterr().err
+    assert main(["validate-evidence", str(path), "--root", str(tmp_path)]) == 0
+    assert "Base contract" in capsys.readouterr().out

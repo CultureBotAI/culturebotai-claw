@@ -445,7 +445,7 @@ def receipt_template(ledger: dict, target: dict) -> dict:
         from kg_microbe_workflows import evidence_directory
         template.update(cycle=ledger["cycle"], workflow_sha256=ledger["workflow"]["sha256"],
                         goal_outputs={"infra_tasks": {"path": "INFRA_TASKS.md", "sha256": ""}})
-        if ledger["stage"] >= 4:
+        if ledger["stage"] >= 4 or (ledger["stage"] > 0 and stage_profile(target, ledger["stage"], ledger).get("required_outputs")):
             template["goal_outputs"]["goal_evidence"] = {
                 "path": evidence_directory(ledger["run_id"], ledger["cycle"], ledger["stage"], 1) + "/evidence.yaml",
                 "sha256": ""}
@@ -504,7 +504,10 @@ def previous_evidence(ledger: dict, stage: int) -> dict | None:
 
 
 def goal_output_data(receipt: dict, ledger: dict, target: dict) -> dict | None:
-    if ledger.get("schema_version") != 2 or ledger["stage"] < 4:
+    if ledger.get("schema_version") != 2 or ledger["stage"] == 0:
+        return None
+    required_outputs = stage_profile(target, ledger["stage"], ledger).get("required_outputs") or []
+    if ledger["stage"] < 4 and not required_outputs:
         return None
     from kg_microbe_workflows import read_goal_evidence
 
@@ -517,8 +520,14 @@ def goal_output_data(receipt: dict, ledger: dict, target: dict) -> dict | None:
     if ledger["stage"] == 5 and previous is None:
         raise SupervisorError("stage 5 requires the exact verified stage-4 review evidence from this cycle")
     previous_data = previous.get("goal_evidence_snapshot") if previous else None
+    for artifact in historical_output_artifacts(ledger):
+        errors = artifact_errors({"artifact": artifact["path"], "sha256": artifact["sha256"]}, [root], "archived workflow evidence")
+        if errors:
+            raise SupervisorError("; ".join(errors))
     data = read_goal_evidence(root / descriptor["path"], repository_root=root, previous=previous_data,
-                              expected={key: ledger[key] for key in ("repository_key", "run_id", "cycle", "stage")})
+                              expected={**{key: ledger[key] for key in ("repository_key", "run_id", "cycle", "stage")},
+                                        "github_repository": target["github_repository"]},
+                              required_outputs=required_outputs)
     if previous is not None and data.get("previous_evidence") != previous["goal_evidence"]:
         raise SupervisorError("goal evidence does not bind the exact previous review manifest")
     if ledger["stage"] == 6:
@@ -551,6 +560,16 @@ def goal_output_data(receipt: dict, ledger: dict, target: dict) -> dict | None:
     return data
 
 
+def historical_output_artifacts(ledger: dict) -> list[dict]:
+    """Every closed report stays immutable, including prior infrastructure plans."""
+    artifacts = []
+    for record in ledger["completed_stages"]:
+        if record.get("goal_evidence"):
+            artifacts.append(record["goal_evidence"])
+            artifacts.extend(record.get("goal_evidence_snapshot", {}).get("artifacts", []))
+    return artifacts
+
+
 def output_artifacts(receipt: dict, evidence: dict | None) -> list[dict]:
     outputs = receipt.get("goal_outputs") or {}
     artifacts = [outputs[key] for key in ("goal_evidence", "infra_tasks") if isinstance(outputs.get(key), dict)]
@@ -565,7 +584,21 @@ def verify_versioned_artifacts(receipt: dict, ledger: dict, target: dict, runner
     if receipt.get("schema_version") == 1 and ledger.get("legacy_receipt_stage") == ledger["stage"] and ledger["stage"] < 4:
         return
     evidence = goal_output_data(receipt, ledger, target)
-    for artifact in output_artifacts(receipt, evidence):
+    artifacts = output_artifacts(receipt, evidence) + historical_output_artifacts(ledger)
+    if evidence:
+        from kg_microbe_workflows import evidence_artifacts
+        previous = previous_evidence(ledger, ledger["stage"])
+        artifacts += evidence_artifacts(evidence, repository_root=Path(target["root"]),
+                                       previous=previous.get("goal_evidence_snapshot") if previous else None)
+    seen = set()
+    for artifact in artifacts:
+        identity = (artifact["path"], artifact["sha256"])
+        if identity in seen:
+            continue
+        seen.add(identity)
+        errors = artifact_errors({"artifact": artifact["path"], "sha256": artifact["sha256"]}, [Path(target["root"])], "versioned workflow evidence")
+        if errors:
+            raise SupervisorError("; ".join(errors))
         path = Path(artifact["path"])
         root = Path(target["root"]).resolve()
         resolved = (root / path).resolve()
@@ -696,6 +729,16 @@ def verify_remote_receipt(receipt: dict, ledger: dict, target: dict, runner=comm
                 issue = gh_json("api", f"repos/{github}/issues/{number}")
                 if issue.get("state") not in {"open", "closed"} or "pull_request" in issue:
                     raise SupervisorError("infrastructure notebook must reference real GitHub issues")
+    evidence = goal_output_data(receipt, ledger, target)
+    if evidence:
+        for item in evidence.get("groups", []) + evidence.get("infra_tasks", []):
+            if item["status"] == "deferred":
+                match = re.fullmatch(r"https://github\.com/" + re.escape(github) + r"/issues/([1-9]\d*)", item["issue_url"], re.I)
+                if not match:
+                    raise SupervisorError("deferred item issue belongs to another repository")
+                deferred_issue = gh_json("api", f"repos/{github}/issues/{match[1]}")
+                if deferred_issue.get("state") != "open" or "pull_request" in deferred_issue:
+                    raise SupervisorError("deferred review/infrastructure issue must remain open")
     if receipt["status"] == "no_changes":
         head = receipt["no_changes"]["head_sha"]
         if git("rev-parse", "HEAD").stdout.strip() != head:
@@ -752,16 +795,6 @@ def verify_remote_receipt(receipt: dict, ledger: dict, target: dict, runner=comm
         by_name = {check["name"]: check for check in all_checks}
         if any(name not in by_name or by_name[name].get("bucket") != "pass" for name in declared_checks):
             raise SupervisorError("repository-declared CI policy is not satisfied")
-    evidence = goal_output_data(receipt, ledger, target)
-    if evidence:
-        for item in evidence.get("groups", []) + evidence.get("infra_tasks", []):
-            if item["status"] == "deferred":
-                match = re.fullmatch(r"https://github\.com/" + re.escape(github) + r"/issues/([1-9]\d*)", item["issue_url"], re.I)
-                if not match:
-                    raise SupervisorError("deferred item issue belongs to another repository")
-                deferred_issue = gh_json("api", f"repos/{github}/issues/{match[1]}")
-                if deferred_issue.get("state") != "open" or "pull_request" in deferred_issue:
-                    raise SupervisorError("deferred review/infrastructure issue must remain open")
     commits = gh_json("api", "--paginate", "--slurp", f"repos/{github}/pulls/{pr['number']}/commits?per_page=100")
     commit_shas = {item["sha"] for page in commits for item in page}
     for issue in receipt["issues"]:
@@ -1078,6 +1111,10 @@ class Supervisor:
         advanced["completed_stages"].append(record)
         if ledger.get("schema_version") == 2 and closed_stage == 6:
             effective = load_effective(self.config, target, next_cycle=True)
+            current = ledger["workflow"]["effective"]
+            parent_fields = ("parent_id", "parent_version", "parent_sha256", "schema_sha256", "parent_repository", "parent_revision")
+            if any(effective[field] != current[field] for field in parent_fields):
+                raise SupervisorError("next-cycle parent provenance changed; a reviewed shared-contract migration is required")
             candidate = target.get("workflow_next_profile_path") or target["workflow_profile_path"]
             head = receipt.get("pr", {}).get("head_sha") if receipt["status"] == "completed" else receipt["no_changes"]["head_sha"]
             self.verify_next_profile(target, effective, candidate, head)
@@ -1098,6 +1135,9 @@ class Supervisor:
         return advanced
 
     def verify_next_profile(self, target: dict, effective: dict, candidate: str, head: str) -> None:
+        if (effective["repository_key"] != target["repository_key"]
+                or effective["github_repository"].casefold() != target["github_repository"].casefold()):
+            raise SupervisorError("next-cycle profile repository identity differs from its verified target")
         root = Path(target["root"]).resolve()
         inputs = [{"path": candidate, "sha256": effective["profile_sha256"]}]
         inputs += [source for source in effective.get("sources", []) if source.get("kind") == "extension"]

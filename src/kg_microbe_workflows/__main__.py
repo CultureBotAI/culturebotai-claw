@@ -31,6 +31,8 @@ def main(argv=None):
     evidence.add_argument("path", type=Path)
     evidence.add_argument("--root", type=Path, required=True)
     evidence.add_argument("--previous", type=Path)
+    evidence.add_argument("--required-output", action="append", default=[],
+                          help="additional output kind required by the pinned effective stage; repeatable")
     args = parser.parse_args(argv)
     try:
         if args.command == "validate":
@@ -42,8 +44,10 @@ def main(argv=None):
             print("Workflow parent valid")
         else:
             previous = load_document(args.previous.read_bytes()) if args.previous else None
-            read_goal_evidence(args.path, repository_root=args.root, previous=previous)
-            print("Goal evidence valid; remote closure and committed bytes remain caller checks")
+            read_goal_evidence(args.path, repository_root=args.root, previous=previous,
+                               required_outputs=args.required_output)
+            print("Base contract and supplied output requirements valid; remote closure, full active policy, "
+                  "and committed bytes remain caller checks")
         return 0
     except (WorkflowError, OSError) as exc:
         print(f"error: {exc}", file=sys.stderr)
