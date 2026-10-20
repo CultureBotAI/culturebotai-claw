@@ -64,6 +64,7 @@ dependencies = [
 openclaw-cli = "cli.main:cli"
 kg-microbe-merge-queue = "kg_microbe_merge_queue.__main__:main"
 kg-microbe-fleet = "kg_microbe_fleet.__main__:main"
+kg-microbe-workflows = "kg_microbe_workflows.__main__:main"
 kg-microbe-embeddings = "kg_microbe_embeddings.__main__:main"
 kg-microbe-consistency = "kg_microbe_consistency.__main__:main"
 kg-microbe-research = "kg_microbe_research.__main__:main"
@@ -114,6 +115,7 @@ kg_microbe_embeddings = ["rollout.yaml"]
 kg_microbe_merge_queue = ["policy.json"]
 kg_microbe_write = ["writers.yaml"]
 kg_microbe_research = ["schema/*.yaml"]
+kg_microbe_workflows = ["schema/*.yaml", "templates/*.yaml", "examples/**/*.yaml", "examples/**/*.md", "examples/README.md"]
 # The catalogue and its canonical templates are read at runtime, so an
 # installed package without them renders nothing while importing fine.
 kg_microbe_skills = ["skills.yaml", "canonical/*.md"]

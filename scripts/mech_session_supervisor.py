@@ -72,7 +72,11 @@ def atomic_json(path: Path, value: Any, *, boundary: Path | None = None) -> None
 
 
 def read_json(path: Path) -> Any:
-    return json.loads(path.read_text())
+    flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0)
+    with os.fdopen(os.open(path, flags), "r") as stream:
+        if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+            raise SupervisorError("JSON input must be a regular file")
+        return json.load(stream)
 
 
 @contextmanager
@@ -130,6 +134,58 @@ def normalize_github(url: str) -> str:
     return match.group(1).casefold()
 
 
+def load_effective(config: dict, target: dict, *, next_cycle: bool = False, profile_path=None) -> dict:
+    """Only the validated parent and repository profile supply workflow policy."""
+    from kg_microbe_workflows import PARENT_PATH, SCHEMA_PATH, load_effective_workflow
+
+    profile = profile_path or (target.get("workflow_next_profile_path") if next_cycle else None)
+    profile = profile or target.get("workflow_profile_path")
+    if not profile:
+        raise SupervisorError("canonical workflow profile missing; explicit migration required")
+    return load_effective_workflow(
+        Path(config.get("workflow_parent_path", PARENT_PATH)), Path(profile),
+        target["repository_key"], schema_path=Path(config.get("workflow_schema_path", SCHEMA_PATH)))
+
+
+def scoped(action: dict, ledger: dict) -> bool:
+    """Legacy actions can only belong to the explicitly adopted first cycle."""
+    return action.get("cycle", 1) == ledger.get("cycle", 1) and action["stage"] == ledger["stage"]
+
+
+def pin_workflow(effective: dict) -> dict:
+    return {"sha256": digest(effective), "effective": copy.deepcopy(effective)}
+
+
+def migrate_ledger(ledger: dict, target: dict, effective: dict) -> dict:
+    """Preserve native identity and history; an exact reviewed migration authorizes adoption."""
+    migration = target.get("workflow_migration") or {}
+    if migration.get("ledger_sha256") != digest(ledger):
+        raise SupervisorError("legacy ledger requires an exact reviewed migration")
+    if (migration.get("goal_identity") != ledger.get("adopted_goal")
+            or not migration.get("reviewed_by") or not migration.get("reason")):
+        raise SupervisorError("migration must bind the adopted goal and identify its review")
+    errors = artifact_errors(migration.get("review", {}),
+                             [Path(target["root"]), Path(migration.get("review_root", target["root"]))], "migration review")
+    if errors:
+        raise SupervisorError("; ".join(errors))
+    if ledger["stage"] not in range(0, 6):
+        raise SupervisorError("unsupported legacy stage; explicit reassessment required")
+    result = copy.deepcopy(ledger)
+    result.update(schema_version=2, cycle=1, workflow=pin_workflow(effective),
+                  migration={**migration, "migrated_at": now()}, phase="assessment",
+                  active_profile_path=target["workflow_profile_path"], policy_notification_required=True)
+    for action in result["actions"].values():
+        action["cycle"] = 1
+    for record in result["completed_stages"]:
+        record["cycle"] = 1
+    # Stage 5 previously meant 'four goals finished'. It now means stage 5;
+    # absence of stage-4 review evidence blocks it, never resets an active goal.
+    if result["stage"] == 5:
+        result["awaiting_goal"] = True
+    result["legacy_receipt_stage"] = result["stage"] if result["stage"] < 4 else None
+    return result
+
+
 def validate_config(config: dict, *, resolve_repositories: bool = True) -> dict:
     config.setdefault("native_reader_path", str(ROOT / "scripts/mech_session_native.py"))
     config.setdefault("notifier_path", str(ROOT / "scripts/mech_session_terminal.py"))
@@ -146,11 +202,32 @@ def validate_config(config: dict, *, resolve_repositories: bool = True) -> dict:
             raise SupervisorError(f"Invalid or duplicate repository key: {key}")
         seen.add(key)
         for field in ("root", "github_repository", "native_session_id", "pid", "tty",
-                      "process_identity", "workflow_prompt_path", "stages", "default_branch", "initial_goal_identity"):
+                      "process_identity", "default_branch", "initial_goal_identity"):
             if not target.get(field):
                 raise SupervisorError(f"{key}: missing {field}")
-        if target.get("initial_stage") not in range(0, 5):
-            raise SupervisorError(f"{key}: initial_stage must be 0 through 4")
+        if target.get("workflow_profile_path"):
+            for field in ("workflow_profile_path", "workflow_next_profile_path"):
+                if target.get(field):
+                    profile_path = Path(target[field])
+                    if not profile_path.is_absolute() or not profile_path.resolve().is_relative_to(Path(target["root"]).resolve()):
+                        raise SupervisorError(f"{key}: {field} must be absolute and inside the repository")
+            existing_path = runtime / key / "ledger.json"
+            existing = read_json(existing_path) if existing_path.is_file() and not existing_path.is_symlink() else {}
+            if existing.get("schema_version") == 2:
+                if existing.get("run_id") != config["run_id"] or existing.get("repository_key") != key:
+                    raise SupervisorError(f"{key}: existing cycle belongs to another workflow")
+                effective = existing.get("workflow", {}).get("effective", {})
+                if digest(effective) != existing.get("workflow", {}).get("sha256"):
+                    raise SupervisorError(f"{key}: pinned effective workflow checksum mismatch")
+            else:
+                effective = load_effective(config, target)
+            if effective["github_repository"].casefold() != target["github_repository"].casefold():
+                raise SupervisorError(f"{key}: workflow GitHub identity mismatch")
+            target["_workflow"] = effective
+            target["stages"] = effective["stages"]
+        last_stage = 6 if target.get("_workflow") else 4
+        if target.get("initial_stage") not in range(0, last_stage + 1):
+            raise SupervisorError(f"{key}: initial_stage must be 0 through {last_stage}")
         if not isinstance(target["pid"], int) or target["pid"] <= 0:
             raise SupervisorError(f"{key}: invalid PID")
         initial = target["initial_goal_identity"]
@@ -159,9 +236,9 @@ def validate_config(config: dict, *, resolve_repositories: bool = True) -> dict:
             raise SupervisorError(f"{key}: initial goal identity is incomplete")
         if not re.fullmatch(r"/dev/ttys\d+", target["tty"]):
             raise SupervisorError(f"{key}: invalid TTY")
-        if {stage.get("stage") for stage in target["stages"]} != {1, 2, 3, 4}:
-            raise SupervisorError(f"{key}: exactly four stages required")
-        if len(target["stages"]) != 4:
+        if {stage.get("stage") for stage in target.get("stages", [])} != set(range(1, last_stage + 1)):
+            raise SupervisorError(f"{key}: exactly {last_stage} stages required")
+        if len(target["stages"]) != last_stage:
             raise SupervisorError(f"{key}: duplicate stages")
         for stage in target["stages"]:
             if not isinstance(stage.get("goal_text"), str) or not stage["goal_text"].strip():
@@ -189,15 +266,21 @@ def validate_config(config: dict, *, resolve_repositories: bool = True) -> dict:
 
 
 def new_ledger(config: dict, target: dict) -> dict:
-    return {"schema_version": 1, "run_id": config["run_id"],
+    ledger = {"schema_version": 1, "run_id": config["run_id"],
             "repository_key": target["repository_key"], "stage": target["initial_stage"],
             "adopted_goal": None, "awaiting_goal": False, "actions": {},
             "completed_stages": [], "phase": "assessment", "created_at": now()}
+    if target.get("_workflow"):
+        ledger.update(schema_version=2, cycle=1, workflow=pin_workflow(target["_workflow"]),
+                      active_profile_path=target["workflow_profile_path"])
+        if ledger["stage"] == 6:
+            ledger["infra_scope"] = freeze_infrastructure(target)
+    return ledger
 
 
 def action_id(ledger: dict, kind: str) -> str:
     # Text can be amended by agy; stable native start identity is intentional.
-    return digest([ledger["run_id"], ledger["repository_key"], ledger["stage"],
+    return digest([ledger["run_id"], ledger["repository_key"], ledger.get("cycle", 1), ledger["stage"],
                    ledger["adopted_goal"], kind])[:24]
 
 
@@ -205,12 +288,22 @@ def decide(ledger: dict, observation: dict) -> dict:
     """Pure next-action reducer. A send is never evidence of completion."""
     if observation.get("error"):
         return {"phase": "unavailable", "reason": observation["error"]}
-    if ledger["stage"] > 4:
-        return {"phase": "pipeline_complete"}
+    if ledger.get("schema_version") == 1 and ledger["stage"] > 4:
+        return {"phase": "requires_migration", "reason": "legacy four-goal sequence needs reviewed six-goal migration"}
+    if ledger["stage"] > 6:
+        return {"phase": "blocked", "reason": "invalid stage; cannot infer a new cycle"}
     if not observation.get("ready"):
         return {"phase": "waiting", "reason": observation.get("readiness_reason", "not ready")}
     if observation.get("goal_state") == "cancelled":
         return {"phase": "blocked", "reason": "native goal is cancelled; cannot infer continuation intent"}
+    if ledger.get("policy_notification_required"):
+        if observation.get("goal_identity") != ledger.get("adopted_goal"):
+            return {"phase": "blocked", "reason": "native goal changed before workflow migration handoff"}
+        identifier = action_id(ledger, "policy_update")
+        prior = ledger["actions"].get(identifier)
+        if prior and prior["state"] in BLOCKING_RECEIPTS:
+            return {"phase": "awaiting_native_acceptance", "reason": "workflow policy handoff requires native acceptance"}
+        return {"phase": "ready_to_dispatch", "action": "policy_update", "action_id": identifier}
     if ledger.get("awaiting_goal"):
         if observation.get("goal_identity") != ledger["adopted_goal"]:
             return {"phase": "blocked", "reason": "a different native goal appeared before next-goal dispatch"}
@@ -220,6 +313,9 @@ def decide(ledger: dict, observation: dict) -> dict:
                     and observation.get("goal_state") == "active")
         if observation.get("goal_state") != "completed" and not override:
             return {"phase": "blocked", "reason": "previous native goal is not completed"}
+        if any(scoped(action, ledger) and action["kind"] == "start_goal" and action["state"] in BLOCKING_RECEIPTS
+               for action in ledger["actions"].values()):
+            return {"phase": "awaiting_native_acceptance", "reason": "a matching next-goal instruction is already reserved or delivered"}
         kind = "start_goal"
     elif not ledger.get("adopted_goal"):
         return {"phase": "blocked", "reason": "no authoritative current goal; assessment required"}
@@ -229,7 +325,7 @@ def decide(ledger: dict, observation: dict) -> dict:
         # One initial/resumption instruction owns its entire closure. Do not
         # repeatedly nudge an accepted instruction that has not produced proof.
         prior = [a for a in ledger["actions"].values()
-                 if a["stage"] == ledger["stage"] and a["kind"] in {"assess_and_finalize", "finalize", "repair_closure"}
+                 if scoped(a, ledger) and a["kind"] in {"assess_and_finalize", "finalize", "repair_closure"}
                  and a["state"] in BLOCKING_RECEIPTS]
         if prior:
             return repair_decision(ledger, observation, "accepted instruction finished or stalled without a valid closure receipt")
@@ -252,7 +348,7 @@ def repair_decision(ledger: dict, observation: dict, reason: str, receipt_hash=N
     fallback = {"phase": "requires_intervention", "reason": reason}
     progress = observation.get("agent_progress") or {}
     if (progress.get("authority") == "informational_only" and progress.get("current") is True
-            and progress.get("stage") == ledger["stage"]
+            and progress.get("stage") == ledger["stage"] and progress.get("cycle", 1) == ledger.get("cycle", 1)
             and progress.get("phase", "").lower() in {"blocked", "prerequisite_blocked", "requires_intervention"}):
         return {"phase": "requires_intervention", "reason": "agent reports blocked: " + progress.get("summary", reason)}
     if not observation.get("ready") or observation.get("goal_identity") != ledger["adopted_goal"]:
@@ -262,7 +358,7 @@ def repair_decision(ledger: dict, observation: dict, reason: str, receipt_hash=N
     # A definitive pre-send rejection cannot acquire native acceptance. It
     # neither supersedes the last delivered instruction nor consumes a repair.
     actions = [action for action in ledger["actions"].values()
-               if action["stage"] == ledger["stage"] and action["state"] != "not-sent"]
+               if scoped(action, ledger) and action["state"] != "not-sent"]
     if not actions:
         return {"phase": "closure_blocked", "reason": reason}
     last = max(actions, key=lambda action: action.get("reserved_epoch_ms", 0))
@@ -289,7 +385,7 @@ def completion_authority(target: dict, ledger: dict, observation: dict) -> str:
         raise SupervisorError("native goal changed before closure verification")
     if observation.get("goal_state") == "completed":
         return "native_completed"
-    accepted = any(action["state"] == "accepted" and action["stage"] == ledger["stage"]
+    accepted = any(action["state"] == "accepted" and action.get("kind") != "policy_update" and scoped(action, ledger)
                    and action.get("accepted_goal_identity", action.get("goal_identity")) == ledger["adopted_goal"]
                    for action in ledger["actions"].values())
     if (target.get("allow_receipt_completion_override") is True
@@ -298,34 +394,62 @@ def completion_authority(target: dict, ledger: dict, observation: dict) -> str:
     raise SupervisorError("native goal is not completed; no explicit audited receipt-override policy applies")
 
 
-def stage_profile(target: dict, stage: int) -> dict:
-    return next(item for item in target["stages"] if item["stage"] == stage)
+def stage_profile(target: dict, stage: int, ledger: dict | None = None) -> dict:
+    effective = (ledger or {}).get("workflow", {}).get("effective", {})
+    return next(item for item in effective.get("stages", target["stages"]) if item["stage"] == stage)
 
 
 def message_for(target: dict, ledger: dict, decision: dict, repository_runtime: Path) -> str:
     marker = "MECH-WORKFLOW-" + decision["action_id"]
-    context = (f"[{marker}] Read {target['workflow_prompt_path']} and "
-               f"{repository_runtime / 'status.json'}. Repository-local .claude/skills is the skill source of truth. "
-               f"This is run {ledger['run_id']}, stage {ledger['stage']}. "
-               f"Write the required structured closure receipt to {repository_runtime / 'completion.json'}. "
+    effective = ledger.get("workflow", {}).get("effective")
+    instruction = repository_runtime / "effective-workflow.json" if effective else Path(target["workflow_prompt_path"])
+    context = (f"[{marker}] Read {instruction} and {repository_runtime / 'status.json'}. "
+               "Repository-local .claude/skills is the skill source of truth. "
+               f"This is run {ledger['run_id']}, cycle {ledger.get('cycle', 1)}, stage {ledger['stage']}. "
+               f"Fill status.json receipt_template with verified facts and write it to {repository_runtime / 'completion.json'}. "
+               "Follow the pinned workflow stage, evidence requirements, infrastructure-note policy, and closure policy. "
+               f"After prior closure is verified, update the tracked review latest index from {repository_runtime / 'verified-evidence-index.json'} in this goal. "
+               "Record-review goal findings are separate from the PR adversarial review; stage 5 resolves the former. "
+               "For stage 6, use the exact supervisor-frozen infra_scope content/hash/time in status.json. "
                "Do not start another goal: the supervisor verifies closure and chooses the next goal. ")
+    if decision["action"] == "policy_update":
+        return (context + "Your existing native goal and its identity are unchanged. Adopt the reviewed six-stage workflow "
+                "and its versioned review and infrastructure evidence requirements for the unfinished work. "
+                "Continue the same goal; this policy handoff itself is not goal completion. "
+                "Save proposed profile changes to the configured next-cycle candidate and include them in stage-6 review; "
+                "do not edit the immutable runtime snapshot.")
     if decision["action"] == "start_goal":
-        profile = stage_profile(target, ledger["stage"])
-        return (f"/goal {profile['goal_text']} {context} "
-                "After completing this objective, run the authorized commit/push PR, adversarial review, "
-                "issue creation and fixes, merge, and branch cleanup sequence; write the receipt and stop.")
+        profile = stage_profile(target, ledger["stage"], ledger)
+        return f"/goal {profile['goal_text']} {context} Finish the configured closure sequence, write the receipt, and stop."
     if decision["action"] == "finalize":
-        return (context + "The adopted goal has native completion evidence. Verify its result and finish the "
-                "authorized commit/push PR, adversarial review, issue creation and fixes, merge, and branch "
-                "cleanup sequence. Reuse already completed matching steps after verifying their evidence.")
+        return context + "The adopted goal has native completion evidence. Verify its result and finish the configured closure sequence. Reuse matching completed steps only after verifying their evidence."
     if decision["action"] == "repair_closure":
         return (context + "Continue only unfinished work or repair the closure receipt. The independent verifier reports: "
                 + decision["repair_reason"] + ". Re-read current status and existing PR/review/issues before acting; "
-                "reuse proven completed steps. Preserve unrelated changes, never force cleanup, and do not start another goal.")
+                "reuse proven completed steps. Preserve unrelated changes and never force cleanup.")
     return (context + "First assess the last running goal recorded in status.json. If incomplete, continue "
-            "that same objective using its applicable skill; do not replace or reset it. If complete, "
-            "proceed to the authorized commit/push PR, adversarial review, issue creation and fixes, "
-            "merge, and branch cleanup sequence. Complete that sequence once the goal finishes.")
+            "that same objective using its applicable skill; do not replace or reset it. Once complete, "
+            "finish the configured closure sequence.")
+
+
+def receipt_template(ledger: dict, target: dict) -> dict:
+    """Provide the machine interface; placeholders are never closure evidence."""
+    template = {key: copy.deepcopy(ledger[key]) for key in ("run_id", "repository_key", "stage")}
+    template.update(schema_version=ledger.get("schema_version", 1), goal_identity=copy.deepcopy(ledger["adopted_goal"]),
+                    goal_complete=False, status="completed", coverage={"artifact": "", "sha256": ""},
+                    review={"artifact": "", "sha256": "", "status": "pending", "head_sha": "", "remaining_findings": None},
+                    validation=[{"artifact": "", "sha256": "", "command": "", "status": "pending", "head_sha": ""}],
+                    issues=[], pr={"number": None, "head_sha": "", "branch": "", "base": target["default_branch"]},
+                    cleanup={"checkout_ready": False, "local_branch_deleted": False, "remote_branch_deleted": False})
+    if ledger.get("schema_version") == 2:
+        from kg_microbe_workflows import evidence_directory
+        template.update(cycle=ledger["cycle"], workflow_sha256=ledger["workflow"]["sha256"],
+                        goal_outputs={"infra_tasks": {"path": "INFRA_TASKS.md", "sha256": ""}})
+        if ledger["stage"] >= 4:
+            template["goal_outputs"]["goal_evidence"] = {
+                "path": evidence_directory(ledger["run_id"], ledger["cycle"], ledger["stage"], 1) + "/evidence.yaml",
+                "sha256": ""}
+    return template
 
 
 def artifact_errors(item: dict, allowed_roots: list[Path], label: str) -> list[str]:
@@ -353,13 +477,123 @@ def artifact_errors(item: dict, allowed_roots: list[Path], label: str) -> list[s
     return [] if actual == expected else [f"{label}: artifact hash mismatch"]
 
 
+def freeze_infrastructure(target: dict) -> dict:
+    """Capture the input scope before stage 6 can start changing the notebook."""
+    from kg_microbe_workflows import validate_infra_notebook
+
+    path = Path(target["root"]) / "INFRA_TASKS.md"
+    flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0)
+    with os.fdopen(os.open(path, flags), "rb") as stream:
+        if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+            raise SupervisorError("infrastructure notebook must be a regular file")
+        raw = stream.read()
+    notebook = validate_infra_notebook(raw, target["github_repository"])
+    return {"sha256": hashlib.sha256(raw).hexdigest(), "content": raw.decode("utf-8"),
+            "tasks": notebook["tasks"], "frozen_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
+
+
+def previous_evidence(ledger: dict, stage: int) -> dict | None:
+    """Stage 5 consumes this cycle's review; later reviews carry prior findings."""
+    if stage not in {4, 5}:
+        return None
+    cycle = ledger["cycle"]
+    eligible = [record for record in ledger["completed_stages"]
+                if (record["stage"] == 4 if stage == 5 else record["stage"] in {4, 5}) and record.get("goal_evidence")
+                and (record.get("cycle", 1) == cycle if stage == 5 else record.get("cycle", 1) < cycle)]
+    return eligible[-1] if eligible else None
+
+
+def goal_output_data(receipt: dict, ledger: dict, target: dict) -> dict | None:
+    if ledger.get("schema_version") != 2 or ledger["stage"] < 4:
+        return None
+    from kg_microbe_workflows import read_goal_evidence
+
+    descriptor = receipt.get("goal_outputs", {}).get("goal_evidence") or {}
+    root = Path(target["root"])
+    errors = artifact_errors({"artifact": descriptor.get("path"), "sha256": descriptor.get("sha256")}, [root], "goal evidence")
+    if errors:
+        raise SupervisorError("; ".join(errors))
+    previous = previous_evidence(ledger, ledger["stage"])
+    if ledger["stage"] == 5 and previous is None:
+        raise SupervisorError("stage 5 requires the exact verified stage-4 review evidence from this cycle")
+    previous_data = previous.get("goal_evidence_snapshot") if previous else None
+    data = read_goal_evidence(root / descriptor["path"], repository_root=root, previous=previous_data,
+                              expected={key: ledger[key] for key in ("repository_key", "run_id", "cycle", "stage")})
+    if previous is not None and data.get("previous_evidence") != previous["goal_evidence"]:
+        raise SupervisorError("goal evidence does not bind the exact previous review manifest")
+    if ledger["stage"] == 6:
+        scope = ledger.get("infra_scope") or {}
+        snapshots = [artifact for artifact in data["artifacts"] if artifact["kind"] == "infra_snapshot"]
+        if (not scope or len(snapshots) != 1 or snapshots[0]["sha256"] != scope.get("sha256")
+                or data.get("scope_frozen_at") != scope.get("frozen_at")):
+            raise SupervisorError("infrastructure plan must consume the supervisor-frozen stage-6 notebook scope")
+        from kg_microbe_workflows import read_infra_notebook
+        notebook = read_infra_notebook(root / "INFRA_TASKS.md", target["github_repository"], root)
+        current = {task["task_id"]: task for task in notebook["tasks"]}
+        for task in data["infra_tasks"]:
+            retained = current.get(task["task_id"], {})
+            if retained.get("status") != task["status"] or retained.get("issue_url") != task["issue_url"]:
+                raise SupervisorError("planned infrastructure tasks and issue dispositions must remain in INFRA_TASKS.md")
+        for task in scope.get("tasks", []):
+            if task["task_id"] not in current:
+                raise SupervisorError("infrastructure history disappeared from the current notebook")
+    if ledger["stage"] == 5:
+        expected_ids = {item["finding_id"] for item in previous_data.get("findings", [])}
+        actual_ids = [finding for group in data.get("groups", []) for finding in group["finding_ids"]]
+        if set(actual_ids) != expected_ids or len(actual_ids) != len(set(actual_ids)):
+            raise SupervisorError("review resolution groups must cover each frozen review finding exactly once")
+    for item in data.get("groups", []) + data.get("infra_tasks", []):
+        if item.get("status") == "resolved":
+            url = item.get("issue_url", "")
+            match = re.fullmatch(r"https://github\.com/" + re.escape(target["github_repository"]) + r"/issues/([1-9]\d*)", url, re.I)
+            if not match or int(match[1]) not in {issue["number"] for issue in receipt.get("issues", [])}:
+                raise SupervisorError("resolved review/infra groups require matching independently verified closure issues")
+    return data
+
+
+def output_artifacts(receipt: dict, evidence: dict | None) -> list[dict]:
+    outputs = receipt.get("goal_outputs") or {}
+    artifacts = [outputs[key] for key in ("goal_evidence", "infra_tasks") if isinstance(outputs.get(key), dict)]
+    if evidence:
+        artifacts += evidence.get("artifacts", [])
+    return artifacts
+
+
+def verify_versioned_artifacts(receipt: dict, ledger: dict, target: dict, runner, head: str) -> None:
+    if ledger.get("schema_version") != 2:
+        return
+    if receipt.get("schema_version") == 1 and ledger.get("legacy_receipt_stage") == ledger["stage"] and ledger["stage"] < 4:
+        return
+    evidence = goal_output_data(receipt, ledger, target)
+    for artifact in output_artifacts(receipt, evidence):
+        path = Path(artifact["path"])
+        root = Path(target["root"]).resolve()
+        resolved = (root / path).resolve()
+        if path.is_absolute() or not resolved.is_relative_to(root):
+            raise SupervisorError("versioned workflow artifacts require repository-relative paths")
+        relative = str(resolved.relative_to(root))
+        blob = runner(["git", "-C", str(root), "rev-parse", f"{head}:{relative}"]).stdout.strip()
+        actual = runner(["git", "-C", str(root), "hash-object", "--no-filters", "--", relative]).stdout.strip()
+        if not SHA.fullmatch(blob) or blob != actual:
+            raise SupervisorError("workflow evidence is not versioned at the exact reviewed final head: " + relative)
+
+
 def validate_receipt(receipt: dict, ledger: dict, target: dict, runtime: Path) -> list[str]:
     """Validate claims and bound evidence before any remote verification."""
     errors = []
     for key in ("run_id", "repository_key", "stage"):
         if receipt.get(key) != ledger[key]:
             errors.append(f"receipt {key} mismatch")
-    if receipt.get("schema_version") != 1 or receipt.get("goal_complete") is not True:
+    legacy_receipt = (ledger.get("schema_version") == 2 and receipt.get("schema_version") == 1
+                      and ledger.get("cycle") == 1 and ledger.get("legacy_receipt_stage") == ledger["stage"]
+                      and ledger["stage"] < 4)
+    if ledger.get("schema_version") == 2 and not legacy_receipt:
+        if receipt.get("cycle") != ledger["cycle"]:
+            errors.append("receipt cycle mismatch")
+        if receipt.get("workflow_sha256") != ledger["workflow"]["sha256"]:
+            errors.append("receipt pinned workflow mismatch")
+    expected_version = 1 if legacy_receipt else ledger.get("schema_version", 1)
+    if receipt.get("schema_version") != expected_version or receipt.get("goal_complete") is not True:
         errors.append("receipt version/goal completion invalid")
     if receipt.get("goal_identity") != ledger.get("adopted_goal") or not ledger.get("adopted_goal"):
         errors.append("receipt goal identity mismatch")
@@ -419,6 +653,19 @@ def validate_receipt(receipt: dict, ledger: dict, target: dict, runtime: Path) -
     if status == "completed" and (cleanup.get("remote_branch_deleted") is not True
                                   or cleanup.get("local_branch_deleted") is not True):
         errors.append("branch cleanup not attested")
+    if ledger.get("schema_version") == 2 and not legacy_receipt:
+        outputs = receipt.get("goal_outputs") or {}
+        infra = outputs.get("infra_tasks") or {}
+        if infra.get("path") != "INFRA_TASKS.md":
+            errors.append("goal output must bind the repository INFRA_TASKS.md")
+        errors += artifact_errors({"artifact": infra.get("path"), "sha256": infra.get("sha256")},
+                                  [Path(target["root"])], "infrastructure notes")
+        try:
+            from kg_microbe_workflows import read_infra_notebook
+            read_infra_notebook(Path(target["root"]) / "INFRA_TASKS.md", target["github_repository"], Path(target["root"]))
+            goal_output_data(receipt, ledger, target)
+        except Exception as error:
+            errors.append("goal outputs: " + str(error))
     return errors
 
 
@@ -438,6 +685,17 @@ def verify_remote_receipt(receipt: dict, ledger: dict, target: dict, runner=comm
         raise SupervisorError("working tree is not clean; preserve unrelated work and finish safe cleanup")
     if git("symbolic-ref", "--quiet", "--short", "HEAD").stdout.strip() != target["default_branch"]:
         raise SupervisorError("checkout is not on the configured default branch")
+    head = receipt["no_changes"]["head_sha"] if receipt["status"] == "no_changes" else receipt["pr"]["head_sha"]
+    verify_versioned_artifacts(receipt, ledger, target, runner, head)
+    if ledger.get("schema_version") == 2 and receipt.get("schema_version") == 2:
+        from kg_microbe_workflows import read_infra_notebook
+        notebook = read_infra_notebook(Path(root) / "INFRA_TASKS.md", github, Path(root))
+        for task in notebook["tasks"]:
+            if task.get("issue_url"):
+                number = task["issue_url"].rsplit("/", 1)[-1]
+                issue = gh_json("api", f"repos/{github}/issues/{number}")
+                if issue.get("state") not in {"open", "closed"} or "pull_request" in issue:
+                    raise SupervisorError("infrastructure notebook must reference real GitHub issues")
     if receipt["status"] == "no_changes":
         head = receipt["no_changes"]["head_sha"]
         if git("rev-parse", "HEAD").stdout.strip() != head:
@@ -494,6 +752,16 @@ def verify_remote_receipt(receipt: dict, ledger: dict, target: dict, runner=comm
         by_name = {check["name"]: check for check in all_checks}
         if any(name not in by_name or by_name[name].get("bucket") != "pass" for name in declared_checks):
             raise SupervisorError("repository-declared CI policy is not satisfied")
+    evidence = goal_output_data(receipt, ledger, target)
+    if evidence:
+        for item in evidence.get("groups", []) + evidence.get("infra_tasks", []):
+            if item["status"] == "deferred":
+                match = re.fullmatch(r"https://github\.com/" + re.escape(github) + r"/issues/([1-9]\d*)", item["issue_url"], re.I)
+                if not match:
+                    raise SupervisorError("deferred item issue belongs to another repository")
+                deferred_issue = gh_json("api", f"repos/{github}/issues/{match[1]}")
+                if deferred_issue.get("state") != "open" or "pull_request" in deferred_issue:
+                    raise SupervisorError("deferred review/infrastructure issue must remain open")
     commits = gh_json("api", "--paginate", "--slurp", f"repos/{github}/pulls/{pr['number']}/commits?per_page=100")
     commit_shas = {item["sha"] for page in commits for item in page}
     for issue in receipt["issues"]:
@@ -634,7 +902,7 @@ class Supervisor:
                 return
             ledger["adopted_goal"] = native_id
         history_path = Path(self.config.get("history_path", Path.home() / ".gemini/antigravity-cli/history.jsonl"))
-        pending = [a for a in ledger["actions"].values() if a["state"] in BLOCKING_RECEIPTS]
+        pending = [a for a in ledger["actions"].values() if scoped(a, ledger) and a["state"] in BLOCKING_RECEIPTS]
         if pending and history_path.is_file():
             with history_path.open() as stream:
                 for line in stream:
@@ -650,9 +918,11 @@ class Supervisor:
                                 and row.get("conversationId") == target["native_session_id"]
                                 and action["native_session_id"] == target["native_session_id"]):
                             action.update(state="accepted", accepted_at=now(), acceptance="native_workspace_history_marker")
+                            if action["kind"] == "policy_update":
+                                ledger["policy_notification_required"] = False
         if ledger.get("awaiting_goal") and native_id and native_id != ledger["adopted_goal"]:
             for action in pending:
-                if (action["kind"] == "start_goal" and action["stage"] == ledger["stage"]
+                if (action["kind"] == "start_goal" and scoped(action, ledger)
                         and action["marker"] in native_goal.get("goal_text", "")):
                     action.update(state="accepted", accepted_at=now(), acceptance="native_goal_marker")
                     action["accepted_goal_identity"] = native_id
@@ -664,13 +934,13 @@ class Supervisor:
             ledger["baseline_head"] = self.runner(["git", "-C", target["root"], "rev-parse", "HEAD"]).stdout.strip()
             ledger["baseline_status"] = self.runner(["git", "-C", target["root"], "status", "--porcelain=v1", "--untracked-files=all"]).stdout
 
-    def skill_errors(self, target: dict, stage: int) -> list[str]:
+    def skill_errors(self, target: dict, stage: int, ledger: dict | None = None) -> list[str]:
         if stage == 0:
             return []
         errors = []
-        profile = stage_profile(target, stage)
+        profile = stage_profile(target, stage, ledger)
         if profile.get("applicability") not in {None, "available", "available_via_composed_workflow",
-                                               "available_with_instruction_conflict", "applicability_audit"}:
+                                               "available_with_instruction_conflict", "applicability_audit", "enabled", "not_applicable"}:
             errors.append("skill applicability unresolved: " + str(profile.get("applicability")))
         for path in profile["skill_paths"]:
             skill = Path(path)
@@ -690,7 +960,7 @@ class Supervisor:
             if path.is_symlink() or path.resolve().parent != directory or path.stat().st_size > 65536:
                 raise SupervisorError("invalid progress file path/size")
             reported = read_json(path)
-            for key in ("run_id", "repository_key", "stage"):
+            for key in (("run_id", "repository_key", "stage", "cycle") if ledger.get("schema_version") == 2 else ("run_id", "repository_key", "stage")):
                 if reported.get(key) != ledger[key]:
                     raise SupervisorError("progress identity mismatch")
             if reported.get("goal_identity") != ledger["adopted_goal"]:
@@ -699,11 +969,11 @@ class Supervisor:
             try:
                 stamp = datetime.fromisoformat(reported.get("updated_at", "").replace("Z", "+00:00"))
                 last_dispatch = max((action.get("reserved_epoch_ms", 0) / 1000 for action in ledger["actions"].values()
-                                     if action["stage"] == ledger["stage"]), default=0)
+                                     if scoped(action, ledger)), default=0)
                 current = stamp.tzinfo is not None and last_dispatch <= stamp.timestamp() <= time.time() + 60 and time.time() - stamp.timestamp() < 86400
             except (TypeError, ValueError):
                 pass
-            return {"authority": "informational_only", "stage": reported["stage"], "current": current,
+            return {"authority": "informational_only", "stage": reported["stage"], "cycle": reported.get("cycle", 1), "current": current,
                     **{key: str(reported[key])[:500]
                     for key in ("phase", "summary", "updated_at", "pr_url") if key in reported}}
         except Exception as error:
@@ -730,15 +1000,20 @@ class Supervisor:
                 current = decide(ledger, observation)
             if current.get("action_id") != decision.get("action_id"):
                 return {"state": "not-sent", "reason": "prerequisite changed before send"}
-            errors = self.skill_errors(target, ledger["stage"])
+            errors = self.skill_errors(target, ledger["stage"], ledger)
+            if ledger.get("schema_version") == 2 and ledger["stage"] == 5 and not previous_evidence(ledger, 5):
+                errors.append("stage 5 requires the verified stage-4 review manifest")
             if errors:
                 return {"state": "not-sent", "reason": "; ".join(errors)}
-            prompt = Path(target["workflow_prompt_path"])
+            if ledger.get("schema_version") == 2:
+                self.check_workflow(target, ledger)
+            prompt = (self.directory(target) / "effective-workflow.json" if ledger.get("workflow")
+                      else Path(target["workflow_prompt_path"]))
             if not prompt.is_file():
                 return {"state": "not-sent", "reason": "workflow instruction file missing"}
             identifier = decision["action_id"]
             message = message_for(target, ledger, decision, self.directory(target))
-            action = {"id": identifier, "kind": decision["action"], "stage": ledger["stage"],
+            action = {"id": identifier, "kind": decision["action"], "stage": ledger["stage"], "cycle": ledger.get("cycle", 1),
                       "marker": "MECH-WORKFLOW-" + identifier, "state": "reserved", "reserved_at": now(),
                       "reserved_epoch_ms": int(time.time() * 1000), "native_session_id": target["native_session_id"],
                       "goal_identity": ledger["adopted_goal"], "message": message,
@@ -758,6 +1033,88 @@ class Supervisor:
             self.save(target, ledger)
             return action
 
+    def check_workflow(self, target: dict, ledger: dict) -> None:
+        effective = ledger["workflow"]["effective"]
+        if digest(effective) != ledger["workflow"]["sha256"]:
+            raise SupervisorError("pinned workflow snapshot changed")
+        queued = target.get("workflow_next_profile_path")
+        if queued and Path(queued).resolve() == Path(ledger["active_profile_path"]).resolve():
+            # The canonical repository profile is now a next-cycle candidate.
+            # Its edits cannot change the already validated effective snapshot.
+            for source in effective.get("sources", []):
+                if source["kind"] in {"parent", "schema"}:
+                    errors = artifact_errors({"artifact": source["path"], "sha256": source["sha256"]},
+                                              [Path(source["path"]).parent], "pinned core input")
+                    if errors:
+                        raise SupervisorError("; ".join(errors))
+        else:
+            current = load_effective(self.config, target, profile_path=ledger.get("active_profile_path"))
+            if digest(current) != ledger["workflow"]["sha256"]:
+                raise SupervisorError("pinned workflow inputs changed during the active cycle; reviewed migration required")
+        path = self.directory(target) / "effective-workflow.json"
+        snapshot = {"cycle": ledger["cycle"], "workflow_sha256": ledger["workflow"]["sha256"],
+                    "effective": ledger["workflow"]["effective"]}
+        if path.exists() and read_json(path) != snapshot:
+            previous = read_json(path)
+            if previous.get("cycle", ledger["cycle"]) >= ledger["cycle"]:
+                raise SupervisorError("pinned instruction snapshot changed")
+        self.write(path, snapshot)
+        archive = self.directory(target) / "cycles" / f"cycle-{ledger['cycle']:06d}" / "effective-workflow.json"
+        if archive.exists() and read_json(archive) != snapshot:
+            raise SupervisorError("archived cycle instruction snapshot changed")
+        self.write(archive, snapshot)
+
+    def advance(self, target: dict, ledger: dict, receipt: dict, verification: dict, authority: str) -> dict:
+        closed_stage = ledger["stage"]
+        advanced = copy.deepcopy(ledger)
+        record = {"stage": closed_stage, "cycle": ledger.get("cycle", 1), "goal_identity": ledger["adopted_goal"],
+                  "receipt_sha256": digest(receipt), "verification": verification, "completion_authority": authority}
+        if ledger.get("schema_version") == 2:
+            evidence = goal_output_data(receipt, ledger, target)
+            record["workflow_sha256"] = ledger["workflow"]["sha256"]
+            if evidence:
+                record["goal_evidence"] = copy.deepcopy(receipt["goal_outputs"]["goal_evidence"])
+                record["goal_evidence_snapshot"] = evidence
+        advanced["completed_stages"].append(record)
+        if ledger.get("schema_version") == 2 and closed_stage == 6:
+            effective = load_effective(self.config, target, next_cycle=True)
+            candidate = target.get("workflow_next_profile_path") or target["workflow_profile_path"]
+            head = receipt.get("pr", {}).get("head_sha") if receipt["status"] == "completed" else receipt["no_changes"]["head_sha"]
+            self.verify_next_profile(target, effective, candidate, head)
+            advanced.update(cycle=ledger["cycle"] + 1, stage=1, awaiting_goal=True,
+                            workflow=pin_workflow(effective), active_profile_path=candidate)
+        else:
+            advanced.update(stage=closed_stage + 1, awaiting_goal=(closed_stage < 6 if ledger.get("schema_version") == 2 else closed_stage < 4))
+        if advanced.get("schema_version") == 2 and advanced["stage"] == 6:
+            advanced["infra_scope"] = freeze_infrastructure(target)
+            self.write(self.directory(target) / "cycles" / f"cycle-{advanced['cycle']:06d}" / "infra-scope.json", advanced["infra_scope"])
+        elif advanced["stage"] != 6:
+            advanced.pop("infra_scope", None)
+        for key in ("baseline_head", "baseline_status", "legacy_receipt_stage"):
+            advanced.pop(key, None)
+        self.baseline(target, advanced)
+        path = self.directory(target) / "receipts" / f"cycle-{ledger.get('cycle', 1):06d}" / f"stage-{closed_stage}-{digest(receipt)[:12]}.json"
+        self.write(path, receipt)
+        return advanced
+
+    def verify_next_profile(self, target: dict, effective: dict, candidate: str, head: str) -> None:
+        root = Path(target["root"]).resolve()
+        inputs = [{"path": candidate, "sha256": effective["profile_sha256"]}]
+        inputs += [source for source in effective.get("sources", []) if source.get("kind") == "extension"]
+        for source in inputs:
+            path = Path(source["path"])
+            errors = artifact_errors({"artifact": str(path), "sha256": source["sha256"]}, [root], "next-cycle profile input")
+            if errors:
+                raise SupervisorError("; ".join(errors))
+            resolved = path.resolve()
+            if not resolved.is_relative_to(root):
+                raise SupervisorError("next-cycle repository profile/extension must live inside its repository")
+            relative = str(resolved.relative_to(root))
+            blob = self.runner(["git", "-C", str(root), "rev-parse", f"{head}:{relative}"]).stdout.strip()
+            actual = self.runner(["git", "-C", str(root), "hash-object", "--no-filters", "--", relative]).stdout.strip()
+            if not SHA.fullmatch(blob) or blob != actual:
+                raise SupervisorError("next-cycle profile/extension is not committed at the verified closure head")
+
     def sweep(self, *, apply: bool = False) -> dict:
         rows = []
         for target in self.config["targets"]:
@@ -770,7 +1127,19 @@ class Supervisor:
             ledger = read_json(ledger_path) if ledger_path.exists() else new_ledger(self.config, target)
             if ledger.get("run_id") != self.config["run_id"] or ledger.get("repository_key") != target["repository_key"]:
                 raise SupervisorError("runtime ledger belongs to another workflow")
+            workflow_error = None
+            try:
+                if target.get("_workflow"):
+                    if ledger.get("schema_version") == 1:
+                        ledger = migrate_ledger(ledger, target, target["_workflow"])
+                    self.check_workflow(target, ledger)
+                elif apply:
+                    raise SupervisorError("legacy workflow is observation-only; canonical profile and reviewed migration required")
+            except Exception as error:
+                workflow_error = str(error)
             observation = self.observe(target)
+            if workflow_error:
+                observation.update(error=workflow_error, ready=False)
             if self.stopping():
                 break
             self.reconcile(target, ledger, observation)
@@ -782,7 +1151,7 @@ class Supervisor:
             receipt_path = directory / "completion.json"
             verification = None
             receipt_errors = []
-            if receipt_path.exists() and ledger["stage"] <= 4 and not ledger.get("awaiting_goal"):
+            if receipt_path.exists() and ledger["stage"] <= (6 if ledger.get("schema_version") == 2 else 4) and not ledger.get("awaiting_goal") and not ledger.get("policy_notification_required") and not workflow_error:
                 try:
                     if receipt_path.is_symlink() or receipt_path.resolve().parent != directory.resolve() or not receipt_path.is_file():
                         raise SupervisorError("completion receipt is not a regular file inside this repository runtime")
@@ -793,19 +1162,7 @@ class Supervisor:
                     if not archived and not receipt_errors and observation.get("ready"):
                         authority = completion_authority(target, ledger, observation)
                         verification = verify_remote_receipt(receipt, ledger, target, self.runner)
-                        closed_stage = ledger["stage"]
-                        advanced = copy.deepcopy(ledger)
-                        advanced["completed_stages"].append({"stage": closed_stage, "goal_identity": ledger["adopted_goal"],
-                            "receipt_sha256": digest(receipt), "verification": verification,
-                            "completion_authority": authority})
-                        advanced.update(stage=closed_stage + 1, awaiting_goal=closed_stage < 4)
-                        advanced.pop("baseline_head", None)
-                        advanced.pop("baseline_status", None)
-                        self.baseline(target, advanced)
-                        self.write(directory / "receipts" / f"stage-{closed_stage}-{digest(receipt)[:12]}.json", receipt)
-                        # Publish the whole in-memory transition only after all
-                        # fallible preparation; the ledger is saved atomically.
-                        ledger = advanced
+                        ledger = self.advance(target, ledger, receipt, verification, authority)
                         # Do not delete the producer's file; mismatched old receipts
                         # are ignored only while a new goal is awaiting acceptance.
                 except Exception as error:
@@ -817,21 +1174,36 @@ class Supervisor:
             elif decision.get("action") == "repair_closure" and receipt_path.is_file():
                 decision = repair_decision(ledger, observation, decision["repair_reason"], hashlib.sha256(receipt_path.read_bytes()).hexdigest())
             if decision.get("action"):
-                errors = self.skill_errors(target, ledger["stage"])
+                errors = self.skill_errors(target, ledger["stage"], ledger)
+                if ledger.get("schema_version") == 2 and ledger["stage"] == 5 and not previous_evidence(ledger, 5):
+                    errors.append("stage 5 requires the verified stage-4 review manifest")
                 if errors:
                     decision = {"phase": "blocked", "reason": "; ".join(errors)}
             ledger.update(phase=decision["phase"], last_observed_at=observation["observed_at"],
                           blocked_reason=decision.get("reason"))
-            self.save(target, ledger)
+            if not workflow_error:
+                self.save(target, ledger)
+                verified_outputs = [{key: record[key] for key in ("cycle", "stage", "goal_evidence", "receipt_sha256", "verification")}
+                                    for record in ledger["completed_stages"] if record.get("goal_evidence")]
+                if verified_outputs:
+                    self.write(directory / "verified-evidence-index.json", {"authority": "verified_closure", "entries": verified_outputs})
             public_observation = {k: v for k, v in observation.items() if k not in {"tab", "native"}}
             native = observation.get("native") or {}
             status = {"run_id": ledger["run_id"], "repository_key": target["repository_key"],
-                      "stage": ledger["stage"], "goal_identity": ledger["adopted_goal"],
+                      "stage": ledger["stage"], "cycle": ledger.get("cycle", 1), "workflow_sha256": ledger.get("workflow", {}).get("sha256"),
+                      "goal_identity": ledger["adopted_goal"],
                       "phase": decision["phase"], "decision": decision, "observation": public_observation,
                       "native_execution_state": native.get("native_execution_state"),
                       "current_goal": native.get("current_goal"), "last_step": native.get("last_step"),
+                      "verified_evidence_index_path": str(directory / "verified-evidence-index.json"),
                       "completion_receipt_path": str(receipt_path), "verification": verification,
+                      "receipt_template": receipt_template(ledger, target),
+                      "effective_workflow_path": str(directory / "effective-workflow.json"),
+                      "goal_evidence_schema_path": next((source["path"] for source in ledger.get("workflow", {}).get("effective", {}).get("sources", []) if source["kind"] == "schema"), None),
                       "agent_progress": self.progress(target, ledger),
+                      "active_profile_path": ledger.get("active_profile_path"),
+                      "next_profile_path": target.get("workflow_next_profile_path"),
+                      "infra_scope": ledger.get("infra_scope"),
                       "completed_stages": ledger["completed_stages"], "updated_at": now()}
             self.write(directory / "status.json", status)
             if apply and decision.get("action"):
@@ -840,7 +1212,7 @@ class Supervisor:
                 except Exception as error:
                     status["delivery"] = {"state": "not-sent", "reason": str(error)[:700]}
                 self.write(directory / "status.json", status)
-            rows.append({"repository": target["repository_key"], "stage": ledger["stage"],
+            rows.append({"repository": target["repository_key"], "stage": ledger["stage"], "cycle": ledger.get("cycle", 1),
                          "phase": decision["phase"], "reason": decision.get("reason"),
                          "goal_state": observation.get("goal_state"),
                          "agent_progress": status["agent_progress"],

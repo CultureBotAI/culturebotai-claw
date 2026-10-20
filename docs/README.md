@@ -27,11 +27,15 @@ Other maintained references:
   record reviews, evidence-linked findings, fleet triage, and planning inputs.
 - [`guides/MECH_SESSION_WORKFLOWS.md`](guides/MECH_SESSION_WORKFLOWS.md) — bind
   existing agy sessions, track goals, and verify PR closure before advancing.
+- [`guides/MECH_WORKFLOW_CONTRACT.md`](guides/MECH_WORKFLOW_CONTRACT.md) — shared
+  LinkML/YAML six-goal cycle, local adaptations, versioned reviews, and
+  issue-linked infrastructure work.
 - [`guides/DEEP_RESEARCH_RESULTS.md`](guides/DEEP_RESEARCH_RESULTS.md) — strict,
   append-only deep-research result capture shared by every Mech.
 - [`AUTONOMOUS_LOOPS.md`](AUTONOMOUS_LOOPS.md) — goal-loop workflow guidance.
 - [`src/kg_microbe_governance/artifacts/`](../src/kg_microbe_governance/artifacts/) —
   canonical ID/label implementation and behavioral contracts.
 
-Generated reports belong under the gitignored `workspace/reports/`, not in the
-documentation tree.
+Operational scratch reports belong under the gitignored `workspace/reports/`,
+not in the documentation tree. Versioned goal-review evidence follows the
+repository paths defined by the workflow contract.

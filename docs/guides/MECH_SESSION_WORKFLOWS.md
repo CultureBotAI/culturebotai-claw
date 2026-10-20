@@ -5,7 +5,11 @@ sessions in macOS Terminal. With explicit `--apply`, it sends bounded workflow
 instructions to an idle session. The coding agent performs repository mutations;
 the supervisor verifies evidence before starting the next goal. Importing the
 committed Terminal adapter performs no UI actions. This guide can serve as the
-agent's `workflow_prompt_path`; its operational instructions are below.
+legacy agent's `workflow_prompt_path`; canonical cycles use the validated YAML contract and immutable runtime snapshot described below.
+
+See [the shared workflow contract](MECH_WORKFLOW_CONTRACT.md) for the six goals,
+versioned review outputs, infrastructure intake, and cycle restart. Its YAML
+parent and LinkML schema are the source of truth.
 
 ## Setup and session binding
 
@@ -32,7 +36,7 @@ repository paths from their names.
 The following creates a **TraitMech example** configuration using an existing
 process. First inspect `/bin/ps ax -o pid=,tty=,lstart=,comm=` and the relevant
 Terminal tab, then set `MECH_SESSION_PID` to its observed numeric PID and
-`MECH_INITIAL_STAGE` to the stage matching its actual last goal (1–4).
+`MECH_INITIAL_STAGE` to the stage matching its actual last goal (1–6).
 Never relabel a different existing goal merely to fit the example. Stage 0 is
 available for closing unrelated adopted work before starting stage 1.
 Set `MECH_MANIFEST_PATH` to the verified manifest if needed.
@@ -79,18 +83,11 @@ assert goal and goal["started_at"]
 run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 runtime = root / "workspace/session-workflows" / run_id
 runtime.mkdir(parents=True, exist_ok=False)
-profiles = [
-    (1, "Use the add-record skill to review and add traits until the documented search finds no new candidates.", "add-trait"),
-    (2, "Use the causal-graph skill to review, edit, and update every record's causal graph.", "research-causal-graphs"),
-    (3, "Review all records and add supported UniProt examples, especially for gene or protein graph elements.", "add-uniprot-protein-examples"),
-    (4, "Use the record-review skill to review every TraitMech record.", "review-yaml-record"),
-]
-stages = []
-for number, objective, skill in profiles:
-    path = repo_root / ".claude/skills" / skill / "SKILL.md"
-    assert path.is_file(), f"Required canonical skill missing: {path}"
-    stages.append({"stage": number, "goal_text": objective, "skill_paths": [str(path)],
-                   "applicability": "available"})
+profile_path = repo_root / "workflow/mech-workflow.yaml"
+assert profile_path.is_file(), "Install and validate this Mech's workflow adapter first"
+from kg_microbe_workflows import load_workflow
+resolved_workflow = load_workflow(profile_path)
+assert resolved_workflow["repository_key"] == "traitmech"
 default_branch = subprocess.check_output(
     ["gh", "api", f"repos/{target.expected_repository}", "--jq", ".default_branch"],
     text=True).strip()
@@ -106,8 +103,8 @@ config = {
         "initial_stage": int(os.environ["MECH_INITIAL_STAGE"]),
         "initial_goal_identity": {"conversation_id": conversation,
             "started_at": goal["started_at"], "start_step_index": goal["start_step_index"]},
-        "workflow_prompt_path": str(root / "docs/guides/MECH_SESSION_WORKFLOWS.md"),
-        "stages": stages,
+        "workflow_profile_path": str(profile_path),
+        "workflow_next_profile_path": str(profile_path),
     }],
 }
 (runtime / "config.json").write_text(json.dumps(config, indent=2) + "\n")
@@ -116,7 +113,10 @@ print(json.dumps(goal, indent=2))
 PY
 ```
 
-Review the printed goal and generated configuration before running it.
+Review the printed goal and generated configuration before running it. The
+profile supplies all six stages; do not copy a second stage list into the runtime
+configuration. The active cycle retains an immutable effective-profile snapshot;
+`workflow_next_profile_path` selects the candidate to validate after stage 6.
 `native_reader_path` and `notifier_path` default to the committed sibling
 scripts; explicit overrides remain supported for a reviewed local adapter.
 For other Mechs, assess native skills and domain applicability separately.
@@ -124,6 +124,27 @@ Missing representations or writers should block a stage. A nonbiological domain
 can use an explicit `applicability_audit` profile with its appropriate local
 review skill and an evidence-backed no-change result. Do not invent graph fields
 or UniProt annotations to satisfy a generic sequence.
+
+## Migrating an existing four-stage run
+
+Stop the goal supervisor and save its configuration, ledgers, receipts, and
+status before migration. Preserve the current run, conversation, native goal,
+stage, and action history. Validate every repository profile and review the
+proposed binding before changing the configuration.
+
+For each legacy target, add `workflow_profile_path`,
+`workflow_next_profile_path`, and `workflow_migration`. The migration contains
+`ledger_sha256` (the supervisor's canonical-JSON `digest` of the old ledger),
+its exact `goal_identity`, a `reviewed_by` identity and `reason`, and a `review`
+artifact with its SHA-256 and allowed `review_root`. The first sweep verifies
+that record and atomically adopts cycle 1 without replacing the native goal.
+A one-time policy handoff is sent only at a verified idle composer.
+
+Only the already adopted legacy goal in stages 0–3 may finish with its old
+receipt format. Existing stage 4 must produce the new versioned review evidence.
+An old stage-5 terminal ledger is not proof of the new stage 5: it needs the
+verified stage-4 evidence or a reviewed reassessment. Never reset a ledger or
+reuse a completed receipt merely to make a migration pass.
 
 ## Running, stopping, and recovery
 
@@ -193,23 +214,33 @@ Reuse already completed steps only after matching their goal, branch, head and
 evidence. Do not force-delete branches, discard/stash unrelated edits, bypass a
 queue, fabricate a review, or create an empty commit to obtain a receipt.
 If a clean checkout or another prerequisite cannot be achieved safely, write
-`progress.json` with the same run/repository/stage/goal identity as `status.json`,
+`progress.json` with the same run/repository/cycle/stage/goal identity as `status.json`,
 an ISO UTC `updated_at`, `phase: "blocked"`, and a concrete `summary`.
 Progress is informational and never completion authority.
 
 ## Closure receipts and verification
 
 Write `<runtime_dir>/<repository_key>/completion.json`. Copy the exact run,
-repository, stage and adopted `goal_identity` from `status.json`. Replace every
+repository, cycle, stage, pinned `workflow_sha256`, and adopted `goal_identity`
+from `status.json`. Replace every
 placeholder below with observed values; hashes are the real artifact SHA-256
 and Git SHAs. Store coverage, review and validation artifacts in the repository
-or that repository's runtime directory. Runtime artifacts avoid committing a
-report that would change the very head it claims to review.
+or that repository's runtime directory. The final-head PR adversarial review
+can remain a runtime artifact to avoid a self-referential commit. The stage's
+domain-review outputs and `INFRA_TASKS.md` are separate: they must be committed
+at the verified final head and bound in `goal_outputs`.
+
+`status.json` includes a scope-bound `receipt_template` and the paths to the
+effective workflow and evidence schema. Start from that template rather than
+copying cycle or workflow hashes from an older receipt. Its placeholders are
+not completion claims.
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "run_id": "<run>",
+  "cycle": 1,
+  "workflow_sha256": "<from status.json>",
   "repository_key": "traitmech",
   "stage": 1,
   "goal_identity": {
@@ -232,6 +263,9 @@ report that would change the very head it claims to review.
   },
   "issues": [{"number": 1, "disposition": "addressed", "fix_commit_sha": "<40 hex>"}],
   "pr": {"number": 1, "head_sha": "<40 hex>", "branch": "<feature branch>", "base": "main"},
+  "goal_outputs": {
+    "infra_tasks": {"path": "INFRA_TASKS.md", "sha256": "<64 hex>"}
+  },
   "cleanup": {
     "remote_branch_deleted": true,
     "local_branch_deleted": true,
@@ -240,7 +274,21 @@ report that would change the very head it claims to review.
 }
 ```
 
-Use `issues: []` when review found no issues. For a proven no-change goal, use
+All canonical receipts include `goal_outputs.infra_tasks`. Stages 4–6 also
+include `goal_outputs.goal_evidence` with the repository-relative path and
+SHA-256 of the versioned LinkML evidence manifest. The manifest binds the
+stage's required reports and data artifacts. Stage 5 must point to this cycle's
+exact verified stage-4 manifest. Stage 6 uses the supervisor's frozen intake
+snapshot from status, accounts for every outstanding task in it, and retains
+new tasks in the current notebook for the next cycle.
+
+Use `python -m kg_microbe_workflows validate-evidence <manifest> --root <repo>`
+from the reviewed CLAW environment; supply `--previous <manifest>` when required
+for finding continuity. Packaged examples under
+`src/kg_microbe_workflows/examples/` show the three stage-specific records.
+Validation checks shape and evidence; it does not replace Git and GitHub closure.
+
+Use `issues: []` when the PR adversarial review found no issues. For a proven no-change goal, use
 `status: "no_changes"`, `pr: null`, `issues: []`, and additionally:
 
 ```json
@@ -271,4 +319,8 @@ By default the native goal must also be completed. The opt-in target setting
 `allow_receipt_completion_override: true` permits a fully verified receipt for
 an active goal only after a matching accepted instruction; use it only after
 assessing why ordinary continuation left native goal state active.
-Stage 4 closes the pipeline; it does not restart stage 1.
+A canonical six-stage run advances only after each verified closure. Stage 6
+then increments `cycle`, validates and pins the committed next-cycle profile,
+and returns to stage 1. Actions, progress, receipts, archives, and reports carry
+the cycle identity, so older evidence cannot complete a later cycle. Legacy
+four-stage configurations remain supported until explicitly migrated.
