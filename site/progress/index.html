@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Evidence-backed goal cycles and pull request progress across the CultureBotAI Mech fleet.">
+    <meta name="color-scheme" content="light">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+    <title>Mech progress · CultureBotAI</title>
+    <link rel="icon" href="mark.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="styles.css">
+    <script src="app.mjs" type="module"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to progress</a>
+    <header class="masthead">
+      <div class="shell masthead-inner">
+        <a class="brand" href="./" aria-label="CultureBotAI Mech progress home">
+          <img src="mark.svg" width="34" height="34" alt="">
+          <span>CultureBotAI <span class="brand-divider">/</span> <strong>CLAW</strong></span>
+        </a>
+        <nav aria-label="Primary">
+          <a class="nav-current" href="#fleet">Fleet progress</a>
+          <a href="https://github.com/CultureBotAI/culturebotai-claw">Repository <span aria-hidden="true">↗</span></a>
+        </nav>
+      </div>
+    </header>
+    <main id="main" class="shell">
+      <section class="intro" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow">MECH OPERATIONS</p>
+          <h1 id="page-title">Mech workflow progress</h1>
+          <p class="lede">Follow each Mech from discovery to review, through pull requests and into the next cycle.</p>
+        </div>
+        <div class="snapshot-meta">
+          <div id="freshness" class="freshness unknown"><span class="status-dot" aria-hidden="true"></span><span>Loading observations</span></div>
+          <p id="snapshot-time">Checking the published snapshot…</p>
+          <button id="refresh" class="text-button" type="button">Refresh data <span aria-hidden="true">↻</span></button>
+        </div>
+      </section>
+      <div id="load-status" class="notice" role="status">Loading fleet progress…</div>
+      <noscript><p class="notice notice-warning">JavaScript is required for the interactive dashboard. You can read the <a href="data/progress.json">published structured progress snapshot</a> directly.</p></noscript>
+      <div id="dashboard" hidden>
+        <section class="metrics" aria-label="Verified progress totals">
+          <article class="metric"><p>Mechs observed</p><div><strong id="metric-mechs">—</strong><span id="metric-fleet-size"></span></div><small id="metric-attention">Within the published fleet</small></article>
+          <article class="metric"><p>Goals completed</p><div><strong id="metric-goals">—</strong><span>verified closures</span></div><small id="metric-no-change">Includes verified no-change outcomes</small></article>
+          <article class="metric"><p>PRs merged</p><div><strong id="metric-prs">—</strong><span>unique pull requests</span></div><small id="metric-open-prs">Associated with tracked goals</small></article>
+          <article class="metric"><p>Cycles completed</p><div><strong id="metric-cycles">—</strong><span>all six goals closed</span></div><small>A new cycle starts after infrastructure</small></article>
+        </section>
+        <section class="sequence-panel" aria-labelledby="sequence-heading">
+          <div class="section-kicker"><h2 id="sequence-heading">One continuous cycle</h2><span>Each goal closes after verification</span></div>
+          <ol class="sequence">
+            <li><span class="sequence-number">01</span><span>Add records<small>Discover &amp; curate</small></span></li>
+            <li><span class="sequence-number">02</span><span>Causal graphs<small>Connect mechanisms</small></span></li>
+            <li><span class="sequence-number">03</span><span>Protein examples<small>Ground in UniProt</small></span></li>
+            <li><span class="sequence-number">04</span><span>Record review<small>Version the findings</small></span></li>
+            <li><span class="sequence-number">05</span><span>Resolve findings<small>Group issues &amp; fix</small></span></li>
+            <li><span class="sequence-number">06</span><span>Infrastructure<small>Plan, improve, repeat</small></span></li>
+          </ol>
+        </section>
+        <section id="fleet" class="fleet-section" aria-labelledby="fleet-heading">
+          <div class="fleet-heading-row"><div><p class="eyebrow">THE FLEET</p><h2 id="fleet-heading">Progress by Mech</h2></div><p class="legend"><span><i class="legend-dot complete"></i>Verified</span><span><i class="legend-dot current"></i>Current</span><span><i class="legend-dot unverified"></i>Unverified</span></p></div>
+          <div class="toolbar">
+            <div class="search-field"><label class="sr-only" for="search">Search Mechs</label><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Find a Mech…" autocomplete="off"></div>
+            <div class="select-field"><label for="filter">Show</label><select id="filter"><option value="all">All states</option><option value="attention">Needs attention</option><option value="active">Active or waiting</option><option value="stale">Stale observations</option><option value="unobserved">Not observed</option></select></div>
+            <div class="select-field"><label for="sort">Sort</label><select id="sort"><option value="attention">Attention first</option><option value="name">Name A–Z</option><option value="stage">Current stage</option><option value="goals">Completed goals</option><option value="prs">Merged PRs</option></select></div>
+            <button id="reset" class="reset-button" type="button">Reset</button>
+          </div>
+          <p id="results-count" class="results-count" aria-live="polite" aria-atomic="true"></p>
+          <div class="list-labels" aria-hidden="true"><span>REPOSITORY / SESSION</span><span>CURRENT CYCLE</span><span>CYCLES</span><span>GOALS</span><span>PRS MERGED</span><span></span></div>
+          <div id="repositories"></div>
+          <p id="empty-state" class="empty-state" hidden>No Mechs match these filters. Try another name or reset the filters.</p>
+        </section>
+        <aside class="coverage-note" aria-labelledby="coverage-heading">
+          <div class="info-mark" aria-hidden="true">i</div>
+          <div><h2 id="coverage-heading">Progress you can trace</h2><p>Counts cover verified goal closures and explicitly associated PRs in the retained tracking history. A commit is not a PR; several PRs may belong to one goal. A cycle counts only when all six goals have verified closures. Earlier history is unknown, so these totals are lower bounds—not lifetime totals.</p><p>Stages preceding an adopted goal remain unverified until evidence is recorded. An observed waiting session does not mean its goal is complete.</p></div>
+        </aside>
+      </div>
+    </main>
+    <footer class="shell footer"><span>CultureBotAI <span aria-hidden="true">·</span> Mech workflow observatory</span><div><a href="data/progress.json">Structured data</a><a href="https://github.com/CultureBotAI/culturebotai-claw/blob/main/docs/guides/MECH_WORKFLOW_CONTRACT.md">Workflow contract <span aria-hidden="true">↗</span></a><a href="https://culturebotai.github.io/mechs/">Mech directory <span aria-hidden="true">↗</span></a></div></footer>
+  </body>
+</html>

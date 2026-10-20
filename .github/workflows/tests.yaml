@@ -69,6 +69,7 @@ jobs:
           src/kg_microbe_merge_queue
           src/kg_microbe_research
           src/kg_microbe_workflows
+          src/kg_microbe_progress
           src/kg_microbe_write
           src/kg_microbe_consistency
           src/kg_microbe_patches

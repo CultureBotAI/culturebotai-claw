@@ -142,7 +142,7 @@ uv run --extra dev mypy \
   src/kg_microbe_history src/kg_microbe_kgscan src/kg_microbe_fleet \
   src/kg_microbe_embeddings \
   src/kg_microbe_merge_queue src/kg_microbe_research src/kg_microbe_write \
-  src/kg_microbe_workflows \
+  src/kg_microbe_workflows src/kg_microbe_progress \
   src/kg_microbe_consistency src/kg_microbe_patches \
   src/kg_microbe_governance/__init__.py \
   src/kg_microbe_governance/__main__.py \
@@ -518,6 +518,17 @@ because they carry literal data the path rules would misread.
   Node; locally it skips without it, in CI it fails.
 - `.claude/commands/curate.md` coordinates the curation stages and must stop for
   confirmation before downstream mutations.
+
+## Mech progress accounting
+
+The progress model and public Pages projection live in `kg_microbe_progress`.
+Read `docs/guides/MECH_PROGRESS.md` before changing counters or publication.
+Register every goal PR, including follow-ups, using the exact supervisor session
+context. A PR merge is not a verified goal closure, and a commit is not a PR
+round. Never infer earlier stage completions from the current stage number.
+Keep the private native identities and free-text session content out of public
+JSON; use the strict public model and bundle validation. The dedicated
+`mech-progress-data` branch is durable data, not a disposable feature branch.
 
 ## Documentation
 
