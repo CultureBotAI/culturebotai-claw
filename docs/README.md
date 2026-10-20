@@ -25,6 +25,8 @@ Other maintained references:
   curation-history schema, CLI, vendoring, and enforcement model.
 - [`guides/RECORD_REVIEWS.md`](guides/RECORD_REVIEWS.md) — shared structured
   record reviews, evidence-linked findings, fleet triage, and planning inputs.
+- [`guides/MECH_SESSION_WORKFLOWS.md`](guides/MECH_SESSION_WORKFLOWS.md) — bind
+  existing agy sessions, track goals, and verify PR closure before advancing.
 - [`guides/DEEP_RESEARCH_RESULTS.md`](guides/DEEP_RESEARCH_RESULTS.md) — strict,
   append-only deep-research result capture shared by every Mech.
 - [`AUTONOMOUS_LOOPS.md`](AUTONOMOUS_LOOPS.md) — goal-loop workflow guidance.
