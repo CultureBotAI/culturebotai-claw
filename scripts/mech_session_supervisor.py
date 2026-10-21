@@ -1332,7 +1332,7 @@ class Supervisor:
                     raise SupervisorError("legacy workflow is observation-only; canonical profile and reviewed migration required")
             except Exception as error:
                 workflow_error = str(error)
-            observation = self.observe(target, allow_redraw=apply)
+            observation = self.observe(target, allow_redraw=bool(apply and not workflow_error))
             if workflow_error:
                 observation.update(error=workflow_error, ready=False)
             if self.stopping():
