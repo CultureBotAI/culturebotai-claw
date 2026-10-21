@@ -120,12 +120,53 @@ def terminal_busy_reason(screen: str) -> str | None:
     while lines and not lines[-1].strip():
         lines.pop()
     footer = "\n".join(lines[-32:])
-    if re.search(r"esc to interrupt|\b(?:messages?|tasks?) queued\b|\bqueued (?:messages?|tasks?)\b|"
+    if re.search(r"esc to interrupt|Compacting conversation|\b(?:messages?|tasks?) queued\b|\bqueued (?:messages?|tasks?)\b|"
                  r"alt\+m to send immediately|Press up to edit queued messages|"
                  r"\b[1-9]\d* (?:background )?task\(s\)|\b[1-9]\d* background tasks?\b|"
                  r"\bbackground tasks?:\s*[1-9]\d*|^\s*● .* running\s*$", footer, re.I | re.M):
         return "busy, background, or queued terminal state"
     return None
+
+
+def confirmed_display_corruption(screen: str, reason: str | None = None) -> bool:
+    """Detect distorted idle agy composers that safe row-bump redraw can refresh."""
+    if reason is None:
+        reason = import_file(ROOT / "scripts/mech_session_terminal.py", "supervisor_terminal").composer_reason(screen)
+    if reason not in {"missing-composer-borders", "unrecognized-composer-tail"}:
+        return False
+    if terminal_busy_reason(screen) is not None:
+        return False
+    lines = [line.rstrip() for line in screen.replace("\r", "").splitlines()]
+    while lines and not lines[-1].strip():
+        lines.pop()
+    candidates = [i for i, line in enumerate(lines) if line.strip() == ">"]
+    if not candidates:
+        return False
+    index = candidates[-1]
+    if index < 1 or len(lines) - index > 9:
+        return False
+    window = lines[max(0, index - 4):]
+    if any(re.match(r"^\s*>\s*\S", line) for line in window):
+        return False
+    if not any(re.search(r"[─━]{5,}", line) for line in window):
+        return False
+    if re.search(r"↑/↓\s*Navigate|(?:Accept|Allow|Run)[^\n]*\?|How's the CLI experience", "\n".join(window), re.I):
+        return False
+    if not re.search(r"Gemini\s+\S", "\n".join(lines[index:])):
+        return False
+    border = r"[─━═\-┌┐└┘│┃╭╮╰╯ ]+"
+    for line in lines[index + 1:]:
+        text = line.strip()
+        if not text or text == ">" or re.fullmatch(border, text):
+            continue
+        if ("Gemini " in text or "esc to cancel" in text.lower()
+                or re.search(
+                    r"(?:\?\s+for\s+(?:shortcuts|help)|tab\s+to\s+accept|"
+                    r"shift\+tab|ctrl\+\w|background task|/tasks)", text, re.I
+                )):
+            continue
+        return False
+    return True
 
 
 def normalize_github(url: str) -> str:
@@ -825,6 +866,15 @@ def verify_remote_receipt(receipt: dict, ledger: dict, target: dict, runner=comm
 
 SEND_JS = r'''
 function run(argv) {
+    const TAIL_CHARS = 64000;
+    function currentTail(tab) {
+        let raw = '';
+        try {
+            if (typeof tab.history === 'function') raw = String(tab.history() || '');
+        } catch (error) { raw = ''; }
+        if (!raw) raw = String(tab.contents() || '');
+        return raw.length > TAIL_CHARS ? raw.slice(-TAIL_CHARS) : raw;
+    }
     const expected = JSON.parse(argv[0]);
     if (!Number.isInteger(expected.pid) || expected.pid <= 0) return 'invalid-pid';
     const terminal = Application('Terminal');
@@ -844,13 +894,74 @@ function run(argv) {
             groups = system.doShellScript('/bin/ps -p ' + expected.pid + ' -o pgid=,tpgid=').trim().split(/\s+/);
         } catch (error) { return 'process-unavailable'; }
         if (identity !== expected.identity || cwd.length !== 1 || cwd[0] !== expected.cwd || groups.length !== 2 || groups[0] !== groups[1]) return 'identity-changed';
-        let currentScreen;
-        try { currentScreen = tab.contents(); } catch (error) { return 'target-unavailable'; }
-        if (currentScreen !== expected.screen) return 'screen-changed';
+        let currentScreen, expectedScreen;
+        try {
+            currentScreen = currentTail(tab);
+            const rawExpected = String(expected.screen || '');
+            expectedScreen = rawExpected.length > TAIL_CHARS ? rawExpected.slice(-TAIL_CHARS) : rawExpected;
+        } catch (error) { return 'target-unavailable'; }
+        if (currentScreen !== expectedScreen) return 'screen-changed';
         terminal.doScript(expected.message, {in: tab});
         return 'sent';
     }
     return 'window-closed';
+}
+'''
+
+REDRAW_JS = r'''
+function run(argv) {
+    const TAIL_CHARS = 64000;
+    function currentTail(tab) {
+        let raw = '';
+        try {
+            if (typeof tab.history === 'function') raw = String(tab.history() || '');
+        } catch (error) { raw = ''; }
+        if (!raw) raw = String(tab.contents() || '');
+        return raw.length > TAIL_CHARS ? raw.slice(-TAIL_CHARS) : raw;
+    }
+    const expected = JSON.parse(argv[0]);
+    if (!Number.isInteger(expected.pid) || expected.pid <= 0) return JSON.stringify({status: 'invalid-pid'});
+    const terminal = Application('Terminal');
+    const system = Application.currentApplication(); system.includeStandardAdditions = true;
+    for (const win of terminal.windows()) {
+        let wid; try { wid = win.id(); } catch (error) { continue; }
+        if (wid !== expected.window) continue;
+        let tab;
+        try {
+            const tabs = win.tabs(); if (tabs.length < expected.tab) return JSON.stringify({status: 'tab-changed'});
+            tab = tabs[expected.tab - 1]; if (tab.tty() !== expected.tty) return JSON.stringify({status: 'tty-changed'});
+        } catch (error) { return JSON.stringify({status: 'target-unavailable'}); }
+        let identity, cwd, groups;
+        try {
+            identity = system.doShellScript('/bin/ps -p ' + expected.pid + ' -o pid=,tty=,lstart=,comm=').trim();
+            cwd = system.doShellScript('/usr/sbin/lsof -a -p ' + expected.pid + ' -d cwd -Fn').split(/\r?\n|\r/).filter(x => x.startsWith('n')).map(x => x.slice(1));
+            groups = system.doShellScript('/bin/ps -p ' + expected.pid + ' -o pgid=,tpgid=').trim().split(/\s+/);
+        } catch (error) { return JSON.stringify({status: 'process-unavailable'}); }
+        if (identity !== expected.identity || cwd.length !== 1 || cwd[0] !== expected.cwd || groups.length !== 2 || groups[0] !== groups[1]) return JSON.stringify({status: 'identity-changed'});
+        let currentScreen, expectedScreen, rows;
+        try {
+            currentScreen = currentTail(tab);
+            const rawExpected = String(expected.screen || '');
+            expectedScreen = rawExpected.length > TAIL_CHARS ? rawExpected.slice(-TAIL_CHARS) : rawExpected;
+            rows = tab.numberOfRows();
+        } catch (error) { return JSON.stringify({status: 'target-unavailable'}); }
+        if (currentScreen !== expectedScreen) return JSON.stringify({status: 'screen-changed'});
+        if (!Number.isInteger(rows) || rows < 5 || rows > 300) return JSON.stringify({status: 'invalid-rows'});
+        try {
+            tab.numberOfRows = rows + 1;
+            delay(0.3);
+        } finally {
+            try { tab.numberOfRows = rows; } catch (error) {}
+        }
+        delay(0.3);
+        let restoredRows, refreshedScreen;
+        try {
+            restoredRows = tab.numberOfRows();
+            refreshedScreen = currentTail(tab);
+        } catch (error) { return JSON.stringify({status: 'target-unavailable'}); }
+        return JSON.stringify({status: 'redrawn', rows: rows, restoredRows: restoredRows, screen: refreshedScreen});
+    }
+    return JSON.stringify({status: 'window-closed'});
 }
 '''
 
@@ -880,7 +991,28 @@ class Supervisor:
     def write(self, path: Path, value: Any) -> None:
         atomic_json(path, value, boundary=self.runtime)
 
-    def observe(self, target: dict, *, fresh: bool = False) -> dict:
+    def redraw_tab(self, target: dict, tab: dict, *, lock_held: bool = False) -> dict:
+        payload = {**tab, "pid": target["pid"], "identity": target["process_identity"], "cwd": target["root"]}
+        lock = Path(self.config["input_lock_dir"]) / (Path(target["tty"]).name + ".lock")
+        try:
+            if lock_held:
+                raw = self.notifier.jxa(REDRAW_JS, payload)
+            else:
+                with file_lock(lock):
+                    raw = self.notifier.jxa(REDRAW_JS, payload)
+            parsed = json.loads(raw) if isinstance(raw, str) else raw
+            if not isinstance(parsed, dict):
+                return {"status": "invalid-response"}
+            return {"status": str(parsed.get("status", "unknown")),
+                    "rows": parsed.get("rows"),
+                    "restored_rows": parsed.get("restoredRows"),
+                    "screen": parsed.get("screen")}
+        except BlockingIOError:
+            return {"status": "lock-busy"}
+        except Exception as error:
+            return {"status": "redraw-error", "error": str(error)[:300]}
+
+    def observe(self, target: dict, *, fresh: bool = False, allow_redraw: bool = False, lock_held: bool = False) -> dict:
         observation = {"observed_at": now(), "ready": False}
         try:
             live = self.notifier.live_process(target["pid"])
@@ -926,6 +1058,19 @@ class Supervisor:
             reason = self.notifier.composer_reason(tab["screen"])
             execution = native.get("native_execution_state", "unknown")
             busy = terminal_busy_reason(tab["screen"])
+            if (allow_redraw and not self.stopping()
+                    and execution in {"idle_candidate", "interrupted"}
+                    and busy is None
+                    and confirmed_display_corruption(tab["screen"], reason)):
+                redrawn = self.redraw_tab(target, tab, lock_held=lock_held)
+                observation["redraw"] = {k: v for k, v in redrawn.items() if k != "screen"}
+                if (redrawn.get("status") == "redrawn"
+                        and redrawn.get("restored_rows") == redrawn.get("rows")
+                        and isinstance(redrawn.get("screen"), str)):
+                    tab = {**tab, "screen": redrawn["screen"]}
+                    observation["tab"] = tab
+                    reason = self.notifier.composer_reason(tab["screen"])
+                    busy = terminal_busy_reason(tab["screen"])
             if not reason and execution not in {"idle_candidate", "interrupted"}:
                 reason = "native execution is " + execution
             if not reason and busy:
@@ -1027,7 +1172,7 @@ class Supervisor:
             return {"state": "not-sent", "reason": "supervisor stop requested"}
         lock = Path(self.config["input_lock_dir"]) / (Path(target["tty"]).name + ".lock")
         with file_lock(lock):
-            observation = self.observe(target, fresh=True)
+            observation = self.observe(target, fresh=True, allow_redraw=True, lock_held=True)
             if self.stopping():
                 return {"state": "not-sent", "reason": "supervisor stop requested"}
             observation["agent_progress"] = self.progress(target, ledger)
@@ -1187,7 +1332,7 @@ class Supervisor:
                     raise SupervisorError("legacy workflow is observation-only; canonical profile and reviewed migration required")
             except Exception as error:
                 workflow_error = str(error)
-            observation = self.observe(target)
+            observation = self.observe(target, allow_redraw=apply)
             if workflow_error:
                 observation.update(error=workflow_error, ready=False)
             if self.stopping():
