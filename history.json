@@ -691,24 +691,38 @@
       "stage_id": "causal_graphs",
       "stage_number": 2,
       "verified_at": "2026-10-21T19:41:47.334347+00:00"
+    },
+    {
+      "cycle": 1,
+      "id": "c8214f2b677667442f57b21bd2de063fbc61d92540129a9edc16e6bb904b4db3",
+      "merge_commit_sha": "6a639c4b597e95b6061f2d1c7baa04de84ba2f00",
+      "outcome": "merged",
+      "pr_number": 654,
+      "pr_url": "https://github.com/CultureBotAI/CultureMech/pull/654",
+      "receipt_sha256": "ecbd579e6da9d86c9a025fbd56a8c0ec8e1a30e025ca272292f8aaf7bd57f972",
+      "repository_key": "culturemech",
+      "run_key": "691d144c1e172ba586e72c5b",
+      "stage_id": "resolve_review_findings",
+      "stage_number": 5,
+      "verified_at": "2026-10-21T20:08:55.813422+00:00"
     }
   ],
   "cursors": [
     {
       "blocker_code": "none",
       "cycle": 1,
-      "observed_at": "2026-10-21T20:05:01.930936+00:00",
-      "phase": "waiting",
+      "observed_at": "2026-10-21T20:10:09.635511+00:00",
+      "phase": "ready_to_dispatch",
       "repository_key": "culturemech",
       "run_key": "691d144c1e172ba586e72c5b",
-      "stage_id": "resolve_review_findings",
-      "stage_number": 5,
+      "stage_id": "infrastructure",
+      "stage_number": 6,
       "started_at": "2026-10-20T01:48:28.355370+00:00"
     },
     {
       "blocker_code": "none",
       "cycle": 1,
-      "observed_at": "2026-10-21T20:05:04.359204+00:00",
+      "observed_at": "2026-10-21T20:10:14.991994+00:00",
       "phase": "waiting",
       "repository_key": "mediaingredientmech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -717,9 +731,9 @@
       "started_at": "2026-10-20T01:48:31.541616+00:00"
     },
     {
-      "blocker_code": "none",
+      "blocker_code": "composer_unavailable",
       "cycle": 1,
-      "observed_at": "2026-10-21T20:05:06.720061+00:00",
+      "observed_at": "2026-10-21T20:10:17.426368+00:00",
       "phase": "waiting",
       "repository_key": "communitymech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -728,9 +742,9 @@
       "started_at": "2026-10-20T01:48:34.372349+00:00"
     },
     {
-      "blocker_code": "none",
+      "blocker_code": "composer_unavailable",
       "cycle": 1,
-      "observed_at": "2026-10-21T20:05:09.171839+00:00",
+      "observed_at": "2026-10-21T20:10:19.893744+00:00",
       "phase": "waiting",
       "repository_key": "traitmech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -741,7 +755,7 @@
     {
       "blocker_code": "none",
       "cycle": 1,
-      "observed_at": "2026-10-21T20:05:11.621435+00:00",
+      "observed_at": "2026-10-21T20:10:22.523200+00:00",
       "phase": "waiting",
       "repository_key": "proteintraitsmech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -752,7 +766,7 @@
     {
       "blocker_code": "composer_unavailable",
       "cycle": 1,
-      "observed_at": "2026-10-21T20:05:14.056052+00:00",
+      "observed_at": "2026-10-21T20:10:24.972682+00:00",
       "phase": "waiting",
       "repository_key": "antibioticmech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -763,7 +777,7 @@
     {
       "blocker_code": "none",
       "cycle": 1,
-      "observed_at": "2026-10-21T20:05:16.451725+00:00",
+      "observed_at": "2026-10-21T20:10:27.337384+00:00",
       "phase": "ready_to_dispatch",
       "repository_key": "cellstructuremech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -774,7 +788,7 @@
     {
       "blocker_code": "composer_unavailable",
       "cycle": 1,
-      "observed_at": "2026-10-21T20:05:21.698432+00:00",
+      "observed_at": "2026-10-21T20:10:32.555480+00:00",
       "phase": "waiting",
       "repository_key": "habitatmech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -785,7 +799,7 @@
     {
       "blocker_code": "none",
       "cycle": 1,
-      "observed_at": "2026-10-21T20:05:24.120504+00:00",
+      "observed_at": "2026-10-21T20:10:35.009903+00:00",
       "phase": "waiting",
       "repository_key": "naturalproductmech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -796,7 +810,7 @@
     {
       "blocker_code": "none",
       "cycle": 1,
-      "observed_at": "2026-10-21T20:05:27.170658+00:00",
+      "observed_at": "2026-10-21T20:10:38.092018+00:00",
       "phase": "waiting",
       "repository_key": "taxonmech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -807,7 +821,7 @@
     {
       "blocker_code": "none",
       "cycle": 1,
-      "observed_at": "2026-10-21T20:05:29.684269+00:00",
+      "observed_at": "2026-10-21T20:10:40.660297+00:00",
       "phase": "waiting",
       "repository_key": "pathwaymech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -818,7 +832,7 @@
     {
       "blocker_code": "none",
       "cycle": 1,
-      "observed_at": "2026-10-21T20:05:32.185175+00:00",
+      "observed_at": "2026-10-21T20:10:43.126318+00:00",
       "phase": "ready_to_dispatch",
       "repository_key": "dufmech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -829,7 +843,7 @@
     {
       "blocker_code": "none",
       "cycle": 1,
-      "observed_at": "2026-10-21T20:05:37.616875+00:00",
+      "observed_at": "2026-10-21T20:10:48.625059+00:00",
       "phase": "ready_to_dispatch",
       "repository_key": "cmmmech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -840,7 +854,7 @@
     {
       "blocker_code": "closure_repairs_exhausted",
       "cycle": 1,
-      "observed_at": "2026-10-21T20:04:29.507272+00:00",
+      "observed_at": "2026-10-21T20:09:37.260196+00:00",
       "phase": "requires_intervention",
       "repository_key": "aimech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -2071,6 +2085,20 @@
       "source": "github",
       "state": "merged",
       "url": "https://github.com/CultureBotAI/CultureMech/pull/654"
+    },
+    {
+      "head_sha": "49e2246193c25e6e628e1ff8f24e264417ce29fb",
+      "id": "e29f9da7e1fccdae34cf0e7b36f84191f94c6112e5820bdd48bee81053b77203",
+      "merge_commit_sha": "5bab842c1acde531640142f784b013af168b9a0f",
+      "merged_at": "2026-10-21T20:10:44Z",
+      "number": 149,
+      "observed_at": "2026-10-21T20:10:48.782602+00:00",
+      "pr_id": "dba4828475405789a64472533f23539b5117c453f99567d06ca87da42063404b",
+      "repository_key": "taxonmech",
+      "sequence": 3,
+      "source": "github",
+      "state": "merged",
+      "url": "https://github.com/CultureBotAI/TaxonMech/pull/149"
     }
   ],
   "schema_version": "1.0.0"
