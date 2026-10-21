@@ -87,11 +87,18 @@ def test_jxa_passes_source_and_payload_as_arguments(monkeypatch):
 def test_snapshot_js_filters_ttys_and_isolates_unreadable_tabs():
     harness = r'''
     let writes = 0;
-    function tab(tty, screen, broken = false) {
-        return {tty: () => tty, contents: () => {
-            if (broken) throw Error("unreadable");
-            return screen;
-        }};
+    function tab(tty, screen, broken = false, history = null) {
+        return {
+            tty: () => tty,
+            history: () => {
+                if (broken) throw Error("unreadable");
+                return history;
+            },
+            contents: () => {
+                if (broken) throw Error("unreadable");
+                return screen;
+            },
+        };
     }
     global.Application = name => {
         if (name !== "Terminal") throw Error("wrong app");
@@ -99,20 +106,27 @@ def test_snapshot_js_filters_ttys_and_isolates_unreadable_tabs():
             doScript: () => { writes++; throw Error("snapshot must never type"); },
             windows: () => [{id: () => 7, tabs: () => [
                 tab("/dev/ttys001", "other"),
-                tab("/dev/ttys002", "selected"),
+                tab("/dev/ttys002", "scrolled viewport", false, "X".repeat(70000) + "\nlive bottom tail"),
                 tab("/dev/ttys003", "broken", true),
+                tab("/dev/ttys004", "fallback contents", false, ""),
             ]}],
         };
     };
     '''
     program = harness + terminal.SNAPSHOT_JS + r'''
-    const result = JSON.parse(run([JSON.stringify(["/dev/ttys002", "/dev/ttys003"])]));
+    const result = JSON.parse(run([JSON.stringify(["/dev/ttys002", "/dev/ttys003", "/dev/ttys004"])]));
     process.stdout.write(JSON.stringify({result, writes}));
     '''
     result = subprocess.run(["node", "-e", program], text=True, capture_output=True, check=True)
     parsed = json.loads(result.stdout)
     assert parsed["writes"] == 0
-    assert parsed["result"]["tabs"] == [
-        {"window": 7, "tab": 2, "tty": "/dev/ttys002", "screen": "selected"}
-    ]
+    assert len(parsed["result"]["tabs"]) == 2
+    tab2 = parsed["result"]["tabs"][0]
+    assert tab2["window"] == 7 and tab2["tab"] == 2 and tab2["tty"] == "/dev/ttys002"
+    assert len(tab2["screen"]) == terminal.TAIL_CHARS
+    assert tab2["screen"].endswith("\nlive bottom tail")
+    assert "scrolled viewport" not in tab2["screen"]
+    assert parsed["result"]["tabs"][1] == {
+        "window": 7, "tab": 4, "tty": "/dev/ttys004", "screen": "fallback contents"
+    }
     assert len(parsed["result"]["warnings"]) == 1

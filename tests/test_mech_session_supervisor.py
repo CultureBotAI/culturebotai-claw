@@ -1302,3 +1302,169 @@ def test_early_stage_preserves_superseded_ancestors_of_archived_infrastructure(c
         setup.remote.snapshot()
     with pytest.raises(supervisor.SupervisorError, match="not versioned|archived workflow evidence"):
         supervisor.verify_remote_receipt(early, ledger, setup.target, setup.remote)
+
+
+def test_compacting_conversation_counts_as_busy():
+    screen = (
+        "Earlier output\n"
+        "✻ Compacting conversation... (esc to interrupt · 19s)\n"
+        "────────────────────────\n>\n────────────────────────\n"
+        "  ? for shortcuts                                         Gemini 3.1 Pro (High)\n"
+    )
+    assert supervisor.terminal_busy_reason(screen) == "busy, background, or queued terminal state"
+    quiet_compaction = screen.replace("(esc to interrupt · 19s)", "(19s)")
+    assert supervisor.terminal_busy_reason(quiet_compaction) == "busy, background, or queued terminal state"
+
+
+@pytest.mark.parametrize("screen", [
+    # ttys020 (communitymech): duplicate > below footer and missing top border
+    "────────────────────────────────────────\n>\n────────────────────────────────────────\n? for shortcuts                                            Gemini 4 Argon · high\n>\n────────────────────────────────────────\nesc to cancel                                              Gemini 4 Argon · high\n",
+    # ttys021 / ttys025 (culturemech / mediaingredientmech): missing bottom border (blank line after >)
+    "────────────────────────────────────────\n>\n\n? for shortcuts                                            Gemini 4 Argon · high\n\n",
+    # ttys022 (dufmech): overwritten top border and blank line after >
+    "──────wrote completion.json.                                               ─────\n>\n\nesc to cancel                                              Gemini 4 Argon · high\n\n\n? for shortcuts\n",
+    # ttys024 / ttys027 (habitatmech / pathwaymech): duplicate > line and missing bottom border
+    "────────────────────────────────────────\n>\n>\n? for shortcuts                                            Gemini 4 Argon · high\nesc to cancel                                              Gemini 4 Argon · high\n",
+    # ttys026 (naturalproductmech): missing top border (blank line before >)
+    "⣟  Generating...\n\n>\n────────────────────────────────────────\nesc to cancel                                              Gemini 4 Argon · high\n? for shortcuts\n",
+    # Leftover esc to cancel on its own line in footer
+    "────────────────────────\n>\n────────────────────────\n  esc to cancel\n  ? for shortcuts                                         Gemini 3.1 Pro (High)\n",
+])
+def test_confirmed_display_corruption_accepts_distorted_idle_composers(screen):
+    assert supervisor.confirmed_display_corruption(screen) is True
+
+
+@pytest.mark.parametrize("screen", [
+    # Healthy idle composer
+    "Earlier output\n────────────────────────\n>\n────────────────────────\n  ? for shortcuts  Gemini 3.1 Pro (High)\n",
+    # Single-line unsent user draft (ttys017 AntibioticMech)
+    "────────────────────────────────────────\n> /goal review all records and add uniprot protein examples espcially for gene\n    or protein elements of causal graphs. make a claude skill for this\n────────────────────────────────────────\n                                                           Gemini 4 Argon · high\n",
+    # Multi-line unsent draft with trailing empty >
+    "────────────────────────\n> first draft line\n>\n────────────────────────\n  ? for shortcuts  Gemini 3.1 Pro (High)\n",
+    # Continuation text below >
+    "────────────────────────\n>\nunsubmitted second line\n────────────────────────\n  ? for shortcuts  Gemini 3.1 Pro (High)\n",
+    # Approval / feedback menu
+    "────────────────────────\n>\n────────────────────────\nHow's the CLI experience so far?\n1. Good\n2. Fine\n  Gemini 3.1 Pro (High)\n",
+    # Busy / compacting state
+    "✻ Compacting conversation...\n>\n────────────────────────\n  ? for shortcuts  Gemini 3.1 Pro (High)\n",
+    # Non-border text around >
+    "not a border\n>\nnot a border\n  ? for shortcuts  Gemini 3.1 Pro (High)\n",
+])
+def test_confirmed_display_corruption_rejects_healthy_drafts_menus_and_busy(screen):
+    assert supervisor.confirmed_display_corruption(screen) is False
+
+
+def test_observe_redraws_confirmed_corruption_only_when_allowed(setup, monkeypatch):
+    distorted = "  Committed d843d7b.\n>\n────────────────────────\n  ? for shortcuts  Gemini 3.1 Pro (High)\n"
+    healthy = "  Committed d843d7b.\n────────────────────────\n>\n────────────────────────\n  ? for shortcuts  Gemini 3.1 Pro (High)\n"
+    cache_path = setup.runtime / "conversations.json"
+    cache_path.write_text(json.dumps({str(setup.repo.resolve()): setup.target["native_session_id"]}))
+    setup.config["conversation_cache_path"] = str(cache_path)
+    setup.config["conversation_dir"] = str(setup.runtime / "conversations")
+    calls = []
+
+    def fake_jxa(source, payload):
+        calls.append((source, payload))
+        if source == notifier.SNAPSHOT_JS:
+            return json.dumps({"tabs": [{"window": 1, "tab": 1, "tty": setup.target["tty"], "screen": distorted}], "warnings": []})
+        if source == supervisor.REDRAW_JS:
+            return json.dumps({"status": "redrawn", "rows": 22, "restoredRows": 22, "screen": healthy})
+        raise AssertionError("unexpected JXA call")
+
+    notifier = SimpleNamespace(
+        SNAPSHOT_JS="snapshot",
+        live_process=lambda pid: {"pid": pid, "tty": setup.target["tty"], "identity": setup.target["process_identity"]},
+        process_cwd=lambda pid: setup.repo.resolve(),
+        foreground=lambda pid, tty: True,
+        jxa=fake_jxa,
+        composer_reason=supervisor.import_file(Path(__file__).parents[1] / "scripts/mech_session_terminal.py", "t").composer_reason,
+    )
+    native = SimpleNamespace(inspect=lambda root, sid: {
+        "conversation_id": sid,
+        "native_execution_state": "idle_candidate",
+        "current_goal": {**GOAL, "state": "completed", "goal_text": "goal"},
+    })
+    gh = GitHubFixture()
+    def runner(args, **kw):
+        if args[0] == "/bin/ps":
+            return SimpleNamespace(stdout=f"{setup.target['pid']} agy\n", stderr="", returncode=0)
+        return gh(args, **kw)
+
+    instance = supervisor.Supervisor(setup.config, native=native, notifier=notifier, runner=runner)
+    obs_readonly = instance.observe(setup.target, fresh=True, allow_redraw=False)
+    assert obs_readonly["ready"] is False
+    assert obs_readonly["readiness_reason"] == "missing-composer-borders"
+    assert len(calls) == 1
+
+    obs_redraw = instance.observe(setup.target, fresh=True, allow_redraw=True)
+    assert obs_redraw["ready"] is True
+    assert obs_redraw["readiness_reason"] is None
+    assert obs_redraw["redraw"] == {"status": "redrawn", "rows": 22, "restored_rows": 22}
+    assert len(calls) == 3
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="Node is needed to execute JXA scripts offline")
+def test_send_js_and_redraw_js_use_history_tail_and_restore_rows(setup):
+    harness = r'''
+    let sent = [];
+    let currentRows = 22;
+    let historyText = "X".repeat(70000) + "\nexpected tail";
+    let refreshedText = "X".repeat(70000) + "\nrefreshed tail";
+    let didBump = false;
+    global.delay = () => {};
+    const tabObj = {
+        tty: () => "/dev/ttys030",
+        contents: () => "stale scrolled viewport",
+        history: () => (didBump ? refreshedText : historyText),
+        numberOfRows: () => currentRows,
+    };
+    Object.defineProperty(tabObj, "numberOfRows", {
+        get: () => () => currentRows,
+        set: (val) => {
+            if (val === 23) didBump = true;
+            currentRows = val;
+        },
+    });
+    global.Application = name => {
+        if (name === "Terminal") {
+            return {
+                windows: () => [{id: () => 1, tabs: () => [tabObj]}],
+                doScript: (msg) => { sent.push(msg); },
+            };
+        }
+        return {
+            includeStandardAdditions: false,
+            doShellScript: (cmd) => {
+                if (cmd.includes("lstart=")) return "1234 ttys030 Mon Oct 19 10:00:00 2026 agy";
+                if (cmd.includes("lsof")) return "p1234\nn/repo/TraitMech";
+                if (cmd.includes("pgid=")) return "1234 1234";
+                throw Error("unexpected cmd: " + cmd);
+            },
+        };
+    };
+    global.Application.currentApplication = () => global.Application("System");
+    '''
+    payload = {
+        "window": 1, "tab": 1, "tty": "/dev/ttys030", "pid": 1234,
+        "identity": "1234 ttys030 Mon Oct 19 10:00:00 2026 agy",
+        "cwd": "/repo/TraitMech",
+        "screen": ("X" * 64000)[-64000 + len("\nexpected tail"):] + "\nexpected tail",
+        "message": "hello world",
+    }
+    send_prog = harness + supervisor.SEND_JS + f"\nconst out = run([JSON.stringify({json.dumps(payload)})]); process.stdout.write(JSON.stringify({{out, sent}}));"
+    res = json.loads(subprocess.run(["node", "-e", send_prog], text=True, capture_output=True, check=True).stdout)
+    assert res["out"] == "sent" and res["sent"] == ["hello world"]
+
+    mismatch_payload = {**payload, "screen": "stale scrolled viewport"}
+    mismatch_prog = harness + supervisor.SEND_JS + f"\nconst out = run([JSON.stringify({json.dumps(mismatch_payload)})]); process.stdout.write(JSON.stringify({{out, sent}}));"
+    res_mismatch = json.loads(subprocess.run(["node", "-e", mismatch_prog], text=True, capture_output=True, check=True).stdout)
+    assert res_mismatch["out"] == "screen-changed" and res_mismatch["sent"] == []
+
+    redraw_prog = harness + supervisor.REDRAW_JS + f"\nconst out = JSON.parse(run([JSON.stringify({json.dumps(payload)})])); process.stdout.write(JSON.stringify({{out, currentRows}}));"
+    res_redraw = json.loads(subprocess.run(["node", "-e", redraw_prog], text=True, capture_output=True, check=True).stdout)
+    assert res_redraw["out"]["status"] == "redrawn"
+    assert res_redraw["out"]["rows"] == 22
+    assert res_redraw["out"]["restoredRows"] == 22
+    assert res_redraw["currentRows"] == 22
+    assert res_redraw["out"]["screen"].endswith("\nrefreshed tail")
+

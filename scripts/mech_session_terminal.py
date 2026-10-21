@@ -10,8 +10,19 @@ import re
 import subprocess
 from pathlib import Path
 
+TAIL_CHARS = 64000
+
 SNAPSHOT_JS = r'''
 function run(argv) {
+    const TAIL_CHARS = 64000;
+    function currentTail(tab) {
+        let raw = '';
+        try {
+            if (typeof tab.history === 'function') raw = String(tab.history() || '');
+        } catch (error) { raw = ''; }
+        if (!raw) raw = String(tab.contents() || '');
+        return raw.length > TAIL_CHARS ? raw.slice(-TAIL_CHARS) : raw;
+    }
     const allowed = JSON.parse(argv[0]);
     const terminal = Application('Terminal');
     const tabs = [], warnings = [];
@@ -25,7 +36,7 @@ function run(argv) {
                     const tab = children[index], tty = tab.tty();
                     if (allowed.includes(tty))
                         tabs.push({window: wid, tab: index + 1, tty,
-                                   screen: tab.contents()});
+                                   screen: currentTail(tab)});
                 } catch (error) { warnings.push(String(error)); }
             }
         } catch (error) { warnings.push(String(error)); }
