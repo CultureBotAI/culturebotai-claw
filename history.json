@@ -1793,13 +1793,27 @@
       "stage_id": "resolve_review_findings",
       "stage_number": 5,
       "verified_at": "2026-10-22T14:41:19.696821+00:00"
+    },
+    {
+      "cycle": 2,
+      "id": "354883eeb33deeedaed2d312129cdaf20765d66e6d4b691fe895281b634c08be",
+      "merge_commit_sha": "141d6b29ac5b00faa5d939dc6aaceea97af819b3",
+      "outcome": "merged",
+      "pr_number": 690,
+      "pr_url": "https://github.com/CultureBotAI/PathwayMech/pull/690",
+      "receipt_sha256": "3016f004df5137ecfb92f4960458b87f3cbaab2ee3d446aa3efd416a2a15cb43",
+      "repository_key": "pathwaymech",
+      "run_key": "691d144c1e172ba586e72c5b",
+      "stage_id": "record_review",
+      "stage_number": 4,
+      "verified_at": "2026-10-22T15:03:14.401046+00:00"
     }
   ],
   "cursors": [
     {
       "blocker_code": "review_required",
       "cycle": 2,
-      "observed_at": "2026-10-22T15:01:07.172298+00:00",
+      "observed_at": "2026-10-22T15:06:24.279696+00:00",
       "phase": "blocked",
       "repository_key": "culturemech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -1810,7 +1824,7 @@
     {
       "blocker_code": "none",
       "cycle": 2,
-      "observed_at": "2026-10-22T15:01:09.917040+00:00",
+      "observed_at": "2026-10-22T15:06:26.973698+00:00",
       "phase": "waiting",
       "repository_key": "mediaingredientmech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -1821,7 +1835,7 @@
     {
       "blocker_code": "composer_unavailable",
       "cycle": 2,
-      "observed_at": "2026-10-22T15:01:12.850725+00:00",
+      "observed_at": "2026-10-22T15:06:29.904778+00:00",
       "phase": "waiting",
       "repository_key": "communitymech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -1832,7 +1846,7 @@
     {
       "blocker_code": "none",
       "cycle": 1,
-      "observed_at": "2026-10-22T15:01:15.765182+00:00",
+      "observed_at": "2026-10-22T15:06:32.923787+00:00",
       "phase": "waiting",
       "repository_key": "traitmech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -1843,7 +1857,7 @@
     {
       "blocker_code": "none",
       "cycle": 1,
-      "observed_at": "2026-10-22T15:01:18.472265+00:00",
+      "observed_at": "2026-10-22T15:06:35.676675+00:00",
       "phase": "waiting",
       "repository_key": "proteintraitsmech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -1854,7 +1868,7 @@
     {
       "blocker_code": "closure_repairs_exhausted",
       "cycle": 1,
-      "observed_at": "2026-10-22T15:01:21.268414+00:00",
+      "observed_at": "2026-10-22T15:06:38.628986+00:00",
       "phase": "requires_intervention",
       "repository_key": "antibioticmech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -1865,7 +1879,7 @@
     {
       "blocker_code": "none",
       "cycle": 1,
-      "observed_at": "2026-10-22T15:01:24.074287+00:00",
+      "observed_at": "2026-10-22T15:06:41.625275+00:00",
       "phase": "waiting",
       "repository_key": "cellstructuremech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -1876,7 +1890,7 @@
     {
       "blocker_code": "none",
       "cycle": 2,
-      "observed_at": "2026-10-22T15:01:26.812989+00:00",
+      "observed_at": "2026-10-22T15:06:44.323713+00:00",
       "phase": "waiting",
       "repository_key": "habitatmech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -1887,7 +1901,7 @@
     {
       "blocker_code": "none",
       "cycle": 2,
-      "observed_at": "2026-10-22T15:01:29.674407+00:00",
+      "observed_at": "2026-10-22T15:06:47.128887+00:00",
       "phase": "waiting",
       "repository_key": "naturalproductmech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -1898,7 +1912,7 @@
     {
       "blocker_code": "none",
       "cycle": 2,
-      "observed_at": "2026-10-22T15:01:32.473202+00:00",
+      "observed_at": "2026-10-22T15:06:50.036324+00:00",
       "phase": "waiting",
       "repository_key": "taxonmech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -1909,18 +1923,18 @@
     {
       "blocker_code": "none",
       "cycle": 2,
-      "observed_at": "2026-10-22T15:01:35.173658+00:00",
-      "phase": "ready_to_dispatch",
+      "observed_at": "2026-10-22T15:06:52.778212+00:00",
+      "phase": "waiting",
       "repository_key": "pathwaymech",
       "run_key": "691d144c1e172ba586e72c5b",
-      "stage_id": "record_review",
-      "stage_number": 4,
+      "stage_id": "resolve_review_findings",
+      "stage_number": 5,
       "started_at": "2026-10-20T01:49:16.412727+00:00"
     },
     {
       "blocker_code": "none",
       "cycle": 2,
-      "observed_at": "2026-10-22T15:00:28.445102+00:00",
+      "observed_at": "2026-10-22T15:06:55.728324+00:00",
       "phase": "waiting",
       "repository_key": "dufmech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -1931,7 +1945,7 @@
     {
       "blocker_code": "none",
       "cycle": 2,
-      "observed_at": "2026-10-22T15:00:31.372040+00:00",
+      "observed_at": "2026-10-22T15:05:48.129484+00:00",
       "phase": "waiting",
       "repository_key": "cmmmech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -1942,7 +1956,7 @@
     {
       "blocker_code": "composer_unavailable",
       "cycle": 1,
-      "observed_at": "2026-10-22T15:00:34.416594+00:00",
+      "observed_at": "2026-10-22T15:05:51.334321+00:00",
       "phase": "waiting",
       "repository_key": "aimech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -5078,6 +5092,18 @@
       "pr_id": "5728ccce0cbbeaa7c77c393aedfda68ac6785338403c674553108683e887924b",
       "repository_key": "cmmmech",
       "sequence": 1,
+      "source": "github",
+      "state": "open",
+      "url": "https://github.com/CultureBotAI/CMMMech/pull/823"
+    },
+    {
+      "head_sha": "4706f65ceb3faaae248e5c3a064d01795d4e8d1f",
+      "id": "8592f164a687ed381f4a682a3d398b7f933495ff25ed7b7ffe5ca29f7b937ce2",
+      "number": 823,
+      "observed_at": "2026-10-22T15:06:58.690438+00:00",
+      "pr_id": "5728ccce0cbbeaa7c77c393aedfda68ac6785338403c674553108683e887924b",
+      "repository_key": "cmmmech",
+      "sequence": 2,
       "source": "github",
       "state": "open",
       "url": "https://github.com/CultureBotAI/CMMMech/pull/823"
