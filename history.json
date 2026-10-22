@@ -977,8 +977,8 @@
     {
       "blocker_code": "none",
       "cycle": 2,
-      "observed_at": "2026-10-22T02:21:38.120755+00:00",
-      "phase": "ready_to_dispatch",
+      "observed_at": "2026-10-22T02:27:37.795980+00:00",
+      "phase": "waiting",
       "repository_key": "culturemech",
       "run_key": "691d144c1e172ba586e72c5b",
       "stage_id": "add_records",
@@ -988,7 +988,7 @@
     {
       "blocker_code": "none",
       "cycle": 2,
-      "observed_at": "2026-10-22T02:21:44.291530+00:00",
+      "observed_at": "2026-10-22T02:27:40.536705+00:00",
       "phase": "waiting",
       "repository_key": "mediaingredientmech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -999,7 +999,7 @@
     {
       "blocker_code": "none",
       "cycle": 1,
-      "observed_at": "2026-10-22T02:21:47.015671+00:00",
+      "observed_at": "2026-10-22T02:27:43.254841+00:00",
       "phase": "waiting",
       "repository_key": "communitymech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -1008,9 +1008,9 @@
       "started_at": "2026-10-20T01:48:34.372349+00:00"
     },
     {
-      "blocker_code": "none",
+      "blocker_code": "composer_unavailable",
       "cycle": 1,
-      "observed_at": "2026-10-22T02:21:49.834393+00:00",
+      "observed_at": "2026-10-22T02:27:45.977507+00:00",
       "phase": "waiting",
       "repository_key": "traitmech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -1021,8 +1021,8 @@
     {
       "blocker_code": "none",
       "cycle": 1,
-      "observed_at": "2026-10-22T02:21:52.665384+00:00",
-      "phase": "ready_to_dispatch",
+      "observed_at": "2026-10-22T02:27:48.726795+00:00",
+      "phase": "waiting",
       "repository_key": "proteintraitsmech",
       "run_key": "691d144c1e172ba586e72c5b",
       "stage_id": "protein_examples",
@@ -1032,7 +1032,7 @@
     {
       "blocker_code": "none",
       "cycle": 1,
-      "observed_at": "2026-10-22T02:21:59.184004+00:00",
+      "observed_at": "2026-10-22T02:27:51.427608+00:00",
       "phase": "waiting",
       "repository_key": "antibioticmech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -1043,7 +1043,7 @@
     {
       "blocker_code": "none",
       "cycle": 1,
-      "observed_at": "2026-10-22T02:22:01.810290+00:00",
+      "observed_at": "2026-10-22T02:27:54.118078+00:00",
       "phase": "waiting",
       "repository_key": "cellstructuremech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -1054,7 +1054,7 @@
     {
       "blocker_code": "none",
       "cycle": 1,
-      "observed_at": "2026-10-22T02:22:04.428159+00:00",
+      "observed_at": "2026-10-22T02:27:56.837117+00:00",
       "phase": "waiting",
       "repository_key": "habitatmech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -1065,7 +1065,7 @@
     {
       "blocker_code": "none",
       "cycle": 1,
-      "observed_at": "2026-10-22T02:22:07.245679+00:00",
+      "observed_at": "2026-10-22T02:27:59.585869+00:00",
       "phase": "waiting",
       "repository_key": "naturalproductmech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -1076,7 +1076,7 @@
     {
       "blocker_code": "none",
       "cycle": 1,
-      "observed_at": "2026-10-22T02:22:10.028713+00:00",
+      "observed_at": "2026-10-22T02:28:02.354189+00:00",
       "phase": "waiting",
       "repository_key": "taxonmech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -1087,7 +1087,7 @@
     {
       "blocker_code": "none",
       "cycle": 1,
-      "observed_at": "2026-10-22T02:22:13.015641+00:00",
+      "observed_at": "2026-10-22T02:28:05.340218+00:00",
       "phase": "waiting",
       "repository_key": "pathwaymech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -1098,8 +1098,8 @@
     {
       "blocker_code": "none",
       "cycle": 2,
-      "observed_at": "2026-10-22T02:22:15.743581+00:00",
-      "phase": "ready_to_dispatch",
+      "observed_at": "2026-10-22T02:26:58.654469+00:00",
+      "phase": "waiting",
       "repository_key": "dufmech",
       "run_key": "691d144c1e172ba586e72c5b",
       "stage_id": "causal_graphs",
@@ -1109,7 +1109,7 @@
     {
       "blocker_code": "none",
       "cycle": 1,
-      "observed_at": "2026-10-22T02:22:22.053744+00:00",
+      "observed_at": "2026-10-22T02:27:02.321849+00:00",
       "phase": "waiting",
       "repository_key": "cmmmech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -1120,7 +1120,7 @@
     {
       "blocker_code": "composer_unavailable",
       "cycle": 1,
-      "observed_at": "2026-10-22T02:22:24.765096+00:00",
+      "observed_at": "2026-10-22T02:27:04.975551+00:00",
       "phase": "waiting",
       "repository_key": "aimech",
       "run_key": "691d144c1e172ba586e72c5b",
@@ -2767,6 +2767,18 @@
       "source": "github",
       "state": "open",
       "url": "https://github.com/CultureBotAI/NaturalProductMech/pull/1008"
+    },
+    {
+      "head_sha": "29e2b63c2d8047d3eb479b828097257411d68472",
+      "id": "f6cbf9e559a4a17cfe0e4eaeca0bc7f5db6e4381ed180d6255ae8d3305c94661",
+      "number": 1977,
+      "observed_at": "2026-10-22T02:28:04.075071+00:00",
+      "pr_id": "3e249c8000d61d226961ba52d380db2f206fd67a16f0e6c427c59dac799b9af5",
+      "repository_key": "traitmech",
+      "sequence": 2,
+      "source": "github",
+      "state": "open",
+      "url": "https://github.com/CultureBotAI/TraitMech/pull/1977"
     }
   ],
   "schema_version": "1.0.0"
