@@ -531,6 +531,12 @@ because they carry literal data the path rules would misread.
 
 ## Mech progress accounting
 
+For "start monitoring", "stop monitoring", or monitoring status requests, use
+[Mech monitoring controls](.claude/skills/mech-monitor-control/SKILL.md).
+`scripts/mech_monitor_control.py` manages the two configured monitoring services;
+it does not launch/quit agy sessions or reset session progress. Setup and failure
+handling are documented in [monitor lifecycle](docs/guides/MECH_MONITOR_CONTROL.md).
+
 The progress model and public Pages projection live in `kg_microbe_progress`.
 Read `docs/guides/MECH_PROGRESS.md` before changing counters or publication.
 Register every goal PR, including follow-ups, using the exact supervisor session
