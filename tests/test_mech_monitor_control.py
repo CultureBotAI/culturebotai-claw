@@ -271,6 +271,7 @@ def test_exact_command_wrong_cwd_is_not_owned(environment, monkeypatch):
     controller.registry = {"services": {}}
     monkeypatch.setattr(control, "exact_argv", lambda *args: True)
     monkeypatch.setattr(control, "process_cwd", lambda pid: "/unrelated")
+    monkeypatch.setattr(control, "process_at", lambda pid: proc)
     with pytest.raises(control.ControlError, match="working directory"):
         controller.identify("approvals", {1234: proc})
 
@@ -468,3 +469,75 @@ def test_controller_state_cannot_overwrite_its_inputs(environment, protected_kin
     with pytest.raises(control.ControlError, match="must not overwrite"):
         control.load_manifest(config)
     assert reserved.read_bytes() == before
+
+
+@pytest.mark.parametrize("confirmation", [None, "zombie"])
+def test_stop_confirms_exit_after_mixed_ps_snapshot(environment, monkeypatch, confirmation):
+    controller = environment["make"]()
+    expected = {"pid": 1234, "started": "Wed Oct 21 09:00:00 2026", "command": "/usr/bin/python3 monitor.py"}
+    first = "1234 S Wed Oct 21 09:00:00 2026 [python3] <defunct>\n"
+    second = "1234 Z Wed Oct 21 09:00:00 2026 [python3] <defunct>\n" if confirmation == "zombie" else ""
+    snapshots = iter([first, second])
+    monkeypatch.setattr(control, "_ps", lambda args: next(snapshots))
+    signals = []
+    monkeypatch.setattr(control.os, "kill", lambda *args: signals.append(args))
+    assert controller.stopped("approvals", expected) is True
+    assert not signals
+
+
+@pytest.mark.parametrize("changed", [{"command": "unrelated"}, {"started": "new process start"}])
+def test_stop_still_refuses_persistent_or_reused_identity(environment, monkeypatch, changed):
+    controller = environment["make"]()
+    expected = {"pid": 1234, "started": "original", "command": "owned"}
+    monkeypatch.setattr(control, "process_at", lambda pid: {**expected, **changed})
+    signals = []
+    monkeypatch.setattr(control.os, "kill", lambda *args: signals.append(args))
+    with pytest.raises(control.ControlError, match="identity changed while waiting"):
+        controller.stopped("approvals", expected)
+    assert not signals
+
+
+@pytest.mark.parametrize("failure", ["empty-argv", "missing-argv", "missing-cwd", "denied-argv", "denied-cwd"])
+@pytest.mark.parametrize("confirmation", ["gone", "zombie", "present", "reused"])
+def test_exit_between_ps_and_linux_proc_verification(environment, monkeypatch, failure, confirmation):
+    controller = environment["make"]()
+    spec = controller.manifest["services"]["approvals"]
+    expected = {"pid": 1234, "started": "Wed Oct 21 09:00:00 2026", "command": " ".join(spec["argv"])}
+    controller.registry = {"services": {}}
+    original_read = Path.read_bytes
+    monkeypatch.setattr(control.sys, "platform", "linux")
+
+    def read_cmdline(path):
+        if str(path) != "/proc/1234/cmdline":
+            return original_read(path)
+        if failure == "empty-argv":
+            return b""  # Zombie cmdline after ps observed the running process.
+        if failure == "missing-argv":
+            raise FileNotFoundError("fixture process exited before cmdline read")
+        if failure == "denied-argv":
+            raise PermissionError("fixture cmdline unreadable")
+        return b"\0".join(os.fsencode(arg) for arg in spec["argv"]) + b"\0"
+
+    monkeypatch.setattr(Path, "read_bytes", read_cmdline)
+
+    def read_cwd(path):
+        assert path == "/proc/1234/cwd"
+        if failure == "denied-cwd":
+            raise PermissionError("fixture cwd unreadable")
+        raise FileNotFoundError("fixture process exited before cwd read")
+
+    monkeypatch.setattr(control.os, "readlink", read_cwd)
+    second = {
+        "gone": "", "zombie": "1234 Z Wed Oct 21 09:00:00 2026 [python3] <defunct>\n",
+        "present": f"1234 S {expected['started']} {expected['command']}\n",
+        "reused": "1234 S Wed Oct 21 09:00:01 2026 unrelated\n",
+    }[confirmation]
+    monkeypatch.setattr(control, "_ps", lambda args: second)
+    signals = []
+    monkeypatch.setattr(control.os, "kill", lambda *args: signals.append(args))
+    if confirmation in ("gone", "zombie"):
+        assert controller.identify("approvals", {1234: expected}) is None
+    else:
+        with pytest.raises(control.ControlError, match="different arguments|Cannot verify"):
+            controller.identify("approvals", {1234: expected})
+    assert not signals

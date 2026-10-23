@@ -312,7 +312,17 @@ class Controller:
         if not matches:
             return None
         proc = matches[0]
-        if not exact_argv(proc["pid"], spec["argv"]) or process_cwd(proc["pid"]) != spec["cwd"]:
+        try:
+            details_match = exact_argv(proc["pid"], spec["argv"]) and process_cwd(proc["pid"]) == spec["cwd"]
+        except ControlError:
+            # The process can exit after ps but before /proc or lsof is read.
+            # Missing/unreadable details alone never prove exit or ownership.
+            if process_at(proc["pid"]) is None:
+                return None
+            raise
+        if not details_match:
+            if process_at(proc["pid"]) is None:
+                return None
             raise ControlError(f"{name}: matching command has different arguments or working directory")
         return proc
 
@@ -426,6 +436,14 @@ class Controller:
         current = process_at(expected["pid"])
         if current is None:
             return True
+        if (current.get("pid") == expected.get("pid") and current.get("started") == expected.get("started")
+                and current.get("command") != expected.get("command")):
+            # ps fields are not an atomic snapshot: a live state/start may be
+            # followed by an exited command description. Require a fresh query
+            # to confirm absence; a persistent or reused identity still blocks.
+            current = process_at(expected["pid"])
+            if current is None:
+                return True
         if any(current.get(key) != expected.get(key) for key in ("pid", "started", "command")):
             raise ControlError(f"{name}: process identity changed while waiting")
         return False
