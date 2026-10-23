@@ -161,15 +161,25 @@ def confirmed_display_corruption(screen: str, reason: str | None = None) -> bool
     index = candidates[-1]
     if index < 1 or len(lines) - index > 9:
         return False
+    for j in range(max(0, index - 20), index):
+        if re.match(r"^\s*>\s*\S", lines[j]):
+            between = lines[j + 1 : index]
+            if not any(
+                re.search(r"[─━]{5,}", line) or re.match(r"^\s*[○●▸✻⣟]", line)
+                for line in between
+            ):
+                return False
     window = lines[max(0, index - 4):]
-    if any(re.match(r"^\s*>\s*\S", line) for line in window):
+    if any(re.match(r"^\s*>\s*\S", line) for line in lines[index:]) or any(
+        re.match(r"^\s*┃(?:\s|$)", line) for line in window
+    ):
         return False
     if not any(re.search(r"[─━]{5,}", line) for line in window):
         return False
     if re.search(
         r"↑/↓\s*Navigate|(?:Accept|Allow|Run)[^\n]*\?|How's the CLI experience|"
         r"ctrl\+k\s+approve|alt\+j\s+manage|needs approval for",
-        "\n".join(window),
+        "\n".join(lines[max(0, index - 25):]),
         re.I,
     ):
         return False
