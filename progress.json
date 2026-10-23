@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-23T21:34:45.744039+00:00",
+  "generated_at": "2026-10-23T21:39:57.509078+00:00",
   "repositories": [
     {
       "closures": [
@@ -72,7 +72,7 @@
       "current": {
         "blocker_code": "review_required",
         "cycle": 2,
-        "observed_at": "2026-10-23T21:34:31.391055+00:00",
+        "observed_at": "2026-10-23T21:39:45.049076+00:00",
         "phase": "blocked",
         "run_key": "691d144c1e172ba586e72c5b",
         "stage_id": "causal_graphs",
@@ -81,7 +81,7 @@
       "github_url": "https://github.com/CultureBotAI/CultureMech",
       "history_coverage": "partial",
       "key": "culturemech",
-      "last_observed_at": "2026-10-23T21:34:31.391055+00:00",
+      "last_observed_at": "2026-10-23T21:39:45.049076+00:00",
       "name": "CultureMech",
       "pull_requests": [
         {
@@ -466,7 +466,7 @@
       "current": {
         "blocker_code": "none",
         "cycle": 4,
-        "observed_at": "2026-10-23T21:34:33.922187+00:00",
+        "observed_at": "2026-10-23T21:39:47.625833+00:00",
         "phase": "waiting",
         "run_key": "691d144c1e172ba586e72c5b",
         "stage_id": "protein_examples",
@@ -475,7 +475,7 @@
       "github_url": "https://github.com/CultureBotAI/MediaIngredientMech",
       "history_coverage": "partial",
       "key": "mediaingredientmech",
-      "last_observed_at": "2026-10-23T21:34:33.922187+00:00",
+      "last_observed_at": "2026-10-23T21:39:47.625833+00:00",
       "name": "MediaIngredientMech",
       "pull_requests": [
         {
@@ -989,7 +989,7 @@
       "current": {
         "blocker_code": "closure_repairs_exhausted",
         "cycle": 2,
-        "observed_at": "2026-10-23T21:34:36.497566+00:00",
+        "observed_at": "2026-10-23T21:39:50.224007+00:00",
         "phase": "requires_intervention",
         "run_key": "691d144c1e172ba586e72c5b",
         "stage_id": "add_records",
@@ -998,7 +998,7 @@
       "github_url": "https://github.com/CultureBotAI/CommunityMech",
       "history_coverage": "partial",
       "key": "communitymech",
-      "last_observed_at": "2026-10-23T21:34:36.497566+00:00",
+      "last_observed_at": "2026-10-23T21:39:50.224007+00:00",
       "name": "CommunityMech",
       "pull_requests": [
         {
@@ -1384,7 +1384,7 @@
       "current": {
         "blocker_code": "none",
         "cycle": 3,
-        "observed_at": "2026-10-23T21:34:39.080361+00:00",
+        "observed_at": "2026-10-23T21:39:52.871314+00:00",
         "phase": "waiting",
         "run_key": "691d144c1e172ba586e72c5b",
         "stage_id": "causal_graphs",
@@ -1393,7 +1393,7 @@
       "github_url": "https://github.com/CultureBotAI/TraitMech",
       "history_coverage": "partial",
       "key": "traitmech",
-      "last_observed_at": "2026-10-23T21:34:39.080361+00:00",
+      "last_observed_at": "2026-10-23T21:39:52.871314+00:00",
       "name": "TraitMech",
       "pull_requests": [
         {
@@ -1790,7 +1790,7 @@
       "current": {
         "blocker_code": "closure_repairs_exhausted",
         "cycle": 2,
-        "observed_at": "2026-10-23T21:34:41.655963+00:00",
+        "observed_at": "2026-10-23T21:38:38.720887+00:00",
         "phase": "requires_intervention",
         "run_key": "691d144c1e172ba586e72c5b",
         "stage_id": "causal_graphs",
@@ -1799,7 +1799,7 @@
       "github_url": "https://github.com/CultureBotAI/proteintraitsmech",
       "history_coverage": "partial",
       "key": "proteintraitsmech",
-      "last_observed_at": "2026-10-23T21:34:41.655963+00:00",
+      "last_observed_at": "2026-10-23T21:38:38.720887+00:00",
       "name": "ProteinTraitsMech",
       "pull_requests": [
         {
@@ -2051,15 +2051,15 @@
         "closed_prs": 0,
         "completed_cycles": 0,
         "completed_goals": 4,
-        "merged_prs": 4,
+        "merged_prs": 5,
         "no_change_goals": 0,
-        "open_prs": 1,
+        "open_prs": 0,
         "unique_prs": 5
       },
       "current": {
         "blocker_code": "none",
         "cycle": 1,
-        "observed_at": "2026-10-23T21:33:31.403804+00:00",
+        "observed_at": "2026-10-23T21:38:41.339729+00:00",
         "phase": "waiting",
         "run_key": "691d144c1e172ba586e72c5b",
         "stage_id": "resolve_review_findings",
@@ -2068,7 +2068,7 @@
       "github_url": "https://github.com/CultureBotAI/AntibioticMech",
       "history_coverage": "partial",
       "key": "antibioticmech",
-      "last_observed_at": "2026-10-23T21:33:31.403804+00:00",
+      "last_observed_at": "2026-10-23T21:38:41.339729+00:00",
       "name": "AntibioticMech",
       "pull_requests": [
         {
@@ -2081,11 +2081,13 @@
           ],
           "head_sha": "bb50d8cfa3d42f9a1adf35972c1bc3daaa49d6db",
           "id": "ce69595a350dcfc415567ba5d4151207c86ee4c1df2b6d799406196c1fb1ae38",
+          "merge_commit_sha": "13877e8d28288acfff5c4880866a6c09758d2fdc",
+          "merged_at": "2026-10-23T21:38:24Z",
           "number": 1260,
-          "observed_at": "2026-10-23T20:21:59.113627+00:00",
+          "observed_at": "2026-10-23T21:39:54.644803+00:00",
           "repository_key": "antibioticmech",
           "source": "github",
-          "state": "open",
+          "state": "merged",
           "url": "https://github.com/CultureBotAI/AntibioticMech/pull/1260"
         },
         {
@@ -2319,13 +2321,13 @@
         "completed_goals": 8,
         "merged_prs": 8,
         "no_change_goals": 0,
-        "open_prs": 0,
-        "unique_prs": 8
+        "open_prs": 1,
+        "unique_prs": 9
       },
       "current": {
-        "blocker_code": "none",
+        "blocker_code": "composer_unavailable",
         "cycle": 2,
-        "observed_at": "2026-10-23T21:33:34.173953+00:00",
+        "observed_at": "2026-10-23T21:38:44.078497+00:00",
         "phase": "waiting",
         "run_key": "691d144c1e172ba586e72c5b",
         "stage_id": "protein_examples",
@@ -2334,9 +2336,26 @@
       "github_url": "https://github.com/CultureBotAI/CellStructureMech",
       "history_coverage": "partial",
       "key": "cellstructuremech",
-      "last_observed_at": "2026-10-23T21:33:34.173953+00:00",
+      "last_observed_at": "2026-10-23T21:38:44.078497+00:00",
       "name": "CellStructureMech",
       "pull_requests": [
+        {
+          "associations": [
+            {
+              "cycle": 2,
+              "run_key": "691d144c1e172ba586e72c5b",
+              "stage_number": 3
+            }
+          ],
+          "head_sha": "7cc8d56111e5cd0541fb9abc430ae120ab6f84cc",
+          "id": "5633dec66711478764c8fa90007daa4d624c702d70b9d44f453507a46b3ec767",
+          "number": 2414,
+          "observed_at": "2026-10-23T21:39:54.644803+00:00",
+          "repository_key": "cellstructuremech",
+          "source": "github",
+          "state": "open",
+          "url": "https://github.com/CultureBotAI/CellStructureMech/pull/2414"
+        },
         {
           "associations": [
             {
@@ -2636,7 +2655,7 @@
       "current": {
         "blocker_code": "closure_repairs_exhausted",
         "cycle": 2,
-        "observed_at": "2026-10-23T21:33:36.927093+00:00",
+        "observed_at": "2026-10-23T21:38:46.813270+00:00",
         "phase": "requires_intervention",
         "run_key": "691d144c1e172ba586e72c5b",
         "stage_id": "causal_graphs",
@@ -2645,7 +2664,7 @@
       "github_url": "https://github.com/CultureBotAI/HabitatMech",
       "history_coverage": "partial",
       "key": "habitatmech",
-      "last_observed_at": "2026-10-23T21:33:36.927093+00:00",
+      "last_observed_at": "2026-10-23T21:38:46.813270+00:00",
       "name": "HabitatMech",
       "pull_requests": [
         {
@@ -3036,12 +3055,26 @@
           "stage_id": "add_records",
           "stage_number": 1,
           "verified_at": "2026-10-23T19:25:40.612436+00:00"
+        },
+        {
+          "cycle": 3,
+          "id": "ae44b194299913509f36d89da65cd35241c8a1b5bca6bb21336691e960330beb",
+          "merge_commit_sha": "06c8a7ac6e1ce6f661538b7bc03b107802fe28a9",
+          "outcome": "merged",
+          "pr_number": 1029,
+          "pr_url": "https://github.com/CultureBotAI/NaturalProductMech/pull/1029",
+          "receipt_sha256": "e0d9561f252b34b6da12d85b8f47ad19894a8cb94b085adcfdc0d1f1ab598486",
+          "repository_key": "naturalproductmech",
+          "run_key": "691d144c1e172ba586e72c5b",
+          "stage_id": "causal_graphs",
+          "stage_number": 2,
+          "verified_at": "2026-10-23T21:37:32.771710+00:00"
         }
       ],
       "counters": {
         "closed_prs": 0,
         "completed_cycles": 2,
-        "completed_goals": 13,
+        "completed_goals": 14,
         "merged_prs": 14,
         "no_change_goals": 0,
         "open_prs": 0,
@@ -3050,16 +3083,16 @@
       "current": {
         "blocker_code": "none",
         "cycle": 3,
-        "observed_at": "2026-10-23T21:33:39.603917+00:00",
-        "phase": "waiting",
+        "observed_at": "2026-10-23T21:38:49.435469+00:00",
+        "phase": "ready_to_dispatch",
         "run_key": "691d144c1e172ba586e72c5b",
-        "stage_id": "causal_graphs",
-        "stage_number": 2
+        "stage_id": "protein_examples",
+        "stage_number": 3
       },
       "github_url": "https://github.com/CultureBotAI/NaturalProductMech",
       "history_coverage": "partial",
       "key": "naturalproductmech",
-      "last_observed_at": "2026-10-23T21:33:39.603917+00:00",
+      "last_observed_at": "2026-10-23T21:38:49.435469+00:00",
       "name": "NaturalProductMech",
       "pull_requests": [
         {
@@ -3338,12 +3371,12 @@
         {
           "key": "causal_graphs",
           "number": 2,
-          "state": "current"
+          "state": "completed"
         },
         {
           "key": "protein_examples",
           "number": 3,
-          "state": "pending"
+          "state": "current"
         },
         {
           "key": "record_review",
@@ -3559,7 +3592,7 @@
       "current": {
         "blocker_code": "none",
         "cycle": 3,
-        "observed_at": "2026-10-23T21:33:42.442102+00:00",
+        "observed_at": "2026-10-23T21:38:55.896128+00:00",
         "phase": "waiting",
         "run_key": "691d144c1e172ba586e72c5b",
         "stage_id": "causal_graphs",
@@ -3568,7 +3601,7 @@
       "github_url": "https://github.com/CultureBotAI/TaxonMech",
       "history_coverage": "partial",
       "key": "taxonmech",
-      "last_observed_at": "2026-10-23T21:33:42.442102+00:00",
+      "last_observed_at": "2026-10-23T21:38:55.896128+00:00",
       "name": "TaxonMech",
       "pull_requests": [
         {
@@ -4155,7 +4188,7 @@
       "current": {
         "blocker_code": "none",
         "cycle": 4,
-        "observed_at": "2026-10-23T21:33:45.065914+00:00",
+        "observed_at": "2026-10-23T21:38:58.603672+00:00",
         "phase": "waiting",
         "run_key": "691d144c1e172ba586e72c5b",
         "stage_id": "add_records",
@@ -4164,7 +4197,7 @@
       "github_url": "https://github.com/CultureBotAI/PathwayMech",
       "history_coverage": "partial",
       "key": "pathwaymech",
-      "last_observed_at": "2026-10-23T21:33:45.065914+00:00",
+      "last_observed_at": "2026-10-23T21:38:58.603672+00:00",
       "name": "PathwayMech",
       "pull_requests": [
         {
@@ -4703,7 +4736,7 @@
       "current": {
         "blocker_code": "closure_repairs_exhausted",
         "cycle": 2,
-        "observed_at": "2026-10-23T21:33:47.767229+00:00",
+        "observed_at": "2026-10-23T21:39:01.335322+00:00",
         "phase": "requires_intervention",
         "run_key": "691d144c1e172ba586e72c5b",
         "stage_id": "record_review",
@@ -4712,7 +4745,7 @@
       "github_url": "https://github.com/CultureBotAI/DUFMech",
       "history_coverage": "partial",
       "key": "dufmech",
-      "last_observed_at": "2026-10-23T21:33:47.767229+00:00",
+      "last_observed_at": "2026-10-23T21:39:01.335322+00:00",
       "name": "DUFMech",
       "pull_requests": [
         {
@@ -5136,7 +5169,7 @@
       "current": {
         "blocker_code": "none",
         "cycle": 3,
-        "observed_at": "2026-10-23T21:33:56.143790+00:00",
+        "observed_at": "2026-10-23T21:39:09.715694+00:00",
         "phase": "waiting",
         "run_key": "691d144c1e172ba586e72c5b",
         "stage_id": "causal_graphs",
@@ -5145,7 +5178,7 @@
       "github_url": "https://github.com/CultureBotAI/CMMMech",
       "history_coverage": "partial",
       "key": "cmmmech",
-      "last_observed_at": "2026-10-23T21:33:56.143790+00:00",
+      "last_observed_at": "2026-10-23T21:39:09.715694+00:00",
       "name": "CMMMech",
       "pull_requests": [
         {
@@ -5462,7 +5495,7 @@
       "current": {
         "blocker_code": "composer_unavailable",
         "cycle": 1,
-        "observed_at": "2026-10-23T21:33:58.810775+00:00",
+        "observed_at": "2026-10-23T21:39:12.448343+00:00",
         "phase": "waiting",
         "run_key": "691d144c1e172ba586e72c5b",
         "stage_id": "add_records",
@@ -5471,7 +5504,7 @@
       "github_url": "https://github.com/CultureBotAI/AIMech",
       "history_coverage": "partial",
       "key": "aimech",
-      "last_observed_at": "2026-10-23T21:33:58.810775+00:00",
+      "last_observed_at": "2026-10-23T21:39:12.448343+00:00",
       "name": "AIMech",
       "pull_requests": [],
       "stages": [
@@ -5512,11 +5545,11 @@
   "totals": {
     "closed_prs": 0,
     "completed_cycles": 18,
-    "completed_goals": 132,
-    "merged_prs": 145,
+    "completed_goals": 133,
+    "merged_prs": 146,
     "no_change_goals": 0,
     "open_prs": 3,
-    "unique_prs": 148
+    "unique_prs": 149
   },
   "tracking": {
     "counts_are_lower_bounds": true,
