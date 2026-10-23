@@ -85,6 +85,9 @@ skills:
   mech-progress-status:
     scope: fleet
     reason: Summarizes verified goals, full cycles, and distinct PR rounds from the manifest-defined fleet tracker.
+  mech-monitor-control:
+    scope: claw
+    reason: Controls explicitly configured local approval and goal-monitor processes while preserving their session bindings and progress.
   onboard-mech:
     scope: fleet
     reason: Registers a verified Mech with complete capability decisions and coordinated governance.

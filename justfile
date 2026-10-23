@@ -15,6 +15,19 @@ default:
 mech-progress:
     @uv run python scripts/mech_progress_status.py
 
+# Local monitoring lifecycle; does not launch or quit agy sessions
+monitor-status:
+    @python3 scripts/mech_monitor_control.py status
+
+monitor-start:
+    @python3 scripts/mech_monitor_control.py start
+
+monitor-stop:
+    @python3 scripts/mech_monitor_control.py stop
+
+monitor-restart:
+    @python3 scripts/mech_monitor_control.py restart
+
 # =============================================================================
 # FEBA Media Workflows
 # =============================================================================

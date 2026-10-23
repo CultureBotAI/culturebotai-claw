@@ -149,6 +149,11 @@ reuse a completed receipt merely to make a migration pass.
 
 ## Running, stopping, and recovery
 
+For an already configured deployment, use the [monitor lifecycle controls](MECH_MONITOR_CONTROL.md)
+to start, stop, restart, or inspect both the supervisor and approval monitor.
+They preserve existing session state and check process ownership. The direct
+commands below remain useful for initial setup and diagnostics.
+
 Set `MECH_SESSION_CONFIG` to the generated absolute configuration path:
 
 ```bash
