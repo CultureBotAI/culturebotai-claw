@@ -1327,8 +1327,16 @@ def test_compacting_conversation_counts_as_busy():
     "────────────────────────────────────────\n>\n>\n? for shortcuts                                            Gemini 4 Argon · high\nesc to cancel                                              Gemini 4 Argon · high\n",
     # ttys026 (naturalproductmech): missing top border (blank line before >)
     "⣟  Generating...\n\n>\n────────────────────────────────────────\nesc to cancel                                              Gemini 4 Argon · high\n? for shortcuts\n",
+    # Missing top border with earlier submitted user prompt and assistant output in scrollback
+    "────────────────────────────────────────\n> /goal earlier submitted prompt\n● Explored 3 files\n⣟  Generating...\n\n>\n────────────────────────────────────────\nesc to cancel                                              Gemini 4 Argon · high\n? for shortcuts\n",
     # Leftover esc to cancel on its own line in footer
     "────────────────────────\n>\n────────────────────────\n  esc to cancel\n  ? for shortcuts                                         Gemini 3.1 Pro (High)\n",
+    # ttys020 (communitymech): response text spliced onto composer > line with old > in scrollback (composer-too-far-from-footer)
+    ">\nEarlier output\n" + "\n".join(f"line {i}" for i in range(15)) + "\n────────────────────────────────────────────────────────────────────────────────\nNothing to commit, working tree clean); wrote completion receipt.   > 2052` merged at `2026-10-22T01:02:13Z`\n────────────────────────────────────────────────────────────────────────────────\n  ? for shortcuts                                         Gemini 3.1 Pro (High)\n",
+    # Response text spliced onto composer > line without any prior > in scrollback (no-empty-composer)
+    "Earlier output\n────────────────────────────────────────────────────────────────────────────────\nNothing to commit, working tree clean); wrote completion receipt.   > 2052` merged at `2026-10-22T01:02:13Z`\n────────────────────────────────────────────────────────────────────────────────\n  ? for shortcuts                                         Gemini 3.1 Pro (High)\n",
+    # Response text spliced onto composer > line with stale > within 9 lines of bottom above top border
+    ">\nEarlier output\n────────────────────────────────────────────────────────────────────────────────\nNothing to commit, working tree clean); wrote completion receipt.   > 2052` merged at `2026-10-22T01:02:13Z`\n────────────────────────────────────────────────────────────────────────────────\n  ? for shortcuts                                         Gemini 3.1 Pro (High)\n",
 ])
 def test_confirmed_display_corruption_accepts_distorted_idle_composers(screen):
     assert supervisor.confirmed_display_corruption(screen) is True
@@ -1339,14 +1347,32 @@ def test_confirmed_display_corruption_accepts_distorted_idle_composers(screen):
     "Earlier output\n────────────────────────\n>\n────────────────────────\n  ? for shortcuts  Gemini 3.1 Pro (High)\n",
     # Single-line unsent user draft (ttys017 AntibioticMech)
     "────────────────────────────────────────\n> /goal review all records and add uniprot protein examples espcially for gene\n    or protein elements of causal graphs. make a claude skill for this\n────────────────────────────────────────\n                                                           Gemini 4 Argon · high\n",
+    # Single-line unsent user draft with old > in scrollback (composer-too-far-from-footer)
+    ">\n" + "\n".join(f"line {i}" for i in range(15)) + "\n────────────────────────────────────────\n> /goal continue unfinished stage\n────────────────────────────────────────\n  ? for shortcuts  Gemini 3.1 Pro (High)\n",
     # Multi-line unsent draft with trailing empty >
     "────────────────────────\n> first draft line\n>\n────────────────────────\n  ? for shortcuts  Gemini 3.1 Pro (High)\n",
+    # 5+ line multi-line unsent draft ending with a trailing empty > (first draft line > 4 lines above >)
+    "────────────────────────\n> first draft line\n  second line\n  third line\n  fourth line\n  fifth line\n>\n────────────────────────\n  ? for shortcuts  Gemini 3.1 Pro (High)\n",
+    # 5+ line multi-line unsent draft with a blank line before trailing empty >
+    "────────────────────────\n> first draft line\n  second line\n  third line\n  fourth line\n  fifth line\n\n>\n────────────────────────\n  ? for shortcuts  Gemini 3.1 Pro (High)\n",
+    # Long multi-line unsent draft whose final continuation line contains " > " above bottom border
+    "────────────────────────\n> first draft line\n  second line\n  third line\n  fourth line\n  fifth line\n  sixth line with > token\n────────────────────────\n  ? for shortcuts  Gemini 3.1 Pro (High)\n",
     # Continuation text below >
     "────────────────────────\n>\nunsubmitted second line\n────────────────────────\n  ? for shortcuts  Gemini 3.1 Pro (High)\n",
     # Approval / feedback menu
     "────────────────────────\n>\n────────────────────────\nHow's the CLI experience so far?\n1. Good\n2. Fine\n  Gemini 3.1 Pro (High)\n",
+    # Native inline bash approval prompt above a missing-border composer
+    " ┃ self needs approval for Bash\n ┃ ────────────────────────────────────────\n ┃ ● Bash(git status)\n ┃ ctrl+k approve · alt+j manage\n────────────────────────────────────────\n>\n\n  ? for shortcuts  Gemini 4 Argon · high\n",
+    # Native inline bash approval prompt where ctrl+k row is blanked and header is > 4 lines above >
+    " ┃ self needs approval for Bash\n ┃ ────────────────────────────────────────\n ┃ ● Bash(git status\n ┃   --short\n ┃   --branch)\n ┃\n────────────────────────────────────────\n>\n\n  ? for shortcuts  Gemini 4 Argon · high\n",
+    # Multi-line native inline approval header above composer without ┃ on bottom rows
+    "  self needs approval for Bash\n  ● Bash(git diff\n    --stat\n    origin/main\n    HEAD)\n────────────────────────────────────────\n>\n\n  ? for shortcuts  Gemini 4 Argon · high\n",
+    # Spliced composer line mentioning Gemini on the prompt line itself but missing Gemini footer below
+    "────────────────────────\nChecked Gemini 3.1 Pro output   > trailing text\n────────────────────────\n  ? for shortcuts\n",
     # Busy / compacting state
     "✻ Compacting conversation...\n>\n────────────────────────\n  ? for shortcuts  Gemini 3.1 Pro (High)\n",
+    # Busy background task state on a spliced composer line
+    "● 1 background task running\n────────────────────────\nNothing to commit   > 2052\n────────────────────────\n  ? for shortcuts  Gemini 3.1 Pro (High)\n",
     # Non-border text around >
     "not a border\n>\nnot a border\n  ? for shortcuts  Gemini 3.1 Pro (High)\n",
 ])
