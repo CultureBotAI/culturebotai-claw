@@ -132,14 +132,30 @@ def confirmed_display_corruption(screen: str, reason: str | None = None) -> bool
     """Detect distorted idle agy composers that safe row-bump redraw can refresh."""
     if reason is None:
         reason = import_file(ROOT / "scripts/mech_session_terminal.py", "supervisor_terminal").composer_reason(screen)
-    if reason not in {"missing-composer-borders", "unrecognized-composer-tail"}:
+    if reason not in {
+        "missing-composer-borders",
+        "unrecognized-composer-tail",
+        "composer-too-far-from-footer",
+        "no-empty-composer",
+    }:
         return False
     if terminal_busy_reason(screen) is not None:
         return False
     lines = [line.rstrip() for line in screen.replace("\r", "").splitlines()]
     while lines and not lines[-1].strip():
         lines.pop()
-    candidates = [i for i, line in enumerate(lines) if line.strip() == ">"]
+    candidates = [
+        i for i, line in enumerate(lines)
+        if len(lines) - i <= 9
+        and (
+            line.strip() == ">"
+            or (
+                0 < i < len(lines) - 1
+                and re.search(r"^\s*[^>\s].*\s+>(?:\s|$)", line)
+                and all(re.search(r"[─━]{5,}", lines[j]) for j in (i - 1, i + 1))
+            )
+        )
+    ]
     if not candidates:
         return False
     index = candidates[-1]
@@ -150,9 +166,14 @@ def confirmed_display_corruption(screen: str, reason: str | None = None) -> bool
         return False
     if not any(re.search(r"[─━]{5,}", line) for line in window):
         return False
-    if re.search(r"↑/↓\s*Navigate|(?:Accept|Allow|Run)[^\n]*\?|How's the CLI experience", "\n".join(window), re.I):
+    if re.search(
+        r"↑/↓\s*Navigate|(?:Accept|Allow|Run)[^\n]*\?|How's the CLI experience|"
+        r"ctrl\+k\s+approve|alt\+j\s+manage|needs approval for",
+        "\n".join(window),
+        re.I,
+    ):
         return False
-    if not re.search(r"Gemini\s+\S", "\n".join(lines[index:])):
+    if not re.search(r"Gemini\s+\S", "\n".join(lines[index + 1:])):
         return False
     border = r"[─━═\-┌┐└┘│┃╭╮╰╯ ]+"
     for line in lines[index + 1:]:
