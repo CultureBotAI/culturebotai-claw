@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-24T10:36:33.629522+00:00",
+  "generated_at": "2026-10-24T10:41:43.452520+00:00",
   "repositories": [
     {
       "closures": [
@@ -6446,8 +6446,8 @@
         "completed_goals": 0,
         "merged_prs": 0,
         "no_change_goals": 0,
-        "open_prs": 0,
-        "unique_prs": 0
+        "open_prs": 1,
+        "unique_prs": 1
       },
       "current": {
         "blocker_code": "composer_unavailable",
@@ -6463,7 +6463,25 @@
       "key": "aimech",
       "last_observed_at": "2026-10-24T07:00:42.787278+00:00",
       "name": "AIMech",
-      "pull_requests": [],
+      "pull_requests": [
+        {
+          "associations": [
+            {
+              "cycle": 1,
+              "run_key": "691d144c1e172ba586e72c5b",
+              "stage_number": 1
+            }
+          ],
+          "head_sha": "e0ec3050952cf97f111dbf5307873595fe08eed9",
+          "id": "001d74d7d8f8bda071b22a5d7257f5fb1b36d913685e7319794564158bbd9c34",
+          "number": 428,
+          "observed_at": "2026-10-24T10:41:41.765021+00:00",
+          "repository_key": "aimech",
+          "source": "github",
+          "state": "open",
+          "url": "https://github.com/CultureBotAI/AIMech/pull/428"
+        }
+      ],
       "stages": [
         {
           "key": "add_records",
@@ -6505,8 +6523,8 @@
     "completed_goals": 159,
     "merged_prs": 179,
     "no_change_goals": 0,
-    "open_prs": 1,
-    "unique_prs": 180
+    "open_prs": 2,
+    "unique_prs": 181
   },
   "tracking": {
     "counts_are_lower_bounds": true,
