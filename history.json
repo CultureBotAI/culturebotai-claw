@@ -9917,6 +9917,20 @@
       "source": "github",
       "state": "open",
       "url": "https://github.com/CultureBotAI/CMMMech/pull/837"
+    },
+    {
+      "head_sha": "29b5b0bbc8e16f854c612ce08e73d80b59b2a300",
+      "id": "084cf1386cb7cb07eba865f925146148dc248cf2ca1dd8d3513956ff7f043620",
+      "merge_commit_sha": "7918502cee65b588f4e0e7cf5bce94d49ba55e51",
+      "merged_at": "2026-10-24T12:29:26Z",
+      "number": 837,
+      "observed_at": "2026-10-24T12:30:16.195387+00:00",
+      "pr_id": "20679be20fddb98888b151a19b83d6bd67260af747a8616bc166d0641ee8daa1",
+      "repository_key": "cmmmech",
+      "sequence": 3,
+      "source": "github",
+      "state": "merged",
+      "url": "https://github.com/CultureBotAI/CMMMech/pull/837"
     }
   ],
   "schema_version": "1.0.0"

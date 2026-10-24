@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-24T12:25:07.718477+00:00",
+  "generated_at": "2026-10-24T12:30:16.865302+00:00",
   "repositories": [
     {
       "closures": [
@@ -6006,9 +6006,9 @@
         "closed_prs": 0,
         "completed_cycles": 3,
         "completed_goals": 18,
-        "merged_prs": 19,
+        "merged_prs": 20,
         "no_change_goals": 0,
-        "open_prs": 1,
+        "open_prs": 0,
         "unique_prs": 20
       },
       "current": {
@@ -6036,11 +6036,13 @@
           ],
           "head_sha": "29b5b0bbc8e16f854c612ce08e73d80b59b2a300",
           "id": "20679be20fddb98888b151a19b83d6bd67260af747a8616bc166d0641ee8daa1",
+          "merge_commit_sha": "7918502cee65b588f4e0e7cf5bce94d49ba55e51",
+          "merged_at": "2026-10-24T12:29:26Z",
           "number": 837,
-          "observed_at": "2026-10-24T12:19:57.174160+00:00",
+          "observed_at": "2026-10-24T12:30:16.195387+00:00",
           "repository_key": "cmmmech",
           "source": "github",
-          "state": "open",
+          "state": "merged",
           "url": "https://github.com/CultureBotAI/CMMMech/pull/837"
         },
         {
@@ -6523,9 +6525,9 @@
     "closed_prs": 0,
     "completed_cycles": 21,
     "completed_goals": 159,
-    "merged_prs": 180,
+    "merged_prs": 181,
     "no_change_goals": 0,
-    "open_prs": 1,
+    "open_prs": 0,
     "unique_prs": 181
   },
   "tracking": {
