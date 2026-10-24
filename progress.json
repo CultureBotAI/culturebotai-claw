@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-24T11:28:19.437303+00:00",
+  "generated_at": "2026-10-24T11:33:30.177596+00:00",
   "repositories": [
     {
       "closures": [
@@ -6444,9 +6444,9 @@
         "closed_prs": 0,
         "completed_cycles": 0,
         "completed_goals": 0,
-        "merged_prs": 0,
+        "merged_prs": 1,
         "no_change_goals": 0,
-        "open_prs": 1,
+        "open_prs": 0,
         "unique_prs": 1
       },
       "current": {
@@ -6474,11 +6474,13 @@
           ],
           "head_sha": "9c4035d709da8d9c92049b000fe58a3d8502f0ac",
           "id": "001d74d7d8f8bda071b22a5d7257f5fb1b36d913685e7319794564158bbd9c34",
+          "merge_commit_sha": "621a86ea8e79b0c97585f978b771f5b024a8f691",
+          "merged_at": "2026-10-24T11:32:36Z",
           "number": 428,
-          "observed_at": "2026-10-24T11:17:56.287064+00:00",
+          "observed_at": "2026-10-24T11:33:28.692465+00:00",
           "repository_key": "aimech",
           "source": "github",
-          "state": "open",
+          "state": "merged",
           "url": "https://github.com/CultureBotAI/AIMech/pull/428"
         }
       ],
@@ -6521,9 +6523,9 @@
     "closed_prs": 0,
     "completed_cycles": 21,
     "completed_goals": 159,
-    "merged_prs": 179,
+    "merged_prs": 180,
     "no_change_goals": 0,
-    "open_prs": 2,
+    "open_prs": 1,
     "unique_prs": 181
   },
   "tracking": {
