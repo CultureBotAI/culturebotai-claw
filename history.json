@@ -9905,6 +9905,18 @@
       "source": "github",
       "state": "merged",
       "url": "https://github.com/CultureBotAI/AIMech/pull/428"
+    },
+    {
+      "head_sha": "29b5b0bbc8e16f854c612ce08e73d80b59b2a300",
+      "id": "c60d9325c53613acc080083e4553bf62306e38739d1de22f59fc1dabadc7f02c",
+      "number": 837,
+      "observed_at": "2026-10-24T12:19:57.174160+00:00",
+      "pr_id": "20679be20fddb98888b151a19b83d6bd67260af747a8616bc166d0641ee8daa1",
+      "repository_key": "cmmmech",
+      "sequence": 2,
+      "source": "github",
+      "state": "open",
+      "url": "https://github.com/CultureBotAI/CMMMech/pull/837"
     }
   ],
   "schema_version": "1.0.0"
