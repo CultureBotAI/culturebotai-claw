@@ -9791,6 +9791,20 @@
       "source": "github",
       "state": "merged",
       "url": "https://github.com/CultureBotAI/TaxonMech/pull/165"
+    },
+    {
+      "head_sha": "5e43b54dbddadb08e6f09e74a800011c423a9095",
+      "id": "8137128483eec7f507959f3fbf71efd0575ef32207f68a9c905e8c819bbbd7a0",
+      "merge_commit_sha": "2ed9b577701df23d0b2b2337fdd16194415d8e5f",
+      "merged_at": "2026-10-24T08:37:15Z",
+      "number": 1182,
+      "observed_at": "2026-10-24T08:37:55.122166+00:00",
+      "pr_id": "e2e18d9c0d3a17fedf61101f939492c1862a54a4f023433d2ec5952d9f3b2ee5",
+      "repository_key": "proteintraitsmech",
+      "sequence": 2,
+      "source": "github",
+      "state": "merged",
+      "url": "https://github.com/CultureBotAI/proteintraitsmech/pull/1182"
     }
   ],
   "schema_version": "1.0.0"

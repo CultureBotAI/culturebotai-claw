@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-24T08:32:43.560763+00:00",
+  "generated_at": "2026-10-24T08:37:55.994924+00:00",
   "repositories": [
     {
       "closures": [
@@ -2001,9 +2001,9 @@
         "closed_prs": 0,
         "completed_cycles": 1,
         "completed_goals": 7,
-        "merged_prs": 8,
+        "merged_prs": 9,
         "no_change_goals": 0,
-        "open_prs": 1,
+        "open_prs": 0,
         "unique_prs": 9
       },
       "current": {
@@ -2031,11 +2031,13 @@
           ],
           "head_sha": "5e43b54dbddadb08e6f09e74a800011c423a9095",
           "id": "e2e18d9c0d3a17fedf61101f939492c1862a54a4f023433d2ec5952d9f3b2ee5",
+          "merge_commit_sha": "2ed9b577701df23d0b2b2337fdd16194415d8e5f",
+          "merged_at": "2026-10-24T08:37:15Z",
           "number": 1182,
-          "observed_at": "2026-10-24T07:30:36.804384+00:00",
+          "observed_at": "2026-10-24T08:37:55.122166+00:00",
           "repository_key": "proteintraitsmech",
           "source": "github",
-          "state": "open",
+          "state": "merged",
           "url": "https://github.com/CultureBotAI/proteintraitsmech/pull/1182"
         },
         {
@@ -6465,9 +6467,9 @@
     "closed_prs": 0,
     "completed_cycles": 21,
     "completed_goals": 159,
-    "merged_prs": 177,
+    "merged_prs": 178,
     "no_change_goals": 0,
-    "open_prs": 1,
+    "open_prs": 0,
     "unique_prs": 178
   },
   "tracking": {
