@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-24T10:10:46.628025+00:00",
+  "generated_at": "2026-10-24T10:15:56.042699+00:00",
   "repositories": [
     {
       "closures": [
@@ -2345,9 +2345,9 @@
         "closed_prs": 0,
         "completed_cycles": 1,
         "completed_goals": 8,
-        "merged_prs": 8,
+        "merged_prs": 9,
         "no_change_goals": 0,
-        "open_prs": 1,
+        "open_prs": 0,
         "unique_prs": 9
       },
       "current": {
@@ -2375,11 +2375,13 @@
           ],
           "head_sha": "763437cba66be83b3c3252764039b70062459426",
           "id": "4c4f8bd8145412c2f31fe5b1df058140b2ae96b0f3805936190808a73c08baef",
+          "merge_commit_sha": "e845645cba98e51e0c96e7595474e92f789fcdc8",
+          "merged_at": "2026-10-24T10:11:00Z",
           "number": 1266,
-          "observed_at": "2026-10-24T09:13:59.998303+00:00",
+          "observed_at": "2026-10-24T10:15:55.329402+00:00",
           "repository_key": "antibioticmech",
           "source": "github",
-          "state": "open",
+          "state": "merged",
           "url": "https://github.com/CultureBotAI/AntibioticMech/pull/1266"
         },
         {
@@ -6484,9 +6486,9 @@
     "closed_prs": 0,
     "completed_cycles": 21,
     "completed_goals": 159,
-    "merged_prs": 178,
+    "merged_prs": 179,
     "no_change_goals": 0,
-    "open_prs": 1,
+    "open_prs": 0,
     "unique_prs": 179
   },
   "tracking": {
