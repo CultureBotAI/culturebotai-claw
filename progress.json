@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-24T07:30:39.123516+00:00",
+  "generated_at": "2026-10-24T07:35:49.452412+00:00",
   "repositories": [
     {
       "closures": [
@@ -1500,9 +1500,9 @@
         "closed_prs": 0,
         "completed_cycles": 2,
         "completed_goals": 17,
-        "merged_prs": 17,
+        "merged_prs": 18,
         "no_change_goals": 0,
-        "open_prs": 1,
+        "open_prs": 0,
         "unique_prs": 18
       },
       "current": {
@@ -1530,11 +1530,13 @@
           ],
           "head_sha": "0e4574ecd34ef36b1f920b9c686c25c9d68fd94a",
           "id": "fab96fa4f98d57f7ffec30740ef39d45746a0cd7d5a2585598966370ff51ad91",
+          "merge_commit_sha": "538e0144fb41016c5511e7d8b5a0ead1b5483052",
+          "merged_at": "2026-10-24T07:34:25Z",
           "number": 2004,
-          "observed_at": "2026-10-24T07:04:39.810224+00:00",
+          "observed_at": "2026-10-24T07:35:47.580205+00:00",
           "repository_key": "traitmech",
           "source": "github",
-          "state": "open",
+          "state": "merged",
           "url": "https://github.com/CultureBotAI/TraitMech/pull/2004"
         },
         {
@@ -6461,9 +6463,9 @@
     "closed_prs": 0,
     "completed_cycles": 21,
     "completed_goals": 159,
-    "merged_prs": 175,
+    "merged_prs": 176,
     "no_change_goals": 0,
-    "open_prs": 3,
+    "open_prs": 2,
     "unique_prs": 178
   },
   "tracking": {
