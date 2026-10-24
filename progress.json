@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-24T08:17:12.904819+00:00",
+  "generated_at": "2026-10-24T08:22:23.897893+00:00",
   "repositories": [
     {
       "closures": [
@@ -4161,9 +4161,9 @@
         "closed_prs": 0,
         "completed_cycles": 2,
         "completed_goals": 16,
-        "merged_prs": 17,
+        "merged_prs": 18,
         "no_change_goals": 0,
-        "open_prs": 1,
+        "open_prs": 0,
         "unique_prs": 18
       },
       "current": {
@@ -4191,11 +4191,13 @@
           ],
           "head_sha": "4eca6c5bdfccce0c548cb1887b7162bd255e8b14",
           "id": "bff517320ef046665786c5d794866840c27101dc5ec740e80dc79fec10d7bfe8",
+          "merge_commit_sha": "a050e29c140f7ca7e74432e364b10d732e2922f1",
+          "merged_at": "2026-10-24T08:22:15Z",
           "number": 165,
-          "observed_at": "2026-10-24T06:33:35.458755+00:00",
+          "observed_at": "2026-10-24T08:22:22.268138+00:00",
           "repository_key": "taxonmech",
           "source": "github",
-          "state": "open",
+          "state": "merged",
           "url": "https://github.com/CultureBotAI/TaxonMech/pull/165"
         },
         {
@@ -6463,9 +6465,9 @@
     "closed_prs": 0,
     "completed_cycles": 21,
     "completed_goals": 159,
-    "merged_prs": 176,
+    "merged_prs": 177,
     "no_change_goals": 0,
-    "open_prs": 2,
+    "open_prs": 1,
     "unique_prs": 178
   },
   "tracking": {

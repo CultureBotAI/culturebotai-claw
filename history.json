@@ -9777,6 +9777,20 @@
       "source": "github",
       "state": "merged",
       "url": "https://github.com/CultureBotAI/TraitMech/pull/2004"
+    },
+    {
+      "head_sha": "4eca6c5bdfccce0c548cb1887b7162bd255e8b14",
+      "id": "1f1ab0aeddb7d002bc2698b8dba331f872709caef41197cff5f4465a425e8f94",
+      "merge_commit_sha": "a050e29c140f7ca7e74432e364b10d732e2922f1",
+      "merged_at": "2026-10-24T08:22:15Z",
+      "number": 165,
+      "observed_at": "2026-10-24T08:22:22.268138+00:00",
+      "pr_id": "bff517320ef046665786c5d794866840c27101dc5ec740e80dc79fec10d7bfe8",
+      "repository_key": "taxonmech",
+      "sequence": 3,
+      "source": "github",
+      "state": "merged",
+      "url": "https://github.com/CultureBotAI/TaxonMech/pull/165"
     }
   ],
   "schema_version": "1.0.0"
