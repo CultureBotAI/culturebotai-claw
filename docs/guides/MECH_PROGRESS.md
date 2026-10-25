@@ -109,6 +109,15 @@ the snapshot time and archive time are separate facts. Set `text_kind` to
 requested display formats as observations. Reusing a `source_id` deduplicates
 the same response and rejects conflicting content.
 
+Use the same saved bundle for the numerical answer and its archive. A publisher
+update between reporting and archiving can otherwise select a different
+measurement. The recorder automatically parses a leading stats line or an
+explicit unique `reported_summary` excerpt and rejects counts that differ from
+the linked snapshot, even when `reported_counts` was omitted. Nonnumerical
+summaries remain unparsed; numbers appearing only in later notes are not inferred.
+Supersession must be acyclic. Multiple summaries may share one replacement, and
+valid replacement chains retain their final unsuperseded response.
+
 The recorder validates the full history/snapshot bundle against its pinned
 fleet before saving. Each snapshot retains totals, per-Mech counters and current
 state, freshness warnings evaluated at archive time, source attribution, and

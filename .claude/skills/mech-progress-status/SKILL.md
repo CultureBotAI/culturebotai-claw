@@ -45,7 +45,10 @@ without inventing counts. Exit 2 means invalid arguments.
 
 For each requested Mech stats answer, preserve its validated source snapshot and
 the response in `workspace/reports/mech-stats/report.json`, as requested by the
-user. Use `scripts/mech_stats_record.py --bundle PATH --response-file PATH`,
+user. Retain a copy of the bundle and its pinned manifest, report using that
+copy with `--bundle`, and archive that same copy. Do not associate an earlier
+answer with a newer publisher snapshot. Use
+`scripts/mech_stats_record.py --bundle PATH --response-file PATH`,
 passing `--manifest PATH` when needed. The response JSON has `source_id`,
 `source`, `text_kind` (`verbatim` or `summary`), `text`, `responded_at` (known
 timezone-aware message time or `null`), and `prompt` (known text or `null`). Use

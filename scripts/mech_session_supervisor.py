@@ -1218,7 +1218,6 @@ class Supervisor:
     def reconcile(self, target: dict, ledger: dict, observation: dict) -> None:
         """Receipt reconciliation never infers completion from message delivery."""
         native_id = observation.get("goal_identity")
-        native_goal = (observation.get("native") or {}).get("current_goal") or {}
         if not ledger["adopted_goal"] and native_id:
             if native_id != target["initial_goal_identity"]:
                 observation.update(error="native goal differs from the assessed initial goal; reassessment required", ready=False)
@@ -1279,11 +1278,10 @@ class Supervisor:
                     break
         if ledger.get("awaiting_goal") and native_id and native_id != ledger["adopted_goal"]:
             for action in pending:
+                # The exact declaration is already verified; later goal text may be amended.
                 if (action["kind"] == "start_goal" and scoped(action, ledger)
                         and action.get("native_consumption", {}).get("verified")
-                        and action["native_consumption"]["step_index"] == native_id["start_step_index"]
-                        and normalized_input(action.get("transport_message", action.get("message", "")))
-                        == native_goal.get("goal_text", "").strip()):
+                        and action["native_consumption"]["step_index"] == native_id["start_step_index"]):
                     action["accepted_goal_identity"] = native_id
                     ledger.update(adopted_goal=native_id, awaiting_goal=False)
                     break

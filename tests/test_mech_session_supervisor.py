@@ -516,6 +516,24 @@ def test_new_goal_marker_adoption_preserves_pre_goal_clean_baseline(setup, monke
     assert setup.ledger["baseline_head"] == HEAD and setup.ledger["baseline_status"] == ""
 
 
+def test_goal_adoption_survives_amended_text_after_exact_native_input(setup, monkeypatch):
+    instance = make_instance(setup, monkeypatch, lambda *_: "sent")
+    setup.ledger.update(stage=2, awaiting_goal=True)
+    action = instance.dispatch(setup.target, setup.ledger, supervisor.decide(setup.ledger, setup.observation))
+    setup.observation["goal_identity"]["start_step_index"] = 40
+    setup.observation["native"]["current_goal"].update(
+        start_step_index=40,
+        goal_text=supervisor.normalized_input(action["transport_message"]) + " appended guidance",
+    )
+    confirm_native_input(instance, action, index=40)
+    instance.reconcile(setup.target, setup.ledger, setup.observation)
+    assert action["state"] == "accepted"
+    assert action["native_consumption"]["verified"] is True
+    assert not setup.ledger["awaiting_goal"], supervisor.decide(setup.ledger, setup.observation)
+    assert setup.ledger["adopted_goal"] == setup.observation["goal_identity"]
+    assert action["accepted_goal_identity"] == setup.observation["goal_identity"]
+
+
 @pytest.mark.parametrize("damage", ["no_native_input", "truncated", "wrong_step", "not_goal"])
 def test_goal_marker_alone_cannot_adopt_a_different_native_goal(setup, monkeypatch, damage):
     instance = make_instance(setup, monkeypatch, lambda *_: "sent")

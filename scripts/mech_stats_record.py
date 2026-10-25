@@ -19,9 +19,10 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+from mech_progress_status import format_summary, freshness_warnings
+
 from kg_microbe_fleet import load_fleet_manifest
 from kg_microbe_progress import ProgressError, atomic_write_json, read_json, validate_bundle
-from mech_progress_status import format_summary, freshness_warnings
 
 DEFAULT_REPORT = Path("workspace/reports/mech-stats")
 
@@ -151,8 +152,12 @@ def response_record(value: dict, snapshot_id: str | None, recorded_at: str) -> d
     if "reported_summary" in value and (not isinstance(summary, str) or not summary
                                          or value["text"].count(summary) != 1):
         raise ProgressError("reported summary must be an exact unique excerpt of the response")
-    if "reported_counts" in value and value["reported_counts"] != reported_counts(summary):
-        raise ProgressError("reported counts differ from the original response text")
+    if ("reported_counts" in value or "reported_summary" in value
+            or re.match(r"\A\d+ Mechs?,", summary)):
+        counts = reported_counts(summary)
+        if "reported_counts" in value and value["reported_counts"] != counts:
+            raise ProgressError("reported counts differ from the original response text")
+        value = {**value, "reported_counts": counts}
     if "source_ref" in value:
         reference = value["source_ref"]
         if (not isinstance(reference, dict) or set(reference) != {
@@ -165,6 +170,15 @@ def response_record(value: dict, snapshot_id: str | None, recorded_at: str) -> d
     if "superseded_by" in value and (not isinstance(value["superseded_by"], str) or not value["superseded_by"]):
         raise ProgressError("superseded response needs a successor source_id")
     return {**value, "snapshot_id": snapshot_id, "recorded_at": recorded_at}
+
+
+def same_response(existing: dict, candidate: dict) -> bool:
+    """Compare content without rewriting legacy rows that lack derived counts."""
+    values = {key: value for key, value in existing.items()
+              if key not in {"snapshot_id", "recorded_at"}}
+    normalized = response_record(values, existing["snapshot_id"], existing["recorded_at"])
+    return all(key in normalized and normalized[key] == value
+               for key, value in candidate.items() if key != "recorded_at")
 
 
 def validate_report(root: Path, report: dict) -> None:
@@ -215,17 +229,28 @@ def validate_report(root: Path, report: dict) -> None:
         seen.add(record["source_id"])
         stamp(record["recorded_at"])
         values = {key: value for key, value in record.items() if key not in {"snapshot_id", "recorded_at"}}
-        response_record(values, record["snapshot_id"], record["recorded_at"])
+        checked_response = response_record(values, record["snapshot_id"], record["recorded_at"])
         if not linked and "reported_counts" not in record:
             raise ProgressError("response-only observations require explicit reported counts")
-        if linked and "reported_counts" in record:
+        if linked and "reported_counts" in checked_response:
             snapshot = next(row for row in report["snapshots"] if row["id"] == record["snapshot_id"])
             facts = {"mech_count": snapshot["mech_count"], **snapshot["totals"]}
-            if any(facts[key] != count for key, count in record["reported_counts"].items()):
+            if any(facts[key] != count for key, count in checked_response["reported_counts"].items()):
                 raise ProgressError("response counts do not match the linked snapshot")
     for record in all_responses:
         if "superseded_by" in record and (record["superseded_by"] not in seen or record["superseded_by"] == record["source_id"]):
             raise ProgressError("superseded response does not reference another response")
+    successors = {row["source_id"]: row["superseded_by"] for row in all_responses
+                  if "superseded_by" in row}
+    resolved = set()
+    for start in successors:
+        visited, cursor = set(), start
+        while cursor in successors and cursor not in resolved:
+            if cursor in visited:
+                raise ProgressError("response supersession contains a cycle")
+            visited.add(cursor)
+            cursor = successors[cursor]
+        resolved.update(visited)
 
 
 def record_response_history(report_dir: Path, entries: list[dict], *,
@@ -256,7 +281,7 @@ def record_response_history(report_dir: Path, entries: list[dict], *,
             existing = next((item for item in report["responses"] + report["response_only_observations"]
                              if item["source_id"] == row["source_id"]), None)
             if existing:
-                if any(existing[key] != value for key, value in row.items() if key != "recorded_at"):
+                if not same_response(existing, row):
                     raise ProgressError("response source_id already records different content")
             else:
                 report["responses" if row["snapshot_id"] is not None else "response_only_observations"].append(row)
@@ -321,7 +346,7 @@ def record_stats(bundle_path: Path, report_dir: Path, *, manifest_path: Path | N
         validate_report(report_dir, report)
         before = encode(report)
         prior_response = next((row for row in report["responses"] if response and row["source_id"] == response["source_id"]), None)
-        if prior_response and any(prior_response[key] != value for key, value in response.items() if key != "recorded_at"):
+        if prior_response and not same_response(prior_response, response):
             raise ProgressError("response source_id already records different content")
         entry = next((row for row in report["snapshots"] if row["id"] == identity), None)
         if entry is None:

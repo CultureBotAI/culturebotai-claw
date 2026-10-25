@@ -203,3 +203,114 @@ def test_embedded_observation_requires_an_exact_unambiguous_response_excerpt(rec
     value["reported_summary"] = summary.replace("1 completed goal", "2 completed goals")
     with pytest.raises(ProgressError, match="exact unique excerpt"):
         recorder.response_record(value, None, NOW.isoformat())
+
+
+def test_cli_response_without_optional_counts_cannot_link_another_measurement(
+        recorder, source, tmp_path, capsys):
+    archive = tmp_path / "report"
+    recorder.record_stats(source, archive, now=NOW)
+    before = (archive / "report.json").read_bytes()
+    count = len(load_fleet_manifest().keys)
+    answer = response(text_kind="verbatim", text=(
+        f"{count} Mechs, 1 PR (0 merged, 1 open), 0 completed goals, 0 completed cycles"))
+    assert "reported_counts" not in answer
+    response_path = tmp_path / "response.json"
+    response_path.write_text(json.dumps(answer))
+    result = recorder.main(["--bundle", str(source), "--report-dir", str(archive),
+                            "--response-file", str(response_path)])
+    assert result == 1
+    assert "linked snapshot" in capsys.readouterr().err
+    assert (archive / "report.json").read_bytes() == before
+
+
+@pytest.mark.parametrize("retry", ["stats", "history"])
+def test_numeric_response_retry_preserves_legacy_rows_without_derived_counts(
+        recorder, source, tmp_path, retry):
+    archive = tmp_path / "report"
+    summary = recorder.format_summary(json.loads(source.read_text())["snapshot"])
+    answer = response(text=summary + "\n\nEarlier stale notes mentioned 999 PRs.")
+    result = recorder.record_stats(source, archive, response=answer, now=NOW)
+    path = archive / "report.json"
+    report = json.loads(path.read_text())
+    assert report["responses"][0]["reported_counts"]["unique_prs"] == 0
+    # A report created before automatic count derivation must remain retryable.
+    del report["responses"][0]["reported_counts"]
+    report["response_only_observations"] = []
+    path.write_text(json.dumps(report))
+    before = path.read_bytes()
+    if retry == "stats":
+        repeated = recorder.record_stats(source, archive, response=answer, now=NOW + timedelta(days=1))
+    else:
+        repeated = recorder.record_response_history(archive,
+            [{**answer, "snapshot_id": result["snapshot_id"]}], now=NOW + timedelta(days=1))
+    assert repeated["status"] == "unchanged"
+    assert path.read_bytes() == before
+
+
+def test_revalidation_checks_legacy_numeric_text_without_optional_counts(recorder, source, tmp_path):
+    archive = tmp_path / "report"
+    summary = recorder.format_summary(json.loads(source.read_text())["snapshot"])
+    recorder.record_stats(source, archive, response=response(text=summary), now=NOW)
+    path = archive / "report.json"
+    report = json.loads(path.read_text())
+    report["responses"][0].pop("reported_counts")
+    report["responses"][0]["text"] = summary.replace("0 completed goals", "1 completed goal")
+    path.write_text(json.dumps(report))
+    before = path.read_bytes()
+    with pytest.raises(ProgressError, match="linked snapshot"):
+        recorder.record_stats(source, archive, now=NOW)
+    assert path.read_bytes() == before
+
+
+def test_explicit_excerpt_is_parsed_without_optional_counts(recorder, source, tmp_path):
+    summary = recorder.format_summary(json.loads(source.read_text())["snapshot"])
+    value = response(text=f"Tracker report: **{summary}**. Other notes are not measurements.",
+                     reported_summary=summary)
+    assert "reported_counts" not in value
+    row = recorder.response_record(value, None, NOW.isoformat())
+    assert row["reported_counts"] == recorder.reported_counts(summary)
+    value["text"] += " " + summary
+    with pytest.raises(ProgressError, match="exact unique excerpt"):
+        recorder.response_record(value, None, NOW.isoformat())
+    value = response(text="Context: not a stats line.", reported_summary="not a stats line.")
+    with pytest.raises(ProgressError, match="unambiguous stats line"):
+        recorder.response_record(value, None, NOW.isoformat())
+
+
+def test_later_stats_line_is_not_inferred_for_an_unparsed_summary(recorder, source):
+    summary = recorder.format_summary(json.loads(source.read_text())["snapshot"])
+    value = response(text="An attributed summary with no current numerical answer.\n" + summary)
+    assert "reported_counts" not in recorder.response_record(value, None, NOW.isoformat())
+
+
+@pytest.mark.parametrize("length", [2, 3])
+def test_supersession_cycles_across_collections_preserve_prior_report(
+        recorder, source, tmp_path, length):
+    archive = tmp_path / "report"
+    recorder.record_stats(source, archive, response=response(source_id="a"), now=NOW)
+    summary = recorder.format_summary(json.loads(source.read_text())["snapshot"])
+    entries = [response(source_id=name, text=summary, snapshot_id=None)
+               for name in ("b", "c")[:length - 1]]
+    chain = {"a": "b"} if length == 2 else {"a": "b", "b": "c"}
+    recorder.record_response_history(archive, entries, supersedes=chain, now=NOW)
+    path = archive / "report.json"
+    before = path.read_bytes()
+    with pytest.raises(ProgressError, match="cycle"):
+        recorder.record_response_history(archive, [],
+            supersedes={("b" if length == 2 else "c"): "a"}, now=NOW)
+    assert path.read_bytes() == before
+    recorder.validate_report(archive, json.loads(before))
+
+
+def test_supersession_allows_shared_successor_and_acyclic_chains(recorder, source, tmp_path):
+    archive = tmp_path / "report"
+    recorder.record_stats(source, archive, response=response(source_id="a"), now=NOW)
+    summary = recorder.format_summary(json.loads(source.read_text())["snapshot"])
+    entries = [response(source_id=name, text=summary, snapshot_id=None) for name in ("b", "c", "d")]
+    links = {"a": "c", "b": "c", "c": "d"}
+    recorder.record_response_history(archive, entries, supersedes=links, now=NOW)
+    report = json.loads((archive / "report.json").read_text())
+    recorder.validate_report(archive, report)
+    rows = report["responses"] + report["response_only_observations"]
+    assert [row["source_id"] for row in rows if "superseded_by" not in row] == ["d"]
+    assert recorder.record_response_history(archive, [], supersedes=links, now=NOW)["status"] == "unchanged"
