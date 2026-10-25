@@ -20,7 +20,8 @@ named samples. External resolvers that serve bot checks to headless browsers
 The published table on `https://culturebotai.github.io/mechs/` was decoded and
 matched its snapshot `_fleet/data/site_features.json` cell for cell (14 Mechs ×
 24 keys) at site-repository main `70c3a4d98f1cd18074ad57f2cef6bacf54f20426`,
-which is the deployed revision. Its ratings are dated 2026-10-10–2026-10-14.
+which was then the deployed revision; the file is byte-identical at
+`6035dc2f64056a8cea5db01cd85c82e83b22928b`, merged later that day. Its ratings are dated 2026-10-10–2026-10-14.
 Every Mech then merged a `feat/complete-website-features` PR on 2026-10-16, so the
 published table no longer describes the sites. Its shared description claims a
 404 recovery page and bulk TSV/JSON exports for every Mech; on 2026-10-25 eight
