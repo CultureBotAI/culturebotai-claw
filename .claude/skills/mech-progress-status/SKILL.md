@@ -43,6 +43,20 @@ stale, missing, or future-dated observations on stderr: retain that qualificatio
 after the summary. Exit 1 means unavailable or invalid evidence; report the error
 without inventing counts. Exit 2 means invalid arguments.
 
-This is read-only. Reporting does not refresh the collector, approve prompts,
-advance goals, or change PRs. See [progress accounting](../../../docs/guides/MECH_PROGRESS.md)
+For each requested Mech stats answer, preserve its validated source snapshot and
+the response in `workspace/reports/mech-stats/report.json`, as requested by the
+user. Use `scripts/mech_stats_record.py --bundle PATH --response-file PATH`,
+passing `--manifest PATH` when needed. The response JSON has `source_id`,
+`source`, `text_kind` (`verbatim` or `summary`), `text`, `responded_at` (known
+timezone-aware message time or `null`), and `prompt` (known text or `null`). Use
+a stable source ID for the particular answer so a retry cannot duplicate it.
+Save full available evidence; `--observations PATH` retains supplementary PR
+observations. Historical snapshots without attributable responses are recorded
+without `--response-file`. Never backfill requested examples as measurements or
+invent earlier response wording/timestamps. Follow the
+[archive contract](../../../docs/guides/MECH_PROGRESS.md#save-stats-responses-and-historical-snapshots).
+
+Source reporting is read-only; this archive writes only local report files.
+Reporting does not refresh the collector, approve prompts, advance goals, or
+change PRs. See [progress accounting](../../../docs/guides/MECH_PROGRESS.md)
 for the tracking and publication contract.

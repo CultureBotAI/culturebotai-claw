@@ -5,6 +5,7 @@ import importlib.util
 import json
 import os
 import shutil
+import sqlite3
 import subprocess
 import sys
 from pathlib import Path
@@ -301,7 +302,18 @@ def make_instance(setup, monkeypatch, send):
     notifier = SimpleNamespace(jxa=send)
     instance = supervisor.Supervisor(setup.config, native=SimpleNamespace(), notifier=notifier, runner=GitHubFixture())
     monkeypatch.setattr(instance, "observe", lambda target, **kwargs: copy.deepcopy(setup.observation))
+    monkeypatch.setattr(instance, "native_inputs", lambda target, after: [])
     return instance
+
+
+def confirm_native_input(instance, action, *, index=None):
+    payload = action.get("transport_message", action.get("message"))
+    item = {"step_index": index if index is not None else (action.get("native_step_index") or 0) + 1,
+            "timestamp_ms": action["reserved_epoch_ms"] + 1,
+            "created_at": "2026-10-25T20:00:00+00:00", "text": supervisor.normalized_input(payload),
+            "goal_declaration": payload.startswith("/goal ")}
+    instance.native_inputs = lambda target, after: [item]
+    return item
 
 
 def test_dispatch_reserves_durable_intent_before_input_and_timeout_is_not_retried(setup, monkeypatch):
@@ -335,17 +347,138 @@ def test_shared_input_lock_prevents_concurrent_terminal_writer(setup, monkeypatc
             instance.dispatch(setup.target, setup.ledger, decision)
 
 
-def test_native_history_marker_reconciles_uncertain_without_duplicate(setup, monkeypatch):
+def test_history_only_records_submission_without_acceptance_or_duplicate(setup, monkeypatch):
     instance = make_instance(setup, monkeypatch, lambda *_: pytest.fail("must not type"))
     action = {"state": "uncertain", "stage": 1, "kind": "finalize", "marker": "MECH-WORKFLOW-test",
-              "reserved_epoch_ms": 100, "native_session_id": setup.target["native_session_id"]}
+              "message": "[MECH-WORKFLOW-test] instruction", "reserved_epoch_ms": 100,
+              "native_session_id": setup.target["native_session_id"]}
     setup.ledger["actions"]["test"] = action
     Path(setup.config["history_path"]).write_text(json.dumps({"workspace": setup.target["root"],
         "conversationId": setup.target["native_session_id"],
         "timestamp": 101, "display": "[MECH-WORKFLOW-test] instruction"}) + "\n")
     instance.reconcile(setup.target, setup.ledger, setup.observation)
-    assert action["state"] == "accepted"
+    assert action["state"] == "uncertain"
+    assert action["submission_evidence"]["timestamp"] == 101
+    assert "accepted_at" not in action
     assert "action" not in supervisor.decide(setup.ledger, setup.observation)
+
+
+@pytest.mark.parametrize("start_goal", [False, True])
+def test_dispatch_persists_full_immutable_instruction_before_short_transport(setup, monkeypatch, start_goal):
+    if start_goal:
+        setup.ledger.update(stage=2, awaiting_goal=True)
+    def send(source, value):
+        saved = supervisor.read_json(setup.runtime / "traitmech/ledger.json")
+        action = next(iter(saved["actions"].values()))
+        artifact = action["instruction_artifact"]
+        path = Path(artifact["path"])
+        assert path.is_absolute() and path.is_file()
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == artifact["sha256"]
+        assert supervisor.read_json(path)["instruction"] == supervisor.normalized_input(action["message"])
+        assert action["state"] == "reserved"
+        assert value["message"] == action["transport_message"]
+        assert value["message"].startswith("/goal ") is start_goal
+        assert len(value["message"]) < len(action["message"]) / 2
+        assert "\n" not in value["message"]
+        return "sent"
+    instance = make_instance(setup, monkeypatch, send)
+    decision = supervisor.decide(setup.ledger, setup.observation)
+    action = instance.dispatch(setup.target, setup.ledger, decision)
+    assert action["state"] == "sent"
+    before = Path(action["instruction_artifact"]["path"]).read_bytes()
+    assert instance.action_transport(setup.target, action["id"], action["kind"], action["message"])[0] == action["transport_message"]
+    with pytest.raises(supervisor.SupervisorError, match="immutable"):
+        instance.action_transport(setup.target, action["id"], action["kind"], action["message"] + " altered")
+    assert Path(action["instruction_artifact"]["path"]).read_bytes() == before
+
+
+@pytest.mark.parametrize("legacy", [False, True])
+@pytest.mark.parametrize("damage", [None, "truncated", "quoted", "old_step", "old_time", "wrong_goal_kind", "wrong_conversation"])
+def test_acceptance_requires_exact_new_native_input(setup, monkeypatch, legacy, damage):
+    instance = make_instance(setup, monkeypatch, lambda *_: "sent")
+    action = instance.dispatch(setup.target, setup.ledger, supervisor.decide(setup.ledger, setup.observation))
+    action["native_step_index"] = 40
+    if legacy:
+        del action["transport_message"]
+    item = confirm_native_input(instance, action, index=41)
+    if damage == "truncated":
+        item["text"] = item["text"][:-5]
+    elif damage == "quoted":
+        item["text"] = "Quoted instruction: " + item["text"]
+    elif damage == "old_step":
+        item["step_index"] = 40
+    elif damage == "old_time":
+        item["timestamp_ms"] = action["reserved_epoch_ms"] - 1
+    elif damage == "wrong_goal_kind":
+        item["goal_declaration"] = True
+    elif damage == "wrong_conversation":
+        action["native_session_id"] = "another-conversation"
+    instance.reconcile(setup.target, setup.ledger, setup.observation)
+    assert action["state"] == ("accepted" if damage is None else "sent")
+    if damage is None:
+        assert action["native_consumption"]["verified"]
+        assert action["native_consumption"]["step_index"] == 41
+        accepted = copy.deepcopy(action)
+        item["step_index"] = 99
+        Path(setup.config["history_path"]).write_text(json.dumps({"workspace": setup.target["root"],
+            "conversationId": setup.target["native_session_id"], "timestamp": action["reserved_epoch_ms"] + 1,
+            "display": action.get("transport_message", action["message"])}) + "\n")
+        instance.reconcile(setup.target, setup.ledger, setup.observation)
+        assert action["accepted_at"] == accepted["accepted_at"]
+        assert action["acceptance"] == "native_user_input_exact"
+        assert action["native_consumption"] == accepted["native_consumption"]
+
+
+def test_historical_acceptance_is_preserved_but_not_reported_as_native_consumption(setup, monkeypatch):
+    instance = make_instance(setup, monkeypatch, lambda *_: "sent")
+    action = instance.dispatch(setup.target, setup.ledger, supervisor.decide(setup.ledger, setup.observation))
+    action.update(state="accepted", accepted_at="original", acceptance="native_workspace_history_marker")
+    instance.reconcile(setup.target, setup.ledger, setup.observation)
+    assert action["state"] == "accepted" and action["accepted_at"] == "original"
+    assert action["native_consumption"]["verified"] is False
+    confirm_native_input(instance, action)
+    instance.reconcile(setup.target, setup.ledger, setup.observation)
+    assert action["native_consumption"]["verified"] is True
+    assert action["accepted_at"] == "original"
+
+
+@pytest.mark.parametrize("damage", [None, "conversation", "workspace"])
+def test_native_input_reader_checks_snapshot_identity_and_completed_user_steps(setup, monkeypatch, damage):
+    native = supervisor.import_file(Path(supervisor.__file__).with_name("mech_session_native.py"), "test_native_inputs")
+    directory = setup.runtime / "native"
+    directory.mkdir()
+    setup.config["conversation_dir"] = str(directory)
+    def vint(value):
+        result = bytearray()
+        while value > 127:
+            result.append((value & 127) | 128)
+            value >>= 7
+        return bytes(result) + bytes([value])
+    def field(number, value):
+        return vint(number << 3 | 2) + vint(len(value)) + value
+    payload = field(5, field(1, b"\x08\x65")) + field(19, field(1, b"exact instruction"))
+    cid = setup.target["native_session_id"]
+    path = directory / f"{cid}.db"
+    with sqlite3.connect(path) as connection:
+        connection.executescript("CREATE TABLE trajectory_meta (id text, cid text); "
+            "CREATE TABLE trajectory_metadata_blob (id text, data blob); "
+            "CREATE TABLE steps (idx integer, step_type integer, status integer, step_payload blob);")
+        connection.execute("INSERT INTO trajectory_meta VALUES (?,?)", ("main", "other" if damage == "conversation" else cid))
+        uri = Path("/different/repository").as_uri() if damage == "workspace" else setup.repo.as_uri()
+        connection.execute("INSERT INTO trajectory_metadata_blob VALUES (?,?)", ("main", field(7, uri.encode())))
+        connection.executemany("INSERT INTO steps VALUES (?,?,?,?)", [
+            (40, 14, 3, payload), (41, 14, 3, payload), (42, 15, 3, payload), (43, 14, 11, payload)])
+    instance = supervisor.Supervisor(setup.config, native=native, notifier=SimpleNamespace())
+    before = path.read_bytes()
+    if damage:
+        with pytest.raises(supervisor.SupervisorError, match=damage):
+            instance.native_inputs(setup.target, 40)
+    else:
+        rows = instance.native_inputs(setup.target, 40)
+        assert [(r["step_index"], r["text"], r["timestamp_ms"], r["goal_declaration"]) for r in rows] == [
+            (41, "exact instruction", 101000, False)]
+    assert path.read_bytes() == before
+    assert not Path(str(path) + "-wal").exists()
 
 
 def test_observe_mode_never_sends_and_archived_receipt_does_not_block_new_stage(setup, monkeypatch):
@@ -372,13 +505,36 @@ def test_new_goal_marker_adoption_preserves_pre_goal_clean_baseline(setup, monke
     setup.ledger.update(stage=2, awaiting_goal=True)
     setup.ledger["actions"]["next"] = {"kind": "start_goal", "stage": 2, "state": "sent",
         "marker": "MECH-WORKFLOW-next", "reserved_epoch_ms": 1,
+        "message": "/goal next MECH-WORKFLOW-next",
         "native_session_id": setup.target["native_session_id"]}
     setup.observation["goal_identity"]["start_step_index"] = 40
     setup.observation["native"]["current_goal"].update(start_step_index=40, goal_text="next MECH-WORKFLOW-next")
+    confirm_native_input(instance, setup.ledger["actions"]["next"], index=40)
     instance.reconcile(setup.target, setup.ledger, setup.observation)
     assert not setup.ledger["awaiting_goal"]
     assert setup.ledger["adopted_goal"]["start_step_index"] == 40
     assert setup.ledger["baseline_head"] == HEAD and setup.ledger["baseline_status"] == ""
+
+
+@pytest.mark.parametrize("damage", ["no_native_input", "truncated", "wrong_step", "not_goal"])
+def test_goal_marker_alone_cannot_adopt_a_different_native_goal(setup, monkeypatch, damage):
+    instance = make_instance(setup, monkeypatch, lambda *_: "sent")
+    setup.ledger.update(stage=2, awaiting_goal=True)
+    action = instance.dispatch(setup.target, setup.ledger, supervisor.decide(setup.ledger, setup.observation))
+    setup.observation["goal_identity"]["start_step_index"] = 40
+    setup.observation["native"]["current_goal"].update(start_step_index=40,
+        goal_text=supervisor.normalized_input(action["transport_message"]))
+    if damage != "no_native_input":
+        item = confirm_native_input(instance, action, index=40)
+        if damage == "truncated":
+            item["text"] = item["text"][:-1]
+        elif damage == "wrong_step":
+            item["step_index"] = 41
+        else:
+            item["goal_declaration"] = False
+    instance.reconcile(setup.target, setup.ledger, setup.observation)
+    assert setup.ledger["awaiting_goal"]
+    assert setup.ledger["adopted_goal"] == GOAL
 
 
 def test_config_refuses_duplicate_targets_and_unverified_skill_locations(setup, monkeypatch):
@@ -484,7 +640,8 @@ def test_repair_dispatch_uses_same_reason_and_receipt_hash_then_refuses_changed_
     receipt_hash = hashlib.sha256(path.read_bytes()).hexdigest()
     decision = supervisor.repair_decision(setup.ledger, setup.observation, "missing validation", receipt_hash)
     assert instance.dispatch(setup.target, setup.ledger, decision)["state"] == "sent"
-    assert "missing validation" in sent[0]
+    action = next(a for a in setup.ledger["actions"].values() if a.get("transport_message") == sent[0])
+    assert "missing validation" in supervisor.read_json(Path(action["instruction_artifact"]["path"]))["instruction"]
     path.write_text('{"corrected": true}')
     assert instance.dispatch(setup.target, setup.ledger, decision)["state"] == "not-sent"
     assert len(sent) == 1
@@ -868,7 +1025,8 @@ def test_two_full_six_goal_cycles_keep_all_identity_and_closure_history(cycle_se
             setup.observation["goal_identity"]["start_step_index"] += 10
             setup.observation["native"]["current_goal"].update(
                 start_step_index=setup.observation["goal_identity"]["start_step_index"],
-                goal_text="new native objective " + action["marker"])
+                goal_text=supervisor.normalized_input(action["transport_message"]))
+            confirm_native_input(instance, action, index=setup.observation["goal_identity"]["start_step_index"])
             instance.reconcile(setup.target, ledger, setup.observation)
             assert not ledger["awaiting_goal"]
             instance.save(setup.target, ledger)
@@ -1000,7 +1158,10 @@ def test_migration_preserves_native_goal_and_old_receipts_but_handoff_is_not_com
     action = instance.dispatch(setup.target, migrated, decision)
     Path(setup.config["history_path"]).write_text(json.dumps({"workspace": setup.target["root"],
         "conversationId": setup.target["native_session_id"], "timestamp": action["reserved_epoch_ms"] + 1,
-        "display": action["marker"]}) + "\n")
+        "display": action["transport_message"]}) + "\n")
+    instance.reconcile(setup.target, migrated, setup.observation)
+    assert migrated["policy_notification_required"]
+    confirm_native_input(instance, action)
     instance.reconcile(setup.target, migrated, setup.observation)
     assert not migrated["policy_notification_required"]
     setup.observation["goal_state"] = "active"
@@ -1149,6 +1310,7 @@ def test_migrated_pending_next_goal_is_reconciled_without_new_identifier_resend(
     ledger.update(stage=2, awaiting_goal=True)
     ledger["actions"]["old-v1-identifier"] = {"kind": "start_goal", "stage": 2, "cycle": 1,
         "state": "uncertain", "marker": "MECH-WORKFLOW-old-v1-identifier", "reserved_epoch_ms": 1,
+        "message": "/goal already started MECH-WORKFLOW-old-v1-identifier",
         "native_session_id": setup.target["native_session_id"]}
     assert supervisor.decide(ledger, setup.observation)["phase"] == "awaiting_native_acceptance"
     setup.observation["goal_identity"]["start_step_index"] += 1
@@ -1156,6 +1318,8 @@ def test_migrated_pending_next_goal_is_reconciled_without_new_identifier_resend(
         start_step_index=setup.observation["goal_identity"]["start_step_index"],
         goal_text="already started MECH-WORKFLOW-old-v1-identifier")
     instance = cycle_instance(setup, monkeypatch)
+    confirm_native_input(instance, ledger["actions"]["old-v1-identifier"],
+                         index=setup.observation["goal_identity"]["start_step_index"])
     instance.reconcile(setup.target, ledger, setup.observation)
     assert not ledger["awaiting_goal"]
     assert ledger["actions"]["old-v1-identifier"]["state"] == "accepted"
@@ -1494,3 +1658,205 @@ def test_send_js_and_redraw_js_use_history_tail_and_restore_rows(setup):
     assert res_redraw["currentRows"] == 22
     assert res_redraw["out"]["screen"].endswith("\nrefreshed tail")
 
+
+
+HIST_HEAD = "d" * 40
+HIST_FIX = "e" * 40
+HIST_MERGE = "f" * 40
+CURRENT_BASE = "1" * 40
+
+
+class HistoricalGitHubFixture(CycleGitHubFixture):
+    """Prior squash merge is inherited; its original fix commit need not be."""
+    def __init__(self, root):
+        super().__init__(root)
+        self.pr["base"]["sha"] = CURRENT_BASE
+        self.historical_pr = copy.deepcopy(self.pr)
+        self.historical_pr.update(merge_commit_sha=HIST_MERGE)
+        self.historical_pr["head"].update(sha=HIST_HEAD, ref="curation/previous")
+        self.historical_commits = [[{"sha": HIST_FIX}, {"sha": HIST_HEAD}]]
+        self.historical_issue = {"state": "closed"}
+        self.historical_ancestry = {}
+
+    def __call__(self, args, **kwargs):
+        endpoint = args[-1]
+        if args[:2] == ["gh", "api"]:
+            if endpoint.endswith("/pulls/41"):
+                self.calls.append(args)
+                return SimpleNamespace(stdout=json.dumps(self.historical_pr), stderr="", returncode=0)
+            if endpoint.endswith("/pulls/41/commits?per_page=100"):
+                self.calls.append(args)
+                return SimpleNamespace(stdout=json.dumps(self.historical_commits), stderr="", returncode=0)
+            if endpoint.endswith("/issues/23"):
+                self.calls.append(args)
+                return SimpleNamespace(stdout=json.dumps(self.historical_issue), stderr="", returncode=0)
+            if endpoint.endswith("/issues/24"):
+                self.calls.append(args)
+                return SimpleNamespace(stdout=json.dumps(self.issue), stderr="", returncode=0)
+        if args[:1] == ["git"] and args[3:5] == ["merge-base", "--is-ancestor"]:
+            if args[-2] == HIST_FIX:
+                return SimpleNamespace(stdout="", stderr="", returncode=1)
+            if args[-2] == HIST_MERGE:
+                self.calls.append(args)
+                return SimpleNamespace(stdout="", stderr="", returncode=self.historical_ancestry.get(args[-1], 0))
+        return super().__call__(args, **kwargs)
+
+
+@pytest.fixture
+def historical_setup(cycle_setup, monkeypatch):
+    setup = cycle_setup
+    instance = cycle_instance(setup, monkeypatch)
+    finding = {"finding_id": "trait-001", "status": "resolved", "summary": "Previously fixed trait defect",
+               "carried_from": "trait-001", "group_id": "related-traits",
+               "issue_url": "https://github.com/CultureBotAI/TraitMech/issues/23"}
+    setup.ledger["stage"] = 4
+    reviewed = write_goal_evidence(setup, setup.ledger, findings=[finding])
+    old_ledger = instance.advance(setup.target, setup.ledger, reviewed, {"status": "merged"}, "native_completed")
+    from kg_microbe_workflows import evidence_directory
+    def group(cycle):
+        return {"group_id": "related-traits", "summary": "Previously fixed defect", "finding_ids": ["trait-001"],
+                "issue_url": finding["issue_url"], "status": "resolved",
+                "resolution_evidence": [evidence_directory(old_ledger["run_id"], cycle, 5, 1) + "/validation.md"]}
+    prior = write_goal_evidence(setup, old_ledger, findings=[finding], groups=[group(1)])
+    prior["pr"].update(number=41, head_sha=HIST_HEAD, branch="curation/previous")
+    prior["issues"][0]["fix_commit_sha"] = HIST_FIX
+    old_record = {"cycle": 1, "stage": 5, "receipt_sha256": supervisor.digest(prior),
+                  "verification": {"status": "merged", "pr_number": 41, "head_sha": HIST_HEAD,
+                                   "merge_commit_sha": HIST_MERGE, "merged_at": "2026-10-19T12:00:00Z"},
+                  "goal_evidence": copy.deepcopy(prior["goal_outputs"]["goal_evidence"]),
+                  "goal_evidence_snapshot": supervisor.goal_output_data(prior, old_ledger, setup.target)}
+    old_ledger["completed_stages"].append(old_record)
+    old_ledger.update(cycle=2, stage=4)
+    reviewed = write_goal_evidence(setup, old_ledger, findings=[finding])
+    setup.ledger = instance.advance(setup.target, old_ledger, reviewed, {"status": "merged"}, "native_completed")
+    receipt = write_goal_evidence(setup, setup.ledger, findings=[finding], groups=[group(2)])
+    receipt["issues"] = [
+        {"number": 23, "disposition": "addressed", "fix_commit_sha": HIST_FIX,
+         "historical_resolution": {"github_repository": setup.target["github_repository"], "pr_number": 41,
+                                   "base": "main", "head_sha": HIST_HEAD, "merge_commit_sha": HIST_MERGE,
+                                   "receipt_sha256": old_record["receipt_sha256"]}},
+        {"number": 24, "disposition": "addressed", "fix_commit_sha": FIX},
+    ]
+    setup.receipt = receipt
+    setup.remote = HistoricalGitHubFixture(setup.repo)
+    setup.remote.snapshot()
+    setup.historical_record = next(record for record in setup.ledger["completed_stages"]
+                                   if record.get("receipt_sha256") == old_record["receipt_sha256"])
+    return setup
+
+
+def test_historical_squash_resolution_and_current_fix_both_verify(historical_setup):
+    s = historical_setup
+    assert supervisor.validate_receipt(s.receipt, s.ledger, s.target, s.runtime) == []
+    proof = supervisor.verify_remote_receipt(s.receipt, s.ledger, s.target, s.remote)
+    assert proof["pr_number"] == 42
+    assert [item["number"] for item in proof["historical_issue_resolutions"]] == [23]
+    ancestry = [args[-2:] for args in s.remote.calls if args[:1] == ["git"] and args[3] == "merge-base"]
+    assert [HIST_MERGE, HEAD] in ancestry and [HIST_MERGE, CURRENT_BASE] in ancestry and [HIST_MERGE, "HEAD"] in ancestry
+    assert not any(pair[0] == HIST_FIX for pair in ancestry), "squashed original fixes are not merge ancestors"
+
+
+@pytest.mark.parametrize("field,value", [
+    ("pr_number", 42), ("pr_number", True), ("github_repository", "Other/Repo"),
+    ("github_repository", None), ("base", "release"), ("head_sha", "d" * 39),
+    ("merge_commit_sha", "0" * 40), ("receipt_sha256", "0" * 64),
+])
+def test_historical_resolution_requires_exact_prior_ledger_identity(historical_setup, field, value):
+    s = historical_setup
+    s.receipt["issues"][0]["historical_resolution"][field] = value
+    assert supervisor.validate_receipt(s.receipt, s.ledger, s.target, s.runtime)
+
+
+@pytest.mark.parametrize("mutation", [
+    lambda s: s.ledger["completed_stages"].remove(s.historical_record),
+    lambda s: s.ledger["completed_stages"].append(copy.deepcopy(s.historical_record)),
+    lambda s: s.historical_record["verification"].update(status="no_changes"),
+    lambda s: s.historical_record.update(cycle=2, stage=6),
+])
+def test_unverified_ambiguous_or_future_receipt_cannot_authorize_historical_fix(historical_setup, mutation):
+    s = historical_setup
+    mutation(s)
+    assert supervisor.validate_receipt(s.receipt, s.ledger, s.target, s.runtime)
+
+
+def test_historical_scope_must_already_be_resolved_in_frozen_review(historical_setup):
+    s = historical_setup
+    previous = supervisor.previous_evidence(s.ledger, 5)
+    previous["goal_evidence_snapshot"]["findings"][0]["status"] = "open"
+    # Even if metadata still claims the old issue is fixed, a reopened finding
+    # requires a current fix; it cannot inherit the prior resolution.
+    with pytest.raises(supervisor.SupervisorError, match="same already-resolved"):
+        supervisor.verify_historical_finding_scope(s.receipt["issues"][0],
+            s.historical_record["goal_evidence_snapshot"]["groups"][0], s.receipt, s.ledger, s.target,
+            previous["goal_evidence_snapshot"])
+
+
+def test_historical_scope_cannot_be_replaced_with_unrelated_finding(historical_setup):
+    s = historical_setup
+    item = copy.deepcopy(s.historical_record["goal_evidence_snapshot"]["groups"][0])
+    item["finding_ids"] = ["new-unrelated-finding"]
+    with pytest.raises(supervisor.SupervisorError, match="same already-resolved"):
+        supervisor.verify_historical_finding_scope(s.receipt["issues"][0], item, s.receipt, s.ledger, s.target,
+                                                  supervisor.previous_evidence(s.ledger, 5)["goal_evidence_snapshot"])
+
+
+@pytest.mark.parametrize("mutation,match", [
+    (lambda r: r.historical_issue.update(state="open"), "not closed"),
+    (lambda r: r.historical_issue.update(pull_request={}), "not closed"),
+    (lambda r: r.historical_pr.update(merged=False), "historical resolution PR"),
+    (lambda r: r.historical_pr.update(merge_commit_sha="0" * 40), "historical resolution PR"),
+    (lambda r: r.historical_pr["head"].update(sha="0" * 40), "historical resolution PR"),
+    (lambda r: r.historical_pr["head"]["repo"].update(full_name="Other/Repo"), "historical resolution PR"),
+    (lambda r: r.historical_pr["base"].update(ref="release"), "historical resolution PR"),
+    (lambda r: r.historical_pr["base"]["repo"].update(full_name="Other/Repo"), "historical resolution PR"),
+    (lambda r: setattr(r, "historical_commits", [[{"sha": HIST_HEAD}]]), "fix is not in"),
+    (lambda r: setattr(r, "historical_commits", {"error": "unavailable"}), "membership unavailable"),
+    (lambda r: r.pr["base"].pop("sha"), "base commit unavailable"),
+    (lambda r: r.historical_ancestry.update({HEAD: 1}), "not in current reviewed"),
+    (lambda r: r.historical_ancestry.update({CURRENT_BASE: 1}), "not in current reviewed"),
+    (lambda r: r.historical_ancestry.update({"HEAD": 1}), "not in current reviewed"),
+])
+def test_historical_remote_checks_fail_closed(historical_setup, mutation, match):
+    s = historical_setup
+    mutation(s.remote)
+    with pytest.raises(supervisor.SupervisorError, match=match):
+        supervisor.verify_remote_receipt(s.receipt, s.ledger, s.target, s.remote)
+
+
+def test_current_issue_does_not_inherit_historical_exception(historical_setup):
+    s = historical_setup
+    s.receipt["issues"][1]["fix_commit_sha"] = HIST_FIX
+    with pytest.raises(supervisor.SupervisorError, match="fix in this PR"):
+        supervisor.verify_remote_receipt(s.receipt, s.ledger, s.target, s.remote)
+
+
+def test_historical_entry_cannot_be_implicit(historical_setup):
+    s = historical_setup
+    del s.receipt["issues"][0]["historical_resolution"]
+    with pytest.raises(supervisor.SupervisorError, match="fix in this PR"):
+        supervisor.verify_remote_receipt(s.receipt, s.ledger, s.target, s.remote)
+
+
+def test_current_ci_remains_required_with_historical_resolutions(historical_setup):
+    s = historical_setup
+    s.remote.checks[0]["bucket"] = "fail"
+    with pytest.raises(supervisor.SupervisorError, match="CI evidence"):
+        supervisor.verify_remote_receipt(s.receipt, s.ledger, s.target, s.remote)
+
+
+@pytest.mark.parametrize("key,value", [("number", 999), ("fix_commit_sha", FIX), ("extra", "ignored")])
+def test_historical_descriptor_cannot_override_verified_proof_fields(historical_setup, key, value):
+    s = historical_setup
+    s.receipt["issues"][0]["historical_resolution"][key] = value
+    assert supervisor.validate_receipt(s.receipt, s.ledger, s.target, s.runtime)
+    with pytest.raises(supervisor.SupervisorError, match="exact distinct prior-PR descriptor"):
+        supervisor.verify_remote_receipt(s.receipt, s.ledger, s.target, s.remote)
+
+
+@pytest.mark.parametrize("stage", [1, 4, 6])
+def test_historical_resolution_cannot_change_other_stage_contracts(historical_setup, stage):
+    s = historical_setup
+    s.ledger["stage"] = stage
+    s.receipt["stage"] = stage
+    with pytest.raises(supervisor.SupervisorError, match="stage-5 receipt"):
+        supervisor.historical_resolution_record(s.receipt["issues"][0], s.receipt, s.ledger, s.target)

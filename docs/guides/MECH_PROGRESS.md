@@ -61,6 +61,68 @@ observations, or timestamps more than one minute in the future. Retain those
 warnings when quoting a stale summary. Exit 1 means data could not be verified
 and prints no counts; exit 2 means invalid arguments.
 
+## Save stats responses and historical snapshots
+
+Keep stats requested in conversation in the local structured report
+`workspace/reports/mech-stats/report.json`. Its `snapshots` array is ordered by
+the snapshot's actual `as_of` timestamp. Its separate `responses` array contains
+only attributable answers: an available snapshot does not establish that an
+answer was sent. Unknown message times remain `null`, and reconstructed answer
+summaries are marked `text_kind: summary` rather than presented as verbatim.
+Recovered transcript replies without a matching full bundle are kept in
+`response_only_observations`, with `snapshot_id: null` and explicitly
+transcript-reported `reported_counts`. These are not validated historical
+snapshots. Exact recovered replies may supersede an earlier summary through
+`superseded_by`; exclude superseded summaries when counting actual replies.
+Transcript-backed records retain original prompt/message times and source-line
+references. The `record_response_history` helper supports this narrow backfill
+and parses only the leading stats line, preserving stale qualifications as text.
+For a numeric report embedded in a longer final response, an optional
+`reported_summary` must be an exact unique excerpt of that response; only this
+explicit excerpt is parsed, and the complete original reply remains retained.
+
+Archive a previously collected bundle without collecting or publishing:
+
+```bash
+uv run python scripts/mech_stats_record.py --bundle /path/to/bundle.json \
+  --manifest workspace/progress-publisher/fleet.yaml \
+  --source "read-only runtime and GitHub collection"
+```
+
+To associate an actual response, pass `--response-file /path/to/response.json`
+with this JSON shape (the values below describe the fields, not measurements):
+
+```json
+{
+  "source_id": "stable identifier for this particular response",
+  "source": "conversation transcript or supplied conversation summary",
+  "text_kind": "verbatim",
+  "text": "Exact answer text, or an explicitly attributed summary",
+  "responded_at": null,
+  "prompt": null
+}
+```
+
+Use a timezone-aware `responded_at` only when the message timestamp is known;
+the snapshot time and archive time are separate facts. Set `text_kind` to
+`summary` when the original wording is unavailable. Never import examples or
+requested display formats as observations. Reusing a `source_id` deduplicates
+the same response and rejects conflicting content.
+
+The recorder validates the full history/snapshot bundle against its pinned
+fleet before saving. Each snapshot retains totals, per-Mech counters and current
+state, freshness warnings evaluated at archive time, source attribution, and
+hash references to complete archived bundle/fleet files. Optional
+`--observations /path/to/observations.json` retains additional raw PR observations
+as supplementary provenance; it does not derive counts from them. The original
+snapshot includes the detailed PR and verified goal-closure history.
+
+Existing reports and evidence are revalidated before an atomic report update.
+Identical imports are idempotent; historical snapshot backfills do not create
+response records. `--report-dir PATH` selects another local archive. These files
+remain under the existing ignored workspace: saving them does not publish,
+change the active collector, or advance supervised goals.
+
 ## Register every PR in the coding session
 
 As soon as a goal opens a PR, including every follow-up PR, register it using the
