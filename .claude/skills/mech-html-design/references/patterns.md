@@ -1,6 +1,8 @@
 # Existing Mech HTML patterns
 
-These source locations were inspected in the October 2026 fleet audit. Resolve
+These source locations were inspected in the October 2026 fleet audits; the
+[X-Mech website features guide](../../../../docs/guides/MECH_SITE_FEATURES.md)
+says which features every site is expected to provide. Resolve
 the current revision when using them. They describe reusable decisions, not a
 claim that every page in an example repository implements every behavior.
 
@@ -13,6 +15,10 @@ claim that every page in an example repository implements every behavior.
 | Inspect evidence behind a record | [CellStructureMech structure template](https://github.com/CultureBotAI/CellStructureMech/blob/main/src/cellstructuremech/templates/structure.html), [TraitMech record template](https://github.com/CultureBotAI/TraitMech/blob/main/src/traitmech/templates/trait.html), [AntibioticMech record template](https://github.com/CultureBotAI/AntibioticMech/blob/main/src/antibioticmech/templates/record.html) | Label plus CURIE, definitions, evidence/provenance, source record link, graph/table alternatives | Which claim each citation supports, relationship direction, reviewed versus imported status |
 | Compare tabular data on a small screen | [TaxonMech templates](https://github.com/CultureBotAI/TaxonMech/tree/main/src/taxonmech/templates) | Semantic table inside a named, keyboard-scrollable region, with wrapping of prose and long identifiers | Column priority and which values must remain aligned; preserve data rather than hiding columns to make the viewport fit |
 | Move between projects | [Maintained Mech directory](https://culturebotai.github.io/mechs/) | A visible All Mech projects link from the project shell | Useful direct sibling links and the current repository's visual identity |
+| Sort a listing and link the filtered view | [DUFMech dashboard script](https://github.com/CultureBotAI/DUFMech/blob/main/src/dufmech/dashboard.js) (`restore()`, `writeState()`), [TraitMech browse](https://culturebotai.github.io/TraitMech/pages/browse.html) | A labelled sort select applied before paging; search, filters, sort and page in the query string, restored on a cold load, with safe fallbacks | Sort orders that mean something for the data; which facets exist |
+| State licence, schema and build on every page | [DUFMech site renderer](https://github.com/CultureBotAI/DUFMech/blob/main/src/dufmech/site.py) footer | Data and code licences as the repository's licence files state them, a schema link, and a deterministic build or corpus stamp | Licence wording read from that repository's own files; what the stamp is derived from |
+| Hand a reader to a sibling Mech | [Sibling routes](../../../../docs/guides/MECH_SITE_FEATURES.md#sibling-routes) | Only routes checked to load and apply the query; an NCBITaxon id opens its TaxonMech record | Which siblings are worth linking from this domain |
+| Offer a text alternative for a map or graph | [TraitMech map pages](https://culturebotai.github.io/TraitMech/pages/map.html) "View data as table", [CommunityMech maps](https://culturebotai.github.io/CommunityMech/) | A disclosure listing every plotted point with a record link, and edge tables beside causal graphs | What a point or edge means in the domain |
 | Keep a selected theme | Existing local theme-toggle scripts and CSS in the repositories above | Reuse the same storage key, early theme initialization and semantic toggle across views | Brand colors; test the real page/card/button surfaces in every declared theme |
 
 ## Patterns that need domain evidence
