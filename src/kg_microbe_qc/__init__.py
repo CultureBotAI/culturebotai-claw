@@ -16,6 +16,11 @@ Or via CLI:
     python -m kg_microbe_qc --config conf/qc_config.yaml \
         --output dashboard
 
+The page has a dark theme and a ``mech-theme`` toggle. A Mech's palette and a
+footer such as its licence line come from the config's ``palette`` and
+``footer`` keys, or from ``--palette``/``--footer`` files that override them
+(see generate_dashboard).
+
 Reproducibility contract:
     ``index.html`` is the staleness artifact: regenerate it and compare bytes.
     ``coverage.png`` is presentation output and is not byte-stable across

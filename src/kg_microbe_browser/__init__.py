@@ -2,7 +2,9 @@
 
 Currently exports a Mermaid-graph builder usable from any per-record
 HTML template (CultureMech media composition, MIM ingredient
-relationships, CommunityMech community membership).
+relationships, CommunityMech community membership). `theme` holds the
+dark theme, ``mech-theme`` toggle, palette and footer that claw's
+standalone pages share (#668).
 
 Phase 5 of the dismech-pattern port; see
 docs/proposals/phase5_mkdocs_material_and_browser_parity.md

@@ -13,8 +13,36 @@ matplotlib.use("Agg")  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
 import yaml  # noqa: E402
 from jinja2 import Environment, FileSystemLoader  # noqa: E402
+from markupsafe import Markup  # noqa: E402
+
+from kg_microbe_browser.theme import ThemeError, page_chrome, read_option  # noqa: E402
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
+
+#: The dashboard's look before #668 in light, and its counterpart in dark. A
+#: palette may override kg_microbe_browser.theme.PALETTE_TOKENS; the status
+#: colours stay these, since they carry meaning rather than identity. The
+#: light accent is the link blue Chrome drew before the page set one.
+DEFAULT_PALETTE = {
+    "light": {
+        "page": "#fff", "card": "#f6f8fa", "fg": "#222", "muted": "#666",
+        "line": "#e5e7eb", "accent": "#00e", "focus": "#0969da",
+        "card-line": "#d0d7de", "rule": "#ddd",
+        "pass": "#2c8a3a", "warn": "#d68f00", "fail": "#b8302c",
+        "pass-bg": "#dafbe1", "pass-fg": "#1a7f37",
+        "warn-bg": "#fff8c5", "warn-fg": "#9a6700",
+        "fail-bg": "#ffebe9", "fail-fg": "#cf222e",
+    },
+    "dark": {
+        "page": "#0d1117", "card": "#161b22", "fg": "#e6edf3", "muted": "#9da7b3",
+        "line": "#30363d", "accent": "#79c0ff", "focus": "#58a6ff",
+        "card-line": "#3d444d", "rule": "#3d444d",
+        "pass": "#3fb950", "warn": "#d29922", "fail": "#ff7b72",
+        "pass-bg": "#0f2a1a", "pass-fg": "#56d364",
+        "warn-bg": "#33270a", "warn-fg": "#e3b341",
+        "fail-bg": "#3d1416", "fail-fg": "#ff9a92",
+    },
+}
 
 
 @dataclasses.dataclass
@@ -241,12 +269,19 @@ def generate_dashboard(
     *,
     config_path: Path,
     output_dir: Path,
+    palette: object = None,
+    footer: object = None,
 ) -> DashboardStats:
     """Read config, score, render PNG + HTML to output_dir.
 
     Output is a pure function of the corpus: the dashboard carries the
     latest provenance timestamp found in the records, not the time of the
     run, so regenerating an unchanged corpus produces no diff.
+
+    The page declares a dark theme and a ``mech-theme`` toggle
+    (kg_microbe_browser.theme, #668). `palette` and `footer`, when not None,
+    replace the config keys of the same name; an invalid one raises
+    ThemeError before anything is written.
 
     Config YAML schema:
 
@@ -262,10 +297,24 @@ def generate_dashboard(
           - path: ontology_mapping.ontology_id
             threshold: 0.80
             required: false
+        palette:                       # optional; quote colours in YAML
+          light: {accent: "#9d292d", page: "#fafafa"}
+          dark: {accent: "#ffb3b5", page: "#101820"}
+        footer:                        # optional lines of text and links,
+          - - "Code: "                 # e.g. the licence line
+            - {text: "BSD-3-Clause", href: "https://github.com/CultureBotAI/<Mech>/blob/main/LICENSE-CODE"}
+
+    A palette may set page, card, fg, muted, line and accent; the
+    kg_microbe_discussions module docstring shows a full licence footer.
     """
     config_path = config_path.resolve()
     with open(config_path) as f:
         cfg = yaml.safe_load(f) or {}
+    chrome = page_chrome(
+        DEFAULT_PALETTE,
+        palette=cfg.get("palette") if palette is None else palette,
+        footer=cfg.get("footer") if footer is None else footer,
+    )
     output_dir = output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -301,20 +350,37 @@ def generate_dashboard(
         trim_blocks=True,
         lstrip_blocks=True,
     )
-    html = env.get_template("dashboard.html.j2").render(stats=stats)
+    # The chrome is validated data and fixed markup, so it is emitted as is;
+    # everything else in the template stays autoescaped.
+    html = env.get_template("dashboard.html.j2").render(
+        stats=stats,
+        chrome={part: Markup(text) for part, text in dataclasses.asdict(chrome).items()},
+    )
     (output_dir / "index.html").write_text(html)
 
     return stats
 
 
-def cli() -> int:
+def cli(argv: list[str] | None = None) -> int:
     import argparse
 
     ap = argparse.ArgumentParser(prog="kg_microbe_qc")
     ap.add_argument("--config", required=True, type=Path)
     ap.add_argument("--output", required=True, type=Path)
-    args = ap.parse_args()
-    stats = generate_dashboard(config_path=args.config, output_dir=args.output)
+    ap.add_argument("--palette", type=Path, default=None,
+                    help="YAML/JSON light and dark colour tokens; overrides the config's palette")
+    ap.add_argument("--footer", type=Path, default=None,
+                    help="YAML/JSON footer lines, e.g. the licence line; overrides the config's footer")
+    args = ap.parse_args(argv)
+    try:
+        stats = generate_dashboard(
+            config_path=args.config,
+            output_dir=args.output,
+            palette=read_option("--palette", args.palette),
+            footer=read_option("--footer", args.footer),
+        )
+    except ThemeError as error:
+        ap.error(str(error))
     print(f"{stats.repo_name}: {stats.record_count} records, "
           f"{len(stats.scores)} slots, "
           f"{stats.fail_count} FAIL, "
