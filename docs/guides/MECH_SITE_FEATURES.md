@@ -85,8 +85,11 @@ expected wherever their reader task exists.
 | `feedback_route` | Report a problem | Each record page offers a route to report an error or suggest an edit, such as a prefilled GitHub issue or an edit link for the record's file. | Present: every record page has a working route. Partial: a site-wide route only, or one that does not identify the record. |
 
 A not-found page deserves one note: GitHub Pages serves the project's single
-root `404.html` for a missing URL at any depth, so its links and assets must be
-site-root-absolute (`/<Repo>/…`). The CommunityMech, CultureMech and
+root `404.html` for a missing URL at any depth, so its links and assets must not
+be relative. Use site-root-absolute paths (`/<Repo>/…`) or full
+`https://culturebotai.github.io/<Repo>/…` URLs. Claw's site check cannot yet
+resolve the `/<Repo>/` form (claw #667), so a Mech whose `404.html` is inside
+the checked tree uses full URLs for now. The CommunityMech, CultureMech and
 MediaIngredientMech 404 pages break below the root because their links are relative.
 
 ## Sibling routes
