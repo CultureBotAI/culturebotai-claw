@@ -52,7 +52,7 @@ therefore be rated present and still have work to do here.
 | `downloads` | A page in the main navigation links a bulk machine-readable export of every complete record, with its count and checksum. | TraitMech `pages/data/traits.json`; DUFMech Sources page; PathwayMech KGX exports |
 | `schema_docs` | A visible link to readable schema documentation generated from, or verified current with, the LinkML schema. A raw YAML link alone stays partial. | MediaIngredientMech `schema/`; DUFMech `schema.html` |
 | `license` | Every page type states the data and code licences exactly as the repository's licence files do, links them, and notes that third-party material keeps its own terms. | DUFMech and AntibioticMech footers |
-| `build_provenance` | Every page states a dated version of its records or its build, derived deterministically so an unchanged re-render is byte-identical. | TraitMech "Corpus as of"; DUFMech "Site build" fingerprint |
+| `build_provenance` | Aggregate pages state a dated version of the corpus, and record pages state their own record's last-update date, both derived deterministically so an unchanged re-render is byte-identical. A corpus-wide date or digest on every record page rewrites every page on each curation commit and makes concurrent record PRs conflict. | TraitMech ("Corpus as of" on aggregate pages, record dates on records) |
 | `responsive` | No page reachable from the navigation, the listing or a record overflows at 390 px, and no sticky element covers the content while scrolling; wide tables scroll inside a named, focusable region; long identifiers and headings wrap. | CellStructureMech and MediaIngredientMech |
 
 ### Wherever the feature exists
