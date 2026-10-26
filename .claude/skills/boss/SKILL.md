@@ -11,6 +11,8 @@ tags: [orchestration, parallel, worktree, tmux, multi-repo, agents, boss, fleet]
 
 # boss: orchestrate parallel agents across the CultureBotAI repos
 
+Fleet ownership, session naming and input boundaries follow the [XMechBay fleet control contract](https://github.com/CultureBotAI/XMechBay/blob/main/docs/fleet-control-contract.md).
+
 ## Overview
 
 Turns the main session into an **orchestrator** of external Claude Code processes
@@ -236,13 +238,35 @@ have an owner-token bypass. Isolation—not a long lease—protects worker edits
 
 ### Dispatch a worker
 
+Inventory the existing server before creating a worktree. A missing local server
+means there are no sessions to inspect; other inventory errors stop dispatch.
+On the M5, run boss inside its existing GUI-origin `mechs` server as the contract
+requires; a missing `mechs` server is a setup error there, not permission to start
+one over ssh. The inventory commands below do not start a tmux server or GUI app.
+
 ```bash
-# 1. Create a collision-resistant worktree on a new branch
+# 1. Choose a task identity, then inventory before creating its worktree
 TASK_DIR="$(mktemp -d "$FLEET_WORKTREE_ROOT/${SLUG}.XXXXXX")"
 WORKTREE="$TASK_DIR/worktree"
-TASK_ID="${TASK_DIR##*.}"
+TASK_ID="$(printf '%s' "${TASK_DIR##*.}" | LC_ALL=C tr '[:upper:]' '[:lower:]')"
 BRANCH="feat/$SLUG-$TASK_ID"
 SESSION="$SLUG-$TASK_ID"
+if SESSION_NAMES="$(tmux list-sessions -F '#S' 2>&1)"; then
+  printf '%s\n' "$SESSION_NAMES"
+else
+  case "$SESSION_NAMES" in
+    'no server running on '*|'error connecting to '*' (No such file or directory)')
+      SESSION_NAMES="" ;;
+    *) printf 'Cannot inventory tmux sessions: %s\n' "$SESSION_NAMES" >&2; exit 1 ;;
+  esac
+fi
+if printf '%s\n' "$SESSION_NAMES" | grep -Fxq -- "$SESSION"; then
+  printf 'Refusing existing tmux session: %s\n' "$SESSION" >&2
+  exit 2
+fi
+if printf '%s\n' "$SESSION_NAMES" | grep -Fxq -- mechs; then
+  tmux list-windows -t '=mechs' -F '#I #W'
+fi
 run_locked_command "fetch-main-$SLUG" 300 \
   git -C "$REPO" fetch origin \
     refs/heads/main:refs/remotes/origin/main
@@ -251,7 +275,7 @@ run_locked_command "create-$SLUG" 300 \
 BASE_SHA="$(git -C "$WORKTREE" rev-parse HEAD)"
 test "$BASE_SHA" = "$(git -C "$REPO" rev-parse origin/main)"
 
-# 2. Start tmux session
+# 2. Start a new session; no -A flag, so a concurrent name collision still fails
 tmux new-session -d -s "$SESSION" -c "$WORKTREE"
 
 # 3. Launch plain Claude with its normal permissions and no active repo lock.

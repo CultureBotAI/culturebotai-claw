@@ -128,6 +128,34 @@ class GitHubFixture:
         return SimpleNamespace(stdout=out, stderr="", returncode=code)
 
 
+@pytest.mark.parametrize("command_name", ["node", "/opt/codex/bin/codex"])
+def test_codex_mechs_pane_never_reaches_native_reader_or_send(setup, monkeypatch, command_name):
+    terminal = supervisor.import_file(
+        Path(__file__).parents[1] / "scripts/mech_session_terminal.py", "codex_boundary_terminal")
+    identity = setup.target["process_identity"].removesuffix("agy") + command_name
+    setup.target["process_identity"] = identity
+
+    def read_identity(args, **_kwargs):
+        assert args == ["/bin/ps", "-p", str(setup.target["pid"]),
+                        "-o", "pid=,tty=,lstart=,comm="]
+        return identity
+
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError("Codex pane reached a native reader, terminal snapshot, or send")
+
+    monkeypatch.setattr(terminal, "command", read_identity)
+    monkeypatch.setattr(terminal, "jxa", forbidden)
+    instance = supervisor.Supervisor(setup.config, native=SimpleNamespace(inspect=forbidden),
+                                     notifier=terminal, runner=forbidden)
+    observed = instance.observe(setup.target, fresh=True, allow_redraw=True)
+    assert observed["ready"] is False
+    assert observed["error"] == "process/start/TTY identity changed"
+    result = instance.dispatch(setup.target, setup.ledger,
+                               {"action": "finalize", "action_id": "must-not-send"})
+    assert result["state"] == "not-sent"
+    assert setup.ledger["actions"] == {}
+
+
 def test_goal_identity_survives_amended_text(setup):
     native = setup.observation["native"]
     before = supervisor.goal_identity(native)

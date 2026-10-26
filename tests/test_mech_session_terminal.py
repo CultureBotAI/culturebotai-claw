@@ -25,6 +25,8 @@ def test_process_identity_retains_start_time_and_rejects_other_processes():
     }
     for line in (
         IDENTITY.replace("agy", "bash"),
+        IDENTITY.replace("agy", "node"),
+        IDENTITY.replace("agy", "/opt/codex/bin/codex"),
         IDENTITY.replace("ttys030", "pts/1"),
         IDENTITY.replace("1234", "unknown"),
         IDENTITY.replace("1234", "0"),
