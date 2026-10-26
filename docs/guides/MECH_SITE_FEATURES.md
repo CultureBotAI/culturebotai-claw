@@ -42,17 +42,25 @@ provide them. "Done" is the acceptance check, applied to the deployed site.
 | `record_pages` | Each record has a stable, linkable page. | — |
 | `source_link` | Each record page links its own source YAML on GitHub. | TraitMech Source card |
 | `evidence` | PMIDs, DOIs and URLs shown anywhere on a record page are links, including notes and synonym sources. One escaping-safe autolink filter, applied to already-escaped record text, does this; documentation prose with format examples stays plain. | TaxonMech record pages |
-| `term_links` | Every displayed CURIE has a readable label when the record carries one and links to a resolver; a CURIE naming one of the Mech's own records links to that page. Unknown prefixes fall back to `https://bioregistry.io/<CURIE>`; nothing links to `#`. | MIM and TaxonMech record pages |
+| `term_links` | Every displayed CURIE has a readable label when the record carries one and links to a resolver; a CURIE naming one of the Mech's own records links to that page. Unknown prefixes fall back to `https://bioregistry.io/<CURIE>`; nothing links to `#`. | MIM and TaxonMech record pages for labelled resolver links; the bioregistry fallback is new in the unmerged [TraitMech](https://github.com/CultureBotAI/TraitMech/pull/2021) and [DUFMech](https://github.com/CultureBotAI/DUFMech/pull/368) unification PRs |
 | `corpus_stats` | The landing page shows counts generated from the same data the site lists. | — |
 | `suite_nav` | A visible link to the X-Mech Suite directory. | — |
 | `downloads` | A page in the main navigation links a bulk machine-readable export of every complete record, with its count and checksum. | TraitMech `pages/data/traits.json`; DUFMech Sources page; PathwayMech KGX exports |
-| `cross_mech_links` | Where a record links a sibling Mech, the link resolves and applies its query; an NCBITaxon identifier opens its TaxonMech record. New relations are a per-Mech decision. | The route table below |
 | `schema_docs` | A visible link to readable schema documentation generated from, or verified current with, the LinkML schema. A raw YAML link alone stays partial. | MediaIngredientMech `schema/`; DUFMech `schema.html` |
 | `license` | Every page type states the data and code licences exactly as the repository's licence files do, links them, and notes that third-party material keeps its own terms. | DUFMech and AntibioticMech footers |
 | `build_provenance` | Every page states a dated version of its records or its build, derived deterministically so an unchanged re-render is byte-identical. | TraitMech "Corpus as of"; DUFMech "Site build" fingerprint |
-| `theme_toggle` | A user-operated light/dark choice persists, under the `mech-theme` storage key, across every linked page type, including standalone maps and reports, and visibly changes the page in both themes. | TraitMech, AntibioticMech |
 | `responsive` | No page reachable from the navigation, the listing or a record overflows at 390 px, and no sticky element covers the content while scrolling; wide tables scroll inside a named, focusable region; long identifiers and headings wrap. | CellStructureMech and MediaIngredientMech |
-| `load_failure` | A failed data request shows an error and a recovery route, never an empty result. | ProteinTraitsMech browse |
+
+### Wherever the feature exists
+
+These apply only where their reader task exists, so they are not required of a
+site that lacks it. Where the site has the thing, it must work.
+
+| Key | Applies when | Done when | Reference implementation |
+|---|---|---|---|
+| `theme_toggle` | The site styles a dark theme (every current site does) | A user-operated light/dark choice persists, under the `mech-theme` storage key, across every linked page type, including standalone maps and reports, and visibly changes the page in both themes. | TraitMech, AntibioticMech |
+| `cross_mech_links` | A page links a sibling Mech | The link resolves and applies its query; an NCBITaxon identifier opens its TaxonMech record. New relations are a per-Mech decision. | The route table below |
+| `load_failure` | A page fetches data | A failed request shows an error and a recovery route, never an empty result. | ProteinTraitsMech browse |
 
 ## Candidate features
 
@@ -112,8 +120,11 @@ the network and a wrong path fails silently on every record page.
 ## Licences
 
 Read the licence files rather than assuming the intended fleet policy, which is
-unresolved (claw #394). Most Mechs carry `LICENSE` (scope), `LICENSE-DATA`
-(CC BY 4.0) and `LICENSE-CODE` (BSD-3-Clause), and their footer says so.
+unresolved (claw #394). Every Mech except AIMech carries `LICENSE` (scope),
+`LICENSE-DATA` (CC BY 4.0) and `LICENSE-CODE` (BSD-3-Clause). The footers do not
+all say so: on 2026-10-25 CommunityMech labelled its data BSD-3-Clause, CultureMech
+named only the code licence, and the footers of HabitatMech, MediaIngredientMech,
+PathwayMech, ProteinTraitsMech and TraitMech were incomplete on some page types.
 AIMech is the exception: its `LICENSE` is the BSD-3-Clause code licence and its
 `LICENSE-DATA` covers only AIO-derived records under `data/aio`, so its site
 must not imply a data licence for its curated concepts.

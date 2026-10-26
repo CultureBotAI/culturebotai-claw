@@ -22,7 +22,8 @@ matched its snapshot `_fleet/data/site_features.json` cell for cell (14 Mechs ×
 24 keys) at site-repository main `70c3a4d98f1cd18074ad57f2cef6bacf54f20426`,
 which was then the deployed revision; the file is byte-identical at
 `6035dc2f64056a8cea5db01cd85c82e83b22928b`, merged later that day. Its ratings are dated 2026-10-10–2026-10-14.
-Every Mech then merged a `feat/complete-website-features` PR on 2026-10-16, so the
+Every Mech then merged a `feat/complete-website-features` PR on 2026-10-16 UTC
+(CommunityMech's at 00:06 on 2026-10-17), so the
 published table no longer describes the sites. Its shared description claims a
 404 recovery page and bulk TSV/JSON exports for every Mech; on 2026-10-25 eight
 sites still served GitHub's generic 404 and ten offered no complete bulk export.
@@ -91,8 +92,8 @@ not a regression; each Mech's evidence file says which.
 - **Shipped features that do not work.** The 2026-10-16 "Explore across X-Mech"
   rows link sibling paths that do not exist (`/TaxonMech/browse.html`,
   `/MediaIngredientMech/app.html`, `/CMMMech/pages/chemicals.html` and others) on
-  record pages of most Mechs; several text maps never draw or open a 404 on every
-  click; PathwayMech's theme toggle changes nothing; three AntibioticMech filter
+  record pages of most Mechs; TaxonMech's text map never draws, PathwayMech's opens
+  a 404 on every click and CMMMech's opens nothing; PathwayMech's theme toggle changes nothing; three AntibioticMech filter
   options always return zero.
 - **Licence statements.** CommunityMech labels its CC BY 4.0 data BSD-3-Clause on
   every page; CultureMech's footer names only the code licence; AIMech's footer
@@ -101,12 +102,13 @@ not a regression; each Mech's evidence file says which.
   indexes rather than complete records, raw schema YAML rather than readable docs,
   and upstream dates rather than a dated version of the site's own records.
 
-Each Mech's evidence file carries the owning source and an acceptance check for
-every non-present key.
+Each Mech's evidence file names the owning source and the change needed for every
+non-present key; the acceptance check is that key's published criterion.
 
 ## Features Beyond The Catalogue
 
-Reviewers listed 229 other reader-facing features. Most are domain displays
+Reviewers listed 229 other distinct reader-facing features (327 observations
+across the Mechs). Most are domain displays
 (structure viewers, lineage, preparation steps). Ten recur across Mechs, appear
 in DisMech or in the design skill, and carry no domain content; they were
 defined and rated live on every site:
@@ -125,8 +127,9 @@ defined and rated live on every site:
 | `feedback_route` | Report a problem | Each record page offers a route to report an error or suggest an edit, such as a prefilled GitHub issue or an edit link for the record's file. | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ● | ○ | ○ |
 
 Search from any page is already universal. A per-record route to report a
-problem exists only on TraitMech; skip links, not-found pages and text
-alternatives for maps are the next largest gaps.
+problem exists only on TraitMech. Counted by sites not rated present, text
+alternatives for maps are lacking on 13 sites, and skip links, not-found pages
+and curation notices on 11 each.
 
 ## DisMech Comparison
 
@@ -135,10 +138,10 @@ reader-task level: 60 features, 10 of them disease-specific.
 It has no counterpart for linkable search state, a theme toggle or cross-Mech
 links, and shows record review status only in source. Of its features with no
 X-Mech key, breadcrumbs, a report-a-problem route, AI-curation notices, keyboard
-support and knowledge-gap pages informed the candidates above; the rest (search
-match context, record dates, section summary bars, item deep links, inline source
-records, hypothesis status, gene and model pages, reader and contributing guides)
-remain uncatalogued observations.
+support and knowledge-gap pages informed the candidates above; the other 22,
+including search match context, record dates, section summary bars, item deep
+links, inline source records, hypothesis status, gene and model pages, and reader
+and contributing guides, remain uncatalogued observations.
 
 ## Limits
 
@@ -150,3 +153,20 @@ remain uncatalogued observations.
 - Contrast was not measured beyond what the reviews state.
 - Sites redeployed during the review; each evidence file names the revision its
   checks ran on.
+
+## Unification PRs
+
+The review led to one draft PR per repository, implementing the
+[website features guide](../guides/MECH_SITE_FEATURES.md) in each Mech's owning
+renderer, plus the catalogue refresh in the site repository. State as of
+2026-10-26; none is merged, and a merged PR is not a verified feature until the
+deployed site is re-reviewed.
+
+| Repository | PR | State |
+| --- | --- | --- |
+| CultureBotAI/culturebotai-claw | [#652](https://github.com/CultureBotAI/culturebotai-claw/pull/652) — this guide and record | draft |
+| CultureBotAI/CultureBotAI.github.io | [#503](https://github.com/CultureBotAI/CultureBotAI.github.io/pull/503) — catalogue refresh and ten new keys | draft |
+| CultureBotAI/TraitMech | [#2021](https://github.com/CultureBotAI/TraitMech/pull/2021) | draft |
+| CultureBotAI/DUFMech | [#368](https://github.com/CultureBotAI/DUFMech/pull/368) | draft |
+
+The other Mechs' PRs are in preparation and will be added here when opened.
