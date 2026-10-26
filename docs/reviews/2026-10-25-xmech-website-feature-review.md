@@ -143,6 +143,33 @@ including search match context, record dates, section summary bars, item deep
 links, inline source records, hypothesis status, gene and model pages, and reader
 and contributing guides, remain uncatalogued observations.
 
+## Re-test And Arbiter
+
+The site repository's refresh procedure asks for an independent re-test before
+ratings are published. A second reviewer re-tested live every verdict that
+changed from the dated table (78) and every candidate-feature verdict (140)
+between 01:03 and 02:08 UTC on 2026-10-26: 211 agreed, 6 disagreed and 1 was
+unresolved. All six disagreements were about how a criterion applies to facts
+both reviewers confirmed, and the arbiter ruled:
+
+- CellStructureMech `sorting` becomes present: a sort control exists and five of
+  its six orders work, as on PathwayMech and TaxonMech, which keep present with
+  one mis-sorting order each.
+- TaxonMech and CMMMech `domain_view` become present: their lineage and
+  mechanism views work, and their broken text maps are scored under `text_map`.
+- CMMMech, AIMech and CommunityMech `evidence` become present under a clarified
+  criterion: a reference counts as linked when its record page links it, an
+  identifier shown inside or beside a linked citation is not plain text, and a
+  few records with a stray unlinked mention do not make the feature partial.
+  DUFMech, PathwayMech and TraitMech stay partial under the same rule.
+- The unresolved CellStructureMech `visual_alternative` stays missing: a link
+  to the general listing does not list what the visual shows.
+
+A delta review then changed TraitMech `skip_link` to partial, because its
+discussion index and priority dashboard start with a skip link. The matrices
+above are the first-pass verdicts; the published table in the site
+repository's refresh PR carries the final ones.
+
 ## Limits
 
 - Interactive checks sampled named records; corpus-wide claims rest on static
