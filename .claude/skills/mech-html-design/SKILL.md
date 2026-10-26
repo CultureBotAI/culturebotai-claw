@@ -76,8 +76,10 @@ include the issue/PR owner when another change already covers it.
 Applicability comes from the reader task and actual data. A small static table
 need not acquire pagination; a large sharded corpus must not become one giant
 DOM. A repository with no supported public HTML surface is not automatically
-required to launch a website. Maps, graphs, dark themes, export formats, and
-domain-specific facets are not universal feature requirements.
+required to launch a website. Maps, graphs, dark themes, particular export
+formats, and domain-specific facets are not universal feature requirements; the
+[website features guide](../../../docs/guides/MECH_SITE_FEATURES.md) says which
+features every site provides and which apply only where they exist.
 
 ## Implement in the owning source
 
