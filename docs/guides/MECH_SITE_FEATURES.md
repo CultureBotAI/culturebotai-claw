@@ -31,6 +31,10 @@ possible; a site whose records carry none is `not_applicable` with the reason.
 
 These features have no domain content, so every publishing Mech is expected to
 provide them. "Done" is the acceptance check, applied to the deployed site.
+Some checks are stricter than the catalogue's criteria: the catalogue rates
+`evidence` present when a record page links each reference it shows, while this
+guide asks for every PMID, DOI and URL on the page to be a link. A site can
+therefore be rated present and still have work to do here.
 
 | Key | Done when | Reference implementation |
 |---|---|---|
