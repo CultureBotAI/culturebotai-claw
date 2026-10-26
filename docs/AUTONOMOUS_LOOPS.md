@@ -1,5 +1,7 @@
 # Autonomous agent loops for the Mechs — research + design
 
+Current fleet ownership, session naming and input boundaries follow the [XMechBay fleet control contract](https://github.com/CultureBotAI/XMechBay/blob/main/docs/fleet-control-contract.md).
+
 Research question: how do we let Claude self-prompt and continue Mech development
 autonomously, using `monarch-initiative/dismech` as the reference implementation?
 

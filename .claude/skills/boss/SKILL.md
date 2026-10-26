@@ -11,6 +11,8 @@ tags: [orchestration, parallel, worktree, tmux, multi-repo, agents, boss, fleet]
 
 # boss: orchestrate parallel agents across the CultureBotAI repos
 
+Fleet ownership, session naming and input boundaries follow the [XMechBay fleet control contract](https://github.com/CultureBotAI/XMechBay/blob/main/docs/fleet-control-contract.md).
+
 ## Overview
 
 Turns the main session into an **orchestrator** of external Claude Code processes

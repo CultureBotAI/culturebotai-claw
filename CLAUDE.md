@@ -497,6 +497,7 @@ because they carry literal data the path rules would misread.
 
 ## Prompts and review workflow
 
+- [Boss](.claude/skills/boss/SKILL.md) and [autonomous loops](docs/AUTONOMOUS_LOOPS.md) follow the [XMechBay fleet control contract](https://github.com/CultureBotAI/XMechBay/blob/main/docs/fleet-control-contract.md) for ownership, session naming and input boundaries.
 - [Mech HTML review](.claude/skills/mech-html-review/SKILL.md) audits published
   Mech interfaces against the current DisMech UI and the X-Mech Website features
   matrix, saving timestamped reports without changing sites or repositories.
