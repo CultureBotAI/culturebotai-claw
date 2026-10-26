@@ -6,12 +6,11 @@ snapshot in BOSS_SKILL_SOURCE for a mutation check. Output: unittest results.
 Shell fixtures live in this file; temporary files contain event data
 only. The fixtures intercept tmux/mktemp and never create live sessions/worktrees.
 """
-from pathlib import Path
 import os
 import subprocess
 import tempfile
 import unittest
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILL = Path(os.environ.get("BOSS_SKILL_SOURCE", ROOT / ".claude/skills/boss/SKILL.md"))
