@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import copy
 import fcntl
+import hashlib
 import json
 import os
 import re
@@ -117,6 +118,76 @@ def _validate_context(context: dict) -> None:
         raise AssociationError("association native goal identity is incomplete")
 
 
+def _continuation_contexts(ledger: dict, anchors: list[dict]) -> list[dict]:
+    """Retain PR ownership across verified continuations, without completion credit.
+
+    The coordinator records these links only after unique native acceptance.
+    A link cannot invent a stage: its successor chain must reach the current
+    goal or an actual completed-stage entry in the same workflow context.
+    """
+    entries = ledger.get("same_stage_continuations", [])
+    if not isinstance(entries, list):
+        raise AssociationError("same-stage continuations must be a list")
+    keys = {"schema_version", "run_id", "repository_key", "cycle", "stage",
+            "workflow_sha256", "predecessor", "successor", "evidence"}
+    def encode(value):
+        return json.dumps(value, sort_keys=True, separators=(",", ":"))
+    roots = {encode(context) for context in anchors}
+    edges, incoming, retained = {}, set(), []
+    for entry in entries:
+        if (not isinstance(entry, dict) or set(entry) != keys
+                or type(entry["schema_version"]) is not int or entry["schema_version"] != 1
+                or entry["run_id"] != ledger["run_id"]
+                or entry["repository_key"] != ledger["repository_key"]):
+            raise AssociationError("invalid same-stage continuation binding")
+        before = {key: entry[key] for key in CONTEXT_FIELDS if key != "goal_identity"}
+        before["goal_identity"] = entry["predecessor"]
+        after = {**before, "goal_identity": entry["successor"]}
+        _validate_context(before)
+        _validate_context(after)
+        predecessor, successor = encode(before), encode(after)
+        if (predecessor == successor or predecessor in edges or successor in incoming
+                or predecessor in roots):
+            raise AssociationError("ambiguous same-stage continuation lineage")
+        evidence = entry["evidence"]
+        if (not isinstance(evidence, dict) or set(evidence) != {"path", "sha256"}
+                or not isinstance(evidence["path"], str) or not Path(evidence["path"]).is_absolute()
+                or not isinstance(evidence["sha256"], str) or not DIGEST.fullmatch(evidence["sha256"])):
+            raise AssociationError("invalid continuation evidence pin")
+        try:
+            raw = _read(Path(evidence["path"]))
+        except OSError as error:
+            raise AssociationError("continuation evidence is unavailable") from error
+        if hashlib.sha256(raw).hexdigest() != evidence["sha256"]:
+            raise AssociationError("continuation evidence hash mismatch")
+        proof = _json(raw)
+        binding = {key: value for key, value in entry.items() if key != "evidence"}
+        if (not isinstance(proof, dict) or encode(proof.get("binding")) != encode(binding)
+                or not _timestamp(proof.get("verified_at"))
+                or not isinstance(proof.get("instruction_sha256"), str)
+                or not DIGEST.fullmatch(proof["instruction_sha256"])):
+            raise AssociationError("continuation evidence does not bind the exact lineage")
+        instruction = proof["instruction_sha256"]
+        if (encode(proof.get("native_acceptance")) != encode({
+                **entry["successor"], "submitted_text_sha256": instruction,
+                "matching_declarations": 1})
+                or encode(proof.get("history_acceptance")) != encode({
+                    "conversation_id": entry["successor"]["conversation_id"],
+                    "submitted_text_sha256": instruction, "matching_entries": 1})):
+            raise AssociationError("continuation lacks unique matching native and history acceptance")
+        edges[predecessor] = successor
+        incoming.add(successor)
+        retained.append(before)
+    for predecessor in edges:
+        seen, cursor = set(), predecessor
+        while cursor not in roots:
+            if cursor in seen or cursor not in edges:
+                raise AssociationError("continuation is cyclic or disconnected from a retained goal")
+            seen.add(cursor)
+            cursor = edges[cursor]
+    return retained
+
+
 def _validate_record(record: Any, ledger: dict) -> dict:
     if not isinstance(record, dict) or set(record) != RECORD_FIELDS:
         raise AssociationError("association fields differ from schema version 1")
@@ -128,6 +199,7 @@ def _validate_record(record: Any, ledger: dict) -> dict:
     _validate_context(context)
     contexts = [_context(ledger)]
     contexts.extend(_context(ledger, item) for item in ledger.get("completed_stages", []))
+    contexts.extend(_continuation_contexts(ledger, contexts))
     if context not in contexts:
         raise AssociationError("PR association does not match a retained goal identity")
     return record

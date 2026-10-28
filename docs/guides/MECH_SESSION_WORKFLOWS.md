@@ -167,17 +167,29 @@ verification can lengthen a sweep. `heartbeat.json` includes sweep progress;
 `dashboard.md` summarizes all targets. Per-repository directories contain
 `status.json`, `ledger.json`, receipts, and optional agent progress.
 
-Stop with SIGTERM or create `STOP` inside `runtime_dir`. Remove `STOP` only when
-intentionally resuming. Restart the same run with the same config and ledger:
+Use `scripts/mech_monitor_control.py stop --service supervisor` and the matching
+`start` command to pause and resume. Preserve the same config and ledger:
 durable reserved/sent/uncertain actions suppress duplicate sends. Do not delete
 receipts or reset the ledger to retry an uncertain delivery.
+
+Each dispatched action saves its complete instructions under the session's
+`instructions/` directory. The terminal receives a short marker and file-reading
+instruction; the ledger preserves both texts and the instruction file hash.
+A `sent` result proves only that Terminal accepted the transport call. CLI
+history can also contain queued input, so acceptance requires the exact native
+user message in the bound conversation after the send baseline. The first
+acceptance timestamp is retained. Historical acceptances without matching
+native input are explicitly marked unverified, without resetting workflow
+progress. Inspect an existing draft or queue before repairing it; do not resend
+an instruction or add Return merely because its display is collapsed.
 
 Binding checks include PID/start time, foreground process group, exact TTY,
 working directory/origin, native conversation and initial goal identity, one
 matching Terminal tab, empty composer, idle native execution, and absence of
 queued/background work. Drafts, menus and unfamiliar screens remain untouched.
 The final send rechecks process identity and the exact captured screen.
-A send is acknowledged only through matching native history or a new goal marker.
+A send is acknowledged only through the exact native user input. A new goal
+must also match that input's native goal identity before adoption.
 
 A replacement agy process or conversation blocks the old binding. Stop,
 inspect its current goal and any already delivered instructions/PRs, preserve
@@ -279,6 +291,42 @@ not completion claims.
   }
 }
 ```
+
+For a stage-5 finding already resolved in the frozen review, an issue
+may explicitly reference its original verified closure instead of claiming that
+its old fix belongs to the current PR:
+
+```json
+{
+  "number": 76,
+  "disposition": "addressed",
+  "fix_commit_sha": "74aec27df2af344f46a4b183578f641d465e2a74",
+  "historical_resolution": {
+    "github_repository": "CultureBotAI/TaxonMech",
+    "pr_number": 151,
+    "base": "main",
+    "head_sha": "74aec27df2af344f46a4b183578f641d465e2a74",
+    "merge_commit_sha": "c520694e483373bf5274bac5bc08327d4f0d364c",
+    "receipt_sha256": "7c5a12af4437a1eecb654bf2f9623241eec4881ecfecf23cddf5b9356707e0cb"
+  }
+}
+```
+
+`receipt_sha256` is the supervisor's canonical JSON digest recorded in
+`completed_stages`, not the raw archive-file hash. It must identify one earlier
+verified merged receipt with the same PR/head/merge. The prior evidence and
+current frozen review must both identify the same already-resolved finding; a reopened or new finding requires a current fix. The
+supervisor rechecks that the issue is a closed real issue, the original PR is
+merged at its pinned repository/base/head/merge, and the stated fix is a member
+of that PR. Its merge commit must be an ancestor of the current reviewed head,
+current PR base and default checkout. For squash merges, membership is checked
+for the original fix, while ancestry is checked for the squash merge commit.
+Historical references are reported separately and do not add a new PR or goal
+completion. Omitting `historical_resolution` retains the requirement that the
+fix commit belongs to the current PR. Current review, CI and cleanup gates are
+unchanged. Stage 6 continues to use its existing unresolved-task intake and
+current-PR fix rules; this historical field is not accepted there. This optional receipt field does not alter the LinkML goal-evidence
+manifest or its pinned workflow schema.
 
 All canonical receipts include `goal_outputs.infra_tasks`. Stages 4–6 also
 include `goal_outputs.goal_evidence` with the repository-relative path and
