@@ -50,7 +50,7 @@ import os
 import re
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 
 import yaml
@@ -769,9 +769,8 @@ def _row_from_yaml(
 
     # Prefer the ontology's canonical rdfs:label for object_label (SSSOM
     # best practice). Fall back to MIM's stored ontology_label if the
-    # label loader didn't resolve. When we replace, keep MIM's stored
-    # label in `other` so the surface form is preserved for downstream
-    # tools.
+    # label loader didn't resolve. The old label names the OBJECT, so it
+    # can become a subject synonym only when the final row asserts identity.
     canonical_label = canonical_labels.get(obj_id, "")
     mim_stored_label = ont_label
     if canonical_label:
@@ -796,13 +795,19 @@ def _row_from_yaml(
         if _is_publishable_mim_synonym(s)
     ]
     # `other` carries alternate surface forms that downstream consumers can
-    # adopt as synonyms. Order: MIM's original ontology_label (preserved
-    # when we replaced it with the canonical) → kg-microbe canonical →
-    # kg-microbe synonyms → MIM's own EXACT_SYNONYMs. Drop the chosen
+    # adopt as synonyms. Non-exact target aliases do not name this subject
+    # (#680): a KG exact alias of the parent remains a parent alias. Preserve
+    # subject-owned YAML synonyms on every predicate. For exactMatch, retain
+    # the existing order: stored target label → KG name → KG synonyms → YAML.
+    # Drop the chosen
     # object_label and the preferred_term so we don't duplicate what's in
     # the dedicated columns.
     drop = {(preferred or "").lower(), (ont_label or "").lower(), ""}
-    candidate_alts = [mim_stored_label] + [kgm_name] + kgm_syns + mim_yaml_syns
+    object_alts = (
+        [mim_stored_label, kgm_name] + kgm_syns
+        if predicate == "skos:exactMatch" else []
+    )
+    candidate_alts = object_alts + mim_yaml_syns
     # Filter MIM RAW_TEXT entries that encode roles/properties — those are
     # not chemical synonyms.
     candidate_alts = [
@@ -908,10 +913,15 @@ def _row_from_yaml(
         kgm_namespace = _kgmicrobe_namespace_for(obj_id)
         kgm_curie = f"{kgm_namespace}{slug_lc}"
         # Skip if the dual-emission block (or some prior row in `rows`)
-        # already produced this exact registry CURIE — avoid duplicates
-        # that would trip Rule B2.
+        # already satisfies B1 in either namespace. The curated identity
+        # takes precedence over the parent-prefix fallback; adding the other
+        # namespace would assert a competing identity and fail B5 (#679).
+        registry_ids = {
+            f"kgmicrobe.ingredient:{slug_lc}", f"kgmicrobe.compound:{slug_lc}",
+        }
         already_emitted = any(
-            r["object_id"] == kgm_curie
+            r["subject_id"] == parent_row["subject_id"]
+            and r["object_id"] in registry_ids
             and r["predicate_id"] == "skos:exactMatch"
             for r in rows
         )
@@ -998,7 +1008,31 @@ COLUMNS = [
 ]
 
 
-def _write_sssom(rows: list[dict], out_path: Path, version: str) -> None:
+def _mapping_set_version(rows: list[dict]) -> str:
+    """Bind header dates to emitted curation dates (MIM Rule G, #681).
+
+    Reject unusable dates before opening the output. A build clock cannot
+    supply missing curation provenance, even if another row has a valid date.
+    """
+    if not rows:
+        raise ValueError("Cannot derive mapping_date from an empty mapping set")
+    dates = []
+    for row in rows:
+        value = row.get("mapping_date", "")
+        if not isinstance(value, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+            raise ValueError(f"Invalid mapping_date for {row.get('subject_id')}: {value!r}")
+        try:
+            datetime.strptime(value, "%Y-%m-%d")
+        except ValueError as exc:
+            raise ValueError(
+                f"Invalid mapping_date for {row.get('subject_id')}: {value!r}"
+            ) from exc
+        dates.append(value)
+    return max(dates)
+
+
+def _write_sssom(rows: list[dict], out_path: Path) -> None:
+    version = _mapping_set_version(rows)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     header = HEADER_YAML.format(version=version)
     with out_path.open("w") as f:
@@ -1200,8 +1234,7 @@ def main():
                     file=sys.stderr,
                 )
 
-    version = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
-    _write_sssom(final, args.output, version=version)
+    _write_sssom(final, args.output)
 
     print(f"Wrote {len(final)} rows to {args.output}", file=sys.stderr)
     print(

@@ -30,12 +30,15 @@ sys.modules[_SPEC.name] = builder
 _SPEC.loader.exec_module(builder)
 
 
-def write_record(tmp_path, stem, identifier, ontology_id, quality, label="Thing"):
+def write_record(tmp_path, stem, identifier, ontology_id, quality, label="Thing",
+                 ingredient_type=None):
     path = tmp_path / f"{stem}.yaml"
+    type_line = f"ingredient_type: {ingredient_type}\n" if ingredient_type else ""
     path.write_text(
         f"identifier: {identifier}\n"
         f"preferred_term: {label}\n"
         f"mapping_status: MAPPED\n"
+        f"{type_line}"
         f"ontology_mapping:\n"
         f"  ontology_id: {ontology_id}\n"
         f"  ontology_label: {label}\n"
@@ -217,6 +220,99 @@ def test_narrow_match_to_a_different_parent_stays_asymmetric(tmp_path):
     assert next(r for r in rows
                 if r["object_id"] == "CHEBI:17634")["predicate_id"] == "skos:broadMatch"
     assert identity_row(rows, "kgmicrobe.ingredient:thing")["predicate_id"] == "skos:exactMatch"
+
+
+@pytest.mark.parametrize(
+    ("stem", "identifier", "ontology_id", "ingredient_type"),
+    [
+        ("MES_Buffer", "kgmicrobe.ingredient:mes_buffer", "CHEBI:39010",
+         "STOCK_SOLUTION"),
+        ("Amylopectin_From_Maize", "kgmicrobe.ingredient:amylopectin_from_maize",
+         "CHEBI:28057", "SINGLE_INGREDIENT"),
+        ("Casamino_Acids_Vitamin_Assay",
+         "kgmicrobe.ingredient:casamino_acids_vitamin_assay", "mesh:C017721",
+         "UNDEFINED_MIXTURE"),
+        ("PBS", "kgmicrobe.ingredient:pbs", "NCIT:C178908", "STOCK_SOLUTION"),
+        # Synthetic reverse-direction control: either explicit local identity
+        # satisfies B1, regardless of the namespace inferred from the parent.
+        ("Thing", "kgmicrobe.compound:thing", "FOODON:00001234",
+         "SINGLE_INGREDIENT"),
+        ("Buffer_(pH7)", "kgmicrobe.ingredient:buffer_~28ph7~29", "CHEBI:39010",
+         "STOCK_SOLUTION"),
+    ],
+)
+def test_b1_preserves_curated_namespace_when_parent_prefix_differs(
+    tmp_path, stem, identifier, ontology_id, ingredient_type,
+):
+    """#679: backfill must not invent a second namespace for an existing ID.
+
+    The real source-qualified amylopectin record deliberately keeps its local
+    ingredient identity despite SINGLE_INGREDIENT classification. Neither that
+    coarse type nor the ontology parent's prefix may replace curated identity.
+    """
+    rows = rows_for(tmp_path, stem=stem, identifier=identifier,
+                    ontology_id=ontology_id, quality="NARROW_MATCH",
+                    ingredient_type=ingredient_type)
+
+    assert len(rows) == 2
+    assert {(r["object_id"], r["predicate_id"]) for r in rows} == {
+        (ontology_id, "skos:broadMatch"),
+        (identifier, "skos:exactMatch"),
+    }
+    assert {r["subject_id"] for r in rows} == {builder._mim_curie(f"{stem}.yaml")}
+
+
+@pytest.mark.parametrize(
+    ("identifier", "ontology_id"),
+    [
+        ("kgmicrobe.compound:thing", "CHEBI:17634"),
+        ("kgmicrobe.ingredient:thing", "FOODON:00001234"),
+    ],
+)
+def test_b1_does_not_duplicate_a_matching_namespace(tmp_path, identifier, ontology_id):
+    rows = rows_for(tmp_path, stem="Thing", identifier=identifier,
+                    ontology_id=ontology_id, quality="NARROW_MATCH")
+
+    assert len(rows) == 2
+    assert [r["object_id"] for r in rows].count(identifier) == 1
+    assert identity_row(rows, identifier)["predicate_id"] == "skos:exactMatch"
+
+
+def test_b1_still_synthesizes_a_registry_row_for_a_cas_primary(tmp_path):
+    """A CAS identity does not satisfy the local-registry obligation."""
+    rows = rows_for(tmp_path, stem="Thing", identifier="cas:1234-56-7",
+                    ontology_id="CHEBI:17634", quality="NARROW_MATCH")
+
+    assert len(rows) == 3
+    assert {(r["object_id"], r["predicate_id"]) for r in rows} == {
+        ("CHEBI:17634", "skos:broadMatch"),
+        ("cas:1234-56-7", "skos:exactMatch"),
+        ("kgmicrobe.compound:thing", "skos:exactMatch"),
+    }
+
+
+def test_b1_requires_the_subject_slug_even_with_another_local_identity(tmp_path):
+    """An unrelated local slug must not suppress the required subject handle."""
+    rows = rows_for(tmp_path, stem="Thing", identifier="kgmicrobe.ingredient:other",
+                    ontology_id="CHEBI:17634", quality="NARROW_MATCH")
+
+    assert len(rows) == 3
+    assert {(r["object_id"], r["predicate_id"]) for r in rows} == {
+        ("CHEBI:17634", "skos:broadMatch"),
+        ("kgmicrobe.ingredient:other", "skos:exactMatch"),
+        ("kgmicrobe.compound:thing", "skos:exactMatch"),
+    }
+
+
+def test_b1_does_not_add_a_registry_row_for_a_close_match_parent(tmp_path):
+    rows = rows_for(tmp_path, stem="Thing", identifier="kgmicrobe.ingredient:thing",
+                    ontology_id="CHEBI:17634", quality="CLOSE_MATCH")
+
+    assert len(rows) == 2
+    assert {(r["object_id"], r["predicate_id"]) for r in rows} == {
+        ("CHEBI:17634", "skos:closeMatch"),
+        ("kgmicrobe.ingredient:thing", "skos:exactMatch"),
+    }
 
 
 def test_identity_row_drops_a_stale_symmetric_comment(tmp_path, monkeypatch):
