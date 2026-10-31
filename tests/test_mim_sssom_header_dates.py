@@ -66,3 +66,37 @@ def test_missing_row_date_is_not_hidden_by_a_valid_one(tmp_path, monkeypatch):
         run_builder(tmp_path, monkeypatch,
                     [{'mapping_date': '2026-10-15'}, {'mapping_date': ''}], path)
     assert not path.exists()
+
+
+@pytest.mark.parametrize('history_date', ['２０２６-10-15', '٢٠٢٦-10-15'])
+def test_non_ascii_history_date_cannot_replace_output(tmp_path, monkeypatch, history_date):
+    """#682: exercise native row extraction as well as the CLI's write guard."""
+    inputs = tmp_path / 'inputs'
+    inputs.mkdir()
+    record = inputs / 'Water.yaml'
+    record.write_text(
+        'identifier: CHEBI:15377\n'
+        'preferred_term: water\n'
+        'mapping_status: MAPPED\n'
+        'ontology_mapping:\n'
+        '  ontology_id: CHEBI:15377\n'
+        '  ontology_label: water\n'
+        '  mapping_quality: EXACT_MATCH\n'
+        'curation_history:\n'
+        f'  - timestamp: "{history_date}T00:00:00Z"\n',
+        encoding='utf-8',
+    )
+    assert builder._row_from_yaml(record, {}, {}, {}, {})[0]['mapping_date'] == history_date
+    output = tmp_path / 'mapping.tsv'
+    output.write_text('previous output\n')
+    monkeypatch.setattr(builder, 'MIM_INGREDIENTS_DIR', inputs)
+    monkeypatch.setattr(builder, 'require_mech_roots', lambda *a, **kw: None)
+    monkeypatch.setattr(builder, '_load_residual_categorization', lambda: {})
+    monkeypatch.setattr(builder, '_load_kgm_source_index', lambda: {})
+    monkeypatch.setattr(builder, '_load_kgm_labels', lambda: {})
+    monkeypatch.setattr(builder, '_load_chebi_labels', lambda *a: {'CHEBI:15377': 'water'})
+    monkeypatch.setattr(sys, 'argv', ['builder', '--no-validate', '--no-preserve-validation',
+                                   '--output', str(output)])
+    with pytest.raises(ValueError, match='mapping_date'):
+        builder.main()
+    assert output.read_text() == 'previous output\n'
