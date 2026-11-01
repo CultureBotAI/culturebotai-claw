@@ -21,6 +21,7 @@ from pathlib import Path
 
 from kg_microbe_utils.owned_name_policy import POLICY_VERSION
 from kg_microbe_write import ValidatedWriteTransaction
+from kg_microbe_write.transaction import JOURNAL_VERSION
 
 POLICY_MARKER = "owned-name-policy-v1; suppression-sidecar-required"
 
@@ -189,14 +190,18 @@ def publish_candidate_artifacts(
     }
     manifest_bytes = (json.dumps(manifest, indent=2, sort_keys=True, ensure_ascii=False) + "\n").encode()
     intended = dict(zip(paths, (sssom_bytes, sidecar_bytes, manifest_bytes), strict=True))
+    journal_dir = paths[0].parent / ".sssom-artifact-journals"
+
+    def check_journal_path() -> None:
+        checked_path(journal_dir)
+        if journal_dir.exists() and not journal_dir.is_dir():
+            raise ValueError(f"Journal path is not a directory: {journal_dir}")
 
     def check_before() -> None:
         for path in inputs:
             _check_path(path)
-        journal_dir = paths[0].parent / ".sssom-artifact-journals"
-        if journal_dir.is_symlink():
-            raise ValueError(f"Symlink journal directory refused: {journal_dir}")
         input_check()
+        check_journal_path()
         # Hashing the sources may take time. Recheck destinations afterward,
         # including the no-op and final native precommit boundary (#704).
         for path, content in before.items():
@@ -220,12 +225,32 @@ def publish_candidate_artifacts(
         check_before()
         transaction = ValidatedWriteTransaction(
             root=paths[0].parent, validator=validate_staged,
-            journal_dir=paths[0].parent / ".sssom-artifact-journals",
+            journal_dir=journal_dir,
         )
         for path, content in intended.items():
             transaction.stage(path, content.decode("utf-8"))
         result = transaction.commit(apply=True)
+        changed = sorted(p for p in paths if before[p] is not None and before[p] != intended[p])
+        created = sorted(p for p in paths if before[p] is None)
+        unchanged = sorted(p for p in paths if before[p] == intended[p])
+        if (result.applied is not True or list(result.changed) != changed
+                or list(result.created) != created or list(result.unchanged) != unchanged
+                or result.journal_path is None
+                or checked_path(result.journal_path).parent != journal_dir):
+            raise ValueError("Native transaction result is not bound to the intended artifact set")
+        journal_before_check = _regular(result.journal_path)
+        expected_journal = {
+            "version": JOURNAL_VERSION, "root": str(paths[0].parent), "status": "complete",
+            "changed": [str(p) for p in changed], "created": [str(p) for p in created],
+            "previous": {str(p): before[p].decode("utf-8") for p in changed},
+        }
+        expected_journal_bytes = json.dumps(expected_journal, indent=2, sort_keys=True).encode("utf-8")
+        if journal_before_check != expected_journal_bytes:
+            raise ValueError(f"Missing or invalid completed recovery journal: {result.journal_path}")
         input_check()
+        check_journal_path()
+        if _regular(result.journal_path) != journal_before_check:
+            raise ValueError(f"Completed recovery journal changed: {result.journal_path}")
         for path, content in intended.items():
             if _regular(path) != content:
                 raise ValueError(f"Artifact publication mismatch: {path}; journal={result.journal_path}")

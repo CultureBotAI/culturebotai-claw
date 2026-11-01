@@ -300,3 +300,56 @@ def test_symlink_parent_traversal_is_refused_before_lexical_normalization(tmp_pa
     assert not (tmp_path / "candidate.tsv").exists()
     assert not (real / "candidate.tsv").exists()
     assert not output.exists()
+
+
+@pytest.mark.parametrize("phase", ["precommit", "postwrite", "journal_bytes"])
+def test_last_callback_cannot_redirect_or_change_the_recovery_journal(setup, tmp_path, phase):
+    output, paths, _, _, publish = setup
+    outside = tmp_path / "elsewhere"
+    outside.mkdir()
+    journal_dir = output.parent / ".sssom-artifact-journals"
+    boundary = 5 if phase == "precommit" else 6
+    calls = 0
+
+    def callback():
+        nonlocal calls
+        calls += 1
+        if calls == boundary:
+            if phase == "journal_bytes":
+                journal = next(journal_dir.glob("write-*.json"))
+                journal.write_bytes(b"{}\n")
+            else:
+                if journal_dir.exists():
+                    journal_dir.rename(output.parent / "original-journals")
+                journal_dir.symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises((ValueError, transaction.ValidationFailed), match="Symlink|journal changed"):
+        publish(input_check=callback)
+    assert calls == boundary
+    assert not list(outside.iterdir())
+    if phase == "precommit":
+        assert not any(p.exists() for p in paths)
+
+
+@pytest.mark.parametrize("corruption", ["missing", "malformed", "root", "status", "changed", "created", "previous"])
+def test_missing_or_incorrect_native_completion_journal_never_reports_success(setup, monkeypatch, corruption):
+    _, _, _, sssom, publish = setup
+    publish()
+    original = transaction.ValidatedWriteTransaction.commit
+
+    def commit(self, **kwargs):
+        result = original(self, **kwargs)
+        if corruption == "missing":
+            result.journal_path.unlink()
+        elif corruption == "malformed":
+            result.journal_path.write_bytes(b"{}\n")
+        else:
+            data = json.loads(result.journal_path.read_bytes())
+            data[corruption] = {"root": "/wrong-root", "status": "in_progress", "changed": [],
+                                "created": ["invented"], "previous": {}}[corruption]
+            result.journal_path.write_text(json.dumps(data, indent=2, sort_keys=True))
+        return result
+
+    monkeypatch.setattr(transaction.ValidatedWriteTransaction, "commit", commit)
+    with pytest.raises(ValueError, match="Missing or invalid completed recovery journal"):
+        publish(text=sssom.replace(b"kept", b"changed"))
