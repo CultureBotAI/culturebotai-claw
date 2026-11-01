@@ -1,0 +1,15 @@
+{
+  "name": "step5-independent-queue709-fda8972-squash",
+  "argv": [
+    "python",
+    "-B",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/queue709/fda8972/probe_squash_verification.py"
+  ],
+  "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+  "started_at": "2026-11-01T13:40:52.567178+00:00",
+  "environment_profile": "claw-ci-no-sibling-roots",
+  "finished_at": "2026-11-01T13:40:53.006379+00:00",
+  "exit_code": 0,
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-independent-queue709-fda8972-squash.log",
+  "log_sha256": "68f7b6c701ac01c7bcc1427a22a9b817c4d571fcdc6ecec144164e0bb15b61e6"
+}

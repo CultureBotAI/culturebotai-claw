@@ -1,0 +1,118 @@
+{
+  "at": "2026-11-01T13:22:38.981649+00:00",
+  "implementation_head": "a56f3ae4563619a5129ad944878c9205267315d6",
+  "implementation_tree": "2234b0a63051fba13517c79005dbd52685ed3cc9",
+  "generation_revision": "90d110e663c10146351b09ae98d387dabdec0b1c",
+  "post_generation_change": "README command parity only; no producer source changes",
+  "full_tests": {
+    "passed": 6660,
+    "skipped": 390,
+    "warnings": 16,
+    "coverage_percent": 87.19
+  },
+  "safety_coverage_percent": 76,
+  "commands": {
+    "step5-claw-full-tests-v5": {
+      "receipt": "logs/step5-claw-full-tests-v5.json",
+      "receipt_sha256": "bd37143d69f8a66877779599354b42ea755095f6b1b1c101df55ae20d2b81d1c",
+      "log_sha256": "4af8708a4d742c8435febf6e3431e8234c629ff29ab7ab085194fc77ae2b53a0",
+      "exit_code": 0,
+      "started_at": "2026-11-01T13:15:50.117707+00:00",
+      "finished_at": "2026-11-01T13:22:03.138665+00:00"
+    },
+    "step5-claw-safety-coverage": {
+      "receipt": "logs/step5-claw-safety-coverage.json",
+      "receipt_sha256": "cb51322d4f1f3f89e86142ea6aa0ff1324e46b85aad01752bab2f5c9bd6076cf",
+      "log_sha256": "0cece343dca148807c2a491abae8be81ecd7bf2599e2a25908aebe3d0b003175",
+      "exit_code": 0,
+      "started_at": "2026-11-01T13:22:18.285737+00:00",
+      "finished_at": "2026-11-01T13:22:18.448756+00:00"
+    },
+    "step5-claw-final-ruff-v4": {
+      "receipt": "logs/step5-claw-final-ruff-v4.json",
+      "receipt_sha256": "f3781f2386a05325c1629dcc3665d8397b93d7d25058ed106c379ac14911aa9e",
+      "log_sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+      "exit_code": 0,
+      "started_at": "2026-11-01T13:04:09.875571+00:00",
+      "finished_at": "2026-11-01T13:04:09.941374+00:00"
+    },
+    "step5-claw-final-mypy-v3": {
+      "receipt": "logs/step5-claw-final-mypy-v3.json",
+      "receipt_sha256": "46c0f8fa403a1864ee05af49313a7b8d26872d5dd783ed7c000f8dcccb89fc6f",
+      "log_sha256": "070c9c331a2e491aabe528a802fadba01ab960cc6017b0199149ee76a8b866b5",
+      "exit_code": 0,
+      "started_at": "2026-11-01T13:03:39.543190+00:00",
+      "finished_at": "2026-11-01T13:03:39.767553+00:00"
+    },
+    "step5-claw-config-validate": {
+      "receipt": "logs/step5-claw-config-validate.json",
+      "receipt_sha256": "5c9075a48225e53cea58cf8870baa2922d41b60db254bb7859db067f78fe11f2",
+      "log_sha256": "8530b860a1a29e581c4807df15a46ddfbbe0a16a8485e6339366c14ca44cb24c",
+      "exit_code": 0,
+      "started_at": "2026-11-01T12:44:24.271993+00:00",
+      "finished_at": "2026-11-01T12:44:24.520255+00:00"
+    },
+    "step5-claw-canary-qc": {
+      "receipt": "logs/step5-claw-canary-qc.json",
+      "receipt_sha256": "8514cdb935b2d2a955967b008758a38c343a75f089c4fe6e98ae6bc7db6f3a0a",
+      "log_sha256": "940ef6d28bf8f341b5b40e681a152de1df7176acadc3a1ef46a7e95320566c6b",
+      "exit_code": 0,
+      "started_at": "2026-11-01T12:44:24.271888+00:00",
+      "finished_at": "2026-11-01T12:46:35.937771+00:00"
+    },
+    "step5-claw-readme-parity-fixed": {
+      "receipt": "logs/step5-claw-readme-parity-fixed.json",
+      "receipt_sha256": "3072b9461d5163e88644583d51886d81cf01833a167b8adda4e7822edf9bdbd3",
+      "log_sha256": "a1d2457c906847cc4714edf296d3e9bf80997485230957897e530993c2561ce5",
+      "exit_code": 0,
+      "started_at": "2026-11-01T13:10:10.816820+00:00",
+      "finished_at": "2026-11-01T13:10:11.477197+00:00"
+    },
+    "step5-real-native-generation-v2": {
+      "receipt": "logs/step5-real-native-generation-v2.json",
+      "receipt_sha256": "d63989ff7f5de61aff5ff03588fea5337178517a334528d327d003cda55c8174",
+      "log_sha256": "d2bba7f78d39aa1ca0cb478bb893fbddb30d0a9bf392a156c819383b4d3342d2",
+      "exit_code": 0,
+      "started_at": "2026-11-01T13:05:14.141128+00:00",
+      "finished_at": "2026-11-01T13:06:41.431956+00:00"
+    },
+    "step5-candidate-acceptance-v4": {
+      "receipt": "logs/step5-candidate-acceptance-v4.json",
+      "receipt_sha256": "19a0c21120d6517145ba1c990cbadd38e126b94b4c37c1938f2b84b24229d229",
+      "log_sha256": "90f2ff64589b3d813a24c7536315660b94a18aad574c869b269ba0482e154c36",
+      "exit_code": 0,
+      "started_at": "2026-11-01T13:09:30.356653+00:00",
+      "finished_at": "2026-11-01T13:09:54.013732+00:00"
+    }
+  },
+  "candidate_acceptance": {
+    "path": "step5-candidate-acceptance/final-v4/acceptance.json",
+    "sha256": "90f2ff64589b3d813a24c7536315660b94a18aad574c869b269ba0482e154c36",
+    "status": "PASS_WITH_LIMITATIONS",
+    "rows": 2974,
+    "suppression_events": 25,
+    "unique_suppressed_pairs": 20,
+    "previously_published_pairs_removed": 7,
+    "limitations": [
+      {
+        "rule": "B4",
+        "kind": "missing ontology transforms",
+        "prefixes": [
+          "BTO",
+          "MICRO"
+        ],
+        "affected_row_count": 74
+      }
+    ],
+    "native_rejects": 0
+  },
+  "independent_preliminary_receipts": {
+    "step5-claw-independent/rereview-705-707-v1/review.json": "ffea4ea56e15a456e82bc15e3e136316b21f6c3fc3ae1ad6f55bb9468b3c1d94",
+    "step5-claw-independent/preliminary-a56f3ae/review.json": "37f698105e9601847498fffb6d2aefbf7b61089f38d745b962564df3bbf6dff1",
+    "step5-claw-independent/packaging-v3/review.json": "8e040bae49c9de3add97801b655a8794bc79512d217285a06eb8ee2520e35180",
+    "step5-claw-independent/closure-helper/review.json": "61f7dbec25bdc3d3e505ae87bf29e96e75be2e54d4f8baeeaf04814560f8d513"
+  },
+  "final_packaged_head_and_body_review": "Pending; this validation record is not that attestation",
+  "full_scientific_release": "Not granted; existing MIM blockers remain",
+  "supervisor_binding": null
+}

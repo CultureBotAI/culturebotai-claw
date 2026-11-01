@@ -1,0 +1,12 @@
+Traceback (most recent call last):
+  File "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name/../step5-candidate-acceptance/verify_candidate_v3.py", line 633, in <module>
+    main()
+    ~~~~^^
+  File "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name/../step5-candidate-acceptance/verify_candidate_v3.py", line 620, in main
+    result = run(args, out)
+  File "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name/../step5-candidate-acceptance/verify_candidate_v3.py", line 494, in run
+    require(all(p.is_file() for p in transforms), 'B4 transform unavailable; all-native acceptance cannot pass')
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name/../step5-candidate-acceptance/verify_candidate_v3.py", line 29, in require
+    raise ValueError(message)
+ValueError: B4 transform unavailable; all-native acceptance cannot pass

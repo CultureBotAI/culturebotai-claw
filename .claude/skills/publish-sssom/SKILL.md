@@ -10,6 +10,17 @@ tags: [sssom, chebi, mim, release, mapping, cross-repo, provenance]
 
 # Publish SSSOM Skill
 
+## Owned-name candidate artifact sets
+
+Current MIM builds implement the adopted owned-name export policy and produce
+a suppression sidecar and generation manifest with the working-copy TSV.
+Follow [MIM owned-name export](../../../docs/guides/MIM_OWNED_NAME_EXPORT.md).
+The legacy TSV-only `publish_sssom.py` explicitly refuses these candidates;
+canonical promotion requires a reviewed MIM guarded writer preserving the
+complete evidence and authorized row scope. The historical single-file
+promotion examples below do not waive that boundary. Current builder code
+and MIM mapping semantics govern dates, counts, predicates and approvals.
+
 ## Purpose
 
 `mim_ingredient_mappings.sssom.tsv` is the **authoritative chemical/ingredient

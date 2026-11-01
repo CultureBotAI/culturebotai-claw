@@ -1,0 +1,22 @@
+{
+  "name": "fixed-v4-shallow",
+  "scenario": "shallow",
+  "expected": "pass",
+  "argv": [
+    "/opt/homebrew/Caskroom/miniforge/base/bin/python",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v6.py",
+    "--module",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/package_evidence_v4.py",
+    "--scenario",
+    "shallow",
+    "--results",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-710/controls/fixed-v4-shallow/results.json"
+  ],
+  "started_at": "2026-11-01T13:44:48.549361+00:00",
+  "finished_at": "2026-11-01T13:44:49.148180+00:00",
+  "exit_code": 0,
+  "log_sha256": "385c8e533b6271b8d6b9fbd65ee10cf45479379950a56774524dca933902a085",
+  "module_sha256": "1377772d93374ce6a31de85fab0ba9fe5697f63430db1e075431360e35018422",
+  "mutation": null,
+  "passing_assertions": 22
+}

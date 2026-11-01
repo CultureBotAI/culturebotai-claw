@@ -1,0 +1,9 @@
+{
+  "frozen": "/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/step5-evidence-test-6f_usagc/packaging/inputs.json",
+  "sha256": "92e95ae3b6cd5e8e887a4aef3f13d05c1dce62ba8ae6527531e3b1ebf4a7a32c"
+}
+Traceback (most recent call last):
+  File "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v5.py", line 82, in <module>
+    assert not (repo/m.DESTINATION).exists(), 'publication wrote artifacts before refusing the substituted plan'
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: publication wrote artifacts before refusing the substituted plan

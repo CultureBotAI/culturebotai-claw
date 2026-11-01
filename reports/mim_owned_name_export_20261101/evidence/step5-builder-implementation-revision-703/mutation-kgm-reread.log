@@ -1,0 +1,61 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+______ test_frozen_kgm_consumption_survives_transient_source_replacement _______
+
+cli = {'canonical': PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8510/test_fr...57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8510/test_frozen_kgm_consumption_su0/mim/data/ingredients/mapped'), ...}
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x108da83e0>
+
+    def test_frozen_kgm_consumption_survives_transient_source_replacement(cli, monkeypatch):
+        original_bytes = cli["kgm"].read_bytes()
+        source_loader = builder.load_kgm_source_index
+        label_loader = builder.load_kgm_labels
+        observed = []
+    
+        def sources(path):
+            observed.append(path)
+            cli["kgm"].write_bytes(gzip.compress(original_bytes.replace(b"Owned", b"Injected")))
+            return source_loader(path)
+    
+        def labels(path):
+            observed.append(path)
+            result = label_loader(path)
+            cli["kgm"].write_bytes(original_bytes)
+            return result
+    
+        monkeypatch.setattr(builder, "load_kgm_source_index", sources)
+        monkeypatch.setattr(builder, "load_kgm_labels", labels)
+>       output, _, _ = cli["run"]()
+                       ^^^^^^^^^^^^
+
+tests/test_mim_owned_name_export.py:304: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_mim_owned_name_export.py:169: in run
+    builder.main()
+scripts/build_mim_ingredient_sssom.py:1279: in main
+    kgm_labels = load_kgm_labels(KGM_UNIFIED_TSV) if kgm_frozen else {}
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_mim_owned_name_export.py:298: in labels
+    result = label_loader(path)
+             ^^^^^^^^^^^^^^^^^^
+scripts/kgm_unified_mappings.py:148: in load_kgm_labels
+    for cid, e in load_kgm_entity_index(path).items()
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+scripts/kgm_unified_mappings.py:81: in load_kgm_entity_index
+    for row in _iter_sssom(path):
+               ^^^^^^^^^^^^^^^^^
+scripts/kgm_unified_mappings.py:56: in _iter_sssom
+    for raw in f:
+               ^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <encodings.utf_8.IncrementalDecoder object at 0x108c93290>
+input = b'\x1f\x8b\x08\x00\x00\x00\x00\x00\x02\xff+.M\xcaJM.\x89\xcfL\xe1,\x862s\x12\x93Rs8\x0b\x8aRS2\x93\x13KRAR\xf9pE\xf9\x...0c9\xfd\xcb\xf3R\x81Fd\xe7\x17[\xa5V$&\x97\xf8&\x96$gp:{\xb8:y\x02e\x83!FC5\xe8&r\x01\x00\x00\xac\x17\xcfw\x00\x00\x00'
+final = False
+
+>   ???
+E   UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 1: invalid start byte
+
+<frozen codecs>:325: UnicodeDecodeError
+=========================== short test summary info ============================
+FAILED tests/test_mim_owned_name_export.py::test_frozen_kgm_consumption_survives_transient_source_replacement
+1 failed, 36 deselected in 0.08s

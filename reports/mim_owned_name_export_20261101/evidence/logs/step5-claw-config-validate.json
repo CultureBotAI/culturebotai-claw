@@ -1,0 +1,18 @@
+{
+  "name": "step5-claw-config-validate",
+  "argv": [
+    "uv",
+    "run",
+    "--frozen",
+    "openclaw-cli",
+    "config",
+    "validate"
+  ],
+  "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+  "started_at": "2026-11-01T12:44:24.271993+00:00",
+  "environment_profile": "generation-and-native-qc",
+  "finished_at": "2026-11-01T12:44:24.520255+00:00",
+  "exit_code": 0,
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-claw-config-validate.log",
+  "log_sha256": "8530b860a1a29e581c4807df15a46ddfbbe0a16a8485e6339366c14ca44cb24c"
+}

@@ -1,0 +1,37 @@
+# curie_map:
+#   CHEBI: "http://purl.obolibrary.org/obo/CHEBI_"
+#   FOODON: "http://purl.obolibrary.org/obo/FOODON_"
+#   UBERON: "http://purl.obolibrary.org/obo/UBERON_"
+#   ENVO: "http://purl.obolibrary.org/obo/ENVO_"
+#   NCIT: "http://purl.obolibrary.org/obo/NCIT_"
+#   MICRO: "http://purl.obolibrary.org/obo/MICRO_"
+#   mesh: "http://id.nlm.nih.gov/mesh/"
+#   BTO: "http://purl.obolibrary.org/obo/BTO_"
+#   kgmicrobe.compound: "https://w3id.org/kg-microbe/compound/"
+#   kgmicrobe.ingredient: "https://w3id.org/kg-microbe/ingredient/"
+#   cas: "https://commonchemistry.cas.org/detail?cas_rn="
+#   registry: "https://w3id.org/kg-microbe/registry/"
+#   MIM: "https://github.com/CultureBotAI/MediaIngredientMech/blob/main/data/ingredients/mapped/"
+#   obo: "http://purl.obolibrary.org/obo/"
+#   kgm: "https://w3id.org/kg-microbe/"
+#   semapv: "https://w3id.org/semapv/vocab/"
+#   skos: "http://www.w3.org/2004/02/skos/core#"
+#   orcid: "https://orcid.org/"
+#   cbclaw: "https://github.com/culturebotai/culturebotai-claw/blob/main/"
+# license: "https://creativecommons.org/publicdomain/zero/1.0/"
+# mapping_set_id: "https://w3id.org/sssom/mappings/culturebotai_mim_ingredient"
+# mapping_set_version: "2026-11-01"
+# mapping_set_description: "Canonical MediaIngredientMech → ingredient-ontology mappings (CHEBI + FOODON; UBERON/ENVO when populated). One row per mapped MIM ingredient record. Per-row object_source distinguishes ontologies. Predicate is skos:exactMatch by default; narrowMatch/broadMatch/closeMatch where residual-P2.5 triage found a specificity or symmetry difference, or where mapping_quality != EXACT_MATCH. The `source` extension column records the upstream origin (MIM evidence + kg-microbe source pipeline, CHEBI only). owned-name-policy-v1; suppression-sidecar-required."
+# mapping_date: "2026-11-01"
+# predicate_semantics: skos
+# creator_id:
+#   - "orcid:0000-0001-8175-045X"
+# subject_source: "MIM:ingredients"
+# extension_definitions:
+#   - slot_name: source
+#     property: "cbclaw:provenance-source"
+#     type_hint: "xsd:string"
+#   - slot_name: validation_method
+#     property: "cbclaw:validation-method"
+#     type_hint: "xsd:string"
+subject_id	subject_label	predicate_id	object_id	object_label	object_source	mapping_justification	source	mapping_date	confidence	comment	other	validation_method	reject_reason

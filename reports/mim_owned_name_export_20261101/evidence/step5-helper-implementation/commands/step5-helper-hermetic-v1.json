@@ -1,0 +1,20 @@
+{
+  "name": "step5-helper-hermetic-v1",
+  "argv": [
+    "uv",
+    "run",
+    "--frozen",
+    "python",
+    "-m",
+    "pytest",
+    "tests/test_mim_owned_name_policy.py",
+    "-q"
+  ],
+  "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+  "started_at": "2026-11-01T12:39:16.283466+00:00",
+  "environment_profile": "claw-ci-no-sibling-roots",
+  "finished_at": "2026-11-01T12:39:16.665985+00:00",
+  "exit_code": 0,
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-helper-hermetic-v1.log",
+  "log_sha256": "0dbab68005debfea8a5b6e50f5ff1f0e301366ce23cdb8dc229c9090cf28b79f"
+}

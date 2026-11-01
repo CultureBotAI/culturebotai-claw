@@ -1,0 +1,20 @@
+{
+  "name": "step5-claw-final-ruff-v3",
+  "argv": [
+    "uvx",
+    "ruff@0.16.3",
+    "check",
+    "cli",
+    "plugins",
+    "pipelines",
+    "src",
+    "tests"
+  ],
+  "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+  "started_at": "2026-11-01T13:03:39.543134+00:00",
+  "environment_profile": "claw-ci-no-sibling-roots",
+  "finished_at": "2026-11-01T13:03:41.083469+00:00",
+  "exit_code": 2,
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-claw-final-ruff-v3.log",
+  "log_sha256": "ab960078234ac3697fb507c8fdadea23ac7e81c44106a364eadf43bd5b0a42b6"
+}

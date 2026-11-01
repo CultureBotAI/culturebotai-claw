@@ -1,0 +1,21 @@
+{
+  "name": "step5-independent-710-v4-retained-controls",
+  "argv": [
+    "python",
+    "-B",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v6.py",
+    "--module",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/package_evidence_v4.py",
+    "--scenario",
+    "historical",
+    "--results",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/retained-controls.json"
+  ],
+  "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+  "started_at": "2026-11-01T13:46:25.158125+00:00",
+  "environment_profile": "claw-ci-no-sibling-roots",
+  "finished_at": "2026-11-01T13:46:25.596566+00:00",
+  "exit_code": 0,
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-independent-710-v4-retained-controls.log",
+  "log_sha256": "9687538d01f7a401829babf1f3bcde9fcbfb25f0ffa87c5996b76210100f8567"
+}

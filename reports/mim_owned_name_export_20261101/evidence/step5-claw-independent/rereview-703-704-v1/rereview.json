@@ -1,0 +1,12 @@
+{
+  "at": "2026-11-01T12:46:30.700240+00:00",
+  "reviewer": "/root/step4_design_review",
+  "scope": "Preliminary #703/#704 repair re-review",
+  "original_findings_replayed": "PASS: original alias and destination-drift reproductions now refuse",
+  "remaining_confirmed_finding": "Journal-directory symlink introduced during final source callback escapes the artifact directory and still reports complete.",
+  "artifact_tests": 37,
+  "builder_lexical_tests": 3,
+  "source_edits": false,
+  "github_mutations": false,
+  "original_evidence_index_sha256": "627e5f4685efe75a340397cf9dea3c0286204b191f1eef9eb435891e22ee70b4"
+}

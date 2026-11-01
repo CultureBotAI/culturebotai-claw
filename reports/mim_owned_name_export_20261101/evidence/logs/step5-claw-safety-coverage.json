@@ -1,0 +1,19 @@
+{
+  "name": "step5-claw-safety-coverage",
+  "argv": [
+    "uv",
+    "run",
+    "--frozen",
+    "coverage",
+    "report",
+    "--include=cli/main.py,plugins/repository_settings.py,plugins/lock_manager.py,plugins/git_integration.py,plugins/just_runner.py",
+    "--fail-under=60"
+  ],
+  "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+  "started_at": "2026-11-01T13:22:18.285737+00:00",
+  "environment_profile": "claw-ci-no-sibling-roots",
+  "finished_at": "2026-11-01T13:22:18.448756+00:00",
+  "exit_code": 0,
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-claw-safety-coverage.log",
+  "log_sha256": "0cece343dca148807c2a491abae8be81ecd7bf2599e2a25908aebe3d0b003175"
+}

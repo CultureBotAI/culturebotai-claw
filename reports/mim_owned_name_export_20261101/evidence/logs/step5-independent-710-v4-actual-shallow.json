@@ -1,0 +1,15 @@
+{
+  "name": "step5-independent-710-v4-actual-shallow",
+  "argv": [
+    "python",
+    "-B",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/replay.py"
+  ],
+  "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+  "started_at": "2026-11-01T13:46:08.785129+00:00",
+  "environment_profile": "claw-ci-no-sibling-roots",
+  "finished_at": "2026-11-01T13:46:10.955054+00:00",
+  "exit_code": 0,
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-independent-710-v4-actual-shallow.log",
+  "log_sha256": "408e352ca8855f9ce97315a8fea2c4e7baf50a9fe88ccc1655413414737d6e70"
+}

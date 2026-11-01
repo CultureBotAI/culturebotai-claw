@@ -1,0 +1,18 @@
+{
+  "at": "2026-11-01T13:45:38.394352+00:00",
+  "scope": "Isolated old-code diagnostic; no production changes",
+  "argv": [
+    "/opt/homebrew/Caskroom/miniforge/base/bin/python",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v6.py",
+    "--module",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-710/controls/old-v3-shallow-without-ancestry/packager.py",
+    "--scenario",
+    "shallow",
+    "--results",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-710/controls/old-v3-shallow-without-ancestry/results.json"
+  ],
+  "exit_code": 1,
+  "module_sha256": "00836ea5afb9ad1dc96aee319afc303ec7c04131a301ebad384bf2496e5235d8",
+  "log_sha256": "2abe3aee123021299d0a9890775bc734549f015781bb2d0d3bd04ce4774e0098",
+  "result": "Ancestry-only removal still fails real shallow consumer because historical git show object is absent."
+}

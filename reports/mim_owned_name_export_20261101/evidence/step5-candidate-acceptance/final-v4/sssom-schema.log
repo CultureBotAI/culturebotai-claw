@@ -1,0 +1,3 @@
+Metadata key 'predicate_semantics' is not a standard SSSOM mapping set metadata field. See https://mapping-commons.github.io/sssom/spec-model/#non-standard-slots on how to specify additional, non-standard fields in a SSSOM file.
+No attr for source [2974 instances]
+No attr for validation_method [2974 instances]

@@ -1,0 +1,15 @@
+{
+  "name": "step5-independent-journal-capture-704-v3",
+  "argv": [
+    "python",
+    "-B",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/probe_journal_initial_capture.py"
+  ],
+  "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+  "started_at": "2026-11-01T12:49:06.775454+00:00",
+  "environment_profile": "generation-and-native-qc",
+  "finished_at": "2026-11-01T12:49:06.850608+00:00",
+  "exit_code": 0,
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-independent-journal-capture-704-v3.log",
+  "log_sha256": "0e0f833ed5e829b7687e96c6962c5ba63eefafb2e870cb1c8166ade1cfc46109"
+}

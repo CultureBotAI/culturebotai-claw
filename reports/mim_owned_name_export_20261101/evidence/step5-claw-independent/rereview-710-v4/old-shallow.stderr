@@ -1,0 +1,18 @@
+fatal: Not a valid commit name a56f3ae4563619a5129ad944878c9205267315d6
+Traceback (most recent call last):
+  File "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/shallow-consumer/reports/mim_owned_name_export_20261101/verify.py", line 241, in <module>
+    if __name__=='__main__':main()
+                            ~~~~^^
+  File "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/shallow-consumer/reports/mim_owned_name_export_20261101/verify.py", line 238, in main
+    else:verify(args.package.absolute(),args.repository.absolute() if args.repository else None,args.require_tracked)
+         ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/shallow-consumer/reports/mim_owned_name_export_20261101/verify.py", line 220, in verify
+    check_references(plan,repository)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/shallow-consumer/reports/mim_owned_name_export_20261101/verify.py", line 101, in check_references
+    subprocess.run(['git','merge-base','--is-ancestor',revision,'HEAD'],cwd=repository,check=True)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/marcin/.local/share/uv/python/cpython-3.13.2-macos-aarch64-none/lib/python3.13/subprocess.py", line 579, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['git', 'merge-base', '--is-ancestor', 'a56f3ae4563619a5129ad944878c9205267315d6', 'HEAD']' returned non-zero exit status 128.

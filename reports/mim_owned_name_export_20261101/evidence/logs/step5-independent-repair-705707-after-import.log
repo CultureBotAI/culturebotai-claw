@@ -1,0 +1,31 @@
+{
+  "cas_rejection_provenance": {
+    "rows": [
+      {
+        "subject_id": "MIM:Subject",
+        "subject_label": "Subject",
+        "predicate_id": "skos:exactMatch",
+        "object_id": "CHEBI:1",
+        "object_label": "Subject",
+        "object_source": "obo:chebi.owl",
+        "mapping_justification": "semapv:LexicalMatching",
+        "source": "",
+        "mapping_date": "2026-10-01",
+        "confidence": "0.99",
+        "comment": "",
+        "other": "",
+        "validation_method": ""
+      }
+    ],
+    "suppression_rows": [],
+    "source_rejection_preserved": true
+  },
+  "imported_code_provenance": {
+    "outcome": "ValueError: Producer source bytes changed after import snapshot",
+    "initial_import_source_sha256": "18ffd0430d0256b6da6cbb1f3da2327c4cf3418e2b0b2da71ff283ee2f4351ae",
+    "postimport_source_sha256": "02fbd2306351e8ae688d359580e3364ff8b02798a168162f337ba01daffefed6",
+    "actual_source_fixture": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-705-707-v1/after-import/producer-fixture/src/kg_microbe_utils/owned_name_policy.py",
+    "identity_transport": "require_mech_roots bypassed for synthetic fixture; production builder, snapshot, ownership, native lock and transaction are unchanged.",
+    "external_validation": "explicit --no-validate, offline label fixture"
+  }
+}

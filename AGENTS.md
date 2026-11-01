@@ -158,6 +158,7 @@ uv run --extra dev mypy \
   src/kg_microbe_workflows src/kg_microbe_progress \
   src/kg_microbe_consistency src/kg_microbe_patches \
   src/kg_microbe_evidence src/kg_microbe_graph \
+  src/kg_microbe_utils/owned_name_policy.py src/kg_microbe_utils/sssom_artifacts.py \
   src/kg_microbe_governance/__init__.py \
   src/kg_microbe_governance/__main__.py \
   src/kg_microbe_governance/fleet_audit.py \

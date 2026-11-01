@@ -1,0 +1,13 @@
+{
+  "classification": "Author harness classifier failure, not a packager failure",
+  "observation": "The no-publish-binding mutant was rejected only by post-publication portable verification; the regression correctly failed because the destination had already been written. The first driver only recognized did-not-refuse assertions and stopped classifying this valid assertion failure.",
+  "remedy": "Add an explicit no-write assertion message and recognize that actual assertion, retain original logs and driver, rerun in distinct controls-v2 directories.",
+  "initial_preserved": [
+    "run_controls.py",
+    "old-v2/test.log",
+    "repaired-v3/test.log",
+    "mutant-no-plan-equality/test.log",
+    "mutant-no-publish-binding/test.log"
+  ],
+  "production_changed": false
+}

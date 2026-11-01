@@ -1,0 +1,58 @@
+WARNING: kg-microbe unified mapping not found (/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/706-same-origin-preload/controls/import-provenance/absent-kgm.tsv.gz); building SSSOM with NO kg-microbe cross-reference enrichment. Regenerate it in kg-microbe with `poetry run python scripts/consolidate_chemical_mappings.py`.
+Scanning 2 MIM ingredient YAMLs...
+Fetching rdfs:labels for 1 CHEBI ids from OAK...
+  resolved 1 / 1
+Published 1 diagnostic rows to /Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/706-same-origin-preload/controls/import-provenance/artifacts/candidate.tsv (complete)
+  (skipped 1 MIM records without a supported ontology_id prefix: CHEBI:, FOODON:, UBERON:, ENVO:, NCIT:, MICRO:, mesh:, BTO:, kgmicrobe.compound:, kgmicrobe.ingredient:, cas:)
+Predicate breakdown:
+  skos:exactMatch          1
+Object-prefix breakdown:
+  CHEBI:     1
+{
+  "cas_rejection_provenance": {
+    "rows": [
+      {
+        "subject_id": "MIM:Subject",
+        "subject_label": "Subject",
+        "predicate_id": "skos:exactMatch",
+        "object_id": "CHEBI:1",
+        "object_label": "Subject",
+        "object_source": "obo:chebi.owl",
+        "mapping_justification": "semapv:LexicalMatching",
+        "source": "",
+        "mapping_date": "2026-10-01",
+        "confidence": "0.99",
+        "comment": "",
+        "other": "",
+        "validation_method": ""
+      }
+    ],
+    "suppression_rows": [],
+    "source_rejection_preserved": true
+  },
+  "imported_code_provenance": {
+    "outcome": "published",
+    "initial_preload_source_sha256": "18ffd0430d0256b6da6cbb1f3da2327c4cf3418e2b0b2da71ff283ee2f4351ae",
+    "prebuilder_disk_source_sha256": "d6893a9cb720dd9aefeb185df6500297025377905cd2687022e39d147bca513f",
+    "actual_source_fixture": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/706-same-origin-preload/producer-fixture/src/kg_microbe_utils/owned_name_policy.py",
+    "identity_transport": "require_mech_roots bypassed for synthetic fixture; production builder, snapshot, ownership, native lock and transaction are unchanged.",
+    "external_validation": "explicit --no-validate, offline label fixture",
+    "manifest_bound_policy_sha256": "d6893a9cb720dd9aefeb185df6500297025377905cd2687022e39d147bca513f",
+    "generated_other": "",
+    "manifest_bound_source_would_keep": [
+      "Owned"
+    ],
+    "emitted_suppressions": [
+      {
+        "subject_id": "MIM:Subject",
+        "token_key": "owned",
+        "token": "Owned",
+        "owner_subject_ids": "[\"MIM:Owned\"]",
+        "disposition": "SUPPRESS",
+        "input_surfaces": "[\"mim.synonym\"]",
+        "source_refs": "[\"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/706-same-origin-preload/controls/import-provenance/mim/data/ingredients/mapped/Subject.yaml#synonyms[0]\"]",
+        "evidence_refs": "[\"https://github.com/CultureBotAI/MediaIngredientMech/issues/669#issuecomment-6558035777\",\"https://github.com/CultureBotAI/culturebotai-claw/issues/701\"]"
+      }
+    ]
+  }
+}

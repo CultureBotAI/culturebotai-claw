@@ -1,0 +1,21 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_ test_repeated_pair_aggregates_every_origin_and_owner_in_one_deterministic_row _
+
+    def test_repeated_pair_aggregates_every_origin_and_owner_in_one_deterministic_row():
+        events = [
+            event(token=" parent ", owner_subject_ids=frozenset({"MIM:Z", "MIM:Parent"})),
+            event(token="PARENT", input_surface="kg_target", source_refs=("nodes.tsv#CHEBI:1",),
+                  evidence_refs=("ontology-source", POLICY)),
+            event(token="Parent", input_surface="registry_cas", source_refs=("child.yaml#/cas",)),
+            event(token="Parent"),
+        ]
+        expected = render_suppressed_aliases(events)
+>       assert all(render_suppressed_aliases(order) == expected for order in itertools.permutations(events))
+E       assert False
+E        +  where False = all(<generator object test_repeated_pair_aggregates_every_origin_and_owner_in_one_deterministic_row.<locals>.<genexpr> at 0x1070eac00>)
+
+tests/test_mim_owned_name_policy.py:215: AssertionError
+=========================== short test summary info ============================
+FAILED ../../../../../../../../../../../../dev::test_repeated_pair_aggregates_every_origin_and_owner_in_one_deterministic_row
+1 failed, 47 deselected in 0.02s
