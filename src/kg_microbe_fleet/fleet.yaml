@@ -52,6 +52,21 @@ capability_catalogue:
   vendored_sync: {}
   unmapped_inventory_input: {}
   source_catalogue: {}
+  # Cached-source quote matching is independent of citation/field presence.
+  # Domain/source adapters must be reviewed before enabling another Mech.
+  evidence_reference_validation:
+    settings:
+      cache_dir:
+        type: string
+        required_when_enabled: true
+      reference_fields:
+        type: string_list
+      snippet_fields:
+        type: string_list
+      evidence_fields:
+        type: string_list
+      evidence_paths:
+        type: string_list
   corpus_statistics:
     settings:
       fields:
@@ -207,6 +222,12 @@ mechs:
       - data/merge_yaml/merged/*.yaml
     vendored_role: consumer
     capabilities:
+      evidence_reference_validation:
+        status: disabled
+        reason: >-
+          Literature quote fields exist, but no deterministic CI gate matches
+          quotes against committed sources; the shared cache/profile
+          contract requires later rollout.
       id_label_validation:
         status: enabled
       record_review:
@@ -352,6 +373,19 @@ mechs:
       - data/ingredients/**/*.yaml
     vendored_role: consumer
     capabilities:
+      evidence_reference_validation:
+        status: enabled
+        settings:
+          cache_dir: references_cache
+          reference_fields: [pmid, doi, reference]
+          snippet_fields: [snippet, excerpt, supporting_text]
+          evidence_fields: [evidence]
+          # Preserve the existing gate's scope. The two role selectors are
+          # legacy names; current role facets need their own reviewed adapter.
+          evidence_paths:
+            - ontology_mapping.evidence
+            - role_assignments[].evidence
+            - cellular_role_assignments[].evidence
       id_label_validation:
         status: enabled
       record_review:
@@ -487,6 +521,12 @@ mechs:
       - data/isolates/*.yaml
     vendored_role: consumer
     capabilities:
+      evidence_reference_validation:
+        status: disabled
+        reason: >-
+          Native reference validation and committed caches exist, but validation
+          is on demand rather than a CI gate, with documented evidence-repair
+          backlog; shared CI adoption is deferred.
       id_label_validation:
         status: enabled
       record_review:
@@ -624,6 +664,12 @@ mechs:
       - data/traits/**/*.yaml
     vendored_role: consumer
     capabilities:
+      evidence_reference_validation:
+        status: disabled
+        reason: >-
+          Verbatim-snippet reviewer instructions are not a deterministic
+          source-matching gate; a committed source-cache/profile contract and CI
+          adoption remain unverified.
       id_label_validation:
         status: enabled
       record_review:
@@ -780,6 +826,12 @@ mechs:
       - data/traits/**/*.yaml
     vendored_role: consumer
     capabilities:
+      evidence_reference_validation:
+        status: disabled
+        reason: >-
+          Populated supporting-text fields include source assertions; a reviewed
+          quote-versus-database-assertion adapter, committed source cache and
+          deterministic CI gate are not adopted.
       id_label_validation:
         status: enabled
       record_review:
@@ -941,6 +993,12 @@ mechs:
       - data/antibiotics/**/*.yaml
     vendored_role: consumer
     capabilities:
+      evidence_reference_validation:
+        status: disabled
+        reason: >-
+          Literature discovery and snippet-bearing records do not establish
+          deterministic cached-source validation; shared profile/cache/CI
+          adoption is deferred.
       # These arrive with the vendoring PR this declaration obliges
       # (AntibioticMech#29). Enabled rather than disabled-with-an-absent-claim
       # (#255): a claim that the files are absent is true only until that lands,
@@ -1103,6 +1161,11 @@ mechs:
       - data/structures/**/*.yaml
     vendored_role: consumer
     capabilities:
+      evidence_reference_validation:
+        status: disabled
+        reason: >-
+          Literature-evidence authoring exists, but a deterministic CI gate
+          matching quotes against committed sources is not established.
       # Enabled rather than disabled-with-an-absent-claim (#255): both arrive in
       # CellStructureMech#53, which is open and green, so a claim that the files
       # are absent is true only until that merges. An enabled declaration carries
@@ -1287,6 +1350,11 @@ mechs:
       - data/habitats/**/*.yaml
     vendored_role: consumer
     capabilities:
+      evidence_reference_validation:
+        status: disabled
+        reason: >-
+          Snippet-bearing evidence is present, but shared deterministic
+          cached-source validation is not adopted in CI.
       id_label_validation:
         status: enabled
       record_review:
@@ -1508,6 +1576,11 @@ mechs:
         allow_unicode: true
         width: 80
     capabilities:
+      evidence_reference_validation:
+        status: disabled
+        reason: >-
+          Snippet-bearing records do not establish source validation; shared
+          quote/cache profile and CI gate adoption are deferred.
       id_label_validation:
         status: enabled
       record_review:
@@ -1679,6 +1752,12 @@ mechs:
         generic serialization must not bypass the native seeder and corpus
         reproduction gate.
     capabilities:
+      evidence_reference_validation:
+        status: disabled
+        reason: >-
+          The native EvidenceItem declares optional verbatim snippets beyond
+          database provenance, but the shared committed-cache quote gate is
+          not adopted.
       id_label_validation:
         status: enabled
       record_review:
@@ -1844,6 +1923,12 @@ mechs:
         already written in safe_dump's style; 79 use block scalars or
         indented sequences that safe_dump never emits. Measured on joining.
     capabilities:
+      evidence_reference_validation:
+        status: disabled
+        reason: >-
+          Native evidence distinguishes quote from source_assertion and uses
+          record-local reference_id; that mapping and committed source-cache
+          validation need a reviewed adapter before enabling.
       id_label_validation:
         status: disabled
         reason: >-
@@ -2040,6 +2125,12 @@ mechs:
       verified: false
       reason: Generated family projections use native seeding and reproduction gates; shared writers must not reserialize them.
     capabilities:
+      evidence_reference_validation:
+        status: disabled
+        reason: >-
+          Curated family evidence includes quote-like fields beyond seeded
+          database provenance, but the shared committed-cache quote gate
+          is not adopted.
       id_label_validation:
         status: enabled
         reason: >-
@@ -2180,6 +2271,12 @@ mechs:
         Material records exist, but shared round-trip options have not been
         verified against the native validation and authoring contract.
     capabilities:
+      evidence_reference_validation:
+        status: disabled
+        reason: >-
+          Native MechanismEvidence uses source_ref/supports/explanation without
+          a verbatim-quote slot; a reviewed quote/cache adapter is required
+          before shared gate adoption.
       id_label_validation:
         status: disabled
         reason: >-
@@ -2325,6 +2422,12 @@ mechs:
         and reproduction; shared round-trip serialization is not an authoring
         contract for generated records.
     capabilities:
+      evidence_reference_validation:
+        status: disabled
+        reason: >-
+          Current main includes maintained curated concepts with source/locator
+          citations in addition to AIO imports; a native quote/cache validation
+          adapter and deterministic CI gate are not adopted.
       id_label_validation:
         status: disabled
         reason: >-

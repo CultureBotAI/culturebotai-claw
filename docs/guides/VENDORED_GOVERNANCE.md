@@ -419,6 +419,57 @@ downstream rollout, exact-main audit, and final-state sequence. Some current
 payload comments retain historical fleet wording; changing those bytes requires
 that separate coordinated release.
 
+## Scoped evidence-validation release
+
+The evidence-reference-validation release has exactly one canary,
+MediaIngredientMech. Its reviewed declaration is
+`src/kg_microbe_governance/releases/evidence-reference-validation-mim-v1.json`.
+The separate read-only audit preserves the coordinated `fleet-audit` command
+and its unanimous-pin contract:
+
+```bash
+uv run python -m kg_microbe_governance.release_audit \
+  --trusted-root /path/to/trusted-claw \
+  --target-root mediaingredientmech=/path/to/MediaIngredientMech \
+  --target-root traitmech=/path/to/TraitMech \
+  ... \
+  --json-output /path/outside-audited-checkouts/release-audit.json
+```
+
+Supply every manifest-defined Mech root. The audit requires exact repository
+identities, distinct clean roots and consumer `HEAD == origin/main`. The trusted
+Claw HEAD must be on its canonical `origin/main` first-parent history; a merged
+feature parent is insufficient, while an older protected main base is valid. Callers fetch before
+inspection; the audit performs no network access or checkout mutation. Its JSON
+report records trusted, baseline and candidate revisions, manifest and policy
+digests, each consumer's pin and checks, and separate pending/adopted counts.
+
+All noncanaries must retain the declaration's exact baseline SHA. MIM may retain
+that baseline, reported as `pending`, or adopt the exact first-parent commit
+that introduced the unchanged declaration, reported as `adopted`. This derives
+the future squash commit without putting its own SHA inside its tree. Later
+unrelated Claw commits do not move the candidate; modification or reintroduction
+of this release declaration is rejected. The only allowed governance-manifest
+delta is the declaration's two complete MIM-only artifact descriptors. Current
+trusted governance bytes and the evidence capability profile must still match
+that reviewed candidate. A later governed change needs an explicit release
+policy transition; this release cannot become an indefinite exception.
+
+Historical manifests and payloads are read as Git blobs from trusted Claw
+history, checked against their digests, and compared with each consumer's
+committed blobs and modes. Native safe-working-path and permission checks also
+run. A downstream pin never selects executable audit/install code, and matching
+working files cannot hide a wrong committed artifact. Missing roots, unexpected
+pins, wider applicability and partial checks fail rather than becoming skips.
+
+During bootstrap, a pull request's trusted base has no release declaration and
+continues using the existing coordinated audit; candidate contract tests run
+separately. After merge, the workflow selects the declaration from trusted main
+and runs the scoped audit. A candidate checkout cannot activate this mode.
+`pending` validates preparation only: release completion additionally requires
+MIM's reviewed PR to merge and its own merged-revision CI to pass. The remaining
+Mechs need a separately authorized rollout; this release does not grant one.
+
 ## Rollback
 
 Rollback means pinning every Mech to the previous reviewed claw commit; do

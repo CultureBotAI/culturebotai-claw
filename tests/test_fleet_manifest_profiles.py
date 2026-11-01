@@ -85,6 +85,7 @@ EXPECTED_PROFILES = {
 }
 
 EXPECTED_CAPABILITIES = {
+    "evidence_reference_validation",
     # Declared by #223: who keeps a download.yaml source catalogue, and why
     # the three who do not have decided against one rather than forgotten.
     "source_catalogue",
@@ -259,7 +260,7 @@ def test_dufmech_keeps_generated_inventory_and_native_serialization() -> None:
     assert {
         name for name, capability in mech.capabilities.items()
         if capability.status == "disabled"
-    } == {"deep_research", "metpo_proposal", "causal_graph_coverage"}
+    } == {"deep_research", "metpo_proposal", "causal_graph_coverage", "evidence_reference_validation"}
     assert "execution is refused" in mech.capability("deep_research").reason
     assert mech.capability("corpus_statistics").settings["fields"] == (
         "id", "name", "seed_status", "characterization_status",

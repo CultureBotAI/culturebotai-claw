@@ -172,6 +172,13 @@ def _validate_fleet_alignment(
         raise GovernanceError(
             "Provider-triage artifact applicability differs from the fleet capability scope"
         )
+    evidence_scope = set(fleet_manifest.with_capability("evidence_reference_validation"))
+    for artifact_id in ("evidence_validator_runner", "evidence_validation_workflow"):
+        artifact = next((a for a in manifest.artifacts if a.artifact_id == artifact_id), None)
+        if artifact is None or set(artifact.consumers) != evidence_scope:
+            raise GovernanceError(
+                f"{artifact_id} applicability differs from the evidence capability scope"
+            )
 
 
 def load_governance_manifest(

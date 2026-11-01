@@ -78,7 +78,7 @@ def test_shipped_manifest_is_complete_aligned_and_checksum_valid() -> None:
     fleet = load_fleet_manifest()
 
     assert set(manifest.consumers) == set(fleet.keys)
-    assert len(manifest.artifacts) == 24
+    assert len(manifest.artifacts) == 26
     assert {
         artifact.artifact_id for artifact in manifest.artifacts
     } >= {

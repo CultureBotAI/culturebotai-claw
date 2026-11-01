@@ -190,9 +190,12 @@ uv run --extra dev mypy \
   src/kg_microbe_merge_queue src/kg_microbe_research src/kg_microbe_write \
   src/kg_microbe_workflows src/kg_microbe_progress \
   src/kg_microbe_consistency src/kg_microbe_patches \
+  src/kg_microbe_evidence src/kg_microbe_graph \
   src/kg_microbe_governance/__init__.py \
   src/kg_microbe_governance/__main__.py \
   src/kg_microbe_governance/fleet_audit.py \
+  src/kg_microbe_governance/release_audit.py \
+  src/kg_microbe_governance/artifacts/scripts/run_shared_evidence_validator.py \
   src/kg_microbe_governance/artifacts/scripts/check_vendored_sync.py
 uv run --extra dev python -m pytest -q \
   --cov=src --cov=cli.main --cov=plugins.repository_settings \
