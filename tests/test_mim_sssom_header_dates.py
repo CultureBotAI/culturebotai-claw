@@ -2,6 +2,7 @@
 
 import importlib.util
 import sys
+from contextlib import nullcontext
 from datetime import date
 from pathlib import Path
 
@@ -13,6 +14,21 @@ SPEC = importlib.util.spec_from_file_location(
     'mim_builder_header_dates', SCRIPTS / 'build_mim_ingredient_sssom.py')
 builder = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(builder)
+
+
+@pytest.fixture(autouse=True)
+def offline_publication_inputs(tmp_path, monkeypatch):
+    """Keep date tests on the native publisher without live repository inputs."""
+    from kg_microbe_utils import sssom_artifacts
+
+    class FixtureLock:
+        def lock(self, *args):
+            return nullcontext()
+
+    monkeypatch.setattr(sssom_artifacts, '_load_lock_manager', lambda root: FixtureLock)
+    monkeypatch.setattr(builder, 'RESIDUAL_JSON', tmp_path / 'absent-residual.json')
+    monkeypatch.setattr(builder, 'KGM_UNIFIED_TSV', tmp_path / 'absent-kgm.tsv.gz')
+    monkeypatch.setattr(builder, 'MIM_PUBLISHED_SSSOM', tmp_path / 'absent-canonical.tsv')
 
 
 def run_builder(tmp_path, monkeypatch, rows, output):

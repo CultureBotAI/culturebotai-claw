@@ -1,7 +1,7 @@
 """
-Build the canonical MIM → ingredient-ontology SSSOM mapping file.
+Build a diagnostic MIM → ingredient-ontology SSSOM candidate artifact set.
 
-This is the authoritative cross-repo ingredient mapping artifact. Every
+This candidate is not canonical promotion or scientific approval. Every
 MediaIngredientMech record whose `ontology_mapping.ontology_id` starts
 with a supported ingredient ontology prefix (CHEBI / FOODON; UBERON /
 ENVO when populated) becomes one SSSOM row with:
@@ -37,19 +37,21 @@ Outputs:
       — working copy, regenerated on every run
       — validated with `sssom validate` before being written
 
-Use `just publish-sssom` to promote the working copy to
-  MediaIngredientMech/mappings/ingredient_mappings.sssom.tsv
-after it passes `sssom validate` + `synonym-review`.
+The suppression sidecar and generation manifest travel with this working
+copy. The legacy `publish-sssom` command refuses policy-marked candidates;
+bounded canonical promotion belongs to a separate reviewed MIM workflow.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
 import subprocess
 import sys
+import tempfile
 from datetime import date
 from pathlib import Path
 
@@ -68,6 +70,25 @@ KGM_ROOT_PATH = Path(
 
 sys.path.insert(0, str(REPO_ROOT / "src"))
 from kg_microbe_fleet import require_mech_roots  # noqa: E402
+from kg_microbe_utils.owned_name_policy import (  # noqa: E402
+    AliasCandidate,
+    Suppression,
+    build_owner_index,
+    filter_owned_aliases,
+    render_suppressed_aliases,
+)
+from kg_microbe_utils.sssom_artifacts import (  # noqa: E402
+    POLICY_MARKER,
+    artifact_paths,
+    capture_beforeimages,
+    checked_path,
+    publish_candidate_artifacts,
+)
+
+OWNED_NAME_EVIDENCE = (
+    "https://github.com/CultureBotAI/MediaIngredientMech/issues/669#issuecomment-6558035777",
+    "https://github.com/CultureBotAI/culturebotai-claw/issues/701",
+)
 
 CLAW_ROOT = REPO_ROOT
 MIM_ROOT = MIM_ROOT
@@ -596,12 +617,61 @@ def _join_sources(mim_ev: list[str], last_curator: str, kgm_src: str) -> str:
     return "|".join(parts)
 
 
+def _read_mapped_records(directory: Path, snapshot: dict[Path, bytes | None] | None = None) -> dict[Path, dict]:
+    """Parse the complete direct mapped-directory population, including ignored files."""
+    paths = sorted(directory.glob("*.yaml"))
+    contents = capture_beforeimages(paths) if snapshot is None else snapshot
+    records = {}
+    subjects = set()
+    for path in paths:
+        content = contents[checked_path(path)]
+        if content is None:
+            raise ValueError(f"Mapped record disappeared: {path}")
+        data = yaml.safe_load(content)
+        if not isinstance(data, dict):
+            raise ValueError(f"Mapped record is not a mapping: {path}")
+        subject = _mim_curie(path.name)
+        if subject in subjects:
+            raise ValueError(f"Duplicate escaped MIM subject: {subject}")
+        subjects.add(subject)
+        records[path] = data
+    return records
+
+
+def _producer_paths() -> tuple[Path, ...]:
+    """Local policy, parser and guarded publisher implementation inputs."""
+    paths = {
+        Path(__file__).resolve(), REPO_ROOT / "scripts/kgm_unified_mappings.py",
+        REPO_ROOT / "src/kg_microbe_utils/__init__.py",
+        REPO_ROOT / "src/kg_microbe_utils/owned_name_policy.py",
+        REPO_ROOT / "src/kg_microbe_utils/sssom_artifacts.py",
+        REPO_ROOT / "plugins/lock_manager.py",
+    }
+    for package in ("kg_microbe_write", "kg_microbe_fleet"):
+        paths.update((REPO_ROOT / "src" / package).rglob("*.py"))
+    return tuple(sorted(paths))
+
+
+def _revision(root: Path) -> str | None:
+    result = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"],
+                            capture_output=True, text=True)
+    return result.stdout.strip() if result.returncode == 0 else None
+
+
+def _digest(content: bytes | None) -> str | None:
+    return hashlib.sha256(content).hexdigest() if content is not None else None
+
+
 def _row_from_yaml(
     path: Path,
     residual: dict[str, dict],
     kgm_sources: dict[str, str],
     kgm_labels: dict[str, tuple[str, list[str]]],
     canonical_labels: dict[str, str],
+    *,
+    record: dict | None = None,
+    owners: dict[str, frozenset[str]] | None = None,
+    suppressions: list[Suppression] | None = None,
 ) -> list[dict]:
     """Returns a list of SSSOM rows for one MIM YAML.
 
@@ -617,10 +687,25 @@ def _row_from_yaml(
 
     Returns [] for records with no supported ontology_id prefix.
     """
-    try:
-        data = yaml.safe_load(path.read_text()) or {}
-    except yaml.YAMLError:
-        return []
+    # Direct callers receive the same complete-directory policy as main().
+    # main supplies its once-parsed snapshot, avoiding a second corpus read.
+    if record is None or owners is None:
+        records = _read_mapped_records(path.parent)
+        if record is None:
+            record = records[path]
+        if owners is None:
+            owners = build_owner_index({_mim_curie(p.name): d for p, d in records.items()})
+    data = record
+
+    def owned_tokens(text: str, surface: str, reference: str) -> list[AliasCandidate]:
+        return [AliasCandidate(token, surface, (reference,), OWNED_NAME_EVIDENCE)
+                for token in text.split("|") if token.strip()]
+
+    def keep_owned(candidates: list[AliasCandidate]) -> list[str]:
+        kept, events = filter_owned_aliases(_mim_curie(path.name), candidates, owners)
+        if suppressions is not None:
+            suppressions.extend(events)
+        return [candidate.text for candidate in kept]
 
     # A curator-rejected record must not appear in the canonical mapping
     # set, even though it can still live under data/ingredients/mapped/
@@ -790,16 +875,12 @@ def _row_from_yaml(
         if isinstance(s, dict) and (s.get("synonym_text") or "").strip()
     ]
     rejected_labels = {
-        (s.get("synonym_text") or "").strip().casefold()
+        token.strip().casefold()
         for s in mim_synonym_rows
         if (s.get("synonym_type") or "").strip().upper()
         in NON_PUBLISHABLE_MIM_SYNONYM_TYPES
+        for token in (s.get("synonym_text") or "").split("|")
     }
-    mim_yaml_syns = [
-        (s.get("synonym_text") or "").strip()
-        for s in mim_synonym_rows
-        if _is_publishable_mim_synonym(s)
-    ]
     # `other` carries alternate surface forms that downstream consumers can
     # adopt as synonyms. Non-exact target aliases do not name this subject
     # (#680): a KG exact alias of the parent remains a parent alias. Preserve
@@ -809,19 +890,28 @@ def _row_from_yaml(
     # object_label and the preferred_term so we don't duplicate what's in
     # the dedicated columns.
     drop = {(preferred or "").lower(), (ont_label or "").lower(), ""}
-    object_alts = (
-        [mim_stored_label, kgm_name] + kgm_syns
-        if predicate == "skos:exactMatch" else []
-    )
-    candidate_alts = object_alts + mim_yaml_syns
+    candidate_alts: list[AliasCandidate] = []
+    if predicate == "skos:exactMatch":
+        candidate_alts.extend(owned_tokens(
+            mim_stored_label, "mim.ontology_label", f"{path}#ontology_mapping.ontology_label"))
+        candidate_alts.extend(owned_tokens(
+            kgm_name, "kgmicrobe.canonical_name", f"{KGM_UNIFIED_TSV}#object_id={obj_id}"))
+        for synonym in kgm_syns:
+            candidate_alts.extend(owned_tokens(
+                synonym, "kgmicrobe.synonym", f"{KGM_UNIFIED_TSV}#object_id={obj_id}"))
+    for index, synonym in enumerate(data.get("synonyms") or []):
+        if isinstance(synonym, dict) and _is_publishable_mim_synonym(synonym):
+            candidate_alts.extend(owned_tokens(
+                synonym.get("synonym_text") or "", "mim.synonym",
+                f"{path}#synonyms[{index}]"))
     # Filter MIM RAW_TEXT entries that encode roles/properties — those are
     # not chemical synonyms.
     candidate_alts = [
         a for a in candidate_alts
-        if (a or "").strip().casefold() not in rejected_labels
-        and not _is_nonresolving_mim_synonym_text(a or "")
+        if a.text.strip().casefold() not in rejected_labels
+        and not _is_nonresolving_mim_synonym_text(a.text)
     ]
-    other = _pipe(candidate_alts, drop=drop, max_entries=MAX_OTHER_ENTRIES)
+    other = _pipe(keep_owned(candidate_alts), drop=drop, max_entries=MAX_OTHER_ENTRIES)
 
     # The CAS-RN travels in `other` so it lands in KGX as a synonym: the KG
     # node optimises for how it *reads*, while the number you actually order
@@ -838,6 +928,11 @@ def _row_from_yaml(
     # One ~15-char token cannot threaten the 128 KiB field limit the cap
     # defends against.
     cas_token = _cas_token(data)
+    # CAS is appended after the ordinary alias cap and also appears on direct
+    # and B1 registry rows. Filter that shared token before any of those paths.
+    cas_token = _pipe(keep_owned(owned_tokens(
+        cas_token, "mim.cas", f"{path}#chemical_properties.cas_rn-or-cross_references")),
+        drop=rejected_labels)
     if cas_token and predicate in SYMMETRIC_PREDICATES:
         if cas_token.lower() not in {p.strip().lower() for p in other.split("|")}:
             other = f"{other}|{cas_token}" if other else cas_token
@@ -991,7 +1086,7 @@ HEADER_YAML = f"""\
 # license: "{LICENSE}"
 # mapping_set_id: "{MAPPING_SET_ID}"
 # mapping_set_version: "{{version}}"
-# mapping_set_description: "Canonical MediaIngredientMech → ingredient-ontology mappings (CHEBI + FOODON; UBERON/ENVO when populated). One row per mapped MIM ingredient record. Per-row object_source distinguishes ontologies. Predicate is skos:exactMatch by default; narrowMatch/broadMatch/closeMatch where residual-P2.5 triage found a specificity or symmetry difference, or where mapping_quality != EXACT_MATCH. The `source` extension column records the upstream origin (MIM evidence + kg-microbe source pipeline, CHEBI only)."
+# mapping_set_description: "Canonical MediaIngredientMech → ingredient-ontology mappings (CHEBI + FOODON; UBERON/ENVO when populated). One row per mapped MIM ingredient record. Per-row object_source distinguishes ontologies. Predicate is skos:exactMatch by default; narrowMatch/broadMatch/closeMatch where residual-P2.5 triage found a specificity or symmetry difference, or where mapping_quality != EXACT_MATCH. The `source` extension column records the upstream origin (MIM evidence + kg-microbe source pipeline, CHEBI only). {POLICY_MARKER}."
 # mapping_date: "{{version}}"
 # predicate_semantics: skos
 # creator_id:
@@ -1095,13 +1190,18 @@ def _sssom_validate(path: Path) -> list[str]:
         return ["sssom CLI not on PATH; skipping validation"]
     combined = (proc.stdout or "") + "\n" + (proc.stderr or "")
     markers = ("is not well-formed", "is not a valid URI or CURIE", "must be supplied")
-    return [ln.strip() for ln in combined.splitlines() if any(m in ln for m in markers)]
+    errors = [ln.strip() for ln in combined.splitlines() if any(m in ln for m in markers)]
+    if proc.returncode:
+        errors.insert(0, f"sssom validate exited {proc.returncode}: {combined.strip()[:1000]}")
+    return errors
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--output", type=Path, default=OUT_TSV)
-    ap.add_argument("--no-validate", action="store_true", help="skip post-write sssom validate")
+    ap.add_argument("--suppressed-aliases-output", type=Path)
+    ap.add_argument("--generation-manifest-output", type=Path)
+    ap.add_argument("--no-validate", action="store_true", help="skip external sssom validation (ownership and publication guards still run)")
     ap.add_argument(
         "--no-preserve-validation",
         action="store_true",
@@ -1126,23 +1226,76 @@ def main():
     require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
 
 
-    residual = _load_residual_categorization()
-    kgm_sources = _load_kgm_source_index()
-    kgm_labels = _load_kgm_labels()
+    paths = artifact_paths(args.output, args.suppressed_aliases_output,
+                           args.generation_manifest_output)
+    args.output = paths[0]
+    before = capture_beforeimages(paths)
+    stamp_sources = ([] if args.no_preserve_validation else
+                     [checked_path(p) for p in (args.prior_stamps_from or
+                                             [args.output, MIM_PUBLISHED_SSSOM])])
+    yamls = tuple(sorted(MIM_INGREDIENTS_DIR.glob("*.yaml")))
+    producers = _producer_paths()
+    inputs = set(yamls) | set(producers) | set(stamp_sources) | {
+        RESIDUAL_JSON, KGM_UNIFIED_TSV, MIM_PUBLISHED_SSSOM,
+    }
+    snapshot = capture_beforeimages(inputs)
+    # The working copy is an allowed stamp input, never a loophole for writing
+    # the published canonical input or an ingredient/code/source path.
+    working_copy_input = args.output in stamp_sources
+    immutable = {p: b for p, b in snapshot.items() if p != args.output}
+    protected = {checked_path(p) for p in (set(yamls) | set(producers) | {
+        RESIDUAL_JSON, KGM_UNIFIED_TSV, MIM_PUBLISHED_SSSOM,
+    })}
+    if args.output in protected:
+        raise ValueError("Candidate output overlaps a protected source input")
+    if working_copy_input and snapshot[args.output] != before[args.output]:
+        raise ValueError("Working-copy stamp beforeimage changed during capture")
+    records = _read_mapped_records(MIM_INGREDIENTS_DIR, snapshot)
+    owners = build_owner_index({_mim_curie(p.name): data for p, data in records.items()})
 
-    yamls = sorted(MIM_INGREDIENTS_DIR.glob("*.yaml"))
+    def check_inputs():
+        if tuple(sorted(MIM_INGREDIENTS_DIR.glob("*.yaml"))) != yamls:
+            raise ValueError("Mapped-record path set changed during generation")
+        if _producer_paths() != producers:
+            raise ValueError("Producer path set changed during generation")
+        if capture_beforeimages(immutable) != immutable:
+            raise ValueError("Source input bytes changed during generation")
+
+    check_inputs()
+    with tempfile.TemporaryDirectory(prefix="mim-owned-name-") as temporary:
+        stage = Path(temporary)
+        frozen_paths = {}
+        for index, source in enumerate(sorted(snapshot)):
+            content = snapshot[source]
+            if content is not None:
+                frozen = stage / f"input-{index}{source.suffix}"
+                frozen.write_bytes(content)
+                frozen_paths[source] = frozen
+        residual_bytes = snapshot[checked_path(RESIDUAL_JSON)]
+        residual = ({d["source_file"]: d for d in json.loads(residual_bytes).get("decisions", [])}
+                    if residual_bytes is not None else {})
+        kgm_frozen = frozen_paths.get(checked_path(KGM_UNIFIED_TSV))
+        kgm_sources = load_kgm_source_index(kgm_frozen) if kgm_frozen else {}
+        kgm_labels = load_kgm_labels(kgm_frozen) if kgm_frozen else {}
+        if kgm_frozen is None:
+            _warn_if_kgm_missing()
+        _build_candidate(args, paths, before, stamp_sources, snapshot, frozen_paths,
+                         records, owners, residual, kgm_sources, kgm_labels,
+                         stage, check_inputs, working_copy_input)
+
+
+def _build_candidate(args, paths, before, stamp_sources, snapshot, frozen_paths,
+                     records, owners, residual, kgm_sources, kgm_labels,
+                     stage, check_inputs, working_copy_input):
+    yamls = tuple(records)
     print(f"Scanning {len(yamls)} MIM ingredient YAMLs...", file=sys.stderr)
-
     # Group target term IDs by prefix so we can dispatch the right label
     # loader (OAK sqlite for CHEBI, OLS4 REST for FOODON, etc.). The
     # residual-P2.5 override can swap CHEBI to kg-microbe's more-specific
     # one, so include both sides when collecting CHEBIs.
     needed_by_prefix: dict[str, set[str]] = {p: set() for p in SUPPORTED_OBJECT_PREFIXES}
     for p in yamls:
-        try:
-            data = yaml.safe_load(p.read_text()) or {}
-        except yaml.YAMLError:
-            continue
+        data = records[p]
         cid = ((data.get("ontology_mapping") or {}).get("ontology_id") or "").strip()
         for pref in SUPPORTED_OBJECT_PREFIXES:
             if cid.startswith(pref):
@@ -1180,10 +1333,12 @@ def main():
             print(f"  (no label loader for {pref}; falling back to MIM-stored labels)", file=sys.stderr)
 
     rows: list[dict] = []
+    suppressions: list[Suppression] = []
     skipped_unsupported = 0
     for p in yamls:
         record_rows = _row_from_yaml(
-            p, residual, kgm_sources, kgm_labels, canonical_labels)
+            p, residual, kgm_sources, kgm_labels, canonical_labels,
+            record=records[p], owners=owners, suppressions=suppressions)
         if not record_rows:
             skipped_unsupported += 1
             continue
@@ -1214,14 +1369,11 @@ def main():
     #      doesn't clobber audit history.
     # Pass ``--prior-stamps-from PATH`` (repeatable) to override.
     if not args.no_preserve_validation:
-        if args.prior_stamps_from:
-            stamp_sources = list(args.prior_stamps_from)
-        else:
-            stamp_sources = [args.output, MIM_PUBLISHED_SSSOM]
         prior_stamps: dict[tuple[str, str, str], str] = {}
         per_source: list[tuple[Path, int]] = []
         for src in stamp_sources:
-            loaded = _load_existing_validation_method(src)
+            frozen = frozen_paths.get(src)
+            loaded = _load_existing_validation_method(frozen) if frozen else {}
             per_source.append((src, len(loaded)))
             prior_stamps.update(loaded)  # later source overrides earlier
         # Fall back to (subject, object) when the predicate has changed since
@@ -1267,9 +1419,38 @@ def main():
                     file=sys.stderr,
                 )
 
-    _write_sssom(final, args.output)
-
-    print(f"Wrote {len(final)} rows to {args.output}", file=sys.stderr)
+    staged = stage / "candidate.sssom.tsv"
+    _write_sssom(final, staged)
+    proposed = staged.read_bytes()
+    if not args.no_validate:
+        errors = _sssom_validate(staged)
+        if errors:
+            raise ValueError("SSSOM validation FAILED: " + "; ".join(errors[:20]))
+    if staged.read_bytes() != proposed:
+        raise ValueError("Staged SSSOM changed during validation")
+    sidecar = render_suppressed_aliases(suppressions)
+    check_inputs()
+    result = publish_candidate_artifacts(
+        args.output, proposed, sidecar,
+        {
+            "scope": "diagnostic candidate; not canonical promotion or scientific approval",
+            "external_sssom_validation": "skipped_explicitly" if args.no_validate else "passed",
+            "prior_stamp_sources": [str(p) for p in stamp_sources],
+            "source_inputs": [{"path": str(p), "sha256": _digest(content)}
+                              for p, content in sorted(snapshot.items())],
+            "mapped_record_paths": [str(p) for p in yamls],
+            "source_revisions": {"claw": _revision(REPO_ROOT), "mim": _revision(MIM_ROOT),
+                                 "kg_microbe": _revision(KGM_ROOT)},
+            "canonical_label_resolution": dict(sorted(canonical_labels.items())),
+            "policy_evidence": list(OWNED_NAME_EVIDENCE),
+            "emitted_rows": len(final),
+        }, check_inputs, input_paths=snapshot,
+        expected_before=before, claw_root=REPO_ROOT,
+        working_copy_stamp_input=working_copy_input,
+        sidecar_output=paths[1], manifest_output=paths[2],
+    )
+    print(f"Published {len(final)} diagnostic rows to {args.output} ({result['status']})",
+          file=sys.stderr)
     print(
         f"  (skipped {skipped_unsupported} MIM records without a supported ontology_id "
         f"prefix: {', '.join(SUPPORTED_OBJECT_PREFIXES)})",
@@ -1296,15 +1477,6 @@ def main():
     for pref, n in sorted(pref_counts.items(), key=lambda kv: -kv[1]):
         print(f"  {pref:10s} {n}", file=sys.stderr)
 
-    if not args.no_validate:
-        print(f"\nValidating {args.output.name}...", file=sys.stderr)
-        errors = _sssom_validate(args.output)
-        if errors:
-            print("SSSOM validation FAILED:", file=sys.stderr)
-            for e in errors[:20]:
-                print(f"  - {e[:200]}", file=sys.stderr)
-            sys.exit(2)
-        print("  OK", file=sys.stderr)
 
 
 if __name__ == "__main__":
