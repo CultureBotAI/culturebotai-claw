@@ -62,6 +62,9 @@ targets:
     reason: Stale-agent assignment loop has not been implemented or admitted to governance.
 
 deterministic_targets:
+  qc-evidence:
+    artifact: evidence_validation_workflow
+    reason: Offline quote-against-source validation consumes no model tokens and must remain a CI gate.
   merge-queue-admission:
     artifact: merge_queue_admission_workflow
     reason: Deterministic queue admission and bounded retries consume no model tokens.

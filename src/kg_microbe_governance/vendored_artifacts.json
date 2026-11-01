@@ -263,6 +263,26 @@
       "consumers": "all",
       "sha256": "7be08e684dcd235ddeae8f3c6a5d45b0ee74a60d1c1818cc81467e38901e5d56",
       "mode": "0644"
+    },
+    {
+      "id": "evidence_validator_runner",
+      "source": "src/kg_microbe_governance/artifacts/scripts/run_shared_evidence_validator.py",
+      "target": "scripts/run_shared_evidence_validator.py",
+      "consumers": [
+        "mediaingredientmech"
+      ],
+      "sha256": "2cac7787736a6ab2a97928711f4174748bdd99d53b78fec6cf08dce01e9e7654",
+      "mode": "0644"
+    },
+    {
+      "id": "evidence_validation_workflow",
+      "source": "src/kg_microbe_governance/artifacts/workflows/qc-evidence.yaml",
+      "target": ".github/workflows/qc-evidence.yaml",
+      "consumers": [
+        "mediaingredientmech"
+      ],
+      "sha256": "288ef1795582105763952c4104d1455c1fef273a65528949f1e558d39c7306f3",
+      "mode": "0644"
     }
   ]
 }
