@@ -19,7 +19,7 @@ ENVO when populated) becomes one SSSOM row with:
   object_source     per-row ontology OWL URI (CHEBI/FOODON/... differ per row)
   mapping_justification  semapv:ManualMappingCuration | semapv:LexicalMatching
   source            MIM:<evidence>|MIM:curator=...|kgm:<sources>  (extension)
-  mapping_date      YAML modification date (ISO, UTC)
+  mapping_date      latest valid curation-history calendar date (ISO)
   confidence        0.99 EXACT_MATCH / 0.9 CONSIDER_SPECIFIC / 0.8 SYMMETRIC
   comment           short human-readable rationale
   other             pipe-separated alternate labels (kg-microbe side, etc.),
@@ -50,7 +50,7 @@ import os
 import re
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import date
 from pathlib import Path
 
 import yaml
@@ -514,9 +514,9 @@ def _last_curator(history: list[dict]) -> str:
 
 
 def _mapping_date(path: Path, history: list[dict]) -> str:
-    """The latest curation_history date, as `YYYY-MM-DD`; empty when unknown.
+    """Latest valid ASCII curation-history date; empty for native Rule F.
 
-    Takes the maximum over parseable timestamps rather than `history[-1]`. The
+    Takes the calendar maximum over valid date prefixes, not `history[-1]`. The
     two coincide only while history stays append-ordered, and the published date
     should not depend on that holding.
 
@@ -527,20 +527,26 @@ def _mapping_date(path: Path, history: list[dict]) -> str:
     was in place it silently mis-stamped three rows, and only a backward-moving
     date in a rebuild diff exposed them (MediaIngredientMech#542).
 
-    An empty date is honest and visible. A record without a parseable timestamp
-    is a curation defect -- `CLAUDE.md` requires a `curation_history` event on
-    every material change -- and belongs in the QC report, not papered over here.
+    Invalid history entries are reported and ignored; they cannot outrank a
+    valid entry through Unicode or lexical ordering. A record with none remains
+    dateless for MIM's Rule F curator report. The writer can emit that diagnostic
+    row if other rows supply a header date; an entirely dateless set is refused.
     """
-    dates = [
-        m.group(1)
-        for event in history or []
-        if (m := re.match(r"^(\d{4}-\d{2}-\d{2})", str(event.get("timestamp") or "")))
-    ]
+    dates = []
+    for event in history or []:
+        value = str(event.get("timestamp") or "")
+        match = re.match(r"^([0-9]{4}-[0-9]{2}-[0-9]{2})(?:[Tt ]|$)", value)
+        parsed = _parse_mapping_date(match.group(1)) if match else None
+        if parsed is not None:
+            dates.append(parsed)
+        else:
+            print(f"  WARNING: ignoring invalid curation_history date in {path.name}: {value!r}")
     if dates:
-        return max(dates)
+        return max(dates).isoformat()
     print(
-        f"  WARNING: no parseable curation_history timestamp in {path.name}; "
-        "emitting an empty mapping_date (#542)"
+        f"  WARNING: no valid curation_history date in {path.name}; "
+        "keeping an empty mapping_date for native Rule F review "
+        "(the writer refuses a set with no dated rows; #686)"
     )
     return ""
 
@@ -769,9 +775,8 @@ def _row_from_yaml(
 
     # Prefer the ontology's canonical rdfs:label for object_label (SSSOM
     # best practice). Fall back to MIM's stored ontology_label if the
-    # label loader didn't resolve. When we replace, keep MIM's stored
-    # label in `other` so the surface form is preserved for downstream
-    # tools.
+    # label loader didn't resolve. The old label names the OBJECT, so it
+    # can become a subject synonym only when the final row asserts identity.
     canonical_label = canonical_labels.get(obj_id, "")
     mim_stored_label = ont_label
     if canonical_label:
@@ -796,13 +801,19 @@ def _row_from_yaml(
         if _is_publishable_mim_synonym(s)
     ]
     # `other` carries alternate surface forms that downstream consumers can
-    # adopt as synonyms. Order: MIM's original ontology_label (preserved
-    # when we replaced it with the canonical) → kg-microbe canonical →
-    # kg-microbe synonyms → MIM's own EXACT_SYNONYMs. Drop the chosen
+    # adopt as synonyms. Non-exact target aliases do not name this subject
+    # (#680): a KG exact alias of the parent remains a parent alias. Preserve
+    # subject-owned YAML synonyms on every predicate. For exactMatch, retain
+    # the existing order: stored target label → KG name → KG synonyms → YAML.
+    # Drop the chosen
     # object_label and the preferred_term so we don't duplicate what's in
     # the dedicated columns.
     drop = {(preferred or "").lower(), (ont_label or "").lower(), ""}
-    candidate_alts = [mim_stored_label] + [kgm_name] + kgm_syns + mim_yaml_syns
+    object_alts = (
+        [mim_stored_label, kgm_name] + kgm_syns
+        if predicate == "skos:exactMatch" else []
+    )
+    candidate_alts = object_alts + mim_yaml_syns
     # Filter MIM RAW_TEXT entries that encode roles/properties — those are
     # not chemical synonyms.
     candidate_alts = [
@@ -898,20 +909,34 @@ def _row_from_yaml(
     # `identifier:` is `kgmicrobe.{ingredient,compound}:<slug>`. For the
     # 162 narrowMatch subjects whose `identifier:` is `cas:` / `mesh:` /
     # `NCIT:` / a same-as-parent CHEBI, we synthesize the missing
-    # registry row here. Namespace decision mirrors
-    # classify_ingredient_type: chemistry registries -> compound,
-    # complex/biological/anatomical -> ingredient. Slug is the
-    # lowercased subject slug — matches Rule B1's
+    # registry row here. A curated local identity determines its namespace,
+    # including when its slug differs from the subject or uses mixed case
+    # (#684, #685). Only nonlocal primaries use the parent-prefix fallback:
+    # chemistry registries -> compound, complex/biological -> ingredient.
+    # Slug is the lowercased subject slug — matches Rule B1's
     # `subject_id[4:].lower()` regex anchor exactly.
     if parent_row["predicate_id"] in ("skos:narrowMatch", "skos:broadMatch"):
         slug_lc = _registry_slug_for_curie(parent_row["subject_id"])
-        kgm_namespace = _kgmicrobe_namespace_for(obj_id)
+        kgm_namespace = next(
+            (prefix for prefix in ("kgmicrobe.ingredient:", "kgmicrobe.compound:")
+             if primary_id.startswith(prefix)),
+            None,
+        )
+        if kgm_namespace is None:
+            kgm_namespace = _kgmicrobe_namespace_for(obj_id)
         kgm_curie = f"{kgm_namespace}{slug_lc}"
         # Skip if the dual-emission block (or some prior row in `rows`)
-        # already produced this exact registry CURIE — avoid duplicates
-        # that would trip Rule B2.
+        # already satisfies B1 in either namespace. The curated identity
+        # takes precedence over the parent-prefix fallback; adding the other
+        # namespace would assert a competing identity and fail B5 (#679).
+        # Keep this exact: a mixed-case primary slug still needs a lowercase
+        # subject handle for B1, emitted in the same namespace as that primary.
+        registry_ids = {
+            f"kgmicrobe.ingredient:{slug_lc}", f"kgmicrobe.compound:{slug_lc}",
+        }
         already_emitted = any(
-            r["object_id"] == kgm_curie
+            r["subject_id"] == parent_row["subject_id"]
+            and r["object_id"] in registry_ids
             and r["predicate_id"] == "skos:exactMatch"
             for r in rows
         )
@@ -998,7 +1023,49 @@ COLUMNS = [
 ]
 
 
-def _write_sssom(rows: list[dict], out_path: Path, version: str) -> None:
+def _parse_mapping_date(value: object) -> date | None:
+    """Parse a real ASCII ISO date, without normalizing invalid provenance."""
+    if not isinstance(value, str) or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
+        return None
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+def _mapping_set_version(rows: list[dict]) -> str:
+    """Bind header dates to emitted curation dates (MIM Rule G, #681).
+
+    Preserve empty row dates for MIM's documented Rule F review path. Derive
+    the header only from valid dated rows, never the clock. If no header can
+    be derived, or nonempty dates are malformed, report every affected subject
+    before opening the output (#686).
+    """
+    if not rows:
+        raise ValueError("Cannot derive mapping_date from an empty mapping set")
+    dates = []
+    dateless = set()
+    invalid = set()
+    for row in rows:
+        value = row.get("mapping_date", "")
+        subject = str(row.get("subject_id", "<missing subject_id>"))
+        if value == "":
+            dateless.add(subject)
+        elif (parsed := _parse_mapping_date(value)) is not None:
+            dates.append(parsed)
+        else:
+            invalid.add(f"{subject}: {value!r}")
+    if invalid:
+        detail = "; ".join(sorted(invalid))
+        raise ValueError(f"Invalid mapping_date values (all offenders): {detail}")
+    if not dates:
+        detail = ", ".join(sorted(dateless))
+        raise ValueError(f"Cannot derive mapping_date: all subjects are dateless: {detail}")
+    return max(dates).isoformat()
+
+
+def _write_sssom(rows: list[dict], out_path: Path) -> None:
+    version = _mapping_set_version(rows)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     header = HEADER_YAML.format(version=version)
     with out_path.open("w") as f:
@@ -1200,8 +1267,7 @@ def main():
                     file=sys.stderr,
                 )
 
-    version = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
-    _write_sssom(final, args.output, version=version)
+    _write_sssom(final, args.output)
 
     print(f"Wrote {len(final)} rows to {args.output}", file=sys.stderr)
     print(
