@@ -21,6 +21,7 @@ Usage:
 import argparse
 import csv
 import os
+import re
 import sys
 import unicodedata
 from pathlib import Path
@@ -54,6 +55,7 @@ STRUCTURED_MIM_SYNONYM_MARKERS = (
     'synonym source:',
 )
 REJECTIONS_PATH = Path('mappings/unified_mapping_rejections.tsv')
+REJECTION_ID = re.compile(r'[A-Za-z][A-Za-z0-9.]*:[A-Za-z0-9][A-Za-z0-9._~-]*\Z')
 
 
 def load_mapping_rejections(
@@ -68,7 +70,9 @@ def load_mapping_rejections(
     The ledger preserves the rejected source ID and its curation reason outside
     the published identity columns. Older MIM checkouts may lack the ledger.
     A present but malformed or stale ledger must fail rather than silently
-    republish the rejected ID.
+    republish the rejected ID. See docs/guides/UNIFIED_MAPPING_REJECTIONS.md:
+    nonempty mim_id rows retain identity-wide scope; explicitly empty mim_id
+    rows hold only the exact source-label/ID pair without asserting a replacement.
     """
     path = mim_root / REJECTIONS_PATH
     if not path.exists():
@@ -80,18 +84,22 @@ def load_mapping_rejections(
         if reader.fieldnames != columns:
             raise ValueError(f'{path}: expected columns {columns}')
         for line, row in enumerate(reader, 2):
-            if None in row or any(not (row.get(c) or '').strip() for c in columns):
+            if (None in row or any(row.get(c) is None for c in columns)
+                    or any(not row[c].strip() for c in columns if c != 'mim_id')):
                 raise ValueError(f'{path}:{line}: incomplete rejection')
             row = {k: v.strip() for k, v in row.items()}
-            key = (row['mim_id'], row['rejected_id'])
-            if key in rejections or ':' not in row['rejected_id']:
+            source_hold = not row['mim_id']
+            key = (('source_label', _label_key(row['ingredient_name']), row['rejected_id'])
+                   if source_hold else (row['mim_id'], row['rejected_id']))
+            if key in rejections or not REJECTION_ID.fullmatch(row['rejected_id']):
                 raise ValueError(f'{path}:{line}: duplicate or invalid rejection')
             mim = _anchor_record(row['ingredient_name'], name_index, label_index, live)
-            if (not mim or mim['mim_id'] != row['mim_id']
-                    or mim['mapping_status'] not in ('MAPPED', 'REJECTED')
-                    or row['rejected_id'] == row['mim_id']):
-                raise ValueError(f'{path}:{line}: rejection disagrees with MIM identity')
-            if row['rejected_id'] in (mim['chebi_id'], mim['kg_microbe_node_id']):
+            if not source_hold:
+                if (not mim or mim['mim_id'] != row['mim_id']
+                        or mim['mapping_status'] not in ('MAPPED', 'REJECTED')
+                        or row['rejected_id'] == row['mim_id']):
+                    raise ValueError(f'{path}:{line}: rejection disagrees with MIM identity')
+            if mim and row['rejected_id'] in (mim['mim_id'], mim['chebi_id'], mim['kg_microbe_node_id']):
                 raise ValueError(f'{path}:{line}: MIM still publishes the rejected ID')
             rejections[key] = row['mim_id']
     return rejections
@@ -902,6 +910,11 @@ def build_unified_rows(
 
     for name, info in occurrences.items():
         term_id = info['term_id']
+        if ('source_label', _label_key(name), term_id) in (rejections or {}):
+            # Hold this exact pair before source-ID lookup can lend a different
+            # record's identity/metadata, or raw publication can reassert the ID.
+            # Independent name ownership still follows the ordinary resolver.
+            term_id = ''
         named_mim = name_index.get(_normalize(name))
         anchor = _anchor_record(name, name_index, label_index, live)
         if term_id in (named_mim or {}).get('_retired_source_ids', ()) or term_id in (
