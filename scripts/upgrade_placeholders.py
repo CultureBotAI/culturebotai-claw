@@ -29,6 +29,7 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_utils.ingredient_identity_rejections import rejection_reason  # noqa: E402
 from kg_microbe_fleet import require_mech_roots  # noqa: E402
 
 MIM_ROOT = Path(os.environ.get(
@@ -117,6 +118,13 @@ def main() -> int:
             continue
 
         new_id = result["id"]
+        reason = next((why for cas in ((record.get("chemical_properties") or {}).get("cas_rn"), prev)
+                       if (why := rejection_reason(ontology_id=new_id, name=name, cas=cas))), None)
+        if reason:
+            counts["REJECTED"] = counts.get("REJECTED", 0) + 1
+            rows.append((rel, prev, name, "REJECTED", new_id, reason))
+            print(f"[REJECTED] {name} → {new_id}: {reason}")
+            continue
         new_label = result["label"]
         match = result["match"]
         verdict = "HIGH"
@@ -124,7 +132,7 @@ def main() -> int:
 
         if args.apply:
             res = upgrade_yaml(path, new_id, new_label, match)
-            action = "UPGRADED" if res == "upgraded" else "NO_CHANGE"
+            action = "UPGRADED" if res == "upgraded" else ("NO_CHANGE" if res == "no-change" else res)
             if res == "upgraded":
                 upgraded += 1
                 counts["UPGRADED"] = counts.get("UPGRADED", 0) + 1

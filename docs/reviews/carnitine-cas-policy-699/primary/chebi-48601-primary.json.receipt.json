@@ -1,0 +1,11 @@
+{
+  "started_at": "2026-11-01T05:29:56.388474+00:00",
+  "finished_at": "2026-11-01T05:29:57.076606+00:00",
+  "url": "https://www.ebi.ac.uk/chebi/backend/api/public/compound/48601/",
+  "final_url": "https://www.ebi.ac.uk/chebi/backend/api/public/compound/48601/",
+  "status": 200,
+  "bytes": 2972,
+  "sha256": "b2ccf5a651f0b3aa875440c5caee4c03eeb78e02e82b344a3278b6b4f935d6cd",
+  "source_receipt_sha256": "705c0b02d2ac1f5798b192d4914fd9d8bccc4b73f771b5e4a1d414772ab517d3",
+  "capture_note": "Projection of retained original receipt; transport headers omitted."
+}
