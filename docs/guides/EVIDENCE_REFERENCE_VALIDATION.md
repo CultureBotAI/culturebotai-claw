@@ -97,12 +97,11 @@ The runner and CI workflow are canonical vendored artifacts. The workflow
 resolves the Claw revision from `scripts/.vendored_canon_ref`; it must not carry
 an independent hard-coded Claw revision.
 
-The bounded release contract is under implementation and review; it is not yet
-deployed. It fixes the fleet baseline at
+The bounded release contract fixes the fleet baseline at
 `a5d562962c75a2ad9efd8160b548df5944315422`. Only MIM may advance to the exact Claw
 commit that introduces the immutable
 `src/kg_microbe_governance/releases/evidence-reference-validation-mim-v1.json`
-declaration; the other 13 Mechs retain the baseline pin. A separate release
+declaration; every other Mech retains the baseline pin. A separate release
 audit verifies trusted history and permits exactly the two declared additions,
 the evidence runner and workflow, with their recorded bytes and consumer scope.
 The existing coordinated fleet-audit contract remains unchanged. Deployment

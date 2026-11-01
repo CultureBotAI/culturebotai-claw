@@ -4,7 +4,7 @@
   "baseline_ref": "a5d562962c75a2ad9efd8160b548df5944315422",
   "canary": "mediaingredientmech",
   "capability": "evidence_reference_validation",
-  "candidate_manifest_sha256": "fbc9d5fb81c508792cf77d7a2ed90673dd66e25493cc3f224562ef6a100f38d2",
+  "candidate_manifest_sha256": "a7487aaf35f73c071ed3296ec29b7a2863f2a78ab1efe6f6f8d5ccfc50f5dd46",
   "allowed_additions": [
     {
       "id": "evidence_validator_runner",
@@ -13,7 +13,7 @@
       "consumers": [
         "mediaingredientmech"
       ],
-      "sha256": "2cac7787736a6ab2a97928711f4174748bdd99d53b78fec6cf08dce01e9e7654",
+      "sha256": "a2b2674a6dbea52a6ae256c9e445ff06118bc7565d9054a1587cbf2ddb3cba38",
       "mode": "0644"
     },
     {

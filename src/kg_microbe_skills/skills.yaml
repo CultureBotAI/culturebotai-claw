@@ -55,8 +55,8 @@ skills:
     scope: domain
     reason: Proposes PMID evidence for MIM ingredient claims.
   evidence-reference-validation:
-    scope: domain
-    reason: Anti-hallucination gate over MIM literature evidence.
+    scope: fleet
+    reason: Validates quoted evidence for manifest-enabled Mechs using explicit native evidence profiles and retained sources.
   feba-integration:
     scope: domain
     reason: FEBA functional-enrichment import into MIM.

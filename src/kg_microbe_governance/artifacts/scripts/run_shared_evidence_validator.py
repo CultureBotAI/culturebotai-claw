@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import stat
 import subprocess
 import sys
 import tempfile
@@ -21,23 +22,105 @@ from pathlib import Path
 CANONICAL_REPOSITORY = "CultureBotAI/culturebotai-claw"
 PIN_PATH = Path("scripts/.vendored_canon_ref")
 SHA = re.compile(rb"[0-9a-f]{40}\n?")
+IMPORT_SUFFIXES = {".py", ".pyw", ".pyc", ".pyo", ".so", ".pyd"}
+MAX_IMPORT_FILES = 10000
+MAX_IMPORT_FILE_BYTES = 16 * 1024 * 1024
+MAX_IMPORT_BYTES = 128 * 1024 * 1024
 
 
 class RunnerError(RuntimeError):
     """The pinned active-checkout boundary could not be established."""
 
 
-def _git(root: Path, *arguments: str) -> str:
+def _git_bytes(root: Path, *arguments: str, input_data: bytes | None = None) -> bytes:
     environment = {key: value for key, value in os.environ.items()
                    if not key.startswith("GIT_")}
+    environment.update(GIT_NO_REPLACE_OBJECTS="1", GIT_NO_LAZY_FETCH="1")
     result = subprocess.run(
         ["git", "--no-optional-locks", "-c", "core.fsmonitor=false", "-C", str(root), *arguments],
-        capture_output=True, text=True, check=False, timeout=30, env=environment,
+        capture_output=True, check=False, timeout=30, env=environment, input=input_data,
     )
     if result.returncode:
         # A remote URL or Git diagnostic may contain credentials; do not echo it.
         raise RunnerError("Git could not verify the requested worktree")
-    return result.stdout.strip()
+    return result.stdout
+
+
+def _git(root: Path, *arguments: str) -> str:
+    return _git_bytes(root, *arguments).decode("utf-8").strip()
+
+
+def _verify_tracked_imports(claw: Path) -> set[str]:
+    """Compare source/resources to HEAD without trusting index status (#694).
+
+    One tree read and one bounded batch read cover the import roots, including
+    top-level Python packages and modules. No flags or user files are changed.
+    """
+    entries: list[tuple[str, str, str, str, str]] = []
+    for row in _git_bytes(claw, "ls-tree", "-rzl", "--full-tree", "HEAD").split(b"\0"):
+        if not row:
+            continue
+        tree_metadata, path_bytes = row.split(b"\t", 1)
+        mode, kind, oid, raw_size = tree_metadata.decode("ascii").split()
+        relative = path_bytes.decode("utf-8")
+        entries.append((relative, mode, kind, oid, raw_size))
+    import_roots = {"src", "plugins"} | {
+        path.split("/")[0] for path, *_ in entries
+        if path.count("/") == 1 and path.endswith("/__init__.py")
+    }
+    selected: list[tuple[str, str, str, int]] = []
+    for relative, mode, kind, oid, size_text in entries:
+        path = Path(relative)
+        if path.parts[0] not in import_roots and not (len(path.parts) == 1 and path.suffix in IMPORT_SUFFIXES):
+            continue
+        if kind != "blob" or mode not in {"100644", "100755"}:
+            raise RunnerError("Pinned Claw import paths must be regular file blobs")
+        size = int(size_text)
+        if size < 0 or size > MAX_IMPORT_FILE_BYTES:
+            raise RunnerError("Pinned Claw import file exceeds the bounded verification limit")
+        selected.append((relative, mode, oid, size))
+    required = {
+        "src/kg_microbe_fleet/__init__.py", "src/kg_microbe_fleet/fleet.yaml",
+        "src/kg_microbe_evidence/__init__.py", "src/kg_microbe_evidence/__main__.py",
+        "plugins/__init__.py", "plugins/repository_settings.py",
+    }
+    if not required <= {path for path, *_ in selected}:
+        raise RunnerError("Pinned Claw lacks the required tracked validator source/resources")
+    if len(selected) > MAX_IMPORT_FILES or sum(size for *_, size in selected) > MAX_IMPORT_BYTES:
+        raise RunnerError("Pinned Claw imports exceed the bounded verification limit")
+
+    objects = {oid: size for _, _, oid, size in selected}
+    batch = _git_bytes(claw, "cat-file", "--batch", input_data="".join(oid + "\n" for oid in objects).encode("ascii"))
+    payloads: dict[str, bytes] = {}
+    offset = 0
+    for oid, size in objects.items():
+        newline = batch.find(b"\n", offset)
+        if newline < 0 or batch[offset:newline] != f"{oid} blob {size}".encode("ascii"):
+            raise RunnerError("Git did not return the expected pinned blob batch")
+        start, end = newline + 1, newline + 1 + size
+        if batch[end:end + 1] != b"\n":
+            raise RunnerError("Git returned a truncated pinned blob")
+        payloads[oid] = batch[start:end]
+        offset = end + 1
+    if offset != len(batch):
+        raise RunnerError("Git returned unexpected data after the pinned blob batch")
+
+    for relative, mode, oid, size in selected:
+        path = claw
+        parts = Path(relative).parts
+        for index, part in enumerate(parts):
+            path = path / part
+            file_info = path.lstat()
+            regular = stat.S_ISREG(file_info.st_mode) if index == len(parts) - 1 else stat.S_ISDIR(file_info.st_mode)
+            if not regular:
+                raise RunnerError("Pinned Claw import path is a symlink or nonregular file")
+        if bool(file_info.st_mode & stat.S_IXUSR) != (mode == "100755"):
+            raise RunnerError("Pinned Claw import mode differs from HEAD")
+        with path.open("rb") as stream:
+            current = stream.read(size + 1)
+        if current != payloads[oid]:
+            raise RunnerError("Pinned Claw source or resource differs from HEAD")
+    return import_roots
 
 
 def _identity(url: str) -> str:
@@ -84,17 +167,18 @@ def pinned_claw(root: Path, environment: Mapping[str, str]) -> Path:
         raise RunnerError("CLAW_ROOT HEAD does not match scripts/.vendored_canon_ref")
     if _git(claw, "status", "--porcelain", "--untracked-files=no"):
         raise RunnerError("CLAW_ROOT has tracked changes; use clean pinned validator code")
+    tracked_roots = _verify_tracked_imports(claw)
     # Omit --exclude-standard deliberately: ignored Python modules can shadow
     # pinned imports just as untracked ones can. Ordinary __pycache__ files are
     # harmless only because run() redirects every bytecode read to a fresh,
     # private empty directory and disables writes before importing Claw.
-    import_roots = ("src", "plugins", ":(top,glob)*", ":(top,glob)*/__init__.*")
+    import_roots = (*sorted(tracked_roots), ":(top,glob)*", ":(top,glob)*/__init__.*")
     for relative in _git(claw, "ls-files", "--others", "-z", "--", *import_roots).split("\0"):
         if not relative:
             continue
         path = claw / relative
         cached = path.parent.name == "__pycache__" and path.suffix == ".pyc"
-        if path.is_symlink() or (path.suffix in {".py", ".pyw", ".pyc", ".pyo", ".so", ".pyd"} and not cached):
+        if path.is_symlink() or (path.suffix in IMPORT_SUFFIXES and not cached):
             raise RunnerError("CLAW_ROOT has untracked or ignored importable code")
     return claw
 

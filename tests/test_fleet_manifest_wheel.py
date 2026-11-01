@@ -119,6 +119,10 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path, review)
             REPOSITORY_ROOT / "src/kg_microbe_merge_queue/policy.json"
         ).read_bytes()
         assert "kg_microbe_governance/vendored_artifacts.json" in names
+        assert "kg_microbe_evidence/__init__.py" in names
+        assert "kg_microbe_evidence/__main__.py" in names
+        assert "kg_microbe_governance/release_audit.py" in names
+        assert "kg_microbe_governance/releases/evidence-reference-validation-mim-v1.json" in names
         for artifact in governance_document["artifacts"]:
             assert artifact["source"].removeprefix("src/") in names
         assert "kg_microbe_config/openclaw_config.yaml" in names
@@ -141,6 +145,7 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path, review)
         )
         entry_points = wheel.read(entry_points_path).decode("utf-8")
         assert "kg-microbe-fleet = kg_microbe_fleet.__main__:main" in entry_points
+        assert "kg-microbe-evidence = kg_microbe_evidence.__main__:main" in entry_points
         assert "kg-microbe-embeddings = kg_microbe_embeddings.__main__:main" in entry_points
         assert "kg-microbe-merge-queue = kg_microbe_merge_queue.__main__:main" in entry_points
         assert "kg-microbe-governance = kg_microbe_governance.__main__:main" in entry_points
@@ -283,7 +288,13 @@ assert review_entry.load()(["validate", sys.argv[3]]) == 0
 assert review_entry.load()(["render", "--content", sys.argv[3]]) == 0
 assert default_config_path().is_relative_to(unpacked)
 governance = load_governance_manifest(fleet_manifest=manifest)
-assert len(governance.artifacts) == 24
+assert len(governance.artifacts) == 26
+from kg_microbe_evidence import EvidenceConfig, EvidenceValidator
+from kg_microbe_governance.release_audit import parse_release
+assert Path(sys.modules["kg_microbe_evidence"].__file__).resolve().is_relative_to(unpacked)
+assert Path(sys.modules["kg_microbe_governance.release_audit"].__file__).resolve().is_relative_to(unpacked)
+assert EvidenceValidator(unpacked, EvidenceConfig("references_cache")).check_item({"pmid": "1"}).verdict == "NO_QUOTE"
+assert parse_release((unpacked / "kg_microbe_governance/releases/evidence-reference-validation-mim-v1.json").read_bytes())["canary"] == "mediaingredientmech"
 assert load_pin_contract()["uv_version"]
 assert governance_main(["list", "--repository", "proteintraitsmech", "--json"]) == 0
 history_schema = Path(_default_schema_path()).resolve()

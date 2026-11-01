@@ -28,6 +28,7 @@ and verify its origin; do not use a guessed sibling checkout.
 
 ```bash
 uv run openclaw-cli config validate
+uv run python -m kg_microbe_fleet list --capability evidence_reference_validation --format tsv
 uv run kg-microbe-evidence --mech mediaingredientmech --strict
 ```
 

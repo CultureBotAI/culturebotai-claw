@@ -241,3 +241,50 @@ def test_preloaded_shared_module_cannot_substitute_for_pinned_source(repositorie
     )
     assert result.returncode == 2 and "Preloaded Claw modules" in result.stderr
     assert not result.stdout
+
+
+@pytest.mark.parametrize("flag", ["skip-worktree", "assume-unchanged"])
+@pytest.mark.parametrize("relative", ["src/kg_microbe_evidence/__main__.py", "src/kg_microbe_fleet/fleet.yaml"])
+def test_index_flags_cannot_hide_source_or_resource_drift(repositories, flag, relative):
+    """#694: status is clean but imported bytes must still equal Git HEAD."""
+    claw, mech, _ = repositories
+    baseline = invoke(claw, mech, "--strict", env={"EVIDENCE_FAKE_EXIT": "2"})
+    assert baseline.returncode == 2 and '"argv"' in baseline.stdout
+    git(claw, "update-index", "--" + flag, relative)
+    target = claw / relative
+    if relative.endswith(".py"):
+        target.write_text("def main(argv):\n    print('UNPINNED HIDDEN SOURCE RAN')\n    return 0\n")
+    else:
+        target.write_text(target.read_text() + "\n# hidden resource drift\n")
+    changed = target.read_bytes()
+    flags = git(claw, "ls-files", "-v", "--", relative)
+    assert git(claw, "status", "--porcelain", "--untracked-files=no") == ""
+    result = invoke(claw, mech, "--strict", env={"EVIDENCE_FAKE_EXIT": "2"})
+    assert result.returncode == 2 and "source or resource differs from HEAD" in result.stderr
+    assert not result.stdout
+    assert target.read_bytes() == changed
+    assert git(claw, "ls-files", "-v", "--", relative) == flags
+
+
+@pytest.mark.parametrize("replacement", ["symlink", "directory", "mode"])
+def test_hidden_import_path_must_be_regular_and_keep_committed_mode(repositories, tmp_path, replacement):
+    claw, mech, _ = repositories
+    relative = "src/kg_microbe_evidence/__main__.py"
+    target = claw / relative
+    original = target.read_bytes()
+    git(claw, "update-index", "--skip-worktree", relative)
+    if replacement == "symlink":
+        outside = tmp_path / "outside.py"
+        outside.write_bytes(original)
+        target.unlink()
+        target.symlink_to(outside)
+    elif replacement == "directory":
+        target.unlink()
+        target.mkdir()
+    else:
+        git(claw, "config", "core.fileMode", "false")
+        target.chmod(0o755)
+    assert git(claw, "status", "--porcelain", "--untracked-files=no") == ""
+    result = invoke(claw, mech)
+    assert result.returncode == 2
+    assert "Pinned Claw import" in result.stderr and not result.stdout
