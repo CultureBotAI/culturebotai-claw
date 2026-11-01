@@ -1,0 +1,37 @@
+{
+  "frozen": "/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/step5-evidence-test-09mld1ut/packaging/inputs.json",
+  "sha256": "0ffcee0f53ccdeb53e3e736e301a311d5ec758450f5f31de5be562060ad701db"
+}
+{
+  "status": "PASS",
+  "archive_members": 12,
+  "original_identities": 7,
+  "tracked_checked": false,
+  "scientific_approval_added": false
+}
+{
+  "status": "PASS",
+  "archive_members": 12,
+  "original_identities": 7,
+  "tracked_checked": true,
+  "scientific_approval_added": false
+}
+{
+  "status": "PASS",
+  "archive_members": 12,
+  "original_identities": 7,
+  "tracked_checked": true,
+  "scientific_approval_added": false
+}
+{
+  "status": "PASS",
+  "archive_members": 12,
+  "original_identities": 7,
+  "tracked_checked": true,
+  "scientific_approval_added": false
+}
+Traceback (most recent call last):
+  File "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v6.py", line 161, in <module>
+    else:raise AssertionError('author historical check did not refuse missing object')
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: author historical check did not refuse missing object

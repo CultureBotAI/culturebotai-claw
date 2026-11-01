@@ -340,10 +340,22 @@
       "disposition": "Expected fresh-process negative control: intentionally mutated helper failed real assertions; original helper positive control is retained.",
       "expected_exit": 1,
       "path": "step5-helper-implementation/controls/truthy_representative_fallback/receipt.json"
+    },
+    {
+      "expected_exit": 0,
+      "path": "logs/step5-independent-queue709-fda8972-squash.json"
+    },
+    {
+      "expected_exit": 0,
+      "path": "logs/step5-independent-710-v4-actual-shallow.json"
+    },
+    {
+      "expected_exit": 0,
+      "path": "logs/step5-independent-710-v4-retained-controls.json"
     }
   ],
-  "created_at": "2026-11-01T13:23:28.927134+00:00",
-  "external_followup": "Root authorizes this evidence publication under the approved user plan; independent exact packaged-head/PR-body review and remote CI/merge remain external and are not claimed complete.",
+  "created_at": "2026-11-01T13:49:11.825774+00:00",
+  "external_followup": "Independent exact replacement-package commit/body review and fresh PR/actual-queue checks remain external. The old v3 queue failure is retained as historical evidence.",
   "generation": {
     "acceptance": "step5-candidate-acceptance/final-v4/acceptance.json",
     "b4_coverage": "step5-candidate-acceptance/final-v4/b4-coverage.json",
@@ -624,6 +636,96 @@
       "expected": "a56f3ae4563619a5129ad944878c9205267315d6",
       "json_source": "step5-final-protection.json",
       "pointer": "/claw_head"
+    },
+    {
+      "json_source": "step5-package-before-710/preservation.json",
+      "pointer": "/metadata/manifest.json/sha256",
+      "target_source": "step5-package-before-710/manifest.json"
+    },
+    {
+      "json_source": "step5-package-before-710/preservation.json",
+      "pointer": "/metadata/final-inputs.json/sha256",
+      "target_source": "step5-package-before-710/final-inputs.json"
+    },
+    {
+      "json_source": "step5-package-before-710/preservation.json",
+      "pointer": "/metadata/selection.final.json/sha256",
+      "target_source": "step5-package-before-710/selection.final.json"
+    },
+    {
+      "json_source": "step5-package-before-710/preservation.json",
+      "pointer": "/metadata/verify.py/sha256",
+      "target_source": "step5-package-before-710/verify.py"
+    },
+    {
+      "json_source": "step5-package-before-710/preservation.json",
+      "pointer": "/metadata/README.md/sha256",
+      "target_source": "step5-package-before-710/README.md"
+    },
+    {
+      "json_source": "step5-package-before-710/preservation.json",
+      "pointer": "/complete_git_archive/sha256",
+      "target_source": "step5-package-before-710/complete-package-at-1f5ad677.tar.gz"
+    },
+    {
+      "expected": 1,
+      "json_source": "step5-claw-independent/queue709/fda8972/finding.json",
+      "pointer": "/actual_portable_verify_exit_code"
+    },
+    {
+      "json_source": "step5-claw-independent/rereview-710-v4/review.json",
+      "pointer": "/references/old-probe-index/sha256",
+      "target_source": "step5-claw-independent/queue709/fda8972/index.json"
+    },
+    {
+      "json_source": "step5-claw-independent/rereview-710-v4/review.json",
+      "pointer": "/references/retained-control-test/sha256",
+      "target_source": "step5-claw-evidence-packaging/test_packager_v6.py"
+    },
+    {
+      "json_source": "step5-claw-independent/rereview-710-v4/review.json",
+      "pointer": "/references/v4-source/sha256",
+      "target_source": "step5-claw-evidence-packaging/package_evidence_v4.py"
+    },
+    {
+      "json_source": "step5-claw-independent/rereview-710-v4/review.json",
+      "pointer": "/references/author-control-results/sha256",
+      "target_source": "step5-claw-evidence-packaging/revision-710/control-results.json"
+    },
+    {
+      "json_source": "step5-claw-independent/rereview-710-v4/review.json",
+      "pointer": "/references/step5-independent-710-v4-actual-shallow-receipt/sha256",
+      "target_source": "logs/step5-independent-710-v4-actual-shallow.json"
+    },
+    {
+      "json_source": "step5-claw-independent/rereview-710-v4/review.json",
+      "pointer": "/references/step5-independent-710-v4-actual-shallow-log/sha256",
+      "target_source": "logs/step5-independent-710-v4-actual-shallow.log"
+    },
+    {
+      "json_source": "step5-claw-independent/rereview-710-v4/review.json",
+      "pointer": "/references/step5-independent-710-v4-retained-controls-receipt/sha256",
+      "target_source": "logs/step5-independent-710-v4-retained-controls.json"
+    },
+    {
+      "json_source": "step5-claw-independent/rereview-710-v4/review.json",
+      "pointer": "/references/step5-independent-710-v4-retained-controls-log/sha256",
+      "target_source": "logs/step5-independent-710-v4-retained-controls.log"
+    },
+    {
+      "expected": "PASS_WITH_LIMITATIONS",
+      "json_source": "step5-claw-independent/rereview-710-v4/review.json",
+      "pointer": "/verdict"
+    },
+    {
+      "json_source": "step5-claw-independent/rereview-710-v4/review.json",
+      "pointer": "/source_sha256",
+      "target_source": "step5-claw-evidence-packaging/package_evidence_v4.py"
+    },
+    {
+      "expected": true,
+      "json_source": "step5-claw-independent/rereview-710-v4/review.json",
+      "pointer": "/prior_blocked_queue_evidence_unchanged"
     }
   ],
   "maintained_file_references": {
@@ -1285,12 +1387,30 @@
     {
       "original": "step5-claw-evidence-packaging/revision-708/controls-v2/*/{packager.py,cache/**}",
       "reason": "Copied mutant modules reconstructable from exact source/replacement strings; caches excluded. Receipts, log hashes, positive results and source snapshots retained."
+    },
+    {
+      "original": "step5-claw-independent/queue709/fda8972/isolated.git/HEAD",
+      "reason": "Temporary Git transport metadata; exact actual integration metadata, original verifier, failed stdout/stderr, probe and indexed result retained."
+    },
+    {
+      "original": "step5-claw-independent/queue709/fda8972/isolated.git/objects/info/alternates",
+      "reason": "Temporary Git transport metadata; exact actual integration metadata, original verifier, failed stdout/stderr, probe and indexed result retained."
+    },
+    {
+      "original": "step5-claw-independent/rereview-710-v4/shallow-consumer/.git/HEAD",
+      "reason": "Disposable Git transport metadata cannot be tracked as an ordinary repository evidence path. The unchanged independent index retains its hash; replay-results.json, clone outputs and original-object absence evidence preserve the actual shallow-consumer proof."
+    },
+    {
+      "original": "step5-claw-independent/rereview-710-v4/shallow-consumer/.git/shallow",
+      "reason": "Disposable Git transport metadata cannot be tracked as an ordinary repository evidence path. The unchanged independent index retains its hash; replay-results.json, clone outputs and original-object absence evidence preserve the actual shallow-consumer proof."
     }
   ],
-  "package_readme": "# Owned-name export evidence\n\nThis package preserves implementation, negative controls, independent review, and diagnostic candidate generation for Claw issues [#701](https://github.com/CultureBotAI/culturebotai-claw/issues/701)\u2013[#708](https://github.com/CultureBotAI/culturebotai-claw/issues/708). It grants no scientific approval and publishes no MediaIngredientMech canonical mapping or baseline changes. Source authorship and independent review are separately attributed in the archived receipts.\n\nThe diagnostic candidate was generated at Claw `90d110e663c10146351b09ae98d387dabdec0b1c`. The subsequent `a56f3ae4563619a5129ad944878c9205267315d6` commit changes only README mypy-target documentation. The final full suite ran at that later source head. Generation receipts retain their actual earlier revision and exact producer/source hashes. The source entrypoint and captured dependency graph assume a trusted caller/interpreter; this is not cryptographic runtime attestation.\n\nActual v4 candidate acceptance is **PASS_WITH_LIMITATIONS**: schema and unmodified native invariants pass with zero rejected data rows, including Rule K with an empty in-memory baseline. B4 checks the available transforms; BTO (1 row) and MICRO (73 rows) are unavailable under the native warning-and-skip contract. The standalone B4 report preserves affected rows and available input hashes. This is not full ontology coverage. The prior v3 acceptance FAIL remains archived: its harness required all B4 transforms to exist, a stronger precondition than the native gate.\n\nThe candidate has 2,974 rows. The builder produced 25 suppression events, aggregated into 20 sidecar rows for distinct subject/name pairs: 7 previously published tokens are removed, while 13 encountered aliases were already excluded by dedicated-label handling. These diagnostic encounters do not imply promotion of deferred canonical policy changes. Detailed before/after classification and captured label-resolution differences remain in the acceptance evidence. MIM YAML, canonical SSSOM, and Rule K baseline remained unchanged.\n\nThe completed v5 full suite passed **6,660 tests**, with 390 skips and 16 warnings; measured coverage was **87.19%**. Safety-module coverage was **76%**, above its 60% gate. Final maintained mypy and Ruff checks passed. The final validation summary binds their exact receipts and logs, along with configuration, canary QC, generation, acceptance, and README-parity checks. Each archived command retains its own actual execution context; earlier configuration/canary runs are not relabeled as final-head executions.\n\nIndependent source-repair review and the #708 packaging repair review both record **PASS_WITH_LIMITATIONS**, no remaining findings within their reviewed scope, and the trusted-caller and review-stage boundaries. The #708 repair binds the frozen plan to the hash-bound selection plus explicit run root and checks the packaged README against selected content. Its original successful substitution proof is retained. The repaired packager passes 21 fixture checks; old code and four fresh guard-removal mutants fail actual assertions.\n\nFailed probes and interrupted suites remain archived with dispositions. These include the real full-suite-v3 README/AGENTS/CI parity failure and README-only repair; the v4 sandbox refusal of `/bin/ps` in an existing lifecycle fixture; the successful authorized focused rerun; and the complete, successful v5 rerun with process access. Earlier incomplete suites and source/candidate evidence remain historical where later repairs supersede them. None is relabeled as a successful final check.\n\n`manifest.json` maps each retained original path and SHA-256 to its portable payload. Large files use deterministic gzip; identical bytes may share one payload. Historical indexes remain unchanged and may reference explicitly omitted bulky fixture trees, copied repositories, or caches. The portable selection and omission list define this package's exact scope.\n\nFrom the repository root:\n\n```bash\npython reports/mim_owned_name_export_20261101/verify.py verify \\\n  --package reports/mim_owned_name_export_20261101 --repository . --require-tracked\n```\n\nVerification checks bytes, membership, source references, command/log bindings, artifact/receipt links, and recorded limitations. It does not rerun checks or approve scientific assertions. The independent review of the eventual package commit and PR body remains external to avoid circular self-binding; this package does not claim that future review, remote CI, publication, or merge has completed.\n",
+  "package_readme": "# Owned-name export evidence\n\nThis package preserves implementation, negative controls, independent review, and diagnostic candidate generation for Claw issues [#701](https://github.com/CultureBotAI/culturebotai-claw/issues/701)\u2013[#708](https://github.com/CultureBotAI/culturebotai-claw/issues/708), plus [#710](https://github.com/CultureBotAI/culturebotai-claw/issues/710). It grants no scientific approval and publishes no MediaIngredientMech canonical mapping or baseline changes. Source authorship and independent review are separately attributed in the archived receipts.\n\nThe diagnostic candidate was generated at Claw `90d110e663c10146351b09ae98d387dabdec0b1c`. The subsequent `a56f3ae4563619a5129ad944878c9205267315d6` commit changes only README mypy-target documentation. The final full suite ran at that later source head. Generation receipts retain their actual earlier revision and exact producer/source hashes. The source entrypoint and captured dependency graph assume a trusted caller/interpreter; this is not cryptographic runtime attestation.\n\nActual v4 candidate acceptance is **PASS_WITH_LIMITATIONS**: schema and unmodified native invariants pass with zero rejected data rows, including Rule K with an empty in-memory baseline. B4 checks the available transforms; BTO (1 row) and MICRO (73 rows) are unavailable under the native warning-and-skip contract. The standalone B4 report preserves affected rows and available input hashes. This is not full ontology coverage. The prior v3 acceptance FAIL remains archived: its harness required all B4 transforms to exist, a stronger precondition than the native gate.\n\nThe candidate has 2,974 rows. The builder produced 25 suppression events, aggregated into 20 sidecar rows for distinct subject/name pairs: 7 previously published tokens are removed, while 13 encountered aliases were already excluded by dedicated-label handling. These diagnostic encounters do not imply promotion of deferred canonical policy changes. Detailed before/after classification and captured label-resolution differences remain in the acceptance evidence. MIM YAML, canonical SSSOM, and Rule K baseline remained unchanged.\n\nThe completed v5 full suite passed **6,660 tests**, with 390 skips and 16 warnings; measured coverage was **87.19%**. Safety-module coverage was **76%**, above its 60% gate. Final maintained mypy and Ruff checks passed. The final validation summary binds their exact receipts and logs, along with configuration, canary QC, generation, acceptance, and README-parity checks. Each archived command retains its own actual execution context; earlier configuration/canary runs are not relabeled as final-head executions.\n\nIndependent source-repair review and the #708 packaging repair review both record **PASS_WITH_LIMITATIONS**, no remaining findings within their reviewed scope, and the trusted-caller and review-stage boundaries. The #708 repair binds the frozen plan to the hash-bound selection plus explicit run root and checks the packaged README against selected content. Its original successful substitution proof is retained. The repaired packager passes 21 fixture checks; old code and four fresh guard-removal mutants fail actual assertions.\n\nFailed probes and interrupted suites remain archived with dispositions. These include the real full-suite-v3 README/AGENTS/CI parity failure and README-only repair; the v4 sandbox refusal of `/bin/ps` in an existing lifecycle fixture; the successful authorized focused rerun; and the complete, successful v5 rerun with process access. Earlier incomplete suites and source/candidate evidence remain historical where later repairs supersede them. None is relabeled as a successful final check.\n\n`manifest.json` maps each retained original path and SHA-256 to its portable payload. Large files use deterministic gzip; identical bytes may share one payload. Historical indexes remain unchanged and may reference explicitly omitted bulky fixture trees, copied repositories, or caches. The portable selection and omission list define this package's exact scope.\n\nFrom the repository root:\n\n```bash\npython reports/mim_owned_name_export_20261101/verify.py verify \\\n  --package reports/mim_owned_name_export_20261101 --repository . --require-tracked\n```\n\nVerification checks bytes, membership, source references, command/log bindings, artifact/receipt links, and recorded limitations. It does not rerun checks or approve scientific assertions. The independent review of the replacement package commit and PR body remains external to avoid circular self-binding; this package does not claim that future review, remote CI, publication, or merge has completed.\n\nThe actual first merge-queue integration exposed #710 after the earlier code and package checks: v3 portable verification required pre-squash feature ancestry and Git objects, even though the integration tree matched. PR #709 was dequeued without merging. V4 preserves strict historical checks during author freeze/publication, while portable verification binds selected SHA-256/size, working bytes, and the current committed Git blobs. It passes real single-parent squash and depth-one consumer fixtures with the old feature object absent; working-byte, committed-byte and selected-hash tampering still refuse. Five fresh mutation controls detect weakened checks. These artifact-only changes do not alter the 13 maintained source references or rerun/relabel source generation.\n\nThe complete v3 package at public commit `1f5ad6779cdb3f39f39ba6f9f26d31840b7e7077`, its five exact metadata files, and the actual failed queue verification are retained. All 572 prior original evidence identities remain unchanged. Independent #710 re-review records **PASS_WITH_LIMITATIONS**, no remaining findings within its repair scope, and separately demonstrates refusal by v3 and success by v4 on actual integration evidence and a depth-one consumer without a56 objects. That review leaves the replacement package, exact new commit/body, and subsequent actual queue integration for separate review; it does not retroactively approve the blocked first queue attempt.\n",
   "pending_final_inputs": [],
   "proposed_repository_destination": "reports/mim_owned_name_export_20261101",
   "publication_authorized": true,
+  "publication_status": "Proposed complete selection and unpublished input freeze only; root publication authorization is not represented by this proposal.",
+  "replacement_prepublication_head": "1f5ad6779cdb3f39f39ba6f9f26d31840b7e7077",
   "scientific_approval_added": false,
   "selected_existing_files": {
     "generate_candidate_step5_v2.py": {
@@ -1623,6 +1743,26 @@
       "source_bytes": 3256,
       "source_sha256": "3498b76a283c20303441dfeb3d2e7b1e0e01d61d4c56b3ef11a84facba2727d0"
     },
+    "logs/step5-independent-710-v4-actual-shallow.json": {
+      "category": "independent_710_exact_reference",
+      "source_bytes": 810,
+      "source_sha256": "b97dc00b45e665df7c06be8416dfde25762de29a3325c43e720b0fcf8d7c3b97"
+    },
+    "logs/step5-independent-710-v4-actual-shallow.log": {
+      "category": "independent_710_exact_reference",
+      "source_bytes": 1516,
+      "source_sha256": "408e352ca8855f9ce97315a8fea2c4e7baf50a9fe88ccc1655413414737d6e70"
+    },
+    "logs/step5-independent-710-v4-retained-controls.json": {
+      "category": "independent_710_exact_reference",
+      "source_bytes": 1221,
+      "source_sha256": "4bdcce38553f7b7c4c453d8672b7f9f515b5bc65ce78c69775328f8e4121c759"
+    },
+    "logs/step5-independent-710-v4-retained-controls.log": {
+      "category": "independent_710_exact_reference",
+      "source_bytes": 3811,
+      "source_sha256": "9687538d01f7a401829babf1f3bcde9fcbfb25f0ffa87c5996b76210100f8567"
+    },
     "logs/step5-independent-artifact-regressions-703-704-v1.json": {
       "category": "independent_review_command",
       "source_bytes": 806,
@@ -1812,6 +1952,16 @@
       "category": "independent_review_command",
       "source_bytes": 502,
       "source_sha256": "3fe88e1e30fe866791579fa99782b761dbfc530ece9b5e5d47930d677b14cbbf"
+    },
+    "logs/step5-independent-queue709-fda8972-squash.json": {
+      "category": "actual_squash_verifier_failure_before_fix",
+      "source_bytes": 834,
+      "source_sha256": "1c3c9d3271a72d49dfbec4e0639229a583a521cad456fe12446ad60af9554e27"
+    },
+    "logs/step5-independent-queue709-fda8972-squash.log": {
+      "category": "actual_squash_verifier_failure_before_fix",
+      "source_bytes": 4189,
+      "source_sha256": "68f7b6c701ac01c7bcc1427a22a9b817c4d571fcdc6ecec144164e0bb15b61e6"
     },
     "logs/step5-independent-repair-705707-after-import.json": {
       "category": "completed_repair_validation_or_failed_attempt",
@@ -2047,6 +2197,16 @@
       "category": "705_707_findings_and_dispositions",
       "source_bytes": 144,
       "source_sha256": "0541235fd61382054822341b34b36212fd591e75014dc42ca2fbaea47395491b"
+    },
+    "step5-710-pr-hold-comment.md": {
+      "category": "issue710_filed_before_repair_and_queue_hold",
+      "source_bytes": 551,
+      "source_sha256": "7394b3722c4ab5654a96d05d30efecd27ebb9d38c32822de52f33ebe8677b45c"
+    },
+    "step5-710-pr-hold.json": {
+      "category": "issue710_filed_before_repair_and_queue_hold",
+      "source_bytes": 356,
+      "source_sha256": "0ad8a4853ef335d6d89bcec805aa2e3ad4abab6cbb17de90c0a2af9bf1969bec"
     },
     "step5-artifact-mutations-v3/results.json": {
       "category": "artifact_final_mutation_control",
@@ -2688,10 +2848,25 @@
       "source_bytes": 3478,
       "source_sha256": "fb211b9a39f7458e3977e574973406e2402a835ec43d1c44eead03038e744df8"
     },
+    "step5-claw-evidence-packaging/REPLACEMENT-PLAN-710.md": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 2134,
+      "source_sha256": "28cef19eedec1a5b370369ca0c99832c85e375edcf6b6cb9a2a8a91809f9ddb3"
+    },
+    "step5-claw-evidence-packaging/historical-package-check-710.json": {
+      "category": "historical_package_integrity_check",
+      "source_bytes": 470,
+      "source_sha256": "be10002470d625423ab8987f93d7fc8212ca22ffa3f630933fbfaaa5c04333e4"
+    },
     "step5-claw-evidence-packaging/package_evidence_v3.py": {
       "category": "author_packager_v3_repair_and_controls",
       "source_bytes": 14702,
       "source_sha256": "74ade999a59f91d61e83d1b41de9d6b00dbae2fd58a9b28f285724359b18c821"
+    },
+    "step5-claw-evidence-packaging/package_evidence_v4.py": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 15144,
+      "source_sha256": "1377772d93374ce6a31de85fab0ba9fe5697f63430db1e075431360e35018422"
     },
     "step5-claw-evidence-packaging/revision-708/control-results-v2.json": {
       "category": "author_packager_v3_repair_and_controls",
@@ -2853,10 +3028,240 @@
       "source_bytes": 9894,
       "source_sha256": "b04731ebe1a7f73e42f4e5bc49b66e1044460dcec58cb3e746abc30804ed9edb"
     },
+    "step5-claw-evidence-packaging/revision-710/README.md": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 1771,
+      "source_sha256": "4ea0bb40ac88ef00febb936b2d4cd8a5a9346b3742ce16357529f327113afa0c"
+    },
+    "step5-claw-evidence-packaging/revision-710/control-results.json": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 16206,
+      "source_sha256": "0f62f736486bd1d83f5057158c5596882199ef9494b197b6b07eff383d112a00"
+    },
+    "step5-claw-evidence-packaging/revision-710/controls/fixed-v4-committed/receipt.json": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 1083,
+      "source_sha256": "c1e55da411f6e82883088e5a40aeae3838c82d4b40c5ae99c593be2436ff9d99"
+    },
+    "step5-claw-evidence-packaging/revision-710/controls/fixed-v4-committed/results.json": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 3109,
+      "source_sha256": "5523671bfcc8d29784e5197b4486a5bdfca50e9d8b82c5a1b730f6aaa78a0417"
+    },
+    "step5-claw-evidence-packaging/revision-710/controls/fixed-v4-committed/test.log": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 3603,
+      "source_sha256": "110e7e214feb28bd28c1b2a0c05f789e06c52dc9643966ef5cfaaca16b7064ea"
+    },
+    "step5-claw-evidence-packaging/revision-710/controls/fixed-v4-historical/receipt.json": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 1087,
+      "source_sha256": "b11c9f77efd011a9041b49ec0124fbb578e08af9b92e3b75285f869c03183b77"
+    },
+    "step5-claw-evidence-packaging/revision-710/controls/fixed-v4-historical/results.json": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 3157,
+      "source_sha256": "00b29d3732117e57df0168587e42abc1c8ca35cb337cd3fa4aa15e74239603e1"
+    },
+    "step5-claw-evidence-packaging/revision-710/controls/fixed-v4-historical/test.log": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 3811,
+      "source_sha256": "675d944e7c2b2d3b2d7b94d86e0778443d6111da802f4c9b24e281da3d0398f7"
+    },
+    "step5-claw-evidence-packaging/revision-710/controls/fixed-v4-manifest/receipt.json": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 1079,
+      "source_sha256": "ff8fc91add5e7acbd8e9fc7220fdc87a7ed41349cbdf00d56fd9750130708d92"
+    },
+    "step5-claw-evidence-packaging/revision-710/controls/fixed-v4-manifest/results.json": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 3080,
+      "source_sha256": "5658f1de024e66a828b42e59797160198fd0ea5972cc61cbfaacf41fceee432a"
+    },
+    "step5-claw-evidence-packaging/revision-710/controls/fixed-v4-manifest/test.log": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 3574,
+      "source_sha256": "954f253dac60bc8ada2e9d1b7296d0a809d5bc4446076de04ccff45777277a41"
+    },
+    "step5-claw-evidence-packaging/revision-710/controls/fixed-v4-shallow/receipt.json": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 1075,
+      "source_sha256": "c5a45c443974fe8701c52830164119eb00fe1161eef590dd01367ca364189878"
+    },
+    "step5-claw-evidence-packaging/revision-710/controls/fixed-v4-shallow/results.json": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 3028,
+      "source_sha256": "9b6980f1e30f19c51febd38222b408adc32e4f808101da47e609fce2fc679e82"
+    },
+    "step5-claw-evidence-packaging/revision-710/controls/fixed-v4-shallow/test.log": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 3665,
+      "source_sha256": "385c8e533b6271b8d6b9fbd65ee10cf45479379950a56774524dca933902a085"
+    },
+    "step5-claw-evidence-packaging/revision-710/controls/fixed-v4-squash/receipt.json": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 1071,
+      "source_sha256": "289954d48564975acf0450ae1a589c41ed2652384ac74c2a411c6d1c2ca7d7ad"
+    },
+    "step5-claw-evidence-packaging/revision-710/controls/fixed-v4-squash/results.json": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 3032,
+      "source_sha256": "803de0dad592d84e2a54004cf41230eb223ddee04c57d4c95b9ce23514b6c6e9"
+    },
+    "step5-claw-evidence-packaging/revision-710/controls/fixed-v4-squash/test.log": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 3669,
+      "source_sha256": "f31854df6cd3d3bf6e98058731435d79f8de02497b4691f43e7922240ad7660e"
+    },
+    "step5-claw-evidence-packaging/revision-710/controls/fixed-v4-working/receipt.json": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 1075,
+      "source_sha256": "be18df77977fbabd81e90118a04888303fa1d40d20e26343265cd90c3598a006"
+    },
+    "step5-claw-evidence-packaging/revision-710/controls/fixed-v4-working/results.json": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 3070,
+      "source_sha256": "5e7a90979e29f151c9564d514535bcbd1bc7e6be863ff23b2f7b1b44bcd2c7cf"
+    },
+    "step5-claw-evidence-packaging/revision-710/controls/fixed-v4-working/test.log": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 3564,
+      "source_sha256": "bc607101dcd49964e57fd309e54751959939607a2e9ad4f21a0479d0aa281e2c"
+    },
+    "step5-claw-evidence-packaging/revision-710/controls/mutant-all-author-history/receipt.json": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 1188,
+      "source_sha256": "37f6a16ebb0256807b02d69a3a63bad99034880034cb4037ec996e034086d61e"
+    },
+    "step5-claw-evidence-packaging/revision-710/controls/mutant-all-author-history/test.log": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 1235,
+      "source_sha256": "d1102ac30ddcccc16150dff89c4bc933e19b245510caff4737e34a1e755ec890"
+    },
+    "step5-claw-evidence-packaging/revision-710/controls/mutant-author-original-bytes/receipt.json": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 1235,
+      "source_sha256": "1f65d3b58aa9ed2d5160e0fd517199395d45454470792dbe0bcd3880413364e6"
+    },
+    "step5-claw-evidence-packaging/revision-710/controls/mutant-author-original-bytes/test.log": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 1331,
+      "source_sha256": "d25eaa5e7455f3a6b168571304fdec868d27fbf3813017e46e60033f27492a0e"
+    },
+    "step5-claw-evidence-packaging/revision-710/controls/mutant-current-git-blob/receipt.json": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 1159,
+      "source_sha256": "b2b0849f5a26de394698de2293fc177c0b3c0520dee48ec7d9b1fe127ecc0a4a"
+    },
+    "step5-claw-evidence-packaging/revision-710/controls/mutant-current-git-blob/test.log": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 1810,
+      "source_sha256": "d9b2dc7a7a5fde26b477f901931b85b05d2b3ed22e7a1750761df65958790b53"
+    },
+    "step5-claw-evidence-packaging/revision-710/controls/mutant-portable-history/receipt.json": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 1211,
+      "source_sha256": "adc1c9058aeb66a094cd4db452f8824b1af2bb97c084d6bbb5a79fb06350cce7"
+    },
+    "step5-claw-evidence-packaging/revision-710/controls/mutant-portable-history/test.log": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 2946,
+      "source_sha256": "ff92550e689da9768623e87532dca885676e0c72ac82c34badc9282fa3485014"
+    },
+    "step5-claw-evidence-packaging/revision-710/controls/mutant-selected-hash/receipt.json": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 1199,
+      "source_sha256": "195a2583ee446bbd1ec934a56ae4bf4dd065ca71b481dfeac4e14fe1688b6319"
+    },
+    "step5-claw-evidence-packaging/revision-710/controls/mutant-selected-hash/test.log": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 1581,
+      "source_sha256": "f646015cd687259ca2c6d4caf4e0361da6085a053b664c371f5979e5258397fa"
+    },
+    "step5-claw-evidence-packaging/revision-710/controls/old-v3-shallow-without-ancestry/receipt.json": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 1130,
+      "source_sha256": "0b029330b57741d92cd7d27bb31aebccb09c843d1ddfe9730c3d9e18e990f068"
+    },
+    "step5-claw-evidence-packaging/revision-710/controls/old-v3-shallow-without-ancestry/test.log": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 3234,
+      "source_sha256": "2abe3aee123021299d0a9890775bc734549f015781bb2d0d3bd04ce4774e0098"
+    },
+    "step5-claw-evidence-packaging/revision-710/controls/old-v3-shallow/receipt.json": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 1046,
+      "source_sha256": "0655158726e771669eb653cf25fb727c8afab67c1e178a01c93e49a92cc6dba7"
+    },
+    "step5-claw-evidence-packaging/revision-710/controls/old-v3-shallow/test.log": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 2958,
+      "source_sha256": "f1cca8ec607176ace6408b702f29d755e18aaab2e6ac90fbee4311c3442a02ad"
+    },
+    "step5-claw-evidence-packaging/revision-710/controls/old-v3-squash/receipt.json": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 1042,
+      "source_sha256": "4e4afab5db2034af0dc8a1e3469f5be1a37f43952af50103466f4531d15c33e7"
+    },
+    "step5-claw-evidence-packaging/revision-710/controls/old-v3-squash/test.log": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 2844,
+      "source_sha256": "dfc3b873b3f958d47e5b1465a78976eded383479aab7509c1c559d120340e246"
+    },
+    "step5-claw-evidence-packaging/revision-710/evidence-index.json": {
+      "category": "author_710_inventory",
+      "source_bytes": 8264,
+      "source_sha256": "93313d2f466de0e703a54784506bdd7f04f1038922d02078e538e6601e121551"
+    },
+    "step5-claw-evidence-packaging/revision-710/initial-squash-results.json": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 3032,
+      "source_sha256": "803de0dad592d84e2a54004cf41230eb223ddee04c57d4c95b9ce23514b6c6e9"
+    },
+    "step5-claw-evidence-packaging/revision-710/initial-squash.log": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 3669,
+      "source_sha256": "2809cbc9a549bbe352388abd84f2bcdda935f86b1ca24c1a7f024ced197bc872"
+    },
+    "step5-claw-evidence-packaging/revision-710/probe_removed_ancestry_only.py": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 1477,
+      "source_sha256": "b8e1aebc58f3cce02e3bce48f775e3ee1f7539bd5da5ba4168c79d1891023238"
+    },
+    "step5-claw-evidence-packaging/revision-710/run_controls.py": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 3451,
+      "source_sha256": "b0af1d43bda1e9c914aff2407d98be04033118a7c6a8fcdfc8991a9e2735383f"
+    },
+    "step5-claw-evidence-packaging/revision-710/source-change.json": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 326,
+      "source_sha256": "8079b995a05b213f4dea816e8a5699bd6d60648bc1fdc7b0b29f80c98a6fbd5e"
+    },
+    "step5-claw-evidence-packaging/revision-710/source-v3.py": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 14702,
+      "source_sha256": "74ade999a59f91d61e83d1b41de9d6b00dbae2fd58a9b28f285724359b18c821"
+    },
+    "step5-claw-evidence-packaging/revision-710/source-v4.py": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 15144,
+      "source_sha256": "1377772d93374ce6a31de85fab0ba9fe5697f63430db1e075431360e35018422"
+    },
+    "step5-claw-evidence-packaging/revision-710/source.patch": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 3491,
+      "source_sha256": "03d37bf19086f75a190f5a5e0147523d4d5a822938a629a6109af8a4b7d9de5d"
+    },
     "step5-claw-evidence-packaging/test_packager_v5.py": {
       "category": "author_packager_v3_repair_and_controls",
       "source_bytes": 9962,
       "source_sha256": "bbe219fb38b06899a4c080b42b1eaeecc3fbe861f3e5b819a88b30e5f463f23a"
+    },
+    "step5-claw-evidence-packaging/test_packager_v6.py": {
+      "category": "author_710_portability_repair_and_real_git_controls",
+      "source_bytes": 14215,
+      "source_sha256": "96020ddec66007c600e96616d672205504082050e453554e6ed7d17b27ccb102"
     },
     "step5-claw-final-validation.json": {
       "category": "final_source_validation_and_protection",
@@ -3448,6 +3853,51 @@
       "source_bytes": 10189,
       "source_sha256": "f2d7f211d28c23b3418580ef6c025ca178562f00758b4141762c040f36152857"
     },
+    "step5-claw-independent/queue709/20261101T134004184676Z.json": {
+      "category": "actual_squash_verifier_failure_before_fix",
+      "source_bytes": 4617,
+      "source_sha256": "58e7a1b608a4940515adae097dd406375de8ed2a2cf5c6f42fc76b54bcf8d32b"
+    },
+    "step5-claw-independent/queue709/fda8972/actual-portable.stderr": {
+      "category": "actual_squash_verifier_failure_before_fix",
+      "source_bytes": 1992,
+      "source_sha256": "3a6801ee658ac19767b05efce33db0022aab7b4b14672b6aaea0e2ddec5b17e3"
+    },
+    "step5-claw-independent/queue709/fda8972/actual-portable.stdout": {
+      "category": "actual_squash_verifier_failure_before_fix",
+      "source_bytes": 0,
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "step5-claw-independent/queue709/fda8972/commit-metadata.txt": {
+      "category": "actual_squash_verifier_failure_before_fix",
+      "source_bytes": 195,
+      "source_sha256": "659a21b27aa8a5901e4534dd8ad9f671b25d8c2e64965e3ae33a6e468e3eda12"
+    },
+    "step5-claw-independent/queue709/fda8972/finding.json": {
+      "category": "actual_squash_verifier_failure_before_fix",
+      "source_bytes": 2196,
+      "source_sha256": "f843a8a06d9e2fc6b1076e1e1eb1fd15a5822d2fffa239fce3bd52a5464dc894"
+    },
+    "step5-claw-independent/queue709/fda8972/index.json": {
+      "category": "actual_squash_failure_inventory",
+      "source_bytes": 2104,
+      "source_sha256": "c2a43278a40d58cbc57bd92ae48a7f25ed36b2bbef881934a8f8151aa4e04fc6"
+    },
+    "step5-claw-independent/queue709/fda8972/integration-export/reports/mim_owned_name_export_20261101/verify.py": {
+      "category": "actual_squash_verifier_failure_before_fix",
+      "source_bytes": 14702,
+      "source_sha256": "74ade999a59f91d61e83d1b41de9d6b00dbae2fd58a9b28f285724359b18c821"
+    },
+    "step5-claw-independent/queue709/fda8972/probe_squash_verification.py": {
+      "category": "actual_squash_verifier_failure_before_fix",
+      "source_bytes": 4093,
+      "source_sha256": "d902aee3e35c015b47d77408f0598cb29c5148cc52c1539cd785f48bcc230f79"
+    },
+    "step5-claw-independent/queue709/fda8972/review.md": {
+      "category": "actual_squash_verifier_failure_before_fix",
+      "source_bytes": 1294,
+      "source_sha256": "b0a252395f61ac32aa49562fe2717b431b5f8d56ab0cb3dc3b2315d3e97a7b22"
+    },
     "step5-claw-independent/rereview-703-704-v1/artifact-probe-results.json": {
       "category": "independent_review_checkpoint",
       "source_bytes": 11827,
@@ -3868,6 +4318,136 @@
       "source_bytes": 2044,
       "source_sha256": "a239ec9a814d7b1aedeb4d95ade414a74e294a974883b97526066b91c8ab79d7"
     },
+    "step5-claw-independent/rereview-710-v4/author-controls-observed.json": {
+      "category": "independent_710_repair_compact_bundle",
+      "source_bytes": 7648,
+      "source_sha256": "a43ef2802c514eb3b934f8f83518e01d194aee906fdc63ba53fc7e2c4c3d4e31"
+    },
+    "step5-claw-independent/rereview-710-v4/clone-shallow.stderr": {
+      "category": "independent_710_repair_compact_bundle",
+      "source_bytes": 177,
+      "source_sha256": "e6b5c8cde13d489b170a60f4b15d10afb51928e977e75bc2900927b0e4f26fbd"
+    },
+    "step5-claw-independent/rereview-710-v4/clone-shallow.stdout": {
+      "category": "independent_710_repair_compact_bundle",
+      "source_bytes": 0,
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "step5-claw-independent/rereview-710-v4/index.json": {
+      "category": "independent_710_repair_inventory",
+      "source_bytes": 3637,
+      "source_sha256": "69fe99d367a7e02ea93b5a1d15eeb9ebcafb809d8b8527aa2bd905de4b253dc5"
+    },
+    "step5-claw-independent/rereview-710-v4/old-actual-squash.stderr": {
+      "category": "independent_710_repair_compact_bundle",
+      "source_bytes": 1980,
+      "source_sha256": "6f705f95df0298eecf9bf1b6522a940f6cef19f75a24b204bec950876404f505"
+    },
+    "step5-claw-independent/rereview-710-v4/old-actual-squash.stdout": {
+      "category": "independent_710_repair_compact_bundle",
+      "source_bytes": 0,
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "step5-claw-independent/rereview-710-v4/old-objects-absent.stderr": {
+      "category": "independent_710_repair_compact_bundle",
+      "source_bytes": 81,
+      "source_sha256": "897548bc9f504566debe4c15aa2c94ec186bf2eef6fc5b7779a5a2f1ea18fb5b"
+    },
+    "step5-claw-independent/rereview-710-v4/old-objects-absent.stdout": {
+      "category": "independent_710_repair_compact_bundle",
+      "source_bytes": 0,
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "step5-claw-independent/rereview-710-v4/old-shallow.stderr": {
+      "category": "independent_710_repair_compact_bundle",
+      "source_bytes": 2054,
+      "source_sha256": "760de281508212d878fd7f63d07fd2e85c1b3b02ebe4a5234ddedf304291325f"
+    },
+    "step5-claw-independent/rereview-710-v4/old-shallow.stdout": {
+      "category": "independent_710_repair_compact_bundle",
+      "source_bytes": 0,
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "step5-claw-independent/rereview-710-v4/refuse-current-git-blob.stderr": {
+      "category": "independent_710_repair_compact_bundle",
+      "source_bytes": 1890,
+      "source_sha256": "8cb57bbbe3e5601211041805a2c4837b5ff8785b3f5f0cde759253defd32cc16"
+    },
+    "step5-claw-independent/rereview-710-v4/refuse-current-git-blob.stdout": {
+      "category": "independent_710_repair_compact_bundle",
+      "source_bytes": 0,
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "step5-claw-independent/rereview-710-v4/refuse-working-byte.stderr": {
+      "category": "independent_710_repair_compact_bundle",
+      "source_bytes": 1971,
+      "source_sha256": "d93c4f72de1edc9d4b6192639ef2448fa895044d30d37e0544d14520bba5996e"
+    },
+    "step5-claw-independent/rereview-710-v4/refuse-working-byte.stdout": {
+      "category": "independent_710_repair_compact_bundle",
+      "source_bytes": 0,
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "step5-claw-independent/rereview-710-v4/replay-results.json": {
+      "category": "independent_710_repair_compact_bundle",
+      "source_bytes": 11805,
+      "source_sha256": "71ef66685fe47593a3397423734123506d9c57df3518b8520e723a678327430d"
+    },
+    "step5-claw-independent/rereview-710-v4/replay.py": {
+      "category": "independent_710_repair_compact_bundle",
+      "source_bytes": 7855,
+      "source_sha256": "e3d2dde342557c3e7a456e4eee124d03209d1cde2bdcfcbbaa2109db4ca74d06"
+    },
+    "step5-claw-independent/rereview-710-v4/retained-controls.json": {
+      "category": "independent_710_repair_compact_bundle",
+      "source_bytes": 3157,
+      "source_sha256": "00b29d3732117e57df0168587e42abc1c8ca35cb337cd3fa4aa15e74239603e1"
+    },
+    "step5-claw-independent/rereview-710-v4/review.json": {
+      "category": "independent_710_repair_compact_bundle",
+      "source_bytes": 3655,
+      "source_sha256": "b78aef1dd4c943ac406ea1a61905b62286a774d70e2b4f215263fdbc155cfd00"
+    },
+    "step5-claw-independent/rereview-710-v4/source-v3.py": {
+      "category": "independent_710_repair_compact_bundle",
+      "source_bytes": 14702,
+      "source_sha256": "74ade999a59f91d61e83d1b41de9d6b00dbae2fd58a9b28f285724359b18c821"
+    },
+    "step5-claw-independent/rereview-710-v4/source-v4.py": {
+      "category": "independent_710_repair_compact_bundle",
+      "source_bytes": 15144,
+      "source_sha256": "1377772d93374ce6a31de85fab0ba9fe5697f63430db1e075431360e35018422"
+    },
+    "step5-claw-independent/rereview-710-v4/v4-actual-squash.stderr": {
+      "category": "independent_710_repair_compact_bundle",
+      "source_bytes": 0,
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "step5-claw-independent/rereview-710-v4/v4-actual-squash.stdout": {
+      "category": "independent_710_repair_compact_bundle",
+      "source_bytes": 144,
+      "source_sha256": "dbf62c6c7e4336b933ce51673ca057e53ffbdac06ed0d10f07f061af686fbcaa"
+    },
+    "step5-claw-independent/rereview-710-v4/v4-restored-shallow.stderr": {
+      "category": "independent_710_repair_compact_bundle",
+      "source_bytes": 0,
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "step5-claw-independent/rereview-710-v4/v4-restored-shallow.stdout": {
+      "category": "independent_710_repair_compact_bundle",
+      "source_bytes": 144,
+      "source_sha256": "dbf62c6c7e4336b933ce51673ca057e53ffbdac06ed0d10f07f061af686fbcaa"
+    },
+    "step5-claw-independent/rereview-710-v4/v4-shallow-no-old-objects.stderr": {
+      "category": "independent_710_repair_compact_bundle",
+      "source_bytes": 0,
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "step5-claw-independent/rereview-710-v4/v4-shallow-no-old-objects.stdout": {
+      "category": "independent_710_repair_compact_bundle",
+      "source_bytes": 144,
+      "source_sha256": "dbf62c6c7e4336b933ce51673ca057e53ffbdac06ed0d10f07f061af686fbcaa"
+    },
     "step5-claw-initial-commit.json": {
       "category": "authority_issue_or_source_identity",
       "source_bytes": 1894,
@@ -4103,6 +4683,41 @@
       "source_bytes": 12044,
       "source_sha256": "62c8675b32177dbc609218851ac13d409cf6dfd628fe37118a76a6c2cc7516b6"
     },
+    "step5-package-before-710/README.md": {
+      "category": "historical_published_v3_package_metadata",
+      "source_bytes": 4586,
+      "source_sha256": "1c3747f49aad56e0f8f73007a3ea1a0827399ba5673a52d5a6e7e8d9cb2be9d2"
+    },
+    "step5-package-before-710/complete-package-at-1f5ad677.tar.gz": {
+      "category": "complete_historical_published_package_git_archive",
+      "source_bytes": 1330740,
+      "source_sha256": "d0772873d7d6419573adeb0969b8842579fedeaaad529d71309ac57cd28a6193"
+    },
+    "step5-package-before-710/final-inputs.json": {
+      "category": "historical_published_v3_package_metadata",
+      "source_bytes": 221361,
+      "source_sha256": "672c0bc071e69f6edc1117d74660492a4d3fdff0a91adcf8d11af780ce93a93f"
+    },
+    "step5-package-before-710/manifest.json": {
+      "category": "historical_published_v3_package_metadata",
+      "source_bytes": 375694,
+      "source_sha256": "c5715dca489558d2f0315aaa657bf3d18b7770f3e857d75a53b3dee9cfe4fa22"
+    },
+    "step5-package-before-710/preservation.json": {
+      "category": "historical_package_preservation_receipt",
+      "source_bytes": 1215,
+      "source_sha256": "a35fa8043986f8b0cc67e29dfb847844ef925ba20acc5116e6b6ff3c3f1c2099"
+    },
+    "step5-package-before-710/selection.final.json": {
+      "category": "historical_published_v3_package_metadata",
+      "source_bytes": 212335,
+      "source_sha256": "4a85c37ccbf6b6ed3c0483271d0a1c6569ccdea08abe7d9e57119b6eec68103c"
+    },
+    "step5-package-before-710/verify.py": {
+      "category": "historical_published_v3_package_metadata",
+      "source_bytes": 14702,
+      "source_sha256": "74ade999a59f91d61e83d1b41de9d6b00dbae2fd58a9b28f285724359b18c821"
+    },
     "step5-packaging-finding-dedup.json": {
       "category": "issue708_before_repair",
       "source_bytes": 1207,
@@ -4137,6 +4752,21 @@
       "category": "authority_issue_or_source_identity",
       "source_bytes": 1147,
       "source_sha256": "7a68d0c9ef48964d225b0a81dcf499349651f48bea7c267bda81ae0d59ac4f61"
+    },
+    "step5-squash-verifier-dedup.json": {
+      "category": "issue710_filed_before_repair_and_queue_hold",
+      "source_bytes": 1615,
+      "source_sha256": "0e65fcd17e1e5c5e7d3c076ba85b8cd8a42a4b595a42988c7c7c3d2432817087"
+    },
+    "step5-squash-verifier-issue-created.json": {
+      "category": "issue710_filed_before_repair_and_queue_hold",
+      "source_bytes": 222,
+      "source_sha256": "82dedf286a4e37b038a508a7a6864bb48c75fc45f696f887fe1da5b94111fed9"
+    },
+    "step5-squash-verifier-issue.md": {
+      "category": "issue710_filed_before_repair_and_queue_hold",
+      "source_bytes": 2063,
+      "source_sha256": "47829644bbb9733cf74fd8c0b044d24b9af5ad4d154e0501b064fe54ff06ad87"
     },
     "step5-types-issue.md": {
       "category": "705_707_findings_and_dispositions",

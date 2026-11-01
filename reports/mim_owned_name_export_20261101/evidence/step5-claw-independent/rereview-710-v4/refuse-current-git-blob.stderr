@@ -1,0 +1,16 @@
+Traceback (most recent call last):
+  File "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/shallow-consumer/reports/mim_owned_name_export_20261101/verify.py", line 247, in <module>
+    if __name__=='__main__':main()
+                            ~~~~^^
+  File "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/shallow-consumer/reports/mim_owned_name_export_20261101/verify.py", line 244, in main
+    else:verify(args.package.absolute(),args.repository.absolute() if args.repository else None,args.require_tracked)
+         ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/shallow-consumer/reports/mim_owned_name_export_20261101/verify.py", line 226, in verify
+    check_references(plan,repository)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/shallow-consumer/reports/mim_owned_name_export_20261101/verify.py", line 109, in check_references
+    require(committed == raw, 'Current committed reference differs: '+name)
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/shallow-consumer/reports/mim_owned_name_export_20261101/verify.py", line 17, in require
+    raise ValueError(message)
+ValueError: Current committed reference differs: src/kg_microbe_utils/owned_name_policy.py
