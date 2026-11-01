@@ -19,7 +19,7 @@ SPEC.loader.exec_module(builder)
 @pytest.fixture(autouse=True)
 def offline_publication_inputs(tmp_path, monkeypatch):
     """Keep date tests on the native publisher without live repository inputs."""
-    from kg_microbe_utils import sssom_artifacts
+    sssom_artifacts = builder._ARTIFACT_PRODUCER
 
     class FixtureLock:
         def lock(self, *args):

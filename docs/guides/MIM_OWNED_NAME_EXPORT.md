@@ -31,6 +31,12 @@ The manifest distinguishes external validation from an explicit
 `--no-validate` diagnostic run. That flag never skips ownership filtering,
 artifact consistency or source snapshot checks.
 
+The builder compiles its declared local dependencies from captured source
+bytes, avoiding cached modules and timestamp-valid bytecode. It checks those
+bytes and the producer file set again before publication. This is a process
+drift check, not cryptographic attestation: use the source CLI, or a trusted
+harness that also compiles the captured entrypoint source.
+
 Publication uses the native lock and validated write transaction. The snapshot
 and output beforeimages are checked again before replacement, and the final
 artifact bytes are verified. The previous working copy may be an explicitly
@@ -48,5 +54,7 @@ canonical file or retire deferred Rule K allowances.
 
 Tests cover native ownership parity, preserved YAML, alias origins, stable
 sidecars, output aliases, source/preimage changes, partial failures and
-nonzero validator exits. See Claw #701–#704. No provider calls or paid
+nonzero validator exits, cached producer code and rejected CAS eligibility.
+The two new helpers are included in the maintained type-checking gate.
+See Claw #701–#707. No provider calls or paid
 research are part of this policy.

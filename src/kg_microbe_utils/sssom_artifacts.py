@@ -239,10 +239,16 @@ def publish_candidate_artifacts(
                 or checked_path(result.journal_path).parent != journal_dir):
             raise ValueError("Native transaction result is not bound to the intended artifact set")
         journal_before_check = _regular(result.journal_path)
+        previous = {}
+        for path in changed:
+            old_content = before[path]
+            if old_content is None:
+                raise ValueError(f"Changed artifact is missing its beforeimage: {path}")
+            previous[str(path)] = old_content.decode("utf-8")
         expected_journal = {
             "version": JOURNAL_VERSION, "root": str(paths[0].parent), "status": "complete",
             "changed": [str(p) for p in changed], "created": [str(p) for p in created],
-            "previous": {str(p): before[p].decode("utf-8") for p in changed},
+            "previous": previous,
         }
         expected_journal_bytes = json.dumps(expected_journal, indent=2, sort_keys=True).encode("utf-8")
         if journal_before_check != expected_journal_bytes:

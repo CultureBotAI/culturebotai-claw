@@ -45,7 +45,9 @@ bounded canonical promotion belongs to a separate reviewed MIM workflow.
 from __future__ import annotations
 
 import argparse
+import builtins
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -54,11 +56,64 @@ import sys
 import tempfile
 from datetime import date
 from pathlib import Path
+from types import ModuleType
 
 import yaml
-from kgm_unified_mappings import load_kgm_labels, load_kgm_source_index
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _producer_paths() -> tuple[Path, ...]:
+    """Enumerate local producers before importing their executable modules."""
+    paths = {
+        Path(__file__).resolve(), REPO_ROOT / "scripts/kgm_unified_mappings.py",
+        REPO_ROOT / "plugins/lock_manager.py",
+    }
+    for package in ("kg_microbe_utils", "kg_microbe_write", "kg_microbe_fleet"):
+        paths.update((REPO_ROOT / "src" / package).rglob("*.py"))
+    return tuple(sorted(paths))
+
+
+def _producer_source_bytes() -> dict[Path, bytes]:
+    """Bootstrap without importing the publication helper being bound."""
+    result = {}
+    for path in _producer_paths():
+        if any(p.is_symlink() for p in (path, *path.parents)) or not path.is_file():
+            raise ValueError(f"Producer source path is not a regular original file: {path}")
+        result[path] = path.read_bytes()
+    return result
+
+
+# This is a process-local drift guard, not cryptographic code attestation.
+# The supported CLI reads this entrypoint as source; an importing harness must
+# likewise compile captured entrypoint bytes instead of trusting a stale pyc.
+# Bind files/path membership before dependent imports, then check the same
+# snapshot after imports and at generation/publication boundaries (#706).
+_IMPORTED_PRODUCER_BYTES = _producer_source_bytes()
+
+
+def _check_producer_bindings() -> None:
+    current = _producer_source_bytes()
+    if current.keys() != _IMPORTED_PRODUCER_BYTES.keys():
+        raise ValueError("Producer path set changed after import snapshot")
+    if current != _IMPORTED_PRODUCER_BYTES:
+        raise ValueError("Producer source bytes changed after import snapshot")
+    for name, module in tuple(sys.modules.items()):
+        if name == "kgm_unified_mappings":
+            expected = REPO_ROOT / "scripts/kgm_unified_mappings.py"
+        elif any(name == prefix or name.startswith(prefix + ".") for prefix in (
+                "kg_microbe_utils", "kg_microbe_write", "kg_microbe_fleet")):
+            stem = REPO_ROOT / "src" / name.replace(".", "/")
+            expected = stem / "__init__.py" if (stem / "__init__.py").is_file() else stem.with_suffix(".py")
+        else:
+            continue
+        origin = getattr(module, "__file__", None)
+        spec_origin = getattr(getattr(module, "__spec__", None), "origin", None)
+        if (not origin or not spec_origin or expected not in current
+                or Path(origin).resolve() != expected or Path(spec_origin).resolve() != expected):
+            raise ValueError(f"Imported producer origin differs from declared source: {name}")
+
+
 # Module level stays plain paths so importing this file never requires a
 # checkout; `require_mech_roots` in main() is what verifies one (#176).
 MIM_ROOT = Path(
@@ -68,22 +123,92 @@ KGM_ROOT_PATH = Path(
     os.environ.get("KGMICROBE_ROOT", REPO_ROOT.parent / "kg-microbe")
 )
 
-sys.path.insert(0, str(REPO_ROOT / "src"))
-from kg_microbe_fleet import require_mech_roots  # noqa: E402
-from kg_microbe_utils.owned_name_policy import (  # noqa: E402
-    AliasCandidate,
-    Suppression,
-    build_owner_index,
-    filter_owned_aliases,
-    render_suppressed_aliases,
-)
-from kg_microbe_utils.sssom_artifacts import (  # noqa: E402
-    POLICY_MARKER,
-    artifact_paths,
-    capture_beforeimages,
-    checked_path,
-    publish_candidate_artifacts,
-)
+# This fixed graph deliberately avoids both public sys.modules entries and
+# timestamp-based .pyc reads. Existing harness modules are left untouched.
+_PRODUCER_MODULE_PATHS = {
+    "kgm_unified_mappings": REPO_ROOT / "scripts/kgm_unified_mappings.py",
+    "claw_lock_manager": REPO_ROOT / "plugins/lock_manager.py",
+    **{name: REPO_ROOT / "src" / filename for name, filename in {
+        "kg_microbe_utils": "kg_microbe_utils/__init__.py",
+        "kg_microbe_utils.owned_name_policy": "kg_microbe_utils/owned_name_policy.py",
+        "kg_microbe_utils.sssom_artifacts": "kg_microbe_utils/sssom_artifacts.py",
+        "kg_microbe_fleet": "kg_microbe_fleet/__init__.py",
+        "kg_microbe_fleet.roots": "kg_microbe_fleet/roots.py",
+        "kg_microbe_write": "kg_microbe_write/__init__.py",
+        "kg_microbe_write.registry": "kg_microbe_write/registry.py",
+        "kg_microbe_write.serialize": "kg_microbe_write/serialize.py",
+        "kg_microbe_write.transaction": "kg_microbe_write/transaction.py",
+    }.items()},
+}
+_PRODUCER_NAMESPACE = f"_mim_candidate_sources_{id(_IMPORTED_PRODUCER_BYTES):x}"
+_PRODUCER_MODULES: dict[str, ModuleType] = {}
+_STANDARD_IMPORT = builtins.__import__
+
+
+def _source_import(name, globals=None, locals=None, fromlist=(), level=0):
+    qualified = importlib.util.resolve_name("." * level + name, globals["__package__"]) if level else name
+    qualified = qualified.removeprefix(_PRODUCER_NAMESPACE + ".")
+    if qualified.split(".")[0] not in {"kgm_unified_mappings", "claw_lock_manager", "plugins",
+                                       "kg_microbe_utils", "kg_microbe_write", "kg_microbe_fleet"}:
+        return _STANDARD_IMPORT(name, globals, locals, fromlist, level)
+    module = _load_producer(qualified)
+    for member in fromlist:
+        child = qualified + "." + member
+        if child in _PRODUCER_MODULE_PATHS:
+            setattr(module, member, _load_producer(child))
+    return module if fromlist else _load_producer(qualified.split(".")[0])
+
+
+def _load_producer(name: str) -> ModuleType:
+    if name not in _PRODUCER_MODULE_PATHS:
+        raise ImportError(f"Undeclared local producer dependency: {name}")
+    if name in _PRODUCER_MODULES:
+        return _PRODUCER_MODULES[name]
+    path = _PRODUCER_MODULE_PATHS[name]
+    private_name = _PRODUCER_NAMESPACE + "." + name
+    spec = importlib.util.spec_from_file_location(private_name, path)
+    if spec is None:
+        raise ImportError(f"Cannot declare producer module: {name}")
+    module = importlib.util.module_from_spec(spec)
+    module.__dict__["__builtins__"] = {**vars(builtins), "__import__": _source_import}
+    _PRODUCER_MODULES[name] = module
+    sys.modules[private_name] = module  # dataclasses resolve their own qualified module
+    exec(compile(_IMPORTED_PRODUCER_BYTES[path], str(path), "exec", dont_inherit=True), module.__dict__)
+    if "." in name:
+        parent, member = name.rsplit(".", 1)
+        setattr(_load_producer(parent), member, module)
+    return module
+
+
+_check_producer_bindings()
+_KGM_PRODUCER = _load_producer("kgm_unified_mappings")
+load_kgm_labels = _KGM_PRODUCER.load_kgm_labels
+load_kgm_source_index = _KGM_PRODUCER.load_kgm_source_index
+require_mech_roots = _load_producer("kg_microbe_fleet.roots").require_mech_roots
+_POLICY_PRODUCER = _load_producer("kg_microbe_utils.owned_name_policy")
+AliasCandidate = _POLICY_PRODUCER.AliasCandidate
+Suppression = _POLICY_PRODUCER.Suppression
+build_owner_index = _POLICY_PRODUCER.build_owner_index
+filter_owned_aliases = _POLICY_PRODUCER.filter_owned_aliases
+render_suppressed_aliases = _POLICY_PRODUCER.render_suppressed_aliases
+_ARTIFACT_PRODUCER = _load_producer("kg_microbe_utils.sssom_artifacts")
+POLICY_MARKER = _ARTIFACT_PRODUCER.POLICY_MARKER
+artifact_paths = _ARTIFACT_PRODUCER.artifact_paths
+capture_beforeimages = _ARTIFACT_PRODUCER.capture_beforeimages
+checked_path = _ARTIFACT_PRODUCER.checked_path
+publish_candidate_artifacts = _ARTIFACT_PRODUCER.publish_candidate_artifacts
+
+
+def _snapshot_lock_manager(claw_root: Path):
+    if checked_path(claw_root) != REPO_ROOT:
+        raise ValueError("Native lock producer requested from another source root")
+    return _load_producer("claw_lock_manager").LockManager
+
+
+# Keep the native lock implementation, but obtain it from the same captured
+# bytes and fresh fleet module, including its otherwise-lazy import path.
+_ARTIFACT_PRODUCER._load_lock_manager = _snapshot_lock_manager
+_check_producer_bindings()
 
 OWNED_NAME_EVIDENCE = (
     "https://github.com/CultureBotAI/MediaIngredientMech/issues/669#issuecomment-6558035777",
@@ -638,20 +763,6 @@ def _read_mapped_records(directory: Path, snapshot: dict[Path, bytes | None] | N
     return records
 
 
-def _producer_paths() -> tuple[Path, ...]:
-    """Local policy, parser and guarded publisher implementation inputs."""
-    paths = {
-        Path(__file__).resolve(), REPO_ROOT / "scripts/kgm_unified_mappings.py",
-        REPO_ROOT / "src/kg_microbe_utils/__init__.py",
-        REPO_ROOT / "src/kg_microbe_utils/owned_name_policy.py",
-        REPO_ROOT / "src/kg_microbe_utils/sssom_artifacts.py",
-        REPO_ROOT / "plugins/lock_manager.py",
-    }
-    for package in ("kg_microbe_write", "kg_microbe_fleet"):
-        paths.update((REPO_ROOT / "src" / package).rglob("*.py"))
-    return tuple(sorted(paths))
-
-
 def _revision(root: Path) -> str | None:
     result = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"],
                             capture_output=True, text=True)
@@ -930,9 +1041,10 @@ def _row_from_yaml(
     cas_token = _cas_token(data)
     # CAS is appended after the ordinary alias cap and also appears on direct
     # and B1 registry rows. Filter that shared token before any of those paths.
-    cas_token = _pipe(keep_owned(owned_tokens(
-        cas_token, "mim.cas", f"{path}#chemical_properties.cas_rn-or-cross_references")),
-        drop=rejected_labels)
+    cas_candidates = [candidate for candidate in owned_tokens(
+        cas_token, "mim.cas", f"{path}#chemical_properties.cas_rn-or-cross_references")
+        if candidate.text.strip().casefold() not in rejected_labels]
+    cas_token = _pipe(keep_owned(cas_candidates), drop=set())
     if cas_token and predicate in SYMMETRIC_PREDICATES:
         if cas_token.lower() not in {p.strip().lower() for p in other.split("|")}:
             other = f"{other}|{cas_token}" if other else cas_token
@@ -1223,6 +1335,7 @@ def main():
              "checkout).",
     )
     args = ap.parse_args()
+    _check_producer_bindings()
     require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
 
 
@@ -1254,6 +1367,7 @@ def main():
     owners = build_owner_index({_mim_curie(p.name): data for p, data in records.items()})
 
     def check_inputs():
+        _check_producer_bindings()
         if tuple(sorted(MIM_INGREDIENTS_DIR.glob("*.yaml"))) != yamls:
             raise ValueError("Mapped-record path set changed during generation")
         if _producer_paths() != producers:
@@ -1438,6 +1552,10 @@ def _build_candidate(args, paths, before, stamp_sources, snapshot, frozen_paths,
             "prior_stamp_sources": [str(p) for p in stamp_sources],
             "source_inputs": [{"path": str(p), "sha256": _digest(content)}
                               for p, content in sorted(snapshot.items())],
+            "producer_import_snapshot": {str(p): _digest(content)
+                                         for p, content in _IMPORTED_PRODUCER_BYTES.items()},
+            "producer_binding_scope": "source entrypoint plus captured local dependency graph; "
+                                      "trusted caller/interpreter, not cryptographic runtime attestation",
             "mapped_record_paths": [str(p) for p in yamls],
             "source_revisions": {"claw": _revision(REPO_ROOT), "mim": _revision(MIM_ROOT),
                                  "kg_microbe": _revision(KGM_ROOT)},

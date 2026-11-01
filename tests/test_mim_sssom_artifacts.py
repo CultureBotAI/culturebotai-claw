@@ -4,11 +4,13 @@ import csv
 import importlib.util
 import io
 import json
+import shlex
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
+import yaml
 
 from kg_microbe_utils import sssom_artifacts as artifacts
 from kg_microbe_write import transaction
@@ -353,3 +355,12 @@ def test_missing_or_incorrect_native_completion_journal_never_reports_success(se
     monkeypatch.setattr(transaction.ValidatedWriteTransaction, "commit", commit)
     with pytest.raises(ValueError, match="Missing or invalid completed recovery journal"):
         publish(text=sssom.replace(b"kept", b"changed"))
+
+
+def test_ci_actually_type_checks_both_artifact_policy_helpers():
+    workflow = yaml.safe_load((ROOT / ".github/workflows/tests.yaml").read_text())
+    runs = [shlex.split(step["run"]) for job in workflow["jobs"].values()
+            for step in job["steps"] if step.get("name") == "Type-check safety-critical modules"]
+    assert len(runs) == 1 and "mypy" in runs[0]
+    assert {"src/kg_microbe_utils/owned_name_policy.py",
+            "src/kg_microbe_utils/sssom_artifacts.py"} <= set(runs[0])
