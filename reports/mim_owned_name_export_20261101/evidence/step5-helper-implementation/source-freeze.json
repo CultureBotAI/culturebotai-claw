@@ -1,0 +1,31 @@
+{
+  "created_at": "2026-11-01T12:39:48.503824+00:00",
+  "scope": "Pure helper author source before isolated mutation controls",
+  "inputs": [
+    {
+      "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name/src/kg_microbe_utils/owned_name_policy.py",
+      "bytes": 7306,
+      "sha256": "18ffd0430d0256b6da6cbb1f3da2327c4cf3418e2b0b2da71ff283ee2f4351ae"
+    },
+    {
+      "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name/tests/test_mim_owned_name_policy.py",
+      "bytes": 12044,
+      "sha256": "62c8675b32177dbc609218851ac13d409cf6dfd628fe37118a76a6c2cc7516b6"
+    },
+    {
+      "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-issue-body.md",
+      "bytes": 2108,
+      "sha256": "33e0da40c5007e137d5442409cfad34673b58aea27667681faf0d18a3a9f29ee"
+    },
+    {
+      "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-helper-interface-preflight/evidence-index.json",
+      "bytes": 423,
+      "sha256": "51366d39e20ff2e93bfd7c97ce9859d71e2986765630517df3778972d723ce27"
+    },
+    {
+      "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/run_step5.py",
+      "bytes": 3088,
+      "sha256": "b26b81caa928772de928e24ae8cd2a3e340f9f718872e53f53031fa41b3eb5c1"
+    }
+  ]
+}

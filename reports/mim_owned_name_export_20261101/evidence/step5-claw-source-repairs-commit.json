@@ -1,0 +1,17 @@
+{
+  "at": "2026-11-01T13:04:56.441461+00:00",
+  "head": "90d110e663c10146351b09ae98d387dabdec0b1c",
+  "tree": "390c7277ca442b3a71e56ce9355c4538e678d415",
+  "parent": "e78e220d153e41d4340ad0f8abfbd83d96d01b57",
+  "files": {
+    ".github/workflows/tests.yaml": "8e74899c1cb01d61a8c239811865a5d3432cbdba09a71c5a0b453f272f8da8c5",
+    "AGENTS.md": "15d179d128f3f30c3e3b724af8251756a53f92e3a7e5f7d4f01646d21a519120",
+    "scripts/build_mim_ingredient_sssom.py": "38d59f42953305f6fc51e4fc24dfc59ee1919bfb961595b67a8afe9f8a46a1bc",
+    "src/kg_microbe_utils/sssom_artifacts.py": "44fb030a7884d76cef9fddf0a79f1d81bd2d49432d3c764ea4ac3e508115594b",
+    "tests/test_mim_owned_name_export.py": "bb26c9f0c6b9b2517bcd1ff91519ac5a11c31a5c130aa59ef484ab51002f1f20",
+    "tests/test_mim_sssom_artifacts.py": "492f711c435f8e83324dc37f2b0f91036d98f5530ea98827293d105fb1bef650",
+    "tests/test_mim_sssom_header_dates.py": "771d31940c0dc38d57ec9aec0fd12698eb88186756394f8db83ae9edd27d6fc2",
+    "docs/guides/MIM_OWNED_NAME_EXPORT.md": "96effe0c0cb0f8817db6943ae9f0e20b4f00cd688f3d9c2f24ec7c3fa2adaba4"
+  },
+  "independent_repair_review": "step4_design_review replay PASS; final exact-head review remains after evidence packaging"
+}

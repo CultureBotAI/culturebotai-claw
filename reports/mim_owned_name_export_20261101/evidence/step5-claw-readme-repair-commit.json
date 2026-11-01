@@ -1,0 +1,13 @@
+{
+  "at": "2026-11-01T13:10:21.092273+00:00",
+  "head": "a56f3ae4563619a5129ad944878c9205267315d6",
+  "tree": "2234b0a63051fba13517c79005dbd52685ed3cc9",
+  "parent": "90d110e663c10146351b09ae98d387dabdec0b1c",
+  "changed_paths": [
+    "README.md"
+  ],
+  "source_generation_revision": "90d110e663c10146351b09ae98d387dabdec0b1c",
+  "source_code_changed": false,
+  "readme_sha256": "e5dd807ec7853e4bb923a141b8edf949e600dc5c3ada7ed5c54aa2b3625ab723",
+  "test_receipt": "logs/step5-claw-readme-parity-fixed.json"
+}

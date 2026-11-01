@@ -1,0 +1,15 @@
+{
+  "name": "step5-independent-lexical-recheck-703-v1",
+  "argv": [
+    "python",
+    "-B",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-703-704-v1/probe_repaired_lexical.py"
+  ],
+  "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+  "started_at": "2026-11-01T12:46:15.058463+00:00",
+  "environment_profile": "generation-and-native-qc",
+  "finished_at": "2026-11-01T12:46:15.102346+00:00",
+  "exit_code": 0,
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-independent-lexical-recheck-703-v1.log",
+  "log_sha256": "cb69f1c16e459a3a162d1a68b48234e7c8c5fc8fd6b378374384d634aa1a969b"
+}

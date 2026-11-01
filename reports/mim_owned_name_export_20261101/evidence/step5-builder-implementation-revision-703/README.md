@@ -1,0 +1,5 @@
+# Builder #703 path-validation repair
+
+Append-only author evidence, superseding the earlier builder source freeze while preserving its indexed evidence unchanged. This is not an independent review. The shared root-authored `checked_path` now handles builder explicit stamp paths and source lookups before normalization. CLI tests cover `..`, a symlink directory, and symlink-plus-`..`; each refuses before output publication and preserves canonical input bytes. The earlier test that allowed normalized `..` is replaced by this explicit fail-closed contract after independent finding #703 was filed.
+
+Current combined focused suite: 273 passed, one existing skip, one warning. All 37 builder integration cases pass in the fresh-process baseline. Pinned Ruff passes. Nine copy-only fresh-process mutants fail behavioral tests, including removal of lexical stamp validation; production source hashes were rechecked. Root's separate artifact changes for #703/#704 are exercised in the combined suite but are not authored or independently approved here. No production generation, GitHub mutation or canonical write was performed.

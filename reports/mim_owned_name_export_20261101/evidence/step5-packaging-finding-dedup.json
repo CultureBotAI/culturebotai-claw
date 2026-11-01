@@ -1,0 +1,36 @@
+{
+  "at": "2026-11-01T13:14:36.226480+00:00",
+  "searches": {
+    "repo:CultureBotAI/culturebotai-claw is:issue \"frozen\" \"selection\"": {
+      "total_count": 3,
+      "items": [
+        {
+          "number": 705,
+          "title": "Type-check the owned-name artifact helpers and narrow optional preimages",
+          "state": "open",
+          "url": "https://github.com/CultureBotAI/culturebotai-claw/issues/705"
+        },
+        {
+          "number": 437,
+          "title": "Require an actual enabled Taxon site canary before the full renderer",
+          "state": "open",
+          "url": "https://github.com/CultureBotAI/culturebotai-claw/issues/437"
+        },
+        {
+          "number": 440,
+          "title": "Reconcile merged Habitat map runtime without invalidating build and launcher provenance",
+          "state": "open",
+          "url": "https://github.com/CultureBotAI/culturebotai-claw/issues/440"
+        }
+      ]
+    },
+    "repo:CultureBotAI/culturebotai-claw is:issue \"package_readme\"": {
+      "total_count": 0,
+      "items": []
+    },
+    "repo:CultureBotAI/culturebotai-claw is:issue \"evidence\" \"packager\"": {
+      "total_count": 0,
+      "items": []
+    }
+  }
+}

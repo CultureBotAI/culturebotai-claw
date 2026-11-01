@@ -1,0 +1,50 @@
+[
+  {
+    "at": "2026-11-01T12:53:35.871570+00:00",
+    "kind": "types",
+    "url": "https://github.com/CultureBotAI/culturebotai-claw/issues/705",
+    "argv": [
+      "gh",
+      "issue",
+      "create",
+      "-R",
+      "CultureBotAI/culturebotai-claw",
+      "--title",
+      "Type-check the owned-name artifact helpers and narrow optional preimages",
+      "--body-file",
+      "output/approved-plan-20261101T031134Z/step5-types-issue.md"
+    ]
+  },
+  {
+    "at": "2026-11-01T12:53:37.645449+00:00",
+    "kind": "producer",
+    "url": "https://github.com/CultureBotAI/culturebotai-claw/issues/706",
+    "argv": [
+      "gh",
+      "issue",
+      "create",
+      "-R",
+      "CultureBotAI/culturebotai-claw",
+      "--title",
+      "Bind producer input hashes before importing ownership code",
+      "--body-file",
+      "output/approved-plan-20261101T031134Z/step5-producer-issue.md"
+    ]
+  },
+  {
+    "at": "2026-11-01T12:53:38.681328+00:00",
+    "kind": "cas",
+    "url": "https://github.com/CultureBotAI/culturebotai-claw/issues/707",
+    "argv": [
+      "gh",
+      "issue",
+      "create",
+      "-R",
+      "CultureBotAI/culturebotai-claw",
+      "--title",
+      "Exclude rejected CAS labels before recording ownership suppression",
+      "--body-file",
+      "output/approved-plan-20261101T031134Z/step5-cas-issue.md"
+    ]
+  }
+]

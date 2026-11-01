@@ -1,0 +1,14 @@
+{
+  "name": "step5-builder-706707-controls",
+  "argv": [
+    "python",
+    "../step5-builder-implementation-revision-706-707/mutation_controls.py"
+  ],
+  "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+  "started_at": "2026-11-01T13:01:41.699885+00:00",
+  "environment_profile": "generation-and-native-qc",
+  "finished_at": "2026-11-01T13:02:03.347366+00:00",
+  "exit_code": 0,
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-builder-706707-controls.log",
+  "log_sha256": "a942883564018d3c197e1b52dfbf0a74134b9068c3ab99e06ca16a8da541b25f"
+}

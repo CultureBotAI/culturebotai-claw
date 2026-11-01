@@ -1,0 +1,100 @@
+FFFF                                                                     [100%]
+=================================== FAILURES ===================================
+____ test_equal_tsv_is_not_a_noop_for_changed_or_missing_companions[empty] _____
+
+setup = (PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8545/test_equal_tsv_is_no...ppression-sidecar-required"\nsubject_id\tother\nMIM:Subject\tkept\n', <function setup.<locals>.publish at 0x106b3ede0>)
+change = 'empty'
+
+    @pytest.mark.parametrize("change", ["empty", "missing_sidecar", "missing_manifest", "stale_manifest"])
+    def test_equal_tsv_is_not_a_noop_for_changed_or_missing_companions(setup, change):
+        output, paths, _, sssom, publish = setup
+        publish()
+        if change == "missing_sidecar":
+            paths[1].unlink()
+        elif change == "missing_manifest":
+            paths[2].unlink()
+        elif change == "stale_manifest":
+            paths[2].write_bytes(b"{}\n")
+        result = publish(aliases=sidecar() if change == "empty" else None)
+>       assert result["status"] == "complete"
+E       AssertionError: assert 'unchanged' == 'complete'
+E         
+E         - complete
+E         + unchanged
+
+tests/test_mim_sssom_artifacts.py:98: AssertionError
+_ test_equal_tsv_is_not_a_noop_for_changed_or_missing_companions[missing_sidecar] _
+
+setup = (PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8545/test_equal_tsv_is_no...ppression-sidecar-required"\nsubject_id\tother\nMIM:Subject\tkept\n', <function setup.<locals>.publish at 0x106b3a340>)
+change = 'missing_sidecar'
+
+    @pytest.mark.parametrize("change", ["empty", "missing_sidecar", "missing_manifest", "stale_manifest"])
+    def test_equal_tsv_is_not_a_noop_for_changed_or_missing_companions(setup, change):
+        output, paths, _, sssom, publish = setup
+        publish()
+        if change == "missing_sidecar":
+            paths[1].unlink()
+        elif change == "missing_manifest":
+            paths[2].unlink()
+        elif change == "stale_manifest":
+            paths[2].write_bytes(b"{}\n")
+        result = publish(aliases=sidecar() if change == "empty" else None)
+>       assert result["status"] == "complete"
+E       AssertionError: assert 'unchanged' == 'complete'
+E         
+E         - complete
+E         + unchanged
+
+tests/test_mim_sssom_artifacts.py:98: AssertionError
+_ test_equal_tsv_is_not_a_noop_for_changed_or_missing_companions[missing_manifest] _
+
+setup = (PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8545/test_equal_tsv_is_no...ppression-sidecar-required"\nsubject_id\tother\nMIM:Subject\tkept\n', <function setup.<locals>.publish at 0x106b38400>)
+change = 'missing_manifest'
+
+    @pytest.mark.parametrize("change", ["empty", "missing_sidecar", "missing_manifest", "stale_manifest"])
+    def test_equal_tsv_is_not_a_noop_for_changed_or_missing_companions(setup, change):
+        output, paths, _, sssom, publish = setup
+        publish()
+        if change == "missing_sidecar":
+            paths[1].unlink()
+        elif change == "missing_manifest":
+            paths[2].unlink()
+        elif change == "stale_manifest":
+            paths[2].write_bytes(b"{}\n")
+        result = publish(aliases=sidecar() if change == "empty" else None)
+>       assert result["status"] == "complete"
+E       AssertionError: assert 'unchanged' == 'complete'
+E         
+E         - complete
+E         + unchanged
+
+tests/test_mim_sssom_artifacts.py:98: AssertionError
+_ test_equal_tsv_is_not_a_noop_for_changed_or_missing_companions[stale_manifest] _
+
+setup = (PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8545/test_equal_tsv_is_no...ppression-sidecar-required"\nsubject_id\tother\nMIM:Subject\tkept\n', <function setup.<locals>.publish at 0x106b39440>)
+change = 'stale_manifest'
+
+    @pytest.mark.parametrize("change", ["empty", "missing_sidecar", "missing_manifest", "stale_manifest"])
+    def test_equal_tsv_is_not_a_noop_for_changed_or_missing_companions(setup, change):
+        output, paths, _, sssom, publish = setup
+        publish()
+        if change == "missing_sidecar":
+            paths[1].unlink()
+        elif change == "missing_manifest":
+            paths[2].unlink()
+        elif change == "stale_manifest":
+            paths[2].write_bytes(b"{}\n")
+        result = publish(aliases=sidecar() if change == "empty" else None)
+>       assert result["status"] == "complete"
+E       AssertionError: assert 'unchanged' == 'complete'
+E         
+E         - complete
+E         + unchanged
+
+tests/test_mim_sssom_artifacts.py:98: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_mim_sssom_artifacts.py::test_equal_tsv_is_not_a_noop_for_changed_or_missing_companions[empty]
+FAILED tests/test_mim_sssom_artifacts.py::test_equal_tsv_is_not_a_noop_for_changed_or_missing_companions[missing_sidecar]
+FAILED tests/test_mim_sssom_artifacts.py::test_equal_tsv_is_not_a_noop_for_changed_or_missing_companions[missing_manifest]
+FAILED tests/test_mim_sssom_artifacts.py::test_equal_tsv_is_not_a_noop_for_changed_or_missing_companions[stale_manifest]
+4 failed in 0.10s

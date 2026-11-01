@@ -1,0 +1,56 @@
+.FF.                                                                     [100%]
+=================================== FAILURES ===================================
+_ test_legacy_validator_never_accepts_a_nonzero_exit[1-Unexpected validation failure-False] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10b51ab10>
+returncode = 1, diagnostic = 'Unexpected validation failure', valid = False
+
+    @pytest.mark.parametrize("returncode,diagnostic,valid", [
+        (0, "Informational extension warning", True),
+        (1, "Unexpected validation failure", False),
+        (2, "", False),
+        (0, "subject_id must be supplied", False),
+    ])
+    def test_legacy_validator_never_accepts_a_nonzero_exit(monkeypatch, returncode, diagnostic, valid):
+        spec = importlib.util.spec_from_file_location("exit_publish_test", ROOT / "scripts/publish_sssom.py")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        monkeypatch.setattr(module.subprocess, "run", lambda *a, **kw:
+                            subprocess.CompletedProcess([], returncode, "", diagnostic))
+        errors = module._validate(Path("not-read.tsv"))
+>       assert (errors == []) is valid
+E       assert ([] == []
+E         
+E         Use -v to get more diff) is False
+
+tests/test_mim_sssom_artifacts.py:240: AssertionError
+_________ test_legacy_validator_never_accepts_a_nonzero_exit[2--False] _________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10b3a99d0>
+returncode = 2, diagnostic = '', valid = False
+
+    @pytest.mark.parametrize("returncode,diagnostic,valid", [
+        (0, "Informational extension warning", True),
+        (1, "Unexpected validation failure", False),
+        (2, "", False),
+        (0, "subject_id must be supplied", False),
+    ])
+    def test_legacy_validator_never_accepts_a_nonzero_exit(monkeypatch, returncode, diagnostic, valid):
+        spec = importlib.util.spec_from_file_location("exit_publish_test", ROOT / "scripts/publish_sssom.py")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        monkeypatch.setattr(module.subprocess, "run", lambda *a, **kw:
+                            subprocess.CompletedProcess([], returncode, "", diagnostic))
+        errors = module._validate(Path("not-read.tsv"))
+>       assert (errors == []) is valid
+E       assert ([] == []
+E         
+E         Use -v to get more diff) is False
+
+tests/test_mim_sssom_artifacts.py:240: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_mim_sssom_artifacts.py::test_legacy_validator_never_accepts_a_nonzero_exit[1-Unexpected validation failure-False]
+FAILED tests/test_mim_sssom_artifacts.py::test_legacy_validator_never_accepts_a_nonzero_exit[2--False]
+2 failed, 2 passed in 0.07s

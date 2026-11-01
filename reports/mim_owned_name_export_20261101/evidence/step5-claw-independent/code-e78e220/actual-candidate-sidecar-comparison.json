@@ -1,0 +1,215 @@
+{
+  "old_candidate": "output/approved-plan-20261101T031134Z/step4-mim/output/step4-native-candidate/candidate.sssom.tsv",
+  "new_candidate": "output/approved-plan-20261101T031134Z/step4-mim/output/step5-owned-name-candidate/candidate.sssom.tsv",
+  "old_rows": 2974,
+  "new_rows": 2974,
+  "other_changed_rows": 8,
+  "removed_pairs": 7,
+  "sidecar_rows": 20,
+  "sidecar_without_old_other_removal": [
+    {
+      "subject_id": "MIM:Bacto-tryptone",
+      "token_key": "tryptone",
+      "token": "tryptone",
+      "owner_subject_ids": "[\"MIM:Tryptone\"]",
+      "disposition": "SUPPRESS",
+      "input_surfaces": "[\"mim.ontology_label\"]",
+      "source_refs": "[\"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Bacto-tryptone.yaml#ontology_mapping.ontology_label\"]",
+      "evidence_refs": "[\"https://github.com/CultureBotAI/MediaIngredientMech/issues/669#issuecomment-6558035777\",\"https://github.com/CultureBotAI/culturebotai-claw/issues/701\"]"
+    },
+    {
+      "subject_id": "MIM:Bacto_Brain_Heart_Infusion",
+      "token_key": "brain heart infusion",
+      "token": "brain heart infusion",
+      "owner_subject_ids": "[\"MIM:Brain_Heart_Infusion\"]",
+      "disposition": "SUPPRESS",
+      "input_surfaces": "[\"mim.ontology_label\"]",
+      "source_refs": "[\"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Bacto_Brain_Heart_Infusion.yaml#ontology_mapping.ontology_label\"]",
+      "evidence_refs": "[\"https://github.com/CultureBotAI/MediaIngredientMech/issues/669#issuecomment-6558035777\",\"https://github.com/CultureBotAI/culturebotai-claw/issues/701\"]"
+    },
+    {
+      "subject_id": "MIM:Bacto_Peptone",
+      "token_key": "peptone",
+      "token": "Peptone",
+      "owner_subject_ids": "[\"MIM:Peptone\"]",
+      "disposition": "SUPPRESS",
+      "input_surfaces": "[\"mim.ontology_label\",\"mim.synonym\"]",
+      "source_refs": "[\"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Bacto_Peptone.yaml#ontology_mapping.ontology_label\",\"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Bacto_Peptone.yaml#synonyms[28]\",\"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Bacto_Peptone.yaml#synonyms[29]\"]",
+      "evidence_refs": "[\"https://github.com/CultureBotAI/MediaIngredientMech/issues/669#issuecomment-6558035777\",\"https://github.com/CultureBotAI/culturebotai-claw/issues/701\"]"
+    },
+    {
+      "subject_id": "MIM:Brain_Heart_Infusion_Broth",
+      "token_key": "brain heart infusion",
+      "token": "brain heart infusion",
+      "owner_subject_ids": "[\"MIM:Brain_Heart_Infusion\"]",
+      "disposition": "SUPPRESS",
+      "input_surfaces": "[\"mim.ontology_label\"]",
+      "source_refs": "[\"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Brain_Heart_Infusion_Broth.yaml#ontology_mapping.ontology_label\"]",
+      "evidence_refs": "[\"https://github.com/CultureBotAI/MediaIngredientMech/issues/669#issuecomment-6558035777\",\"https://github.com/CultureBotAI/culturebotai-claw/issues/701\"]"
+    },
+    {
+      "subject_id": "MIM:Cr1_Soil",
+      "token_key": "soil",
+      "token": "soil",
+      "owner_subject_ids": "[\"MIM:Soil\"]",
+      "disposition": "SUPPRESS",
+      "input_surfaces": "[\"mim.ontology_label\"]",
+      "source_refs": "[\"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Cr1_Soil.yaml#ontology_mapping.ontology_label\"]",
+      "evidence_refs": "[\"https://github.com/CultureBotAI/MediaIngredientMech/issues/669#issuecomment-6558035777\",\"https://github.com/CultureBotAI/culturebotai-claw/issues/701\"]"
+    },
+    {
+      "subject_id": "MIM:Geomycin",
+      "token_key": "oxytetracycline",
+      "token": "Oxytetracycline",
+      "owner_subject_ids": "[\"MIM:Oxytetracycline\"]",
+      "disposition": "SUPPRESS",
+      "input_surfaces": "[\"mim.ontology_label\"]",
+      "source_refs": "[\"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Geomycin.yaml#ontology_mapping.ontology_label\"]",
+      "evidence_refs": "[\"https://github.com/CultureBotAI/MediaIngredientMech/issues/669#issuecomment-6558035777\",\"https://github.com/CultureBotAI/culturebotai-claw/issues/701\"]"
+    },
+    {
+      "subject_id": "MIM:Glebomycin",
+      "token_key": "bluensomycin",
+      "token": "Bluensomycin",
+      "owner_subject_ids": "[\"MIM:Bluensomycin\"]",
+      "disposition": "SUPPRESS",
+      "input_surfaces": "[\"mim.ontology_label\"]",
+      "source_refs": "[\"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Glebomycin.yaml#ontology_mapping.ontology_label\"]",
+      "evidence_refs": "[\"https://github.com/CultureBotAI/MediaIngredientMech/issues/669#issuecomment-6558035777\",\"https://github.com/CultureBotAI/culturebotai-claw/issues/701\"]"
+    },
+    {
+      "subject_id": "MIM:Liver_Extract_Concentrate",
+      "token_key": "liver extract",
+      "token": "liver extract",
+      "owner_subject_ids": "[\"MIM:Liver_Extract\"]",
+      "disposition": "SUPPRESS",
+      "input_surfaces": "[\"mim.ontology_label\"]",
+      "source_refs": "[\"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Liver_Extract_Concentrate.yaml#ontology_mapping.ontology_label\"]",
+      "evidence_refs": "[\"https://github.com/CultureBotAI/MediaIngredientMech/issues/669#issuecomment-6558035777\",\"https://github.com/CultureBotAI/culturebotai-claw/issues/701\"]"
+    },
+    {
+      "subject_id": "MIM:Liver_Extract_Infusion",
+      "token_key": "liver extract",
+      "token": "liver extract",
+      "owner_subject_ids": "[\"MIM:Liver_Extract\"]",
+      "disposition": "SUPPRESS",
+      "input_surfaces": "[\"mim.ontology_label\"]",
+      "source_refs": "[\"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Liver_Extract_Infusion.yaml#ontology_mapping.ontology_label\"]",
+      "evidence_refs": "[\"https://github.com/CultureBotAI/MediaIngredientMech/issues/669#issuecomment-6558035777\",\"https://github.com/CultureBotAI/culturebotai-claw/issues/701\"]"
+    },
+    {
+      "subject_id": "MIM:Trisodium_Citrate",
+      "token_key": "sodium citrate",
+      "token": "Sodium citrate",
+      "owner_subject_ids": "[\"MIM:Na3-citrate_X_2_H2o\"]",
+      "disposition": "SUPPRESS",
+      "input_surfaces": "[\"kgmicrobe.canonical_name\",\"kgmicrobe.synonym\",\"mim.ontology_label\",\"mim.synonym\"]",
+      "source_refs": "[\"/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe/mappings/kgmicrobe_unified_entity_mappings.sssom.tsv.gz#object_id=CHEBI:53258\",\"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Trisodium_Citrate.yaml#ontology_mapping.ontology_label\",\"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Trisodium_Citrate.yaml#synonyms[9]\"]",
+      "evidence_refs": "[\"https://github.com/CultureBotAI/MediaIngredientMech/issues/669#issuecomment-6558035777\",\"https://github.com/CultureBotAI/culturebotai-claw/issues/701\"]"
+    },
+    {
+      "subject_id": "MIM:Trisodium_Citrate_X_H2O",
+      "token_key": "trisodium citrate",
+      "token": "trisodium citrate",
+      "owner_subject_ids": "[\"MIM:Trisodium_Citrate\"]",
+      "disposition": "SUPPRESS",
+      "input_surfaces": "[\"mim.ontology_label\"]",
+      "source_refs": "[\"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Trisodium_Citrate_X_H2O.yaml#ontology_mapping.ontology_label\"]",
+      "evidence_refs": "[\"https://github.com/CultureBotAI/MediaIngredientMech/issues/669#issuecomment-6558035777\",\"https://github.com/CultureBotAI/culturebotai-claw/issues/701\"]"
+    },
+    {
+      "subject_id": "MIM:Trypticase",
+      "token_key": "trypticase peptone",
+      "token": "Trypticase peptone",
+      "owner_subject_ids": "[\"MIM:Trypticase_Peptone\"]",
+      "disposition": "SUPPRESS",
+      "input_surfaces": "[\"mim.ontology_label\"]",
+      "source_refs": "[\"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Trypticase.yaml#ontology_mapping.ontology_label\"]",
+      "evidence_refs": "[\"https://github.com/CultureBotAI/MediaIngredientMech/issues/669#issuecomment-6558035777\",\"https://github.com/CultureBotAI/culturebotai-claw/issues/701\"]"
+    },
+    {
+      "subject_id": "MIM:Tryptone_Peptone",
+      "token_key": "tryptone",
+      "token": "tryptone",
+      "owner_subject_ids": "[\"MIM:Tryptone\"]",
+      "disposition": "SUPPRESS",
+      "input_surfaces": "[\"mim.ontology_label\"]",
+      "source_refs": "[\"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Tryptone_Peptone.yaml#ontology_mapping.ontology_label\"]",
+      "evidence_refs": "[\"https://github.com/CultureBotAI/MediaIngredientMech/issues/669#issuecomment-6558035777\",\"https://github.com/CultureBotAI/culturebotai-claw/issues/701\"]"
+    }
+  ],
+  "changed_rows": [
+    {
+      "key": [
+        "MIM:Beta-lactose",
+        "skos:exactMatch",
+        "CHEBI:36218"
+      ],
+      "old": "lactose|beta-D-galactopyranosyl-(1->4)-beta-D-glucopyranose|CAS:5965-66-2",
+      "new": "beta-D-galactopyranosyl-(1->4)-beta-D-glucopyranose|CAS:5965-66-2"
+    },
+    {
+      "key": [
+        "MIM:D-mannitol",
+        "skos:exactMatch",
+        "CHEBI:16899"
+      ],
+      "old": "(2R,3R,4R,5R)-Hexane-1,2,3,4,5,6-hexaol|(2R,3R,4R,5R)-hexane-1,2,3,4,5,6-hexol|D-(-)-Mannitol|E 421|E-421|E421|Osmitrol|dulcite|manna sugar|mannite|Mannitol|CAS:69-65-8",
+      "new": "(2R,3R,4R,5R)-Hexane-1,2,3,4,5,6-hexaol|(2R,3R,4R,5R)-hexane-1,2,3,4,5,6-hexol|D-(-)-Mannitol|E 421|E-421|E421|Osmitrol|dulcite|manna sugar|mannite|CAS:69-65-8"
+    },
+    {
+      "key": [
+        "MIM:L-asparagine",
+        "skos:exactMatch",
+        "CHEBI:17196"
+      ],
+      "old": "(2S)-2,4-diamino-4-oxobutanoic acid|(2S)-2-amino-3-carbamoylpropanoic acid|(S)-2-amino-3-carbamoylpropanoic acid|(S)-Asparagine|2-Aminosuccinamic acid|Aspartamic acid|L-2-aminosuccinamic acid|L-Asparagin|L-aspartic acid beta-amide|alpha-aminosuccinamic acid|ASPARAGINE|CAS:70-47-3",
+      "new": "(2S)-2,4-diamino-4-oxobutanoic acid|(2S)-2-amino-3-carbamoylpropanoic acid|(S)-2-amino-3-carbamoylpropanoic acid|(S)-Asparagine|2-Aminosuccinamic acid|Aspartamic acid|L-2-aminosuccinamic acid|L-Asparagin|L-aspartic acid beta-amide|alpha-aminosuccinamic acid|CAS:70-47-3"
+    },
+    {
+      "key": [
+        "MIM:L-cysteine",
+        "skos:exactMatch",
+        "CHEBI:17561"
+      ],
+      "old": "(2R)-2-amino-3-mercaptopropanoic acid|(2R)-2-amino-3-sulfanylpropanoic acid|(2R)-2-ammonio-3-mercaptopropanoate|(2R)-2-ammonio-3-sulfanylpropanoate|(R)-2-amino-3-mercaptopropanoic acid|E 920|E-920|E920|FREE CYSTEINE|L-2-Amino-3-mercaptopropionic acid|L-Cystein|L-Zystein|CYSTEINE|L-cysteine (Sigma)|CAS:52-90-4",
+      "new": "(2R)-2-amino-3-mercaptopropanoic acid|(2R)-2-amino-3-sulfanylpropanoic acid|(2R)-2-ammonio-3-mercaptopropanoate|(2R)-2-ammonio-3-sulfanylpropanoate|(R)-2-amino-3-mercaptopropanoic acid|E 920|E-920|E920|FREE CYSTEINE|L-2-Amino-3-mercaptopropionic acid|L-Cystein|L-Zystein|L-cysteine (Sigma)|CAS:52-90-4"
+    },
+    {
+      "key": [
+        "MIM:L-glutamic_Acid",
+        "skos:exactMatch",
+        "CHEBI:16015"
+      ],
+      "old": "L-Glutamate|(2S)-2-aminopentanedioic acid|(S)-2-aminopentanedioic acid|(S)-glutamic acid|L-Glu|L-Glutaminic acid|L-Glutaminsaeure|acide glutamique|acido glutamico|acidum glutamicum|GLUTAMIC ACID|CAS:56-86-0",
+      "new": "L-Glutamate|(2S)-2-aminopentanedioic acid|(S)-2-aminopentanedioic acid|(S)-glutamic acid|L-Glu|L-Glutaminic acid|L-Glutaminsaeure|acide glutamique|acido glutamico|acidum glutamicum|CAS:56-86-0"
+    },
+    {
+      "key": [
+        "MIM:L-proline",
+        "skos:exactMatch",
+        "CHEBI:17203"
+      ],
+      "old": "(-)-(S)-proline|(-)-2-pyrrolidinecarboxylic acid|(-)-proline|(2S)-pyrrolidine-2-carboxylic acid|(S)-2-carboxypyrrolidine|(S)-2-pyrrolidinecarboxylic acid|(S)-pyrrolidine-2-carboxylic acid|2-Pyrrolidinecarboxylic acid|L-(-)-proline|L-Prolin|L-alpha-pyrrolidinecarboxylic acid|L-pyrrolidine-2-carboxylic acid|prolinum|PROLINE|CAS:147-85-3",
+      "new": "(-)-(S)-proline|(-)-2-pyrrolidinecarboxylic acid|(-)-proline|(2S)-pyrrolidine-2-carboxylic acid|(S)-2-carboxypyrrolidine|(S)-2-pyrrolidinecarboxylic acid|(S)-pyrrolidine-2-carboxylic acid|2-Pyrrolidinecarboxylic acid|L-(-)-proline|L-Prolin|L-alpha-pyrrolidinecarboxylic acid|L-pyrrolidine-2-carboxylic acid|prolinum|CAS:147-85-3"
+    },
+    {
+      "key": [
+        "MIM:L-tryptophan",
+        "skos:exactMatch",
+        "CHEBI:16828"
+      ],
+      "old": "(2S)-2-amino-3-(1H-indol-3-yl)propanoic acid|(S)-alpha-Amino-beta-(3-indolyl)-propionic acid|(S)-alpha-amino-1H-indole-3-propanoic acid|(S)-tryptophan|L-(-)-tryptophan|L-beta-3-indolylalanine|Tryptophan|CAS:73-22-3",
+      "new": "(2S)-2-amino-3-(1H-indol-3-yl)propanoic acid|(S)-alpha-Amino-beta-(3-indolyl)-propionic acid|(S)-alpha-amino-1H-indole-3-propanoic acid|(S)-tryptophan|L-(-)-tryptophan|L-beta-3-indolylalanine|CAS:73-22-3"
+    },
+    {
+      "key": [
+        "MIM:Seawater",
+        "skos:exactMatch",
+        "ENVO:00002149"
+      ],
+      "old": "Seawater (30 ppt)|Seawater(non-sterilized)",
+      "new": "sea water|Seawater (30 ppt)|Seawater(non-sterilized)"
+    }
+  ]
+}

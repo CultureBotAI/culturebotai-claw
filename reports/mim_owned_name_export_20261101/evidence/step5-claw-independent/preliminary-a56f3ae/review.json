@@ -1,0 +1,46 @@
+{
+  "reviewer": "/root/step4_design_review",
+  "verdict": "PASS_WITH_LIMITATIONS",
+  "scope": "Independent exact preliminary current code head and actual diagnostic artifacts, before final package/PR body/full-suite completion.",
+  "head": "a56f3ae4563619a5129ad944878c9205267315d6",
+  "tree": "2234b0a63051fba13517c79005dbd52685ed3cc9",
+  "generation_revision": "90d110e663c10146351b09ae98d387dabdec0b1c",
+  "producer_unchanged_after_generation": true,
+  "changed_file_count": 13,
+  "remaining_findings": [],
+  "native_verification": "Exact candidate and sidecar replay; all native invariant functions using real available transforms, strict B1 and in-memory empty Rule K baseline; zero rejects.",
+  "b4_limitation": {
+    "BTO": 1,
+    "MICRO": 73
+  },
+  "sidecar_scope": "25 actual policy events aggregate into20 pairs:7 prior published removals,13 already excluded dedicated-label encounters. Not canonical removal count.",
+  "separate_label_input_delta": "Four ENVO:00002149 object labels follow captured fresh canonical resolution. One corresponding Seawater row exposes the old label in other; no other row metadata changes.",
+  "source_preservation": {
+    "generation_inputs": 2697,
+    "maintained_MIM_files": 2959,
+    "individual_YAML_pathset": 2955,
+    "canonical_and_baseline_bytes": "exact merged Step4 Git blobs"
+  },
+  "validation_harness": "Captured source entrypoint compiled explicitly; trusted caller/interpreter boundary documented.",
+  "limitations": [
+    "B4 cannot inspect missing BTO/MICRO transforms; no transforms synthesized or rule waived.",
+    "Full suite completion and final packaged committed-head/PR-body attestation remain required.",
+    "No canonical promotion or scientific approval."
+  ],
+  "runtime_receipt": {
+    "name": "step5-independent-actual-a56-review",
+    "argv": [
+      "python",
+      "-B",
+      "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/preliminary-a56f3ae/verify_actual.py"
+    ],
+    "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+    "started_at": "2026-11-01T13:11:43.943431+00:00",
+    "environment_profile": "generation-and-native-qc",
+    "finished_at": "2026-11-01T13:12:03.216810+00:00",
+    "exit_code": 0,
+    "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-independent-actual-a56-review.log",
+    "log_sha256": "8a29887876694c7f8296e8041cf0c0cda10a850d1fdfa85a24b46a7fbb037282"
+  },
+  "supervisor_context": null
+}

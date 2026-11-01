@@ -1,0 +1,134 @@
+{
+  "classification": "Synthetic native-validator parity, not live generation or independent scientific approval",
+  "native_validator_path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/scripts/validate_sssom_invariants.py",
+  "native_validator_sha256": "89821559f9cbf999675b163396140c4b035cac7bf3ae23dd709f8b76e149de77",
+  "helper_sha256": "18ffd0430d0256b6da6cbb1f3da2327c4cf3418e2b0b2da71ff283ee2f4351ae",
+  "fixtures": {
+    "Live_old.yaml": {
+      "preferred_term": "Old owner",
+      "identifier": "CHEBI:1",
+      "mapping_status": "MAPPED"
+    },
+    "Live_target_A.yaml": {
+      "preferred_term": "Target A",
+      "identifier": "CHEBI:2",
+      "mapping_status": "MAPPED"
+    },
+    "Live_target_Z.yaml": {
+      "preferred_term": "Target Z",
+      "identifier": "CHEBI:2",
+      "mapping_status": "AMBIGUOUS"
+    },
+    "No_target.yaml": {
+      "preferred_term": "Unsupported owner",
+      "identifier": "CHEBI:33",
+      "mapping_status": "MAPPED",
+      "ontology_mapping": {
+        "ontology_id": "unsupported:33"
+      }
+    },
+    "No_name.yaml": {
+      "preferred_term": "",
+      "identifier": "CHEBI:44",
+      "mapping_status": "MAPPED"
+    },
+    "Explicit.yaml": {
+      "preferred_term": "Corrected tombstone",
+      "identifier": "CHEBI:1",
+      "mapping_status": "REJECTED",
+      "representative": "CHEBI:2"
+    },
+    "Legacy.yaml": {
+      "preferred_term": "Legacy tombstone",
+      "identifier": "CHEBI:2",
+      "mapping_status": "REJECTED"
+    },
+    "Empty.yaml": {
+      "preferred_term": "Empty representative",
+      "identifier": "CHEBI:2",
+      "mapping_status": "REJECTED",
+      "representative": ""
+    },
+    "Null.yaml": {
+      "preferred_term": "Null representative",
+      "identifier": "CHEBI:2",
+      "mapping_status": "REJECTED",
+      "representative": null
+    },
+    "Dangling.yaml": {
+      "preferred_term": "Dangling representative",
+      "identifier": "CHEBI:2",
+      "mapping_status": "REJECTED",
+      "representative": "CHEBI:missing"
+    },
+    "Orphan.yaml": {
+      "preferred_term": "Orphan name",
+      "identifier": "CHEBI:99",
+      "mapping_status": "REJECTED"
+    },
+    "α1~name.yaml": {
+      "preferred_term": "Straße",
+      "identifier": "CHEBI:50",
+      "mapping_status": "MAPPED"
+    },
+    "Shared_A.yaml": {
+      "preferred_term": "Same name",
+      "identifier": "CHEBI:51",
+      "mapping_status": "MAPPED"
+    },
+    "Shared_Z.yaml": {
+      "preferred_term": "SAME NAME",
+      "identifier": "CHEBI:52",
+      "mapping_status": "MAPPED"
+    }
+  },
+  "owner_index": {
+    "corrected tombstone": [
+      "MIM:Live_target_A",
+      "MIM:Live_target_Z"
+    ],
+    "dangling representative": [
+      "MIM:Dangling"
+    ],
+    "empty representative": [
+      "MIM:Empty"
+    ],
+    "legacy tombstone": [
+      "MIM:Live_target_A",
+      "MIM:Live_target_Z"
+    ],
+    "null representative": [
+      "MIM:Null"
+    ],
+    "old owner": [
+      "MIM:Live_old"
+    ],
+    "orphan name": [
+      "MIM:Orphan"
+    ],
+    "same name": [
+      "MIM:Shared_A",
+      "MIM:Shared_Z"
+    ],
+    "strasse": [
+      "MIM:~3B11~7Ename"
+    ],
+    "target a": [
+      "MIM:Live_target_A"
+    ],
+    "target z": [
+      "MIM:Live_target_Z"
+    ],
+    "unsupported owner": [
+      "MIM:No_target"
+    ]
+  },
+  "owner_index_equal": true,
+  "row_token_trials": 240,
+  "native_rule_k_before": 192,
+  "native_rule_k_after": 0,
+  "unique_suppressed_pairs": 165,
+  "sidecar_sha256": "43d9d9516864988465f22264b738719ccc0d870629298b2fea22d0dd0a239bba",
+  "no_outside_mapped_directory_owner": true,
+  "empty_native_baseline": true
+}
