@@ -19,6 +19,8 @@ from __future__ import annotations
 import argparse
 import csv
 import dataclasses
+import hashlib
+import io
 import json
 import os
 import re
@@ -58,6 +60,7 @@ KGM_ROOT_PATH = Path(
 
 sys.path.insert(0, str(REPO_ROOT / "src"))
 from kg_microbe_fleet import require_mech_roots  # noqa: E402
+from kg_microbe_utils.ingredient_identity_rejections import rejection_reason  # noqa: E402
 WORKSPACE = REPO_ROOT / "workspace"
 # Overridable so an import can target a git worktree instead of the primary
 # checkout. Without this the hardcoded path writes into whatever branch the main
@@ -107,6 +110,8 @@ class Candidate:
     panels: list[str] = dataclasses.field(default_factory=list)
     media_uses: list[str] = dataclasses.field(default_factory=list)
     raw: dict = dataclasses.field(default_factory=dict)
+    source_correction: dict = dataclasses.field(default_factory=dict)
+    rejected_proposals: list[dict] = dataclasses.field(default_factory=list)
 
 
 @dataclasses.dataclass
@@ -115,6 +120,36 @@ class ResolveResult:
     label: str = ""                # ontology label (when applicable)
     method: str = "no-match"       # which resolver tier hit
     confidence: str = "NONE"       # HIGH / MEDIUM / LOW / NONE / FALLBACK_REGISTRY / UNMAPPED
+
+
+def _rejection(c: Candidate, r: ResolveResult) -> str | None:
+    reason = rejection_reason(ontology_id=r.primary, cas=c.cas, name=c.name)
+    if reason:
+        diagnostic = {"ontology_id": r.primary, "method": r.method, "reason": reason}
+        if diagnostic not in c.rejected_proposals:
+            c.rejected_proposals.append(diagnostic)
+    return reason
+
+
+def _accept_result(c: Candidate, r: ResolveResult) -> ResolveResult:
+    if _rejection(c, r):
+        return ResolveResult("", c.name, "reviewed-identity-rejection", "UNMAPPED")
+    return r
+
+
+def _candidate_evidence(c: Candidate) -> dict:
+    """Serializable evidence shared by histories and the complete run report."""
+    result = {}
+    if c.source_correction:
+        result["source_correction"] = c.source_correction
+    if c.rejected_proposals:
+        result["rejected_proposals"] = c.rejected_proposals
+    return result
+
+
+def _evidence_notes(c: Candidate) -> str:
+    evidence = _candidate_evidence(c)
+    return " Evidence: " + json.dumps(evidence, ensure_ascii=False, sort_keys=True) if evidence else ""
 
 
 # ---------- caches ----------
@@ -282,26 +317,26 @@ class Resolver:
         if c.preset_id and c.preset_id.startswith(
             ("CHEBI:", "FOODON:", "UBERON:", "ENVO:", "NCIT:")
         ):
-            return ResolveResult(c.preset_id, c.preset_label or c.name,
-                                 "source-preset", "HIGH")
+            return _accept_result(c, ResolveResult(c.preset_id, c.preset_label or c.name,
+                                                  "source-preset", "HIGH"))
 
         # Tier 2: OLS exact label/synonym in CHEBI
         hit = ols_search_by_name(c.name, "chebi", self.ols_cache)
         if hit and "chebi" in hit:
-            return ResolveResult(hit["chebi"], hit.get("label", ""),
-                                 f"ols-{hit['match']}-chebi", "HIGH")
+            return _accept_result(c, ResolveResult(hit["chebi"], hit.get("label", ""),
+                                                  f"ols-{hit['match']}-chebi", "HIGH"))
 
         # Tier 4: OAK CHEBI CAS-xref
         if c.cas:
             chebi = oak_cas_lookup(c.cas, self.oak_index)
             if chebi:
-                return ResolveResult(chebi, "", "oak-cas-xref", "HIGH")
+                return _accept_result(c, ResolveResult(chebi, "", "oak-cas-xref", "HIGH"))
 
         # Tier 5: PubChem CID→CHEBI synonym
         if c.cas and self.use_pubchem and self.accept_medium:
             chebi = pubchem_cas_to_chebi(c.cas, self.pubchem_cache)
             if chebi:
-                return ResolveResult(chebi, "", "pubchem-cid-synonym", "MEDIUM")
+                return _accept_result(c, ResolveResult(chebi, "", "pubchem-cid-synonym", "MEDIUM"))
 
         # Tier 6: NCIT exact match
         hit = ols_search_by_name(c.name, "ncit", self.ols_cache)
@@ -322,6 +357,9 @@ class Resolver:
 
 def emit_mapped_yaml(path: Path, c: Candidate, r: ResolveResult,
                      source_name: str) -> tuple[bool, str]:
+    reason = _rejection(c, r)
+    if reason:
+        raise ValueError(reason)
     if path.exists():
         return False, "yaml exists"
     primary = r.primary
@@ -337,6 +375,7 @@ def emit_mapped_yaml(path: Path, c: Candidate, r: ResolveResult,
             f"Used in {len(c.media_uses)} CultureBot media; samples: "
             f"{', '.join(c.media_uses[:3])}{'…' if len(c.media_uses) > 3 else ''}. "
         )
+    notes += _evidence_notes(c)
     extra_synonyms = [
         {"synonym_text": s, "synonym_type": "EXACT_SYNONYM",
          "source": source_name}
@@ -402,11 +441,14 @@ def emit_unmapped_yaml(path: Path, c: Candidate, identifier: str,
         return False, "yaml exists"
     notes = (
         f"Imported from {source_name} (source_id={c.source_id or '—'}); "
-        f"no CAS-RN or CHEBI/NCIT match. Curator review needed."
+        + ("Reviewed identity rejection; curator review needed."
+           if c.rejected_proposals else
+           f"No accepted CHEBI/NCIT match; source CAS-RN={c.cas or 'absent'}. Curator review needed.")
     )
     if c.media_uses:
         notes += (f" Used in {len(c.media_uses)} CultureBot media; samples: "
                   f"{', '.join(c.media_uses[:3])}.")
+    notes += _evidence_notes(c)
     doc = {
         "identifier": identifier,
         "preferred_term": c.name,
@@ -513,58 +555,151 @@ def src_microbedecoder() -> Iterable[Candidate]:
             )
 
 
+_CARNITINE_CORRECTION = {
+    "compound": "Carnitine (Dl) Hydrochloride",
+    "wrong_cas": "461-06-3",
+    "correct_cas": "461-05-2",
+    "correct_form": "hydrochloride",
+    "evidence": '461-06-3 is DL-carnitine free base (C7H15NO3); DL-carnitine hydrochloride is 461-05-2 (C7H16ClNO3); the catalogue already uses 461-05-2 for the "Carnitine Hydrochloride" row',
+}
+_CORRECTION_PATH = Path("data/curated/compound_cas_corrections.tsv")
+_REVIEWED_CORRECTION_REFERENCE = (
+    "https://github.com/CultureBotAI/CultureBotHT/blob/"
+    "1f27c43b1d5c7d15c08b45fc675d91b6ee938371/data/curated/compound_cas_corrections.tsv"
+)
+
+
+def _overlay_reference(path: Path, captured: bytes) -> dict:
+    """Bind a Git reference only when its blob equals the bytes actually parsed."""
+    digest = hashlib.sha256(captured).hexdigest()
+    context = {"overlay_revision": None, "checkout_revision": None,
+               "overlay_reference": f"sha256:{digest}",
+               "reviewed_entry_reference": _REVIEWED_CORRECTION_REFERENCE}
+    try:
+        head = subprocess.run(["git", "-C", str(CULTUREBOT_ROOT), "rev-parse", "HEAD"],
+                              capture_output=True, text=True, timeout=10)
+        revision = head.stdout.strip()
+        if head.returncode or not re.fullmatch(r"[0-9a-f]{40}", revision):
+            return context
+        context["checkout_revision"] = revision
+        relative = path.relative_to(CULTUREBOT_ROOT).as_posix()
+        blob = subprocess.run(["git", "-C", str(CULTUREBOT_ROOT), "show", f"{revision}:{relative}"],
+                              capture_output=True, timeout=10)
+        if blob.returncode == 0 and blob.stdout == captured:
+            context["overlay_revision"] = revision
+            context["overlay_reference"] = f"git:{revision}:{relative}"
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return context
+
+
+def _correct_culturebotht(candidates: list[tuple[Candidate, dict]]) -> None:
+    """Validate the one reviewed raw tuple before any source candidate is yielded."""
+    needed = [(candidate, source) for candidate, source in candidates
+              if (candidate.name.strip(), candidate.cas.strip()) == (
+                  _CARNITINE_CORRECTION["compound"], _CARNITINE_CORRECTION["wrong_cas"])]
+    if not needed:
+        return
+    path = CULTUREBOT_ROOT / _CORRECTION_PATH
+    try:
+        captured = path.read_bytes()
+        reader = csv.DictReader(io.StringIO(captured.decode("utf-8")), delimiter="\t", strict=True)
+        fields = reader.fieldnames or []
+        if len(fields) != len(set(fields)) or not set(_CARNITINE_CORRECTION).issubset(fields):
+            raise ValueError("Missing or duplicate correction columns")
+        rows = list(reader)
+        if any(None in row or any(value is None for value in row.values()) for row in rows):
+            raise ValueError("Malformed correction row")
+        matches = [row for row in rows if (row["compound"].strip(), row["wrong_cas"].strip()) == (
+            _CARNITINE_CORRECTION["compound"], _CARNITINE_CORRECTION["wrong_cas"])]
+        if len(matches) != 1:
+            raise ValueError("Required correction must occur exactly once")
+        entry = matches[0]
+        if any(entry[key].strip() != value for key, value in _CARNITINE_CORRECTION.items()):
+            raise ValueError("Reviewed correction value/form/evidence changed")
+    except (OSError, UnicodeError, csv.Error, ValueError) as error:
+        raise ValueError(f"CultureBotHT carnitine correction preflight failed: {error}") from error
+    reference = _overlay_reference(path, captured)
+    for candidate, source in needed:
+        candidate.source_correction = {
+            **source, "source_id": candidate.source_id, "source_row": candidate.raw,
+            "original_cas": candidate.cas, "corrected_cas": entry["correct_cas"].strip(),
+            "reason": entry["evidence"].strip(), "overlay_entry": entry,
+            "overlay_path": _CORRECTION_PATH.as_posix(),
+            "overlay_sha256": hashlib.sha256(captured).hexdigest(), **reference,
+        }
+        candidate.cas = entry["correct_cas"].strip()
+
+
 def src_culturebotht() -> Iterable[Candidate]:
     compounds_csv = CULTUREBOT_ROOT / "data/raw/google_sheets/compounds_to_cas.csv"
     media_json = CULTUREBOT_ROOT / "data/consolidated/consolidated_media.json"
     # Build media-usage index first.
     ing_to_media: dict[str, list[str]] = defaultdict(list)
     media_cas: dict[str, str] = {}
+    media_origins: dict[str, tuple[dict, dict]] = {}
+    candidates: list[tuple[Candidate, dict]] = []
     if media_json.exists():
-        data = json.loads(media_json.read_text())
+        media_bytes = media_json.read_bytes()
+        data = json.loads(media_bytes)
         for medium_name, m in data.items():
-            for ing in m.get("ingredients", []):
+            for index, ing in enumerate(m.get("ingredients", [])):
                 n = (ing.get("name") or "").strip()
                 if not n:
                     continue
                 ing_to_media[n].append(medium_name)
                 if ing.get("cas_number") and n not in media_cas:
                     media_cas[n] = ing["cas_number"].strip()
+                    media_origins[n] = (dict(ing), {
+                        "source_path": media_json.relative_to(CULTUREBOT_ROOT).as_posix(),
+                        "source_sha256": hashlib.sha256(media_bytes).hexdigest(),
+                        "source_locator": {"medium": medium_name, "ingredient_index": index},
+                    })
     # Compound master pass.
     seen: set[str] = set()
     if compounds_csv.exists():
-        with compounds_csv.open() as f:
-            for r in csv.DictReader(f):
+        source_bytes = compounds_csv.read_bytes()
+        with io.StringIO(source_bytes.decode("utf-8")) as f:
+            reader = csv.DictReader(f)
+            for r in reader:
                 name = (r.get("Compound") or "").strip()
                 cas = (r.get("CAS") or "").strip()
-                # Sanitize multi-CAS values: take first.
-                if cas and (" " in cas or "/" in cas):
-                    cas = cas.split("/")[0].split()[0].strip()
                 if not name:
                     continue
                 seen.add(name.lower())
                 panels = [p for p in PANEL_COLUMNS if (r.get(p) or "").strip()]
                 synonyms = [s.strip() for s in
                             (r.get("Synonyms") or "").split(";") if s.strip()]
-                yield Candidate(
+                candidates.append((Candidate(
                     name=name, cas=cas,
                     source_id="culturebotht.compound:" + name.replace(" ", "_"),
                     synonyms=synonyms,
                     panels=panels,
                     media_uses=ing_to_media.get(name, []),
                     raw=r,
-                )
+                ), {
+                    "source_path": compounds_csv.relative_to(CULTUREBOT_ROOT).as_posix(),
+                    "source_sha256": hashlib.sha256(source_bytes).hexdigest(),
+                    "source_locator": {"csv_line": reader.line_num},
+                }))
     # Media-only pass — names not in compound master.
     for n, media_uses in ing_to_media.items():
         if n.lower() in seen:
             continue
         cas = media_cas.get(n, "")
-        if cas and (" " in cas or "/" in cas):
-            cas = cas.split("/")[0].split()[0].strip()
-        yield Candidate(
+        raw, origin = media_origins.get(n, ({}, {}))
+        candidates.append((Candidate(
             name=n, cas=cas,
             source_id="culturebotht.media:" + n.replace(" ", "_"),
             media_uses=media_uses,
-        )
+            raw=raw,
+        ), origin))
+    _correct_culturebotht(candidates)
+    for candidate, _ in candidates:
+        # Exact source corrections must precede this lossy legacy sanitization.
+        if candidate.cas and (" " in candidate.cas or "/" in candidate.cas):
+            candidate.cas = candidate.cas.split("/")[0].split()[0].strip()
+        yield candidate
 
 
 def src_mim_queue() -> Iterable[Candidate]:
@@ -817,30 +952,43 @@ def main() -> None:
     minted_slugs: set[str] = set()
     next_id = next_unmapped_id()
     sample_records = []
+    candidate_diagnostics = []
 
     start = time.time()
     for i, c in enumerate(_SOURCES[args.source]()):
         if args.max and i >= args.max:
             break
+        diagnostic = {"name": c.name, "source_id": c.source_id, "cas": c.cas,
+                      **_candidate_evidence(c)}
+        if diagnostic.get("source_correction"):
+            candidate_diagnostics.append(diagnostic)
         # Skip if name or CAS already in MIM.
         if c.name.lower() in labels:
+            diagnostic["outcome"] = "skipped_existing_name"
             counts["skipped_already_in_mim"] += 1
             continue
         if c.cas and c.cas in by_cas:
+            diagnostic["outcome"] = "skipped_existing_cas"
             counts["skipped_already_in_mim"] += 1
             continue
         # Slug collision guard.
         slug = slugify(c.name)
         if slug.lower() in slugs or slug.lower() in minted_slugs:
+            diagnostic["outcome"] = "skipped_slug_collision"
             counts["skipped_slug_collision"] += 1
             continue
         result = resolver.resolve(c)
+        diagnostic.update(_candidate_evidence(c))
+        diagnostic["outcome"] = result.method
+        if c.rejected_proposals and diagnostic not in candidate_diagnostics:
+            candidate_diagnostics.append(diagnostic)
         method_counts[result.method] += 1
 
         if result.confidence in ("HIGH", "FALLBACK_REGISTRY") or \
                 (result.confidence == "MEDIUM" and args.accept_medium):
             # Check primary collision (CHEBI/NCIT/cas: already in MIM).
             if result.primary in by_chebi:
+                diagnostic["outcome"] = "skipped_existing_primary"
                 counts["chebi_collision"] += 1
                 continue
             path = MAPPED_DIR / f"{slug}.yaml"
@@ -936,6 +1084,9 @@ def main() -> None:
         out.append("| Name | Primary | Method | Confidence |\n|---|---|---|---|\n")
         for r in sample_records[:25]:
             out.append(f"| {r['name']} | `{r['primary']}` | {r['method']} | {r['confidence']} |\n")
+    if candidate_diagnostics:
+        out.append("\n## Source corrections and rejected proposals (all affected candidates)\n\n")
+        out.append("```json\n" + json.dumps(candidate_diagnostics, indent=2, ensure_ascii=False) + "\n```\n")
     summary_md.write_text("".join(out))
     print(f"\n[5/5] Summary: {summary_md}")
 

@@ -1,0 +1,98 @@
+{
+  "captured_at": "2026-11-01T08:35:28.900127+00:00",
+  "purpose": "Immutable scientific/source evidence for Claw699; implementation validation saved separately.",
+  "source_base": "0cc221bd0f4eb460030eb2e5d14b91a311ed2965",
+  "files": {
+    "primary/ncit-c216679.json": {
+      "sha256": "3c2bbdefd80f43e183e5710bc34afcd24d4af9769cbbd966b8387b90d72a7db0",
+      "bytes": 1391,
+      "source": "step3-preflight-new/ncit-c216679.json"
+    },
+    "primary/ncit-c216679.json.receipt.json": {
+      "sha256": "724418e5f5fab7a63ea9cc61df436580eca791bd79659461a0aefb9a432d7927",
+      "bytes": 582,
+      "source": "step3-preflight-new/ncit-c216679.json.receipt.json"
+    },
+    "primary/pubchem-5970-properties.json": {
+      "sha256": "deccda58718bdec8e08efcd641918524dd5c8ed5cc05bfb7fbc3c1ccbec2064c",
+      "bytes": 502,
+      "source": "step3-preflight-new/pubchem-5970-properties.json"
+    },
+    "primary/pubchem-5970-properties.json.receipt.json": {
+      "sha256": "2a865a973b9d6550e9f14e12b4ec61c34c7cb621dd474a053346768de31d0c79",
+      "bytes": 761,
+      "source": "step3-preflight-new/pubchem-5970-properties.json.receipt.json"
+    },
+    "primary/pubchem-5970-synonyms.json": {
+      "sha256": "6687dc9bf22813e53e3db3bf8d41cfb17ebf347ff3632aed9e86fbc6251b4e80",
+      "bytes": 3831,
+      "source": "step3-preflight-new/pubchem-5970-synonyms.json"
+    },
+    "primary/pubchem-5970-synonyms.json.receipt.json": {
+      "sha256": "defac89b19c1d3038632c59630b3f6210231b2e1d3d1810326c5631ad11b9b12",
+      "bytes": 584,
+      "source": "step3-preflight-new/pubchem-5970-synonyms.json.receipt.json"
+    },
+    "primary/pubchem-cas-461-05-2.json": {
+      "sha256": "d7760ddfaff2de1febd179fbb96b0e384920cbf78ab910bec3e722059cb649df",
+      "bytes": 312,
+      "source": "step3-preflight-new/pubchem-cas-461-05-2.json"
+    },
+    "primary/pubchem-cas-461-05-2.json.receipt.json": {
+      "sha256": "2f8a49420d0b8edc0387d06c4d59cce2534f47ead20101a3ca3a0c6ceecf81e0",
+      "bytes": 669,
+      "source": "step3-preflight-new/pubchem-cas-461-05-2.json.receipt.json"
+    },
+    "primary/pubchem-cas-461-06-3.json": {
+      "sha256": "b9a1509861112a8e100a7edf2a83a14e1dfc9f3d6d2ab93c1e959a105773c4ea",
+      "bytes": 295,
+      "source": "step3-preflight-new/pubchem-cas-461-06-3.json"
+    },
+    "primary/pubchem-cas-461-06-3.json.receipt.json": {
+      "sha256": "a05518f1a84e4b7e36290aae5e68da1c2ad9f6fdef16316306a1613fb45651ae",
+      "bytes": 669,
+      "source": "step3-preflight-new/pubchem-cas-461-06-3.json.receipt.json"
+    },
+    "primary/pubchem-288-properties.json": {
+      "sha256": "37e10b81d61f327bad86e2367d8d5f2b2d053f2f841941c3159814fff53570f0",
+      "bytes": 473,
+      "source": "step3-preflight-new/pubchem-288-properties.json"
+    },
+    "primary/pubchem-288-properties.json.receipt.json": {
+      "sha256": "2541b0bfd1eb44bd17a4b16f2c74c4326bb5ab920f350828ff56a2b116c05b27",
+      "bytes": 759,
+      "source": "step3-preflight-new/pubchem-288-properties.json.receipt.json"
+    },
+    "primary/chebi-48601-primary.json": {
+      "sha256": "b2ccf5a651f0b3aa875440c5caee4c03eeb78e02e82b344a3278b6b4f935d6cd",
+      "bytes": 2972,
+      "source": "step3-preflight-new/chebi-48601-primary.json"
+    },
+    "primary/chebi-48601-primary.json.receipt.json": {
+      "sha256": "a37c32754843862073e8833c9278d11ea26af4f5c505ce4119934af586f04c2f",
+      "bytes": 562,
+      "source": "step3-preflight-new/chebi-48601-primary.json.receipt.json"
+    },
+    "culturebotht/compound_cas_corrections.tsv": {
+      "sha256": "10147dabecb0da6c50ca35445faafc514719a7cd3e25bf7b7bebe3c4b8685b27",
+      "bytes": 908,
+      "source": "step3-independent-preflight/cas-guard-design-review/overlay-source-snapshot/data/curated/compound_cas_corrections.tsv"
+    },
+    "culturebotht/selected-source-rows.json": {
+      "sha256": "7c36a19ccd5562abf7ef533df5251a35cfeaf23dbbd2ef78fe5d733093b2f50c",
+      "bytes": 1514,
+      "source": "step3-preflight-new/culturebotht-compounds-to-cas.csv"
+    },
+    "approved-decision.md": {
+      "sha256": "aee19d779a2980d1b2f9cb65eae352c3519ddd76d177db46db82186721342805",
+      "bytes": 2476,
+      "source": "step3-live-audit/mim1004-approved-decision.md"
+    },
+    "implementation-contract.md": {
+      "sha256": "b28fe108604185e1285ed53c7a39b0754d4abfe5d3d8d00877f93574f519c2a1",
+      "bytes": 9017,
+      "source": "step3-independent-preflight/cas-guard-scope-choice-review/review.md"
+    }
+  },
+  "supervisor_binding": null
+}

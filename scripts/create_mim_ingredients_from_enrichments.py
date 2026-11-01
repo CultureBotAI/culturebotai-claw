@@ -25,6 +25,7 @@ MIM_ROOT_PATH = Path(
     os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
 )
 sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_utils.ingredient_identity_rejections import rejection_reason  # noqa: E402
 from kg_microbe_fleet import require_mech_roots  # noqa: E402
 
 
@@ -36,6 +37,7 @@ class MIMIngredientCreator:
         self.enrichment_file = enrichment_file
         self.culturemech_root = culturemech_root
         self.enrichments = {}
+        self.rejections = []
         self.ingredient_usage = {}
         self.stats = {
             'enrichments_loaded': 0,
@@ -55,9 +57,11 @@ class MIMIngredientCreator:
         self.stats['enrichments_loaded'] = len(self.enrichments)
 
         # Count successful enrichments
-        successful = sum(1 for e in self.enrichments.values() if e.get('chebi_id'))
+        successful = sum(1 for name, e in self.enrichments.items()
+                         if e.get('chebi_id') and not rejection_reason(
+                             ontology_id=e['chebi_id'], name=name, cas=e.get('cas_rn')))
         print(f"Loaded {len(self.enrichments)} enrichment entries")
-        print(f"  {successful} with ChEBI IDs\n")
+        print(f"  {successful} admissible ChEBI IDs\n")
 
     def collect_usage_statistics(self):
         """
@@ -158,6 +162,12 @@ class MIMIngredientCreator:
         if not chebi_id:
             return False
 
+        reason = rejection_reason(ontology_id=chebi_id, name=ingredient_name, cas=cas_rn)
+        if reason:
+            self.rejections.append({"name": ingredient_name, "chebi_id": chebi_id, "reason": reason})
+            print(f"[REJECTED] {ingredient_name} → {chebi_id}: {reason}")
+            return False
+
         # Get usage statistics
         usage = self.ingredient_usage.get(ingredient_name, {
             'total_occurrences': 0,
@@ -233,6 +243,13 @@ class MIMIngredientCreator:
             chebi_id = enrichment_data.get('chebi_id')
 
             if not chebi_id:
+                continue
+
+            reason = rejection_reason(ontology_id=chebi_id, name=ingredient_name,
+                                      cas=enrichment_data.get("cas_rn"))
+            if reason:
+                self.rejections.append({"name": ingredient_name, "chebi_id": chebi_id, "reason": reason})
+                print(f"[REJECTED] {ingredient_name} → {chebi_id}: {reason}")
                 continue
 
             # Check if already exists
