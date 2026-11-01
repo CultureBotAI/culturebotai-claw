@@ -292,7 +292,7 @@ def test_b1_still_synthesizes_a_registry_row_for_a_cas_primary(tmp_path):
 
 
 def test_b1_requires_the_subject_slug_even_with_another_local_identity(tmp_path):
-    """An unrelated local slug must not suppress the required subject handle."""
+    """#684: retain B1's subject slug in the curated identity's namespace."""
     rows = rows_for(tmp_path, stem="Thing", identifier="kgmicrobe.ingredient:other",
                     ontology_id="CHEBI:17634", quality="NARROW_MATCH")
 
@@ -300,7 +300,60 @@ def test_b1_requires_the_subject_slug_even_with_another_local_identity(tmp_path)
     assert {(r["object_id"], r["predicate_id"]) for r in rows} == {
         ("CHEBI:17634", "skos:broadMatch"),
         ("kgmicrobe.ingredient:other", "skos:exactMatch"),
-        ("kgmicrobe.compound:thing", "skos:exactMatch"),
+        ("kgmicrobe.ingredient:thing", "skos:exactMatch"),
+    }
+
+
+def test_b1_stock_alias_retains_the_curated_namespace_with_a_different_slug(tmp_path):
+    """#684: the real Sodium_Nitrate_070_M_Stock identity predates its filename.
+
+    Preserve that curated identity and add the filename-based B1 handle in the
+    same namespace; the broader sodium nitrate compound does not type the stock.
+    """
+    identifier = "kgmicrobe.ingredient:sodium_nitrate_~28070_m_stock~29"
+    rows = rows_for(
+        tmp_path, stem="Sodium_Nitrate_070_M_Stock", identifier=identifier,
+        ontology_id="CHEBI:63005", quality="NARROW_MATCH",
+        ingredient_type="STOCK_SOLUTION", label="Sodium nitrate (0.70 M stock)",
+    )
+
+    assert len(rows) == 3
+    assert {(r["object_id"], r["predicate_id"]) for r in rows} == {
+        ("CHEBI:63005", "skos:broadMatch"),
+        (identifier, "skos:exactMatch"),
+        ("kgmicrobe.ingredient:sodium_nitrate_070_m_stock", "skos:exactMatch"),
+    }
+    alias = identity_row(rows, "kgmicrobe.ingredient:sodium_nitrate_070_m_stock")
+    assert alias["object_source"] == "kgm:ingredient"
+
+
+@pytest.mark.parametrize(
+    ("identifier", "ontology_id", "expected_alias"),
+    [
+        ("kgmicrobe.ingredient:MES_Buffer", "CHEBI:39010",
+         "kgmicrobe.ingredient:mes_buffer"),
+        ("kgmicrobe.compound:MES_Buffer", "FOODON:00001234",
+         "kgmicrobe.compound:mes_buffer"),
+        ("kgmicrobe.compound:another_slug", "FOODON:00001234",
+         "kgmicrobe.compound:mes_buffer"),
+    ],
+)
+def test_b1_canonical_alias_keeps_namespace_for_mixed_case_or_other_slug(
+    tmp_path, identifier, ontology_id, expected_alias,
+):
+    """#685: preserve original spelling without a B5 namespace collision.
+
+    B1 requires the lowercase subject slug, so merely skipping the backfill
+    case-insensitively would not satisfy it for a mixed-case primary identity.
+    """
+    rows = rows_for(tmp_path, stem="MES_Buffer", identifier=identifier,
+                    ontology_id=ontology_id, quality="NARROW_MATCH")
+
+    assert len(rows) == 3
+    assert {(r["object_id"], r["predicate_id"]) for r in rows} == {
+        (ontology_id, "skos:broadMatch"),
+        (identifier, "skos:exactMatch"),
+        (expected_alias, "skos:exactMatch"),
     }
 
 

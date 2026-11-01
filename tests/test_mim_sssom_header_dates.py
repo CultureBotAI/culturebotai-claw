@@ -2,7 +2,7 @@
 
 import importlib.util
 import sys
-from datetime import datetime
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -20,12 +20,12 @@ def run_builder(tmp_path, monkeypatch, rows, output):
     inputs = tmp_path / 'inputs'
     inputs.mkdir()
     (inputs / 'fixture.yaml').write_text('{}\n')
-    class BuildClock(datetime):
+    class BuildClock(date):
         @classmethod
-        def now(cls, tz=None):
-            return cls(2031, 1, 2, tzinfo=tz)
+        def today(cls):
+            return cls(2031, 1, 2)
 
-    monkeypatch.setattr(builder, 'datetime', BuildClock)
+    monkeypatch.setattr(builder, 'date', BuildClock)
     emitted = [dict(subject_id=f'MIM:record{i}', object_id=f'CHEBI:{i+1}',
                     predicate_id='skos:exactMatch', **row) for i, row in enumerate(rows)]
     monkeypatch.setattr(builder, 'MIM_INGREDIENTS_DIR', inputs)
@@ -60,12 +60,44 @@ def test_no_usable_row_date_refuses_to_replace_existing_output(tmp_path, monkeyp
     assert path.read_text() == 'previous output\n'
 
 
-def test_missing_row_date_is_not_hidden_by_a_valid_one(tmp_path, monkeypatch):
+def test_missing_row_date_is_preserved_for_rule_f(tmp_path, monkeypatch):
     path = tmp_path / 'mapping.tsv'
-    with pytest.raises(ValueError, match='mapping_date'):
-        run_builder(tmp_path, monkeypatch,
-                    [{'mapping_date': '2026-10-15'}, {'mapping_date': ''}], path)
-    assert not path.exists()
+    run_builder(tmp_path, monkeypatch,
+                [{'mapping_date': '2026-10-15'}, {'mapping_date': ''}], path)
+    assert '# mapping_date: "2026-10-15"' in path.read_text()
+    assert read_rows(path)[1]['mapping_date'] == ''
+
+
+def read_rows(path):
+    import csv
+    return list(csv.DictReader(
+        (line for line in path.read_text().splitlines() if not line.startswith('#')),
+        delimiter='\t',
+    ))
+
+
+def test_all_dateless_subjects_are_reported_before_replacing_output(tmp_path, monkeypatch):
+    path = tmp_path / 'mapping.tsv'
+    path.write_text('previous output\n')
+    with pytest.raises(ValueError, match='mapping_date') as error:
+        run_builder(tmp_path, monkeypatch, [{'mapping_date': ''}, {}], path)
+    assert 'MIM:record0' in str(error.value)
+    assert 'MIM:record1' in str(error.value)
+    assert path.read_text() == 'previous output\n'
+
+
+def test_all_malformed_row_dates_are_reported_before_replacing_output(tmp_path, monkeypatch):
+    path = tmp_path / 'mapping.tsv'
+    path.write_text('previous output\n')
+    with pytest.raises(ValueError, match='mapping_date') as error:
+        run_builder(tmp_path, monkeypatch, [
+            {'mapping_date': '2026-10-15'},
+            {'mapping_date': '2026-02-30'},
+            {'mapping_date': '２０２６-10-15'},
+        ], path)
+    assert 'MIM:record1' in str(error.value)
+    assert 'MIM:record2' in str(error.value)
+    assert path.read_text() == 'previous output\n'
 
 
 @pytest.mark.parametrize('history_date', ['２０２６-10-15', '٢٠٢٦-10-15'])
@@ -86,7 +118,7 @@ def test_non_ascii_history_date_cannot_replace_output(tmp_path, monkeypatch, his
         f'  - timestamp: "{history_date}T00:00:00Z"\n',
         encoding='utf-8',
     )
-    assert builder._row_from_yaml(record, {}, {}, {}, {})[0]['mapping_date'] == history_date
+    assert builder._row_from_yaml(record, {}, {}, {}, {})[0]['mapping_date'] == ''
     output = tmp_path / 'mapping.tsv'
     output.write_text('previous output\n')
     monkeypatch.setattr(builder, 'MIM_INGREDIENTS_DIR', inputs)
@@ -100,3 +132,35 @@ def test_non_ascii_history_date_cannot_replace_output(tmp_path, monkeypatch, his
     with pytest.raises(ValueError, match='mapping_date'):
         builder.main()
     assert output.read_text() == 'previous output\n'
+
+
+def test_dateless_record_reaches_rule_f_as_an_empty_cell(tmp_path, monkeypatch, capsys):
+    """Native YAML extraction and CLI output keep every dateless record visible."""
+    inputs = tmp_path / 'records'
+    inputs.mkdir()
+    base = (
+        'identifier: CHEBI:15377\n'
+        'mapping_status: MAPPED\n'
+        'ontology_mapping:\n'
+        '  ontology_id: CHEBI:15377\n'
+        '  ontology_label: water\n'
+        '  mapping_quality: EXACT_MATCH\n'
+    )
+    (inputs / 'Dated.yaml').write_text(base + 'preferred_term: Dated\n'
+        'curation_history:\n  - timestamp: "2026-10-15T00:00:00Z"\n')
+    (inputs / 'Dateless.yaml').write_text(base + 'preferred_term: Dateless\n')
+    output = tmp_path / 'mapping.tsv'
+    monkeypatch.setattr(builder, 'MIM_INGREDIENTS_DIR', inputs)
+    monkeypatch.setattr(builder, 'require_mech_roots', lambda *a, **kw: None)
+    monkeypatch.setattr(builder, '_load_residual_categorization', lambda: {})
+    monkeypatch.setattr(builder, '_load_kgm_source_index', lambda: {})
+    monkeypatch.setattr(builder, '_load_kgm_labels', lambda: {})
+    monkeypatch.setattr(builder, '_load_chebi_labels', lambda *a: {'CHEBI:15377': 'water'})
+    monkeypatch.setattr(sys, 'argv', ['builder', '--no-validate', '--no-preserve-validation',
+                                   '--output', str(output)])
+    builder.main()
+    dates = {row['subject_id']: row['mapping_date'] for row in read_rows(output)}
+    assert dates == {'MIM:Dated': '2026-10-15', 'MIM:Dateless': ''}
+    assert '# mapping_date: "2026-10-15"' in output.read_text()
+    warning = capsys.readouterr().out
+    assert 'Dateless.yaml' in warning and 'Rule F' in warning
