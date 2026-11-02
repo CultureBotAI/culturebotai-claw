@@ -348,6 +348,8 @@ def validate_history(history: dict[str, Any], manifest: FleetManifest | None = N
         association_ids.add(item["id"])
     cursor_ids = set()
     for item in history["cursors"]:
+        if "excluded_pr_associations" in item and type(item["excluded_pr_associations"]) is not int:
+            raise ProgressError("excluded association count must be a nonnegative integer")
         identity = (item["repository_key"], item["run_key"])
         if identity in cursor_ids or item["repository_key"] not in fleet.mechs:
             raise ProgressError("duplicate or unknown run cursor")
@@ -434,8 +436,11 @@ def snapshot_from_history(history: dict[str, Any], *, generated_at: str,
             "history_coverage": "partial" if cursors else "unobserved",
         }
         if current:
-            row["current"] = {k: v for k, v in current.items() if k not in {"repository_key", "started_at"}}
+            row["current"] = {k: v for k, v in current.items()
+                              if k not in {"repository_key", "started_at", "excluded_pr_associations"}}
             row["last_observed_at"] = current["observed_at"]
+        if any("excluded_pr_associations" in cursor for cursor in cursors):
+            row["excluded_pr_associations"] = sum(cursor.get("excluded_pr_associations", 0) for cursor in cursors)
         repositories.append(row)
     result = {
         "schema_version": VERSION, "generated_at": generated_at,
@@ -457,6 +462,8 @@ def validate_snapshot(snapshot: dict[str, Any], manifest: FleetManifest | None =
     if [row["key"] for row in snapshot["repositories"]] != list(fleet.keys):
         raise ProgressError("snapshot must contain the complete manifest fleet in order")
     for row in snapshot["repositories"]:
+        if "excluded_pr_associations" in row and type(row["excluded_pr_associations"]) is not int:
+            raise ProgressError("excluded association count must be a nonnegative integer")
         mech = fleet.mechs[row["key"]]
         if row["github_url"] != f"https://github.com/{mech.github}" or row["name"] != mech.display_name:
             raise ProgressError("snapshot repository identity differs from manifest")
@@ -512,11 +519,13 @@ def collect_progress(
     runtime_dirs: list[Path], previous_history: dict[str, Any] | None = None, *,
     generated_at: str | None = None, manifest: FleetManifest | None = None,
     verified_pr_observations: list[dict[str, Any]] | None = None,
+    excluded_association_counts: dict[tuple[str, str], int] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Read explicit supervisor runs and return history plus a public snapshot.
 
     Omitted old runs retain their history. Supplied runs must retain every
     previously observed closure and must not regress cycle, stage or timestamp.
+    Omitted exclusion counts retain their last observed values.
     Repeated collection is idempotent apart from fresher observation cursors.
     The caller must serialize this read/modify/write operation with an exclusive
     lock, and preserve the previous history on failure.
@@ -529,6 +538,11 @@ def collect_progress(
     validate_history(history, fleet)
     old_closures = {event["id"]: event for event in history["closures"]}
     observations: list[dict[str, Any]] = []
+    diagnostic_sources: set[tuple[str, str]] = set()
+    if excluded_association_counts is not None and any(
+        type(count) is not int or count < 0 for count in excluded_association_counts.values()
+    ):
+        raise ProgressError("excluded association count must be a nonnegative integer")
     run_sources: set[str] = set()
     for runtime in runtime_dirs:
         runtime = Path(runtime)
@@ -566,9 +580,17 @@ def collect_progress(
                 "blocker_code": _blocker(ledger.get("blocked_reason"), phase),
                 "observed_at": observed_at, "started_at": ledger["created_at"],
             }
+            source = (config["run_id"], key)
+            diagnostic_sources.add(source)
+            if excluded_association_counts is not None:
+                if source not in excluded_association_counts:
+                    raise ProgressError("missing excluded association count for runtime target")
+                cursor["excluded_pr_associations"] = excluded_association_counts[source]
             prior_cursor = next((c for c in history["cursors"]
                                  if c["repository_key"] == key and c["run_key"] == run), None)
             if prior_cursor:
+                if excluded_association_counts is None and "excluded_pr_associations" in prior_cursor:
+                    cursor["excluded_pr_associations"] = prior_cursor["excluded_pr_associations"]
                 if (cursor["started_at"] != prior_cursor["started_at"]
                         or (cycle, stage) < (prior_cursor["cycle"], prior_cursor["stage_number"])
                         or _date(observed_at) < _date(prior_cursor["observed_at"])):
@@ -601,6 +623,8 @@ def collect_progress(
         old_targets = {cursor["repository_key"] for cursor in history["cursors"] if cursor["run_key"] == run}
         if not old_targets <= target_keys:
             raise ProgressError("previously observed run target disappeared")
+    if excluded_association_counts is not None and set(excluded_association_counts) != diagnostic_sources:
+        raise ProgressError("excluded association counts contain unknown runtime targets")
     for observation in verified_pr_observations or []:
         item = copy.deepcopy(observation)
         key = item["repository_key"]

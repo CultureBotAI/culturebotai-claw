@@ -275,6 +275,10 @@ classes:
         required: true
   Cursor:
     attributes:
+      excluded_pr_associations:
+        description: Well-formed registry records excluded because no retained goal context matches.
+        range: integer
+        minimum_value: 0
       repository_key:
         range: RepositoryKey
         required: true
@@ -361,6 +365,10 @@ classes:
         required: true
   RepositoryProgress:
     attributes:
+      excluded_pr_associations:
+        description: Sum of excluded registry records across retained run cursors with diagnostics.
+        range: integer
+        minimum_value: 0
       key:
         range: RepositoryKey
         required: true
