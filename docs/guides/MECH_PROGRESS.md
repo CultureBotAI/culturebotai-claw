@@ -197,6 +197,41 @@ or replace newer observations with an old bundle to bypass this boundary.
 Recover with a release that understands the extended schema; an older binary
 would require a separately reviewed compatibility change before it could run.
 
+### Reading status without updating the monitor checkout
+
+If the live monitor checkout cannot be safely updated in place, leave it
+untouched and run status from the pinned updated release instead. This meets
+the consumer upgrade requirement without switching the monitor checkout or
+changing its dependencies. Use that release's `mech-progress-status` skill and
+substitute these commands for its checkout-relative `uv` or `just` invocation.
+The release must already contain the reviewed change and its own environment,
+as prepared by the installation procedure below.
+
+Set `STATE` to the existing production publisher state directory and `RELEASE`
+to the exact reviewed release. Both status modes explicitly select the producer's
+fleet pin; local status also explicitly selects the production bundle so it
+cannot accidentally read a different checkout's default state directory:
+
+```bash
+STATE=/absolute/path/to/production/progress-publisher
+RELEASE="$STATE/releases/FULL_REVIEWED_MAIN_COMMIT_SHA"
+PYTHON="$RELEASE/.venv/bin/python"
+
+env PYTHONPATH="$RELEASE/src:$RELEASE" "$PYTHON" \
+  "$RELEASE/scripts/mech_progress_status.py" \
+  --bundle "$STATE/bundle.json" --manifest "$STATE/fleet.yaml"
+
+env PYTHONPATH="$RELEASE/src:$RELEASE" "$PYTHON" \
+  "$RELEASE/scripts/mech_progress_status.py" \
+  --published --manifest "$STATE/fleet.yaml"
+```
+
+These commands read saved evidence; they neither deploy nor restart a publisher
+or monitor. For the skill, return stdout unchanged and retain any freshness
+warnings on stderr. Do not continue using the old checkout's status command
+after updated bundles appear, and do not edit or remove the fleet pin to make
+an incompatible reader accept them.
+
 ### Installing a reviewed publisher release
 
 This is an operator procedure, not an automatic deployment command. First merge

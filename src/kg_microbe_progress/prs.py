@@ -134,7 +134,9 @@ def _retained_contexts(ledger: dict) -> list[dict]:
     """Validate the comparison source before calling a registry record orphaned."""
     current = _context(ledger)
     contexts = []
-    if current["goal_identity"] is not None or not (ledger.get("stage") == 0 or ledger.get("awaiting_goal") is True):
+    # Initialization or failed adoption can leave any stage without a goal.
+    # Absence supplies no current context; non-null malformed goals still fail.
+    if current["goal_identity"] is not None:
         _validate_context(current)
         contexts.append(current)
     completed = ledger.get("completed_stages")

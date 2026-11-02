@@ -78,3 +78,17 @@ def test_guide_covers_all_readers_and_the_first_write_rollback_boundary():
 
     installation = guide.split("### Installing a reviewed publisher release\n", 1)[1]
     assert installation.index('mkdir -p "$STATE/releases"') < installation.index('mkdir "$RELEASE"')
+
+
+def test_guide_routes_status_and_skill_through_release_with_explicit_production_state():
+    guide = (ROOT / "docs/guides/MECH_PROGRESS.md").read_text()
+    route = guide.split("### Reading status without updating the monitor checkout\n", 1)[1]
+    route = route.split("\n### ", 1)[0]
+
+    assert "mech-progress-status" in route
+    assert "leave it untouched" in " ".join(route.split())
+    assert 'PYTHON="$RELEASE/.venv/bin/python"' in route
+    assert route.count('env PYTHONPATH="$RELEASE/src:$RELEASE" "$PYTHON"') == 2
+    assert route.count('"$RELEASE/scripts/mech_progress_status.py"') == 2
+    assert '--bundle "$STATE/bundle.json" --manifest "$STATE/fleet.yaml"' in route
+    assert '--published --manifest "$STATE/fleet.yaml"' in route

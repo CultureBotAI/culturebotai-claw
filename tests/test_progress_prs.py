@@ -247,7 +247,6 @@ def test_duplicate_runtime_cannot_inflate_exclusions(session):
 @pytest.mark.parametrize("mutate", [
     lambda ledger: ledger.update(adopted_goal="malformed-not-an-object"),
     lambda ledger: ledger.update(adopted_goal={**GOAL, "start_step_index": True}),
-    lambda ledger: ledger.update(adopted_goal=None),
     lambda ledger: ledger.update(completed_stages={}),
     lambda ledger: ledger.update(completed_stages=["malformed"]),
     lambda ledger: ledger.update(completed_stages=[{"cycle": 1, "stage": 1,
@@ -278,7 +277,7 @@ def test_legacy_closure_without_workflow_pin_does_not_invent_association_authori
     assert found.excluded_counts == {(session.ledger["run_id"], "traitmech"): 1}
 
 
-@pytest.mark.parametrize("stage,awaiting", [(0, False), (1, True)])
+@pytest.mark.parametrize("stage,awaiting", [(0, False), (1, True), (1, False), (3, False), (6, False)])
 def test_unadopted_goal_does_not_create_retained_context(session, stage, awaiting):
     write(session.root / prs.REGISTRY_NAME, record(session))
     session.ledger.update(adopted_goal=None, stage=stage, awaiting_goal=awaiting)
@@ -286,6 +285,29 @@ def test_unadopted_goal_does_not_create_retained_context(session, stage, awaitin
     result = prs.collect_associations([session.runtime])
     assert result.records == []
     assert result.excluded_counts == {(session.ledger["run_id"], "traitmech"): 1}
+
+
+@pytest.mark.parametrize("goal", ["malformed", "", False, 0, {}, []])
+def test_non_null_malformed_goal_fails_even_without_associations(session, goal):
+    session.ledger.update(adopted_goal=goal, stage=3, awaiting_goal=False)
+    write(session.root / "ledger.json", session.ledger)
+    with pytest.raises(prs.AssociationError, match="native goal"):
+        prs.collect_associations([session.runtime])
+
+
+def test_unadopted_goal_preserves_retained_completed_context(session):
+    completed = record(session)
+    write(session.root / prs.REGISTRY_NAME, completed)
+    session.ledger.update(adopted_goal=None, stage=3, awaiting_goal=False,
+                          completed_stages=[completed])
+    write(session.root / "ledger.json", session.ledger)
+    result = prs.collect_associations([session.runtime])
+    assert result.records == [completed]
+    assert result.excluded_counts == {(session.ledger["run_id"], "traitmech"): 0}
+    session.ledger["completed_stages"][0]["goal_identity"] = "malformed"
+    write(session.root / "ledger.json", session.ledger)
+    with pytest.raises(prs.AssociationError, match="native goal"):
+        prs.collect_associations([session.runtime])
 
 
 @pytest.mark.parametrize("number", [0, -1, True, "42"])
@@ -359,12 +381,13 @@ def test_runtime_target_cannot_redirect_github(session):
         prs.register_pr(session.root, 42)
 
 
-def test_unadopted_assessment_has_no_pr_associations_and_cannot_register(session):
-    session.ledger.update(stage=0, adopted_goal=None)
+@pytest.mark.parametrize("stage", [0, 3])
+def test_unadopted_assessment_has_no_pr_associations_and_cannot_register(session, stage):
+    session.ledger.update(stage=stage, adopted_goal=None)
     write(session.root / "ledger.json", session.ledger)
     write(session.root / "status.json", prs._context(session.ledger))
     assert prs.gather_associations([session.runtime]) == []
-    with pytest.raises(prs.AssociationError, match="workflow identity"):
+    with pytest.raises(prs.AssociationError, match="identity"):
         prs.register_pr(session.root, 42)
 
 

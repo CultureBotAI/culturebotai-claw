@@ -285,3 +285,57 @@ def test_published_association_later_orphaned_keeps_history_and_refreshes_pr(tmp
     assert refreshed["history"]["cursors"][0]["excluded_pr_associations"] == 1
     assert queries == [["gh", "api", f"repos/{GITHUB}/pulls/42"]] * 2
     assert {p: p.read_bytes() for p in root.rglob("*") if p.is_file()} == before
+
+
+@pytest.mark.parametrize("stage", [1, 3, 6])
+@pytest.mark.parametrize("apply", [False, True])
+def test_unadopted_target_does_not_block_healthy_fleet_publication(tmp_path, monkeypatch, stage, apply):
+    from test_progress_model import GITHUB, KEY, runtime, save_ledger, write
+
+    from kg_microbe_fleet import load_fleet_manifest
+    from kg_microbe_progress import prs, validate_bundle
+
+    root, healthy = runtime(tmp_path)
+    healthy.update(adopted_goal={"conversation_id": "private", "started_at": healthy["created_at"],
+                                 "start_step_index": 2}, workflow={"sha256": "c" * 64})
+    save_ledger(root, healthy)
+    (root / KEY / prs.REGISTRY_NAME).write_text(json.dumps({**prs._context(healthy),
+        "schema_version": 1, "pr_number": 42, "reported_at": healthy["last_observed_at"]}) + "\n")
+    unadopted = {**healthy, "repository_key": "traitmech", "stage": stage,
+        "adopted_goal": None, "awaiting_goal": False, "phase": "blocked",
+        "blocked_reason": "no authoritative current goal; assessment required"}
+    write(root / "traitmech" / "ledger.json", unadopted)
+    config = json.loads((root / "config.json").read_text())
+    config["targets"].append({"repository_key": "traitmech",
+                              "github_repository": load_fleet_manifest().get("traitmech").github})
+    write(root / "config.json", config)
+    assert sorted(p.name for p in (root / "traitmech").iterdir()) == ["ledger.json"]
+    before = {p: p.read_bytes() for p in root.rglob("*") if p.is_file()}
+    queries = []
+    def github(args):
+        queries.append(args)
+        return subprocess.CompletedProcess(args, 0, stdout=json.dumps({
+            "number": 42, "base": {"repo": {"full_name": GITHUB}},
+            "head": {"sha": "a" * 40}, "html_url": f"https://github.com/{GITHUB}/pull/42",
+            "merged": False, "state": "open", "merged_at": None,
+        }))
+    monkeypatch.setattr(publisher, "fetch_pr_observations",
+                        lambda associations: prs.fetch_pr_observations(associations, gh=github))
+    api = GitHub()
+    state = tmp_path / "state"
+    result = publisher.collect_once([root], state, api=api, apply=apply, initialize=apply)
+    bundle = json.loads((state / "bundle.json").read_text())
+    validate_bundle(bundle["history"], bundle["snapshot"])
+    rows = {row["key"]: row for row in bundle["snapshot"]["repositories"]}
+    assert [pr["number"] for pr in rows[KEY]["pull_requests"]] == [42]
+    assert rows["traitmech"]["pull_requests"] == []
+    assert rows["traitmech"]["excluded_pr_associations"] == 0
+    assert bundle["snapshot"]["totals"]["unique_prs"] == 1
+    assert bundle["snapshot"]["totals"]["completed_goals"] == 0
+    assert queries == [["gh", "api", f"repos/{GITHUB}/pulls/42"]]
+    assert result["status"] == ("published" if apply else "collected")
+    if apply:
+        assert publisher.read_remote(api)[1] == bundle
+    else:
+        assert api.calls == []
+    assert {p: p.read_bytes() for p in root.rglob("*") if p.is_file()} == before
