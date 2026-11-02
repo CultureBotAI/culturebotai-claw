@@ -145,6 +145,12 @@ def _mim_merge_target(data: dict) -> str:
         if event.get('action') in MIM_MERGE_ACTIONS:
             return (data.get('identifier') or '').strip()
         if event.get('new_status') == 'REJECTED':
+            # This reviewed source cleanup preserves a tombstone's status and
+            # merge evidence (MIM#882, claw#711). Unknown events, incomplete
+            # transitions and explicit rejection still stop the legacy scan.
+            if (event.get('action') == 'REMOVED_STALE_KG_MICROBE_NODE_ID'
+                    and event.get('previous_status') == 'REJECTED'):
+                continue
             return ''
     return ''
 
