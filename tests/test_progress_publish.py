@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from kg_microbe_progress import collect_progress
+from kg_microbe_progress.prs import AssociationCollection
 
 ROOT = Path(__file__).parents[1]
 SPEC = importlib.util.spec_from_file_location("mech_progress_publish", ROOT / "scripts/mech_progress_publish.py")
@@ -132,7 +133,7 @@ def test_atomic_state_refuses_symlink_without_touching_target(tmp_path, bundle):
 def test_failed_publish_retains_local_history(tmp_path, monkeypatch, bundle):
     api = GitHub()
     api.fail_dispatch = True
-    monkeypatch.setattr(publisher, "gather_associations", lambda _: [])
+    monkeypatch.setattr(publisher, "collect_associations", lambda _: AssociationCollection([], {}))
     monkeypatch.setattr(publisher, "fetch_pr_observations", lambda _: [])
     monkeypatch.setattr(publisher, "collect_progress", lambda *a, **kw: (bundle["history"], bundle["snapshot"]))
     with pytest.raises(publisher.PublishError):
@@ -201,3 +202,41 @@ def test_refresh_skips_known_merged_bindings_but_checks_new_and_reopenable_prs()
     assert new_binding in refresh
     assert any(item["pr_number"] == 2 for item in refresh)
     assert old not in refresh
+
+
+def test_dry_run_excludes_orphan_and_preserves_public_history(tmp_path, monkeypatch):
+    from test_progress_model import KEY, pr_observation, runtime, save_ledger
+
+    from kg_microbe_progress import prs, validate_bundle
+
+    root, ledger = runtime(tmp_path)
+    ledger.update(adopted_goal={"conversation_id": "private", "started_at": ledger["created_at"],
+                                "start_step_index": 2}, workflow={"sha256": "c" * 64})
+    save_ledger(root, ledger)
+    orphan = {**prs._context(ledger), "schema_version": 1, "pr_number": 42,
+              "reported_at": ledger["last_observed_at"]}
+    orphan["goal_identity"] = {**ledger["adopted_goal"], "start_step_index": 1}
+    registry = root / KEY / prs.REGISTRY_NAME
+    registry.write_text(json.dumps(orphan) + "\n")
+    before = {p: p.read_bytes() for p in root.rglob("*") if p.is_file()}
+    history, snapshot = collect_progress([root], verified_pr_observations=[pr_observation(ledger)])
+    state = tmp_path / "state"
+    publisher.atomic_json(state / "bundle.json", {"history": history, "snapshot": snapshot})
+    queries = []
+    def fetch(associations):
+        queries.extend(associations)
+        return []
+    monkeypatch.setattr(publisher, "fetch_pr_observations", fetch)
+    api = GitHub()
+    result = publisher.collect_once([root], state, api=api)
+    bundle = json.loads((state / "bundle.json").read_text())
+    validate_bundle(bundle["history"], bundle["snapshot"])
+    row = next(r for r in bundle["snapshot"]["repositories"] if r["key"] == KEY)
+    assert result["status"] == "collected"
+    assert row["excluded_pr_associations"] == 1
+    assert [r["number"] for r in row["pull_requests"]] == [7]
+    assert [r["pr_number"] for r in queries] == [7]  # retained history, never orphan #42
+    assert bundle["history"]["associations"] == history["associations"]
+    assert bundle["snapshot"]["totals"] == snapshot["totals"]
+    assert api.calls == []
+    assert {p: p.read_bytes() for p in root.rglob("*") if p.is_file()} == before

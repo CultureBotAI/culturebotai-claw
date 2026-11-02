@@ -86,15 +86,81 @@ def test_completed_stage_association_survives_cycle_restart(session):
 
 
 @pytest.mark.parametrize("field,value", [
-    ("run_id", "other-run"), ("repository_key", "cmmmech"), ("cycle", 2), ("stage", 2),
-    ("workflow_sha256", "d" * 64), ("goal_identity", {**GOAL, "start_step_index": 99}),
+    ("run_id", "other-run"), ("repository_key", "cmmmech"),
 ])
-def test_registry_exact_goal_binding_required(session, field, value):
+def test_registry_source_identity_mismatch_fails_closed(session, field, value):
     item = record(session)
     item[field] = value
     write(session.root / prs.REGISTRY_NAME, item)
-    with pytest.raises(prs.AssociationError, match="retained goal"):
+    with pytest.raises(prs.AssociationError, match="containing ledger"):
         prs.gather_associations([session.runtime])
+
+
+@pytest.mark.parametrize("field,value", [
+    ("cycle", 2), ("stage", 2),
+    ("workflow_sha256", "d" * 64), ("goal_identity", {**GOAL, "start_step_index": 99}),
+])
+def test_orphan_registry_association_is_excluded_and_counted(session, field, value):
+    item = record(session)
+    item[field] = value
+    write(session.root / prs.REGISTRY_NAME, item)
+    before = {p.name: p.read_bytes() for p in session.root.iterdir()}
+    found = prs.collect_associations([session.runtime])
+    assert found.records == prs.gather_associations([session.runtime]) == []
+    assert found.excluded_counts == {(session.ledger["run_id"], "traitmech"): 1}
+    assert {p.name: p.read_bytes() for p in session.root.iterdir()} == before
+    # Registration retains its stronger contract and never silently rewrites
+    # an existing registry containing a superseded goal identity.
+    with pytest.raises(prs.OrphanAssociation, match="retained goal"):
+        prs.register_pr(session.root, 43)
+
+
+def test_valid_records_unchanged_beside_orphan_and_no_orphan_github_query(session):
+    valid = record(session)
+    orphan = record(session, 43)
+    orphan["goal_identity"] = {**GOAL, "start_step_index": 99}
+    (session.root / prs.REGISTRY_NAME).write_text(json.dumps(orphan) + "\n" + json.dumps(valid) + "\n")
+    result = prs.collect_associations([session.runtime])
+    assert result.records == [valid]
+    assert result.excluded_counts == {(session.ledger["run_id"], "traitmech"): 1}
+    calls = []
+    prs.fetch_pr_observations(result.records, gh=fake_gh(live(), calls))
+    assert calls == [["gh", "api", "repos/CultureBotAI/TraitMech/pulls/42"]]
+    write(session.root / prs.REGISTRY_NAME, valid)
+    result = prs.collect_associations([session.runtime])
+    assert result.records == [valid]
+    assert result.excluded_counts == {(session.ledger["run_id"], "traitmech"): 0}
+
+
+@pytest.mark.parametrize("field,value", [
+    ("schema_version", True), ("pr_number", True), ("pr_number", 0),
+    ("reported_at", "not-a-date"), ("stage", 7), ("cycle", "2"),
+    ("workflow_sha256", "bad"), ("goal_identity", {**GOAL, "start_step_index": True}),
+    ("summary", "private text"),
+])
+def test_malformed_orphan_still_raises(session, field, value):
+    item = record(session)
+    item["cycle"] = 99
+    item[field] = value
+    write(session.root / prs.REGISTRY_NAME, item)
+    with pytest.raises(prs.AssociationError) as error:
+        prs.collect_associations([session.runtime])
+    assert not isinstance(error.value, prs.OrphanAssociation)
+
+
+@pytest.mark.parametrize("orphan_first", [True, False])
+def test_orphan_cannot_hide_conflicting_registry_identity(session, orphan_first):
+    valid = record(session)
+    orphan = {**valid, "goal_identity": {**GOAL, "start_step_index": 99}}
+    records = [orphan, valid] if orphan_first else [valid, orphan]
+    (session.root / prs.REGISTRY_NAME).write_text("".join(json.dumps(r) + "\n" for r in records))
+    with pytest.raises(prs.AssociationError, match="conflicting"):
+        prs.collect_associations([session.runtime])
+
+
+def test_duplicate_runtime_cannot_inflate_exclusions(session):
+    with pytest.raises(prs.AssociationError, match="duplicate registry"):
+        prs.collect_associations([session.runtime, session.runtime])
 
 
 @pytest.mark.parametrize("number", [0, -1, True, "42"])

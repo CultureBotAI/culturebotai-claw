@@ -87,6 +87,20 @@ progress prose and commit messages are excluded. Previously omitted PRs need an
 explicit evidence-backed association; the tracker does not guess from titles,
 creation dates, or commit counts.
 
+Collection excludes a well-formed registry record when its goal context is no
+longer among the ledger's current or retained completed goals. Each observed
+run cursor records `excluded_pr_associations`; each repository's snapshot sums
+these counts across its retained run cursors. These count registry records, not
+distinct PRs, and describe the latest collection of each run rather than a
+cumulative total. An omitted run retains its last observed count. Older bundles
+without this diagnostic remain readable; absence means it was not recorded.
+The count exposes no native identity or private registry content. Malformed,
+unsafe, cross-run/repository, and conflicting registry records still fail the
+collection. Registration remains strict, and collection never rewrites a
+registry or ledger. Exclusion does not remove previously validated public
+history: a PR may remain visible through its retained historical association or
+another valid binding.
+
 ## Durable records and public projection
 
 `kg_microbe_progress.collect_progress` reads explicit supervisor runtime roots.
@@ -147,6 +161,85 @@ Actions deployment when diagnosing refresh problems. If the local host is
 asleep, offline, or the publisher fails, the last valid site remains available
 with stale timestamps. Neither the exporter nor the website approves prompts,
 resumes goals, merges PRs, or changes terminal state.
+
+### Installing a reviewed publisher release
+
+This is an operator procedure, not an automatic deployment command. First merge
+the reviewed change and ensure the main-branch Pages consumer understands its
+schema before publishing new fields. Choose the exact reviewed main commit, not
+a moving branch name. Use a separate review checkout to obtain its archive;
+never switch the checkout used by running monitors. Preserve the state directory
+and every configured `--runtime` argument. The example below has one runtime;
+repeat that argument when the existing deployment has more.
+
+```bash
+set -euo pipefail
+CLAW_ROOT=/absolute/path/to/live-claw
+REVIEW_CHECKOUT=/absolute/path/to/review-checkout
+REVIEWED_COMMIT=FULL_REVIEWED_MAIN_COMMIT_SHA
+STATE="$CLAW_ROOT/workspace/progress-publisher"
+RUNTIME="$CLAW_ROOT/workspace/session-orchestration/RUN"
+RELEASE="$STATE/releases/$REVIEWED_COMMIT"
+
+git -C "$REVIEW_CHECKOUT" fetch origin main
+test "$REVIEWED_COMMIT" = "$(git -C "$REVIEW_CHECKOUT" rev-parse "${REVIEWED_COMMIT}^{commit}")"
+git -C "$REVIEW_CHECKOUT" merge-base --is-ancestor "$REVIEWED_COMMIT" origin/main
+test ! -e "$RELEASE"
+mkdir "$RELEASE"
+ARCHIVE="$(mktemp "${TMPDIR:-/tmp}/mech-progress-release.XXXXXX")"
+git -C "$REVIEW_CHECKOUT" archive --format=tar --output="$ARCHIVE" "$REVIEWED_COMMIT"
+tar -xf "$ARCHIVE" -C "$RELEASE"
+printf '%s\n' "$REVIEWED_COMMIT" > "$RELEASE/REVISION"
+shasum -a 256 "$ARCHIVE" > "$RELEASE/archive.sha256"
+UV_PROJECT_ENVIRONMENT="$RELEASE/.venv" uv sync --project "$RELEASE" --locked
+PYTHON="$RELEASE/.venv/bin/python"
+
+DRY_STATE="$(mktemp -d "${TMPDIR:-/tmp}/mech-progress-dry-run.XXXXXX")"
+cp -p "$STATE/bundle.json" "$DRY_STATE/bundle.json"
+cp "$RELEASE/src/kg_microbe_fleet/fleet.yaml" "$DRY_STATE/fleet.yaml"
+env PYTHONPATH="$RELEASE/src:$RELEASE" "$PYTHON" \
+  "$RELEASE/scripts/mech_progress_publish.py" \
+  --runtime "$RUNTIME" --state-dir "$DRY_STATE"
+```
+
+Stop at any failed command. Inspect the dry-run bundle's timestamp, exclusions,
+and totals before proceeding. It writes only the temporary state directory and
+makes no GitHub mutations. The release's own virtual environment avoids
+upgrading dependencies underneath the live monitors.
+
+Immediately before stopping the old publisher, verify its PID, start time, and
+full command against the recorded deployment. Do not signal an unverified PID or
+start a second publisher while the first is alive. `SIGTERM` asks the publisher
+to finish its current collection and exit; wait for that exit without forcing
+termination. Then preserve the current bundle, status, and fleet pin, install
+the new release's fleet pin atomically, and start the pinned command:
+
+```bash
+PUBLISHER_PID=VERIFIED_CURRENT_PUBLISHER_PID
+ps -p "$PUBLISHER_PID" -o pid=,lstart=,command=
+# Compare the identity above with the recorded deployment before this signal.
+kill -TERM "$PUBLISHER_PID"
+while kill -0 "$PUBLISHER_PID" 2>/dev/null; do sleep 1; done
+BACKUP="$STATE/backups/$(date -u +%Y%m%dT%H%M%SZ)"
+mkdir -p "$BACKUP"
+cp -p "$STATE/bundle.json" "$STATE/status.json" "$BACKUP/"
+if test -f "$STATE/fleet.yaml"; then cp -p "$STATE/fleet.yaml" "$BACKUP/"; fi
+FLEET_TEMP="$(mktemp "$STATE/.fleet.yaml.XXXXXX")"
+cp "$RELEASE/src/kg_microbe_fleet/fleet.yaml" "$FLEET_TEMP"
+mv "$FLEET_TEMP" "$STATE/fleet.yaml"
+nohup env PYTHONPATH="$RELEASE/src:$RELEASE" "$PYTHON" -u \
+  "$RELEASE/scripts/mech_progress_publish.py" \
+  --runtime "$RUNTIME" --state-dir "$STATE" --apply --loop --interval 300 \
+  >> "$STATE/publisher-$REVIEWED_COMMIT.log" 2>&1 < /dev/null &
+printf 'Publisher PID: %s\n' "$!"
+```
+
+Record the new PID and release pin. Verify `status.json` reports `published`,
+the data branch advances, and the Pages artifact's `data/publication.json`
+identifies that data commit. Do not use `--initialize` for an existing data
+branch. Retain the previous release and backup; do not prune releases, reset
+history, or restore an old bundle over newer observations as a rollback. Before
+restarting an older publisher, verify it can read the current public schema.
 
 ## Verification
 

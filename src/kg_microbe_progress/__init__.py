@@ -434,8 +434,11 @@ def snapshot_from_history(history: dict[str, Any], *, generated_at: str,
             "history_coverage": "partial" if cursors else "unobserved",
         }
         if current:
-            row["current"] = {k: v for k, v in current.items() if k not in {"repository_key", "started_at"}}
+            row["current"] = {k: v for k, v in current.items()
+                              if k not in {"repository_key", "started_at", "excluded_pr_associations"}}
             row["last_observed_at"] = current["observed_at"]
+        if any("excluded_pr_associations" in cursor for cursor in cursors):
+            row["excluded_pr_associations"] = sum(cursor.get("excluded_pr_associations", 0) for cursor in cursors)
         repositories.append(row)
     result = {
         "schema_version": VERSION, "generated_at": generated_at,
@@ -512,6 +515,7 @@ def collect_progress(
     runtime_dirs: list[Path], previous_history: dict[str, Any] | None = None, *,
     generated_at: str | None = None, manifest: FleetManifest | None = None,
     verified_pr_observations: list[dict[str, Any]] | None = None,
+    excluded_association_counts: dict[tuple[str, str], int] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Read explicit supervisor runs and return history plus a public snapshot.
 
@@ -529,6 +533,11 @@ def collect_progress(
     validate_history(history, fleet)
     old_closures = {event["id"]: event for event in history["closures"]}
     observations: list[dict[str, Any]] = []
+    diagnostic_sources: set[tuple[str, str]] = set()
+    if excluded_association_counts is not None and any(
+        type(count) is not int or count < 0 for count in excluded_association_counts.values()
+    ):
+        raise ProgressError("excluded association count must be a nonnegative integer")
     run_sources: set[str] = set()
     for runtime in runtime_dirs:
         runtime = Path(runtime)
@@ -566,6 +575,12 @@ def collect_progress(
                 "blocker_code": _blocker(ledger.get("blocked_reason"), phase),
                 "observed_at": observed_at, "started_at": ledger["created_at"],
             }
+            source = (config["run_id"], key)
+            diagnostic_sources.add(source)
+            if excluded_association_counts is not None:
+                if source not in excluded_association_counts:
+                    raise ProgressError("missing excluded association count for runtime target")
+                cursor["excluded_pr_associations"] = excluded_association_counts[source]
             prior_cursor = next((c for c in history["cursors"]
                                  if c["repository_key"] == key and c["run_key"] == run), None)
             if prior_cursor:
@@ -601,6 +616,8 @@ def collect_progress(
         old_targets = {cursor["repository_key"] for cursor in history["cursors"] if cursor["run_key"] == run}
         if not old_targets <= target_keys:
             raise ProgressError("previously observed run target disappeared")
+    if excluded_association_counts is not None and set(excluded_association_counts) != diagnostic_sources:
+        raise ProgressError("excluded association counts contain unknown runtime targets")
     for observation in verified_pr_observations or []:
         item = copy.deepcopy(observation)
         key = item["repository_key"]

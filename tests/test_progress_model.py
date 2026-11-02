@@ -365,3 +365,101 @@ def test_missing_target_and_foreign_github_identity_are_not_silent_partial_fleet
     with pytest.raises(progress.ProgressError, match="no targets"):
         collect(root, history)
     assert ledger["stage"] == 1
+
+
+def test_legacy_bundle_without_exclusion_counts_keeps_exact_projection(tmp_path):
+    root, ledger = runtime(tmp_path)
+    history, snapshot = collect(root, verified_pr_observations=[pr_observation(ledger)])
+    original = copy.deepcopy((history, snapshot))
+    assert all("excluded_pr_associations" not in cursor for cursor in history["cursors"])
+    assert all("excluded_pr_associations" not in row for row in snapshot["repositories"])
+    progress.validate_bundle(history, snapshot)
+    assert progress.snapshot_from_history(history, generated_at=NOW) == snapshot
+    assert collect(root, history) == original
+
+
+def test_exclusion_counts_project_from_history_without_leaking_into_current(tmp_path):
+    root, ledger = runtime(tmp_path)
+    counts = {(ledger["run_id"], KEY): 2}
+    history, snapshot = collect(root, excluded_association_counts=counts)
+    assert history["cursors"][0]["excluded_pr_associations"] == 2
+    assert repo(snapshot)["excluded_pr_associations"] == 2
+    assert "excluded_pr_associations" not in repo(snapshot)["current"]
+    assert "excluded_pr_associations" not in snapshot["totals"]
+    assert all("excluded_pr_associations" not in row for row in snapshot["repositories"] if row["key"] != KEY)
+    progress.validate_bundle(history, snapshot)
+    for replacement in (0, 3):
+        altered = copy.deepcopy(snapshot)
+        repo(altered)["excluded_pr_associations"] = replacement
+        with pytest.raises(progress.ProgressError, match="differs from its history"):
+            progress.validate_bundle(history, altered)
+    altered = copy.deepcopy(snapshot)
+    del repo(altered)["excluded_pr_associations"]
+    with pytest.raises(progress.ProgressError, match="differs from its history"):
+        progress.validate_bundle(history, altered)
+
+
+@pytest.mark.parametrize("count", [-1, True, False, 2.0, "2", None])
+def test_exclusion_counts_require_exact_nonnegative_integers(tmp_path, count):
+    root, ledger = runtime(tmp_path)
+    with pytest.raises(progress.ProgressError):
+        collect(root, excluded_association_counts={(ledger["run_id"], KEY): count})
+
+
+@pytest.mark.parametrize("counts", [
+    {},
+    {("other-run", KEY): 1},
+    {("run-one", "traitmech"): 1},
+    {("run-one", KEY): 0, ("other-run", KEY): 1},
+])
+def test_exclusion_counts_must_cover_exact_runtime_targets(tmp_path, counts):
+    root, _ = runtime(tmp_path)
+    with pytest.raises(progress.ProgressError):
+        collect(root, excluded_association_counts=counts)
+
+
+def test_exclusion_counts_sum_retained_runs_and_can_return_to_zero(tmp_path):
+    first, first_ledger = runtime(tmp_path, name="run-one")
+    second, second_ledger = runtime(tmp_path, name="run-two")
+    second_ledger["created_at"] = "2026-10-20T06:00:00Z"
+    save_ledger(second, second_ledger)
+    history, snapshot = progress.collect_progress(
+        [first, second], generated_at=NOW,
+        excluded_association_counts={
+            (first_ledger["run_id"], KEY): 2, (second_ledger["run_id"], KEY): 3,
+        },
+    )
+    assert repo(snapshot)["excluded_pr_associations"] == 5
+    assert repo(snapshot)["current"]["run_key"] == progress.run_key(second_ledger["run_id"])
+    old_history = copy.deepcopy(history)
+    history, snapshot = collect(
+        first, history, excluded_association_counts={(first_ledger["run_id"], KEY): 0},
+    )
+    assert repo(snapshot)["excluded_pr_associations"] == 3
+    assert {cursor["run_key"]: cursor["excluded_pr_associations"] for cursor in history["cursors"]} == {
+        progress.run_key(first_ledger["run_id"]): 0, progress.run_key(second_ledger["run_id"]): 3,
+    }
+    progress.validate_extension(old_history, history)
+    progress.validate_bundle(history, snapshot)
+    history, snapshot = collect(
+        second, history, excluded_association_counts={(second_ledger["run_id"], KEY): 0},
+    )
+    assert repo(snapshot)["excluded_pr_associations"] == 0
+    progress.validate_bundle(history, snapshot)
+
+
+def test_exclusions_preserve_prior_pr_history_and_goal_counters(tmp_path):
+    root, ledger = runtime(tmp_path, stage=2)
+    add_closure(root, ledger, pr=42)
+    history, baseline = collect(root, verified_pr_observations=[pr_observation(ledger, number=43)])
+    original = copy.deepcopy(history)
+    history, snapshot = collect(root, history, excluded_association_counts={(ledger["run_id"], KEY): 2})
+    assert repo(snapshot)["excluded_pr_associations"] == 2
+    assert snapshot["totals"] == baseline["totals"]
+    assert repo(snapshot)["counters"] == repo(baseline)["counters"]
+    assert repo(snapshot)["pull_requests"] == repo(baseline)["pull_requests"]
+    assert {pr["number"] for pr in repo(snapshot)["pull_requests"]} == {42, 43}
+    for field in ("closures", "associations", "pr_events"):
+        assert history[field] == original[field]
+    progress.validate_extension(original, history)
+    progress.validate_bundle(history, snapshot)

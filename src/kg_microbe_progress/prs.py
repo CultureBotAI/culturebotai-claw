@@ -16,6 +16,7 @@ import re
 import stat
 import subprocess
 import tempfile
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable
@@ -32,6 +33,16 @@ RECORD_FIELDS = {"schema_version", *CONTEXT_FIELDS, "pr_number", "reported_at"}
 
 class AssociationError(ValueError):
     """An association cannot safely be used as progress evidence."""
+
+
+class OrphanAssociation(AssociationError):
+    """A valid registry record has no retained supervisor goal context."""
+
+
+@dataclass
+class AssociationCollection:
+    records: list[dict]
+    excluded_counts: dict[tuple[str, str], int]
 
 
 def now() -> str:
@@ -117,7 +128,7 @@ def _validate_context(context: dict) -> None:
         raise AssociationError("association native goal identity is incomplete")
 
 
-def _validate_record(record: Any, ledger: dict) -> dict:
+def _validate_record(record: Any, ledger: dict, *, require_retained: bool = True) -> dict:
     if not isinstance(record, dict) or set(record) != RECORD_FIELDS:
         raise AssociationError("association fields differ from schema version 1")
     if type(record["schema_version"]) is not int or record["schema_version"] != 1:
@@ -126,21 +137,23 @@ def _validate_record(record: Any, ledger: dict) -> dict:
         raise AssociationError("association PR number or timestamp is invalid")
     context = {key: record[key] for key in CONTEXT_FIELDS}
     _validate_context(context)
+    if any(context[key] != ledger.get(key) for key in ("run_id", "repository_key")):
+        raise AssociationError("association run or repository differs from containing ledger")
     contexts = [_context(ledger)]
     contexts.extend(_context(ledger, item) for item in ledger.get("completed_stages", []))
-    if context not in contexts:
-        raise AssociationError("PR association does not match a retained goal identity")
+    if require_retained and context not in contexts:
+        raise OrphanAssociation("PR association does not match a retained goal identity")
     return record
 
 
-def _records(raw: bytes, ledger: dict) -> list[dict]:
+def _records(raw: bytes, ledger: dict, *, require_retained: bool = True) -> list[dict]:
     if raw and not raw.endswith(b"\n"):
         raise AssociationError("association registry has an incomplete final record")
     result = []
     for line in raw.splitlines():
         if not line:
             raise AssociationError("association registry contains a blank record")
-        result.append(_validate_record(_json(line), ledger))
+        result.append(_validate_record(_json(line), ledger, require_retained=require_retained))
     return result
 
 
@@ -165,6 +178,11 @@ def _association_key(record: dict) -> tuple:
 
 
 def gather_associations(runtime_dirs: Iterable[Path], *, fleet: FleetManifest | None = None) -> list[dict]:
+    """Return usable bindings; collectors use collect_associations for diagnostics."""
+    return collect_associations(runtime_dirs, fleet=fleet).records
+
+
+def collect_associations(runtime_dirs: Iterable[Path], *, fleet: FleetManifest | None = None) -> AssociationCollection:
     """Read explicit registries and exact version-2 receipt candidate bindings.
 
     A receipt candidate contributes a reported association only. Malformed or
@@ -173,6 +191,8 @@ def gather_associations(runtime_dirs: Iterable[Path], *, fleet: FleetManifest | 
     """
     fleet = fleet or load_fleet_manifest()
     gathered: dict[tuple, dict] = {}
+    seen: dict[tuple, dict] = {}
+    excluded: dict[tuple[str, str], int] = {}
     for directory in runtime_dirs:
         runtime = Path(directory).resolve(strict=True)
         for key in fleet.keys:
@@ -182,7 +202,21 @@ def gather_associations(runtime_dirs: Iterable[Path], *, fleet: FleetManifest | 
             if session.is_symlink() or not session.is_dir():
                 raise AssociationError("session directory is not a real directory")
             ledger = _ledger(session, fleet)
-            records = _records(_read(session / REGISTRY_NAME, missing=True), ledger)
+            source = (ledger["run_id"], key)
+            if source in excluded:
+                raise AssociationError("duplicate registry source")
+            excluded[source] = 0
+            records = []
+            for record in _records(_read(session / REGISTRY_NAME, missing=True), ledger, require_retained=False):
+                identity = _association_key(record)
+                prior = seen.get(identity)
+                if prior and any(prior[field] != record[field] for field in CONTEXT_FIELDS):
+                    raise AssociationError("conflicting PR association identity")
+                seen[identity] = record
+                try:
+                    records.append(_validate_record(record, ledger))
+                except OrphanAssociation:
+                    excluded[source] += 1
             candidate_raw = _read(session / "completion.json", missing=True)
             if candidate_raw:
                 try:
@@ -198,11 +232,12 @@ def gather_associations(runtime_dirs: Iterable[Path], *, fleet: FleetManifest | 
                     pass
             for record in records:
                 identity = _association_key(record)
-                prior = gathered.get(identity)
+                prior = seen.get(identity)
                 if prior and any(prior[field] != record[field] for field in CONTEXT_FIELDS):
                     raise AssociationError("conflicting PR association identity")
                 gathered[identity] = copy.deepcopy(record)
-    return sorted(gathered.values(), key=_association_key)
+                seen[identity] = record
+    return AssociationCollection(sorted(gathered.values(), key=_association_key), excluded)
 
 
 def register_pr(session_dir: Path, number: int, *, fleet: FleetManifest | None = None) -> dict:
