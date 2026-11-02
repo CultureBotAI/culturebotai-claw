@@ -163,6 +163,50 @@ def test_duplicate_runtime_cannot_inflate_exclusions(session):
         prs.collect_associations([session.runtime, session.runtime])
 
 
+@pytest.mark.parametrize("mutate", [
+    lambda ledger: ledger.update(adopted_goal="malformed-not-an-object"),
+    lambda ledger: ledger.update(adopted_goal={**GOAL, "start_step_index": True}),
+    lambda ledger: ledger.update(adopted_goal=None),
+    lambda ledger: ledger.update(completed_stages={}),
+    lambda ledger: ledger.update(completed_stages=["malformed"]),
+    lambda ledger: ledger.update(completed_stages=[{"cycle": 1, "stage": 1,
+        "goal_identity": "malformed", "workflow_sha256": WORKFLOW}]),
+    lambda ledger: ledger.update(completed_stages=[{"cycle": 1, "stage": 1,
+        "goal_identity": GOAL, "workflow_sha256": None}]),
+])
+def test_malformed_retained_context_cannot_be_counted_as_orphan(session, mutate):
+    write(session.root / prs.REGISTRY_NAME, record(session))
+    mutate(session.ledger)
+    write(session.root / "ledger.json", session.ledger)
+    with pytest.raises(prs.AssociationError) as error:
+        prs.collect_associations([session.runtime])
+    assert not isinstance(error.value, prs.OrphanAssociation)
+
+
+def test_legacy_closure_without_workflow_pin_does_not_invent_association_authority(session):
+    valid = record(session)
+    legacy = {"cycle": 1, "stage": 1, "goal_identity": {**GOAL, "start_step_index": 1}}
+    session.ledger["completed_stages"] = [legacy]
+    write(session.root / "ledger.json", session.ledger)
+    write(session.root / prs.REGISTRY_NAME, valid)
+    assert prs.collect_associations([session.runtime]).records == [valid]
+    valid["goal_identity"] = legacy["goal_identity"]
+    write(session.root / prs.REGISTRY_NAME, valid)
+    found = prs.collect_associations([session.runtime])
+    assert found.records == []
+    assert found.excluded_counts == {(session.ledger["run_id"], "traitmech"): 1}
+
+
+@pytest.mark.parametrize("stage,awaiting", [(0, False), (1, True)])
+def test_unadopted_goal_does_not_create_retained_context(session, stage, awaiting):
+    write(session.root / prs.REGISTRY_NAME, record(session))
+    session.ledger.update(adopted_goal=None, stage=stage, awaiting_goal=awaiting)
+    write(session.root / "ledger.json", session.ledger)
+    result = prs.collect_associations([session.runtime])
+    assert result.records == []
+    assert result.excluded_counts == {(session.ledger["run_id"], "traitmech"): 1}
+
+
 @pytest.mark.parametrize("number", [0, -1, True, "42"])
 def test_registry_requires_integer_positive_number(session, number):
     with pytest.raises(prs.AssociationError, match="positive integer"):

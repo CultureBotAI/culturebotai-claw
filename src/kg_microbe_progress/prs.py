@@ -111,14 +111,16 @@ def _context(ledger: dict, record: dict | None = None) -> dict:
     return context
 
 
-def _validate_context(context: dict) -> None:
+def _validate_context(context: dict, *, allow_missing_workflow: bool = False) -> None:
     goal = context.get("goal_identity")
+    workflow = context.get("workflow_sha256")
+    valid_workflow = ((allow_missing_workflow and workflow is None)
+                      or (isinstance(workflow, str) and DIGEST.fullmatch(workflow) is not None))
     if (not isinstance(context.get("run_id"), str) or not context["run_id"]
             or len(context["run_id"]) > 200 or not isinstance(context.get("repository_key"), str)
             or not _positive(context.get("cycle")) or type(context.get("stage")) is not int
             or context["stage"] not in range(1, 7)
-            or not isinstance(context.get("workflow_sha256"), str)
-            or not DIGEST.fullmatch(context["workflow_sha256"])):
+            or not valid_workflow):
         raise AssociationError("association workflow identity is incomplete")
     if (not isinstance(goal, dict)
             or set(goal) != {"conversation_id", "started_at", "start_step_index"}
@@ -126,6 +128,29 @@ def _validate_context(context: dict) -> None:
             or len(goal["conversation_id"]) > 200 or not _timestamp(goal["started_at"])
             or type(goal["start_step_index"]) is not int or goal["start_step_index"] < 0):
         raise AssociationError("association native goal identity is incomplete")
+
+
+def _retained_contexts(ledger: dict) -> list[dict]:
+    """Validate the comparison source before calling a registry record orphaned."""
+    current = _context(ledger)
+    contexts = []
+    if current["goal_identity"] is not None or not (ledger.get("stage") == 0 or ledger.get("awaiting_goal") is True):
+        _validate_context(current)
+        contexts.append(current)
+    completed = ledger.get("completed_stages")
+    if not isinstance(completed, list):
+        raise AssociationError("retained goal contexts must be a list")
+    for item in completed:
+        if not isinstance(item, dict):
+            raise AssociationError("retained goal context must be an object")
+        context = _context(ledger, item)
+        # Legacy closures predate workflow pins. Validate their available
+        # identity, but never invent a pin or use them as registry authority.
+        legacy = "workflow_sha256" not in item
+        _validate_context(context, allow_missing_workflow=legacy)
+        if not legacy:
+            contexts.append(context)
+    return contexts
 
 
 def _validate_record(record: Any, ledger: dict, *, require_retained: bool = True) -> dict:
@@ -139,8 +164,7 @@ def _validate_record(record: Any, ledger: dict, *, require_retained: bool = True
     _validate_context(context)
     if any(context[key] != ledger.get(key) for key in ("run_id", "repository_key")):
         raise AssociationError("association run or repository differs from containing ledger")
-    contexts = [_context(ledger)]
-    contexts.extend(_context(ledger, item) for item in ledger.get("completed_stages", []))
+    contexts = _retained_contexts(ledger)
     if require_retained and context not in contexts:
         raise OrphanAssociation("PR association does not match a retained goal identity")
     return record
