@@ -201,6 +201,26 @@ def _association_key(record: dict) -> tuple:
     return (record["repository_key"], record["run_id"], record["cycle"], record["stage"], record["pr_number"])
 
 
+def _retained_records(raw: bytes, ledger: dict) -> tuple[list[dict], int]:
+    """Ignore well-formed orphans before comparing retained evidence identities."""
+    retained = []
+    excluded = 0
+    seen: dict[tuple, dict] = {}
+    for record in _records(raw, ledger, require_retained=False):
+        try:
+            _validate_record(record, ledger)
+        except OrphanAssociation:
+            excluded += 1
+            continue
+        identity = _association_key(record)
+        prior = seen.get(identity)
+        if prior and any(prior[field] != record[field] for field in CONTEXT_FIELDS):
+            raise AssociationError("conflicting PR association identity")
+        seen[identity] = record
+        retained.append(record)
+    return retained, excluded
+
+
 def gather_associations(runtime_dirs: Iterable[Path], *, fleet: FleetManifest | None = None) -> list[dict]:
     """Return usable bindings; collectors use collect_associations for diagnostics."""
     return collect_associations(runtime_dirs, fleet=fleet).records
@@ -215,7 +235,6 @@ def collect_associations(runtime_dirs: Iterable[Path], *, fleet: FleetManifest |
     """
     fleet = fleet or load_fleet_manifest()
     gathered: dict[tuple, dict] = {}
-    seen: dict[tuple, dict] = {}
     excluded: dict[tuple[str, str], int] = {}
     for directory in runtime_dirs:
         runtime = Path(directory).resolve(strict=True)
@@ -226,21 +245,13 @@ def collect_associations(runtime_dirs: Iterable[Path], *, fleet: FleetManifest |
             if session.is_symlink() or not session.is_dir():
                 raise AssociationError("session directory is not a real directory")
             ledger = _ledger(session, fleet)
+            # A malformed comparison source is not an incomplete candidate.
+            # Validate outside the candidate-tolerance catch, even with no registry.
+            _retained_contexts(ledger)
             source = (ledger["run_id"], key)
             if source in excluded:
                 raise AssociationError("duplicate registry source")
-            excluded[source] = 0
-            records = []
-            for record in _records(_read(session / REGISTRY_NAME, missing=True), ledger, require_retained=False):
-                identity = _association_key(record)
-                prior = seen.get(identity)
-                if prior and any(prior[field] != record[field] for field in CONTEXT_FIELDS):
-                    raise AssociationError("conflicting PR association identity")
-                seen[identity] = record
-                try:
-                    records.append(_validate_record(record, ledger))
-                except OrphanAssociation:
-                    excluded[source] += 1
+            records, excluded[source] = _retained_records(_read(session / REGISTRY_NAME, missing=True), ledger)
             candidate_raw = _read(session / "completion.json", missing=True)
             if candidate_raw:
                 try:
@@ -256,11 +267,10 @@ def collect_associations(runtime_dirs: Iterable[Path], *, fleet: FleetManifest |
                     pass
             for record in records:
                 identity = _association_key(record)
-                prior = seen.get(identity)
+                prior = gathered.get(identity)
                 if prior and any(prior[field] != record[field] for field in CONTEXT_FIELDS):
                     raise AssociationError("conflicting PR association identity")
                 gathered[identity] = copy.deepcopy(record)
-                seen[identity] = record
     return AssociationCollection(sorted(gathered.values(), key=_association_key), excluded)
 
 
@@ -292,7 +302,7 @@ def register_pr(session_dir: Path, number: int, *, fleet: FleetManifest | None =
         _validate_record(record, ledger)
         path = session / REGISTRY_NAME
         raw = _read(path, missing=True)
-        records = _records(raw, ledger)
+        records, _ = _retained_records(raw, ledger)
         for existing in records:
             if _association_key(existing) == _association_key(record):
                 if any(existing[field] != record[field] for field in CONTEXT_FIELDS):

@@ -1,0 +1,6 @@
+{
+  "source_commit": "33be66ab1b993e2a47792c13daa3e4f39635f2cb",
+  "source_path": "src/kg_microbe_progress/schema/progress.yaml",
+  "sha256": "ea2e043606d71c9ef5f33e413f6c1cc6120a70ba666ded7395d0f2b0573915e1",
+  "purpose": "Frozen pre-diagnostics closed schema for old-reader compatibility regressions; do not regenerate from the schema under test."
+}

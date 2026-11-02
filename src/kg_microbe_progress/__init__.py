@@ -348,6 +348,8 @@ def validate_history(history: dict[str, Any], manifest: FleetManifest | None = N
         association_ids.add(item["id"])
     cursor_ids = set()
     for item in history["cursors"]:
+        if "excluded_pr_associations" in item and type(item["excluded_pr_associations"]) is not int:
+            raise ProgressError("excluded association count must be a nonnegative integer")
         identity = (item["repository_key"], item["run_key"])
         if identity in cursor_ids or item["repository_key"] not in fleet.mechs:
             raise ProgressError("duplicate or unknown run cursor")
@@ -460,6 +462,8 @@ def validate_snapshot(snapshot: dict[str, Any], manifest: FleetManifest | None =
     if [row["key"] for row in snapshot["repositories"]] != list(fleet.keys):
         raise ProgressError("snapshot must contain the complete manifest fleet in order")
     for row in snapshot["repositories"]:
+        if "excluded_pr_associations" in row and type(row["excluded_pr_associations"]) is not int:
+            raise ProgressError("excluded association count must be a nonnegative integer")
         mech = fleet.mechs[row["key"]]
         if row["github_url"] != f"https://github.com/{mech.github}" or row["name"] != mech.display_name:
             raise ProgressError("snapshot repository identity differs from manifest")
@@ -521,6 +525,7 @@ def collect_progress(
 
     Omitted old runs retain their history. Supplied runs must retain every
     previously observed closure and must not regress cycle, stage or timestamp.
+    Omitted exclusion counts retain their last observed values.
     Repeated collection is idempotent apart from fresher observation cursors.
     The caller must serialize this read/modify/write operation with an exclusive
     lock, and preserve the previous history on failure.
@@ -584,6 +589,8 @@ def collect_progress(
             prior_cursor = next((c for c in history["cursors"]
                                  if c["repository_key"] == key and c["run_key"] == run), None)
             if prior_cursor:
+                if excluded_association_counts is None and "excluded_pr_associations" in prior_cursor:
+                    cursor["excluded_pr_associations"] = prior_cursor["excluded_pr_associations"]
                 if (cursor["started_at"] != prior_cursor["started_at"]
                         or (cycle, stage) < (prior_cursor["cycle"], prior_cursor["stage_number"])
                         or _date(observed_at) < _date(prior_cursor["observed_at"])):

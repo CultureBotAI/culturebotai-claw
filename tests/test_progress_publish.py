@@ -240,3 +240,48 @@ def test_dry_run_excludes_orphan_and_preserves_public_history(tmp_path, monkeypa
     assert bundle["snapshot"]["totals"] == snapshot["totals"]
     assert api.calls == []
     assert {p: p.read_bytes() for p in root.rglob("*") if p.is_file()} == before
+
+
+def test_published_association_later_orphaned_keeps_history_and_refreshes_pr(tmp_path, monkeypatch):
+    from test_progress_model import GITHUB, KEY, runtime, save_ledger
+
+    from kg_microbe_progress import prs, validate_bundle
+
+    root, ledger = runtime(tmp_path)
+    ledger.update(adopted_goal={"conversation_id": "private", "started_at": ledger["created_at"],
+                                "start_step_index": 2}, workflow={"sha256": "c" * 64})
+    save_ledger(root, ledger)
+    registry = root / KEY / prs.REGISTRY_NAME
+    registry.write_text(json.dumps({**prs._context(ledger), "schema_version": 1,
+        "pr_number": 42, "reported_at": ledger["last_observed_at"]}) + "\n")
+    queries = []
+    def github(args):
+        queries.append(args)
+        return subprocess.CompletedProcess(args, 0, stdout=json.dumps({
+            "number": 42, "base": {"repo": {"full_name": GITHUB}},
+            "head": {"sha": "a" * 40}, "html_url": f"https://github.com/{GITHUB}/pull/42",
+            "merged": False, "state": "open", "merged_at": None,
+        }))
+    monkeypatch.setattr(publisher, "fetch_pr_observations",
+                        lambda associations: prs.fetch_pr_observations(associations, gh=github))
+    state = tmp_path / "state"
+    api = GitHub()
+    publisher.collect_once([root], state, api=api, apply=True, initialize=True)
+    published = publisher.read_remote(api)[1]
+    assert published["snapshot"]["totals"]["unique_prs"] == 1
+    assert published["history"]["cursors"][0]["excluded_pr_associations"] == 0
+    ledger["adopted_goal"]["start_step_index"] = 99
+    save_ledger(root, ledger)
+    before = {p: p.read_bytes() for p in root.rglob("*") if p.is_file()}
+    collected = prs.collect_associations([root])
+    assert collected.records == []
+    assert collected.excluded_counts == {(ledger["run_id"], KEY): 1}
+    publisher.collect_once([root], state, api=api)
+    refreshed = json.loads((state / "bundle.json").read_text())
+    validate_bundle(refreshed["history"], refreshed["snapshot"])
+    assert refreshed["history"]["associations"] == published["history"]["associations"]
+    assert refreshed["history"]["pr_events"] == published["history"]["pr_events"]
+    assert refreshed["snapshot"]["totals"] == published["snapshot"]["totals"]
+    assert refreshed["history"]["cursors"][0]["excluded_pr_associations"] == 1
+    assert queries == [["gh", "api", f"repos/{GITHUB}/pulls/42"]] * 2
+    assert {p: p.read_bytes() for p in root.rglob("*") if p.is_file()} == before

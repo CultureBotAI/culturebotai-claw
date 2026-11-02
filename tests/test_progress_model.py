@@ -406,6 +406,39 @@ def test_exclusion_counts_require_exact_nonnegative_integers(tmp_path, count):
         collect(root, excluded_association_counts={(ledger["run_id"], KEY): count})
 
 
+@pytest.mark.parametrize("count", [-1, True, False, 2.0, "2", None])
+@pytest.mark.parametrize("document", ["history", "snapshot"])
+def test_read_exclusion_counts_require_exact_nonnegative_integers(tmp_path, count, document):
+    root, ledger = runtime(tmp_path)
+    history, snapshot = collect(root, excluded_association_counts={(ledger["run_id"], KEY): 2})
+    if document == "history":
+        history["cursors"][0]["excluded_pr_associations"] = count
+        with pytest.raises(progress.ProgressError):
+            progress.validate_history(history)
+    else:
+        repo(snapshot)["excluded_pr_associations"] = count
+        with pytest.raises(progress.ProgressError):
+            progress.validate_snapshot(snapshot)
+
+
+def test_omitted_exclusion_counts_retain_last_observation(tmp_path):
+    root, ledger = runtime(tmp_path)
+    history, snapshot = collect(root, excluded_association_counts={(ledger["run_id"], KEY): 2})
+    prior = copy.deepcopy(history)
+    retained, refreshed = collect(root, history)
+    assert retained["cursors"][0]["excluded_pr_associations"] == 2
+    assert repo(refreshed)["excluded_pr_associations"] == 2
+    assert refreshed["totals"] == snapshot["totals"]
+    assert history == prior
+    progress.validate_bundle(retained, refreshed)
+    reset, refreshed = collect(
+        root, retained, excluded_association_counts={(ledger["run_id"], KEY): 0},
+    )
+    assert reset["cursors"][0]["excluded_pr_associations"] == 0
+    assert repo(refreshed)["excluded_pr_associations"] == 0
+    progress.validate_bundle(reset, refreshed)
+
+
 @pytest.mark.parametrize("counts", [
     {},
     {("other-run", KEY): 1},

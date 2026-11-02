@@ -92,14 +92,21 @@ longer among the ledger's current or retained completed goals. Each observed
 run cursor records `excluded_pr_associations`; each repository's snapshot sums
 these counts across its retained run cursors. These count registry records, not
 distinct PRs, and describe the latest collection of each run rather than a
-cumulative total. An omitted run retains its last observed count. Older bundles
-without this diagnostic remain readable; absence means it was not recorded.
-The count exposes no native identity or private registry content. Malformed,
-unsafe, cross-run/repository, and conflicting registry records still fail the
-collection. Registration remains strict, and collection never rewrites a
-registry or ledger. Exclusion does not remove previously validated public
-history: a PR may remain visible through its retained historical association or
-another valid binding.
+cumulative total. An omitted run retains its last observed count. A direct
+`collect_progress` call that omits the count map also preserves prior counts;
+absence of a measurement does not assert zero. Older bundles without this
+diagnostic remain readable; absence means it was not recorded. The count exposes
+no native identity or private registry content.
+
+A retained valid association takes precedence over a conflicting well-formed
+orphan, including when a goal re-adopts the same PR. Conflicts between retained
+valid associations still fail. Malformed or unsafe input, cross-run/repository
+records, and malformed retained goal contexts fail closed. Registration validates
+all existing records, preserves the original bytes of orphan records, and can
+append a valid PR association for the current goal while orphans are present.
+Collection never rewrites a registry or ledger. Exclusion does not remove
+previously validated public history: a PR may remain visible through its retained
+historical association or another valid binding.
 
 ## Durable records and public projection
 
@@ -162,15 +169,43 @@ asleep, offline, or the publisher fails, the last valid site remains available
 with stale timestamps. Neither the exporter nor the website approves prompts,
 resumes goals, merges PRs, or changes terminal state.
 
+### Compatibility and upgrade order
+
+The optional `excluded_pr_associations` diagnostic is an incompatible extension
+for old readers, despite retaining `schema_version: "1.0.0"`. Their closed schema
+rejects that field with `Additional properties are not allowed`. The updated
+reader accepts existing bundles that omit it. A matching version string alone
+therefore does not establish compatibility; pin consumers to the reviewed code.
+This release chooses a coordinated consumer upgrade rather than introducing a
+history migration or downgrade mechanism.
+
+Before the updated publisher first writes a bundle to the production state
+directory or publishes one, upgrade **every consumer** to the merged main commit
+or a pinned release containing the change. This includes the Pages workflow,
+the publisher, and every checkout used for `scripts/mech_progress_status.py`
+(local and `--published` modes) or the `mech-progress-status` skill. Merely
+updating Pages is insufficient: an older status checkout also rejects the new
+bundle. Verify these consumers before starting the updated publisher. A dry run
+in an isolated temporary state directory can precede the upgrade; its generated
+bundle must be read only by updated consumers.
+
+After the first updated bundle is written locally or published, rollback to the
+old publisher is impossible with the retained history: it cannot read the new
+fields, even when the diagnostic is zero. Retain the previous release and
+backups for investigation, but do not strip diagnostic fields, reset history,
+or replace newer observations with an old bundle to bypass this boundary.
+Recover with a release that understands the extended schema; an older binary
+would require a separately reviewed compatibility change before it could run.
+
 ### Installing a reviewed publisher release
 
 This is an operator procedure, not an automatic deployment command. First merge
-the reviewed change and ensure the main-branch Pages consumer understands its
-schema before publishing new fields. Choose the exact reviewed main commit, not
-a moving branch name. Use a separate review checkout to obtain its archive;
-never switch the checkout used by running monitors. Preserve the state directory
-and every configured `--runtime` argument. The example below has one runtime;
-repeat that argument when the existing deployment has more.
+the reviewed change and complete the consumer upgrades above. Choose the exact
+reviewed main commit, not a moving branch name. Use a separate review checkout
+to obtain its archive; never switch the checkout used by running monitors.
+Preserve the state directory and every configured `--runtime` argument. The
+example below has one runtime; repeat that argument when the existing deployment
+has more.
 
 ```bash
 set -euo pipefail
@@ -185,6 +220,7 @@ git -C "$REVIEW_CHECKOUT" fetch origin main
 test "$REVIEWED_COMMIT" = "$(git -C "$REVIEW_CHECKOUT" rev-parse "${REVIEWED_COMMIT}^{commit}")"
 git -C "$REVIEW_CHECKOUT" merge-base --is-ancestor "$REVIEWED_COMMIT" origin/main
 test ! -e "$RELEASE"
+mkdir -p "$STATE/releases"
 mkdir "$RELEASE"
 ARCHIVE="$(mktemp "${TMPDIR:-/tmp}/mech-progress-release.XXXXXX")"
 git -C "$REVIEW_CHECKOUT" archive --format=tar --output="$ARCHIVE" "$REVIEWED_COMMIT"
@@ -238,8 +274,9 @@ Record the new PID and release pin. Verify `status.json` reports `published`,
 the data branch advances, and the Pages artifact's `data/publication.json`
 identifies that data commit. Do not use `--initialize` for an existing data
 branch. Retain the previous release and backup; do not prune releases, reset
-history, or restore an old bundle over newer observations as a rollback. Before
-restarting an older publisher, verify it can read the current public schema.
+history, or restore an old bundle over newer observations as a rollback. The
+compatibility boundary above rules out restarting a pre-diagnostics publisher
+after the updated publisher has written its first production bundle.
 
 ## Verification
 

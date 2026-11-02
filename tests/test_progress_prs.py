@@ -109,10 +109,10 @@ def test_orphan_registry_association_is_excluded_and_counted(session, field, val
     assert found.records == prs.gather_associations([session.runtime]) == []
     assert found.excluded_counts == {(session.ledger["run_id"], "traitmech"): 1}
     assert {p.name: p.read_bytes() for p in session.root.iterdir()} == before
-    # Registration retains its stronger contract and never silently rewrites
-    # an existing registry containing a superseded goal identity.
-    with pytest.raises(prs.OrphanAssociation, match="retained goal"):
-        prs.register_pr(session.root, 43)
+    registered = prs.register_pr(session.root, 43)
+    assert registered["pr_number"] == 43
+    assert (session.root / prs.REGISTRY_NAME).read_bytes().startswith(before[prs.REGISTRY_NAME])
+    assert (session.root / "ledger.json").read_bytes() == before["ledger.json"]
 
 
 def test_valid_records_unchanged_beside_orphan_and_no_orphan_github_query(session):
@@ -149,12 +149,93 @@ def test_malformed_orphan_still_raises(session, field, value):
 
 
 @pytest.mark.parametrize("orphan_first", [True, False])
-def test_orphan_cannot_hide_conflicting_registry_identity(session, orphan_first):
+def test_retained_registry_record_takes_precedence_over_orphan(session, orphan_first):
     valid = record(session)
     orphan = {**valid, "goal_identity": {**GOAL, "start_step_index": 99}}
     records = [orphan, valid] if orphan_first else [valid, orphan]
     (session.root / prs.REGISTRY_NAME).write_text("".join(json.dumps(r) + "\n" for r in records))
+    result = prs.collect_associations([session.runtime])
+    assert result.records == [valid]
+    assert result.excluded_counts == {(session.ledger["run_id"], "traitmech"): 1}
+
+
+def test_readopted_completion_candidate_takes_precedence_over_orphan(session):
+    old = record(session)
+    write(session.root / prs.REGISTRY_NAME, old)
+    session.ledger["adopted_goal"] = {**GOAL, "start_step_index": 99}
+    write(session.root / "ledger.json", session.ledger)
+    candidate = {**prs._context(session.ledger), "schema_version": 2, "pr": {"number": 42}}
+    write(session.root / "completion.json", candidate)
+    before = {p.name: p.read_bytes() for p in session.root.iterdir()}
+    result = prs.collect_associations([session.runtime])
+    assert result.records == [record(session)]
+    assert result.records[0]["goal_identity"] != old["goal_identity"]
+    assert result.excluded_counts == {(session.ledger["run_id"], "traitmech"): 1}
+    assert {p.name: p.read_bytes() for p in session.root.iterdir()} == before
+
+
+@pytest.mark.parametrize("candidate", [True, False])
+def test_conflicting_retained_records_still_fail(session, candidate):
+    current = record(session)
+    prior = {**current, "goal_identity": {**GOAL, "start_step_index": 1}}
+    session.ledger["completed_stages"] = [prior]
+    write(session.root / "ledger.json", session.ledger)
+    write(session.root / prs.REGISTRY_NAME, prior)
+    if candidate:
+        write(session.root / "completion.json", {**current, "schema_version": 2, "pr": {"number": 42}})
+    else:
+        with (session.root / prs.REGISTRY_NAME).open("a") as stream:
+            stream.write(json.dumps(current) + "\n")
     with pytest.raises(prs.AssociationError, match="conflicting"):
+        prs.collect_associations([session.runtime])
+
+
+@pytest.mark.parametrize("number", [42, 43])
+def test_registration_after_readoption_preserves_orphan_and_is_idempotent(session, number):
+    old = prs.register_pr(session.root, 42)
+    original = (session.root / prs.REGISTRY_NAME).read_bytes()
+    session.ledger["adopted_goal"] = {**GOAL, "start_step_index": 99}
+    write(session.root / "ledger.json", session.ledger)
+    write(session.root / "status.json", prs._context(session.ledger))
+    before_ledger = (session.root / "ledger.json").read_bytes()
+    current = prs.register_pr(session.root, number)
+    combined = (session.root / prs.REGISTRY_NAME).read_bytes()
+    assert combined.startswith(original)
+    assert [json.loads(line) for line in combined.splitlines()] == [old, current]
+    assert current["goal_identity"] == session.ledger["adopted_goal"]
+    assert prs.register_pr(session.root, number) == current
+    assert (session.root / prs.REGISTRY_NAME).read_bytes() == combined
+    assert (session.root / "ledger.json").read_bytes() == before_ledger
+    result = prs.collect_associations([session.runtime])
+    assert result.records == [current]
+    assert result.excluded_counts == {(session.ledger["run_id"], "traitmech"): 1}
+
+
+@pytest.mark.parametrize("mutate", [
+    lambda item: item.update(pr_number=True),
+    lambda item: item.update(reported_at="bad"),
+    lambda item: item.update(summary="unexpected"),
+    lambda item: item.update(repository_key="cmmmech"),
+])
+def test_registration_with_malformed_orphan_refuses_without_rewriting(session, mutate):
+    bad = record(session)
+    bad["goal_identity"] = {**GOAL, "start_step_index": 99}
+    mutate(bad)
+    write(session.root / prs.REGISTRY_NAME, bad)
+    before = (session.root / prs.REGISTRY_NAME).read_bytes()
+    with pytest.raises(prs.AssociationError) as error:
+        prs.register_pr(session.root, 43)
+    assert not isinstance(error.value, prs.OrphanAssociation)
+    assert (session.root / prs.REGISTRY_NAME).read_bytes() == before
+
+
+def test_completion_candidate_cannot_swallow_malformed_retained_context(session):
+    candidate = {**prs._context(session.ledger), "schema_version": 2, "pr": {"number": 42}}
+    write(session.root / "completion.json", candidate)
+    session.ledger["adopted_goal"] = "malformed"
+    write(session.root / "ledger.json", session.ledger)
+    assert not (session.root / prs.REGISTRY_NAME).exists()
+    with pytest.raises(prs.AssociationError, match="native goal"):
         prs.collect_associations([session.runtime])
 
 
