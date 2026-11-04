@@ -54,12 +54,85 @@ Causal-edge evidence is also outside MIM's declared selectors, so graph
 coverage must report it as unmeasured. Expanding any selector requires review
 of its native semantics and source/cache support.
 
-The first source adapter reads the cited PMID's retained markdown abstract.
-It checks source identity and matches normalized quote text inside the abstract
-body; title, authors and other metadata are not quote evidence. It performs no
-fetch, provider call or corpus repair. Unsupported references, absent quotes,
-and unavailable or invalid cached sources remain unverified; a populated
-citation alone cannot become a successful quote validation.
+The source adapters read a retained markdown abstract for the cited PMID
+(`PMID_<n>.md`, header `# PMID:<n>`) or DOI (`DOI_<percent-encoded lowercase
+DOI>.md`, header `# DOI:<doi>`). DOIs are case-insensitive. The `doi:` form, the
+bare `10.<registrant>/<suffix>` form and resolver URLs (`doi.org`,
+`www.doi.org` or `dx.doi.org`, with or without a scheme) of one DOI read one
+cache. Only a resolver URL's path is the DOI -- its `#fragment` and `?query` are
+not -- and only that path is percent-decoded, because a URL encodes the DOI
+while `%` is a legal DOI character. A citation that carries a PMID is checked
+against the PMID alone, exactly as before DOI support; DOI values beside it are
+not read.
+The adapter checks source identity and matches normalized quote text inside the
+abstract body; title, authors and other metadata are not quote evidence. It
+performs no fetch, provider call or corpus repair. Citations that are neither a
+PMID nor a DOI, absent quotes, and unavailable or invalid cached sources remain
+unverified; a populated citation alone cannot become a successful quote
+validation. Every report states how many in-scope items carry quote text in a
+configured quote slot, whatever their verdict, because a pass covers only those
+([#729](https://github.com/CultureBotAI/culturebotai-claw/issues/729)).
+
+### Adding caches
+
+`kg-microbe-evidence-fetch --mech <mech>` is the separate, explicit command that
+adds caches; the gate never runs it. It plans from the gate's own
+`MISSING_CACHE` results, so it fetches exactly what the declared selectors cite,
+and it is a dry run unless `--apply` is given. Before any request, both modes
+check that the cache destination is a writable directory, and every dry run
+checks the repository-lock setup that `--apply` takes (the locks directory, its
+hierarchy guard, the global lock and the Mech's lock path), so a dry run fails
+wherever
+`--apply` would, before anything is fetched or written. A lock another process
+holds at that moment is reported only by `--apply`. An efetch reply other than a
+`PubmedArticleSet` without an `ERROR` element stops the run as a provider
+failure; it is never read as sources not found. `--json` may name a file outside
+the Mech checkout or under its `workspace/`, never a cache, record or ledger. `--limit N` makes a canary:
+when both PMIDs and DOIs are pending it covers at least one DOI, so `--limit 2`
+exercises both lookup paths. `--apply` holds the Mech's repository lock. It
+calls NCBI E-utilities anonymously, with no e-mail address or tool registration;
+`NCBI_API_KEY` only raises the rate limit and is never printed. A DOI's abstract
+is accepted only from a single PubMed record that itself lists that DOI. It
+never rewrites an existing cache, writes each file atomically, and writes
+nothing for a record without an abstract, which therefore stays `MISSING_CACHE`.
+Each file records its PubMed URL and retrieval date. A cache records what
+PubMed returned; it does not clear the text's redistribution rights, which
+remain each Mech's source policy.
+
+### Known findings
+
+A profile may declare `known_findings`, a repository-relative TSV with the
+columns `record`, `reference`, `verdict`, `quote_sha256` and `issue`. The
+capability catalogue declares that setting in the rollout release; until then
+the manifest rejects it, so the CLIs, which read profiles only from the
+manifest, cannot reach a ledger. It lets a Mech adopt the gate with an existing
+backlog without pretending the backlog is validated:
+
+- A current finding listed there is reported and counted apart, never as
+  validated, and does not block. Each entry names the GitHub issue that owns
+  its repair, and excuses exactly one occurrence: a copy of a recorded failing
+  quote blocks until it is recorded too.
+- A finding that is not listed blocks as before, so new or edited quotes are
+  checked from the day the gate is adopted.
+- The key holds the quote's hash and not the item's position. Reordering a
+  record keeps an entry; editing the quote makes it stale.
+- An entry whose finding no longer occurs is stale and blocks until removed, so
+  the ledger can only shrink by repair. A record that could not be read is
+  never the reason an entry is called stale, and the run fails on the read
+  error.
+- Only quote and citation findings can be recorded (`MISSING_REFERENCE`,
+  `MISSING_CACHE`, `UNSUPPORTED_REFERENCE`, `SNIPPET_NOT_IN_SOURCE`).
+  `INVALID_EVIDENCE` and `INVALID_CACHE` are broken input and must be fixed.
+  A `MISSING_REFERENCE` entry has an empty `reference`, because the finding is
+  that there is none; every other entry names its citation.
+
+`kg-microbe-evidence --record-known-findings --issue <url>` plans the ledger
+from the current findings (keep, add, drop stale) and writes it only with
+`--apply`, reading, planning and writing under one hold of the Mech's
+repository lock. Its dry run checks the ledger directory and the lock setup the
+same way. A dry run that would leave a
+current finding without an owner exits 1, and `--apply` then refuses (exit 2);
+a row the writer cannot write fails the dry run too.
 
 A cached substring match does not prove that a source supports the scientific
 claim, establish the source's redistribution rights, or replace human review.
