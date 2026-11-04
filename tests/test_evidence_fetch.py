@@ -428,28 +428,54 @@ def test_a_non_string_search_id_is_malformed(tmp_path):
 
 
 class _Locks:
-    """A LockManager stand-in that records which repository locks were held."""
+    """A LockManager stand-in that knows whether the repository lock is held now."""
 
-    held: list[tuple[str, str]] = []
+    held_now = False
+    taken: list[tuple[str, str]] = []
 
     def lock(self, resource, operation):
         import contextlib
 
         @contextlib.contextmanager
-        def held():
-            _Locks.held.append((resource, operation))
-            yield
-        return held()
+        def hold():
+            _Locks.taken.append((resource, operation))
+            _Locks.held_now = True
+            try:
+                yield
+            finally:
+                _Locks.held_now = False
+        return hold()
+
+
+def _watch_lock(monkeypatch):
+    """Record, for the plan and every cache write, whether the lock was held."""
+    _Locks.held_now, _Locks.taken = False, []
+    seen: dict[str, list[bool]] = {"plan": [], "write": []}
+    monkeypatch.setattr(fetcher, "LockManager", _Locks)
+    validate, write = fetcher.validate_corpus, fetcher._write_new
+
+    def watched_validate(*args, **kwargs):
+        seen["plan"].append(_Locks.held_now)
+        return validate(*args, **kwargs)
+
+    def watched_write(*args, **kwargs):
+        seen["write"].append(_Locks.held_now)
+        return write(*args, **kwargs)
+    monkeypatch.setattr(fetcher, "validate_corpus", watched_validate)
+    monkeypatch.setattr(fetcher, "_write_new", watched_write)
+    return seen
 
 
 def test_cli_holds_the_repository_lock_only_while_applying(cli_root, monkeypatch):
-    """#746: AGENTS.md requires the lock for every write into a Mech checkout."""
-    _Locks.held = []
-    monkeypatch.setattr(fetcher, "LockManager", _Locks)
+    """#746/#748/#749: the plan and every write happen inside one hold; dry runs take none."""
+    seen = _watch_lock(monkeypatch)
     assert fetcher.main(["--mech", "habitatmech", "--root", str(cli_root)]) == 0
-    assert _Locks.held == []
+    assert _Locks.taken == [] and seen == {"plan": [False], "write": []}
+    seen = _watch_lock(monkeypatch)
     assert fetcher.main(["--mech", "habitatmech", "--root", str(cli_root), "--apply"]) == 0
-    assert _Locks.held == [("habitatmech", "evidence-fetch")]
+    assert _Locks.taken == [("habitatmech", "evidence-fetch")]
+    assert seen == {"plan": [True], "write": [True]}
+    assert not _Locks.held_now
 
 
 def test_cli_reports_a_held_lock_without_a_traceback(cli_root, monkeypatch, capsys):
@@ -460,3 +486,24 @@ def test_cli_reports_a_held_lock_without_a_traceback(cli_root, monkeypatch, caps
     assert fetcher.main(["--mech", "habitatmech", "--root", str(cli_root), "--apply"]) == 2
     assert "Failed to acquire lock" in capsys.readouterr().err
     assert not (cli_root / "references_cache").exists()
+
+
+# --- third review on #730 (#750, #751) ---------------------------------------
+
+def test_a_dry_run_fails_where_the_lock_setup_would(cli_root, monkeypatch, tmp_path_factory):
+    """#750: --apply refuses a symlinked lock workspace, so the dry run must too."""
+    real = tmp_path_factory.mktemp("real-workspace")
+    link = tmp_path_factory.mktemp("links") / "workspace"
+    link.symlink_to(real, target_is_directory=True)
+    monkeypatch.setenv("OPENCLAW_WORKSPACE", str(link))
+    assert fetcher.main(["--mech", "habitatmech", "--root", str(cli_root)]) == 2
+    assert fetcher.main(["--mech", "habitatmech", "--root", str(cli_root), "--apply"]) == 2
+    assert not (cli_root / "references_cache").exists()
+
+
+@pytest.mark.parametrize("limit", [0, -1])
+def test_a_limit_below_one_is_refused(tmp_path, limit):
+    """#751: with both kinds pending, a zero limit once planned almost everything."""
+    report = corpus(tmp_path, "PMID:2", "PMID:3", "doi:10.1000/x", "doi:10.1000/y")
+    with pytest.raises(ValueError, match="at least 1"):
+        fetcher.fetch_missing(tmp_path, CONFIG, report, limit=limit)

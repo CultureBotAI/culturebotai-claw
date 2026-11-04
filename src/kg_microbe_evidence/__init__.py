@@ -466,7 +466,12 @@ def render_known_findings(rows: Iterable[KnownFinding]) -> str:
             writer.writerow(values)
         except csv.Error as exc:
             raise EvidenceError(f"known finding cannot be written as TSV: {exc}") from exc
-    return buffer.getvalue()
+    text = buffer.getvalue()
+    try:
+        text.encode("utf-8")  # e.g. a lone surrogate from a YAML escape (#752)
+    except UnicodeEncodeError as exc:
+        raise EvidenceError(f"known finding cannot be written as UTF-8: {exc}") from exc
+    return text
 
 
 def write_known_findings(root: Path, relative: str, rows: Iterable[KnownFinding]) -> Path:
@@ -474,10 +479,11 @@ def write_known_findings(root: Path, relative: str, rows: Iterable[KnownFinding]
     path = _ledger_path(root, relative)
     text = render_known_findings(rows)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=path.parent, delete=False) as stream:
-        temporary = Path(stream.name)
-        stream.write(text)
-    try:
+    descriptor, name = tempfile.mkstemp(dir=path.parent)
+    temporary = Path(name)
+    try:  # no temporary file survives a failed write (#752)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            stream.write(text)
         os.chmod(temporary, 0o644)
         os.replace(temporary, path)
     finally:

@@ -22,7 +22,7 @@ from kg_microbe_evidence import (
 )
 from kg_microbe_fleet import FleetManifestError, load_fleet_manifest
 from kg_microbe_fleet.roots import claw_root
-from plugins.lock_manager import LockManager
+from plugins.lock_manager import LockManager, resolve_workspace_root
 from plugins.repository_settings import (
     RepositoryConfigurationError,
     RepositorySettings,
@@ -71,21 +71,23 @@ def write_reports(report: dict, output: Path) -> None:
         target = output / f"evidence_reference_validation.{suffix}"
         if target.is_symlink():
             raise EvidenceError("report output must not be a symlink")
-        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=output, delete=False) as stream:
-            temporary = Path(stream.name)
-            stream.write(text)
-        try:
+        descriptor, name = tempfile.mkstemp(dir=output)
+        temporary = Path(name)
+        try:  # no temporary file survives a failed write (#752)
+            with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+                stream.write(text)
             os.replace(temporary, target)
         finally:
             temporary.unlink(missing_ok=True)
 
 
 def record_known_findings(report: dict, root: Path, config: EvidenceConfig,
-                          issue: str | None, *, apply: bool, mech_key: str) -> int:
+                          issue: str | None, *, apply: bool) -> int:
     """Rewrite the declared ledger from the current findings, dry-run by default.
 
-    Input errors stop it: an unreadable record's findings are unknown, so a
-    ledger written then would silently forget them.
+    With `apply`, the caller holds the repository lock from before `report` was
+    read until this returns. Input errors stop it: an unreadable record's
+    findings are unknown, so a ledger written then would silently forget them.
     """
     if config.known_findings is None:
         raise EvidenceError("declare known_findings in this Mech's evidence profile first")
@@ -102,9 +104,7 @@ def record_known_findings(report: dict, root: Path, config: EvidenceConfig,
         return 1 if plan["unowned"] else 0
     if plan["unowned"]:
         raise EvidenceError("refusing to write a ledger that leaves current findings unrecorded")
-    # A write into a Mech checkout holds that repository's lock (AGENTS.md, #746).
-    with LockManager().lock(mech_key, "evidence-known-findings"):
-        write_known_findings(root, config.known_findings, plan["rows"])
+    write_known_findings(root, config.known_findings, plan["rows"])
     print(f"  Wrote {root / config.known_findings}")
     return 0
 
@@ -148,13 +148,23 @@ def main(argv: list[str] | None = None) -> int:
         output = output.resolve()
         if not output.is_relative_to(root):
             raise EvidenceError("report output must remain inside the active checkout")
-        report = validate_corpus(root, mech.record_globs, config,
-                                 missing_ledger_ok=args.record_known_findings)
-        report.update(repository=mech.github, revision=repo.head.commit.hexsha,
-                      strict=args.strict, input_state="active checkout, including uncommitted files")
+        def validated() -> dict:
+            report = validate_corpus(root, mech.record_globs, config,
+                                     missing_ledger_ok=args.record_known_findings)
+            report.update(repository=mech.github, revision=repo.head.commit.hexsha, strict=args.strict,
+                          input_state="active checkout, including uncommitted files")
+            return report
+
+        if args.record_known_findings and args.apply:
+            # Read, plan and write under one hold of the repository lock, so no
+            # concurrent update is lost between them (AGENTS.md; #746, #749).
+            with LockManager().lock(mech.key, "evidence-known-findings"):
+                report = validated()
+                return record_known_findings(report, root, config, args.issue, apply=True)
+        report = validated()
         if args.record_known_findings:
-            return record_known_findings(report, root, config, args.issue, apply=args.apply,
-                                         mech_key=mech.key)
+            resolve_workspace_root()  # the dry run fails where --apply's lock would (#750)
+            return record_known_findings(report, root, config, args.issue, apply=False)
         write_reports(report, output)
         print(f"{mech.key}: {report['evidence_items']} evidence items; "
               f"{report['quote_validated_items']} quote-validated; {len(report['errors'])} input errors")

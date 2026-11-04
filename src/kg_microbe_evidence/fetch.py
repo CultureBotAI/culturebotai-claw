@@ -45,7 +45,7 @@ from kg_microbe_evidence import (
 )
 from kg_microbe_fleet import FleetManifestError, load_fleet_manifest
 from kg_microbe_fleet.roots import claw_root
-from plugins.lock_manager import LockManager
+from plugins.lock_manager import LockManager, resolve_workspace_root
 from plugins.repository_settings import (
     RepositoryConfigurationError,
     RepositorySettings,
@@ -262,6 +262,8 @@ def fetch_missing(
     api_key: str | None = None, rate: float | None = None,
     sleep: Callable[[float], None] = time.sleep, today: dt.date | None = None,
 ) -> FetchResult:
+    if limit is not None and limit < 1:
+        raise ValueError("limit must be at least 1")  # 0 would slice past the DOI reserve (#751)
     missing_pmids, missing_dois = plan(report)
     pmids, dois = missing_pmids, missing_dois
     if limit is not None:
@@ -371,20 +373,22 @@ def main(argv: list[str] | None = None) -> int:
             env = merged_repository_environment(dotenv if dotenv.exists() else None)
             target = RepositorySettings.from_environment(environ=env, manifest=manifest).get_target(mech.key)
         target.open()
-        report = validate_corpus(target.path, mech.record_globs, config, missing_ledger_ok=True)
-        if report["errors"]:
-            raise EvidenceError(f"{len(report['errors'])} records could not be read; the plan would be incomplete")
+
+        def run() -> FetchResult:
+            report = validate_corpus(target.path, mech.record_globs, config, missing_ledger_ok=True)
+            if report["errors"]:
+                raise EvidenceError(f"{len(report['errors'])} records could not be read; the plan would be incomplete")
+            return fetch_missing(target.path, config, report, apply=args.apply, limit=args.limit,
+                                 transport=http_transport, api_key=os.environ.get("NCBI_API_KEY") or None)
         try:
-            def run() -> FetchResult:
-                return fetch_missing(target.path, config, report, apply=args.apply, limit=args.limit,
-                                     transport=http_transport,
-                                     api_key=os.environ.get("NCBI_API_KEY") or None)
             if args.apply:
-                # A write into a Mech checkout holds that repository's lock (AGENTS.md, #746).
+                # Plan and write under one hold of the repository lock (AGENTS.md; #746, #749).
                 with LockManager().lock(mech.key, "evidence-fetch"):
                     result = run()
             else:
                 result = run()
+                if result.planned_pmids or result.planned_dois:
+                    resolve_workspace_root()  # the dry run fails where --apply's lock would (#750)
             outcome, code = result.as_dict(), 0
         except FetchError as exc:
             print(f"evidence fetch: {exc}", file=sys.stderr)

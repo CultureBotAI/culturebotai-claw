@@ -436,27 +436,73 @@ def test_apply_refuses_to_leave_a_current_finding_without_an_owner(root, monkeyp
 
 
 class _Locks:
-    held: list[tuple[str, str]] = []
+    """A LockManager stand-in that knows whether the repository lock is held now."""
+
+    held_now = False
+    taken: list[tuple[str, str]] = []
 
     def lock(self, resource, operation):
         import contextlib
 
         @contextlib.contextmanager
-        def held():
-            _Locks.held.append((resource, operation))
-            yield
-        return held()
+        def hold():
+            _Locks.taken.append((resource, operation))
+            _Locks.held_now = True
+            try:
+                yield
+            finally:
+                _Locks.held_now = False
+        return hold()
 
 
-def test_the_ledger_write_holds_the_repository_lock(root, monkeypatch, tmp_path_factory):
-    """#746: the dry run takes no lock; the write holds the Mech's lock."""
+def test_the_ledger_is_read_planned_and_written_under_one_lock(root, monkeypatch, tmp_path_factory):
+    """#746/#748/#749: no concurrent update can land between the read and the write."""
     args = _ledger_cli(root, monkeypatch, tmp_path_factory, ("PMID:1", "a paraphrase"))
-    _Locks.held = []
+    seen: dict[str, list[bool]] = {"read": [], "write": []}
+    validate, write = cli.validate_corpus, cli.write_known_findings
+
+    def watched_validate(*a, **k):
+        seen["read"].append(_Locks.held_now)
+        return validate(*a, **k)
+
+    def watched_write(*a, **k):
+        seen["write"].append(_Locks.held_now)
+        return write(*a, **k)
     monkeypatch.setattr(cli, "LockManager", _Locks)
+    monkeypatch.setattr(cli, "validate_corpus", watched_validate)
+    monkeypatch.setattr(cli, "write_known_findings", watched_write)
+    _Locks.held_now, _Locks.taken = False, []
     assert cli.main([*args, "--issue", ISSUE]) == 0
-    assert _Locks.held == []
+    assert _Locks.taken == [] and seen == {"read": [False], "write": []}
+    seen = {"read": [], "write": []}
     assert cli.main([*args, "--issue", ISSUE, "--apply"]) == 0
-    assert _Locks.held == [("habitatmech", "evidence-known-findings")]
+    assert _Locks.taken == [("habitatmech", "evidence-known-findings")]
+    assert seen == {"read": [True], "write": [True]}
+
+
+def test_a_held_ledger_lock_is_reported_and_nothing_is_written(root, monkeypatch, tmp_path_factory, capsys):
+    """#748: the ledger CLI reports a busy lock instead of a traceback."""
+    args = _ledger_cli(root, monkeypatch, tmp_path_factory, ("PMID:1", "a paraphrase"))
+
+    class Busy:
+        def lock(self, resource, operation):
+            raise RuntimeError(f"Failed to acquire lock on {resource}")
+    monkeypatch.setattr(cli, "LockManager", Busy)
+    assert cli.main([*args, "--issue", ISSUE, "--apply"]) == 2
+    assert "Failed to acquire lock" in capsys.readouterr().err
+    assert not (root / LEDGER).exists()
+
+
+def test_the_ledger_dry_run_fails_where_the_lock_setup_would(root, monkeypatch, tmp_path_factory):
+    """#750: a symlinked lock workspace fails the dry run as it fails --apply."""
+    args = _ledger_cli(root, monkeypatch, tmp_path_factory, ("PMID:1", "a paraphrase"))
+    real = tmp_path_factory.mktemp("real-workspace")
+    link = tmp_path_factory.mktemp("links") / "workspace"
+    link.symlink_to(real, target_is_directory=True)
+    monkeypatch.setenv("OPENCLAW_WORKSPACE", str(link))
+    assert cli.main([*args, "--issue", ISSUE]) == 2
+    assert cli.main([*args, "--issue", ISSUE, "--apply"]) == 2
+    assert not (root / LEDGER).exists()
 
 
 def test_the_writer_refuses_a_field_the_reader_cannot_read_back(root):
@@ -466,3 +512,38 @@ def test_the_writer_refuses_a_field_the_reader_cannot_read_back(root):
     with pytest.raises(EvidenceError, match="longer than the ledger reader accepts"):
         write_known_findings(root, LEDGER, [KnownFinding("item.yaml", huge, "UNSUPPORTED_REFERENCE",
                                                          "a" * 64, ISSUE)])
+
+
+# --- third review on #730 (#752) ---------------------------------------------
+
+def test_a_lone_surrogate_fails_the_render_and_the_dry_run(root, monkeypatch, tmp_path_factory):
+    """#752: the dry run fails where the UTF-8 write would."""
+    with pytest.raises(EvidenceError, match="UTF-8"):
+        write_known_findings(root, LEDGER, [KnownFinding("item.yaml", "Smith J. \ud800 2020",
+                                                         "UNSUPPORTED_REFERENCE", "a" * 64, ISSUE)])
+    args = _ledger_cli(root, monkeypatch, tmp_path_factory)
+    (root / "item.yaml").write_text('evidence:\n- reference: "Smith J. \\ud800 2020"\n  snippet: a line\n')
+    assert cli.main([*args, "--issue", ISSUE]) == 2
+    assert cli.main([*args, "--issue", ISSUE, "--apply"]) == 2
+    assert not (root / "curation").exists() or list((root / "curation").iterdir()) == []
+
+
+def test_a_failed_ledger_write_leaves_no_temporary_file(root, monkeypatch):
+    """#752: the leak happened when the stream write itself failed, so fail it there."""
+    import kg_microbe_evidence as evidence
+
+    monkeypatch.setattr(evidence, "render_known_findings", lambda rows: "header \ud800\n")
+    with pytest.raises(UnicodeEncodeError):
+        write_known_findings(root, LEDGER, [])
+    assert list((root / "curation").iterdir()) == []
+
+
+def test_a_failed_report_write_leaves_no_temporary_file(root):
+    """#752: the existing report writer leaked the same way when the TSV write failed."""
+    record(root, ("PMID:1", "growth increased"))
+    report = validate_corpus(root, ["item.yaml"], config())
+    report["results"][0]["reference"] = "PMID:1 \ud800"  # JSON escapes it; the TSV cannot
+    output = root / "reports"
+    with pytest.raises(UnicodeEncodeError):
+        cli.write_reports(report, output)
+    assert sorted(p.name for p in output.iterdir()) == ["evidence_reference_validation.json"]
