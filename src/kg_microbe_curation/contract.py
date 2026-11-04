@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import stat
 from collections.abc import Iterable
 from functools import lru_cache
 from importlib.resources import files
@@ -49,10 +51,19 @@ def _nonfinite(value: str) -> None:
 
 
 def load_bundle(path: str | Path) -> dict[str, Any]:
-    """Read strict JSON and validate its internal contract, without ledger access."""
+    """Read bounded regular-file JSON without following a symlink or blocking on a FIFO."""
     try:
-        with Path(path).open("rb") as handle:
-            raw = handle.read(MAX_BUNDLE_BYTES + 1)
+        try:
+            descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        except OSError as exc:
+            raise CurationError("Bundle input must be an accessible regular file, not a symlink") from exc
+        try:
+            if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+                raise CurationError("Bundle input must be a regular file")
+            with os.fdopen(descriptor, "rb", closefd=False) as handle:
+                raw = handle.read(MAX_BUNDLE_BYTES + 1)
+        finally:
+            os.close(descriptor)
         if len(raw) > MAX_BUNDLE_BYTES:
             raise CurationError("Curation bundle exceeds the 16 MiB byte limit")
         bundle = json.loads(

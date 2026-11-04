@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import subprocess
+import sys
 from copy import deepcopy
+from pathlib import Path
 
 import pytest
 
@@ -368,6 +372,34 @@ def test_reader_refuses_oversized_file_before_parsing(tmp_path):
         handle.truncate(MAX_BUNDLE_BYTES + 1)
     with pytest.raises(CurationError, match="16 MiB"):
         load_bundle(path)
+
+
+@pytest.mark.parametrize("command", ["validate-bundle", "apply"])
+@pytest.mark.parametrize("input_kind", ["fifo", "symlink"])
+def test_cli_rejects_nonregular_bundle_before_read_or_apply(bundle, tmp_path, command, input_kind):
+    """CLAW #759: both bundle entrypoints must refuse pipes promptly and never follow links."""
+    path = tmp_path / "bundle.json"
+    original = tmp_path / "original.json"
+    original_bytes = canonical_json(bundle)
+    original.write_bytes(original_bytes)
+    if input_kind == "fifo":
+        os.mkfifo(path)
+    else:
+        path.symlink_to(original)
+    database = tmp_path / "must-not-create.sqlite"
+    args = (["validate-bundle", str(path)] if command == "validate-bundle" else [
+        "apply", "--bundle", str(path), "--database", str(database),
+        "--expected-revision", "0" * 64,
+    ])
+    root = Path(__file__).resolve().parents[1]
+    result = subprocess.run(
+        [sys.executable, "-m", "kg_microbe_curation", *args],
+        cwd=root, env={**os.environ, "PYTHONPATH": str(root / "src")},
+        capture_output=True, text=True, timeout=15,
+    )
+    assert result.returncode == 2 and "regular file" in result.stderr
+    assert not database.exists()
+    assert original.read_bytes() == original_bytes
 
 
 def test_in_memory_bundle_size_and_selected_count_are_bounded(bundle):

@@ -11,18 +11,103 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib
 import json
+import os
 import subprocess
 import sys
+from importlib.resources import files
 from pathlib import Path
+
+RUNTIME_MODULES = {
+    "kg_microbe_curation": "__init__.py",
+    **{
+        f"kg_microbe_curation.{name}": f"{name}.py"
+        for name in ("identity", "contract", "ledger", "__main__")
+    },
+}
 
 
 def _hash(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
 
 
-def _run(command: list[str], cwd: Path, *, succeeds: bool = True) -> dict:
-    result = subprocess.run(command, cwd=cwd, capture_output=True, text=True, check=False)
+def _consumer_environment(root: Path) -> dict[str, str]:
+    """Ignore ambient package paths for every consumer probe and command (#763)."""
+    return {
+        **os.environ,
+        "PYTHONPATH": os.pathsep.join((str(root / "src"), str(root))),
+        "PYTHONDONTWRITEBYTECODE": "1",
+    }
+
+
+def _runtime_probe() -> dict:
+    """Report actual imported module and packaged-schema origins in a child process."""
+    modules = {}
+    for name in RUNTIME_MODULES:
+        module = importlib.import_module(name)
+        path = Path(module.__file__).resolve(strict=True)
+        modules[name] = {"path": str(path), "sha256": _hash(path)}
+    schema = Path(str(files("kg_microbe_curation").joinpath("schema/bundle.json"))).resolve(
+        strict=True
+    )
+    return {
+        "interpreter": {"executable": str(Path(sys.executable).absolute()), "version": sys.version},
+        "modules": modules,
+        "schema": {"path": str(schema), "sha256": _hash(schema)},
+    }
+
+
+def _verify_runtime(probe: dict, root: Path) -> None:
+    """Reject a different interpreter, checkout, packaged resource, or source digest."""
+    try:
+        if probe["interpreter"]["executable"] != str(Path(sys.executable).absolute()):
+            raise ValueError("interpreter differs")
+        if probe["interpreter"]["version"] != sys.version or set(probe["modules"]) != set(
+            RUNTIME_MODULES
+        ):
+            raise ValueError("interpreter version or module set differs")
+        expected = {
+            **{
+                name: root / "src/kg_microbe_curation" / relative
+                for name, relative in RUNTIME_MODULES.items()
+            },
+            "schema": root / "src/kg_microbe_curation/schema/bundle.json",
+        }
+        for name, path in expected.items():
+            observed = probe["schema"] if name == "schema" else probe["modules"][name]
+            actual = Path(observed["path"]).resolve(strict=True)
+            if not actual.is_relative_to(root.resolve()) or actual != path.resolve(strict=True):
+                raise ValueError(f"{name} origin is outside the expected checkout")
+            if observed["sha256"] != _hash(path):
+                raise ValueError(f"{name} digest differs from the expected checkout")
+    except (KeyError, TypeError, ValueError, OSError) as exc:
+        raise RuntimeError(f"consumer runtime verification failed: {exc}") from exc
+
+
+def _probe(root: Path, environment: dict[str, str]) -> dict:
+    probe = _run(
+        [sys.executable, str(Path(__file__).resolve()), "--probe-runtime"],
+        root,
+        env=environment,
+    )
+    _verify_runtime(probe, root)
+    return probe
+
+
+def _verify_file_hashes(expected: dict[Path, str]) -> None:
+    """Refuse receipts when a directly executed source or input changed during the run."""
+    for path, digest in expected.items():
+        if _hash(path) != digest:
+            raise RuntimeError(f"canary input or executed source changed: {path}")
+
+
+def _run(command: list[str], cwd: Path, *, succeeds: bool = True, env: dict | None = None) -> dict:
+    result = subprocess.run(command, cwd=cwd, env=env, capture_output=True, text=True, check=False)
     if succeeds and result.returncode:
         raise RuntimeError(f"canary command failed: {result.stderr}")
     if not succeeds:
@@ -34,6 +119,9 @@ def _run(command: list[str], cwd: Path, *, succeeds: bool = True) -> dict:
 
 def main() -> None:
     """Run one end-to-end unit through the same launchers used for later batches."""
+    if sys.argv[1:] == ["--probe-runtime"]:
+        print(json.dumps(_runtime_probe(), sort_keys=True))
+        return
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--kg-root", type=Path, required=True)
     parser.add_argument("--kg-python", type=Path, required=True)
@@ -46,6 +134,7 @@ def main() -> None:
     if args.rows < 1:
         parser.error("a positive bounded row count is required")
     root = Path(__file__).resolve().parents[2]
+    environment = _consumer_environment(root)
     producer = args.kg_root.resolve() / "kg_microbe/edge_snapshot.py"
     for path in (producer, args.kg_python, args.snapshot_manifest):
         if not path.is_file():
@@ -82,23 +171,43 @@ def main() -> None:
         "ledger_audit": [*ledger_command, "audit", "--database", str(database)],
     }
     if args.plan:
-        print(json.dumps({"mode": "plan", "commands": commands, "output": str(output)}, indent=2))
+        print(
+            json.dumps(
+                {
+                    "mode": "plan",
+                    "commands": commands,
+                    "output": str(output),
+                    "consumer_pythonpath": environment["PYTHONPATH"],
+                },
+                indent=2,
+            )
+        )
         return
+    consumer_runtime = _probe(root, environment)
+    bound_files = {
+        path: _hash(path) for path in (producer, args.snapshot_manifest, Path(__file__).resolve())
+    }
     output.mkdir(parents=True)
     exported = _run(commands["producer"], args.kg_root)
-    initial = _run(commands["ledger_init"], root)
+    initial = _run(commands["ledger_init"], root, env=environment)
     if initial["accounted_rows"] != exported["selection"]["exported_rows"]:
         raise RuntimeError("persisted occurrence count differs from the producer")
     if initial["accounted_rows"] < 1:
         raise RuntimeError("canary has no persisted edge")
     with (output / "snapshot" / exported["shards"][0]["file"]).open() as handle:
         first = json.loads(handle.readline())
-    from kg_microbe_curation.contract import unprocessed_decision
-
-    decision = unprocessed_decision(first["occurrence_id"])
-    decision.update(
-        review_state="deferred", rationale="Canary routing only; evidence has not been assessed."
-    )
+    # Construct the explicit routing packet without importing an ambient parent package.
+    decision = {
+        "occurrence_id": first["occurrence_id"],
+        "lifecycle": "active",
+        "review_state": "deferred",
+        "conflict_state": "not_assessed",
+        "disposition": "withheld",
+        "claim_ids": [],
+        "observation_id": None,
+        "review_ids": [],
+        "rationale": "Canary routing only; evidence has not been assessed.",
+    }
     bundle = {
         "contract": "kg-microbe-curation/v1",
         "input_sha256": initial["input_sha256"],
@@ -120,10 +229,10 @@ def main() -> None:
         "--expected-revision",
         initial["revision"],
     ]
-    updated = _run(apply_command, root)
-    stale = _run(apply_command, root, succeeds=False)
-    persisted = _run(commands["ledger_status"], root)
-    audited = _run(commands["ledger_audit"], root)
+    updated = _run(apply_command, root, env=environment)
+    stale = _run(apply_command, root, succeeds=False, env=environment)
+    persisted = _run(commands["ledger_status"], root, env=environment)
+    audited = _run(commands["ledger_audit"], root, env=environment)
     shown = _run(
         [
             *ledger_command,
@@ -134,6 +243,7 @@ def main() -> None:
             first["occurrence_id"],
         ],
         root,
+        env=environment,
     )
     if persisted != updated or shown["source_row"] != first["source_row"]:
         raise RuntimeError("persisted ledger differs from the completed update or source row")
@@ -143,14 +253,21 @@ def main() -> None:
         raise RuntimeError("canary incorrectly approved scientific claims or lost decision history")
     if database.stat().st_size == 0:
         raise RuntimeError("ledger was not persisted")
+    if _probe(root, environment) != consumer_runtime:
+        raise RuntimeError("consumer runtime changed during canary execution")
+    _verify_file_hashes(bound_files)
+    if exported["source_manifest_sha256"] != bound_files[args.snapshot_manifest]:
+        raise RuntimeError("producer consumed a different source manifest")
     receipt = {
         "kind": "offline_release_accounting_canary",
         "scientific_approvals": 0,
-        "source_manifest_sha256": _hash(args.snapshot_manifest),
-        "producer_code_sha256": _hash(producer),
+        "source_manifest_sha256": bound_files[args.snapshot_manifest],
+        "producer_code_sha256": bound_files[producer],
+        "canary_script_sha256": bound_files[Path(__file__).resolve()],
+        "consumer_runtime": consumer_runtime,
         "consumer_code_sha256": {
-            name: _hash(root / "src/kg_microbe_curation" / name)
-            for name in ("identity.py", "contract.py", "ledger.py", "__main__.py")
+            RUNTIME_MODULES[name]: observed["sha256"]
+            for name, observed in consumer_runtime["modules"].items()
         },
         "commands": commands,
         "apply_command": apply_command,
