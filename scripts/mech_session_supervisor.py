@@ -312,6 +312,17 @@ def migrate_ledger(ledger: dict, target: dict, effective: dict) -> dict:
 
 
 def validate_config(config: dict, *, resolve_repositories: bool = True) -> dict:
+    from kg_microbe_workflows.port_pressure import normalize_config
+
+    pressure = config.get("port_pressure", {"mode": "off"})
+    if not isinstance(pressure, dict):
+        raise SupervisorError("port_pressure must be an object")
+    try:
+        config["port_pressure"] = normalize_config({key: value for key, value in pressure.items() if key != "binding_files"})
+        if "binding_files" in pressure:
+            config["port_pressure"]["binding_files"] = pressure["binding_files"]
+    except ValueError as error:
+        raise SupervisorError(str(error)) from error
     config.setdefault("native_reader_path", str(ROOT / "scripts/mech_session_native.py"))
     config.setdefault("notifier_path", str(ROOT / "scripts/mech_session_terminal.py"))
     for field in ("run_id", "runtime_dir", "native_reader_path", "notifier_path", "input_lock_dir", "targets"):
@@ -1276,6 +1287,14 @@ function run(argv) {
             groups = system.doShellScript('/bin/ps -p ' + expected.pid + ' -o pgid=,tpgid=').trim().split(/\s+/);
         } catch (error) { return 'process-unavailable'; }
         if (identity !== expected.identity || cwd.length !== 1 || cwd[0] !== expected.cwd || groups.length !== 2 || groups[0] !== groups[1]) return 'identity-changed';
+        if (expected.agy_inventory) {
+            let inventory;
+            try {
+                inventory = system.doShellScript('/bin/ps -ax -o pid=,tty=,lstart=,comm=').split(/\r?\n|\r/)
+                    .map(x => x.trim()).filter(x => /(?:^|\s)agy$/.test(x)).sort();
+            } catch (error) { return 'process-inventory-unavailable'; }
+            if (JSON.stringify(inventory) !== JSON.stringify(expected.agy_inventory)) return 'process-inventory-changed';
+        }
         let currentScreen, expectedScreen;
         try {
             currentScreen = currentTail(tab);
@@ -1357,6 +1376,27 @@ class Supervisor:
         self.runner = runner
         self.stop_requested = stop_requested or (lambda: False)
         self.native_cache: dict[str, tuple[tuple, dict]] = {}
+        self._port_pressure_helpers = {
+            "read_json": read_json, "atomic_json": atomic_json, "file_lock": file_lock,
+            "send_js": SEND_JS, "busy": terminal_busy_reason,
+        }
+
+    def port_pressure(self, *, apply: bool = False, report_only: bool = False) -> dict:
+        from kg_microbe_workflows.port_pressure import normalize_config
+
+        # The one-setting off switch is reread each tick, not just at startup.
+        if self.config.get("_config_path"):
+            source = read_json(Path(self.config["_config_path"]))
+            self.config["port_pressure"] = source.get("port_pressure", {"mode": "off"})
+        if report_only:
+            self.config["port_pressure"] = {**self.config.get("port_pressure", {}), "mode": "report"}
+        raw = self.config.get("port_pressure", {"mode": "off"})
+        normalized = normalize_config({key: value for key, value in raw.items() if key != "binding_files"})
+        self.config["port_pressure"] = {**raw, **normalized}
+        if normalized["mode"] == "off":
+            return {"phase": "off", "candidate": None}
+        adapter = import_file(ROOT / "scripts/mech_session_port_pressure.py", "supervisor_port_pressure")
+        return adapter.PortPressureGuard(self).tick(apply=apply and not report_only)
 
     def stopping(self) -> bool:
         return self.stop_requested() or (self.runtime / "STOP").exists()
@@ -1746,6 +1786,16 @@ class Supervisor:
                 raise SupervisorError("next-cycle profile/extension is not committed at the verified closure head")
 
     def sweep(self, *, apply: bool = False) -> dict:
+        pressure = self.port_pressure(apply=apply)
+        if (self.config.get("port_pressure", {}).get("mode") == "restart"
+                and pressure["phase"] in {"restarted", "disabled", "unknown"}):
+            # A maintenance tick never sends ordinary workflow/goal text. An
+            # uncertain transaction stays stopped for operator reconciliation.
+            result = {"run_id": self.config["run_id"], "updated_at": now(),
+                      "mode": "apply" if apply else "observe", "sessions": [],
+                      "port_pressure": pressure}
+            self.write(self.runtime / "dashboard.json", result)
+            return result
         rows = []
         for target in self.config["targets"]:
             if self.stopping():
@@ -1853,7 +1903,8 @@ class Supervisor:
             self.write(self.runtime / "heartbeat.json", {"pid": os.getpid(), "updated_at": now(),
                 "running": True, "mode": "apply" if apply else "observe", "sweep_in_progress": True,
                 "repositories_observed": len(rows), "repositories_total": len(self.config["targets"])})
-        dashboard = {"run_id": self.config["run_id"], "updated_at": now(), "mode": "apply" if apply else "observe", "sessions": rows}
+        dashboard = {"run_id": self.config["run_id"], "updated_at": now(), "mode": "apply" if apply else "observe", "sessions": rows,
+                     "port_pressure": pressure}
         self.write(self.runtime / "dashboard.json", dashboard)
         lines = ["# Mech session workflow", "", f"Updated: {dashboard['updated_at']}", "",
                  "| Repository | Stage | Phase | Native goal | Detail |", "|---|---:|---|---|---|"]
@@ -1879,14 +1930,20 @@ def main(argv=None) -> int:
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--observe", action="store_true", help="read-only observation (default)")
     mode.add_argument("--apply", action="store_true", help="submit guarded instructions at idle composers")
+    mode.add_argument("--port-pressure-report", action="store_true",
+                      help="only report port pressure and blocked tasks; never send session input")
+    mode.add_argument("--port-pressure-restart", action="store_true",
+                      help="only run the explicitly enabled maintenance guard; never dispatch goal text")
     parser.add_argument("--loop", action="store_true")
     parser.add_argument("--interval", type=float, default=30)
     args = parser.parse_args(argv)
     if not 5 <= args.interval <= 60:
         parser.error("--interval must be between 5 and 60 seconds")
     config = validate_config(read_json(args.config))
+    config["_config_path"] = str(args.config.resolve())
     stopped = False
     supervisor = Supervisor(config, stop_requested=lambda: stopped)
+    guard_failed = False
 
     def stop(_signal, _frame):
         nonlocal stopped
@@ -1894,10 +1951,26 @@ def main(argv=None) -> int:
 
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
+    if args.port_pressure_report or args.port_pressure_restart:
+        # A standalone observation must not acquire the workflow loop's lock or
+        # overwrite its heartbeat. The guard owns a separate transaction lock.
+        while not stopped and not supervisor.stopping():
+            result = supervisor.port_pressure(report_only=args.port_pressure_report,
+                                              apply=args.port_pressure_restart)
+            print(json.dumps(result), flush=True)
+            guard_failed = guard_failed or result.get("phase") in {"unknown", "disabled"}
+            if not args.loop:
+                return int(guard_failed)
+            deadline = time.monotonic() + args.interval
+            while not stopped and time.monotonic() < deadline:
+                time.sleep(min(0.5, max(0, deadline - time.monotonic())))
+        return int(guard_failed)
     with file_lock(supervisor.runtime / "supervisor.lock"):
         try:
             while not stopped and not (supervisor.runtime / "STOP").exists():
-                print(json.dumps(supervisor.sweep(apply=args.apply)), flush=True)
+                result = supervisor.sweep(apply=args.apply)
+                print(json.dumps(result), flush=True)
+                guard_failed = guard_failed or result.get("port_pressure", {}).get("phase") in {"unknown", "disabled"}
                 if not args.loop:
                     break
                 deadline = time.monotonic() + args.interval
@@ -1906,7 +1979,7 @@ def main(argv=None) -> int:
         finally:
             supervisor.write(supervisor.runtime / "heartbeat.json", {"pid": os.getpid(), "updated_at": now(),
                 "running": False, "mode": "apply" if args.apply else "observe"})
-    return 0
+    return int(guard_failed)
 
 
 if __name__ == "__main__":
