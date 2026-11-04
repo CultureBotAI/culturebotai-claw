@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import os
 import subprocess
 import urllib.parse
 from types import SimpleNamespace
@@ -507,3 +508,63 @@ def test_a_limit_below_one_is_refused(tmp_path, limit):
     report = corpus(tmp_path, "PMID:2", "PMID:3", "doi:10.1000/x", "doi:10.1000/y")
     with pytest.raises(ValueError, match="at least 1"):
         fetcher.fetch_missing(tmp_path, CONFIG, report, limit=limit)
+
+
+# --- fourth review on #730 (#753, #754) --------------------------------------
+
+def test_a_failed_cache_write_leaves_no_temporary_file(tmp_path, monkeypatch):
+    """#753: a write that fails part-way must not leave a temp file in the Mech's cache."""
+    import errno
+
+    def full(fd):
+        raise OSError(errno.ENOSPC, "No space left on device")
+    monkeypatch.setattr(fetcher.os, "fsync", full)
+    cache = tmp_path / "references_cache"
+    cache.mkdir()
+    with pytest.raises(OSError):
+        fetcher._write_new(cache, "PMID_2.md", "text")
+    assert list(cache.iterdir()) == []
+    report = corpus(tmp_path, "PMID:2")
+    with pytest.raises(fetcher.FetchError):
+        run(tmp_path, report, FakeNCBI([article(2)]))
+    assert list(cache.iterdir()) == []
+
+
+def _broken_lock_setups(tmp_path_factory):
+    """Workspaces LockManager refuses, each as (name, OPENCLAW_WORKSPACE value)."""
+    base = tmp_path_factory.mktemp("broken")
+    symlinked = base / "symlinked"
+    symlinked.mkdir()
+    (symlinked / "locks").symlink_to(base, target_is_directory=True)
+    filed = base / "filed"
+    filed.mkdir()
+    (filed / "locks").write_text("not a directory")
+    (base / "plain-file").write_text("x")
+    return [("locks-symlink", symlinked), ("locks-file", filed), ("under-a-file", base / "plain-file" / "ws")]
+
+
+def test_a_dry_run_fails_wherever_the_lock_would_even_with_nothing_planned(cli_root, monkeypatch, tmp_path_factory):
+    """#754: --apply always takes the lock, so every dry run checks the same setup."""
+    (cli_root / "references_cache").mkdir()
+    (cli_root / "references_cache/PMID_2.md").write_text("# PMID:2\n\n## Abstract\n\nGrowth increased.\n")
+    for name, workspace in _broken_lock_setups(tmp_path_factory):
+        monkeypatch.setenv("OPENCLAW_WORKSPACE", str(workspace))
+        assert fetcher.main(["--mech", "habitatmech", "--root", str(cli_root)]) == 2, name
+        assert fetcher.main(["--mech", "habitatmech", "--root", str(cli_root), "--apply"]) == 2, name
+
+
+def test_an_unwritable_cache_fails_before_any_request(cli_root, monkeypatch):
+    """#754: neither the dry run nor --apply may fetch what it cannot write."""
+    if os.geteuid() == 0:
+        pytest.skip("root ignores directory permissions")
+    cache = cli_root / "references_cache"
+    cache.mkdir()
+    ncbi = FakeNCBI([article(2)])
+    monkeypatch.setattr(fetcher, "http_transport", ncbi)
+    cache.chmod(0o555)
+    try:
+        assert fetcher.main(["--mech", "habitatmech", "--root", str(cli_root)]) == 2
+        assert fetcher.main(["--mech", "habitatmech", "--root", str(cli_root), "--apply"]) == 2
+    finally:
+        cache.chmod(0o755)
+    assert ncbi.calls == [] and list(cache.iterdir()) == []

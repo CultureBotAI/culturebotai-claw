@@ -111,8 +111,9 @@ accepted only from a single PubMed record that lists that DOI. It never rewrites
 an existing cache and writes nothing for a record without an abstract, so those
 stay `MISSING_CACHE`. When both PMIDs and DOIs are pending, `--limit` covers at
 least one DOI, so the `--limit 2` canary exercises both lookup paths; check its
-files before fanning out. The dry run checks the write destination too, and
-`--apply` holds the Mech's repository lock. A cached abstract
+files before fanning out. Before any request, both modes check that the cache
+directory is writable; every dry run also checks the repository-lock setup that
+`--apply` takes, and `--apply` holds that lock. A cached abstract
 does not clear its redistribution rights; follow the Mech's source policy before
 committing caches.
 

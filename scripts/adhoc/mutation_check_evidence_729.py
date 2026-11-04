@@ -18,6 +18,8 @@ ROOT = Path(__file__).resolve().parents[2]
 EVIDENCE = "src/kg_microbe_evidence/__init__.py"
 FETCH = "src/kg_microbe_evidence/fetch.py"
 MAIN = "src/kg_microbe_evidence/__main__.py"
+LOCKS = "plugins/lock_manager.py"
+LOCK_TESTS = "tests/test_lock_manager.py"
 LEDGER_TESTS = "tests/test_evidence_doi_and_ledger.py"
 FETCH_TESTS = "tests/test_evidence_fetch.py"
 
@@ -179,8 +181,8 @@ MUTATIONS = [
      "        reserve = 0",
      f"{FETCH_TESTS}::test_a_limited_canary_covers_a_doi_whenever_one_is_pending"),
     ("#745 dry run returns before checking the destination", FETCH,
-     "    cache = _cache_root(root, config, create=False)\n    if not apply:\n        return result",
-     "    if not apply:\n        return result\n    cache = _cache_root(root, config, create=False)",
+     "    cache = _cache_root(root, config, create=False)\n    require_writable_directory(cache)\n    if not apply:\n        return result",
+     "    if not apply:\n        return result\n    cache = _cache_root(root, config, create=False)\n    require_writable_directory(cache)",
      f"{FETCH_TESTS}::test_cli_refuses_to_write_through_a_symlinked_parent"),
     ("#746 fetch writes without the repository lock", FETCH,
      '                with LockManager().lock(mech.key, "evidence-fetch"):\n                    result = run()',
@@ -208,11 +210,11 @@ MUTATIONS = [
      "OSError, ValueError) as exc:\n        print(f\"evidence validation:",
      f"{LEDGER_TESTS}::test_a_held_ledger_lock_is_reported_and_nothing_is_written"),
     ("#750 fetch dry run skips the lock setup", FETCH,
-     "                    resolve_workspace_root()  # the dry run fails where --apply's lock would (#750)\n",
+     "                check_lock_setup()  # --apply always takes the lock, so the dry run checks it (#750, #754)\n",
      "",
      f"{FETCH_TESTS}::test_a_dry_run_fails_where_the_lock_setup_would"),
     ("#750 ledger dry run skips the lock setup", MAIN,
-     "            resolve_workspace_root()  # the dry run fails where --apply's lock would (#750)\n",
+     "            check_lock_setup()  # the dry run fails where --apply's lock would (#750, #754)\n",
      "",
      f"{LEDGER_TESTS}::test_the_ledger_dry_run_fails_where_the_lock_setup_would"),
     ("#751 zero limit accepted", FETCH,
@@ -231,6 +233,43 @@ MUTATIONS = [
      '        try:  # no temporary file survives a failed write (#752)\n            with os.fdopen(descriptor, "w", encoding="utf-8") as stream:\n                stream.write(text)\n            os.replace(temporary, target)',
      '        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:\n            stream.write(text)\n        try:\n            os.replace(temporary, target)',
      f"{LEDGER_TESTS}::test_a_failed_report_write_leaves_no_temporary_file"),
+    # Round 5: fixes for the fourth review's findings #753-#755.
+    ("#753 cache write leaks its temporary file", FETCH,
+     '    try:  # no temporary file survives a failed write (#753)\n        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:\n            stream.write(text)\n            stream.flush()\n            os.fsync(stream.fileno())\n        os.chmod(temporary, 0o644)',
+     '    with os.fdopen(descriptor, "w", encoding="utf-8") as stream:\n        stream.write(text)\n        stream.flush()\n        os.fsync(stream.fileno())\n    try:\n        os.chmod(temporary, 0o644)',
+     f"{FETCH_TESTS}::test_a_failed_cache_write_leaves_no_temporary_file"),
+    ("#754 lock check accepts a symlinked locks dir", LOCKS,
+     '    if locks_dir.is_symlink():\n        raise ValueError(f"locks_dir must not be a symlink: {locks_dir}")\n    if locks_dir.exists():',
+     '    if locks_dir.exists():',
+     f"{LOCK_TESTS}::test_check_lock_setup_refuses_exactly_what_a_real_lock_refuses"),
+    ("#754 lock check accepts a locks file", LOCKS,
+     "        if not locks_dir.is_dir():\n            raise FileExistsError",
+     "        if False:\n            raise FileExistsError",
+     f"{LOCK_TESTS}::test_check_lock_setup_refuses_exactly_what_a_real_lock_refuses"),
+    ("#754 lock check ignores an unwritable parent", LOCKS,
+     "    if not os.access(ancestor, os.W_OK | os.X_OK):\n        raise PermissionError",
+     "    if False:\n        raise PermissionError",
+     f"{LOCK_TESTS}::test_check_lock_setup_refuses_exactly_what_a_real_lock_refuses"),
+    ("#754 lock check ignores an unwritable locks dir", LOCKS,
+     "        if not os.access(locks_dir, os.W_OK | os.X_OK):\n            raise PermissionError",
+     "        if False:\n            raise PermissionError",
+     f"{LOCK_TESTS}::test_check_lock_setup_refuses_exactly_what_a_real_lock_refuses"),
+    ("#754 fetch dry run checks the lock only with a plan", FETCH,
+     "                check_lock_setup()  # --apply always takes the lock, so the dry run checks it (#750, #754)",
+     "                if result.planned_pmids or result.planned_dois:\n                    check_lock_setup()",
+     f"{FETCH_TESTS}::test_a_dry_run_fails_wherever_the_lock_would_even_with_nothing_planned"),
+    ("#754 fetch fetches into an unwritable cache", FETCH,
+     "    require_writable_directory(cache)\n",
+     "",
+     f"{FETCH_TESTS}::test_an_unwritable_cache_fails_before_any_request"),
+    ("#754 ledger dry run ignores an unwritable ledger dir", MAIN,
+     "        require_writable_directory((root / config.known_findings).parent)  # as --apply would (#754)\n",
+     "",
+     f"{LEDGER_TESTS}::test_the_ledger_dry_run_fails_where_the_write_or_lock_would"),
+    ("#755 plain validation checks the lock", MAIN,
+     "        write_reports(report, output)\n",
+     "        check_lock_setup()\n        write_reports(report, output)\n",
+     f"{LEDGER_TESTS}::test_plain_validation_never_needs_the_lock"),
 ]
 
 

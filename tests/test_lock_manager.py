@@ -783,3 +783,57 @@ def test_relative_workspace_fails_closed_outside_checkout(
     explicit_status = tmp_path / "explicit-status"
     assert LockManager({"locks_dir": explicit_locks}).locks_dir == explicit_locks
     assert StatusManager({"status_dir": explicit_status}).status_dir == explicit_status
+
+
+# --- check_lock_setup mirrors the constructor and a first acquisition (#754) --
+
+def _acquire(workspace):
+    from plugins.lock_manager import LockManager
+    with LockManager().lock("probe", "probe"):
+        pass
+
+
+@pytest.mark.parametrize("state", ["fresh", "locks-symlink", "locks-file", "under-a-file",
+                                   "unwritable-parent", "unwritable-locks"])
+def test_check_lock_setup_refuses_exactly_what_a_real_lock_refuses(tmp_path, monkeypatch, state):
+    from plugins.lock_manager import check_lock_setup
+    workspace = tmp_path / "workspace"
+    if state == "locks-symlink":
+        workspace.mkdir()
+        (workspace / "locks").symlink_to(tmp_path, target_is_directory=True)
+    elif state == "locks-file":
+        workspace.mkdir()
+        (workspace / "locks").write_text("not a directory")
+        # Executable, so only the directory check -- not the access check -- refuses it.
+        (workspace / "locks").chmod(0o755)
+    elif state == "under-a-file":
+        (tmp_path / "file").write_text("x")
+        workspace = tmp_path / "file" / "workspace"
+    elif state == "unwritable-parent":
+        workspace.mkdir()
+    elif state == "unwritable-locks":
+        (workspace / "locks").mkdir(parents=True)
+    monkeypatch.setenv("OPENCLAW_WORKSPACE", str(workspace))
+    restrict = {"unwritable-parent": workspace, "unwritable-locks": workspace / "locks"}.get(state)
+    if restrict is not None and os.geteuid() == 0:
+        pytest.skip("root ignores directory permissions")
+    if restrict is not None:
+        restrict.chmod(0o555)
+    try:
+        before = sorted(p.name for p in tmp_path.rglob("*"))
+        try:
+            check_lock_setup()
+            checked = True
+        except (OSError, ValueError):
+            checked = False
+        assert sorted(p.name for p in tmp_path.rglob("*")) == before  # created nothing
+        try:
+            _acquire(workspace)
+            acquired = True
+        except (OSError, ValueError, RuntimeError):
+            acquired = False
+    finally:
+        if restrict is not None:
+            restrict.chmod(0o755)
+    assert checked == acquired
+    assert checked == (state == "fresh")

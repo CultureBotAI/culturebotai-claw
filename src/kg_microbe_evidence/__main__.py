@@ -17,12 +17,13 @@ from kg_microbe_evidence import (
     exit_code,
     plan_known_findings,
     render_known_findings,
+    require_writable_directory,
     validate_corpus,
     write_known_findings,
 )
 from kg_microbe_fleet import FleetManifestError, load_fleet_manifest
 from kg_microbe_fleet.roots import claw_root
-from plugins.lock_manager import LockManager, resolve_workspace_root
+from plugins.lock_manager import LockManager, check_lock_setup
 from plugins.repository_settings import (
     RepositoryConfigurationError,
     RepositorySettings,
@@ -100,6 +101,7 @@ def record_known_findings(report: dict, root: Path, config: EvidenceConfig,
     if plan["unowned"]:
         print(f"  {len(plan['unowned'])} current findings have no owner; pass --issue to record them")
     if not apply:
+        require_writable_directory((root / config.known_findings).parent)  # as --apply would (#754)
         print("  Dry run: nothing written. Pass --apply to write the ledger.")
         return 1 if plan["unowned"] else 0
     if plan["unowned"]:
@@ -163,7 +165,7 @@ def main(argv: list[str] | None = None) -> int:
                 return record_known_findings(report, root, config, args.issue, apply=True)
         report = validated()
         if args.record_known_findings:
-            resolve_workspace_root()  # the dry run fails where --apply's lock would (#750)
+            check_lock_setup()  # the dry run fails where --apply's lock would (#750, #754)
             return record_known_findings(report, root, config, args.issue, apply=False)
         write_reports(report, output)
         print(f"{mech.key}: {report['evidence_items']} evidence items; "

@@ -77,8 +77,10 @@ because a pass covers only those
 `kg-microbe-evidence-fetch --mech <mech>` is the separate, explicit command that
 adds caches; the gate never runs it. It plans from the gate's own
 `MISSING_CACHE` results, so it fetches exactly what the declared selectors cite,
-and it is a dry run unless `--apply` is given. The dry run also checks where it
-would write, so it fails wherever `--apply` would. `--limit N` makes a canary:
+and it is a dry run unless `--apply` is given. Before any request, both modes
+check that the cache destination is a writable directory, and every dry run
+checks the repository-lock setup that `--apply` takes, so a dry run fails
+wherever `--apply` would, before anything is fetched or written. `--limit N` makes a canary:
 when both PMIDs and DOIs are pending it covers at least one DOI, so `--limit 2`
 exercises both lookup paths. `--apply` holds the Mech's repository lock. It
 calls NCBI E-utilities anonymously, with no e-mail address or tool registration;
@@ -119,7 +121,9 @@ backlog without pretending the backlog is validated:
 
 `kg-microbe-evidence --record-known-findings --issue <url>` plans the ledger
 from the current findings (keep, add, drop stale) and writes it only with
-`--apply`, holding the Mech's repository lock. A dry run that would leave a
+`--apply`, reading, planning and writing under one hold of the Mech's
+repository lock. Its dry run checks the ledger directory and the lock setup the
+same way. A dry run that would leave a
 current finding without an owner exits 1, and `--apply` then refuses (exit 2);
 a row the writer cannot write fails the dry run too.
 

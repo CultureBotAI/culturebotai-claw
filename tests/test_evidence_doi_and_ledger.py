@@ -7,6 +7,7 @@ that matches one finding and not its neighbour.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from types import SimpleNamespace
 
@@ -547,3 +548,42 @@ def test_a_failed_report_write_leaves_no_temporary_file(root):
     with pytest.raises(UnicodeEncodeError):
         cli.write_reports(report, output)
     assert sorted(p.name for p in output.iterdir()) == ["evidence_reference_validation.json"]
+
+
+# --- fourth review on #730 (#754, #755) --------------------------------------
+
+def test_the_ledger_dry_run_fails_where_the_write_or_lock_would(root, monkeypatch, tmp_path_factory):
+    """#754: an unwritable ledger directory or a refused lock setup fails both modes."""
+    if os.geteuid() == 0:
+        pytest.skip("root ignores directory permissions")
+    args = _ledger_cli(root, monkeypatch, tmp_path_factory, ("PMID:1", "a paraphrase"))
+    (root / "curation").mkdir()
+    (root / "curation").chmod(0o555)
+    try:
+        assert cli.main([*args, "--issue", ISSUE]) == 2
+        assert cli.main([*args, "--issue", ISSUE, "--apply"]) == 2
+    finally:
+        (root / "curation").chmod(0o755)
+    filed = tmp_path_factory.mktemp("filed")
+    (filed / "locks").write_text("not a directory")
+    monkeypatch.setenv("OPENCLAW_WORKSPACE", str(filed))
+    assert cli.main([*args, "--issue", ISSUE]) == 2
+    assert cli.main([*args, "--issue", ISSUE, "--apply"]) == 2
+    assert not (root / LEDGER).exists()
+
+
+def test_plain_validation_never_needs_the_lock(root, monkeypatch, tmp_path_factory):
+    """#755: the gate MIM's CI runs must not depend on the lock workspace."""
+    _git_repo(root)
+    record(root, ("PMID:1", "growth increased"))
+    settings = {"cache_dir": "references_cache", "reference_fields": ["reference"], "snippet_fields": ["snippet"]}
+    monkeypatch.setattr(cli, "load_fleet_manifest", lambda: _stub_manifest(settings))
+    link = tmp_path_factory.mktemp("links") / "workspace"
+    link.symlink_to(tmp_path_factory.mktemp("real"), target_is_directory=True)
+    monkeypatch.setenv("OPENCLAW_WORKSPACE", str(link))
+
+    def refuse(*args, **kwargs):
+        raise RuntimeError("plain validation must not touch the lock")
+    monkeypatch.setattr(cli, "LockManager", refuse)
+    monkeypatch.setattr(cli, "check_lock_setup", refuse)
+    assert cli.main(["--mech", "habitatmech", "--root", str(root), "--strict"]) == 0

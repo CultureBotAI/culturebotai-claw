@@ -116,6 +116,20 @@ def parse_cache_text(text: str, kind: str, identifier: str) -> str:
     return body
 
 
+def require_writable_directory(directory: Path) -> None:
+    """Fail now where a later write into `directory` would fail (#754).
+
+    The directory, or its nearest existing ancestor when it does not exist yet,
+    must be a directory this process can create files in. Dry runs use it so
+    they fail wherever --apply would, before any request or partial write.
+    """
+    probe = directory
+    while not probe.exists() and probe != probe.parent:
+        probe = probe.parent
+    if not probe.is_dir() or not os.access(probe, os.W_OK | os.X_OK):
+        raise EvidenceError(f"cannot write under {directory}: {probe} is not a writable directory")
+
+
 def _relative_path(value: str, name: str) -> None:
     path = PurePosixPath(value)
     if (not value or path.is_absolute() or ".." in path.parts

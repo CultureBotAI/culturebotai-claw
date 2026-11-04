@@ -41,11 +41,12 @@ from kg_microbe_evidence import (
     cache_file_name,
     normalize_doi,
     parse_cache_text,
+    require_writable_directory,
     validate_corpus,
 )
 from kg_microbe_fleet import FleetManifestError, load_fleet_manifest
 from kg_microbe_fleet.roots import claw_root
-from plugins.lock_manager import LockManager, resolve_workspace_root
+from plugins.lock_manager import LockManager, check_lock_setup
 from plugins.repository_settings import (
     RepositoryConfigurationError,
     RepositorySettings,
@@ -239,13 +240,13 @@ def _write_new(cache: Path, name: str, text: str) -> bool:
     target = cache / name
     if target.exists() or target.is_symlink():
         return False
-    with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=cache, delete=False,
-                                     prefix=".fetch-", suffix=".tmp") as stream:
-        temporary = Path(stream.name)
-        stream.write(text)
-        stream.flush()
-        os.fsync(stream.fileno())
-    try:
+    descriptor, temporary_name = tempfile.mkstemp(dir=cache, prefix=".fetch-", suffix=".tmp")
+    temporary = Path(temporary_name)
+    try:  # no temporary file survives a failed write (#753)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            stream.write(text)
+            stream.flush()
+            os.fsync(stream.fileno())
         os.chmod(temporary, 0o644)
         try:
             os.link(temporary, target)  # fails rather than replacing a concurrent file
@@ -277,8 +278,10 @@ def fetch_missing(
                          planned_pmids=pmids, planned_dois=dois)
     if not (pmids or dois):
         return result
-    # Checked in a dry run too, so a dry run fails exactly where --apply would (#745).
+    # Checked in a dry run too, and before any request: a dry run fails exactly
+    # where --apply would, and --apply never fetches what it cannot write (#745, #754).
     cache = _cache_root(root, config, create=False)
+    require_writable_directory(cache)
     if not apply:
         return result
     cache.mkdir(parents=True, exist_ok=True)
@@ -387,8 +390,7 @@ def main(argv: list[str] | None = None) -> int:
                     result = run()
             else:
                 result = run()
-                if result.planned_pmids or result.planned_dois:
-                    resolve_workspace_root()  # the dry run fails where --apply's lock would (#750)
+                check_lock_setup()  # --apply always takes the lock, so the dry run checks it (#750, #754)
             outcome, code = result.as_dict(), 0
         except FetchError as exc:
             print(f"evidence fetch: {exc}", file=sys.stderr)

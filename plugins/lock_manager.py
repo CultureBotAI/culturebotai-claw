@@ -60,6 +60,34 @@ def resolve_workspace_root() -> Path:
     return resolved
 
 
+def check_lock_setup(config: Optional[Dict[str, Any]] = None) -> Path:
+    """Refuse what ``LockManager(config)`` would refuse, creating nothing.
+
+    For dry runs that must fail wherever the real run would: the workspace
+    resolves, ``locks_dir`` is not a symlink and is a writable directory if it
+    exists, and otherwise its nearest existing ancestor is a writable directory
+    in which the constructor's ``mkdir`` would succeed.
+    """
+    configured = (config or {}).get("locks_dir")
+    locks_dir = Path(configured) if configured is not None else resolve_workspace_root() / "locks"
+    if locks_dir.is_symlink():
+        raise ValueError(f"locks_dir must not be a symlink: {locks_dir}")
+    if locks_dir.exists():
+        if not locks_dir.is_dir():
+            raise FileExistsError(f"locks_dir exists and is not a directory: {locks_dir}")
+        if not os.access(locks_dir, os.W_OK | os.X_OK):
+            raise PermissionError(f"locks_dir is not writable: {locks_dir}")
+        return locks_dir
+    ancestor = locks_dir.parent
+    while not ancestor.exists() and ancestor != ancestor.parent:
+        ancestor = ancestor.parent
+    if not ancestor.is_dir():
+        raise NotADirectoryError(f"locks_dir cannot be created under {ancestor}")
+    if not os.access(ancestor, os.W_OK | os.X_OK):
+        raise PermissionError(f"locks_dir cannot be created under {ancestor}")
+    return locks_dir
+
+
 class LockManager:
     """Local lock manager for multi-Claude coordination on one machine."""
 
