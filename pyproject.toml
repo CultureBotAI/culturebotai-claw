@@ -125,7 +125,6 @@ kg_microbe_skills = ["skills.yaml", "canonical/*.md"]
 kg_microbe_governance = [
     "vendored_artifacts.json",
     "workflow_pins.json",
-    "releases/*.json",
     "artifacts/**/*.py",
     "artifacts/**/*.sh",
     "artifacts/**/*.yaml",
