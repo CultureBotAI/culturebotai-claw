@@ -24,33 +24,61 @@ def _canary(document):
     return document["mechs"]["mediaingredientmech"]["capabilities"][CAPABILITY]
 
 
-def test_every_mech_declares_quote_validation_and_only_the_canary_is_enabled():
+LEDGER = "curation/evidence_known_findings.tsv"
+# The rollout release (#729): MIM's bounded canary plus two measured adopters.
+EXPECTED_PROFILES = {
+    "mediaingredientmech": EvidenceConfig(
+        cache_dir="references_cache",
+        reference_fields=("pmid", "doi", "reference"),
+        snippet_fields=("snippet", "excerpt", "supporting_text"),
+        evidence_fields=("evidence",),
+        evidence_paths=(
+            "ontology_mapping.evidence", "role_assignments[].evidence",
+            "cellular_role_assignments[].evidence",
+        ),
+    ),
+    "cellstructuremech": EvidenceConfig(
+        cache_dir="references_cache", reference_fields=("reference",),
+        snippet_fields=("snippet",), known_findings=LEDGER,
+    ),
+    "habitatmech": EvidenceConfig(
+        cache_dir="references_cache", reference_fields=("reference",),
+        snippet_fields=("snippet",), known_findings=LEDGER,
+    ),
+}
+
+
+def test_every_mech_declares_quote_validation_and_exactly_the_adopters_are_enabled():
     manifest = load_fleet_manifest(MANIFEST)
     assert CAPABILITY in manifest.capability_names
-    assert manifest.with_capability(CAPABILITY) == ("mediaingredientmech",)
+    assert set(manifest.with_capability(CAPABILITY)) == set(EXPECTED_PROFILES)
     for mech in manifest.mechs.values():
         capability = mech.capability(CAPABILITY)
         assert capability is not None
-        if mech.key != "mediaingredientmech":
+        if mech.key not in EXPECTED_PROFILES:
             assert capability.status == "disabled"
             assert capability.reason
 
 
-def test_enabled_manifest_settings_are_a_valid_evidence_profile():
+def test_enabled_manifest_settings_are_the_reviewed_evidence_profiles():
     manifest = load_fleet_manifest(MANIFEST)
     for key in manifest.with_capability(CAPABILITY):
         capability = manifest.get(key).capability(CAPABILITY)
-        config = EvidenceConfig.from_settings(capability.settings)
-        assert config == EvidenceConfig(
-            cache_dir="references_cache",
-            reference_fields=("pmid", "doi", "reference"),
-            snippet_fields=("snippet", "excerpt", "supporting_text"),
-            evidence_fields=("evidence",),
-            evidence_paths=(
-                "ontology_mapping.evidence", "role_assignments[].evidence",
-                "cellular_role_assignments[].evidence",
-            ),
-        )
+        assert EvidenceConfig.from_settings(capability.settings) == EXPECTED_PROFILES[key]
+
+
+def test_known_findings_is_a_declared_string_setting():
+    document = _document()
+    _canary(document)["settings"]["known_findings"] = ["curation/ledger.tsv"]
+    with pytest.raises(FleetManifestError, match=CAPABILITY):
+        parse_fleet_manifest(document, MANIFEST)
+    _canary(document)["settings"]["known_findings"] = "../outside.tsv"
+    capability = parse_fleet_manifest(document, MANIFEST).get("mediaingredientmech").capability(CAPABILITY)
+    with pytest.raises(EvidenceError, match="known_findings"):
+        EvidenceConfig.from_settings(capability.settings)
+    _canary(document)["settings"]["known_findings"] = LEDGER
+    capability = parse_fleet_manifest(document, MANIFEST).get("mediaingredientmech").capability(CAPABILITY)
+    assert EvidenceConfig.from_settings(capability.settings).known_findings == LEDGER
 
 
 def test_omitting_a_mech_declaration_is_not_silently_disabled():

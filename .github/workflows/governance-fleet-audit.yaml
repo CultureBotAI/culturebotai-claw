@@ -101,6 +101,10 @@ jobs:
 
       # Only trusted base/main can select this lane. A candidate declaration
       # cannot authorize its own downstream rollout before Claw merges it.
+      # Retired by #729: the declaration and release_audit.py are removed, so
+      # once that change is the trusted base this lane is never selected again.
+      # The steps stay until the fleet re-pins, because the pull request that
+      # retires the lane is itself audited against a base that still has it.
       - name: Select trusted release contract
         id: release-contract
         shell: bash
@@ -247,8 +251,6 @@ jobs:
           uv run --project control --extra dev python -m pytest -q \
             control/tests/test_fleet_manifest.py \
             control/tests/test_kg_microbe_governance.py \
-            control/tests/test_governance_release_audit.py \
-            control/tests/test_governance_release_workflow.py \
             control/tests/test_id_label_workflow.py \
             control/tests/test_authoritative_governance_layout.py
 

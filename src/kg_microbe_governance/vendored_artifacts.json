@@ -269,7 +269,9 @@
       "source": "src/kg_microbe_governance/artifacts/scripts/run_shared_evidence_validator.py",
       "target": "scripts/run_shared_evidence_validator.py",
       "consumers": [
-        "mediaingredientmech"
+        "mediaingredientmech",
+        "cellstructuremech",
+        "habitatmech"
       ],
       "sha256": "a2b2674a6dbea52a6ae256c9e445ff06118bc7565d9054a1587cbf2ddb3cba38",
       "mode": "0644"
@@ -279,7 +281,9 @@
       "source": "src/kg_microbe_governance/artifacts/workflows/qc-evidence.yaml",
       "target": ".github/workflows/qc-evidence.yaml",
       "consumers": [
-        "mediaingredientmech"
+        "mediaingredientmech",
+        "cellstructuremech",
+        "habitatmech"
       ],
       "sha256": "288ef1795582105763952c4104d1455c1fef273a65528949f1e558d39c7306f3",
       "mode": "0644"

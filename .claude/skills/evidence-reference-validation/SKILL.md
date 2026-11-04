@@ -13,8 +13,9 @@ tags: [fleet, evidence, literature, pubmed, validation]
 Use this skill before publishing curated quotations or when auditing whether
 quoted edge evidence occurs in its cited cached source. Read the Mech's
 `evidence_reference_validation` capability in `src/kg_microbe_fleet/fleet.yaml`;
-disabled and not-applicable declarations include a reason. Only the MIM canary
-is enabled in this release. Adoption in other Mechs is a separate rollout.
+disabled and not-applicable declarations include a reason. MIM,
+CellStructureMech and HabitatMech enable it; each other Mech's reason names what
+its adoption needs.
 
 The validator is offline. It reads records and existing source caches, writes
 reports within the active Mech checkout, and does not fetch sources, repair
@@ -46,8 +47,8 @@ uv run python scripts/validate_evidence_references.py --strict
 Mech CI uses the canonical
 `src/kg_microbe_governance/artifacts/scripts/run_shared_evidence_validator.py`
 runner and `src/kg_microbe_governance/artifacts/workflows/qc-evidence.yaml`
-workflow. The workflow checks out Claw at the full commit from the consumer's
-`MediaIngredientMech/scripts/.vendored_canon_ref`; the runner requires `CLAW_ROOT` at that clean
+workflow. The workflow checks out Claw at the full commit in the consumer's own
+pin file, scripts/.vendored_canon_ref; the runner requires `CLAW_ROOT` at that clean
 pinned revision and binds validation to the Mech worktree containing it.
 
 ## What the result means
@@ -124,10 +125,8 @@ committing caches.
 
 A Mech whose profile declares `known_findings` keeps a TSV
 (`record`, `reference`, `verdict`, `quote_sha256`, `issue`) of existing findings
-whose repair an issue owns; the rollout release declares the setting in the
-manifest catalogue, and the manifest rejects it before that. A finding listed
-there is reported, counted apart and never shown as validated, but does not
-block. Each row excuses exactly one occurrence, so a copy of a recorded failing
+whose repair an issue owns. A finding listed there is reported, counted apart
+and never shown as validated, but does not block. Each row excuses exactly one occurrence, so a copy of a recorded failing
 quote blocks until it is recorded too. Any finding not listed still
 blocks, and an entry whose finding no longer occurs is stale and blocks until it
 is removed, so the ledger can only shrink by repair. Only quote or citation
