@@ -71,9 +71,12 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path, review)
     assert "src/kg_microbe_research/__main__.py" in source_names
     assert "src/kg_microbe_research/schema/research.yaml" in source_names
     assert "src/kg_microbe_reviews/__main__.py" in source_names
+    assert "src/kg_microbe_curation/schema/bundle.json" in source_names
     assert "src/kg_microbe_governance/artifacts/schema/record_review.yaml" in source_names
     assert "src/kg_microbe_governance/artifacts/docs/record-reviews.md" in source_names
-    assert "src/kg_microbe_governance/artifacts/tests/test_record_review_contract.py" in source_names
+    assert (
+        "src/kg_microbe_governance/artifacts/tests/test_record_review_contract.py" in source_names
+    )
     assert not any(name.startswith("agents/") for name in source_names)
     assert not any(name.startswith("conf/") for name in source_names)
     assert not any(name.startswith("build/") for name in source_names)
@@ -109,15 +112,17 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path, review)
     with zipfile.ZipFile(wheels[0]) as wheel:
         names = set(wheel.namelist())
         assert "kg_microbe_fleet/fleet.yaml" in names
-        assert wheel.read("kg_microbe_embeddings/rollout.yaml") == (
-            REPOSITORY_ROOT / "src/kg_microbe_embeddings/rollout.yaml"
-        ).read_bytes()
+        assert (
+            wheel.read("kg_microbe_embeddings/rollout.yaml")
+            == (REPOSITORY_ROOT / "src/kg_microbe_embeddings/rollout.yaml").read_bytes()
+        )
         assert "kg_microbe_merge_queue/__init__.py" in names
         assert "kg_microbe_merge_queue/__main__.py" in names
         assert "kg_microbe_merge_queue/policy.json" in names
-        assert wheel.read("kg_microbe_merge_queue/policy.json") == (
-            REPOSITORY_ROOT / "src/kg_microbe_merge_queue/policy.json"
-        ).read_bytes()
+        assert (
+            wheel.read("kg_microbe_merge_queue/policy.json")
+            == (REPOSITORY_ROOT / "src/kg_microbe_merge_queue/policy.json").read_bytes()
+        )
         assert "kg_microbe_governance/vendored_artifacts.json" in names
         assert "kg_microbe_evidence/__init__.py" in names
         assert "kg_microbe_evidence/__main__.py" in names
@@ -130,9 +135,13 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path, review)
         assert "kg_microbe_research/__main__.py" in names
         assert "kg_microbe_research/schema/research.yaml" in names
         assert "kg_microbe_reviews/__main__.py" in names
-        assert wheel.read("kg_microbe_governance/artifacts/schema/record_review.yaml") == (
-            REPOSITORY_ROOT / "src/kg_microbe_governance/artifacts/schema/record_review.yaml"
-        ).read_bytes()
+        assert "kg_microbe_curation/schema/bundle.json" in names
+        assert (
+            wheel.read("kg_microbe_governance/artifacts/schema/record_review.yaml")
+            == (
+                REPOSITORY_ROOT / "src/kg_microbe_governance/artifacts/schema/record_review.yaml"
+            ).read_bytes()
+        )
         assert "kg_microbe_agents/definitions/dev_workflow/validation_agent.yaml" in names
         assert "conf/fleet.yaml" not in names
         assert "openclaw_config.yaml" not in names
@@ -152,6 +161,7 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path, review)
         assert "kg-microbe-history = kg_microbe_history.__main__:main" in entry_points
         assert "kg-microbe-research = kg_microbe_research.__main__:main" in entry_points
         assert "kg-microbe-reviews = kg_microbe_reviews.__main__:main" in entry_points
+        assert "kg-microbe-curation = kg_microbe_curation.__main__:main" in entry_points
         wheel.extractall(unpacked)
 
     smoke_environment = os.environ.copy()
@@ -186,6 +196,9 @@ import kg_microbe_research.__main__
 import kg_microbe_reviews
 import kg_microbe_reviews.__main__
 import kg_microbe_reviews.aggregate
+import kg_microbe_curation
+import kg_microbe_curation.__main__
+from kg_microbe_curation.contract import validate_bundle, unprocessed_decision
 import plugins
 from click.testing import CliRunner
 from cli.main import cli
@@ -224,12 +237,20 @@ runtime_modules = (
     kg_microbe_reviews,
     kg_microbe_reviews.__main__,
     kg_microbe_reviews.aggregate,
+    kg_microbe_curation,
+    kg_microbe_curation.__main__,
     plugins,
 )
 for module in runtime_modules:
     module_path = Path(module.__file__).resolve()
     assert module_path.is_relative_to(unpacked), (module.__name__, module_path)
 module_path = Path(kg_microbe_fleet.__file__).resolve()
+occurrence = "urn:kg-microbe:occurrence:v1:" + "a" * 64
+validate_bundle({
+    "contract": "kg-microbe-curation/v1", "input_sha256": "b" * 64,
+    "occurrence_ids": [occurrence], "decisions": [unprocessed_decision(occurrence)],
+    "observations": [], "claims": [], "reviews": [],
+})
 manifest = load_fleet_manifest()
 assert manifest.keys == (
     "culturemech",
