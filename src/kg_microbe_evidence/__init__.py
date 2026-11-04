@@ -2,15 +2,21 @@
 
 A match means a normalized quote occurs in the identified cached source body.
 It does not prove that the source supports the assertion, its generality, or its
-causal interpretation. No cache fetching, repair or provider access occurs here.
+causal interpretation. No cache fetching, repair or provider access occurs here;
+`kg_microbe_evidence.fetch` is the separate, explicit command that adds caches.
 """
 from __future__ import annotations
 
+import csv
 import hashlib
+import io
+import os
 import re
+import tempfile
 import unicodedata
+import urllib.parse
 from collections import Counter
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -27,9 +33,22 @@ VERDICTS = (
 )
 BLOCKING = frozenset({"MISSING_REFERENCE", "INVALID_EVIDENCE", "INVALID_CACHE", "SNIPPET_NOT_IN_SOURCE"})
 STRICT_BLOCKING = BLOCKING | {"MISSING_CACHE", "UNSUPPORTED_REFERENCE"}
+# Findings about what a curated quote says or cites can be recorded as known
+# debt. INVALID_EVIDENCE and INVALID_CACHE are broken inputs: fix them instead.
+KNOWN_FINDING_VERDICTS = frozenset({
+    "MISSING_REFERENCE", "MISSING_CACHE", "UNSUPPORTED_REFERENCE", "SNIPPET_NOT_IN_SOURCE",
+})
+KNOWN_FINDING_COLUMNS = ("record", "reference", "verdict", "quote_sha256", "issue")
 _FIELD = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
 _PATH = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(?:\[\])?(?:\.[A-Za-z_][A-Za-z0-9_]*(?:\[\])?)*\Z")
 _PMID = re.compile(r"(?:PMID:)?([0-9]+)\Z", re.IGNORECASE)
+_DOI_PREFIX = re.compile(r"\A(?:doi:\s*|https?://(?:dx\.)?doi\.org/)", re.IGNORECASE)
+# Directory indicator 10, a registrant code with optional subdivisions, a suffix.
+_DOI = re.compile(r"10\.[0-9]+(?:\.[0-9]+)*/\S+\Z")
+_ISSUE = re.compile(r"https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/issues/[1-9][0-9]*\Z")
+_SHA256 = re.compile(r"[0-9a-f]{64}\Z")
+# One path component on every supported filesystem, with room for a suffix.
+MAX_CACHE_NAME = 200
 
 
 class EvidenceError(ValueError):
@@ -41,6 +60,60 @@ def normalize(text: str) -> str:
     return " ".join(unicodedata.normalize("NFKC", text).split()).lower()
 
 
+def normalize_doi(value: str) -> str | None:
+    """The DOI a citation names, in its one lowercase spelling, or None.
+
+    DOIs are case-insensitive, so `DOI:10.1/AB` and `https://doi.org/10.1/ab`
+    name one source and one cache file. A bare `10.<registrant>/<suffix>` is
+    unambiguous DOI syntax; percent-encoding in a URL is kept literally rather
+    than guessed at.
+    """
+    text = _DOI_PREFIX.sub("", value.strip(), count=1)
+    return text.lower() if _DOI.fullmatch(text) else None
+
+
+def cache_file_name(kind: str, identifier: str) -> str:
+    """The cache file for one identified source: PMID_<n>.md or DOI_<encoded>.md.
+
+    A DOI is percent-encoded whole, so `/`, `:` and every other character that
+    is unsafe in a path component becomes `%XX`. The encoding is reversible, so
+    two DOIs never share a file.
+    """
+    if kind == "PMID":
+        return f"PMID_{identifier}.md"
+    if kind == "DOI":
+        return f"DOI_{urllib.parse.quote(identifier, safe='')}.md"
+    raise EvidenceError(f"unsupported source kind: {kind}")
+
+
+def parse_cache_text(text: str, kind: str, identifier: str) -> str:
+    """The quotable body of one cache file, after checking whose source it is.
+
+    The first line must name the cited source (`# PMID:<n>` or `# DOI:<doi>`)
+    and there must be exactly one `## Abstract` heading. Only the text under it
+    counts; title, authors and any other metadata are never quote evidence.
+    """
+    header = re.match(rf"\A#\s+{kind}:(\S+)\s*\n", text)
+    named = header.group(1) if header else None
+    if named is None or (named != identifier if kind == "PMID" else normalize_doi(named) != identifier):
+        raise EvidenceError(f"cache header does not identify the cited {kind}")
+    headings = list(re.finditer(r"(?im)^##\s+Abstract\s*$", text))
+    if len(headings) != 1:
+        raise EvidenceError("cache requires exactly one explicit Abstract section")
+    remainder = text[headings[0].end():]
+    body = re.split(r"(?m)^#{1,2}\s+", remainder, maxsplit=1)[0].strip()
+    if not body:
+        raise EvidenceError("cache abstract is empty")
+    return body
+
+
+def _relative_path(value: str, name: str) -> None:
+    path = PurePosixPath(value)
+    if (not value or path.is_absolute() or ".." in path.parts
+            or "\\" in value or str(path) != value or value == "."):
+        raise EvidenceError(f"{name} must be a normalized repository-relative path")
+
+
 @dataclass(frozen=True)
 class EvidenceConfig:
     cache_dir: str
@@ -48,12 +121,16 @@ class EvidenceConfig:
     snippet_fields: tuple[str, ...] = ("snippet", "excerpt", "supporting_text")
     evidence_fields: tuple[str, ...] = ("evidence",)
     evidence_paths: tuple[str, ...] = ()
+    known_findings: str | None = None
 
     def __post_init__(self) -> None:
-        path = PurePosixPath(self.cache_dir)
-        if (not self.cache_dir or path.is_absolute() or ".." in path.parts
-                or "\\" in self.cache_dir or str(path) != self.cache_dir or self.cache_dir == "."):
+        if not isinstance(self.cache_dir, str):
             raise EvidenceError("cache_dir must be a normalized repository-relative directory")
+        _relative_path(self.cache_dir, "cache_dir")
+        if self.known_findings is not None:
+            if not isinstance(self.known_findings, str):
+                raise EvidenceError("known_findings must be a normalized repository-relative path")
+            _relative_path(self.known_findings, "known_findings")
         for name in ("reference_fields", "snippet_fields", "evidence_fields"):
             fields = getattr(self, name)
             if (not isinstance(fields, tuple) or not fields
@@ -68,13 +145,18 @@ class EvidenceConfig:
 
     @classmethod
     def from_settings(cls, settings: Mapping[str, Any]) -> EvidenceConfig:
-        allowed = {"cache_dir", "reference_fields", "snippet_fields", "evidence_fields", "evidence_paths"}
+        lists = {"reference_fields", "snippet_fields", "evidence_fields", "evidence_paths"}
+        allowed = lists | {"cache_dir", "known_findings"}
         if set(settings) - allowed:
             raise EvidenceError(f"unknown evidence settings: {sorted(set(settings) - allowed)}")
         if not isinstance(settings.get("cache_dir"), str):
             raise EvidenceError("evidence validation requires cache_dir")
         values: dict[str, Any] = {"cache_dir": settings["cache_dir"]}
-        for name in allowed - {"cache_dir"}:
+        if "known_findings" in settings:
+            if not isinstance(settings["known_findings"], str):
+                raise EvidenceError("known_findings must be a repository-relative file path")
+            values["known_findings"] = settings["known_findings"]
+        for name in lists:
             if name in settings:
                 value = settings[name]
                 if not isinstance(value, (list, tuple)):
@@ -139,13 +221,22 @@ class EvidenceValidator:
         self.root = root.resolve()
         self.config = config
         self.cache_root = self.root / config.cache_dir
-        self._cache: dict[str, CachedSource | QuoteResult] = {}
+        self._cache: dict[tuple[str, str], CachedSource | QuoteResult] = {}
 
-    def _source(self, pmid: str) -> CachedSource | QuoteResult:
-        if pmid in self._cache:
-            return self._cache[pmid]
-        reference = f"PMID:{pmid}"
-        path = self.cache_root / f"PMID_{pmid}.md"
+    def _source(self, pmid: str, kind: str = "PMID") -> CachedSource | QuoteResult:
+        """Read one identified cache: `# PMID:<n>` or `# DOI:<doi>`, then one Abstract."""
+        key = (kind, pmid)
+        if key in self._cache:
+            return self._cache[key]
+        reference = f"{kind}:{pmid}"
+        name = cache_file_name(kind, pmid)
+        if len(name) > MAX_CACHE_NAME:
+            result: CachedSource | QuoteResult = QuoteResult(
+                "UNSUPPORTED_REFERENCE", reference,
+                "Identifier is too long for a portable cache file name; it remains unverified.")
+            self._cache[key] = result
+            return result
+        path = self.cache_root / name
         relative = path.relative_to(self.root).as_posix()
         try:
             if not path.resolve().is_relative_to(self.root):
@@ -153,23 +244,13 @@ class EvidenceValidator:
             if path.is_symlink() or self.cache_root.is_symlink():
                 raise EvidenceError("cache files and directory must not be symlinks")
             raw = path.read_bytes()
-            text = raw.decode("utf-8")
-            header = re.match(r"\A#\s+PMID:([0-9]+)\s*\n", text)
-            if header is None or header.group(1) != pmid:
-                raise EvidenceError("cache header does not identify the cited PMID")
-            headings = list(re.finditer(r"(?im)^##\s+Abstract\s*$", text))
-            if len(headings) != 1:
-                raise EvidenceError("cache requires exactly one explicit Abstract section")
-            remainder = text[headings[0].end():]
-            body = re.split(r"(?m)^#{1,2}\s+", remainder, maxsplit=1)[0].strip()
-            if not body:
-                raise EvidenceError("cache abstract is empty")
-            result: CachedSource | QuoteResult = CachedSource(body, relative, hashlib.sha256(raw).hexdigest())
+            body = parse_cache_text(raw.decode("utf-8"), kind, pmid)
+            result = CachedSource(body, relative, hashlib.sha256(raw).hexdigest())
         except FileNotFoundError:
-            result = QuoteResult("MISSING_CACHE", reference, "No supported PMID markdown cache; no source was fetched.", cache_path=relative)
+            result = QuoteResult("MISSING_CACHE", reference, f"No supported {kind} markdown cache; no source was fetched.", cache_path=relative)
         except (OSError, UnicodeError, EvidenceError) as exc:
             result = QuoteResult("INVALID_CACHE", reference, str(exc), cache_path=relative)
-        self._cache[pmid] = result
+        self._cache[key] = result
         return result
 
     def check_item(self, item: object) -> QuoteResult:
@@ -202,6 +283,7 @@ class EvidenceValidator:
         if not references:
             return QuoteResult("MISSING_REFERENCE", detail="Quote has no citation", quote_sha256=quote_hash)
         pmids: set[str] = set()
+        dois: set[str] = set()
         for field, ref in references:
             match = _PMID.fullmatch(ref)
             if field == "pmid" and match is None:
@@ -210,16 +292,29 @@ class EvidenceValidator:
             # A DOI (even one that happens to look numeric) is never a PMID.
             if field != "doi" and match and (field == "pmid" or ref.upper().startswith("PMID:")):
                 pmids.add(match.group(1))
+                continue
+            doi = normalize_doi(ref)
+            if field == "doi" and doi is None:
+                return QuoteResult("INVALID_EVIDENCE", detail="doi must identify a DOI", quote_sha256=quote_hash)
+            if doi is not None:
+                dois.add(doi)
         if len(pmids) > 1:
             return QuoteResult("INVALID_EVIDENCE", detail="Conflicting PMID references", quote_sha256=quote_hash)
-        if not pmids:
-            return QuoteResult("UNSUPPORTED_REFERENCE", references[0][1], "Only identified PMID abstract caches are supported; other sources remain unverified.", quote_hash)
-        pmid = next(iter(pmids))
-        source = self._source(pmid)
+        # A PMID is the more specific identifier and keeps precedence, so a
+        # record citing both is checked exactly as it was before DOI support.
+        if pmids:
+            kind, identifier = "PMID", next(iter(pmids))
+        elif len(dois) > 1:
+            return QuoteResult("INVALID_EVIDENCE", detail="Conflicting DOI references", quote_sha256=quote_hash)
+        elif dois:
+            kind, identifier = "DOI", next(iter(dois))
+        else:
+            return QuoteResult("UNSUPPORTED_REFERENCE", references[0][1], "Only PMID and DOI citations with a retained abstract are supported; other sources remain unverified.", quote_hash)
+        source = self._source(identifier, kind)
         if isinstance(source, QuoteResult):
             return QuoteResult(source.verdict, source.reference, source.detail, quote_hash, source.cache_path, source.cache_sha256)
         verdict = "OK" if normalize(quote) in normalize(source.body) else "SNIPPET_NOT_IN_SOURCE"
-        return QuoteResult(verdict, f"PMID:{pmid}",
+        return QuoteResult(verdict, f"{kind}:{identifier}",
             "Normalized quote occurs in the cached abstract; claim support still requires review." if verdict == "OK" else "Quote is absent from the cached abstract body.",
             quote_hash, source.path, source.sha256)
 
@@ -248,9 +343,128 @@ def iter_evidence(document: object, fields: Sequence[str], path: str = "$", *, _
             yield from iter_evidence(value, fields, location, _ancestors=ancestors)
 
 
-def validate_corpus(root: Path, globs: Sequence[str], config: EvidenceConfig) -> dict[str, Any]:
+@dataclass(frozen=True)
+class KnownFinding:
+    """One recorded, issue-owned finding the gate reports without blocking on.
+
+    The key leaves out the item's position, so reordering a record does not
+    disturb it, and includes the quote's hash, so editing the quote makes the
+    entry stale and the new text is checked like any other.
+    """
+
+    record: str
+    reference: str
+    verdict: str
+    quote_sha256: str
+    issue: str
+
+    @property
+    def key(self) -> tuple[str, str, str, str]:
+        return (self.record, self.reference, self.verdict, self.quote_sha256)
+
+
+def _ledger_path(root: Path, relative: str) -> Path:
+    root = root.resolve()
+    _relative_path(relative, "known_findings")
+    path = root / relative
+    if any(part.is_symlink() for part in (path, *path.parents) if part != root and part.is_relative_to(root)):
+        raise EvidenceError("known_findings ledger and its directories must not be symlinks")
+    if not path.resolve().is_relative_to(root):
+        raise EvidenceError("known_findings ledger resolves outside the active repository")
+    return path
+
+
+def load_known_findings(root: Path, relative: str, *, missing_ok: bool = False) -> dict[tuple[str, str, str, str], KnownFinding]:
+    """Parse a declared ledger strictly; a declared but absent ledger is an error.
+
+    `missing_ok` exists only so the ledger writer can create the first one.
+    """
+    path = _ledger_path(root, relative)
+    try:
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError as exc:
+        if missing_ok:
+            return {}
+        raise EvidenceError(f"declared known_findings ledger is missing: {relative}") from exc
+    rows = list(csv.reader(io.StringIO(text), delimiter="\t", quoting=csv.QUOTE_NONE, strict=True))
+    if not rows or tuple(rows[0]) != KNOWN_FINDING_COLUMNS:
+        raise EvidenceError(f"{relative}: header must be {', '.join(KNOWN_FINDING_COLUMNS)}")
+    findings: dict[tuple[str, str, str, str], KnownFinding] = {}
+    for number, row in enumerate(rows[1:], start=2):
+        if len(row) != len(KNOWN_FINDING_COLUMNS):
+            raise EvidenceError(f"{relative}:{number}: expected {len(KNOWN_FINDING_COLUMNS)} tab-separated fields")
+        finding = KnownFinding(*row)
+        record = PurePosixPath(finding.record)
+        if (not finding.record or record.is_absolute() or ".." in record.parts
+                or str(record) != finding.record):
+            raise EvidenceError(f"{relative}:{number}: record must be a normalized repository-relative path")
+        if not finding.reference:
+            raise EvidenceError(f"{relative}:{number}: reference is required")
+        if finding.verdict not in KNOWN_FINDING_VERDICTS:
+            raise EvidenceError(f"{relative}:{number}: {finding.verdict!r} cannot be recorded as a known finding")
+        if not _SHA256.fullmatch(finding.quote_sha256):
+            raise EvidenceError(f"{relative}:{number}: quote_sha256 must be a lowercase SHA-256 digest")
+        if not _ISSUE.fullmatch(finding.issue):
+            raise EvidenceError(f"{relative}:{number}: issue must be a GitHub issue URL")
+        if finding.key in findings:
+            raise EvidenceError(f"{relative}:{number}: duplicate known finding")
+        findings[finding.key] = finding
+    return findings
+
+
+def plan_known_findings(report: Mapping[str, Any], issue: str | None) -> dict[str, Any]:
+    """The ledger the current findings imply: kept, added (owned by `issue`), dropped."""
+    if issue is not None and not _ISSUE.fullmatch(issue):
+        raise EvidenceError("issue must be a GitHub issue URL")
+    rows: dict[tuple[str, str, str, str], KnownFinding] = {}
+    kept = added = 0
+    unowned: list[dict[str, Any]] = []
+    for row in report["results"]:
+        if row["verdict"] not in KNOWN_FINDING_VERDICTS:
+            continue
+        key = (row["record"], row["reference"], row["verdict"], row["quote_sha256"])
+        if key in rows:
+            continue
+        owner = row.get("known_issue") or issue
+        if owner is None:
+            unowned.append(row)
+            continue
+        kept += bool(row.get("known_issue"))
+        added += not row.get("known_issue")
+        rows[key] = KnownFinding(*key, owner)
+    return {"rows": sorted(rows.values(), key=lambda f: f.key), "kept": kept, "added": added,
+            "dropped": len(report.get("stale_known_findings", [])), "unowned": unowned}
+
+
+def write_known_findings(root: Path, relative: str, rows: Iterable[KnownFinding]) -> Path:
+    """Replace the ledger atomically; a field containing a tab or newline is refused."""
+    path = _ledger_path(root, relative)
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, delimiter="\t", quoting=csv.QUOTE_NONE, lineterminator="\n")
+    writer.writerow(KNOWN_FINDING_COLUMNS)
+    for finding in rows:
+        values = [getattr(finding, column) for column in KNOWN_FINDING_COLUMNS]
+        if any(re.search(r"[\t\r\n]", value) for value in values):
+            raise EvidenceError("known finding fields must not contain tabs or line breaks")
+        writer.writerow(values)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=path.parent, delete=False) as stream:
+        temporary = Path(stream.name)
+        stream.write(buffer.getvalue())
+    try:
+        os.chmod(temporary, 0o644)
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return path
+
+
+def validate_corpus(root: Path, globs: Sequence[str], config: EvidenceConfig, *,
+                    missing_ledger_ok: bool = False) -> dict[str, Any]:
     """Read every selected record. Malformed/unreadable input cannot disappear."""
     root = root.resolve()
+    known = (load_known_findings(root, config.known_findings, missing_ok=missing_ledger_ok)
+             if config.known_findings else {})
     # Do not filter through is_file(): it would silently drop broken symlinks
     # and other unreadable selected inputs before the error gate sees them.
     files = sorted({path for pattern in globs for path in root.glob(pattern)})
@@ -279,16 +493,34 @@ def validate_corpus(root: Path, globs: Sequence[str], config: EvidenceConfig) ->
                         "shape": type(item).__name__, "reason": "outside declared evidence_paths; not quote-validated"})
         except (OSError, UnicodeError, yaml.YAMLError, ValueError, RecursionError) as exc:
             errors.append({"record": relative, "error": str(exc)})
+    matched: set[tuple[str, str, str, str]] = set()
+    for row in results:
+        finding = known.get((row["record"], row["reference"], row["verdict"], row["quote_sha256"]))
+        row["known_issue"] = finding.issue if finding else ""
+        if finding:
+            matched.add(finding.key)
+    # A record that could not be read cannot show that its recorded findings
+    # are gone, so its entries are neither matched nor called stale.
+    unreadable = {error["record"] for error in errors}
+    stale = [asdict(f) for key, f in sorted(known.items()) if key not in matched and f.record not in unreadable]
     counts = Counter(row["verdict"] for row in results)
+    recorded = Counter(row["verdict"] for row in results if row["known_issue"])
     return {"records": len(files), "evidence_items": len(results),
+        "quote_bearing_items": len(results) - counts["NO_QUOTE"],
         "quote_validated_items": counts["OK"], "verdicts": {v: counts[v] for v in VERDICTS},
+        "known_findings_ledger": config.known_findings,
+        "known_findings": {v: recorded[v] for v in VERDICTS if v in KNOWN_FINDING_VERDICTS},
+        "stale_known_findings": stale,
         "errors": errors, "results": results, "cache_dir": config.cache_dir,
         "evidence_paths": list(config.evidence_paths), "unmeasured_items": len(unmeasured),
         "unmeasured": unmeasured,
         "comparison": "NFKC + collapsed whitespace + lowercase substring in identified abstract body",
-        "limits": "Quote occurrence is not scientific claim support, scope, source-rights clearance or human review. Unsupported sources are unverified."}
+        "limits": "Quote occurrence is not scientific claim support, scope, source-rights clearance or human review. Unsupported sources and recorded known findings are unverified."}
 
 
 def exit_code(report: Mapping[str, Any], *, strict: bool) -> int:
+    """Fail on input errors, stale ledger entries, or any unrecorded blocking verdict."""
     blocked = STRICT_BLOCKING if strict else BLOCKING
-    return 2 if report["errors"] or any(report["verdicts"][v] for v in blocked) else 0
+    unrecorded = Counter(row["verdict"] for row in report["results"] if not row.get("known_issue"))
+    return 2 if (report["errors"] or report.get("stale_known_findings")
+                 or any(unrecorded[v] for v in blocked)) else 0

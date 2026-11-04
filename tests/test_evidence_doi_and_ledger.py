@@ -1,0 +1,296 @@
+"""DOI sources, the known-findings ledger and the quote-bearing share (#729).
+
+Every case is driven by an input where the two behaviours differ: a cache
+that holds the quote under one identifier and not the other, a ledger entry
+that matches one finding and not its neighbour.
+"""
+from __future__ import annotations
+
+import json
+import subprocess
+from types import SimpleNamespace
+
+import pytest
+
+import kg_microbe_evidence.__main__ as cli
+from kg_microbe_evidence import (
+    EvidenceConfig,
+    EvidenceError,
+    EvidenceValidator,
+    KnownFinding,
+    cache_file_name,
+    exit_code,
+    load_known_findings,
+    normalize_doi,
+    plan_known_findings,
+    validate_corpus,
+    write_known_findings,
+)
+
+DOI = "10.1000/abc"
+ISSUE = "https://github.com/CultureBotAI/HabitatMech/issues/1"
+OTHER_ISSUE = "https://github.com/CultureBotAI/HabitatMech/issues/2"
+LEDGER = "curation/evidence_known_findings.tsv"
+
+
+@pytest.fixture
+def root(tmp_path):
+    cache = tmp_path / "references_cache"
+    cache.mkdir()
+    (cache / "PMID_1.md").write_text(
+        "# PMID:1\n\n**Title:** A title is metadata.\n\n## Abstract\n\nThe PMID abstract says growth increased.\n")
+    (cache / cache_file_name("DOI", DOI)).write_text(
+        "# DOI:10.1000/ABC\n\n**PMID:** 9\n\n## Abstract\n\nThe DOI abstract says yield doubled.\n")
+    return tmp_path
+
+
+def check(root, item, **settings):
+    config = EvidenceConfig.from_settings({"cache_dir": "references_cache",
+                                           "reference_fields": ["pmid", "doi", "reference"], **settings})
+    return EvidenceValidator(root, config).check_item(item)
+
+
+@pytest.mark.parametrize("citation", [
+    "doi:10.1000/abc", "DOI:10.1000/ABC", "https://doi.org/10.1000/abc",
+    "http://dx.doi.org/10.1000/abc", "10.1000/abc",
+])
+def test_every_spelling_of_one_doi_reads_one_cache(root, citation):
+    result = check(root, {"reference": citation, "snippet": "yield doubled"})
+    assert (result.verdict, result.reference) == ("OK", f"DOI:{DOI}")
+    assert check(root, {"reference": citation, "snippet": "growth increased"}).verdict == "SNIPPET_NOT_IN_SOURCE"
+
+
+def test_doi_cache_must_name_the_cited_doi(root):
+    (root / "references_cache" / cache_file_name("DOI", "10.1000/xyz")).write_text(
+        "# DOI:10.1000/abc\n\n## Abstract\n\nyield doubled\n")
+    assert check(root, {"reference": "doi:10.1000/xyz", "snippet": "yield doubled"}).verdict == "INVALID_CACHE"
+
+
+def test_pmid_keeps_precedence_over_a_doi(root):
+    # The DOI cache holds this quote and the PMID cache does not: a PMID-first
+    # checker reports a mismatch, a DOI-first one would report OK.
+    result = check(root, {"pmid": "1", "doi": DOI, "snippet": "yield doubled"})
+    assert (result.verdict, result.reference) == ("SNIPPET_NOT_IN_SOURCE", "PMID:1")
+
+
+def test_two_distinct_dois_conflict(root):
+    item = {"doi": DOI, "reference": "doi:10.1000/other", "snippet": "yield doubled"}
+    assert check(root, item).verdict == "INVALID_EVIDENCE"
+    item["reference"] = "https://doi.org/10.1000/ABC"
+    assert check(root, item).verdict == "OK"
+
+
+def test_doi_without_cache_is_missing_not_unsupported(root):
+    result = check(root, {"reference": "doi:10.2000/none", "snippet": "anything"})
+    assert result.verdict == "MISSING_CACHE"
+    assert result.cache_path == "references_cache/" + cache_file_name("DOI", "10.2000/none")
+
+
+def test_cache_names_are_reversible_and_case_folded():
+    assert cache_file_name("DOI", "10.1000/a:b") == "DOI_10.1000%2Fa%3Ab.md"
+    assert cache_file_name("DOI", "10.1000/a/b") != cache_file_name("DOI", "10.1000/a_b")
+    assert normalize_doi("DOI:10.1000/ABC") == normalize_doi("10.1000/abc") == "10.1000/abc"
+    assert normalize_doi("10.1000/has space") is None
+    assert normalize_doi("https://example.org/10.1000/abc") is None
+
+
+def test_overlong_doi_stays_unverified(root):
+    doi = "10.1000/" + "x" * 300
+    assert check(root, {"reference": doi, "snippet": "anything"}).verdict == "UNSUPPORTED_REFERENCE"
+
+
+# --- known-findings ledger -------------------------------------------------
+
+def record(root, *items):
+    lines = ["evidence:"]
+    for reference, snippet in items:
+        lines += [f"- reference: '{reference}'", f"  snippet: '{snippet}'"]
+    (root / "item.yaml").write_text("\n".join(lines) + "\n")
+
+
+def config(**extra):
+    return EvidenceConfig.from_settings({"cache_dir": "references_cache", "reference_fields": ["reference"],
+                                         "snippet_fields": ["snippet"], **extra})
+
+
+def ledger_rows(root, report, issue=ISSUE):
+    plan = plan_known_findings(report, issue)
+    write_known_findings(root, LEDGER, plan["rows"])
+    return plan
+
+
+def test_a_recorded_finding_stops_blocking_and_is_counted_apart(root):
+    record(root, ("PMID:1", "a paraphrase"), ("PMID:1", "growth increased"))
+    unrecorded = validate_corpus(root, ["item.yaml"], config(known_findings=LEDGER), missing_ledger_ok=True)
+    assert exit_code(unrecorded, strict=True) == 2
+    ledger_rows(root, unrecorded)
+    report = validate_corpus(root, ["item.yaml"], config(known_findings=LEDGER))
+    assert exit_code(report, strict=True) == 0
+    assert report["known_findings"]["SNIPPET_NOT_IN_SOURCE"] == 1
+    assert report["verdicts"]["SNIPPET_NOT_IN_SOURCE"] == 1  # still reported, never validated
+    assert report["quote_validated_items"] == 1
+
+
+def test_a_new_failure_beside_a_recorded_one_still_blocks(root):
+    record(root, ("PMID:1", "a paraphrase"))
+    ledger_rows(root, validate_corpus(root, ["item.yaml"], config(known_findings=LEDGER), missing_ledger_ok=True))
+    record(root, ("PMID:1", "a paraphrase"), ("PMID:1", "another invention"))
+    report = validate_corpus(root, ["item.yaml"], config(known_findings=LEDGER))
+    assert exit_code(report, strict=True) == 2
+    assert report["known_findings"]["SNIPPET_NOT_IN_SOURCE"] == 1
+
+
+def test_a_repaired_finding_leaves_a_stale_entry_that_blocks(root):
+    record(root, ("PMID:1", "a paraphrase"))
+    ledger_rows(root, validate_corpus(root, ["item.yaml"], config(known_findings=LEDGER), missing_ledger_ok=True))
+    record(root, ("PMID:1", "growth increased"))
+    report = validate_corpus(root, ["item.yaml"], config(known_findings=LEDGER))
+    assert report["verdicts"]["OK"] == 1
+    assert len(report["stale_known_findings"]) == 1
+    assert exit_code(report, strict=False) == 2
+
+
+def test_moving_an_item_keeps_its_entry_but_editing_the_quote_does_not(root):
+    record(root, ("PMID:1", "growth increased"), ("PMID:1", "a paraphrase"))
+    ledger_rows(root, validate_corpus(root, ["item.yaml"], config(known_findings=LEDGER), missing_ledger_ok=True))
+    record(root, ("PMID:1", "a paraphrase"), ("PMID:1", "growth increased"))
+    assert exit_code(validate_corpus(root, ["item.yaml"], config(known_findings=LEDGER)), strict=True) == 0
+    record(root, ("PMID:1", "a different paraphrase"), ("PMID:1", "growth increased"))
+    report = validate_corpus(root, ["item.yaml"], config(known_findings=LEDGER))
+    assert len(report["stale_known_findings"]) == 1
+    assert report["known_findings"]["SNIPPET_NOT_IN_SOURCE"] == 0
+
+
+def test_strict_only_findings_can_be_recorded(root):
+    record(root, ("PMID:2", "no cache yet"), ("UniProtKB:P1", "a database line"))
+    report = validate_corpus(root, ["item.yaml"], config(known_findings=LEDGER), missing_ledger_ok=True)
+    assert exit_code(report, strict=True) == 2
+    ledger_rows(root, report)
+    report = validate_corpus(root, ["item.yaml"], config(known_findings=LEDGER))
+    assert exit_code(report, strict=True) == 0
+    assert report["known_findings"]["MISSING_CACHE"] == report["known_findings"]["UNSUPPORTED_REFERENCE"] == 1
+
+
+def test_unreadable_record_entries_are_not_called_stale(root):
+    record(root, ("PMID:1", "a paraphrase"))
+    ledger_rows(root, validate_corpus(root, ["item.yaml"], config(known_findings=LEDGER), missing_ledger_ok=True))
+    (root / "item.yaml").write_text("evidence: [\n")
+    report = validate_corpus(root, ["item.yaml"], config(known_findings=LEDGER))
+    assert report["errors"] and report["stale_known_findings"] == []
+    assert exit_code(report, strict=True) == 2
+
+
+HEADER = "record\treference\tverdict\tquote_sha256\tissue\n"
+GOOD = f"item.yaml\tPMID:1\tSNIPPET_NOT_IN_SOURCE\t{'a' * 64}\t{ISSUE}\n"
+
+
+@pytest.mark.parametrize("text", [
+    "record\treference\tverdict\tissue\n",
+    HEADER + GOOD.replace("SNIPPET_NOT_IN_SOURCE", "INVALID_EVIDENCE"),
+    HEADER + GOOD.replace("SNIPPET_NOT_IN_SOURCE", "INVALID_CACHE"),
+    HEADER + GOOD.replace(ISSUE, "HabitatMech#1"),
+    HEADER + GOOD.replace("a" * 64, "A" * 64),
+    HEADER + GOOD.replace("item.yaml", "../item.yaml"),
+    HEADER + GOOD.replace("item.yaml", "/item.yaml"),
+    HEADER + GOOD.replace("\tPMID:1\t", "\t\t"),
+    HEADER + GOOD + GOOD,
+    HEADER + GOOD.rstrip("\n") + "\textra\n",
+])
+def test_malformed_ledger_is_an_input_error(root, text):
+    (root / "curation").mkdir()
+    (root / LEDGER).write_text(text)
+    with pytest.raises(EvidenceError):
+        load_known_findings(root, LEDGER)
+    (root / LEDGER).write_text(HEADER + GOOD)
+    assert len(load_known_findings(root, LEDGER)) == 1
+
+
+def test_declared_ledger_must_exist_except_when_creating_it(root):
+    record(root, ("PMID:1", "growth increased"))
+    with pytest.raises(EvidenceError, match="missing"):
+        validate_corpus(root, ["item.yaml"], config(known_findings=LEDGER))
+    assert validate_corpus(root, ["item.yaml"], config(known_findings=LEDGER), missing_ledger_ok=True)["errors"] == []
+
+
+def test_symlinked_ledger_is_refused(root, tmp_path_factory):
+    outside = tmp_path_factory.mktemp("outside")
+    (outside / "ledger.tsv").write_text(HEADER)
+    (root / "curation").mkdir()
+    (root / LEDGER).symlink_to(outside / "ledger.tsv")
+    with pytest.raises(EvidenceError, match="symlink"):
+        load_known_findings(root, LEDGER)
+
+
+def test_ledger_plan_keeps_owners_adds_new_and_drops_stale(root):
+    record(root, ("PMID:1", "first paraphrase"), ("PMID:1", "second paraphrase"))
+    report = validate_corpus(root, ["item.yaml"], config(known_findings=LEDGER), missing_ledger_ok=True)
+    first = next(r for r in report["results"] if r["verdict"] == "SNIPPET_NOT_IN_SOURCE")
+    write_known_findings(root, LEDGER, [KnownFinding(first["record"], first["reference"], first["verdict"],
+                                                     first["quote_sha256"], OTHER_ISSUE),
+                                        KnownFinding("item.yaml", "PMID:1", "SNIPPET_NOT_IN_SOURCE", "b" * 64, ISSUE)])
+    report = validate_corpus(root, ["item.yaml"], config(known_findings=LEDGER))
+    assert plan_known_findings(report, None)["unowned"]
+    plan = plan_known_findings(report, ISSUE)
+    assert (plan["kept"], plan["added"], plan["dropped"]) == (1, 1, 1)
+    owners = {f.quote_sha256: f.issue for f in plan["rows"]}
+    assert owners[first["quote_sha256"]] == OTHER_ISSUE
+    with pytest.raises(EvidenceError):
+        plan_known_findings(report, "not a url")
+
+
+def test_quote_bearing_share_is_reported(root):
+    (root / "item.yaml").write_text(
+        "evidence:\n- reference: PMID:1\n  snippet: growth increased\n- reference: PMID:1\n- reference: PMID:1\n")
+    report = validate_corpus(root, ["item.yaml"], config())
+    assert (report["quote_bearing_items"], report["evidence_items"]) == (1, 3)
+    assert "Quote-bearing items: 1 of 3 in-scope evidence items (33.3%)" in cli.quote_share(report)
+
+
+# --- the ledger CLI ----------------------------------------------------------
+
+def _stub_manifest(settings):
+    capability = SimpleNamespace(is_enabled=True, settings=settings, reason=None)
+    mech = SimpleNamespace(key="habitatmech", github="CultureBotAI/HabitatMech", record_globs=("item.yaml",),
+                           capability=lambda name: capability)
+    return SimpleNamespace(mechs={"habitatmech": mech})
+
+
+def _git_repo(root):
+    def git(*args):
+        subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True)
+    git("init", "-q")
+    git("config", "user.name", "Test")
+    git("config", "user.email", "test@example.invalid")
+    git("remote", "add", "origin", "https://github.com/CultureBotAI/HabitatMech.git")
+    git("-c", "core.hooksPath=/dev/null", "commit", "--allow-empty", "-qm", "fixture")
+
+
+def test_cli_records_known_findings_only_with_apply(root, monkeypatch, capsys):
+    _git_repo(root)
+    record(root, ("PMID:1", "a paraphrase"))
+    settings = {"cache_dir": "references_cache", "reference_fields": ["reference"],
+                "snippet_fields": ["snippet"], "known_findings": LEDGER}
+    monkeypatch.setattr(cli, "load_fleet_manifest", lambda: _stub_manifest(settings))
+    base = ["--mech", "habitatmech", "--root", str(root)]
+    assert cli.main([*base, "--strict"]) == 2  # declared ledger is missing
+    assert cli.main([*base, "--record-known-findings"]) == 1  # dry run, unowned finding
+    assert not (root / LEDGER).exists()
+    assert cli.main([*base, "--record-known-findings", "--issue", ISSUE]) == 0
+    assert not (root / LEDGER).exists()
+    assert cli.main([*base, "--record-known-findings", "--issue", ISSUE, "--apply"]) == 0
+    assert (root / LEDGER).stat().st_mode & 0o777 == 0o644
+    assert cli.main([*base, "--strict"]) == 0
+    report = json.loads((root / "workspace/reports/evidence_reference_validation.json").read_text())
+    assert report["known_findings"]["SNIPPET_NOT_IN_SOURCE"] == 1
+    assert "do not block" in (root / "workspace/reports/evidence_reference_validation.md").read_text()
+
+
+def test_cli_refuses_to_record_without_a_declared_ledger(root, monkeypatch):
+    _git_repo(root)
+    record(root, ("PMID:1", "a paraphrase"))
+    settings = {"cache_dir": "references_cache", "reference_fields": ["reference"], "snippet_fields": ["snippet"]}
+    monkeypatch.setattr(cli, "load_fleet_manifest", lambda: _stub_manifest(settings))
+    assert cli.main(["--mech", "habitatmech", "--root", str(root), "--record-known-findings",
+                     "--issue", ISSUE, "--apply"]) == 2
+    with pytest.raises(SystemExit):
+        cli.main(["--mech", "habitatmech", "--root", str(root), "--apply"])
