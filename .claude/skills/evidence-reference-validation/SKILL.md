@@ -101,7 +101,7 @@ adds caches, and it is a dry run unless `--apply` is given:
 
 ```bash
 uv run kg-microbe-evidence-fetch --mech <mech> --root <worktree>            # plan
-uv run kg-microbe-evidence-fetch --mech <mech> --root <worktree> --limit 1 --apply   # canary
+uv run kg-microbe-evidence-fetch --mech <mech> --root <worktree> --limit 2 --apply   # canary
 uv run kg-microbe-evidence-fetch --mech <mech> --root <worktree> --apply
 ```
 
@@ -109,7 +109,10 @@ It fetches exactly the sources the gate reports as `MISSING_CACHE` under the
 declared selectors, from NCBI E-utilities, anonymously. A DOI's abstract is
 accepted only from a single PubMed record that lists that DOI. It never rewrites
 an existing cache and writes nothing for a record without an abstract, so those
-stay `MISSING_CACHE`. Check the canary file before fanning out. A cached abstract
+stay `MISSING_CACHE`. When both PMIDs and DOIs are pending, `--limit` covers at
+least one DOI, so the `--limit 2` canary exercises both lookup paths; check its
+files before fanning out. The dry run checks the write destination too, and
+`--apply` holds the Mech's repository lock. A cached abstract
 does not clear its redistribution rights; follow the Mech's source policy before
 committing caches.
 
@@ -135,8 +138,9 @@ uv run kg-microbe-evidence --mech <mech> --root <worktree> --record-known-findin
 
 The writer keeps entries that still occur with their existing owner, drops stale
 ones, and assigns new findings to `--issue`. After repairing quotes, rerun it
-without `--issue` to drop the repaired entries; it refuses to write while any
-current finding has no owner.
+without `--issue` to drop the repaired entries. A dry run that leaves a current
+finding without an owner exits 1, and `--apply` then refuses (exit 2); the write
+holds the Mech's repository lock.
 
 A match establishes quote occurrence only. It does not establish that the
 paper supports the asserted relationship, causal direction, organism scope,

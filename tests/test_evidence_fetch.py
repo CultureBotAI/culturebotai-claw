@@ -211,9 +211,23 @@ def test_api_key_is_sent_as_a_parameter_and_identity_is_anonymous(tmp_path):
 def test_limit_is_a_canary_that_still_reports_everything_missing(tmp_path):
     """#740: --limit narrows what this run covers, not what it reports as missing."""
     report = corpus(tmp_path, "PMID:2", "PMID:3", "doi:10.1000/x")
-    result = fetcher.fetch_missing(tmp_path, CONFIG, report, limit=1)
-    assert (result.planned_pmids, result.planned_dois) == (["2"], [])
+    result = fetcher.fetch_missing(tmp_path, CONFIG, report, limit=2)
     assert (result.missing_pmids, result.missing_dois) == (["2", "3"], ["10.1000/x"])
+    assert (result.planned_pmids, result.planned_dois) == (["2"], ["10.1000/x"])
+
+
+@pytest.mark.parametrize(("references", "limit", "covered"), [
+    (("PMID:2", "PMID:3", "doi:10.1000/x"), 1, ([], ["10.1000/x"])),
+    (("PMID:2", "PMID:3", "doi:10.1000/x"), 2, (["2"], ["10.1000/x"])),
+    (("PMID:2", "doi:10.1000/x", "doi:10.1000/y", "doi:10.1000/z"), 4, (["2"], ["10.1000/x", "10.1000/y", "10.1000/z"])),
+    (("PMID:2", "PMID:3"), 1, (["2"], [])),
+    (("doi:10.1000/x", "doi:10.1000/y"), 1, ([], ["10.1000/x"])),
+])
+def test_a_limited_canary_covers_a_doi_whenever_one_is_pending(tmp_path, references, limit, covered):
+    """#744: a canary must take the batch's paths, so the DOI path is never skipped."""
+    report = corpus(tmp_path, *references)
+    result = fetcher.fetch_missing(tmp_path, CONFIG, report, limit=limit)
+    assert (result.planned_pmids, result.planned_dois) == covered
 
 
 def test_http_transport_posts_form_parameters(monkeypatch):
@@ -316,7 +330,8 @@ def _manifest(enabled=True, globs=("item.yaml",), cache_dir="references_cache"):
 
 
 @pytest.fixture
-def cli_root(tmp_path, monkeypatch):
+def cli_root(tmp_path, tmp_path_factory, monkeypatch):
+    monkeypatch.setenv("OPENCLAW_WORKSPACE", str(tmp_path_factory.mktemp("workspace")))
     _repo(tmp_path)
     corpus(tmp_path, "PMID:2")
     monkeypatch.setattr(fetcher, "load_fleet_manifest", lambda: _manifest())
@@ -358,7 +373,8 @@ def test_cli_refuses_to_write_through_a_symlinked_parent(cli_root, monkeypatch):
     (cli_root / "elsewhere").mkdir()
     (cli_root / "sources").symlink_to(cli_root / "elsewhere", target_is_directory=True)
     monkeypatch.setattr(fetcher, "load_fleet_manifest", lambda: _manifest(cache_dir="sources/abstracts"))
-    assert fetcher.main(["--mech", "habitatmech", "--root", str(cli_root)]) == 0  # the plan is not empty
+    # #745: the dry run checks the destination too, so it fails where --apply would.
+    assert fetcher.main(["--mech", "habitatmech", "--root", str(cli_root)]) == 2
     assert fetcher.main(["--mech", "habitatmech", "--root", str(cli_root), "--apply"]) == 2
     assert list((cli_root / "elsewhere").iterdir()) == []
 
@@ -374,4 +390,73 @@ def test_cli_checks_the_json_destination_before_any_work(cli_root):
         fetcher.main(["--mech", "habitatmech", "--root", str(cli_root), "--apply",
                       "--json", str(cli_root / "missing-dir/out.json")])
     assert raised.value.code == 2
+    assert not (cli_root / "references_cache").exists()
+
+
+# --- second review on #730 (#742 to #747) ------------------------------------
+
+def test_cli_prints_everything_missing_beside_what_a_limited_run_covers(cli_root, capsys):
+    """#742: the printed summary, not just FetchResult, must differ under --limit."""
+    corpus(cli_root, "PMID:2", "PMID:3")
+    assert fetcher.main(["--mech", "habitatmech", "--root", str(cli_root), "--limit", "1"]) == 0
+    assert "2 PMIDs and 0 DOIs lack a cache; this run covers 1 and 0" in capsys.readouterr().out
+
+
+def test_cli_refuses_a_json_destination_that_is_a_directory(cli_root):
+    """#743: refused at parse time, before any network work or cache write."""
+    (cli_root / "out").mkdir()
+    with pytest.raises(SystemExit) as raised:
+        fetcher.main(["--mech", "habitatmech", "--root", str(cli_root), "--apply", "--json", str(cli_root / "out")])
+    assert raised.value.code == 2
+    assert not (cli_root / "references_cache").exists()
+
+
+def test_cli_reports_an_unwritable_json_destination_without_a_traceback(cli_root, monkeypatch, capsys):
+    """#743: the result write is guarded even when the path looked writable."""
+    def refuse(self, *args, **kwargs):
+        raise PermissionError("read-only")
+    monkeypatch.setattr(fetcher.Path, "write_text", refuse)
+    assert fetcher.main(["--mech", "habitatmech", "--root", str(cli_root), "--json", str(cli_root / "out.json")]) == 2
+    assert "could not write" in capsys.readouterr().err
+
+
+def test_a_non_string_search_id_is_malformed(tmp_path):
+    """#743: an integer id must not escape as a TypeError."""
+    report = corpus(tmp_path, "doi:10.1000/x")
+    with pytest.raises(fetcher.FetchError):
+        run(tmp_path, report, lambda url, params: b'{"esearchresult": {"idlist": [7]}}')
+
+
+class _Locks:
+    """A LockManager stand-in that records which repository locks were held."""
+
+    held: list[tuple[str, str]] = []
+
+    def lock(self, resource, operation):
+        import contextlib
+
+        @contextlib.contextmanager
+        def held():
+            _Locks.held.append((resource, operation))
+            yield
+        return held()
+
+
+def test_cli_holds_the_repository_lock_only_while_applying(cli_root, monkeypatch):
+    """#746: AGENTS.md requires the lock for every write into a Mech checkout."""
+    _Locks.held = []
+    monkeypatch.setattr(fetcher, "LockManager", _Locks)
+    assert fetcher.main(["--mech", "habitatmech", "--root", str(cli_root)]) == 0
+    assert _Locks.held == []
+    assert fetcher.main(["--mech", "habitatmech", "--root", str(cli_root), "--apply"]) == 0
+    assert _Locks.held == [("habitatmech", "evidence-fetch")]
+
+
+def test_cli_reports_a_held_lock_without_a_traceback(cli_root, monkeypatch, capsys):
+    class Busy:
+        def lock(self, resource, operation):
+            raise RuntimeError(f"Failed to acquire lock on {resource}")
+    monkeypatch.setattr(fetcher, "LockManager", Busy)
+    assert fetcher.main(["--mech", "habitatmech", "--root", str(cli_root), "--apply"]) == 2
+    assert "Failed to acquire lock" in capsys.readouterr().err
     assert not (cli_root / "references_cache").exists()

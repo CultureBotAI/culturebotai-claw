@@ -22,6 +22,7 @@ from kg_microbe_evidence import (
 )
 from kg_microbe_fleet import FleetManifestError, load_fleet_manifest
 from kg_microbe_fleet.roots import claw_root
+from plugins.lock_manager import LockManager
 from plugins.repository_settings import (
     RepositoryConfigurationError,
     RepositorySettings,
@@ -80,7 +81,7 @@ def write_reports(report: dict, output: Path) -> None:
 
 
 def record_known_findings(report: dict, root: Path, config: EvidenceConfig,
-                          issue: str | None, *, apply: bool) -> int:
+                          issue: str | None, *, apply: bool, mech_key: str) -> int:
     """Rewrite the declared ledger from the current findings, dry-run by default.
 
     Input errors stop it: an unreadable record's findings are unknown, so a
@@ -101,7 +102,9 @@ def record_known_findings(report: dict, root: Path, config: EvidenceConfig,
         return 1 if plan["unowned"] else 0
     if plan["unowned"]:
         raise EvidenceError("refusing to write a ledger that leaves current findings unrecorded")
-    write_known_findings(root, config.known_findings, plan["rows"])
+    # A write into a Mech checkout holds that repository's lock (AGENTS.md, #746).
+    with LockManager().lock(mech_key, "evidence-known-findings"):
+        write_known_findings(root, config.known_findings, plan["rows"])
     print(f"  Wrote {root / config.known_findings}")
     return 0
 
@@ -150,7 +153,8 @@ def main(argv: list[str] | None = None) -> int:
         report.update(repository=mech.github, revision=repo.head.commit.hexsha,
                       strict=args.strict, input_state="active checkout, including uncommitted files")
         if args.record_known_findings:
-            return record_known_findings(report, root, config, args.issue, apply=args.apply)
+            return record_known_findings(report, root, config, args.issue, apply=args.apply,
+                                         mech_key=mech.key)
         write_reports(report, output)
         print(f"{mech.key}: {report['evidence_items']} evidence items; "
               f"{report['quote_validated_items']} quote-validated; {len(report['errors'])} input errors")
@@ -162,7 +166,8 @@ def main(argv: list[str] | None = None) -> int:
         if report["stale_known_findings"]:
             print(f"  Stale known-findings entries: {len(report['stale_known_findings'])}")
         return exit_code(report, strict=args.strict)
-    except (EvidenceError, FleetManifestError, RepositoryConfigurationError, OSError, ValueError) as exc:
+    except (EvidenceError, FleetManifestError, RepositoryConfigurationError, OSError, ValueError,
+            RuntimeError) as exc:  # RuntimeError: the repository lock is held elsewhere
         print(f"evidence validation: {exc}", file=sys.stderr)
         return 2
 

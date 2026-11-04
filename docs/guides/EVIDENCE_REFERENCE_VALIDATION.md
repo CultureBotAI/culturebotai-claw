@@ -77,7 +77,10 @@ because a pass covers only those
 `kg-microbe-evidence-fetch --mech <mech>` is the separate, explicit command that
 adds caches; the gate never runs it. It plans from the gate's own
 `MISSING_CACHE` results, so it fetches exactly what the declared selectors cite,
-and it is a dry run unless `--apply` is given (`--limit N` makes a canary). It
+and it is a dry run unless `--apply` is given. The dry run also checks where it
+would write, so it fails wherever `--apply` would. `--limit N` makes a canary:
+when both PMIDs and DOIs are pending it covers at least one DOI, so `--limit 2`
+exercises both lookup paths. `--apply` holds the Mech's repository lock. It
 calls NCBI E-utilities anonymously, with no e-mail address or tool registration;
 `NCBI_API_KEY` only raises the rate limit and is never printed. A DOI's abstract
 is accepted only from a single PubMed record that itself lists that DOI. It
@@ -105,8 +108,9 @@ backlog without pretending the backlog is validated:
 - The key holds the quote's hash and not the item's position. Reordering a
   record keeps an entry; editing the quote makes it stale.
 - An entry whose finding no longer occurs is stale and blocks until removed, so
-  the ledger can only shrink by repair. Entries for a record that could not be
-  read are neither matched nor stale; the run fails on the read error.
+  the ledger can only shrink by repair. A record that could not be read is
+  never the reason an entry is called stale, and the run fails on the read
+  error.
 - Only quote and citation findings can be recorded (`MISSING_REFERENCE`,
   `MISSING_CACHE`, `UNSUPPORTED_REFERENCE`, `SNIPPET_NOT_IN_SOURCE`).
   `INVALID_EVIDENCE` and `INVALID_CACHE` are broken input and must be fixed.
@@ -115,7 +119,9 @@ backlog without pretending the backlog is validated:
 
 `kg-microbe-evidence --record-known-findings --issue <url>` plans the ledger
 from the current findings (keep, add, drop stale) and writes it only with
-`--apply`.
+`--apply`, holding the Mech's repository lock. A dry run that would leave a
+current finding without an owner exits 1, and `--apply` then refuses (exit 2);
+a row the writer cannot write fails the dry run too.
 
 A cached substring match does not prove that a source supports the scientific
 claim, establish the source's redistribution rights, or replace human review.

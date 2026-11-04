@@ -265,7 +265,8 @@ def _git_repo(root):
     git("-c", "core.hooksPath=/dev/null", "commit", "--allow-empty", "-qm", "fixture")
 
 
-def test_cli_records_known_findings_only_with_apply(root, monkeypatch, capsys):
+def test_cli_records_known_findings_only_with_apply(root, monkeypatch, capsys, tmp_path_factory):
+    monkeypatch.setenv("OPENCLAW_WORKSPACE", str(tmp_path_factory.mktemp("workspace")))
     _git_repo(root)
     record(root, ("PMID:1", "a paraphrase"))
     settings = {"cache_dir": "references_cache", "reference_fields": ["reference"],
@@ -402,3 +403,66 @@ def test_cli_will_not_record_findings_while_a_record_is_unreadable(root, monkeyp
     assert cli.main(["--mech", "habitatmech", "--root", str(root), "--record-known-findings",
                      "--issue", ISSUE, "--apply"]) == 2
     assert not (root / LEDGER).exists()
+
+
+# --- second review on #730 (#743, #746, #747) --------------------------------
+
+def _ledger_cli(root, monkeypatch, tmp_path_factory, *items):
+    monkeypatch.setenv("OPENCLAW_WORKSPACE", str(tmp_path_factory.mktemp("workspace")))
+    _git_repo(root)
+    record(root, *items)
+    settings = {"cache_dir": "references_cache", "reference_fields": ["reference"],
+                "snippet_fields": ["snippet"], "known_findings": LEDGER}
+    monkeypatch.setattr(cli, "load_fleet_manifest", lambda: _stub_manifest(settings))
+    return ["--mech", "habitatmech", "--root", str(root), "--record-known-findings"]
+
+
+def test_the_ledger_dry_run_fails_where_apply_would(root, monkeypatch, tmp_path_factory):
+    """#743: a row the writer refuses fails the dry run too."""
+    args = _ledger_cli(root, monkeypatch, tmp_path_factory)
+    (root / "item.yaml").write_text('evidence:\n- reference: "Smith J.\\tIron uptake 2020"\n  snippet: a line\n')
+    assert cli.main([*args, "--issue", ISSUE]) == 2
+    assert cli.main([*args, "--issue", ISSUE, "--apply"]) == 2
+    assert not (root / LEDGER).exists()
+
+
+def test_apply_refuses_to_leave_a_current_finding_without_an_owner(root, monkeypatch, tmp_path_factory, capsys):
+    """#743: --apply without --issue writes nothing while any finding is unowned."""
+    args = _ledger_cli(root, monkeypatch, tmp_path_factory, ("PMID:1", "a paraphrase"))
+    assert cli.main(args) == 1  # the dry run says so with exit 1
+    assert cli.main([*args, "--apply"]) == 2
+    assert "unrecorded" in capsys.readouterr().err
+    assert not (root / LEDGER).exists()
+
+
+class _Locks:
+    held: list[tuple[str, str]] = []
+
+    def lock(self, resource, operation):
+        import contextlib
+
+        @contextlib.contextmanager
+        def held():
+            _Locks.held.append((resource, operation))
+            yield
+        return held()
+
+
+def test_the_ledger_write_holds_the_repository_lock(root, monkeypatch, tmp_path_factory):
+    """#746: the dry run takes no lock; the write holds the Mech's lock."""
+    args = _ledger_cli(root, monkeypatch, tmp_path_factory, ("PMID:1", "a paraphrase"))
+    _Locks.held = []
+    monkeypatch.setattr(cli, "LockManager", _Locks)
+    assert cli.main([*args, "--issue", ISSUE]) == 0
+    assert _Locks.held == []
+    assert cli.main([*args, "--issue", ISSUE, "--apply"]) == 0
+    assert _Locks.held == [("habitatmech", "evidence-known-findings")]
+
+
+def test_the_writer_refuses_a_field_the_reader_cannot_read_back(root):
+    """#747: csv's field-size limit applies to reading, so the writer enforces it."""
+    import csv
+    huge = "x" * (csv.field_size_limit() + 1)
+    with pytest.raises(EvidenceError, match="longer than the ledger reader accepts"):
+        write_known_findings(root, LEDGER, [KnownFinding("item.yaml", huge, "UNSUPPORTED_REFERENCE",
+                                                         "a" * 64, ISSUE)])

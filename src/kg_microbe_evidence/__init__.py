@@ -460,6 +460,8 @@ def render_known_findings(rows: Iterable[KnownFinding]) -> str:
         values = [getattr(finding, column) for column in KNOWN_FINDING_COLUMNS]
         if any(re.search(r"[\t\r\n]", value) for value in values):
             raise EvidenceError("known finding fields must not contain tabs or line breaks")
+        if any(len(value) > csv.field_size_limit() for value in values):
+            raise EvidenceError("a known finding field is longer than the ledger reader accepts")
         try:
             writer.writerow(values)
         except csv.Error as exc:

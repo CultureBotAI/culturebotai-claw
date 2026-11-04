@@ -45,6 +45,7 @@ from kg_microbe_evidence import (
 )
 from kg_microbe_fleet import FleetManifestError, load_fleet_manifest
 from kg_microbe_fleet.roots import claw_root
+from plugins.lock_manager import LockManager
 from plugins.repository_settings import (
     RepositoryConfigurationError,
     RepositorySettings,
@@ -264,13 +265,21 @@ def fetch_missing(
     missing_pmids, missing_dois = plan(report)
     pmids, dois = missing_pmids, missing_dois
     if limit is not None:
-        pmids = pmids[:limit]
-        dois = dois[:max(0, limit - len(pmids))]
+        # A canary must take the batch's paths: when both kinds are pending,
+        # at least one DOI is covered, so --limit 2 runs both (#744). Whatever
+        # the PMIDs leave unused goes to DOIs.
+        reserve = min(len(dois), max(1, limit // 2)) if dois and pmids else 0
+        pmids = pmids[:limit - reserve]
+        dois = dois[:limit - len(pmids)]
     result = FetchResult(missing_pmids=missing_pmids, missing_dois=missing_dois,
                          planned_pmids=pmids, planned_dois=dois)
-    if not apply or not (pmids or dois):
+    if not (pmids or dois):
         return result
-    cache = _cache_root(root, config, create=True)
+    # Checked in a dry run too, so a dry run fails exactly where --apply would (#745).
+    cache = _cache_root(root, config, create=False)
+    if not apply:
+        return result
+    cache.mkdir(parents=True, exist_ok=True)
     retrieved = today or dt.datetime.now(dt.timezone.utc).date()
     session = _Session(transport, 1.0 / (rate or (KEYED_RATE if api_key else DEFAULT_RATE)), api_key, sleep)
 
@@ -343,8 +352,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.limit is not None and args.limit < 1:
         parser.error("--limit must be at least 1")
-    if args.json is not None and not args.json.parent.is_dir():
-        parser.error(f"--json directory does not exist: {args.json.parent}")
+    if args.json is not None and (not args.json.parent.is_dir() or args.json.is_dir()):
+        parser.error(f"--json must name a file in an existing directory: {args.json}")
     try:
         manifest = load_fleet_manifest()
         mech = manifest.mechs.get(args.mech)
@@ -366,14 +375,22 @@ def main(argv: list[str] | None = None) -> int:
         if report["errors"]:
             raise EvidenceError(f"{len(report['errors'])} records could not be read; the plan would be incomplete")
         try:
-            result = fetch_missing(target.path, config, report, apply=args.apply, limit=args.limit,
-                                   transport=http_transport,
-                                   api_key=os.environ.get("NCBI_API_KEY") or None)
+            def run() -> FetchResult:
+                return fetch_missing(target.path, config, report, apply=args.apply, limit=args.limit,
+                                     transport=http_transport,
+                                     api_key=os.environ.get("NCBI_API_KEY") or None)
+            if args.apply:
+                # A write into a Mech checkout holds that repository's lock (AGENTS.md, #746).
+                with LockManager().lock(mech.key, "evidence-fetch"):
+                    result = run()
+            else:
+                result = run()
             outcome, code = result.as_dict(), 0
         except FetchError as exc:
             print(f"evidence fetch: {exc}", file=sys.stderr)
             outcome, code = exc.partial, 1
-    except (EvidenceError, FleetManifestError, RepositoryConfigurationError, OSError, ValueError) as exc:
+    except (EvidenceError, FleetManifestError, RepositoryConfigurationError, OSError, ValueError,
+            RuntimeError) as exc:  # RuntimeError: the repository lock is held elsewhere
         print(f"evidence fetch: {exc}", file=sys.stderr)
         return 2
     mode = "applied" if args.apply else "dry run, nothing fetched or written"
