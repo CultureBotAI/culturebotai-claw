@@ -66,7 +66,7 @@ def test_ambiguous_or_empty_cache_body_is_not_success(source, body):
     ({"snippet": "increased growth"}, "MISSING_REFERENCE"),
     ({"pmid": "2", "snippet": "increased growth"}, "MISSING_CACHE"),
     ({"doi": "10.123/example", "snippet": "increased growth"}, "MISSING_CACHE"),
-    ({"doi": "not a doi", "snippet": "increased growth"}, "INVALID_EVIDENCE"),
+    ({"doi": "not a doi", "snippet": "increased growth"}, "UNSUPPORTED_REFERENCE"),
     ({"reference": "GITHUB:owner/project", "snippet": "increased growth"}, "UNSUPPORTED_REFERENCE"),
     ({"reference": "https://example.org/10.1/x", "snippet": "increased growth"}, "UNSUPPORTED_REFERENCE"),
     ({"pmid": "../../outside", "snippet": "increased growth"}, "INVALID_EVIDENCE"),
@@ -86,14 +86,10 @@ def test_configured_native_aliases(source):
     assert checker(source).check_item({"source_ref": "PMID:1", "quote": "increased growth"}).verdict == "NO_QUOTE"
 
 
-@pytest.mark.parametrize(("field", "verdict"), [
-    # An explicit DOI slot that names no DOI is broken input, as a bad pmid is.
-    ("doi", "INVALID_EVIDENCE"),
-    ("reference", "UNSUPPORTED_REFERENCE"),
-])
-def test_numeric_identifier_does_not_invent_a_pmid(source, field, verdict):
+@pytest.mark.parametrize("field", ["doi", "reference"])
+def test_numeric_identifier_does_not_invent_a_pmid(source, field):
     result = checker(source).check_item({field: "1", "snippet": "increased growth"})
-    assert result.verdict == verdict
+    assert result.verdict == "UNSUPPORTED_REFERENCE"
     assert "PMID" not in result.reference
 
 

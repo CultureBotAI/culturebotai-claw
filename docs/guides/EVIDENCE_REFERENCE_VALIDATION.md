@@ -56,9 +56,13 @@ of its native semantics and source/cache support.
 
 The source adapters read a retained markdown abstract for the cited PMID
 (`PMID_<n>.md`, header `# PMID:<n>`) or DOI (`DOI_<percent-encoded lowercase
-DOI>.md`, header `# DOI:<doi>`). DOIs are case-insensitive, so every spelling of
-one DOI (`doi:`, `https://doi.org/`, bare `10.x/y`) reads one cache; a citation
-that carries a PMID as well is checked against the PMID, as before DOI support.
+DOI>.md`, header `# DOI:<doi>`). DOIs are case-insensitive. The `doi:` form, the
+bare `10.<registrant>/<suffix>` form and resolver URLs (`doi.org`,
+`www.doi.org` or `dx.doi.org`, with or without a scheme) of one DOI read one
+cache; only a resolver URL is percent-decoded, because a URL encodes the DOI
+while `%` is a legal DOI character. A citation that carries a PMID is checked
+against the PMID alone, exactly as before DOI support; DOI values beside it are
+not read.
 The adapter checks source identity and matches normalized quote text inside the
 abstract body; title, authors and other metadata are not quote evidence. It
 performs no fetch, provider call or corpus repair. Citations that are neither a
@@ -86,13 +90,16 @@ remain each Mech's source policy.
 ### Known findings
 
 A profile may declare `known_findings`, a repository-relative TSV with the
-columns `record`, `reference`, `verdict`, `quote_sha256` and `issue`. It lets a
-Mech adopt the gate with an existing backlog without pretending the backlog is
-validated:
+columns `record`, `reference`, `verdict`, `quote_sha256` and `issue`. The
+capability catalogue declares that setting in the rollout release; until then
+the manifest rejects it, so the CLIs, which read profiles only from the
+manifest, cannot reach a ledger. It lets a Mech adopt the gate with an existing
+backlog without pretending the backlog is validated:
 
 - A current finding listed there is reported and counted apart, never as
   validated, and does not block. Each entry names the GitHub issue that owns
-  its repair.
+  its repair, and excuses exactly one occurrence: a copy of a recorded failing
+  quote blocks until it is recorded too.
 - A finding that is not listed blocks as before, so new or edited quotes are
   checked from the day the gate is adopted.
 - The key holds the quote's hash and not the item's position. Reordering a
@@ -103,6 +110,8 @@ validated:
 - Only quote and citation findings can be recorded (`MISSING_REFERENCE`,
   `MISSING_CACHE`, `UNSUPPORTED_REFERENCE`, `SNIPPET_NOT_IN_SOURCE`).
   `INVALID_EVIDENCE` and `INVALID_CACHE` are broken input and must be fixed.
+  A `MISSING_REFERENCE` entry has an empty `reference`, because the finding is
+  that there is none; every other entry names its citation.
 
 `kg-microbe-evidence --record-known-findings --issue <url>` plans the ledger
 from the current findings (keep, add, drop stale) and writes it only with

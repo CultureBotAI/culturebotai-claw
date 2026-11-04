@@ -193,7 +193,7 @@ GOOD = f"item.yaml\tPMID:1\tSNIPPET_NOT_IN_SOURCE\t{'a' * 64}\t{ISSUE}\n"
     HEADER + GOOD.replace("item.yaml", "../item.yaml"),
     HEADER + GOOD.replace("item.yaml", "/item.yaml"),
     HEADER + GOOD.replace("\tPMID:1\t", "\t\t"),
-    HEADER + GOOD + GOOD,
+    HEADER + GOOD.replace("SNIPPET_NOT_IN_SOURCE", "MISSING_REFERENCE"),
     HEADER + GOOD.rstrip("\n") + "\textra\n",
 ])
 def test_malformed_ledger_is_an_input_error(root, text):
@@ -201,8 +201,8 @@ def test_malformed_ledger_is_an_input_error(root, text):
     (root / LEDGER).write_text(text)
     with pytest.raises(EvidenceError):
         load_known_findings(root, LEDGER)
-    (root / LEDGER).write_text(HEADER + GOOD)
-    assert len(load_known_findings(root, LEDGER)) == 1
+    (root / LEDGER).write_text(HEADER + GOOD + GOOD)
+    assert len(load_known_findings(root, LEDGER)) == 2  # two occurrences, not a duplicate
 
 
 def test_declared_ledger_must_exist_except_when_creating_it(root):
@@ -294,3 +294,111 @@ def test_cli_refuses_to_record_without_a_declared_ledger(root, monkeypatch):
                      "--issue", ISSUE, "--apply"]) == 2
     with pytest.raises(SystemExit):
         cli.main(["--mech", "habitatmech", "--root", str(root), "--apply"])
+
+
+# --- review findings on #730 (#732 to #736, #738) ----------------------------
+
+def test_a_missing_reference_finding_round_trips_through_the_ledger(root):
+    """#732: the recorded row has an empty reference, and the loader accepts it."""
+    (root / "item.yaml").write_text("evidence:\n- snippet: a quote with no citation\n")
+    report = validate_corpus(root, ["item.yaml"], config(known_findings=LEDGER), missing_ledger_ok=True)
+    assert report["verdicts"]["MISSING_REFERENCE"] == 1
+    ledger_rows(root, report)
+    assert "\t\tMISSING_REFERENCE\t" in (root / LEDGER).read_text()
+    assert exit_code(validate_corpus(root, ["item.yaml"], config(known_findings=LEDGER)), strict=True) == 0
+
+
+def test_a_quote_character_in_a_recorded_citation_round_trips(root):
+    """#733: QUOTE_NONE with a quote character must neither crash nor alter the field."""
+    citation = 'Smith J. "Iron uptake" J Bact 2020'
+    (root / "item.yaml").write_text(f"evidence:\n- reference: '{citation}'\n  snippet: a line\n")
+    report = validate_corpus(root, ["item.yaml"], config(known_findings=LEDGER), missing_ledger_ok=True)
+    ledger_rows(root, report)
+    assert [f.reference for f in load_known_findings(root, LEDGER)] == [citation]
+    assert exit_code(validate_corpus(root, ["item.yaml"], config(known_findings=LEDGER)), strict=True) == 0
+
+
+def test_each_row_excuses_one_occurrence(root):
+    """#734: a copy of a recorded failing quote blocks until it is recorded too."""
+    one = "evidence:\n- reference: PMID:1\n  snippet: invented\n"
+    (root / "item.yaml").write_text(one)
+    ledger_rows(root, validate_corpus(root, ["item.yaml"], config(known_findings=LEDGER), missing_ledger_ok=True))
+    two = one + "other:\n  evidence:\n  - reference: PMID:1\n    snippet: invented\n"
+    (root / "item.yaml").write_text(two)
+    report = validate_corpus(root, ["item.yaml"], config(known_findings=LEDGER))
+    assert report["known_findings"]["SNIPPET_NOT_IN_SOURCE"] == 1
+    assert exit_code(report, strict=True) == 2
+    ledger_rows(root, report)
+    assert len(load_known_findings(root, LEDGER)) == 2
+    assert exit_code(validate_corpus(root, ["item.yaml"], config(known_findings=LEDGER)), strict=True) == 0
+    (root / "item.yaml").write_text(one)
+    report = validate_corpus(root, ["item.yaml"], config(known_findings=LEDGER))
+    assert len(report["stale_known_findings"]) == 1 and exit_code(report, strict=True) == 2
+
+
+@pytest.mark.parametrize("value", [
+    "https://www.doi.org/10.1000/abc", "doi.org/10.1000/abc", "DOI 10.1000/abc", "N/A", "PMID:1",
+    "doi:10.1000/one", "",
+])
+def test_a_pmid_is_checked_exactly_as_before_whatever_its_doi_slot_holds(root, value):
+    """#736: with MIM's profile, nothing in the doi slot changes a PMID-cited verdict."""
+    for quote, verdict in (("growth increased", "OK"), ("yield doubled", "SNIPPET_NOT_IN_SOURCE")):
+        result = check(root, {"pmid": "1", "doi": value, "snippet": quote,
+                              "reference": "doi:10.1000/two"})
+        assert (result.verdict, result.reference) == (verdict, "PMID:1")
+
+
+@pytest.mark.parametrize(("citation", "doi"), [
+    ("https://www.doi.org/10.1000/ABC", "10.1000/abc"),
+    ("doi.org/10.1000/abc", "10.1000/abc"),
+    ("www.doi.org/10.1000/abc", "10.1000/abc"),
+    ("https://doi.org/10.1002/%28SICI%29", "10.1002/(sici)"),
+    ("doi:10.1002/%28SICI%29", "10.1002/%28sici%29"),
+    ("10.1002/%28SICI%29", "10.1002/%28sici%29"),
+])
+def test_only_resolver_urls_are_percent_decoded(citation, doi):
+    assert normalize_doi(citation) == doi
+
+
+def test_ledger_writer_refuses_tabs_and_line_breaks(root):
+    for bad in ("a\tb", "a\nb", "a\rb"):
+        with pytest.raises(EvidenceError, match="tabs or line breaks"):
+            write_known_findings(root, LEDGER, [KnownFinding("item.yaml", bad, "UNSUPPORTED_REFERENCE",
+                                                             "a" * 64, ISSUE)])
+    assert not (root / LEDGER).exists()
+
+
+def test_a_symlinked_ledger_directory_is_refused(root, tmp_path_factory):
+    outside = tmp_path_factory.mktemp("outside")
+    (outside / "evidence_known_findings.tsv").write_text(HEADER)
+    (root / "curation").symlink_to(outside, target_is_directory=True)
+    with pytest.raises(EvidenceError, match="symlink"):
+        load_known_findings(root, LEDGER)
+    with pytest.raises(EvidenceError, match="symlink"):
+        write_known_findings(root, LEDGER, [])
+
+
+def test_cli_reports_the_quote_bearing_share(root, monkeypatch, capsys):
+    _git_repo(root)
+    (root / "item.yaml").write_text(
+        "evidence:\n- reference: PMID:1\n  snippet: growth increased\n- reference: PMID:1\n")
+    settings = {"cache_dir": "references_cache", "reference_fields": ["reference"], "snippet_fields": ["snippet"]}
+    monkeypatch.setattr(cli, "load_fleet_manifest", lambda: _stub_manifest(settings))
+    assert cli.main(["--mech", "habitatmech", "--root", str(root), "--strict"]) == 0
+    share = "Quote-bearing items: 1 of 2 in-scope evidence items (50.0%)"
+    assert share in capsys.readouterr().out
+    assert share in (root / "workspace/reports/evidence_reference_validation.md").read_text()
+
+
+def test_cli_will_not_record_findings_while_a_record_is_unreadable(root, monkeypatch):
+    _git_repo(root)
+    record(root, ("PMID:1", "a paraphrase"))
+    (root / "broken.yaml").write_text("evidence: [\n")
+    settings = {"cache_dir": "references_cache", "reference_fields": ["reference"],
+                "snippet_fields": ["snippet"], "known_findings": LEDGER}
+    stub = _stub_manifest(settings)
+    stub.mechs["habitatmech"].record_globs = ("*.yaml",)
+    monkeypatch.setattr(cli, "load_fleet_manifest", lambda: stub)
+    assert cli.main(["--mech", "habitatmech", "--root", str(root), "--record-known-findings",
+                     "--issue", ISSUE, "--apply"]) == 2
+    assert not (root / LEDGER).exists()

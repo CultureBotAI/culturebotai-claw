@@ -55,9 +55,10 @@ pinned revision and binds validation to the Mech worktree containing it.
 Supported sources are PMID and DOI Markdown caches: `PMID_<n>.md` with a
 matching `# PMID:<n>` header, or `DOI_<percent-encoded lowercase DOI>.md` with a
 matching `# DOI:<doi>` header, each with exactly one nonempty `## Abstract`
-section. DOIs are case-insensitive, so the `doi:`, `https://doi.org/` and bare
-spellings of one DOI read one cache. A citation carrying both a PMID and
-a DOI is checked against the PMID. A quote is compared only with that abstract
+section. DOIs are case-insensitive, and the `doi:`, bare and resolver-URL
+(`doi.org`, `www.doi.org`, `dx.doi.org`) spellings of one DOI read one cache;
+only a URL is percent-decoded. A citation that carries a PMID is checked against
+the PMID alone; DOI values beside it are not read. A quote is compared only with that abstract
 body, using NFKC normalization, collapsed whitespace and lowercase. Titles,
 metadata and curator notes cannot establish a match. Manifest settings declare
 cache location and evidence/reference/quote field aliases.
@@ -76,7 +77,7 @@ Evidence-field presence or an enabled capability alone does not certify them.
 | `MISSING_REFERENCE` | Quote has no citation | Fail |
 | `MISSING_CACHE` | Cited PMID or DOI cache is absent | Fail with `--strict` |
 | `UNSUPPORTED_REFERENCE` | Citation is neither a PMID nor a DOI (a database record, URL or free text) | Fail with `--strict` |
-| `INVALID_EVIDENCE` | Malformed or conflicting evidence fields, including a `pmid` or `doi` slot that names none | Fail |
+| `INVALID_EVIDENCE` | Malformed or conflicting evidence fields, including a `pmid` slot that names no PMID | Fail |
 | `INVALID_CACHE` | Cache identity/body is invalid or ambiguous | Fail |
 | `SNIPPET_NOT_IN_SOURCE` | Quote is absent from the abstract body | Fail |
 
@@ -116,8 +117,11 @@ committing caches.
 
 A Mech whose profile declares `known_findings` keeps a TSV
 (`record`, `reference`, `verdict`, `quote_sha256`, `issue`) of existing findings
-whose repair an issue owns. A finding listed there is reported, counted apart
-and never shown as validated, but does not block. Any finding not listed still
+whose repair an issue owns; the rollout release declares the setting in the
+manifest catalogue, and the manifest rejects it before that. A finding listed
+there is reported, counted apart and never shown as validated, but does not
+block. Each row excuses exactly one occurrence, so a copy of a recorded failing
+quote blocks until it is recorded too. Any finding not listed still
 blocks, and an entry whose finding no longer occurs is stale and blocks until it
 is removed, so the ledger can only shrink by repair. Only quote or citation
 findings can be recorded (`MISSING_REFERENCE`, `MISSING_CACHE`,

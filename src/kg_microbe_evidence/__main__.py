@@ -16,6 +16,7 @@ from kg_microbe_evidence import (
     EvidenceError,
     exit_code,
     plan_known_findings,
+    render_known_findings,
     validate_corpus,
     write_known_findings,
 )
@@ -90,6 +91,7 @@ def record_known_findings(report: dict, root: Path, config: EvidenceConfig,
     if report["errors"]:
         raise EvidenceError(f"{len(report['errors'])} records could not be read; fix them before recording findings")
     plan = plan_known_findings(report, issue)
+    render_known_findings(plan["rows"])  # a row the writer would refuse fails the dry run too
     print(f"{config.known_findings}: keep {plan['kept']}, add {plan['added']}, drop {plan['dropped']} stale; "
           f"{len(plan['rows'])} entries after the update")
     if plan["unowned"]:

@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import subprocess
 import urllib.parse
+from types import SimpleNamespace
 
 import pytest
 
@@ -23,15 +25,18 @@ from kg_microbe_evidence import fetch as fetcher
 TODAY = dt.date(2026, 11, 3)
 
 
-def article(pmid, abstract="Growth increased under iron.", doi=None, label=None):
+def article(pmid, abstract="Growth increased under iron.", doi=None, label=None, cited_doi=None):
     text = f'<AbstractText Label="{label}">{abstract}</AbstractText>' if label else f"<AbstractText>{abstract}</AbstractText>"
     body = f"<Abstract>{text}</Abstract>" if abstract else ""
     location = f'<ELocationID EIdType="doi">{doi}</ELocationID>' if doi else ""
+    # A record's reference list carries the DOIs of the papers it cites.
+    references = (f'<ReferenceList><Reference><ArticleIdList><ArticleId IdType="doi">{cited_doi}'
+                  f"</ArticleId></ArticleIdList></Reference></ReferenceList>") if cited_doi else ""
     return (f"<PubmedArticle><MedlineCitation><PMID>{pmid}</PMID><Article>"
             f"<Journal><Title>J</Title><JournalIssue><PubDate><Year>2020</Year></PubDate></JournalIssue></Journal>"
             f"<ArticleTitle>Title {pmid}</ArticleTitle>{location}{body}"
             f"<AuthorList><Author><LastName>Doe</LastName><Initials>J</Initials></Author></AuthorList>"
-            f"</Article></MedlineCitation></PubmedArticle>")
+            f"</Article></MedlineCitation><PubmedData>{references}</PubmedData></PubmedArticle>")
 
 
 class FakeNCBI:
@@ -50,7 +55,8 @@ class FakeNCBI:
             raise OSError("connection reset")
         if url == fetcher.ESEARCH:
             doi = params["term"].split('"')[1]
-            return json.dumps({"esearchresult": {"idlist": self.search.get(doi, [])}}).encode()
+            ids = self.search.get(doi, [])[: int(params["retmax"])]  # PubMed honours retmax
+            return json.dumps({"esearchresult": {"idlist": ids}}).encode()
         ids = params["id"].split(",")
         found = "".join(self.articles[i] for i in ids if i in self.articles)
         return f"<PubmedArticleSet>{found}</PubmedArticleSet>".encode()
@@ -92,6 +98,7 @@ def test_written_pmid_cache_is_read_back_by_the_gate(tmp_path):
     assert cached.stat().st_mode & 0o777 == 0o644
     text = cached.read_text()
     assert text.startswith("# PMID:2\n") and "retrieved 2026-11-03" in text
+    assert "https://pubmed.ncbi.nlm.nih.gov/2/" in text
     after = validate_corpus(tmp_path, ["item.yaml"], CONFIG)
     assert after["verdicts"]["OK"] == 1 and after["verdicts"]["MISSING_CACHE"] == 2
     assert len(ncbi.calls) == 1  # one batched efetch for three PMIDs
@@ -172,13 +179,25 @@ def test_failure_after_retries_reports_partial_work_without_the_key(tmp_path):
     assert calls["n"] == 1 + fetcher.ATTEMPTS
 
 
-def test_retry_recovers_and_rate_limits(tmp_path):
+@pytest.mark.parametrize(("api_key", "pause"), [(None, 1 / 3), ("k", 1 / 10)])
+def test_successive_requests_are_spaced_at_ncbis_published_rate(tmp_path, api_key, pause):
+    """#737: three requests (PMID efetch, DOI esearch, DOI efetch) give exactly two pauses."""
+    report = corpus(tmp_path, "PMID:2", "doi:10.1000/good")
+    pauses = []
+    ncbi = FakeNCBI([article(2), article(7, doi="10.1000/good")], search={"10.1000/good": ["7"]})
+    fetcher.fetch_missing(tmp_path, CONFIG, report, transport=ncbi, apply=True,
+                          sleep=pauses.append, today=TODAY, api_key=api_key)
+    assert len(ncbi.calls) == 3
+    assert pauses == [pytest.approx(pause)] * 2
+
+
+def test_a_failed_request_backs_off_before_retrying(tmp_path):
     report = corpus(tmp_path, "PMID:2")
     pauses = []
     result = fetcher.fetch_missing(tmp_path, CONFIG, report, transport=FakeNCBI([article(2)], fail=1),
-                                   apply=True, sleep=pauses.append, today=TODAY, api_key="k")
+                                   apply=True, sleep=pauses.append, today=TODAY)
     assert result.written == ["PMID:2"]
-    assert pauses and all(p > 0 for p in pauses)
+    assert pauses == [pytest.approx(2 / 3), pytest.approx(1 / 3)]  # back-off, then the rate pause
 
 
 def test_api_key_is_sent_as_a_parameter_and_identity_is_anonymous(tmp_path):
@@ -189,10 +208,12 @@ def test_api_key_is_sent_as_a_parameter_and_identity_is_anonymous(tmp_path):
     assert "email" not in ncbi.calls[0][1] and "@" not in fetcher.USER_AGENT
 
 
-def test_limit_is_a_canary(tmp_path):
+def test_limit_is_a_canary_that_still_reports_everything_missing(tmp_path):
+    """#740: --limit narrows what this run covers, not what it reports as missing."""
     report = corpus(tmp_path, "PMID:2", "PMID:3", "doi:10.1000/x")
     result = fetcher.fetch_missing(tmp_path, CONFIG, report, limit=1)
     assert (result.planned_pmids, result.planned_dois) == (["2"], [])
+    assert (result.missing_pmids, result.missing_dois) == (["2", "3"], ["10.1000/x"])
 
 
 def test_http_transport_posts_form_parameters(monkeypatch):
@@ -222,3 +243,135 @@ def test_written_doi_cache_survives_validator_identity_rules(tmp_path):
     run(tmp_path, report, FakeNCBI([article(7, doi="10.1000/a:b")], search={"10.1000/a:b": ["7"]}))
     validator = EvidenceValidator(tmp_path, CONFIG)
     assert validator.check_item({"reference": "doi:10.1000/a:b", "snippet": "growth increased"}).verdict == "OK"
+
+
+# --- review findings on #730 (#738, #739) ------------------------------------
+
+def test_the_plan_is_exactly_the_gates_missing_caches(tmp_path):
+    """#738: a cached source (matching or not) or a broken cache is never refetched."""
+    cache = tmp_path / "references_cache"
+    cache.mkdir()
+    (cache / "PMID_1.md").write_text("# PMID:1\n\n## Abstract\n\nGrowth increased.\n")
+    (cache / "PMID_5.md").write_text("not a cache file")
+    (tmp_path / "item.yaml").write_text(
+        "evidence:\n"
+        "- reference: PMID:1\n  snippet: growth increased\n"
+        "- reference: PMID:1\n  snippet: something else\n"
+        "- reference: PMID:2\n  snippet: growth increased\n"
+        "- reference: PMID:5\n  snippet: growth increased\n"
+        "- reference: UniProtKB:P1\n  snippet: growth increased\n")
+    report = validate_corpus(tmp_path, ["item.yaml"], CONFIG)
+    assert {r["verdict"] for r in report["results"]} == {
+        "OK", "SNIPPET_NOT_IN_SOURCE", "MISSING_CACHE", "INVALID_CACHE", "UNSUPPORTED_REFERENCE"}
+    assert fetcher.plan(report) == (["2"], [])
+
+
+def test_a_doi_in_the_records_reference_list_is_not_its_own(tmp_path):
+    """#738: only the record's own ELocationID and ArticleIdList identify it."""
+    report = corpus(tmp_path, "doi:10.1000/cited")
+    ncbi = FakeNCBI([article(7, doi="10.1000/own", cited_doi="10.1000/cited")],
+                    search={"10.1000/cited": ["7"]})
+    result = run(tmp_path, report, ncbi)
+    assert result.doi_unverified == ["DOI:10.1000/cited"] and result.written == []
+
+
+@pytest.mark.parametrize("reply", [b"[]", b'{"esearchresult": []}', b'{"esearchresult": {"idlist": "7"}}',
+                                   b'{"esearchresult": {"idlist": ["seven"]}}', b"not json"])
+def test_a_malformed_search_reply_stops_with_the_partial_result(tmp_path, reply):
+    """#739: no traceback, and what was already written is still reported."""
+    report = corpus(tmp_path, "PMID:2", "doi:10.1000/x")
+    ncbi = FakeNCBI([article(2)])
+
+    def transport(url, params):
+        return reply if url == fetcher.ESEARCH else ncbi(url, params)
+    with pytest.raises(fetcher.FetchError) as raised:
+        run(tmp_path, report, transport)
+    assert raised.value.partial["written"] == ["PMID:2"]
+
+
+def test_a_rejected_query_names_no_record(tmp_path):
+    report = corpus(tmp_path, "doi:10.1000/x")
+    result = run(tmp_path, report, lambda url, params: b'{"esearchresult": {"ERROR": "bad query"}}')
+    assert result.doi_unresolved == ["DOI:10.1000/x"]
+
+
+# --- the fetch CLI (#738) ----------------------------------------------------
+
+def _repo(root):
+    def git(*args):
+        subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True)
+    git("init", "-q")
+    git("config", "user.name", "Test")
+    git("config", "user.email", "test")  # git does not require an address here
+    git("remote", "add", "origin", "https://github.com/CultureBotAI/HabitatMech.git")
+    git("-c", "core.hooksPath=/dev/null", "commit", "--allow-empty", "-qm", "fixture")
+
+
+def _manifest(enabled=True, globs=("item.yaml",), cache_dir="references_cache"):
+    settings = {"cache_dir": cache_dir, "reference_fields": ["reference"], "snippet_fields": ["snippet"]}
+    capability = SimpleNamespace(is_enabled=enabled, settings=settings, reason="measured reason")
+    mech = SimpleNamespace(key="habitatmech", github="CultureBotAI/HabitatMech", record_globs=globs,
+                           capability=lambda name: capability)
+    return SimpleNamespace(mechs={"habitatmech": mech})
+
+
+@pytest.fixture
+def cli_root(tmp_path, monkeypatch):
+    _repo(tmp_path)
+    corpus(tmp_path, "PMID:2")
+    monkeypatch.setattr(fetcher, "load_fleet_manifest", lambda: _manifest())
+    monkeypatch.setattr(fetcher, "http_transport", FakeNCBI([article(2)]))
+    monkeypatch.setattr(fetcher.time, "sleep", lambda _: None)
+    return tmp_path
+
+
+def test_cli_dry_run_reports_the_plan_and_writes_nothing(cli_root, capsys):
+    assert fetcher.main(["--mech", "habitatmech", "--root", str(cli_root)]) == 0
+    assert "1 PMIDs and 0 DOIs lack a cache; this run covers 1 and 0" in capsys.readouterr().out
+    assert not (cli_root / "references_cache").exists()
+
+
+def test_cli_apply_writes_and_exits_zero(cli_root):
+    assert fetcher.main(["--mech", "habitatmech", "--root", str(cli_root), "--apply"]) == 0
+    assert (cli_root / "references_cache/PMID_2.md").is_file()
+
+
+def test_cli_exits_one_when_requests_fail(cli_root, monkeypatch, capsys):
+    def down(url, params):
+        raise OSError("down")
+    monkeypatch.setattr(fetcher, "http_transport", down)
+    assert fetcher.main(["--mech", "habitatmech", "--root", str(cli_root), "--apply"]) == 1
+    assert "fetch stopped" in capsys.readouterr().err
+
+
+def test_cli_refuses_unreadable_records(cli_root, monkeypatch):
+    (cli_root / "broken.yaml").write_text("evidence: [\n")
+    monkeypatch.setattr(fetcher, "load_fleet_manifest", lambda: _manifest(globs=("*.yaml",)))
+    assert fetcher.main(["--mech", "habitatmech", "--root", str(cli_root), "--apply"]) == 2
+    assert not (cli_root / "references_cache").exists()
+
+
+def test_cli_refuses_to_write_through_a_symlinked_parent(cli_root, monkeypatch):
+    """A symlinked cache_dir itself is already INVALID_CACHE to the gate, so nothing is
+    planned. A symlinked parent inside the repository leaves the items MISSING_CACHE,
+    and the fetcher must still refuse to write through it."""
+    (cli_root / "elsewhere").mkdir()
+    (cli_root / "sources").symlink_to(cli_root / "elsewhere", target_is_directory=True)
+    monkeypatch.setattr(fetcher, "load_fleet_manifest", lambda: _manifest(cache_dir="sources/abstracts"))
+    assert fetcher.main(["--mech", "habitatmech", "--root", str(cli_root)]) == 0  # the plan is not empty
+    assert fetcher.main(["--mech", "habitatmech", "--root", str(cli_root), "--apply"]) == 2
+    assert list((cli_root / "elsewhere").iterdir()) == []
+
+
+def test_cli_refuses_a_disabled_mech(cli_root, monkeypatch, capsys):
+    monkeypatch.setattr(fetcher, "load_fleet_manifest", lambda: _manifest(enabled=False))
+    assert fetcher.main(["--mech", "habitatmech", "--root", str(cli_root)]) == 2
+    assert "measured reason" in capsys.readouterr().err
+
+
+def test_cli_checks_the_json_destination_before_any_work(cli_root):
+    with pytest.raises(SystemExit) as raised:
+        fetcher.main(["--mech", "habitatmech", "--root", str(cli_root), "--apply",
+                      "--json", str(cli_root / "missing-dir/out.json")])
+    assert raised.value.code == 2
+    assert not (cli_root / "references_cache").exists()

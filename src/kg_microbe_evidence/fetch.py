@@ -43,6 +43,14 @@ from kg_microbe_evidence import (
     parse_cache_text,
     validate_corpus,
 )
+from kg_microbe_fleet import FleetManifestError, load_fleet_manifest
+from kg_microbe_fleet.roots import claw_root
+from plugins.repository_settings import (
+    RepositoryConfigurationError,
+    RepositorySettings,
+    RepositoryTarget,
+    merged_repository_environment,
+)
 
 EFETCH = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
 ESEARCH = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
@@ -139,6 +147,19 @@ def render(kind: str, identifier: str, article: Article, retrieved: dt.date) -> 
     return text
 
 
+def _search_ids(payload: bytes) -> list[str]:
+    """PMIDs from one esearch reply; a malformed reply is an error, not "no match" (#739)."""
+    data = json.loads(payload)
+    result = data.get("esearchresult") if isinstance(data, dict) else None
+    if not isinstance(result, dict):
+        raise ValueError("esearch reply has no esearchresult object")
+    # A query PubMed rejects carries an error and no idlist: it names no record.
+    ids = result.get("idlist", [])
+    if not isinstance(ids, list) or any(not isinstance(i, str) or not i.isdigit() for i in ids):
+        raise ValueError("esearch reply has a malformed idlist")
+    return ids
+
+
 def plan(report: Mapping[str, Any]) -> tuple[list[str], list[str]]:
     """Exactly the PMIDs and DOIs the gate reported as MISSING_CACHE."""
     pmids: set[str] = set()
@@ -180,6 +201,10 @@ class _Session:
 
 @dataclass
 class FetchResult:
+    # Everything the gate reports as uncached, and the part this run covers;
+    # they differ only under --limit (#740).
+    missing_pmids: list[str] = field(default_factory=list)
+    missing_dois: list[str] = field(default_factory=list)
     planned_pmids: list[str] = field(default_factory=list)
     planned_dois: list[str] = field(default_factory=list)
     written: list[str] = field(default_factory=list)
@@ -236,11 +261,13 @@ def fetch_missing(
     api_key: str | None = None, rate: float | None = None,
     sleep: Callable[[float], None] = time.sleep, today: dt.date | None = None,
 ) -> FetchResult:
-    pmids, dois = plan(report)
+    missing_pmids, missing_dois = plan(report)
+    pmids, dois = missing_pmids, missing_dois
     if limit is not None:
         pmids = pmids[:limit]
         dois = dois[:max(0, limit - len(pmids))]
-    result = FetchResult(planned_pmids=pmids, planned_dois=dois)
+    result = FetchResult(missing_pmids=missing_pmids, missing_dois=missing_dois,
+                         planned_pmids=pmids, planned_dois=dois)
     if not apply or not (pmids or dois):
         return result
     cache = _cache_root(root, config, create=True)
@@ -283,8 +310,7 @@ def fetch_missing(
                 continue
             payload = session.call(ESEARCH, {"db": "pubmed", "term": f'"{doi}"[doi]',
                                              "retmode": "json", "retmax": "2"})
-            # A query PubMed rejects names no record; it does not stop the run.
-            ids = json.loads(payload)["esearchresult"].get("idlist") or []
+            ids = _search_ids(payload)
             if not ids:
                 result.doi_unresolved.append(f"DOI:{doi}")
             elif len(ids) > 1:
@@ -308,15 +334,6 @@ def fetch_missing(
 
 
 def main(argv: list[str] | None = None) -> int:
-    from kg_microbe_fleet import FleetManifestError, load_fleet_manifest
-    from kg_microbe_fleet.roots import claw_root
-    from plugins.repository_settings import (
-        RepositoryConfigurationError,
-        RepositorySettings,
-        RepositoryTarget,
-        merged_repository_environment,
-    )
-
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--mech", required=True)
     parser.add_argument("--root", type=Path, help="exact active Mech checkout, with origin identity verified")
@@ -326,6 +343,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.limit is not None and args.limit < 1:
         parser.error("--limit must be at least 1")
+    if args.json is not None and not args.json.parent.is_dir():
+        parser.error(f"--json directory does not exist: {args.json.parent}")
     try:
         manifest = load_fleet_manifest()
         mech = manifest.mechs.get(args.mech)
@@ -348,6 +367,7 @@ def main(argv: list[str] | None = None) -> int:
             raise EvidenceError(f"{len(report['errors'])} records could not be read; the plan would be incomplete")
         try:
             result = fetch_missing(target.path, config, report, apply=args.apply, limit=args.limit,
+                                   transport=http_transport,
                                    api_key=os.environ.get("NCBI_API_KEY") or None)
             outcome, code = result.as_dict(), 0
         except FetchError as exc:
@@ -357,14 +377,19 @@ def main(argv: list[str] | None = None) -> int:
         print(f"evidence fetch: {exc}", file=sys.stderr)
         return 2
     mode = "applied" if args.apply else "dry run, nothing fetched or written"
-    print(f"{mech.key} ({mode}): {len(outcome['planned_pmids'])} PMIDs and "
-          f"{len(outcome['planned_dois'])} DOIs lack a cache")
+    print(f"{mech.key} ({mode}): {len(outcome['missing_pmids'])} PMIDs and "
+          f"{len(outcome['missing_dois'])} DOIs lack a cache; this run covers "
+          f"{len(outcome['planned_pmids'])} and {len(outcome['planned_dois'])}")
     for name in ("written", "skipped_existing", "no_abstract", "not_found", "doi_unresolved",
                  "doi_ambiguous", "doi_unverified", "unrenderable"):
         if outcome[name]:
             print(f"  {name}: {len(outcome[name])}")
     if args.json is not None:
-        args.json.write_text(json.dumps(outcome, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        try:
+            args.json.write_text(json.dumps(outcome, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        except OSError as exc:
+            print(f"evidence fetch: could not write {args.json}: {exc}", file=sys.stderr)
+            return max(code, 2)
     return code
 
 

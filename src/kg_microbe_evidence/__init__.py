@@ -15,7 +15,7 @@ import re
 import tempfile
 import unicodedata
 import urllib.parse
-from collections import Counter
+from collections import Counter, defaultdict
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path, PurePosixPath
@@ -42,7 +42,9 @@ KNOWN_FINDING_COLUMNS = ("record", "reference", "verdict", "quote_sha256", "issu
 _FIELD = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
 _PATH = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(?:\[\])?(?:\.[A-Za-z_][A-Za-z0-9_]*(?:\[\])?)*\Z")
 _PMID = re.compile(r"(?:PMID:)?([0-9]+)\Z", re.IGNORECASE)
-_DOI_PREFIX = re.compile(r"\A(?:doi:\s*|https?://(?:dx\.)?doi\.org/)", re.IGNORECASE)
+_DOI_SCHEME = re.compile(r"\Adoi:\s*", re.IGNORECASE)
+# A resolver URL carries the DOI percent-encoded as a URL path (RFC 3986).
+_DOI_RESOLVER = re.compile(r"\A(?:https?://)?(?:www\.|dx\.)?doi\.org/", re.IGNORECASE)
 # Directory indicator 10, a registrant code with optional subdivisions, a suffix.
 _DOI = re.compile(r"10\.[0-9]+(?:\.[0-9]+)*/\S+\Z")
 _ISSUE = re.compile(r"https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/issues/[1-9][0-9]*\Z")
@@ -65,10 +67,17 @@ def normalize_doi(value: str) -> str | None:
 
     DOIs are case-insensitive, so `DOI:10.1/AB` and `https://doi.org/10.1/ab`
     name one source and one cache file. A bare `10.<registrant>/<suffix>` is
-    unambiguous DOI syntax; percent-encoding in a URL is kept literally rather
-    than guessed at.
+    unambiguous DOI syntax. A resolver URL (`doi.org`, `www.doi.org`,
+    `dx.doi.org`, with or without a scheme) encodes the DOI as a URL path, so
+    only that form is percent-decoded; `doi:` and bare forms are taken
+    literally, because `%` is a legal DOI character.
     """
-    text = _DOI_PREFIX.sub("", value.strip(), count=1)
+    text = value.strip()
+    resolver = _DOI_RESOLVER.match(text)
+    if resolver:
+        text = urllib.parse.unquote(text[resolver.end():])
+    else:
+        text = _DOI_SCHEME.sub("", text, count=1)
     return text.lower() if _DOI.fullmatch(text) else None
 
 
@@ -293,15 +302,15 @@ class EvidenceValidator:
             if field != "doi" and match and (field == "pmid" or ref.upper().startswith("PMID:")):
                 pmids.add(match.group(1))
                 continue
+            # A value that names no DOI is simply not a DOI citation, as before
+            # DOI support; it is never an input error of its own (#736).
             doi = normalize_doi(ref)
-            if field == "doi" and doi is None:
-                return QuoteResult("INVALID_EVIDENCE", detail="doi must identify a DOI", quote_sha256=quote_hash)
             if doi is not None:
                 dois.add(doi)
         if len(pmids) > 1:
             return QuoteResult("INVALID_EVIDENCE", detail="Conflicting PMID references", quote_sha256=quote_hash)
-        # A PMID is the more specific identifier and keeps precedence, so a
-        # record citing both is checked exactly as it was before DOI support.
+        # A PMID keeps absolute precedence: DOI values beside it are not read,
+        # so an item citing a PMID is checked exactly as before DOI support.
         if pmids:
             kind, identifier = "PMID", next(iter(pmids))
         elif len(dois) > 1:
@@ -345,11 +354,13 @@ def iter_evidence(document: object, fields: Sequence[str], path: str = "$", *, _
 
 @dataclass(frozen=True)
 class KnownFinding:
-    """One recorded, issue-owned finding the gate reports without blocking on.
+    """One recorded occurrence of an issue-owned finding, reported without blocking.
 
-    The key leaves out the item's position, so reordering a record does not
-    disturb it, and includes the quote's hash, so editing the quote makes the
-    entry stale and the new text is checked like any other.
+    Each row excuses exactly one occurrence: two identical failing items need
+    two rows, and a copy of a recorded quote blocks until it is recorded too
+    (#734). The key leaves out the item's position, so reordering a record does
+    not disturb it, and includes the quote's hash, so editing the quote makes
+    the entry stale and the new text is checked like any other.
     """
 
     record: str
@@ -374,7 +385,7 @@ def _ledger_path(root: Path, relative: str) -> Path:
     return path
 
 
-def load_known_findings(root: Path, relative: str, *, missing_ok: bool = False) -> dict[tuple[str, str, str, str], KnownFinding]:
+def load_known_findings(root: Path, relative: str, *, missing_ok: bool = False) -> list[KnownFinding]:
     """Parse a declared ledger strictly; a declared but absent ledger is an error.
 
     `missing_ok` exists only so the ledger writer can create the first one.
@@ -384,12 +395,15 @@ def load_known_findings(root: Path, relative: str, *, missing_ok: bool = False) 
         text = path.read_text(encoding="utf-8")
     except FileNotFoundError as exc:
         if missing_ok:
-            return {}
+            return []
         raise EvidenceError(f"declared known_findings ledger is missing: {relative}") from exc
-    rows = list(csv.reader(io.StringIO(text), delimiter="\t", quoting=csv.QUOTE_NONE, strict=True))
+    try:
+        rows = list(csv.reader(io.StringIO(text), delimiter="\t", quoting=csv.QUOTE_NONE, strict=True))
+    except csv.Error as exc:
+        raise EvidenceError(f"{relative}: {exc}") from exc
     if not rows or tuple(rows[0]) != KNOWN_FINDING_COLUMNS:
         raise EvidenceError(f"{relative}: header must be {', '.join(KNOWN_FINDING_COLUMNS)}")
-    findings: dict[tuple[str, str, str, str], KnownFinding] = {}
+    findings: list[KnownFinding] = []
     for number, row in enumerate(rows[1:], start=2):
         if len(row) != len(KNOWN_FINDING_COLUMNS):
             raise EvidenceError(f"{relative}:{number}: expected {len(KNOWN_FINDING_COLUMNS)} tab-separated fields")
@@ -398,32 +412,33 @@ def load_known_findings(root: Path, relative: str, *, missing_ok: bool = False) 
         if (not finding.record or record.is_absolute() or ".." in record.parts
                 or str(record) != finding.record):
             raise EvidenceError(f"{relative}:{number}: record must be a normalized repository-relative path")
-        if not finding.reference:
-            raise EvidenceError(f"{relative}:{number}: reference is required")
         if finding.verdict not in KNOWN_FINDING_VERDICTS:
             raise EvidenceError(f"{relative}:{number}: {finding.verdict!r} cannot be recorded as a known finding")
+        # A MISSING_REFERENCE finding has no citation by definition; every
+        # other recordable finding names the citation it failed on (#732).
+        if (finding.verdict == "MISSING_REFERENCE") != (finding.reference == ""):
+            raise EvidenceError(f"{relative}:{number}: reference must be empty exactly for MISSING_REFERENCE")
         if not _SHA256.fullmatch(finding.quote_sha256):
             raise EvidenceError(f"{relative}:{number}: quote_sha256 must be a lowercase SHA-256 digest")
         if not _ISSUE.fullmatch(finding.issue):
             raise EvidenceError(f"{relative}:{number}: issue must be a GitHub issue URL")
-        if finding.key in findings:
-            raise EvidenceError(f"{relative}:{number}: duplicate known finding")
-        findings[finding.key] = finding
+        findings.append(finding)
     return findings
 
 
 def plan_known_findings(report: Mapping[str, Any], issue: str | None) -> dict[str, Any]:
-    """The ledger the current findings imply: kept, added (owned by `issue`), dropped."""
+    """The ledger the current findings imply, one row per occurrence.
+
+    Rows still matched keep their owner, new findings are owned by `issue`, and
+    stale rows are dropped.
+    """
     if issue is not None and not _ISSUE.fullmatch(issue):
         raise EvidenceError("issue must be a GitHub issue URL")
-    rows: dict[tuple[str, str, str, str], KnownFinding] = {}
+    rows: list[KnownFinding] = []
     kept = added = 0
     unowned: list[dict[str, Any]] = []
     for row in report["results"]:
         if row["verdict"] not in KNOWN_FINDING_VERDICTS:
-            continue
-        key = (row["record"], row["reference"], row["verdict"], row["quote_sha256"])
-        if key in rows:
             continue
         owner = row.get("known_issue") or issue
         if owner is None:
@@ -431,26 +446,35 @@ def plan_known_findings(report: Mapping[str, Any], issue: str | None) -> dict[st
             continue
         kept += bool(row.get("known_issue"))
         added += not row.get("known_issue")
-        rows[key] = KnownFinding(*key, owner)
-    return {"rows": sorted(rows.values(), key=lambda f: f.key), "kept": kept, "added": added,
+        rows.append(KnownFinding(row["record"], row["reference"], row["verdict"], row["quote_sha256"], owner))
+    return {"rows": sorted(rows, key=lambda f: (f.key, f.issue)), "kept": kept, "added": added,
             "dropped": len(report.get("stale_known_findings", [])), "unowned": unowned}
 
 
-def write_known_findings(root: Path, relative: str, rows: Iterable[KnownFinding]) -> Path:
-    """Replace the ledger atomically; a field containing a tab or newline is refused."""
-    path = _ledger_path(root, relative)
+def render_known_findings(rows: Iterable[KnownFinding]) -> str:
+    """The ledger as TSV. Quote characters are literal (#733); tabs and breaks are refused."""
     buffer = io.StringIO()
-    writer = csv.writer(buffer, delimiter="\t", quoting=csv.QUOTE_NONE, lineterminator="\n")
+    writer = csv.writer(buffer, delimiter="\t", quoting=csv.QUOTE_NONE, quotechar=None, lineterminator="\n")
     writer.writerow(KNOWN_FINDING_COLUMNS)
     for finding in rows:
         values = [getattr(finding, column) for column in KNOWN_FINDING_COLUMNS]
         if any(re.search(r"[\t\r\n]", value) for value in values):
             raise EvidenceError("known finding fields must not contain tabs or line breaks")
-        writer.writerow(values)
+        try:
+            writer.writerow(values)
+        except csv.Error as exc:
+            raise EvidenceError(f"known finding cannot be written as TSV: {exc}") from exc
+    return buffer.getvalue()
+
+
+def write_known_findings(root: Path, relative: str, rows: Iterable[KnownFinding]) -> Path:
+    """Replace the ledger atomically with exactly `render_known_findings(rows)`."""
+    path = _ledger_path(root, relative)
+    text = render_known_findings(rows)
     path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=path.parent, delete=False) as stream:
         temporary = Path(stream.name)
-        stream.write(buffer.getvalue())
+        stream.write(text)
     try:
         os.chmod(temporary, 0o644)
         os.replace(temporary, path)
@@ -464,7 +488,7 @@ def validate_corpus(root: Path, globs: Sequence[str], config: EvidenceConfig, *,
     """Read every selected record. Malformed/unreadable input cannot disappear."""
     root = root.resolve()
     known = (load_known_findings(root, config.known_findings, missing_ok=missing_ledger_ok)
-             if config.known_findings else {})
+             if config.known_findings else [])
     # Do not filter through is_file(): it would silently drop broken symlinks
     # and other unreadable selected inputs before the error gate sees them.
     files = sorted({path for pattern in globs for path in root.glob(pattern)})
@@ -493,16 +517,18 @@ def validate_corpus(root: Path, globs: Sequence[str], config: EvidenceConfig, *,
                         "shape": type(item).__name__, "reason": "outside declared evidence_paths; not quote-validated"})
         except (OSError, UnicodeError, yaml.YAMLError, ValueError, RecursionError) as exc:
             errors.append({"record": relative, "error": str(exc)})
-    matched: set[tuple[str, str, str, str]] = set()
+    # Each ledger row excuses one occurrence, in document order (#734).
+    available: dict[tuple[str, str, str, str], list[KnownFinding]] = defaultdict(list)
+    for entry in known:
+        available[entry.key].append(entry)
     for row in results:
-        finding = known.get((row["record"], row["reference"], row["verdict"], row["quote_sha256"]))
+        queue = available.get((row["record"], row["reference"], row["verdict"], row["quote_sha256"]))
+        finding = queue.pop(0) if queue else None
         row["known_issue"] = finding.issue if finding else ""
-        if finding:
-            matched.add(finding.key)
     # A record that could not be read cannot show that its recorded findings
-    # are gone, so its entries are neither matched nor called stale.
+    # are gone, so its unmatched rows are not called stale.
     unreadable = {error["record"] for error in errors}
-    stale = [asdict(f) for key, f in sorted(known.items()) if key not in matched and f.record not in unreadable]
+    stale = [asdict(f) for key in sorted(available) for f in available[key] if f.record not in unreadable]
     counts = Counter(row["verdict"] for row in results)
     recorded = Counter(row["verdict"] for row in results if row["known_issue"])
     return {"records": len(files), "evidence_items": len(results),
