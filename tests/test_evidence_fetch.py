@@ -568,3 +568,34 @@ def test_an_unwritable_cache_fails_before_any_request(cli_root, monkeypatch):
     finally:
         cache.chmod(0o755)
     assert ncbi.calls == [] and list(cache.iterdir()) == []
+
+
+# --- fifth review on #730 (#765) ---------------------------------------------
+
+def test_a_missing_cache_under_an_unwritable_root_fails_before_any_request(cli_root, monkeypatch):
+    """#765: the first adoption has no cache directory yet; its nearest ancestor decides."""
+    if os.geteuid() == 0:
+        pytest.skip("root ignores directory permissions")
+    ncbi = FakeNCBI([article(2)])
+    monkeypatch.setattr(fetcher, "http_transport", ncbi)
+    assert fetcher.main(["--mech", "habitatmech", "--root", str(cli_root)]) == 0  # writable control
+    assert not (cli_root / "references_cache").exists()  # and a dry run creates nothing
+    cli_root.chmod(0o555)
+    try:
+        assert fetcher.main(["--mech", "habitatmech", "--root", str(cli_root)]) == 2
+        assert fetcher.main(["--mech", "habitatmech", "--root", str(cli_root), "--apply"]) == 2
+    finally:
+        cli_root.chmod(0o755)
+    assert ncbi.calls == [] and not (cli_root / "references_cache").exists()
+
+
+def test_an_interrupted_cache_write_leaves_no_temporary_file(tmp_path, monkeypatch):
+    """#765: cleanup must cover an interrupt, not only an Exception."""
+    def interrupt(fd):
+        raise KeyboardInterrupt
+    monkeypatch.setattr(fetcher.os, "fsync", interrupt)
+    cache = tmp_path / "references_cache"
+    cache.mkdir()
+    with pytest.raises(KeyboardInterrupt):
+        fetcher._write_new(cache, "PMID_2.md", "text")
+    assert list(cache.iterdir()) == []

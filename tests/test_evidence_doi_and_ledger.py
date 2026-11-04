@@ -587,3 +587,29 @@ def test_plain_validation_never_needs_the_lock(root, monkeypatch, tmp_path_facto
     monkeypatch.setattr(cli, "LockManager", refuse)
     monkeypatch.setattr(cli, "check_lock_setup", refuse)
     assert cli.main(["--mech", "habitatmech", "--root", str(root), "--strict"]) == 0
+
+
+# --- fifth review on #730 (#765) ---------------------------------------------
+
+def test_a_ledger_dry_run_passes_once_a_ledger_exists(root, monkeypatch, tmp_path_factory):
+    """#765: the dry run checks the ledger's directory, which an existing ledger file is not."""
+    args = _ledger_cli(root, monkeypatch, tmp_path_factory, ("PMID:1", "a paraphrase"))
+    assert cli.main([*args, "--issue", ISSUE, "--apply"]) == 0
+    assert (root / LEDGER).is_file()
+    assert cli.main(args) == 0
+
+
+def test_a_missing_ledger_directory_under_an_unwritable_root_fails_both_modes(root, monkeypatch, tmp_path_factory):
+    """#765: with no curation directory yet, the nearest existing ancestor decides."""
+    if os.geteuid() == 0:
+        pytest.skip("root ignores directory permissions")
+    args = _ledger_cli(root, monkeypatch, tmp_path_factory, ("PMID:1", "a paraphrase"))
+    assert cli.main([*args, "--issue", ISSUE]) == 0  # writable control; the dry run creates nothing
+    assert not (root / "curation").exists()
+    root.chmod(0o555)
+    try:
+        assert cli.main([*args, "--issue", ISSUE]) == 2
+        assert cli.main([*args, "--issue", ISSUE, "--apply"]) == 2
+    finally:
+        root.chmod(0o755)
+    assert not (root / "curation").exists()

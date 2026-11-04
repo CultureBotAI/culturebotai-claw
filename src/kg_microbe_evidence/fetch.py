@@ -390,7 +390,7 @@ def main(argv: list[str] | None = None) -> int:
                     result = run()
             else:
                 result = run()
-                check_lock_setup()  # --apply always takes the lock, so the dry run checks it (#750, #754)
+                check_lock_setup(resource=mech.key)  # --apply always takes the lock, so the dry run checks it (#750, #754)
             outcome, code = result.as_dict(), 0
         except FetchError as exc:
             print(f"evidence fetch: {exc}", file=sys.stderr)

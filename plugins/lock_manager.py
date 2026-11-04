@@ -60,14 +60,33 @@ def resolve_workspace_root() -> Path:
     return resolved
 
 
-def check_lock_setup(config: Optional[Dict[str, Any]] = None) -> Path:
-    """Refuse what ``LockManager(config)`` would refuse, creating nothing.
+def _require_lock_entry(path: Path, *, read_write: bool) -> None:
+    """A guard or lock entry, when present, must be a regular file, not a link."""
+    try:
+        entry = path.lstat()
+    except FileNotFoundError:
+        return
+    if not stat.S_ISREG(entry.st_mode):
+        raise ValueError(f"lock entry must be a regular file, not a link or directory: {path}")
+    if read_write and not os.access(path, os.R_OK | os.W_OK):
+        raise PermissionError(f"lock guard is not readable and writable: {path}")
 
-    For dry runs that must fail wherever the real run would: the workspace
-    resolves, ``locks_dir`` is not a symlink and is a writable directory if it
-    exists, and otherwise its nearest existing ancestor is a writable directory
-    in which the constructor's ``mkdir`` would succeed.
+
+def check_lock_setup(config: Optional[Dict[str, Any]] = None, resource: Optional[str] = None) -> Path:
+    """Refuse the structural states in which locking `resource` must fail; create nothing.
+
+    For dry runs that should fail wherever the real run would. It mirrors
+    ``LockManager(config)`` -- the workspace resolves, ``locks_dir`` is not a
+    symlink, is a writable directory if it exists, and can otherwise be created
+    (no dangling symlink on the way, a writable existing ancestor) -- and a first
+    acquisition: the hierarchy guard must be a regular read-write file when
+    present, and `resource`'s lock path must not be a directory or link. A lease
+    another process holds now, a corrupt lease file, and the per-resource guard
+    (used only to release or reclaim, never to acquire) are left to the real
+    run.
     """
+    if resource is not None and not LockManager._RESOURCE_PATTERN.fullmatch(resource):
+        raise ValueError(f"invalid lock resource: {resource!r}")
     configured = (config or {}).get("locks_dir")
     locks_dir = Path(configured) if configured is not None else resolve_workspace_root() / "locks"
     if locks_dir.is_symlink():
@@ -77,9 +96,16 @@ def check_lock_setup(config: Optional[Dict[str, Any]] = None) -> Path:
             raise FileExistsError(f"locks_dir exists and is not a directory: {locks_dir}")
         if not os.access(locks_dir, os.W_OK | os.X_OK):
             raise PermissionError(f"locks_dir is not writable: {locks_dir}")
+        _require_lock_entry(locks_dir / LockManager._HIERARCHY_GUARD_NAME, read_write=True)
+        if resource is not None:
+            _require_lock_entry(locks_dir / f"{resource}.lock", read_write=False)
         return locks_dir
     ancestor = locks_dir.parent
-    while not ancestor.exists() and ancestor != ancestor.parent:
+    while True:
+        if ancestor.is_symlink() and not ancestor.exists():
+            raise FileExistsError(f"locks_dir cannot be created through a dangling symlink: {ancestor}")
+        if ancestor.exists() or ancestor == ancestor.parent:
+            break
         ancestor = ancestor.parent
     if not ancestor.is_dir():
         raise NotADirectoryError(f"locks_dir cannot be created under {ancestor}")

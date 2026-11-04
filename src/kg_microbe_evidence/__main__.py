@@ -165,7 +165,7 @@ def main(argv: list[str] | None = None) -> int:
                 return record_known_findings(report, root, config, args.issue, apply=True)
         report = validated()
         if args.record_known_findings:
-            check_lock_setup()  # the dry run fails where --apply's lock would (#750, #754)
+            check_lock_setup(resource=mech.key)  # the dry run fails where --apply's lock would (#750, #754)
             return record_known_findings(report, root, config, args.issue, apply=False)
         write_reports(report, output)
         print(f"{mech.key}: {report['evidence_items']} evidence items; "

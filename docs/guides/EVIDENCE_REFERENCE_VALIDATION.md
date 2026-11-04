@@ -79,8 +79,10 @@ adds caches; the gate never runs it. It plans from the gate's own
 `MISSING_CACHE` results, so it fetches exactly what the declared selectors cite,
 and it is a dry run unless `--apply` is given. Before any request, both modes
 check that the cache destination is a writable directory, and every dry run
-checks the repository-lock setup that `--apply` takes, so a dry run fails
-wherever `--apply` would, before anything is fetched or written. `--limit N` makes a canary:
+checks the repository-lock setup that `--apply` takes (the locks directory, its
+hierarchy guard, and the Mech's lock path), so a dry run fails wherever
+`--apply` would, before anything is fetched or written. A lock another process
+holds at that moment is reported only by `--apply`. `--limit N` makes a canary:
 when both PMIDs and DOIs are pending it covers at least one DOI, so `--limit 2`
 exercises both lookup paths. `--apply` holds the Mech's repository lock. It
 calls NCBI E-utilities anonymously, with no e-mail address or tool registration;
