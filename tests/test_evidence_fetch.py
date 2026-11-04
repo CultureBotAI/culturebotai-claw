@@ -416,8 +416,10 @@ def test_cli_reports_an_unwritable_json_destination_without_a_traceback(cli_root
     """#743: the result write is guarded even when the path looked writable."""
     def refuse(self, *args, **kwargs):
         raise PermissionError("read-only")
+    (cli_root / "workspace").mkdir()
     monkeypatch.setattr(fetcher.Path, "write_text", refuse)
-    assert fetcher.main(["--mech", "habitatmech", "--root", str(cli_root), "--json", str(cli_root / "out.json")]) == 2
+    destination = cli_root / "workspace" / "out.json"
+    assert fetcher.main(["--mech", "habitatmech", "--root", str(cli_root), "--json", str(destination)]) == 2
     assert "could not write" in capsys.readouterr().err
 
 
@@ -599,3 +601,46 @@ def test_an_interrupted_cache_write_leaves_no_temporary_file(tmp_path, monkeypat
     with pytest.raises(KeyboardInterrupt):
         fetcher._write_new(cache, "PMID_2.md", "text")
     assert list(cache.iterdir()) == []
+
+
+# --- Codex review on #730 (#768, #769, #770) ----------------------------------
+
+def test_json_output_can_never_land_on_a_cache_record_or_ledger(cli_root, tmp_path_factory):
+    """#768: refused before any work, unless outside the checkout or under workspace/."""
+    cache = cli_root / "references_cache"
+    cache.mkdir()
+    original = "# PMID:2\n\n## Abstract\n\ngrowth increased\n"
+    (cache / "PMID_2.md").write_text(original)
+    for target in (cache / "PMID_2.md", cli_root / "item.yaml", cli_root / "curation-ledger.tsv"):
+        before = target.read_text() if target.exists() else None
+        assert fetcher.main(["--mech", "habitatmech", "--root", str(cli_root), "--json", str(target)]) == 2
+        assert (target.read_text() if target.exists() else None) == before
+    link = tmp_path_factory.mktemp("elsewhere") / "out.json"
+    link.symlink_to(cache / "PMID_2.md")
+    assert fetcher.main(["--mech", "habitatmech", "--root", str(cli_root), "--json", str(link)]) == 2
+    assert (cache / "PMID_2.md").read_text() == original
+    (cli_root / "workspace").mkdir()
+    assert fetcher.main(["--mech", "habitatmech", "--root", str(cli_root),
+                         "--json", str(cli_root / "workspace" / "out.json")]) == 0
+    outside = tmp_path_factory.mktemp("outside") / "out.json"
+    assert fetcher.main(["--mech", "habitatmech", "--root", str(cli_root), "--json", str(outside)]) == 0
+    assert json.loads(outside.read_text())["missing_pmids"] == []
+
+
+@pytest.mark.parametrize("reply", [
+    b"<eFetchResult><ERROR>Temporary service failure</ERROR></eFetchResult>",
+    b"<PubmedArticleSet><ERROR>Temporary service failure</ERROR></PubmedArticleSet>",
+    b"<html><body>Bad gateway</body></html>",
+])
+def test_a_provider_error_is_a_failure_not_records_not_found(tmp_path, reply):
+    """#770: an NCBI error must stop the run, never read as 'these PMIDs do not exist'."""
+    report = corpus(tmp_path, "PMID:2")
+    with pytest.raises(fetcher.FetchError) as raised:
+        run(tmp_path, report, lambda url, params: reply)
+    assert raised.value.partial["not_found"] == []
+
+
+def test_an_empty_article_set_is_an_honest_not_found(tmp_path):
+    report = corpus(tmp_path, "PMID:2")
+    result = run(tmp_path, report, lambda url, params: b"<PubmedArticleSet></PubmedArticleSet>")
+    assert result.not_found == ["PMID:2"]

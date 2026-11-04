@@ -793,7 +793,7 @@ PERMISSION_STATES = {"unwritable-parent", "unwritable-locks", "guard-unwritable"
 @pytest.mark.parametrize("state", [
     "fresh", "existing-locks", "locks-symlink", "locks-file", "under-a-file", "unwritable-parent",
     "unwritable-locks", "guard-symlink", "guard-dir", "guard-unwritable", "resource-lock-dir",
-    "resource-guard-dir", "configured-under-dangling-symlink",
+    "resource-guard-dir", "configured-under-dangling-symlink", "global-lock-dir",
 ])
 def test_check_lock_setup_refuses_exactly_what_a_real_lock_refuses(tmp_path, monkeypatch, state):
     """The dry-run check and a real first acquisition of the same resource agree."""
@@ -805,7 +805,7 @@ def test_check_lock_setup_refuses_exactly_what_a_real_lock_refuses(tmp_path, mon
     config = None
     restrict = None
     if state in {"existing-locks", "guard-symlink", "guard-dir", "guard-unwritable",
-                 "resource-lock-dir", "resource-guard-dir", "unwritable-locks"}:
+                 "resource-lock-dir", "resource-guard-dir", "unwritable-locks", "global-lock-dir"}:
         locks.mkdir(parents=True)
     if state == "locks-symlink":
         workspace.mkdir()
@@ -836,6 +836,8 @@ def test_check_lock_setup_refuses_exactly_what_a_real_lock_refuses(tmp_path, mon
         (locks / "probe.lock").mkdir()
     elif state == "resource-guard-dir":
         (locks / ".probe.lock.guard").mkdir()
+    elif state == "global-lock-dir":
+        (locks / "global.lock").mkdir()  # every resource acquisition consults it (#771)
     elif state == "configured-under-dangling-symlink":
         (tmp_path / "dangling").symlink_to(tmp_path / "missing", target_is_directory=True)
         config = {"locks_dir": str(tmp_path / "dangling" / "locks")}

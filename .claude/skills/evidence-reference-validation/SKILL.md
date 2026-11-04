@@ -57,7 +57,8 @@ matching `# PMID:<n>` header, or `DOI_<percent-encoded lowercase DOI>.md` with a
 matching `# DOI:<doi>` header, each with exactly one nonempty `## Abstract`
 section. DOIs are case-insensitive, and the `doi:`, bare and resolver-URL
 (`doi.org`, `www.doi.org`, `dx.doi.org`) spellings of one DOI read one cache;
-only a URL is percent-decoded. A citation that carries a PMID is checked against
+only a URL's path is the DOI (not its fragment or query), and only it is
+percent-decoded. A citation that carries a PMID is checked against
 the PMID alone; DOI values beside it are not read. A quote is compared only with that abstract
 body, using NFKC normalization, collapsed whitespace and lowercase. Titles,
 metadata and curator notes cannot establish a match. Manifest settings declare
@@ -113,7 +114,9 @@ stay `MISSING_CACHE`. When both PMIDs and DOIs are pending, `--limit` covers at
 least one DOI, so the `--limit 2` canary exercises both lookup paths; check its
 files before fanning out. Before any request, both modes check that the cache
 directory is writable; every dry run also checks the repository-lock setup that
-`--apply` takes, and `--apply` holds that lock. A cached abstract
+`--apply` takes (including the global lock), and `--apply` holds that lock. An
+NCBI error reply stops the run; it is never reported as sources not found.
+`--json` must be outside the checkout or under its `workspace/`. A cached abstract
 does not clear its redistribution rights; follow the Mech's source policy before
 committing caches.
 

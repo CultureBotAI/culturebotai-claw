@@ -75,7 +75,9 @@ def normalize_doi(value: str) -> str | None:
     text = value.strip()
     resolver = _DOI_RESOLVER.match(text)
     if resolver:
-        text = urllib.parse.unquote(text[resolver.end():])
+        # Only the URL's path is the DOI: a #fragment or ?query is not (#769).
+        url = text if "://" in text[:resolver.end()] else "https://" + text
+        text = urllib.parse.unquote(urllib.parse.urlsplit(url).path.lstrip("/"))
     else:
         text = _DOI_SCHEME.sub("", text, count=1)
     return text.lower() if _DOI.fullmatch(text) else None
@@ -128,6 +130,16 @@ def require_writable_directory(directory: Path) -> None:
         probe = probe.parent
     if not probe.is_dir() or not os.access(probe, os.W_OK | os.X_OK):
         raise EvidenceError(f"cannot write under {directory}: {probe} is not a writable directory")
+
+
+def bears_quote(item: object, config: EvidenceConfig) -> bool:
+    """Whether an item carries quote text in a configured slot, whatever its verdict.
+
+    Coverage is about what a pass can check, so it is measured from the quote
+    slots themselves; a malformed item with no quote is not quote-bearing (#772).
+    """
+    return isinstance(item, Mapping) and any(
+        isinstance(item.get(field), str) and bool(normalize(item[field])) for field in config.snippet_fields)
 
 
 def _relative_path(value: str, name: str) -> None:
@@ -518,6 +530,7 @@ def validate_corpus(root: Path, globs: Sequence[str], config: EvidenceConfig, *,
         raise EvidenceError("record globs selected no files")
     validator = EvidenceValidator(root, config)
     results: list[dict[str, Any]] = []
+    quote_bearing = 0
     errors: list[dict[str, str]] = []
     unmeasured: list[dict[str, str]] = []
     for path in files:
@@ -534,6 +547,7 @@ def validate_corpus(root: Path, globs: Sequence[str], config: EvidenceConfig, *,
             for location, item in iter_evidence(document, config.evidence_fields):
                 if config.selects(location):
                     results.append({"record": relative, "location": location, **asdict(validator.check_item(item))})
+                    quote_bearing += bears_quote(item, config)
                 else:
                     unmeasured.append({"record": relative, "location": location,
                         "shape": type(item).__name__, "reason": "outside declared evidence_paths; not quote-validated"})
@@ -554,7 +568,7 @@ def validate_corpus(root: Path, globs: Sequence[str], config: EvidenceConfig, *,
     counts = Counter(row["verdict"] for row in results)
     recorded = Counter(row["verdict"] for row in results if row["known_issue"])
     return {"records": len(files), "evidence_items": len(results),
-        "quote_bearing_items": len(results) - counts["NO_QUOTE"],
+        "quote_bearing_items": quote_bearing,
         "quote_validated_items": counts["OK"], "verdicts": {v: counts[v] for v in VERDICTS},
         "known_findings_ledger": config.known_findings,
         "known_findings": {v: recorded[v] for v in VERDICTS if v in KNOWN_FINDING_VERDICTS},

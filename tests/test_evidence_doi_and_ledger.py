@@ -357,6 +357,12 @@ def test_a_pmid_is_checked_exactly_as_before_whatever_its_doi_slot_holds(root, v
     ("https://doi.org/10.1002/%28SICI%29", "10.1002/(sici)"),
     ("doi:10.1002/%28SICI%29", "10.1002/%28sici%29"),
     ("10.1002/%28SICI%29", "10.1002/%28sici%29"),
+    # #769: a URL's fragment and query are not part of the DOI; an encoded # is.
+    ("https://doi.org/10.1000/abc#abstract", "10.1000/abc"),
+    ("https://doi.org/10.1000/abc?locatt=mode:legacy", "10.1000/abc"),
+    ("doi.org/10.1000/abc#abstract", "10.1000/abc"),
+    ("https://doi.org/10.1000/abc%23abstract", "10.1000/abc#abstract"),
+    ("doi:10.1000/abc#abstract", "10.1000/abc#abstract"),
 ])
 def test_only_resolver_urls_are_percent_decoded(citation, doi):
     assert normalize_doi(citation) == doi
@@ -613,3 +619,15 @@ def test_a_missing_ledger_directory_under_an_unwritable_root_fails_both_modes(ro
     finally:
         root.chmod(0o755)
     assert not (root / "curation").exists()
+
+
+# --- Codex review on #730 (#772) ---------------------------------------------
+
+def test_malformed_items_without_a_quote_are_not_quote_bearing(root):
+    """#772: coverage counts quote text in the configured slots, not non-NO_QUOTE verdicts."""
+    (root / "item.yaml").write_text(
+        "evidence:\n- 42\n- snippet: []\n- {}\n"
+        "- reference: PMID:1\n  snippet: growth increased\n  excerpt: something else\n")
+    report = validate_corpus(root, ["item.yaml"], config(snippet_fields=["snippet", "excerpt"]))
+    assert report["verdicts"]["INVALID_EVIDENCE"] == 3 and report["verdicts"]["NO_QUOTE"] == 1
+    assert (report["quote_bearing_items"], report["evidence_items"]) == (1, 4)

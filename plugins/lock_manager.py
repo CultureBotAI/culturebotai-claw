@@ -80,10 +80,10 @@ def check_lock_setup(config: Optional[Dict[str, Any]] = None, resource: Optional
     symlink, is a writable directory if it exists, and can otherwise be created
     (no dangling symlink on the way, a writable existing ancestor) -- and a first
     acquisition: the hierarchy guard must be a regular read-write file when
-    present, and `resource`'s lock path must not be a directory or link. A lease
-    another process holds now, a corrupt lease file, and the per-resource guard
-    (used only to release or reclaim, never to acquire) are left to the real
-    run.
+    present, and neither `resource`'s lock path nor the global lock it is checked
+    against may be a directory or link. A lease another process holds now, a
+    corrupt lease file, and the per-resource guard (used only to release or
+    reclaim, never to acquire) are left to the real run.
     """
     if resource is not None and not LockManager._RESOURCE_PATTERN.fullmatch(resource):
         raise ValueError(f"invalid lock resource: {resource!r}")
@@ -99,6 +99,9 @@ def check_lock_setup(config: Optional[Dict[str, Any]] = None, resource: Optional
         _require_lock_entry(locks_dir / LockManager._HIERARCHY_GUARD_NAME, read_write=True)
         if resource is not None:
             _require_lock_entry(locks_dir / f"{resource}.lock", read_write=False)
+            # Every other resource's acquisition consults the global lease (#771).
+            if resource != LockManager._GLOBAL_RESOURCE:
+                _require_lock_entry(locks_dir / f"{LockManager._GLOBAL_RESOURCE}.lock", read_write=False)
         return locks_dir
     ancestor = locks_dir.parent
     while True:

@@ -98,9 +98,17 @@ def _text(element: ET.Element | None) -> str:
 
 
 def parse_articles(payload: bytes) -> dict[str, Article]:
-    """PubmedArticle records by PMID. Book records carry no journal abstract here."""
+    """PubmedArticle records by PMID. Book records carry no journal abstract here.
+
+    Only a PubmedArticleSet without an ERROR element is an answer; anything else
+    is a provider failure, never "these records do not exist" (#770).
+    """
     articles: dict[str, Article] = {}
-    for node in ET.fromstring(payload).findall("PubmedArticle"):
+    envelope = ET.fromstring(payload)
+    if envelope.tag != "PubmedArticleSet" or envelope.find(".//ERROR") is not None:
+        detail = " ".join(" ".join(envelope.itertext()).split())[:200]
+        raise ValueError(f"efetch did not return a PubmedArticleSet: <{envelope.tag}> {detail}")
+    for node in envelope.findall("PubmedArticle"):
         pmid = (node.findtext("MedlineCitation/PMID") or "").strip()
         article = node.find("MedlineCitation/Article")
         if not pmid.isdigit() or article is None:
@@ -347,6 +355,18 @@ def fetch_missing(
     return result
 
 
+def _check_json_destination(path: Path, root: Path) -> None:
+    """The result can never land on a cache, a record or the ledger (#768).
+
+    Outside the Mech checkout anything goes; inside it, only its workspace/.
+    """
+    if path.is_symlink():
+        raise EvidenceError(f"--json must not be a symlink: {path}")
+    destination, root = path.resolve(), root.resolve()
+    if destination.is_relative_to(root) and not destination.is_relative_to(root / "workspace"):
+        raise EvidenceError("--json inside the Mech checkout must be under its workspace/ directory")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--mech", required=True)
@@ -376,6 +396,8 @@ def main(argv: list[str] | None = None) -> int:
             env = merged_repository_environment(dotenv if dotenv.exists() else None)
             target = RepositorySettings.from_environment(environ=env, manifest=manifest).get_target(mech.key)
         target.open()
+        if args.json is not None:
+            _check_json_destination(args.json, target.path)
 
         def run() -> FetchResult:
             report = validate_corpus(target.path, mech.record_globs, config, missing_ledger_ok=True)

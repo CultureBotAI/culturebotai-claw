@@ -59,7 +59,8 @@ The source adapters read a retained markdown abstract for the cited PMID
 DOI>.md`, header `# DOI:<doi>`). DOIs are case-insensitive. The `doi:` form, the
 bare `10.<registrant>/<suffix>` form and resolver URLs (`doi.org`,
 `www.doi.org` or `dx.doi.org`, with or without a scheme) of one DOI read one
-cache; only a resolver URL is percent-decoded, because a URL encodes the DOI
+cache. Only a resolver URL's path is the DOI -- its `#fragment` and `?query` are
+not -- and only that path is percent-decoded, because a URL encodes the DOI
 while `%` is a legal DOI character. A citation that carries a PMID is checked
 against the PMID alone, exactly as before DOI support; DOI values beside it are
 not read.
@@ -68,8 +69,8 @@ abstract body; title, authors and other metadata are not quote evidence. It
 performs no fetch, provider call or corpus repair. Citations that are neither a
 PMID nor a DOI, absent quotes, and unavailable or invalid cached sources remain
 unverified; a populated citation alone cannot become a successful quote
-validation. Every report states how many in-scope items carry a quote at all,
-because a pass covers only those
+validation. Every report states how many in-scope items carry quote text in a
+configured quote slot, whatever their verdict, because a pass covers only those
 ([#729](https://github.com/CultureBotAI/culturebotai-claw/issues/729)).
 
 ### Adding caches
@@ -80,9 +81,13 @@ adds caches; the gate never runs it. It plans from the gate's own
 and it is a dry run unless `--apply` is given. Before any request, both modes
 check that the cache destination is a writable directory, and every dry run
 checks the repository-lock setup that `--apply` takes (the locks directory, its
-hierarchy guard, and the Mech's lock path), so a dry run fails wherever
+hierarchy guard, the global lock and the Mech's lock path), so a dry run fails
+wherever
 `--apply` would, before anything is fetched or written. A lock another process
-holds at that moment is reported only by `--apply`. `--limit N` makes a canary:
+holds at that moment is reported only by `--apply`. An efetch reply other than a
+`PubmedArticleSet` without an `ERROR` element stops the run as a provider
+failure; it is never read as sources not found. `--json` may name a file outside
+the Mech checkout or under its `workspace/`, never a cache, record or ledger. `--limit N` makes a canary:
 when both PMIDs and DOIs are pending it covers at least one DOI, so `--limit 2`
 exercises both lookup paths. `--apply` holds the Mech's repository lock. It
 calls NCBI E-utilities anonymously, with no e-mail address or tool registration;
