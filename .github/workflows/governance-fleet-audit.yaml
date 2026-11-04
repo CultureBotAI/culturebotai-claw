@@ -1,10 +1,8 @@
 name: authoritative governance fleet audit
 
 # Audit the public Mech mains with code from trusted claw base/main. Downstream
-# pins are treated only as data and resolve inside trusted claw history before
-# any audit runs. A committed, bounded release declaration may select the
-# separate canary audit; the coordinated audit still requires one shared pin.
-# Public Git/GitHub reads and deterministic local
+# pins are treated only as data: all must agree and resolve inside trusted claw
+# history before any audit runs. Public Git/GitHub reads and deterministic local
 # checks never invoke a model, research provider, credentialed service, or paid API.
 
 on:
@@ -99,28 +97,7 @@ jobs:
             git -C "$root" checkout --detach origin/main
           done < fleet/governance-consumers.tsv
 
-      # Only trusted base/main can select this lane. A candidate declaration
-      # cannot authorize its own downstream rollout before Claw merges it.
-      # Retired by #729: the declaration and release_audit.py are removed, so
-      # once that change is the trusted base this lane is never selected again.
-      # The steps stay until the fleet re-pins, because the pull request that
-      # retires the lane is itself audited against a base that still has it.
-      - name: Select trusted release contract
-        id: release-contract
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 -I - <<'PY'
-          import os
-          from pathlib import Path
-
-          declaration = Path("fleet/trusted-claw/src/kg_microbe_governance/releases/evidence-reference-validation-mim-v1.json")
-          with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as output:
-              output.write("active=" + ("true" if declaration.exists() else "false") + "\n")
-          PY
-
       - name: Read and compare every committed fleet pin
-        if: steps.release-contract.outputs.active != 'true'
         id: fleet-pin
         shell: bash
         run: |
@@ -200,7 +177,6 @@ jobs:
           PY
 
       - name: Authenticate pin against trusted claw history
-        if: steps.release-contract.outputs.active != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -212,7 +188,6 @@ jobs:
           fi
 
       - name: Audit all governed artifacts at committed main tips
-        if: steps.release-contract.outputs.active != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -227,18 +202,6 @@ jobs:
           done < fleet/governance-consumers.tsv
           uv run --project fleet/trusted-claw kg-microbe-governance \
             "${audit_args[@]}"
-
-      - name: Audit the trusted bounded canary release
-        if: steps.release-contract.outputs.active == 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          release_args=(--trusted-root "$GITHUB_WORKSPACE/fleet/trusted-claw")
-          while IFS=$'\t' read -r key _github _package_path _pin_path; do
-            release_args+=(--target-root "$key=$GITHUB_WORKSPACE/fleet/$key")
-          done < fleet/governance-consumers.tsv
-          uv run --project fleet/trusted-claw python -m kg_microbe_governance.release_audit \
-            "${release_args[@]}" --json-output "$GITHUB_WORKSPACE/fleet/release-audit.json"
 
       # The deployed-fleet audit above deliberately uses trusted base/main code.
       # This separate lane proves that the proposed/current checkout itself has

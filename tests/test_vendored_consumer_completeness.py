@@ -62,20 +62,7 @@ class IncompleteConsumer:
 # Consumers known to be mid-adoption, with the exact gaps and reason. A new
 # missing path fails rather than inheriting the waiver. When the repository
 # finishes vendoring, this test says so and the entry comes out.
-_EVIDENCE_GATE = frozenset({
-    ".github/workflows/qc-evidence.yaml",
-    "scripts/run_shared_evidence_validator.py",
-})
-INCOMPLETE_CONSUMERS: dict[str, IncompleteConsumer] = {
-    mech: IncompleteConsumer(
-        expected_missing=_EVIDENCE_GATE,
-        reason=(
-            "adopting the shared quote gate (#729); the runner and workflow "
-            "arrive with this Mech's re-pin PR"
-        ),
-    )
-    for mech in ("cellstructuremech", "habitatmech")
-}
+INCOMPLETE_CONSUMERS: dict[str, IncompleteConsumer] = {}
 
 
 def _applicable(consumer: str) -> list[str]:
