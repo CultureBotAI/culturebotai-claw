@@ -288,6 +288,7 @@ def test_fleet_pr_review_uses_only_declared_repository_identities():
 # call. The claim is still checkable -- the script it names must itself read
 # the manifest -- so this is a redirection, not an exemption.
 RESOLVES_THROUGH_A_SCRIPT = {
+    "cron-status": "scripts/cron_status.py",
     "fleet-branch-status": "scripts/fleet_branch_status.py",
     "fleet-issue-status": "scripts/fleet_issue_status.py",
     "fleet-maintenance-cycle": "scripts/fleet_maintenance_cycle.py",
