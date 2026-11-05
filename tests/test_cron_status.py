@@ -467,7 +467,7 @@ def test_a_pipe_or_newline_in_a_cell_cannot_add_a_column_or_row():
     broken = cs.WorkflowStatus("o/r", "w", ".github/workflows/w.yaml", "active", [], error="bad | line\nnext")
     out = cs.render([broken], {}, [job], [], ["o/r"], 7, NOW, True, False)
     local_row = next(line for line in out.splitlines() if "tee" in line)
-    assert _cells(local_row) == ["crontab", "/bin/echo ok \\| /usr/bin/tee /tmp/job.log", "0 0 * * *", "installed"]
+    assert _cells(local_row) == ["crontab", "`/bin/echo ok \\| /usr/bin/tee /tmp/job.log`", "`0 0 * * *`", "installed"]
     workflow_row = next(line for line in out.splitlines() if "not assessed" in line and line.startswith("|"))
     assert len(_cells(workflow_row)) == 9
 
@@ -498,3 +498,34 @@ def test_an_older_failure_is_flagged_even_when_the_latest_succeeded():
     status = daily_status()
     cs.assess(status, runs, NOW, 7)
     assert "1 non-success run(s) in the window" in status.attention
+
+
+# --------------------------------------------------- fourth review (#833) --
+def _rendered_cells(table: str) -> list[list[str]]:
+    import re
+
+    from markdown_it import MarkdownIt
+
+    html = MarkdownIt().enable("table").render(table)
+    rows = re.findall(r"<tr>(.*?)</tr>", html, re.S)
+    return [[re.sub(r"<[^>]+>", "", cell).replace("&quot;", '"').replace("&amp;", "&")
+             .replace("&lt;", "<").replace("&gt;", ">")
+             for cell in re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", row, re.S)] for row in rows]
+
+
+@pytest.mark.parametrize("command", [r"echo \| cat", "echo **hello** | tee out", "printf '`x`' && echo `date`",
+                                     "``fenced``"])
+def test_local_commands_render_literally_through_markdown(command):
+    job = cs.LocalJob("crontab", command, "0 0 * * *", "installed")
+    out = cs.render([], {}, [job], [], ["o/r"], 7, NOW, True)
+    table = "\n".join(line for line in out.splitlines() if line.startswith("| Local") or line.startswith("|---|---|---|---|")
+                      or "installed" in line)
+    cells = _rendered_cells(table)[1]
+    assert cells[1] == command and cells[2] == "0 0 * * *" and cells[3] == "installed"
+
+
+def test_multiline_text_is_joined_with_a_space_and_not_assessed_stays_bold():
+    broken = cs.WorkflowStatus("o/r", "w", ".github/workflows/w.yaml", "active", [], error="first\nsecond")
+    out = cs.render([broken], {}, [], [], ["o/r"], 7, NOW, False)
+    row = next(line for line in out.splitlines() if line.startswith("| r | w |"))
+    assert "**not assessed: first second**" in row

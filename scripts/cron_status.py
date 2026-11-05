@@ -478,9 +478,23 @@ def _duration(minutes: int) -> str:
     return f"{days} d {hours} h {rest} min" if rest else f"{days} d {hours} h"
 
 
+class Code(str):
+    """A literal value, such as a command, shown as a code span so Markdown cannot rewrite it (#833)."""
+
+
 def _cell(value: object) -> str:
-    """One table cell: a pipe would start a new column and a newline a new row (#831)."""
-    return " ".join(str(value).splitlines()).replace("|", "\\|")
+    """One table cell: a pipe would start a new column and a newline a new row (#831).
+
+    A Code value is fenced with more backticks than any run inside it. GitHub's
+    table parser removes the pipe's escape before reading the code span, so a
+    literal backslash before a pipe survives as itself.
+    """
+    text = " ".join(str(value).splitlines())
+    if isinstance(value, Code) and text:
+        fence = "`" * (max((len(run) for run in re.findall(r"`+", text)), default=0) + 1)
+        pad = " " if text.startswith("`") or text.endswith("`") else ""
+        text = f"{fence}{pad}{text}{pad}{fence}"
+    return text.replace("|", "\\|")
 
 
 def _row(*cells: object) -> str:
@@ -516,7 +530,8 @@ def render(statuses: list[WorkflowStatus], failures: dict[str, str], local: list
         lines.append("| — | no scheduled workflow found | | | | | | | |")
     if include_local:
         lines += ["", "| Local source | Job | Schedule | Status |", "|---|---|---|---|"]
-        lines += [_row(job.source, job.job, job.schedule, job.status) for job in local]
+        lines += [_row(job.source, Code(job.job), Code(job.schedule) if job.source == "crontab" else job.schedule,
+                       job.status) for job in local]
         if not local:
             found = "no crontab entries" + ("; no LaunchAgent with a calendar or interval trigger"
                                             if launchd_checked else "")

@@ -9,7 +9,7 @@ from a backup, never from git.
 Inputs: none; run from the claw checkout root.
 Outputs: one line per mutant, killed or SURVIVED; a nonzero exit if any
 survives.
-Serves: the cron-status skill, PR #820 and its review issues #821-#832. Written 2026-11-05.
+Serves: the cron-status skill, PR #820 and its review issues #821-#833. Written 2026-11-05.
 """
 from __future__ import annotations
 
@@ -66,7 +66,12 @@ MUTANTS = [
      '        created = _parse_time(run.get("run_started_at") or run["created_at"])\n        if created.date() in by_day:'),
     ("schedule-event filter dropped", "runs?event=schedule&per_page=100", "runs?per_page=100"),
     ("older failures ignored", "            status.non_success += 1\n", "            pass\n"),
-    ("local command hidden", "_row(job.source, job.job, job.schedule, job.status)", '_row(job.source, "", job.schedule, job.status)'),
+    ("local command hidden", "_row(job.source, Code(job.job),", '_row(job.source, "",'),
+    # Fourth review of PR #820 (#833).
+    ("local command not a code span", "_row(job.source, Code(job.job),", "_row(job.source, job.job,"),
+    ("code fence not longer than inner backticks", "default=0) + 1)", "default=0) * 0 + 1)"),
+    ("multiline joined without a space", 'text = " ".join(str(value).splitlines())', 'text = "".join(str(value).splitlines())'),
+    ("not-assessed marker unbolded", 'f"**not assessed: {status.error}**"', 'f"not assessed: {status.error}"'),
 ]
 
 original = SOURCE.read_bytes()
