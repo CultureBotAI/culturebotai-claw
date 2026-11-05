@@ -1,0 +1,103 @@
+---
+name: cron-status
+description: "Answer \"did the cron job run?\" or \"cron job status\" in one standard table. Runs scripts/cron_status.py over claw's scheduled GitHub workflows (or, with --fleet, every manifest Mech's) plus this machine's crontab and user LaunchAgents. Each row gives the schedule, runs per day against the runs due, how late the latest scheduled run started, and the workflow's state. Then add Claude Code session jobs from CronList. Read-only: it never dispatches, re-runs, enables or disables anything."
+category: cross-repo
+requires_database: false
+requires_internet: true
+version: 1.0.0
+tags: [cron, schedule, github-actions, launchd, status, fleet, read-only, reporting]
+---
+
+# Cron job status
+
+## Purpose
+
+Answer one question, the same way every time: **did the scheduled jobs run, and
+on time?**
+
+"Latest run: success" is not that answer. A scheduled job fails quietly in three
+ways, and the table shows each one:
+
+- **Disabled.** GitHub stops scheduling a workflow after 60 days without
+  repository activity, or when someone disables it. Its run list just goes quiet.
+- **Late or dropped.** GitHub starts scheduled runs late and drops many,
+  especially frequent ones. On claw, daily jobs routinely start about 8 hours
+  late, and a 15-minute job runs about 5 times a day instead of 96.
+- **Not looked at.** A repository whose query failed must not read as "nothing
+  scheduled there".
+
+## Run it
+
+```bash
+uv run python scripts/cron_status.py --launch-agents-dir ~/Library/LaunchAgents          # claw + local schedulers
+uv run python scripts/cron_status.py --fleet --launch-agents-dir ~/Library/LaunchAgents  # and every manifest Mech
+uv run python scripts/cron_status.py --repo CultureBotAI/TraitMech   # one repo; repeatable
+uv run python scripts/cron_status.py --days 14       # longer window (1-90)
+uv run python scripts/cron_status.py --no-local      # skip crontab and launchd
+uv run python scripts/cron_status.py --json          # machine-readable
+```
+
+Exit codes:
+- `0`: complete report.
+- `1`: a repository, a workflow file or a local source could not be read. The
+  report names it on an `INCOMPLETE` line.
+- `2`: bad usage, or `gh` missing.
+
+**A non-zero exit means the report is incomplete**, so do not present its counts
+as the whole answer.
+
+Then call **CronList** (load it with ToolSearch `select:CronList` if it is
+deferred). Add a third table, `| Claude Code job | Schedule | Recurring | Prompt (first 60 chars) |`,
+or say "no Claude Code session jobs". A script cannot see these jobs, because
+they live in the Claude Code session.
+
+## Reading the table
+
+| Column | Meaning |
+|---|---|
+| Schedule (UTC) | The workflow's `on.schedule` crons, summarised (`daily 06:41`, `every 15 min`, `hourly at :23`), or the raw expression. GitHub evaluates crons in UTC. |
+| State | GitHub's workflow state. Anything but `active` (for example `disabled_inactivity`, `disabled_manually`) means GitHub will not schedule it. |
+| Runs per day | Scheduled runs started on each day of the window, oldest first. Today's figure counts only ticks so far. |
+| Due / ran | Ticks older than the 12-hour grace period, against the runs actually started in the window. |
+| Latest scheduled run | When it started, and its conclusion. Only `schedule` events count: a push run that passed afterwards does not change this column. |
+| Started late by | The latest run's start minus the tick it served. |
+| Attention | Empty (`ok`), or the reasons below. |
+
+`Attention` flags:
+- a workflow that is not `active`;
+- no scheduled run in the window although some were due;
+- fewer than half the due runs ("GitHub dropped runs");
+- a latest run that failed, was cancelled or timed out, or any non-success in
+  the window;
+- a start more than 12 hours late.
+
+Lateness under 12 hours is GitHub's normal behaviour. It stays in its own
+column, unflagged.
+
+The local table lists crontab entries, and the LaunchAgents in `--launch-agents-dir`
+with a calendar or interval trigger. The script never assumes that directory: without the
+argument, it reports launchd as "not checked". The LaunchAgents are marked `loaded` or `not loaded`. Most such LaunchAgents are
+vendor updaters. Name any that look like the user's own jobs.
+
+## Output
+
+Always show:
+- the script's tables verbatim;
+- the Claude Code table;
+- one to three sentences on what needs attention, citing rows.
+
+When the user asks "did it run?" about one job, answer that first, then the
+table.
+
+Do not quote a total from an incomplete report as if it were the answer.
+
+## Boundaries
+
+Read-only:
+- `gh api` GETs only;
+- `crontab -l`;
+- `launchctl list`;
+- reading plists.
+
+Never dispatch, re-run, enable or disable a workflow, or load or unload a
+LaunchAgent, as part of this skill. Suggest it, and leave it to the user.

@@ -38,6 +38,11 @@ skills:
   complex-ingredient-resolver:
     scope: domain
     reason: Multi-ontology cascade for heuristic-complex MIM ingredients.
+  cron-status:
+    scope: fleet
+    reason: >-
+      Reports whether scheduled jobs ran and on time: claw's scheduled workflows,
+      or with --fleet every manifest-resolved Mech's, plus local schedulers.
   cross-mech-sync:
     scope: fleet
     reason: Propagates a vendored artifact across manifest-declared consumers.
