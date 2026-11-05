@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib
 import json
 import os
 import re
@@ -22,6 +23,11 @@ from pathlib import Path, PurePosixPath
 
 POSITIONS = (1, 21, 25)
 MIM_COMMIT = "1848b0fe521bc2462f165912fcf92d09ad9a8cec"
+VALIDATORS = {
+    "kg_microbe.utils.review_claims": "kg_microbe/utils/review_claims.py",
+    "scripts.mim_reviewed_release": "scripts/mim_reviewed_release.py",
+    "scripts.refresh_reviewed_mim": "scripts/refresh_reviewed_mim.py",
+}
 
 
 def digest(content: bytes) -> str:
@@ -132,13 +138,83 @@ def verify_review_inputs(path: Path, expected: dict, retain: set[str], root: str
     return kept
 
 
-def validate(args: argparse.Namespace) -> dict:
-    """Run in the explicitly selected KG Python environment, entirely offline."""
-    sys.path.insert(0, str(args.kg_root))
-    from kg_microbe.utils.review_claims import validate_review_decision
+def source_snapshot(root: Path) -> dict:
+    """Bind the launcher and selected validator sources before starting Python."""
+    root = root.resolve(strict=True)
+    sources = {}
+    for name, relative in VALIDATORS.items():
+        path = (root / relative).resolve(strict=True)
+        if not path.is_relative_to(root) or not path.is_file():
+            raise ValueError(f"Validator source is outside the selected checkout: {path}")
+        sources[name] = {"path": str(path), "sha256": digest(path.read_bytes())}
+    launcher = Path(__file__).resolve(strict=True)
+    return {
+        "validators": sources,
+        "launcher": {"path": str(launcher), "sha256": digest(launcher.read_bytes())},
+    }
 
-    from scripts import mim_reviewed_release as release
-    from scripts import refresh_reviewed_mim as refresh
+
+def verify_sources(root: Path, expected: dict) -> None:
+    if source_snapshot(root) != expected:
+        raise ValueError("Canary launcher or validator source changed during execution")
+
+
+def runtime_metadata(modules: dict) -> dict:
+    """Observe imported modules, rather than infer their origins from PYTHONPATH."""
+    return {
+        "interpreter": {
+            "executable": str(Path(sys.executable).absolute()),
+            "version": sys.version,
+            "prefix": sys.prefix,
+            "base_prefix": sys.base_prefix,
+        },
+        "validators": {
+            name: {
+                "path": str(Path(module.__file__).resolve(strict=True)),
+                "spec_origin": str(Path(module.__spec__.origin).resolve(strict=True)),
+                "sha256": digest(Path(module.__file__).read_bytes()),
+            }
+            for name, module in modules.items()
+        },
+    }
+
+
+def verify_runtime(runtime: dict, args: argparse.Namespace, expected: dict) -> None:
+    interpreter = runtime["interpreter"]
+    if interpreter["executable"] != str(args.kg_python.absolute()) or not all(
+        isinstance(interpreter.get(field), str) and interpreter[field]
+        for field in ("version", "prefix", "base_prefix")
+    ):
+        raise ValueError("Canary ran under an unexpected Python interpreter")
+    wanted = {
+        name: dict(binding, spec_origin=binding["path"])
+        for name, binding in expected["validators"].items()
+    }
+    if runtime["validators"] != wanted:
+        raise ValueError("Imported validator origin or source hash differs from selected checkout")
+
+
+def validate(args: argparse.Namespace, expected: dict) -> dict:
+    """Run in the selected Python, binding imported code before and after validation."""
+    verify_sources(args.kg_root, expected)
+    modules = {name: importlib.import_module(name) for name in VALIDATORS}
+    before = runtime_metadata(modules)
+    verify_runtime(before, args, expected)
+    report = {} if args.runtime_probe else validate_review(args, modules)
+    after = runtime_metadata(modules)
+    verify_runtime(after, args, expected)
+    verify_sources(args.kg_root, expected)
+    if before != after:
+        raise ValueError("Canary runtime changed during validation")
+    report["runtime_provenance"] = {"before": before, "after": after, "sources": expected}
+    return report
+
+
+def validate_review(args: argparse.Namespace, modules: dict) -> dict:
+    """Verify the pinned scientific inputs using the already origin-checked modules."""
+    validate_review_decision = modules["kg_microbe.utils.review_claims"].validate_review_decision
+    release = modules["scripts.mim_reviewed_release"]
+    refresh = modules["scripts.refresh_reviewed_mim"]
 
     pin_path = args.kg_root / refresh.PIN_FILE
     pin_bytes = pin_path.read_bytes()
@@ -285,16 +361,47 @@ def validate(args: argparse.Namespace) -> dict:
             "declared_members": kg_manifest.get("members", {}),
             "verification": "manifest_only; graph membership not tested",
         },
-        "validator_code_sha256": {
-            name: digest((args.kg_root / name).read_bytes())
-            for name in (
-                "scripts/mim_reviewed_release.py",
-                "scripts/refresh_reviewed_mim.py",
-                "kg_microbe/utils/review_claims.py",
-            )
-        },
         "selected_claims": results,
     }
+
+
+def run_child(args: argparse.Namespace, *, probe_only: bool = False) -> dict:
+    """Isolate imports and reject provenance drift before any receipt is published."""
+    expected = source_snapshot(args.kg_root)
+    command = [str(args.kg_python.absolute()), expected["launcher"]["path"], "--validation-child"]
+    if probe_only:
+        command.append("--runtime-probe")
+    for key, value in vars(args).items():
+        if isinstance(value, Path):
+            command.extend(["--" + key.replace("_", "-"), str(value.absolute())])
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = str(args.kg_root.resolve(strict=True))
+    environment["PYTHONDONTWRITEBYTECODE"] = "1"
+    # -B still reads timestamp-valid bytecode. A fresh prefix forces source reads.
+    with tempfile.TemporaryDirectory(prefix="mim-canary-pycache-") as pycache:
+        environment["PYTHONPYCACHEPREFIX"] = pycache
+        completed = subprocess.run(
+            command,
+            input=json.dumps(expected, allow_nan=False),
+            check=True,
+            text=True,
+            capture_output=True,
+            env=environment,
+            cwd=args.kg_root,
+            timeout=180,
+        )
+    verify_sources(args.kg_root, expected)
+    report = read_json(completed.stdout.encode())
+    provenance = report["runtime_provenance"]
+    if provenance["sources"] != expected or provenance["before"] != provenance["after"]:
+        raise ValueError("Child runtime provenance differs from the launch snapshot")
+    for phase in ("before", "after"):
+        verify_runtime(provenance[phase], args, expected)
+    report["validator_code_sha256"] = {
+        VALIDATORS[name]: value["sha256"] for name, value in expected["validators"].items()
+    }
+    report["canary_script_sha256"] = expected["launcher"]["sha256"]
+    return report
 
 
 def publish_new(path: Path, report: dict) -> None:
@@ -322,9 +429,16 @@ def main() -> None:
         "--plan", action="store_true", help="Print the local execution plan; write nothing"
     )
     parser.add_argument("--validation-child", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--runtime-probe", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.validation_child:
-        print(json.dumps(validate(args), ensure_ascii=False, allow_nan=False))
+        print(
+            json.dumps(
+                validate(args, read_json(sys.stdin.buffer.read())),
+                ensure_ascii=False,
+                allow_nan=False,
+            )
+        )
         return
     plan = {
         "mode": "offline_review_reuse",
@@ -341,24 +455,8 @@ def main() -> None:
         return
     if args.output.exists() or args.output.is_symlink():
         raise FileExistsError(f"Refusing to overwrite output: {args.output}")
-    command = [str(args.kg_python), str(Path(__file__).absolute()), "--validation-child"]
-    for key, value in vars(args).items():
-        if isinstance(value, Path):
-            command.extend(["--" + key.replace("_", "-"), str(value.absolute())])
-    environment = os.environ.copy()
-    environment["PYTHONDONTWRITEBYTECODE"] = "1"
-    completed = subprocess.run(
-        command,
-        check=True,
-        text=True,
-        capture_output=True,
-        env=environment,
-        cwd=args.kg_root,
-        timeout=180,
-    )
-    report = read_json(completed.stdout.encode())
+    report = run_child(args)
     report["execution"] = plan
-    report["canary_script_sha256"] = digest(Path(__file__).read_bytes())
     publish_new(args.output, report)
     print(
         json.dumps(

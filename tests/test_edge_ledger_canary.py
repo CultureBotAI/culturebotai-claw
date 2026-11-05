@@ -3,6 +3,7 @@
 import hashlib
 import importlib.util
 import os
+import py_compile
 import subprocess
 import sys
 from copy import deepcopy
@@ -126,3 +127,34 @@ def test_changed_direct_source_or_manifest_refuses_attestation(tmp_path, changed
     (tmp_path / changed).write_text("changed after execution\n")
     with pytest.raises(RuntimeError, match="executed source changed"):
         canary._verify_file_hashes(expected)
+
+
+@pytest.mark.parametrize("command", ["probe", "consumer"])
+def test_every_child_reads_source_despite_timestamp_valid_bytecode(tmp_path, monkeypatch, command):
+    """Both attestation probes and real CLI children must ignore stale caches (#813)."""
+    root = tmp_path / "checkout"
+    _shadow_package(root / "src")
+    package = root / "src/kg_microbe_curation"
+    (package / "__main__.py").write_text(
+        "from . import identity\n"
+        "if __name__ == '__main__':\n"
+        "    print('{\"synthetic_probe_only\": true}')\n"
+    )
+    path = package / "identity.py"
+    original = "#" + "x" * 69 + "\n"
+    changed = "raise RuntimeError('changed source was executed')\n".ljust(len(original) - 1) + "\n"
+    assert len(original.encode()) == len(changed.encode())
+    path.write_text(original)
+    original_stat = path.stat()
+    py_compile.compile(
+        str(path), doraise=True, invalidation_mode=py_compile.PycInvalidationMode.TIMESTAMP
+    )
+    path.write_text(changed)
+    os.utime(path, ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns))
+    monkeypatch.delenv("PYTHONPYCACHEPREFIX", raising=False)
+    environment = canary._consumer_environment(root)
+    with pytest.raises(RuntimeError, match="changed source was executed"):
+        if command == "probe":
+            canary._probe(root, environment)
+        else:
+            canary._run([sys.executable, "-m", "kg_microbe_curation"], root, env=environment)

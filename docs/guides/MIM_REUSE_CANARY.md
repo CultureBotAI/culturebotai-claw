@@ -66,6 +66,14 @@ The CLI reads the saved bytes back and prints their SHA-256. Inspect the receipt
 `selected_claims`, assurance flags, source counts, input verification count,
 validator hashes, and scope controls. Keep this full receipt and retained
 inputs in local/versioned artifact storage rather than checking them into Git.
+New receipts also record the selected child interpreter and actual imported
+origins of all three KG validators. The launcher compares source hashes before
+and after the child; the child checks origins and hashes before and after
+validation. An unexpected origin or changed source prevents publication. The
+child replaces ambient `PYTHONPATH` with the selected KG root and uses a fresh
+bytecode-cache prefix with cache writes disabled, so stale bytecode cannot
+substitute for the fingerprinted source. These checks bind the named validators
+and launcher; they do not attest the interpreter's complete dependency closure.
 The ordinary regression fixtures are synthetic and require no large archives:
 
 ```bash
@@ -100,3 +108,21 @@ An earlier successful run used the planning worktree with the same pinned KG
 validators; its receipt is preserved separately as
 `mim-reuse-canary-planning-root.json`. It was not overwritten. The implementation
 worktree receipt above is the final recorded run.
+
+The receipts recorded above predate the runtime-origin guards added for #810.
+They remain historical evidence and are not retroactively certified by those
+guards; a new run must publish to a fresh output path.
+
+## Runtime-bound rerun, 2026-11-04
+
+After #810, the same pinned inputs were verified using the implementation KG
+checkout and its Python interpreter at
+`/Users/marcin/Library/Caches/pypoetry/virtualenvs/kg-microbe-aXSqUX8A-py3.10/bin/python`.
+The command above was run with `--plan`, then without it, using the new output
+`workspace/reports/edge-curation-20261103/mim-reuse-canary-review-810.json`.
+The receipt has SHA-256
+`81c1835ae7f82cf952db84f7d46c589cf827caf695f533b321ba43314fe49422`.
+It records actual validator origins, the selected interpreter, and matching
+source snapshots before and after execution. The partition remains 2,999 =
+1,747 supported + 1,252 withheld, with 2,694 native review input hashes checked
+and zero actual KG edges approved. Earlier receipts are preserved.

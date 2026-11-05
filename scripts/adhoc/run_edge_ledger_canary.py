@@ -16,6 +16,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 from importlib.resources import files
 from pathlib import Path
 
@@ -107,7 +108,15 @@ def _verify_file_hashes(expected: dict[Path, str]) -> None:
 
 
 def _run(command: list[str], cwd: Path, *, succeeds: bool = True, env: dict | None = None) -> dict:
-    result = subprocess.run(command, cwd=cwd, env=env, capture_output=True, text=True, check=False)
+    # Disabling writes alone still permits stale timestamp-valid bytecode reads.
+    # Each child (including both runtime probes) gets a fresh, empty namespace.
+    environment = dict(os.environ if env is None else env)
+    environment["PYTHONDONTWRITEBYTECODE"] = "1"
+    with tempfile.TemporaryDirectory(prefix="edge-canary-pycache-") as pycache:
+        environment["PYTHONPYCACHEPREFIX"] = pycache
+        result = subprocess.run(
+            command, cwd=cwd, env=environment, capture_output=True, text=True, check=False
+        )
     if succeeds and result.returncode:
         raise RuntimeError(f"canary command failed: {result.stderr}")
     if not succeeds:
