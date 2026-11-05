@@ -81,9 +81,26 @@ def test_a_committed_manifest_snapshot_is_found_by_name(tmp_path: Path) -> None:
     assert _found(root) == [("scripts/.vendored_manifest.json", "manifest-snapshot")]
 
 
-def test_dated_reports_are_records_not_couplings(tmp_path: Path) -> None:
-    root = _repo(tmp_path, {"reports/2026-09-21/run.json": f'{{"claw": "{OLD}"}}\n'})
-    assert _found(root) == []
+@pytest.mark.parametrize("record", [
+    "reports/2026-09-21/run.json",
+    # The shapes of #795's hits: dated review bundles and research runs.
+    "reviews/structured/20261010T210459Z-diatom/review.md",
+    "reviews/publication/20261015-round87/build-manifest.py",
+    "research/ingests/round26-20261011-publication.md",
+])
+def test_dated_records_are_not_couplings_but_the_same_text_elsewhere_is(tmp_path: Path, record: str) -> None:
+    """Only a top-level dated directory is exempt: the same text under docs/ is still found (#795)."""
+    text = f'{{"claw": "{OLD}"}}\n'
+    elsewhere = "docs/" + record
+    root = _repo(tmp_path, {record: text, elsewhere: text})
+    assert _found(root) == [(elsewhere, "pin-reference")]
+
+
+@pytest.mark.parametrize("directory", ["reports", "reviews", "research"])
+def test_a_manifest_snapshot_inside_a_dated_record_is_not_a_coupling(tmp_path: Path, directory: str) -> None:
+    root = _repo(tmp_path, {f"{directory}/2026-10-15/.vendored_manifest.json": "{}\n",
+                            "scripts/.vendored_manifest.json": "{}\n"})
+    assert _found(root) == [("scripts/.vendored_manifest.json", "manifest-snapshot")]
 
 
 def test_only_the_committed_tree_is_read(tmp_path: Path) -> None:
