@@ -202,18 +202,14 @@ def test_a_repeated_prefix_is_a_layout_not_a_typo(tmp_path):
     assert check(tmp_path, {"CommunityMech": root})[0].verdict == "ok"
 
 
-def test_a_bare_repeated_prefix_names_the_checkout_itself(tmp_path):
-    """`CommunityMech/CommunityMech` is the nested checkout, written from the
-    shared parent. Stripping the repeated name leaves nothing to look up,
-    which is the checkout itself, not a missing file (#843, the cause of #835)."""
-    # A real checkout: the filesystem fallback for a non-git directory finds
-    # the empty remainder (the directory itself) and hides the bug.
-    root = _repository(tmp_path / "CommunityMech" / "CommunityMech", {"README.md": "x"})
-    _skill(tmp_path, "s", "Compare `CommunityMech/CommunityMech` with `CommunityMech/gone.csv`.\n")
+def test_a_bare_repeated_prefix_is_judged_not_assumed(tmp_path):
+    """In a sibling layout `CultureMech/CultureMech` names a directory that
+    does not exist, so it is missing; an earlier fix that called any bare
+    repeated prefix "ok" hid exactly this (#845)."""
+    mech = _repository(tmp_path / "CultureMech", {"README.md": "x"})
+    _skill(tmp_path, "s", "Compare `CultureMech/CultureMech`.\n")
 
-    verdicts = {f.reference.text: f.verdict for f in check(tmp_path, {"CommunityMech": root})}
-
-    assert verdicts == {"CommunityMech/CommunityMech": "ok", "CommunityMech/gone.csv": "missing"}
+    assert check(tmp_path, {"CultureMech": mech})[0].verdict == "missing"
 
 
 @pytest.mark.parametrize("text", [".git/objects/pack", "OtherMech/.git/objects/pack"])

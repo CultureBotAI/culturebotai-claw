@@ -479,8 +479,6 @@ def _resolve_path(
         # them until the remainder is relative to the checkout itself.
         while rest.split("/")[0] == head:
             rest = rest.partition("/")[2]
-        if not rest:  # `CommunityMech/CommunityMech` names the checkout itself (#843)
-            return Finding(reference, "ok")
         verdict = repo.verdict(rest)
         if verdict == "ok":
             return Finding(reference, "ok")
