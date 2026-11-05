@@ -168,9 +168,15 @@ every repository. The scripts are under `scripts/adhoc/`
 
 CellStructureMech and HabitatMech adopt the gate. Every one of their `evidence`
 slots holds an `EvidenceItem` or `SupportingReference` whose schema defines
-`snippet` as a verbatim quote, so their profiles select every slot. Each commits
-the abstracts its quotes cite, and keeps a known-findings ledger whose entries
-name one issue in that Mech that owns their repair. HabitatMech's habitat
+`snippet` as a verbatim quote, so their profiles select every slot. Each keeps a
+known-findings ledger whose entries name one issue in that Mech that owns their
+repair.
+
+HabitatMech commits the abstracts its quotes cite. CellStructureMech's LICENSE
+hosts only licence-verified CC0, public-domain or CC BY text, so it commits
+none. Its ledger records every quote as `MISSING_CACHE` until
+[CellStructureMech#3065](https://github.com/CultureBotAI/CellStructureMech/issues/3065)
+hosts the abstracts whose licence allows it. HabitatMech's habitat
 records are generated from its curation sources, whose evidence they carry
 unchanged, so a repair goes into the curation source and is regenerated.
 
@@ -204,42 +210,55 @@ measurement and what adoption needs:
   reviewed adapter for that reference join
   ([#790](https://github.com/CultureBotAI/culturebotai-claw/issues/790)).
 
-### How the rollout release lands
+### How the rollout release landed
 
 The single-MIM canary ran as a bounded release lane that froze the evidence
 capability and the governance manifest; see
-`docs/guides/VENDORED_GOVERNANCE.md`. The rollout release retires that lane and
-returns the fleet to the coordinated contract of one shared pin:
+`docs/guides/VENDORED_GOVERNANCE.md`. The rollout release,
+[#773](https://github.com/CultureBotAI/culturebotai-claw/pull/773), retired that
+lane and returned the fleet to the coordinated contract of one shared pin. A
+later adoption follows the same three steps:
 
-1. The release enables the adopters, extends the runner and workflow to them,
-   lists them in `INCOMPLETE_CONSUMERS` until they vendor, and removes the
-   lane's declaration and audit. From its merge until every Mech re-pins,
-   `fleet-audit` reports a rollout in progress. Until the first Mech re-pins,
-   that message names MIM's canary commit as the commit to advance to; the
-   target is the release commit
-   ([#775](https://github.com/CultureBotAI/culturebotai-claw/issues/775)).
-2. Every Mech re-pins to the release commit with `kg-microbe-governance sync`.
-   Before fanning out, run `kg-microbe-governance pin-coupling` once per
-   outgoing pin: MIM leaves the canary commit `16fd7c94`, the other thirteen
-   the baseline `a5d56296`. It reports every file that names the outgoing pin,
-   but only a copy the Mech's own checks compare changes. For this release
-   that is NaturalProductMech's `scripts/.vendored_manifest.json`, which must
-   equal claw's manifest at the pin, so its re-pin re-snapshots it
-   ([#791](https://github.com/CultureBotAI/culturebotai-claw/issues/791)).
-   Dated review and research records, provenance and commit permalinks that
-   name the old pin are history and stay unchanged
-   ([#795](https://github.com/CultureBotAI/culturebotai-claw/issues/795)).
-   The adopters' PRs also commit their fetched caches and ledger. They also add
-   `scripts/run_shared_evidence_validator.py` to `[tool.ruff] extend-exclude`
-   beside their other claw-governed scripts, since their required `qc` lint
-   rejects it at 110 columns
-   ([#788](https://github.com/CultureBotAI/culturebotai-claw/issues/788)).
-   Their `qc-evidence` job must pass on the PR and in the merge group.
-3. A final claw PR removes the adopters from `INCOMPLETE_CONSUMERS` and
-   removes the lane's now-unreachable workflow steps. Until that PR lands,
-   `fleet-audit` stays red even after every Mech has re-pinned: once an
-   adopter vendors the runner and workflow, the audit's completeness check
-   reports that adopter's `INCOMPLETE_CONSUMERS` entry as stale.
+1. The release enabled the adopters and extended the runner and workflow to
+   them. It listed them in `INCOMPLETE_CONSUMERS` until they vendored, and
+   removed the lane's declaration and audit.
+   - From its merge until every Mech re-pinned, `fleet-audit` reported a
+     rollout in progress.
+   - Until the first re-pin, that message named MIM's canary commit as the
+     commit to advance to, though the target was the release commit
+     ([#775](https://github.com/CultureBotAI/culturebotai-claw/issues/775)).
+2. Every Mech re-pinned to the release commit with `kg-microbe-governance
+   sync`, in one PR per Mech.
+   - **Pin coupling.** `kg-microbe-governance pin-coupling` ran first, once per
+     outgoing pin: MIM left the canary commit `16fd7c94`, the other thirteen
+     the baseline `a5d56296`. It reports every file that names the outgoing
+     pin, but only a copy the Mech's own checks compare has to change. Here
+     that was NaturalProductMech's `scripts/.vendored_manifest.json`, which
+     must equal claw's manifest at the pin, so its re-pin re-snapshotted it
+     ([#791](https://github.com/CultureBotAI/culturebotai-claw/issues/791)).
+   - **Dated records.** Review and research records, provenance and commit
+     permalinks that name the old pin are history, and stayed unchanged
+     ([#795](https://github.com/CultureBotAI/culturebotai-claw/issues/795)).
+   - **Adopters.** Their PRs committed a known-findings ledger. They added
+     `scripts/run_shared_evidence_validator.py` to `[tool.ruff]
+     extend-exclude` beside their other claw-governed scripts, since their
+     required `qc` lint rejects it at 110 columns
+     ([#788](https://github.com/CultureBotAI/culturebotai-claw/issues/788)).
+     Their `qc-evidence` job had to pass on the PR and in the merge group.
+   - **Abstracts.** Only HabitatMech committed its fetched abstracts.
+     CellStructureMech's LICENSE hosts only licence-verified CC0,
+     public-domain or CC BY text, and the abstracts were unverified. So its PR
+     committed none, and recorded every quote as `MISSING_CACHE` under
+     [CellStructureMech#3065](https://github.com/CultureBotAI/CellStructureMech/issues/3065)
+     ([#796](https://github.com/CultureBotAI/culturebotai-claw/issues/796)).
+   - **Provenance.** The re-pin and publishing scripts are
+     `scripts/adhoc/repin_fleet_evidence_rollout_729.py` and
+     `scripts/adhoc/open_repin_prs_evidence_rollout_729.py`.
+3. A cleanup PR then removed the adopters from `INCOMPLETE_CONSUMERS` and
+   removed the lane's unreachable workflow steps. Until it landed,
+   `fleet-audit` stayed red even after every Mech had re-pinned. Once an
+   adopter vendored the runner and workflow, the audit's completeness check
+   reported its `INCOMPLETE_CONSUMERS` entry as stale.
 
 `qc-evidence` stays advisory in the adopters after the rollout. A merge-queue
 policy mapping alone changes nothing on GitHub; only a reviewed
@@ -251,22 +270,20 @@ would block every queue plan for that Mech, as it already blocks MIM's
 ([#793](https://github.com/CultureBotAI/culturebotai-claw/issues/793)). Once the
 checker accepts a pin-derived claw checkout, map the job and apply the plan.
 
-To roll the release back, roll forward.
+To roll the release back, roll forward, as Rollback in
+`docs/guides/VENDORED_GOVERNANCE.md` describes:
 
-- Do not revert it. Until the final PR lands, a revert restores the lane's
-  declaration while its selection steps are still in the workflow. The
-  restored audit then fails every pull request, including one that would
-  remove the declaration again
+- Do not re-pin the fleet to an older commit. `fleet-audit` requires the
+  manifest at the shared pin to equal the one claw's base installs. Every claw
+  pull request would then fail, including one that restores the old manifest
+  ([#789](https://github.com/CultureBotAI/culturebotai-claw/issues/789)).
+- Do not use a plain `git revert` of the release either. It would also restore
+  the retired lane's declaration, its audit and their tests
   ([#784](https://github.com/CultureBotAI/culturebotai-claw/issues/784)).
-- Do not re-pin the fleet to an older commit either. `fleet-audit` requires
-  the manifest at the shared pin to equal the one claw's base installs, so
-  every claw pull request would fail, including one that restores the old
-  manifest ([#789](https://github.com/CultureBotAI/culturebotai-claw/issues/789)).
 - Instead:
   1. Bring every Mech to the release commit.
   2. Merge a reviewed claw PR that restores the previous evidence profiles and
-     manifest without the lane declaration. If the final PR has not landed, it
-     also removes the adopters' `INCOMPLETE_CONSUMERS` entries.
+     manifest, without the lane.
   3. Re-pin every Mech to that commit. `sync` never deletes, so each adopter's
      re-pin also deletes the `qc-evidence` workflow and runner, whose job would
      fail under the restored profile. If that job is required by then,
@@ -288,8 +305,14 @@ To roll the release back, roll forward.
    did for the [#729](https://github.com/CultureBotAI/culturebotai-claw/issues/729)
    rollout. Classify the residual findings, file one issue that owns their
    repair, and record them with `--record-known-findings`. A cached abstract
-   does not clear redistribution rights; follow the Mech's source policy before
-   committing caches.
+   does not clear redistribution rights. Before committing caches, read the
+   Mech's source policy, including any hosting policy in its `LICENSE`, and
+   check whether its Pages site publishes the repository root. Where only
+   licence-verified text may be hosted, land the verified abstracts in their
+   own reviewed PR first, and record the rest as `MISSING_CACHE` known
+   findings. The rollout's scripts commit no abstracts under such a policy
+   ([#796](https://github.com/CultureBotAI/culturebotai-claw/issues/796),
+   [#808](https://github.com/CultureBotAI/culturebotai-claw/issues/808)).
 3. Adopt through a coordinated re-pin as above. A Mech that lints its scripts
    excludes the vendored runner, as it does its other claw-governed files.
    Making `qc-evidence` required waits for the merge-queue checker to accept

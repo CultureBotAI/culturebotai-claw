@@ -436,15 +436,17 @@ MediaIngredientMech alone advance from the fleet baseline
 audit while every other Mech kept the baseline. That lane rejected any change to
 the evidence capability or the governance manifest, so the fleet rollout
 ([#729](https://github.com/CultureBotAI/culturebotai-claw/issues/729)) retired
-it. The declaration and `release_audit.py` are removed, so the lane can no
-longer be selected; its workflow steps stay only until the cleanup PR, because
-the release PR itself is audited against a base that still has the declaration.
-Every Mech re-pins to the rollout release, and the coordinated `fleet-audit`
-above is again the only release gate. Roll the release back forward, as
-Rollback below describes, never by `git revert`. Until the cleanup PR removes
-those steps, a revert restores the declaration beside its still-present
-selection steps, and the restored audit fails every pull request (#784).
-Historical receipts that cite the lane keep the revision they validated.
+it in [claw#773](https://github.com/CultureBotAI/culturebotai-claw/pull/773).
+
+- The release removed the declaration and `release_audit.py`.
+- The lane's workflow steps stayed for one more PR, because the release PR
+  itself was audited against a base that still had the declaration. The
+  cleanup PR that followed the fleet's re-pin removed them.
+
+Every Mech re-pinned to the rollout release, and the coordinated `fleet-audit`
+above is again the only release gate. Roll a release back forward, as Rollback
+below describes, not with a plain `git revert` (#784). Historical receipts that
+cite the lane keep the revision they validated.
 
 ## Rollback
 
