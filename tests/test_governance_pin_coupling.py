@@ -152,3 +152,12 @@ def test_a_consumer_not_pinning_the_outgoing_commit_is_not_ok(tmp_path: Path, ca
                  "--target-root", f"culturemech={root}"]) == 0
     assert "not the outgoing pin" not in capsys.readouterr().out
 
+
+
+@pytest.mark.parametrize("lookalike", ["reviewsX", "research-notes", "Reviews", "Research", "REPORTS"])
+def test_a_lookalike_or_differently_cased_directory_is_not_exempt(tmp_path: Path, lookalike: str) -> None:
+    """The exemption is the exact top-level name, case and slash included (#842)."""
+    root = _repo(tmp_path, {f"{lookalike}/2026-10-15/run.json": f'{{"claw": "{OLD}"}}\n',
+                            f"{lookalike}/2026-10-15/.vendored_manifest.json": "{}\n"})
+    assert sorted(_found(root)) == [(f"{lookalike}/2026-10-15/.vendored_manifest.json", "manifest-snapshot"),
+                                    (f"{lookalike}/2026-10-15/run.json", "pin-reference")]
