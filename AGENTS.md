@@ -166,7 +166,6 @@ uv run --extra dev mypy \
   src/kg_microbe_governance/__init__.py \
   src/kg_microbe_governance/__main__.py \
   src/kg_microbe_governance/fleet_audit.py \
-  src/kg_microbe_governance/release_audit.py \
   src/kg_microbe_governance/artifacts/scripts/run_shared_evidence_validator.py \
   src/kg_microbe_governance/artifacts/scripts/check_vendored_sync.py
 uv run --extra dev python -m pytest -q \
