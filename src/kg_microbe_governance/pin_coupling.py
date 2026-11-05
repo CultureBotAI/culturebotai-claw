@@ -32,7 +32,7 @@ from . import GovernanceError, _validate_ref
 MIN_ABBREVIATION = 7
 # Dated records: review bundles, research runs and reports quote the commit they
 # were made against. For the pin the rollout to 76c1ebee retired (a5d56296),
-# 226 of the 230 hits in thirteen Mechs were such records (#795).
+# 226 of the 230 hits across the Mechs still pinned to it were such records (#795).
 DATED_RECORD_PREFIXES = ("reports/", "reviews/", "research/")
 _HEX_RUN = re.compile(r"[0-9a-f]{%d,40}" % MIN_ABBREVIATION)
 _SNAPSHOT_NAME = re.compile(r"(^|/)\.?vendored[_-]?manifest[^/]*$", re.IGNORECASE)
