@@ -73,6 +73,9 @@ RUN_SEARCH_CAP = 1000
 HORIZON_DAYS = 366 * 9
 RUN_FIELDS = ".workflow_runs[] | {id, created_at, run_started_at, run_attempt, status, conclusion, html_url}"
 ASSIGNMENT = re.compile(r"^\s*[A-Za-z_][A-Za-z0-9_]*\s*=")
+#: CommonMark's line endings. str.splitlines() also splits on U+0085, U+2028
+#: and others, which are not line endings for cron, jq or a Markdown table (#838).
+LINE_ENDING = re.compile(r"\r\n|\r|\n")
 #: The StartCalendarInterval keys launchd(5) defines, with their ranges (0 and
 #: 7 are both Sunday). Anything else is a schedule launchd would not run (#836).
 CALENDAR_KEYS = {"Minute": (0, 59), "Hour": (0, 23), "Day": (1, 31), "Weekday": (0, 7), "Month": (1, 12)}
@@ -232,7 +235,7 @@ def default_gh(args: list[str]) -> str:
 
 
 def _json_lines(text: str) -> list[dict]:
-    return [json.loads(line) for line in text.splitlines() if line.strip()]
+    return [json.loads(line) for line in text.split("\n") if line.strip()]  # jq writes U+2028 raw (#838)
 
 
 def schedule_crons(document: object) -> list[str]:
@@ -322,6 +325,8 @@ def collect_repository(repository: str, gh: GhRunner, now: dt.datetime, window_d
         try:
             content = json.loads(gh(["api", f"repos/{repository}/contents/{path}"]))
             document = yaml.safe_load(base64.b64decode(content["content"]))
+            if not isinstance(document, dict):  # a list, scalar or empty file schedules nothing we can read (#838)
+                raise ValueError(f"top level is {type(document).__name__}, not a mapping")
             crons = schedule_crons(document)
             timezones = schedule_timezones(document)
         except (RuntimeError, KeyError, ValueError, yaml.YAMLError) as exc:
@@ -375,6 +380,13 @@ def fetch_runs(gh: GhRunner, repository: str, workflow_id: int, since: str, toda
 
 
 # ---------------------------------------------------------------- local ---
+def run_local(command: list[str]) -> subprocess.CompletedProcess:
+    """Run crontab or launchctl. A byte that is not UTF-8 is shown escaped, not raised:
+    the source was read, and strict decoding would abort the whole report (#838)."""
+    return subprocess.run(command, capture_output=True, text=True, encoding="utf-8",
+                          errors="backslashreplace", check=False)
+
+
 @dataclass
 class LocalJob:
     source: str
@@ -394,7 +406,7 @@ def collect_local(run: Callable[[list[str]], subprocess.CompletedProcess],
         crontab = None
         errors.append(f"crontab: {exc}")
     if crontab is not None and crontab.returncode == 0:
-        for line in crontab.stdout.splitlines():
+        for line in crontab.stdout.split("\n"):  # cron ends a line at a newline only (#838)
             stripped = line.strip()
             if not stripped or stripped.startswith("#") or ASSIGNMENT.match(stripped):
                 continue  # comments and environment assignments are not jobs (#825)
@@ -532,7 +544,7 @@ def _cell(value: object) -> str:
     table parser removes the pipe's escape before reading the code span, so a
     literal backslash before a pipe survives as itself.
     """
-    text = " ".join(str(value).splitlines())
+    text = " ".join(LINE_ENDING.split(str(value)))
     if isinstance(value, Code) and text:
         fence = "`" * (max((len(run) for run in re.findall(r"`+", text)), default=0) + 1)
         pad = " " if text.startswith("`") or text.endswith("`") else ""
@@ -629,13 +641,11 @@ def main(argv: list[str] | None = None, gh: GhRunner | None = None, now: dt.date
         try:
             statuses += collect_repository(repository, gh, now, args.days)
         except (RuntimeError, ValueError) as exc:
-            failures[repository] = str(exc).splitlines()[0][:200]
+            failures[repository] = (str(exc).strip() or type(exc).__name__).splitlines()[0][:200]
     local: list[LocalJob] = []
     local_errors: list[str] = []
     if not args.no_local:
-        local, local_errors = collect_local(
-            lambda command: subprocess.run(command, text=True, capture_output=True, check=False),
-            args.launch_agents_dir)
+        local, local_errors = collect_local(run_local, args.launch_agents_dir)
     incomplete = bool(failures or local_errors or any(status.error for status in statuses))
     if args.json:
         print(json.dumps({

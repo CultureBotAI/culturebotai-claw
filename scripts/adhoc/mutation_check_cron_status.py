@@ -9,7 +9,7 @@ from a backup, never from git.
 Inputs: none; run from the claw checkout root.
 Outputs: one line per mutant, killed or SURVIVED; a nonzero exit if any
 survives.
-Serves: the cron-status skill, PR #820 and its review issues #821-#834, #836 and #837. Written 2026-11-05.
+Serves: the cron-status skill, PR #820 and its review issues #821-#834 and #836-#838. Written 2026-11-05.
 """
 from __future__ import annotations
 
@@ -22,7 +22,8 @@ MUTANTS = [
     ("lateness flagged at 2 h", "LATE = GRACE\n", "LATE = dt.timedelta(hours=2)\n"),
     ("disabled workflow not flagged", '    if status.state != "active":\n', "    if False:\n"),
     ("DOM/DOW combined with AND", "            return in_days or in_weekdays", "            return in_days and in_weekdays"),
-    ("repository failure swallowed", "            failures[repository] = str(exc).splitlines()[0][:200]\n",
+    ("repository failure swallowed",
+     "            failures[repository] = (str(exc).strip() or type(exc).__name__).splitlines()[0][:200]\n",
      "            pass\n"),
     ("start/step stops at its start", "            end = high if has_step else start", "            end = start"),
     ("silent workflow not flagged", "    if status.expected_due and total == 0:\n", "    if False:\n"),
@@ -70,7 +71,8 @@ MUTANTS = [
     # Fourth review of PR #820 (#833).
     ("local command not a code span", "_row(job.source, Code(job.job),", "_row(job.source, job.job,"),
     ("code fence not longer than inner backticks", "default=0) + 1)", "default=0) * 0 + 1)"),
-    ("multiline joined without a space", 'text = " ".join(str(value).splitlines())', 'text = "".join(str(value).splitlines())'),
+    ("multiline joined without a space", 'text = " ".join(LINE_ENDING.split(str(value)))',
+     'text = "".join(LINE_ENDING.split(str(value)))'),
     ("not-assessed marker unbolded", 'f"**not assessed: {status.error}**"', 'f"not assessed: {status.error}"'),
     # Fifth review of PR #820 (#834).
     ("malformed trigger escapes the per-plist handler",
@@ -109,6 +111,20 @@ MUTANTS = [
     ("is_dir outside the directory handler",
      "    if agents_dir is not None:\n        try:\n",
      "    if agents_dir is not None:\n        agents_dir.is_dir()\n        try:\n"),
+    # Eighth review of PR #820 (#838).
+    ("scheduler output decoded strictly", 'errors="backslashreplace"', 'errors="strict"'),
+    ("main bypasses run_local", "collect_local(run_local, args.launch_agents_dir)",
+     "collect_local(lambda command: subprocess.run(command, text=True, capture_output=True, check=False), "
+     "args.launch_agents_dir)"),
+    ("non-mapping workflow file read as unscheduled",
+     "            if not isinstance(document, dict):  # a list", "            if False:  # a list"),
+    ("crontab split on Unicode separators", 'crontab.stdout.split("\\n"):', "crontab.stdout.splitlines():"),
+    ("gh lines split on Unicode separators", 'text.split("\\n") if line.strip()]', "text.splitlines() if line.strip()]"),
+    ("cells split on Unicode separators", "LINE_ENDING.split(str(value))", "str(value).splitlines()"),
+    ("carriage return not a cell line ending", 'LINE_ENDING = re.compile(r"\\r\\n|\\r|\\n")',
+     'LINE_ENDING = re.compile(r"\\n")'),
+    ("empty repository failure message indexes nothing",
+     "(str(exc).strip() or type(exc).__name__).splitlines()[0]", "str(exc).splitlines()[0]"),
 ]
 
 original = SOURCE.read_bytes()

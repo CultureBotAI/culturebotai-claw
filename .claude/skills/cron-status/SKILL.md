@@ -87,6 +87,8 @@ named on an `INCOMPLETE` line, while the rest of the report still appears:
 - a `StartCalendarInterval` that launchd(5) would reject.
 
 A LaunchAgents directory it cannot list is reported the same way, not as empty.
+So is a workflow file that is not a YAML mapping. A byte in crontab or launchctl
+output that is not UTF-8 is read, not refused: it appears escaped, as `\xff`.
 
 ## Output
 

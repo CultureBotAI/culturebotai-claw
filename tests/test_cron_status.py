@@ -683,3 +683,81 @@ def test_an_unsearchable_parent_of_the_launch_agents_dir_is_named_not_raised(tmp
     finally:
         parent.chmod(0o700)
     assert jobs == [] and len(errors) == 1 and errors[0].startswith(f"launchd: cannot list {agents}:")
+
+
+# --------------------------------------------------- eighth review (#838) --
+def _fake_schedulers(tmp_path, monkeypatch, crontab_octal: str, launchctl_octal: str = "") -> Path:
+    """`crontab` and `launchctl` stand-ins first on PATH, printing the given bytes (as printf octal)."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    for name, payload in (("crontab", crontab_octal), ("launchctl", launchctl_octal)):
+        script = bin_dir / name
+        script.write_text(f"#!/bin/sh\nprintf '{payload}'\n")
+        script.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bin_dir}:{__import__('os').environ['PATH']}")
+    agents = tmp_path / "agents"
+    agents.mkdir()
+    return agents
+
+
+def test_run_local_escapes_bytes_that_are_not_utf8():
+    completed_process = cs.run_local([sys.executable, "-c", "import sys; sys.stdout.buffer.write(b'echo \\xff')"])
+    assert completed_process.stdout == "echo \\xff"
+
+
+def test_undecodable_scheduler_output_is_shown_escaped_through_main(tmp_path, monkeypatch, capsys):
+    import plistlib
+
+    agents = _fake_schedulers(tmp_path, monkeypatch, "0 0 * * * echo \\377\\n", '"LastExitStatus" = \\377;\\n')
+    (agents / "a.plist").write_bytes(plistlib.dumps({"Label": "me.job", "StartInterval": 60}))
+    status = cs.main(["--repo", "o/r", "--json", "--launch-agents-dir", str(agents)],
+                     gh=fake_gh([], {}, {}), now=NOW)
+    data = json.loads(capsys.readouterr().out)
+    assert status == 0 and data["complete"] is True
+    assert [(job["source"], job["job"]) for job in data["local"]] == [("crontab", "echo \\xff"), ("launchd", "me.job")]
+
+
+def test_a_unicode_separator_inside_a_crontab_command_does_not_split_it(tmp_path, monkeypatch, capsys):
+    agents = _fake_schedulers(tmp_path, monkeypatch, "0 0 * * * echo a\\302\\205b\\n")  # U+0085 in UTF-8
+    status = cs.main(["--repo", "o/r", "--json", "--launch-agents-dir", str(agents)],
+                     gh=fake_gh([], {}, {}), now=NOW)
+    data = json.loads(capsys.readouterr().out)
+    assert status == 0
+    assert [(job["schedule"], job["job"]) for job in data["local"]] == [("0 0 * * *", "echo a\u0085b")]
+
+
+@pytest.mark.parametrize("text", ["- not\n- a workflow\n", "just a string\n", ""])
+def test_a_workflow_file_that_is_not_a_mapping_is_not_assessed(capsys, text):
+    files = {**FILES, ".github/workflows/audit.yaml": workflow_file(text)}
+    status, out = main_output(capsys, fake_gh(WORKFLOWS, files, {}), "--repo", "o/r")
+    assert status == 1
+    assert "INCOMPLETE: o/r .github/workflows/audit.yaml was not assessed: could not read the workflow file" in out
+    assert "not a mapping" in out
+
+
+@pytest.mark.parametrize("value,cell", [
+    (cs.Code("echo a b"), "`echo a b`"),
+    (cs.Code("echo a\u0085b"), "`echo a\u0085b`"),
+    ("a\r\nb\rc\nd", "a b c d"),
+])
+def test_cells_join_only_markdown_line_endings(value, cell):
+    assert cs._cell(value) == cell
+
+
+def test_a_unicode_separator_inside_a_gh_json_line_is_part_of_the_string():
+    base = fake_gh(WORKFLOWS[:1], FILES, {1: daily_runs()})
+    named = json.dumps({**WORKFLOWS[0], "name": "a\u2028b"}, ensure_ascii=False)  # raw, as jq writes it
+
+    def gh(args):
+        return named + "\n" if args[-1].startswith(".workflows[]") else base(args)
+
+    assert "\u2028" in named
+    assert [status.name for status in cs.collect_repository("o/r", gh, NOW, 7)] == ["a\u2028b"]
+
+
+def test_a_repository_failure_without_a_message_is_named_by_its_type(capsys):
+    def gh(args):
+        raise RuntimeError("")
+
+    status, out = main_output(capsys, gh, "--repo", "o/r", "--json")
+    assert status == 1 and json.loads(out)["failures"] == {"o/r": "RuntimeError"}
