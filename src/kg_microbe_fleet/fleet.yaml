@@ -2322,14 +2322,17 @@ mechs:
         reason: >-
           Native inline events and canonical sidecars are implemented through
           src/cmmmech/history.py and justfile, with history/ validated as append-only
-          in CI. Generic curation remains disabled because neither
-          .claude/skills/curate-yaml-record/SKILL.md nor
-          .claude/skills/curate-yaml-record/references/review-checklist.md exists
-          to implement that write contract. Read-only structured review has its own record_review capability
-          and does not enable curation.
+          in CI. .claude/skills/curate-yaml-record/SKILL.md and
+          .claude/skills/curate-yaml-record/references/review-checklist.md now exist,
+          added with CMMMech's canonical skill adapters (CMMMech#513), so the
+          write contract's files are present; enabling generic curation awaits
+          review (#785). Read-only structured review has its own record_review
+          capability and does not enable curation.
         reason_claims:
-          present: ["justfile", "src/cmmmech/history.py", "history"]
-          absent:
+          present:
+            - "justfile"
+            - "src/cmmmech/history.py"
+            - "history"
             - ".claude/skills/curate-yaml-record/SKILL.md"
             - ".claude/skills/curate-yaml-record/references/review-checklist.md"
       strict_validation:
@@ -2395,9 +2398,10 @@ mechs:
         reason: Mechanism evidence is modeled without nodes or directed causal edges.
       page_budgets:
         status: disabled
-        reason: No pages/ tree or conf/pages_budgets.json defines a site and its budgets.
+        reason: A pages/ tree exists, but no conf/pages_budgets.json declares its budgets.
         reason_claims:
-          absent: ["pages", "conf/pages_budgets.json"]
+          present: ["pages"]
+          absent: ["conf/pages_budgets.json"]
       kgx_export:
         status: disabled
         reason: No curated graph or KGX export product exists yet.
@@ -2423,9 +2427,11 @@ mechs:
           absent: ["scripts/audit_writers.py"]
       site_contract:
         status: disabled
-        reason: No pages/ tree exists for the shared site contract to audit.
+        reason: >-
+          A pages/ tree exists, but no site_path and published_root have been
+          declared for it or verified against the shared HTML contract.
         reason_claims:
-          absent: ["pages"]
+          present: ["pages"]
       source_catalogue:
         status: disabled
         reason: No download.yaml declares sources in the fleet catalogue format.
@@ -2473,14 +2479,14 @@ mechs:
       curation_history:
         status: disabled
         reason: >-
-          The native new-history recipe in justfile does not establish the
-          shared curation write contract. Neither
-          .claude/skills/curate-yaml-record/SKILL.md nor
-          .claude/skills/curate-yaml-record/references/review-checklist.md
-          implements it. Structured record review is separately enabled.
+          The native new-history recipe in justfile predates the shared curation
+          write contract. .claude/skills/curate-yaml-record/SKILL.md and
+          .claude/skills/curate-yaml-record/references/review-checklist.md now
+          exist (AIMech#428); enabling generic curation awaits review (#785).
+          Structured record review is separately enabled.
         reason_claims:
-          present: ["justfile"]
-          absent:
+          present:
+            - "justfile"
             - ".claude/skills/curate-yaml-record/SKILL.md"
             - ".claude/skills/curate-yaml-record/references/review-checklist.md"
       strict_validation:
