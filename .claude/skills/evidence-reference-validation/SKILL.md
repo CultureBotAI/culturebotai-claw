@@ -118,8 +118,11 @@ directory is writable; every dry run also checks the repository-lock setup that
 `--apply` takes (including the global lock), and `--apply` holds that lock. An
 NCBI error reply stops the run; it is never reported as sources not found.
 `--json` must be outside the checkout or under its `workspace/`. A cached abstract
-does not clear its redistribution rights; follow the Mech's source policy before
-committing caches.
+does not clear its redistribution rights. Follow the Mech's source policy before
+committing caches, including any hosting policy in its `LICENSE`.
+CellStructureMech, for example, hosts only licence-verified CC0, public-domain
+or CC BY text, so it records unhostable sources as `MISSING_CACHE` instead
+(claw#796).
 
 ## Known findings ledger
 
