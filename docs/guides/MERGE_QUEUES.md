@@ -74,14 +74,28 @@ Readiness checks cover triggers, cancellation, required jobs and their transitiv
 prerequisites, candidate repository and commit, and separate immutable auxiliary
 checkouts.
 
-An auxiliary checkout must name a literal 40-character commit, with one
-exception: a claw checkout at a step output (`${{ steps.<id>.outputs.ref }}`),
-and only when the whole workflow file is byte-identical to a claw-governed
-workflow artifact. The governed `qc-evidence.yaml` derives that ref from the
-consumer's committed pin, and the consumer's `vendored-sync` check holds those
-bytes to the canon. A hand-written lookalike, or a local edit of the governed
-file, still needs a literal commit
-([#793](https://github.com/CultureBotAI/culturebotai-claw/issues/793)).
+An auxiliary checkout must name a literal 40-character commit, with two
+exceptions:
+
+- **claw's own trusted audit base:** `fleet/trusted-claw` at the event's base
+  commit.
+- **A claw checkout at a step output** (`${{ steps.<id>.outputs.ref }}`), only
+  when the whole workflow file is byte-identical to a claw-governed workflow
+  artifact.
+  - The governed `qc-evidence.yaml` derives that ref from the consumer's
+    committed pin, and the consumer's `vendored-sync` check holds those bytes
+    to the canon.
+  - A hand-written lookalike, or any byte change to the governed file
+    (including CRLF line endings or a byte-order mark), still needs a literal
+    commit
+    ([#793](https://github.com/CultureBotAI/culturebotai-claw/issues/793),
+    [#818](https://github.com/CultureBotAI/culturebotai-claw/issues/818)).
+
+The accepted digests come from the claw governance package that runs the plan,
+not from the consumer's pin. During a rollout, a consumer still pinned to an
+earlier version of a governed workflow therefore gets a blocked plan until it
+re-pins. That fails closed by design
+([#819](https://github.com/CultureBotAI/culturebotai-claw/issues/819)).
 
 Concurrency belongs at workflow level to avoid jobs contending with
 their own workflow. The checker also requires exact unique successful job names observed in the ten latest

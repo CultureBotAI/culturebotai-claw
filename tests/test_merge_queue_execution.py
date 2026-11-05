@@ -94,6 +94,16 @@ def test_pin_derived_claw_checkout_needs_the_governed_bytes():
     assert any(AUXILIARY_ERROR in error for error in workflow_errors(text, ['qc-evidence']))
 
 
+@pytest.mark.parametrize('variant', [
+    lambda text: text.replace('\n', '\r\n'),  # CRLF line endings
+    lambda text: '﻿' + text,             # byte-order mark
+], ids=['crlf', 'bom'])
+def test_byte_variants_of_the_governed_workflow_are_not_the_governed_bytes(variant):
+    """#818: the digest is over the exact bytes; normalising them would admit a non-canonical file."""
+    text = variant(GOVERNED_QC_EVIDENCE.read_text(encoding='utf-8'))
+    assert any(AUXILIARY_ERROR in error for error in workflow_errors(text, ['qc-evidence']))
+
+
 def test_pin_derived_checkout_of_another_repository_is_rejected():
     text = GOVERNED_QC_EVIDENCE.read_text(encoding='utf-8').replace(
         'repository: CultureBotAI/culturebotai-claw', 'repository: CultureBotAI/other')

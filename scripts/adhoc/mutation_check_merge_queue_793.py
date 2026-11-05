@@ -10,7 +10,7 @@ safe.
 Inputs: none; run from the claw checkout root.
 Outputs: one line per mutant, killed or SURVIVED; a nonzero exit if any
 survives.
-Serves: culturebotai-claw#793. Written 2026-11-05.
+Serves: culturebotai-claw#793, #818. Written 2026-11-05.
 """
 from __future__ import annotations
 
@@ -28,6 +28,11 @@ MUTANTS = [
     ("repository condition dropped", "                options.get(\"repository\") == CLAW\n", "                True\n"),
     ("step-output ref condition dropped",
      "                and isinstance(ref, str) and PIN_DERIVED_REF.fullmatch(ref) is not None\n", ""),
+    # #818: hashing a normalised text would admit bytes vendored-sync rejects.
+    ("hash input normalises CRLF", 'hashlib.sha256(text.encode("utf-8"))',
+     'hashlib.sha256(text.replace("\\r\\n", "\\n").encode("utf-8"))'),
+    ("hash input strips a BOM", 'hashlib.sha256(text.encode("utf-8"))',
+     'hashlib.sha256(text.lstrip("\\ufeff").encode("utf-8"))'),
 ]
 
 original = SOURCE.read_bytes()

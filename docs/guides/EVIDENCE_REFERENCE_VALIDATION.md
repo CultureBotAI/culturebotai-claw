@@ -267,7 +267,10 @@ policy mapping alone changes nothing on GitHub; only a reviewed
 
 The queue checker now accepts the governed workflow's pin-derived claw checkout,
 because the workflow's bytes are the governed artifact
-([#793](https://github.com/CultureBotAI/culturebotai-claw/issues/793)). So
+([#793](https://github.com/CultureBotAI/culturebotai-claw/issues/793)). The
+accepted digests come from the claw package that runs the plan, so a Mech
+pinned to an older version of the workflow gets a blocked plan until it
+re-pins ([#819](https://github.com/CultureBotAI/culturebotai-claw/issues/819)). So
 making the job required in an adopter is a policy decision, not a technical
 block: map it in the merge-queue policy and apply a reviewed plan.
 
