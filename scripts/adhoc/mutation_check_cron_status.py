@@ -9,7 +9,7 @@ from a backup, never from git.
 Inputs: none; run from the claw checkout root.
 Outputs: one line per mutant, killed or SURVIVED; a nonzero exit if any
 survives.
-Serves: the cron-status skill, PR #820 and its review issues #821-#827. Written 2026-11-05.
+Serves: the cron-status skill, PR #820 and its review issues #821-#830. Written 2026-11-05.
 """
 from __future__ import annotations
 
@@ -43,8 +43,20 @@ MUTANTS = [
     ("unassessed workflow not named", "        if status.error:\n            lines.append(f\"INCOMPLETE:",
      "        if False:\n            lines.append(f\"INCOMPLETE:"),
     ("missing crontab binary raises", "    except OSError as exc:  # no crontab binary", "    except ValueError as exc:  # no crontab binary"),
-    ("launchd interval read as minutes", 'f"every {seconds} s" if seconds < 60 else ', ""),
+    ("launchd interval read as minutes", '            parts.append(f"every {seconds} s")\n',
+     '            parts.append(f"every {_duration(seconds // 60)}")\n'),
     ("re-run attempt hidden", '        if (latest.get("run_attempt") or 1) > 1:\n', "        if False:\n"),
+    # Second review of PR #820 (#828-#830).
+    ("count query paginated", 'int(gh(["api", f"{base}&created={quote(created)}", "--jq", ".total_count"])',
+     'int(gh(["api", "--paginate", f"{base}&created={quote(created)}", "--jq", ".total_count"])'),
+    ("today omitted from per-day queries", "    while day <= today:\n", "    while day < today:\n"),
+    ("per-day runs deduplicated by timestamp", '            runs[run.get("id", run["created_at"])] = run\n',
+     '            runs[run["created_at"]] = run\n'),
+    ("missing launchctl raises", '        except OSError as exc:\n            errors.append(f"launchctl: {exc}")',
+     '        except ValueError as exc:\n            errors.append(f"launchctl: {exc}")'),
+    ("shortcut split on a space only", "                parts = stripped.split(None, 1)", '                parts = stripped.split(" ", 1)'),
+    ("bare shortcut accepted", "                if len(parts) < 2:\n", "                if False:\n"),
+    ("interval seconds dropped", "        elif seconds % 60:", "        elif False:"),
 ]
 
 original = SOURCE.read_bytes()

@@ -1,6 +1,6 @@
 ---
 name: cron-status
-description: "Answer \"did the cron job run?\" or \"cron job status\" in one standard table. Runs scripts/cron_status.py over claw's scheduled GitHub workflows (or, with --fleet, every manifest Mech's) plus this machine's crontab and user LaunchAgents. Each row gives the schedule, runs per day against the runs due, how late the latest scheduled run started, and the workflow's state. Then add Claude Code session jobs from CronList. Read-only: it never dispatches, re-runs, enables or disables anything."
+description: "Answer \"did the cron job run?\" or \"cron job status\" in one standard table. Runs scripts/cron_status.py over claw's scheduled GitHub workflows (or, with --fleet, every manifest Mech's) plus this machine's crontab and user LaunchAgents. Each row gives the schedule, runs per day against the runs due, how long after its tick the latest scheduled run was created (a lower bound), and the workflow's state. Then add Claude Code session jobs from CronList. Read-only: it never dispatches, re-runs, enables or disables anything."
 category: cross-repo
 requires_database: false
 requires_internet: true
@@ -57,8 +57,8 @@ they live in the Claude Code session.
 |---|---|
 | Schedule (UTC) | The workflow's `on.schedule` crons, summarised (`daily 06:41`, `every 15 min`, `hourly at :23`), or the raw expression. GitHub evaluates crons in UTC unless a schedule names a `timezone`. Such a workflow is reported as not assessed, which makes the report incomplete. |
 | State | GitHub's workflow state. Anything but `active` (for example `disabled_inactivity`, `disabled_manually`) means GitHub will not schedule it. |
-| Runs per day | Scheduled runs started on each day of the window, oldest first. Today's figure counts only ticks so far. |
-| Due / ran | Ticks older than the 12-hour grace period, against the runs created in the window. Due counts ticks and ran counts runs. They are not matched pairs: a run delayed from the day before the window counts in neither. |
+| Runs per day | Scheduled runs created on each UTC day of the window, oldest first. Today's figure is so far. |
+| Due / ran | Ticks older than the 12-hour grace period, against the runs created in the window. Due counts ticks and ran counts runs. They are not matched pairs: a tick from before the window is not due, but its delayed run counts in ran if it was created inside the window. |
 | Latest scheduled run | When it was created, its conclusion, and its attempt if it was re-run. Only `schedule` events count: a push run that passed afterwards does not change this column. |
 | Created late by (at least) | The latest run's creation minus the nearest preceding tick. That is a lower bound: a run does not record which tick it served, and it may have served an earlier one. It measures GitHub's scheduler, not when a runner picked the job up. |
 | Attention | Empty (`ok`), or the reasons below. |
@@ -76,7 +76,7 @@ column, unflagged.
 
 The local table lists crontab entries, and the LaunchAgents in `--launch-agents-dir`
 with a calendar or interval trigger. The script never assumes that directory: without the
-argument, it reports launchd as "not checked". The LaunchAgents are marked `loaded` or `not loaded`. Most such LaunchAgents are
+argument, it reports launchd as "not checked". The LaunchAgents are marked `loaded`, `not loaded`, or `unknown` when launchctl could not be asked (which makes the report incomplete). Most such LaunchAgents are
 vendor updaters. Name any that look like the user's own jobs.
 
 ## Output

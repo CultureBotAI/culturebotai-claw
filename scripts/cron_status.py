@@ -344,7 +344,7 @@ def collect_repository(repository: str, gh: GhRunner, now: dt.datetime, window_d
 def fetch_runs(gh: GhRunner, repository: str, workflow_id: int, since: str, today: dt.date) -> list[dict]:
     """Every scheduled run created since `since`, despite the search cap (#821).
 
-    One query normally suffices. When its total exceeds the cap, each day is
+    Normally one count call and one listing call suffice. When the count exceeds the cap, each day is
     queried on its own and the results are deduplicated by run id. A day that
     still exceeds the cap raises, so the report is marked incomplete rather
     than reading the cap as dropped runs.
@@ -396,8 +396,11 @@ def collect_local(run: Callable[[list[str]], subprocess.CompletedProcess],
             if not stripped or stripped.startswith("#") or ASSIGNMENT.match(stripped):
                 continue  # comments and environment assignments are not jobs (#825)
             if stripped.startswith("@"):  # shortcuts such as daily or reboot: one token, then the command
-                shortcut, _, command = stripped.partition(" ")
-                jobs.append(LocalJob("crontab", command.strip(), shortcut, "installed"))
+                parts = stripped.split(None, 1)  # any whitespace, tabs included (#828)
+                if len(parts) < 2:
+                    errors.append(f"crontab: shortcut without a command: {stripped}")
+                    continue
+                jobs.append(LocalJob("crontab", parts[1].strip(), parts[0], "installed"))
                 continue
             fields = stripped.split(None, 5)
             schedule = " ".join(fields[:5]) if len(fields) >= 6 else stripped
@@ -444,7 +447,12 @@ def _launchd_schedule(data: dict) -> str:
     parts = []
     if "StartInterval" in data:
         seconds = int(data["StartInterval"])
-        parts.append(f"every {seconds} s" if seconds < 60 else f"every {_duration(seconds // 60)}")
+        if seconds < 60:
+            parts.append(f"every {seconds} s")
+        elif seconds % 60:  # keep the seconds of an interval that is not whole minutes (#828)
+            parts.append(f"every {_duration(seconds // 60)} {seconds % 60} s")
+        else:
+            parts.append(f"every {_duration(seconds // 60)}")
     if "StartCalendarInterval" in data:
         calendar = data["StartCalendarInterval"]
         entries = calendar if isinstance(calendar, list) else [calendar]

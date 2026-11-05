@@ -367,6 +367,55 @@ def test_a_schedule_with_a_timezone_is_not_assessed_in_utc(capsys):
     assert "schedule timezone America/Los_Angeles is not supported yet" in out
 
 
+def test_a_tab_separated_shortcut_keeps_its_command_and_a_bare_one_is_malformed():
+    jobs, errors = cs.collect_local(lambda command: completed(stdout="@daily\t/bin/true\n@reboot\n"), None)
+    assert [(job.schedule, job.job) for job in jobs] == [("@daily", "/bin/true")]
+    assert errors == ["crontab: shortcut without a command: @reboot"]
+
+
+@pytest.mark.parametrize("seconds,schedule", [(61, "every 1 min 1 s"), (90, "every 1 min 30 s"),
+                                              (120, "every 2 min")])
+def test_launchd_intervals_keep_their_seconds(seconds, schedule):
+    assert cs._launchd_schedule({"StartInterval": seconds}) == schedule
+
+
+def test_the_count_query_is_not_paginated_and_the_listing_is():
+    calls = []
+    inner = fake_gh(WORKFLOWS, FILES, {1: daily_runs()})
+
+    def gh(args):
+        calls.append(args)
+        return inner(args)
+
+    cs.fetch_runs(gh, "o/r", 1, "2026-10-30", NOW.date())
+    counts = [args for args in calls if ".total_count" in args]
+    listings = [args for args in calls if ".total_count" not in args]
+    assert counts and all("--paginate" not in args for args in counts)
+    assert listings and all("--paginate" in args for args in listings)
+
+
+def test_the_per_day_path_includes_today_and_dedupes_by_run_id():
+    runs = [dict(run("2026-11-05T01:00:00Z"), id="today"),
+            dict(run("2026-11-04T09:00:00Z"), id="a"), dict(run("2026-11-04T09:00:00Z"), id="b")]
+    gh = fake_gh(WORKFLOWS, FILES, {1: runs}, window_total=cs.RUN_SEARCH_CAP + 1)
+    fetched = cs.fetch_runs(gh, "o/r", 1, "2026-10-30", NOW.date())
+    assert sorted(item["id"] for item in fetched) == ["a", "b", "today"]
+
+
+def test_a_missing_launchctl_is_reported_not_raised(tmp_path):
+    import plistlib
+
+    (tmp_path / "a.plist").write_bytes(plistlib.dumps({"Label": "me.job", "StartInterval": 3600}))
+
+    def run_command(command):
+        if command[0] == "crontab":
+            return completed(1, stderr="crontab: no crontab for me")
+        raise FileNotFoundError("launchctl")
+
+    jobs, errors = cs.collect_local(run_command, tmp_path)
+    assert jobs[0].status == "unknown" and errors and errors[0].startswith("launchctl:")
+
+
 def test_crontab_assignments_are_skipped_and_shortcuts_keep_their_command(tmp_path):
     crontab = "PATH=/bin:/usr/bin\nMAILTO=\n@daily /bin/echo one two three four five\n"
     jobs, errors = cs.collect_local(lambda command: completed(stdout=crontab), None)
