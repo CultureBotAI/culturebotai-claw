@@ -37,16 +37,30 @@ import argparse
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections import Counter
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from kg_microbe_fleet import load_fleet_manifest  # noqa: E402
+from kg_microbe_fleet.roots import (  # noqa: E402
+    MechRootError,
+    resolve_mech_root,
+)
+from kg_microbe_fleet.roots import (  # noqa: E402
+    claw_root as default_claw_root,
+)
+from kg_microbe_pages.budgets import BudgetError, load_budgets  # noqa: E402
+from kg_microbe_pages.budgets import audit as audit_pages_budget  # noqa: E402
+from kg_microbe_site.contract import check_site  # noqa: E402
+from kg_microbe_site.contrast import check_stylesheet  # noqa: E402
 
 DEFAULT_ORG = "CultureBotAI"
 DEFAULT_REPO_LIMIT = 300
@@ -75,10 +89,18 @@ class ApiError(RuntimeError):
 
 
 class GitHubClient:
-    def __init__(self, token: str | None = None, timeout: float = 20):
+    def __init__(
+        self,
+        token: str | None = None,
+        timeout: float = 20,
+        use_gh_cli: bool | None = None,
+    ):
         self.token = token
         self.timeout = timeout
         self.api_root = "https://api.github.com"
+        self.use_gh_cli = (
+            bool(shutil.which("gh")) if use_gh_cli is None and not token else bool(use_gh_cli)
+        )
 
     def _headers(self) -> dict[str, str]:
         headers = {
@@ -90,13 +112,47 @@ class GitHubClient:
             headers["Authorization"] = f"Bearer {self.token}"
         return headers
 
+    def _gh_api_json(self, path: str) -> Any:
+        endpoint = path.removeprefix(self.api_root) if path.startswith(self.api_root) else path
+        try:
+            proc = subprocess.run(
+                [
+                    "gh",
+                    "api",
+                    "-H",
+                    "Accept: application/vnd.github+json",
+                    "-H",
+                    "X-GitHub-Api-Version: 2022-11-28",
+                    endpoint,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=self.timeout,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise ApiError(str(exc)) from exc
+        if proc.returncode != 0:
+            detail = (proc.stderr or proc.stdout or f"gh api exited {proc.returncode}").strip()
+            match = re.search(r"HTTP (\d{3})", detail)
+            code = int(match.group(1)) if match else None
+            raise ApiError(detail, code)
+        try:
+            return json.loads(proc.stdout)
+        except json.JSONDecodeError as exc:
+            raise ApiError(str(exc)) from exc
+
     def json(self, path: str) -> Any:
+        if self.use_gh_cli and not self.token:
+            return self._gh_api_json(path)
         url = path if path.startswith("https://") else self.api_root + path
         request = urllib.request.Request(url, headers=self._headers())
         try:
             with urllib.request.urlopen(request, timeout=self.timeout) as response:
                 return json.load(response)
         except urllib.error.HTTPError as exc:
+            if not self.token and exc.code in (401, 403, 429) and shutil.which("gh"):
+                return self._gh_api_json(path)
             try:
                 body = json.loads(exc.read().decode("utf-8", "replace"))
                 detail = body.get("message", str(exc))
@@ -391,12 +447,98 @@ def check_repo(
     return result
 
 
+def collect_local_audits(claw_root: Path | None = None) -> list[dict[str, Any]]:
+    """Run local page_budgets and site_contract audits across manifest Mechs."""
+    resolved_claw = claw_root.resolve() if claw_root is not None else default_claw_root()
+    manifest = load_fleet_manifest()
+    audits: list[dict[str, Any]] = []
+    for key in sorted(manifest.mechs):
+        mech = manifest.mechs[key]
+        budget_cap = mech.capabilities.get("page_budgets")
+        contract_cap = mech.capabilities.get("site_contract")
+        budget_enabled = bool(budget_cap and budget_cap.is_enabled)
+        contract_enabled = bool(contract_cap and contract_cap.is_enabled)
+        if not budget_enabled and not contract_enabled:
+            continue
+        row: dict[str, Any] = {
+            "mech": key,
+            "repo": mech.github.split("/")[-1],
+            "configured": False,
+            "page_budgets_enabled": budget_enabled,
+            "site_contract_enabled": contract_enabled,
+            "budget_ok": None,
+            "budget_total_bytes": None,
+            "budget_total_files": None,
+            "budget_failures": [],
+            "site_contract_ok": None,
+            "site_html_pages": None,
+            "site_stylesheets": None,
+            "site_finding_counts": {},
+            "error": None,
+        }
+        try:
+            root = resolve_mech_root(key, claw_root=resolved_claw)
+            row["configured"] = True
+        except MechRootError as exc:
+            row["error"] = str(exc)
+            audits.append(row)
+            continue
+
+        if budget_enabled and budget_cap is not None:
+            try:
+                budgets = load_budgets(root / budget_cap.settings["budgets_path"])
+                site_dir = root / budget_cap.settings["site_path"]
+                metrics, failures = audit_pages_budget(site_dir, budgets)
+                row["budget_total_bytes"] = metrics.get("total_bytes")
+                row["budget_total_files"] = metrics.get("total_files")
+                row["budget_failures"] = list(failures)
+                row["budget_ok"] = len(failures) == 0
+            except (BudgetError, OSError, KeyError) as exc:
+                row["budget_ok"] = False
+                row["budget_failures"] = [str(exc)]
+
+        if contract_enabled and contract_cap is not None:
+            site_dir = root / contract_cap.settings["site_path"]
+            if not site_dir.is_dir():
+                row["site_contract_ok"] = False
+                row["site_finding_counts"] = {"MISSING_SITE_DIR": 1}
+            else:
+                allowed = list(contract_cap.settings.get("allowed_hosts", ()))
+                declared_root = contract_cap.settings.get("published_root")
+                published = (root / declared_root).resolve() if declared_root else None
+                if published is not None and not published.is_dir():
+                    row["site_contract_ok"] = False
+                    row["site_finding_counts"] = {"MISSING_PUBLISHED_ROOT": 1}
+                else:
+                    pages = sorted(site_dir.rglob("*.html"))
+                    stylesheets = sorted(site_dir.rglob("*.css"))
+                    findings = check_site(
+                        site_dir,
+                        allowed_hosts=allowed,
+                        pages=pages,
+                        published_root=published,
+                    )
+                    contrast = []
+                    for sheet in stylesheets:
+                        contrast.extend(check_stylesheet(sheet))
+                    counts: Counter[str] = Counter(f.code for f in findings)
+                    counts.update(c.code for c in contrast)
+                    row["site_html_pages"] = len(pages)
+                    row["site_stylesheets"] = len(stylesheets)
+                    row["site_finding_counts"] = dict(sorted(counts.items()))
+                    row["site_contract_ok"] = len(counts) == 0
+        audits.append(row)
+    return audits
+
+
 def collect(
     client: GitHubClient,
     org: str = DEFAULT_ORG,
     repo_limit: int = DEFAULT_REPO_LIMIT,
     deployment_limit: int = DEFAULT_DEPLOYMENT_LIMIT,
     check_live: bool = True,
+    with_local_audits: bool = False,
+    claw_root: Path | None = None,
 ) -> dict[str, Any]:
     all_repos = _list_org_repos(client, org)
     repos, truncated = _filter_mech_repos(all_repos, repo_limit)
@@ -420,7 +562,7 @@ def collect(
         if suite_repo is not None
         else None
     )
-    return {
+    payload: dict[str, Any] = {
         "org": org,
         "repo_limit": repo_limit,
         "repo_listing_truncated": truncated,
@@ -433,6 +575,9 @@ def collect(
         "suite_site": asdict(suite_status) if suite_status is not None else None,
         "results": [asdict(result) for result in results],
     }
+    if with_local_audits:
+        payload["local_audits"] = collect_local_audits(claw_root=claw_root)
+    return payload
 
 
 def result_is_healthy(result: dict[str, Any], check_live: bool = True) -> bool:
@@ -447,13 +592,28 @@ def result_is_healthy(result: dict[str, Any], check_live: bool = True) -> bool:
     return True
 
 
+def local_audit_is_healthy(audit_row: dict[str, Any]) -> bool:
+    if not audit_row.get("configured"):
+        return False
+    if audit_row.get("page_budgets_enabled") and not audit_row.get("budget_ok"):
+        return False
+    if audit_row.get("site_contract_enabled") and not audit_row.get("site_contract_ok"):
+        return False
+    return True
+
+
 def report_is_healthy(data: dict[str, Any], check_live: bool = True) -> bool:
     suite_site = data.get("suite_site")
     suite_ok = suite_site is None or result_is_healthy(suite_site, check_live)
+    local_audits = data.get("local_audits")
+    local_ok = local_audits is None or all(
+        local_audit_is_healthy(row) for row in local_audits
+    )
     return (
         bool(data["results"])
         and not data["repo_listing_truncated"]
         and suite_ok
+        and local_ok
         and all(result_is_healthy(result, check_live) for result in data["results"])
     )
 
@@ -512,6 +672,47 @@ def render(data: dict[str, Any], check_live: bool = True) -> str:
     if suite_site is not None:
         lines.extend(["", "Suite site (X-Mech overview)", _format_row(suite_site, check_live)])
 
+    local_audits = data.get("local_audits")
+    if local_audits is not None:
+        lines.extend(
+            [
+                "",
+                "Local Pages Budget & Site Contract Audits",
+                f"{'MECH':<23} {'BUDGET':<10} {'FILES':<8} {'BYTES':<12} {'CONTRACT':<10} {'HTML':<6} {'CSS':<5} FINDINGS",
+            ]
+        )
+        for row in local_audits:
+            if not row.get("configured"):
+                lines.append(
+                    f"{row['mech']:<23} {'UNCONF':<10} {'-':<8} {'-':<12} {'UNCONF':<10} {'-':<6} {'-':<5} {row.get('error') or 'not configured'}"
+                )
+                continue
+            b_state = (
+                ("PASS" if row["budget_ok"] else "FAIL")
+                if row["page_budgets_enabled"]
+                else "N/A"
+            )
+            c_state = (
+                ("PASS" if row["site_contract_ok"] else "FAIL")
+                if row["site_contract_enabled"]
+                else "N/A"
+            )
+            files_s = str(row["budget_total_files"]) if row["budget_total_files"] is not None else "-"
+            bytes_s = str(row["budget_total_bytes"]) if row["budget_total_bytes"] is not None else "-"
+            html_s = str(row["site_html_pages"]) if row["site_html_pages"] is not None else "-"
+            css_s = str(row["site_stylesheets"]) if row["site_stylesheets"] is not None else "-"
+            findings_parts = []
+            if row["budget_failures"]:
+                findings_parts.extend(row["budget_failures"])
+            if row["site_finding_counts"]:
+                findings_parts.extend(
+                    f"{code}={n}" for code, n in row["site_finding_counts"].items()
+                )
+            findings_s = "; ".join(findings_parts) if findings_parts else "clean"
+            lines.append(
+                f"{row['mech']:<23} {b_state:<10} {files_s:<8} {bytes_s:<12} {c_state:<10} {html_s:<6} {css_s:<5} {findings_s}"
+            )
+
     lines.extend(["", "Coverage"])
     outside = data.get("publishing_non_members") or []
     if outside:
@@ -551,6 +752,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--timeout", type=float, default=20)
     parser.add_argument("--no-live-check", action="store_true")
+    parser.add_argument(
+        "--with-local-audits",
+        action="store_true",
+        help="Run local kg-microbe-pages audit and kg-microbe-site check on configured Mechs",
+    )
+    parser.add_argument(
+        "--claw-root",
+        type=Path,
+        default=None,
+        help="Explicit claw root for resolving local Mech checkouts with --with-local-audits",
+    )
     parser.add_argument("--json", action="store_true", dest="as_json")
     return parser
 
@@ -569,6 +781,8 @@ def main(argv: list[str] | None = None) -> int:
             repo_limit=args.repo_limit,
             deployment_limit=args.deployment_limit,
             check_live=not args.no_live_check,
+            with_local_audits=args.with_local_audits,
+            claw_root=args.claw_root,
         )
     except ApiError as exc:
         print(f"ERROR: fleet discovery failed: {exc}", file=sys.stderr)

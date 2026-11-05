@@ -579,3 +579,28 @@ cron-profile name *args:
 # Preview reviewed upstream releases for canonical governed workflows; pass --apply to write.
 governed-workflow-pins *args:
     uv run python scripts/update_governed_workflow_pins.py {{args}}
+
+# ============== Fleet Maintenance & Telemetry ==============
+
+# Read-only audit of /tmp + /private/tmp + $TMPDIR, claw/workspace/,
+# worktrees, local branches, stashes, and lock leases across the fleet.
+# See .claude/skills/fleet-worktree-and-temp-hygiene/SKILL.md.
+fleet-hygiene *args:
+    uv run python scripts/fleet_git_and_temp_hygiene.py {{args}}
+
+# Read-only audit of repository weight, .git bloat, legacy root test_*.py,
+# unreferenced scripts, ungoverned YAML writers, and unapplied patch backlogs.
+# See .claude/skills/fleet-stale-content-audit/SKILL.md.
+fleet-stale-audit *args:
+    uv run python scripts/fleet_stale_content_audit.py {{args}}
+
+# Read-only audit of test counts, coverage floors, mypy/ruff parity,
+# workflow pins, and optional live pytest durations / CI pass rates.
+# See .claude/skills/fleet-test-and-ci-status/SKILL.md.
+fleet-test-ci-status *args:
+    uv run python scripts/fleet_test_ci_status.py {{args}}
+
+# Run the unified read-only fleet maintenance cycle (--tier fast or --tier full).
+# See .claude/skills/fleet-maintenance-cycle/SKILL.md.
+fleet-maintenance *args:
+    uv run python scripts/fleet_maintenance_cycle.py {{args}}
