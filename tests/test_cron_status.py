@@ -392,6 +392,7 @@ def test_the_count_query_is_not_paginated_and_the_listing_is():
     listings = [args for args in calls if ".total_count" not in args]
     assert counts and all("--paginate" not in args for args in counts)
     assert listings and all("--paginate" in args for args in listings)
+    assert all("event=schedule" in next(arg for arg in args if arg.startswith("repos/")) for args in calls)
 
 
 def test_the_per_day_path_includes_today_and_dedupes_by_run_id():
@@ -452,3 +453,48 @@ def test_a_missing_scheduler_binary_is_reported_not_raised(tmp_path):
 ])
 def test_launchd_triggers_are_rendered_in_full(plist, schedule):
     assert cs._launchd_schedule(plist) == schedule
+
+
+# ------------------------------------------- third review (#831, #832) --
+def _cells(row: str) -> list[str]:
+    import re
+
+    return [cell.strip() for cell in re.split(r"(?<!\\)\|", row)[1:-1]]
+
+
+def test_a_pipe_or_newline_in_a_cell_cannot_add_a_column_or_row():
+    job = cs.LocalJob("crontab", "/bin/echo ok | /usr/bin/tee /tmp/job.log", "0 0 * * *", "installed")
+    broken = cs.WorkflowStatus("o/r", "w", ".github/workflows/w.yaml", "active", [], error="bad | line\nnext")
+    out = cs.render([broken], {}, [job], [], ["o/r"], 7, NOW, True, False)
+    local_row = next(line for line in out.splitlines() if "tee" in line)
+    assert _cells(local_row) == ["crontab", "/bin/echo ok \\| /usr/bin/tee /tmp/job.log", "0 0 * * *", "installed"]
+    workflow_row = next(line for line in out.splitlines() if "not assessed" in line and line.startswith("|"))
+    assert len(_cells(workflow_row)) == 9
+
+
+@pytest.mark.parametrize("seconds,schedule", [(172860, "every 2 d 0 h 1 min"), (172800, "every 2 d 0 h"),
+                                              (90061, "every 25 h 1 min 1 s")])
+def test_long_launchd_intervals_keep_their_minutes(seconds, schedule):
+    assert cs._launchd_schedule({"StartInterval": seconds}) == schedule
+
+
+def test_a_tick_inside_the_grace_period_is_not_yet_due():
+    status = daily_status()
+    cs.assess(status, daily_runs(), dt.datetime(2026, 11, 5, 10, 0, tzinfo=dt.UTC), 7)
+    assert status.expected_per_day[-1] == 1  # today's 06:41 has passed
+    assert status.expected_due == 6  # but is not due until 12 h after it
+
+
+def test_runs_are_counted_on_the_day_they_were_created():
+    late_start = dict(run("2026-11-03T23:30:00Z"), run_started_at="2026-11-04T00:30:00Z")
+    status = daily_status()
+    cs.assess(status, [late_start], NOW, 7)
+    assert status.runs_per_day == [0, 0, 0, 0, 1, 0, 0]  # Nov 3, not Nov 4
+
+
+def test_an_older_failure_is_flagged_even_when_the_latest_succeeded():
+    runs = daily_runs()
+    runs[0]["conclusion"] = "failure"
+    status = daily_status()
+    cs.assess(status, runs, NOW, 7)
+    assert "1 non-success run(s) in the window" in status.attention

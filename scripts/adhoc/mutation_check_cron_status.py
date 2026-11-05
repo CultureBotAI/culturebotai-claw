@@ -9,7 +9,7 @@ from a backup, never from git.
 Inputs: none; run from the claw checkout root.
 Outputs: one line per mutant, killed or SURVIVED; a nonzero exit if any
 survives.
-Serves: the cron-status skill, PR #820 and its review issues #821-#830. Written 2026-11-05.
+Serves: the cron-status skill, PR #820 and its review issues #821-#832. Written 2026-11-05.
 """
 from __future__ import annotations
 
@@ -57,6 +57,16 @@ MUTANTS = [
     ("shortcut split on a space only", "                parts = stripped.split(None, 1)", '                parts = stripped.split(" ", 1)'),
     ("bare shortcut accepted", "                if len(parts) < 2:\n", "                if False:\n"),
     ("interval seconds dropped", "        elif seconds % 60:", "        elif False:"),
+    # Third review of PR #820 (#831, #832).
+    ("pipe in a cell not escaped", '.replace("|", "\\\\|")', ""),
+    ("long-duration minutes dropped", 'return f"{days} d {hours} h {rest} min" if rest else f"{days} d {hours} h"',
+     'return f"{days} d {hours} h"'),
+    ("grace period removed from due", "if tick <= now - GRACE)", "if tick <= now)"),
+    ("runs counted by start day", '        created = _parse_time(run["created_at"])\n        if created.date() in by_day:',
+     '        created = _parse_time(run.get("run_started_at") or run["created_at"])\n        if created.date() in by_day:'),
+    ("schedule-event filter dropped", "runs?event=schedule&per_page=100", "runs?per_page=100"),
+    ("older failures ignored", "            status.non_success += 1\n", "            pass\n"),
+    ("local command hidden", "_row(job.source, job.job, job.schedule, job.status)", '_row(job.source, "", job.schedule, job.status)'),
 ]
 
 original = SOURCE.read_bytes()

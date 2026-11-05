@@ -474,7 +474,17 @@ def _duration(minutes: int) -> str:
     hours, rest = divmod(minutes, 60)
     if hours < 48:
         return f"{hours} h {rest} min" if rest else f"{hours} h"
-    return f"{hours // 24} d {hours % 24} h"
+    days, hours = divmod(hours, 24)  # keep the leftover minutes too (#831)
+    return f"{days} d {hours} h {rest} min" if rest else f"{days} d {hours} h"
+
+
+def _cell(value: object) -> str:
+    """One table cell: a pipe would start a new column and a newline a new row (#831)."""
+    return " ".join(str(value).splitlines()).replace("|", "\\|")
+
+
+def _row(*cells: object) -> str:
+    return "| " + " | ".join(_cell(cell) for cell in cells) + " |"
 
 
 def render(statuses: list[WorkflowStatus], failures: dict[str, str], local: list[LocalJob],
@@ -488,8 +498,8 @@ def render(statuses: list[WorkflowStatus], failures: dict[str, str], local: list
     for status in statuses:
         repo = status.repository.split("/", 1)[1]
         if status.error:
-            lines.append(f"| {repo} | {status.name} | {', '.join(status.crons) or '?'} | {status.state} "
-                         f"| — | — | — | — | **not assessed: {status.error}** |")
+            lines.append(_row(repo, status.name, ", ".join(status.crons) or "?", status.state,
+                              "—", "—", "—", "—", f"**not assessed: {status.error}**"))
             continue
         schedule = "; ".join(Cron.parse(expression).describe() for expression in status.crons)
         per_day = " ".join(str(count) for count in status.runs_per_day)
@@ -500,13 +510,13 @@ def render(statuses: list[WorkflowStatus], failures: dict[str, str], local: list
             result += f" (attempt {latest['run_attempt']})"
         late = (_duration(status.late_minutes_at_least) if status.late_minutes_at_least is not None else "—")
         attention = "; ".join(status.attention) or "ok"
-        lines.append(f"| {repo} | {status.name} | {schedule} | {status.state} | {per_day} | "
-                     f"{status.expected_due} / {sum(status.runs_per_day)} | {when} {result} | {late} | {attention} |")
+        lines.append(_row(repo, status.name, schedule, status.state, per_day,
+                          f"{status.expected_due} / {sum(status.runs_per_day)}", f"{when} {result}", late, attention))
     if not statuses:
         lines.append("| — | no scheduled workflow found | | | | | | | |")
     if include_local:
         lines += ["", "| Local source | Job | Schedule | Status |", "|---|---|---|---|"]
-        lines += [f"| {job.source} | {job.job} | {job.schedule} | {job.status} |" for job in local]
+        lines += [_row(job.source, job.job, job.schedule, job.status) for job in local]
         if not local:
             found = "no crontab entries" + ("; no LaunchAgent with a calendar or interval trigger"
                                             if launchd_checked else "")
