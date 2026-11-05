@@ -72,7 +72,18 @@ remove an existing protection merely to make adoption succeed.
 
 Readiness checks cover triggers, cancellation, required jobs and their transitive
 prerequisites, candidate repository and commit, and separate immutable auxiliary
-checkouts. Concurrency belongs at workflow level to avoid jobs contending with
+checkouts.
+
+An auxiliary checkout must name a literal 40-character commit, with one
+exception: a claw checkout at a step output (`${{ steps.<id>.outputs.ref }}`),
+and only when the whole workflow file is byte-identical to a claw-governed
+workflow artifact. The governed `qc-evidence.yaml` derives that ref from the
+consumer's committed pin, and the consumer's `vendored-sync` check holds those
+bytes to the canon. A hand-written lookalike, or a local edit of the governed
+file, still needs a literal commit
+([#793](https://github.com/CultureBotAI/culturebotai-claw/issues/793)).
+
+Concurrency belongs at workflow level to avoid jobs contending with
 their own workflow. The checker also requires exact unique successful job names observed in the ten latest
 completed runs using the same workflow bytes. No match requires a fresh CI run.
 This is not a proof of arbitrary workflow shell code: review step conditions,
