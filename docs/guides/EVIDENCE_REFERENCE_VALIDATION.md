@@ -263,12 +263,22 @@ later adoption follows the same three steps:
 `qc-evidence` stays advisory in the adopters after the rollout. A merge-queue
 policy mapping alone changes nothing on GitHub; only a reviewed
 `kg-microbe-merge-queue plan` and `apply` writes a ruleset
-([#792](https://github.com/CultureBotAI/culturebotai-claw/issues/792)). And the
-queue checker accepts an auxiliary checkout only at a literal commit, while the
-governed workflow checks claw out at the committed pin. So mapping the job
-would block every queue plan for that Mech, as it already blocks MIM's
-([#793](https://github.com/CultureBotAI/culturebotai-claw/issues/793)). Once the
-checker accepts a pin-derived claw checkout, map the job and apply the plan.
+([#792](https://github.com/CultureBotAI/culturebotai-claw/issues/792)).
+
+The queue checker now accepts the governed workflow's pin-derived claw checkout,
+because the workflow's bytes are the governed artifact
+([#793](https://github.com/CultureBotAI/culturebotai-claw/issues/793)). The
+accepted digests come from the claw package that runs the plan, so a Mech
+pinned to an older version of the workflow gets a blocked plan until it
+re-pins ([#819](https://github.com/CultureBotAI/culturebotai-claw/issues/819)). So
+making the job required in an adopter is a policy decision, not a technical
+block: map it in the merge-queue policy and apply a reviewed plan.
+
+Decide it per Mech. Once the job is required, every new or edited quote must
+validate or be recorded before it can merge. In CellStructureMech nothing can be
+hosted until
+[CellStructureMech#3065](https://github.com/CultureBotAI/CellStructureMech/issues/3065)
+is decided, so every new quote would block there.
 
 To roll the release back, roll forward, as Rollback in
 `docs/guides/VENDORED_GOVERNANCE.md` describes:
@@ -315,8 +325,7 @@ To roll the release back, roll forward, as Rollback in
    [#808](https://github.com/CultureBotAI/culturebotai-claw/issues/808)).
 3. Adopt through a coordinated re-pin as above. A Mech that lints its scripts
    excludes the vendored runner, as it does its other claw-governed files.
-   Making `qc-evidence` required waits for the merge-queue checker to accept
-   the governed workflow
+   To make `qc-evidence` required, map the job in the merge-queue policy and
+   apply a reviewed `kg-microbe-merge-queue plan`. The checker accepts the
+   governed workflow's pin-derived claw checkout
    ([#793](https://github.com/CultureBotAI/culturebotai-claw/issues/793)).
-   After that, map the job in the merge-queue policy and apply a reviewed
-   `kg-microbe-merge-queue plan`.
