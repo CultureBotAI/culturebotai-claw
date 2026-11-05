@@ -413,10 +413,13 @@ def collect_local(run: Callable[[list[str]], subprocess.CompletedProcess],
     for plist in plists:
         try:
             data = plistlib.loads(plist.read_bytes())
-        except (OSError, plistlib.InvalidFileException, ValueError) as exc:
+            if not isinstance(data, dict):
+                raise ValueError("top level is not a dictionary")
+            # A malformed trigger is this file's problem, not the report's (#834).
+            schedule = _launchd_schedule(data)
+        except (OSError, plistlib.InvalidFileException, ValueError, TypeError, AttributeError) as exc:
             errors.append(f"{plist.name}: {exc}")
             continue
-        schedule = _launchd_schedule(data)
         if not schedule:
             continue
         label = data.get("Label", plist.stem)

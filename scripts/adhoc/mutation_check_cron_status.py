@@ -9,7 +9,7 @@ from a backup, never from git.
 Inputs: none; run from the claw checkout root.
 Outputs: one line per mutant, killed or SURVIVED; a nonzero exit if any
 survives.
-Serves: the cron-status skill, PR #820 and its review issues #821-#833. Written 2026-11-05.
+Serves: the cron-status skill, PR #820 and its review issues #821-#834. Written 2026-11-05.
 """
 from __future__ import annotations
 
@@ -72,6 +72,11 @@ MUTANTS = [
     ("code fence not longer than inner backticks", "default=0) + 1)", "default=0) * 0 + 1)"),
     ("multiline joined without a space", 'text = " ".join(str(value).splitlines())', 'text = "".join(str(value).splitlines())'),
     ("not-assessed marker unbolded", 'f"**not assessed: {status.error}**"', 'f"not assessed: {status.error}"'),
+    # Fifth review of PR #820 (#834).
+    ("malformed trigger escapes the per-plist handler",
+     "        except (OSError, plistlib.InvalidFileException, ValueError, TypeError, AttributeError) as exc:",
+     "        except (OSError, plistlib.InvalidFileException) as exc:"),
+    ("non-dictionary plist not rejected", '                raise ValueError("top level is not a dictionary")\n', "                pass\n"),
 ]
 
 original = SOURCE.read_bytes()

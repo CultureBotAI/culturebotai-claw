@@ -529,3 +529,21 @@ def test_multiline_text_is_joined_with_a_space_and_not_assessed_stays_bold():
     out = cs.render([broken], {}, [], [], ["o/r"], 7, NOW, False)
     row = next(line for line in out.splitlines() if line.startswith("| r | w |"))
     assert "**not assessed: first second**" in row
+
+
+# ---------------------------------------------------- fifth review (#834) --
+@pytest.mark.parametrize("bad", [{"Label": "bad", "StartInterval": "oops"}, ["not", "a", "dict"]])
+def test_a_malformed_launch_agent_is_named_and_the_rest_still_reported(tmp_path, bad):
+    import plistlib
+
+    (tmp_path / "bad.plist").write_bytes(plistlib.dumps(bad))
+    (tmp_path / "good.plist").write_bytes(plistlib.dumps({"Label": "me.good", "StartInterval": 3600}))
+
+    def run_command(command):
+        if command[0] == "crontab":
+            return completed(1, stderr="crontab: no crontab for me")
+        return completed(stdout='{\n\t"LastExitStatus" = 0;\n};\n')
+
+    jobs, errors = cs.collect_local(run_command, tmp_path)
+    assert [job.job for job in jobs] == ["me.good"]
+    assert len(errors) == 1 and errors[0].startswith("bad.plist:")
