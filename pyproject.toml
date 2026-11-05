@@ -72,6 +72,7 @@ kg-microbe-reviews = "kg_microbe_reviews.__main__:main"
 kg-microbe-skills = "kg_microbe_skills.__main__:main"
 kg-microbe-sources = "kg_microbe_sources.__main__:main"
 kg-microbe-corpus = "kg_microbe_corpus.__main__:main"
+kg-microbe-curation = "kg_microbe_curation.__main__:main"
 kg-microbe-graph = "kg_microbe_graph.__main__:main"
 kg-microbe-evidence = "kg_microbe_evidence.__main__:main"
 kg-microbe-evidence-fetch = "kg_microbe_evidence.fetch:main"
@@ -117,6 +118,7 @@ kg_microbe_embeddings = ["rollout.yaml"]
 kg_microbe_merge_queue = ["policy.json"]
 kg_microbe_write = ["writers.yaml"]
 kg_microbe_research = ["schema/*.yaml"]
+kg_microbe_curation = ["schema/*.json"]
 kg_microbe_progress = ["schema/*.yaml"]
 kg_microbe_workflows = ["schema/*.yaml", "templates/*.yaml", "examples/**/*.yaml", "examples/**/*.md", "examples/README.md"]
 # The catalogue and its canonical templates are read at runtime, so an
