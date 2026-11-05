@@ -24,7 +24,8 @@ three answers that look right and are not.
 So every row carries:
   * the schedule;
   * the runs it should have had and the runs it had, per day;
-  * how late its latest run started;
+  * how long after its tick the latest run was created. That is a lower
+    bound: a run cannot tell which earlier tick it served;
   * the workflow's state.
 The report names every source it could not query.
 
@@ -45,12 +46,14 @@ import base64
 import datetime as dt
 import json
 import plistlib
+import re
 import shutil
 import subprocess
 import sys
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import quote
 
 import yaml
 
@@ -62,6 +65,14 @@ GRACE = dt.timedelta(hours=12)
 #: normal behaviour and is shown in its own column instead.
 LATE = GRACE
 FAILED = {"failure", "cancelled", "timed_out", "startup_failure", "action_required"}
+#: The runs API caps a filtered search at this many results; pagination does
+#: not lift it (#821).
+RUN_SEARCH_CAP = 1000
+#: Long enough to find the next 29 February across a century gap (2096 to
+#: 2104), so a leap-day schedule always has a next and a last tick (#823).
+HORIZON_DAYS = 366 * 9
+RUN_FIELDS = ".workflow_runs[] | {id, created_at, run_started_at, run_attempt, status, conclusion, html_url}"
+ASSIGNMENT = re.compile(r"^\s*[A-Za-z_][A-Za-z0-9_]*\s*=")
 
 GhRunner = Callable[[list[str]], str]
 
@@ -117,14 +128,14 @@ class Cron:
         return [dt.datetime(day.year, day.month, day.day, hour, minute, tzinfo=dt.UTC)
                 for hour in sorted(self.hours) for minute in sorted(self.minutes)]
 
-    def last_tick(self, at: dt.datetime, horizon_days: int = 400) -> dt.datetime | None:
+    def last_tick(self, at: dt.datetime, horizon_days: int = HORIZON_DAYS) -> dt.datetime | None:
         for back in range(horizon_days):
             ticks = [tick for tick in self.ticks_on(at.date() - dt.timedelta(days=back)) if tick <= at]
             if ticks:
                 return ticks[-1]
         return None
 
-    def next_tick(self, after: dt.datetime, horizon_days: int = 400) -> dt.datetime | None:
+    def next_tick(self, after: dt.datetime, horizon_days: int = HORIZON_DAYS) -> dt.datetime | None:
         for ahead in range(horizon_days):
             ticks = [tick for tick in self.ticks_on(after.date() + dt.timedelta(days=ahead)) if tick > after]
             if ticks:
@@ -133,7 +144,10 @@ class Cron:
 
     def describe(self) -> str:
         per_day = len(self.minutes) * len(self.hours)
-        daily = not self.days_restricted and not self.weekdays_restricted and len(self.months) == 12
+        # Summarise as daily only when every day matches; the star-prefix flags
+        # govern the DOM/DOW OR rule, not coverage ("*/2" is star-prefixed) (#823).
+        daily = (self.days == frozenset(range(1, 32)) and self.weekdays == frozenset(range(7))
+                 and self.months == frozenset(range(1, 13)))
         if daily and len(self.hours) == 24 and len(self.minutes) == 1:
             return f"hourly at :{min(self.minutes):02d}"
         if daily and len(self.hours) == 24:
@@ -165,7 +179,8 @@ def _field(text: str, index: int) -> frozenset[int]:
     values: set[int] = set()
     for part in text.split(","):
         step = 1
-        if "/" in part:
+        has_step = "/" in part  # "5/1" is a step too, even though its value is 1 (#823)
+        if has_step:
             part, step_text = part.split("/", 1)
             if not step_text.isdigit() or int(step_text) < 1:
                 raise CronError(f"bad step {step_text!r}")
@@ -179,7 +194,7 @@ def _field(text: str, index: int) -> frozenset[int]:
                 raise CronError(f"backwards range {part!r}")
         else:
             start = _value(part, index)
-            end = high if step != 1 else start  # "5/15" means 5-max/15
+            end = high if has_step else start  # "5/15" means 5-max/15
         values.update(range(start, end + 1, step))
     if index == 4 and text == "*":
         values = set(range(0, 7))
@@ -199,7 +214,7 @@ class WorkflowStatus:
     expected_per_day: list[int] = field(default_factory=list)
     expected_due: int = 0  # ticks in the window older than GRACE
     latest: dict | None = None
-    started_late_minutes: int | None = None
+    late_minutes_at_least: int | None = None  # run creation after its nearest preceding tick
     next_tick: str | None = None
     non_success: int = 0
     error: str | None = None
@@ -228,6 +243,17 @@ def schedule_crons(document: object) -> list[str]:
             if isinstance(entry, dict) and entry.get("cron")]
 
 
+def schedule_timezones(document: object) -> list[str]:
+    """Any `timezone` declared beside a cron. Those schedules are not evaluated (#822)."""
+    if not isinstance(document, dict):
+        return []
+    events = document.get("on", document.get(True))
+    if not isinstance(events, dict) or not isinstance(events.get("schedule"), list):
+        return []
+    return sorted({str(entry["timezone"]) for entry in events["schedule"]
+                   if isinstance(entry, dict) and entry.get("timezone")})
+
+
 def assess(status: WorkflowStatus, runs: Iterable[dict], now: dt.datetime, window_days: int) -> None:
     """Fill the counts, lateness and attention flags from the scheduled runs in the window."""
     crons = [Cron.parse(expression) for expression in status.crons]
@@ -250,11 +276,14 @@ def assess(status: WorkflowStatus, runs: Iterable[dict], now: dt.datetime, windo
     status.next_tick = min(upcoming).isoformat() if upcoming else None
     if runs:
         latest = runs[-1]
-        status.latest = {key: latest.get(key) for key in ("created_at", "status", "conclusion", "html_url")}
+        status.latest = {key: latest.get(key) for key in (
+            "created_at", "run_started_at", "run_attempt", "status", "conclusion", "html_url")}
         created = _parse_time(latest["created_at"])
+        # The nearest preceding tick gives a lower bound: the run may have
+        # served an earlier tick of this or another cron (#824).
         previous = [tick for tick in (cron.last_tick(created) for cron in crons) if tick]
         if previous:
-            status.started_late_minutes = int((created - max(previous)).total_seconds() // 60)
+            status.late_minutes_at_least = int((created - max(previous)).total_seconds() // 60)
     _flag(status)
 
 
@@ -272,8 +301,9 @@ def _flag(status: WorkflowStatus) -> None:
         flags.append(f"latest run {latest['conclusion']}")
     elif status.non_success:
         flags.append(f"{status.non_success} non-success run(s) in the window")
-    if status.started_late_minutes is not None and status.started_late_minutes >= LATE.total_seconds() // 60:
-        flags.append(f"latest started {_duration(status.started_late_minutes)} late")
+    late = status.late_minutes_at_least
+    if late is not None and late >= LATE.total_seconds() // 60:
+        flags.append(f"latest run created at least {_duration(late)} after its tick")
 
 
 def collect_repository(repository: str, gh: GhRunner, now: dt.datetime, window_days: int) -> list[WorkflowStatus]:
@@ -290,6 +320,7 @@ def collect_repository(repository: str, gh: GhRunner, now: dt.datetime, window_d
             content = json.loads(gh(["api", f"repos/{repository}/contents/{path}"]))
             document = yaml.safe_load(base64.b64decode(content["content"]))
             crons = schedule_crons(document)
+            timezones = schedule_timezones(document)
         except (RuntimeError, KeyError, ValueError, yaml.YAMLError) as exc:
             statuses.append(WorkflowStatus(repository, workflow["name"], path, workflow["state"], [],
                                            error=f"could not read the workflow file: {exc}"))
@@ -297,18 +328,47 @@ def collect_repository(repository: str, gh: GhRunner, now: dt.datetime, window_d
         if not crons:
             continue
         status = WorkflowStatus(repository, workflow["name"], path, workflow["state"], crons)
+        if timezones:
+            status.error = f"schedule timezone {', '.join(timezones)} is not supported yet; not assessed"
+            statuses.append(status)
+            continue
         try:
-            runs = _json_lines(gh([
-                "api", "--paginate",
-                f"repos/{repository}/actions/workflows/{workflow['id']}/runs?event=schedule&per_page=100"
-                f"&created=%3E%3D{since}",
-                "--jq", ".workflow_runs[] | {created_at, status, conclusion, html_url}",
-            ]))
+            runs = fetch_runs(gh, repository, workflow["id"], since, now.date())
             assess(status, runs, now, window_days)
         except (RuntimeError, CronError, ValueError) as exc:
             status.error = f"{type(exc).__name__}: {exc}"
         statuses.append(status)
     return statuses
+
+
+def fetch_runs(gh: GhRunner, repository: str, workflow_id: int, since: str, today: dt.date) -> list[dict]:
+    """Every scheduled run created since `since`, despite the search cap (#821).
+
+    One query normally suffices. When its total exceeds the cap, each day is
+    queried on its own and the results are deduplicated by run id. A day that
+    still exceeds the cap raises, so the report is marked incomplete rather
+    than reading the cap as dropped runs.
+    """
+    base = f"repos/{repository}/actions/workflows/{workflow_id}/runs?event=schedule&per_page=100"
+
+    def total(created: str) -> int:
+        return int(gh(["api", f"{base}&created={quote(created)}", "--jq", ".total_count"]).strip())
+
+    def listed(created: str) -> list[dict]:
+        return _json_lines(gh(["api", "--paginate", f"{base}&created={quote(created)}", "--jq", RUN_FIELDS]))
+
+    window = f">={since}"
+    if total(window) <= RUN_SEARCH_CAP:
+        return listed(window)
+    runs: dict[object, dict] = {}
+    day = dt.date.fromisoformat(since)
+    while day <= today:
+        if total(day.isoformat()) > RUN_SEARCH_CAP:
+            raise RuntimeError(f"more than {RUN_SEARCH_CAP} scheduled runs on {day}; the API cannot list them all")
+        for run in listed(day.isoformat()):
+            runs[run.get("id", run["created_at"])] = run
+        day += dt.timedelta(days=1)
+    return list(runs.values())
 
 
 # ---------------------------------------------------------------- local ---
@@ -325,14 +385,24 @@ def collect_local(run: Callable[[list[str]], subprocess.CompletedProcess],
     """The crontab, plus the timed LaunchAgents in agents_dir when one is given."""
     jobs: list[LocalJob] = []
     errors: list[str] = []
-    crontab = run(["crontab", "-l"])
-    if crontab.returncode == 0:
+    try:
+        crontab = run(["crontab", "-l"])
+    except OSError as exc:  # no crontab binary is a source we could not read (#825)
+        crontab = None
+        errors.append(f"crontab: {exc}")
+    if crontab is not None and crontab.returncode == 0:
         for line in crontab.stdout.splitlines():
-            if line.strip() and not line.lstrip().startswith("#"):
-                fields = line.split(None, 5)
-                schedule = " ".join(fields[:5]) if len(fields) >= 6 else line
-                jobs.append(LocalJob("crontab", fields[5] if len(fields) >= 6 else line, schedule, "installed"))
-    elif "no crontab" not in (crontab.stderr or "").lower():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#") or ASSIGNMENT.match(stripped):
+                continue  # comments and environment assignments are not jobs (#825)
+            if stripped.startswith("@"):  # shortcuts such as daily or reboot: one token, then the command
+                shortcut, _, command = stripped.partition(" ")
+                jobs.append(LocalJob("crontab", command.strip(), shortcut, "installed"))
+                continue
+            fields = stripped.split(None, 5)
+            schedule = " ".join(fields[:5]) if len(fields) >= 6 else stripped
+            jobs.append(LocalJob("crontab", fields[5] if len(fields) >= 6 else stripped, schedule, "installed"))
+    elif crontab is not None and "no crontab" not in (crontab.stderr or "").lower():
         errors.append(f"crontab: {(crontab.stderr or '').strip() or 'exit ' + str(crontab.returncode)}")
     if agents_dir is not None and not agents_dir.is_dir():
         errors.append(f"launchd: {agents_dir} is not a directory")
@@ -347,9 +417,20 @@ def collect_local(run: Callable[[list[str]], subprocess.CompletedProcess],
         if not schedule:
             continue
         label = data.get("Label", plist.stem)
-        listed = run(["launchctl", "list", label])
+        try:
+            listed = run(["launchctl", "list", label])
+        except OSError as exc:
+            errors.append(f"launchctl: {exc}")
+            jobs.append(LocalJob("launchd", label, schedule, "unknown"))
+            continue
         if listed.returncode != 0:
-            state = "not loaded"
+            # Only launchd's not-found answer means "not loaded"; anything else
+            # is a source we could not read (#825).
+            if "could not find service" in (listed.stderr or "").lower():
+                state = "not loaded"
+            else:
+                state = "unknown"
+                errors.append(f"launchctl list {label}: {(listed.stderr or '').strip() or 'exit ' + str(listed.returncode)}")
         else:
             exit_line = [line for line in listed.stdout.splitlines() if "LastExitStatus" in line]
             state = "loaded" + (f", last exit {exit_line[0].split('=')[-1].strip(' ;')}" if exit_line else "")
@@ -358,17 +439,20 @@ def collect_local(run: Callable[[list[str]], subprocess.CompletedProcess],
 
 
 def _launchd_schedule(data: dict) -> str:
-    if "StartInterval" in data:
-        return f"every {_duration(int(data['StartInterval']) // 60)}"
-    calendar = data.get("StartCalendarInterval")
-    if not calendar:
-        return ""
-    entries = calendar if isinstance(calendar, list) else [calendar]
+    """Both launchd triggers, which run independently: StartInterval is in seconds,
+    and an empty StartCalendarInterval dictionary means every minute (#825)."""
     parts = []
-    for entry in entries:
-        text = " ".join(f"{key}={value}" for key, value in sorted(entry.items()))
-        parts.append(text or "every minute")
-    return "; ".join(parts) + " (local time)"
+    if "StartInterval" in data:
+        seconds = int(data["StartInterval"])
+        parts.append(f"every {seconds} s" if seconds < 60 else f"every {_duration(seconds // 60)}")
+    if "StartCalendarInterval" in data:
+        calendar = data["StartCalendarInterval"]
+        entries = calendar if isinstance(calendar, list) else [calendar]
+        texts = [" ".join(f"{key}={value}" for key, value in sorted(entry.items())) or "every minute"
+                 for entry in entries if isinstance(entry, dict)]
+        if texts:
+            parts.append("; ".join(texts) + " (local time)")
+    return "; ".join(parts)
 
 
 # ---------------------------------------------------------------- output --
@@ -391,7 +475,7 @@ def render(statuses: list[WorkflowStatus], failures: dict[str, str], local: list
     lines = [f"Scheduled jobs as of {now:%Y-%m-%d %H:%M} UTC; runs counted over the last {window_days} days "
              "(oldest → today; today counts ticks so far).", ""]
     lines += ["| Repository | Workflow | Schedule (UTC) | State | Runs per day | Due / ran | "
-              "Latest scheduled run (UTC) | Started late by | Attention |",
+              "Latest scheduled run (UTC) | Created late by (at least) | Attention |",
               "|---|---|---|---|---|---|---|---|---|"]
     for status in statuses:
         repo = status.repository.split("/", 1)[1]
@@ -404,7 +488,9 @@ def render(statuses: list[WorkflowStatus], failures: dict[str, str], local: list
         latest = status.latest or {}
         when = latest.get("created_at", "")[:16].replace("T", " ") or "none"
         result = latest.get("conclusion") or latest.get("status") or ""
-        late = _duration(status.started_late_minutes) if status.started_late_minutes is not None else "—"
+        if (latest.get("run_attempt") or 1) > 1:
+            result += f" (attempt {latest['run_attempt']})"
+        late = (_duration(status.late_minutes_at_least) if status.late_minutes_at_least is not None else "—")
         attention = "; ".join(status.attention) or "ok"
         lines.append(f"| {repo} | {status.name} | {schedule} | {status.state} | {per_day} | "
                      f"{status.expected_due} / {sum(status.runs_per_day)} | {when} {result} | {late} | {attention} |")
@@ -424,6 +510,9 @@ def render(statuses: list[WorkflowStatus], failures: dict[str, str], local: list
               f"{len(statuses)} scheduled workflow(s), {flagged} needing attention."]
     for repository, error in failures.items():
         lines.append(f"INCOMPLETE: {repository} could not be queried: {error}")
+    for status in statuses:  # a workflow that was not assessed is named too (#826)
+        if status.error:
+            lines.append(f"INCOMPLETE: {status.repository} {status.path} was not assessed: {status.error}")
     for error in local_errors:
         lines.append(f"INCOMPLETE: local scheduler source: {error}")
     return "\n".join(lines)

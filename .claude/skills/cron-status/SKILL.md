@@ -55,12 +55,12 @@ they live in the Claude Code session.
 
 | Column | Meaning |
 |---|---|
-| Schedule (UTC) | The workflow's `on.schedule` crons, summarised (`daily 06:41`, `every 15 min`, `hourly at :23`), or the raw expression. GitHub evaluates crons in UTC. |
+| Schedule (UTC) | The workflow's `on.schedule` crons, summarised (`daily 06:41`, `every 15 min`, `hourly at :23`), or the raw expression. GitHub evaluates crons in UTC unless a schedule names a `timezone`. Such a workflow is reported as not assessed, which makes the report incomplete. |
 | State | GitHub's workflow state. Anything but `active` (for example `disabled_inactivity`, `disabled_manually`) means GitHub will not schedule it. |
 | Runs per day | Scheduled runs started on each day of the window, oldest first. Today's figure counts only ticks so far. |
-| Due / ran | Ticks older than the 12-hour grace period, against the runs actually started in the window. |
-| Latest scheduled run | When it started, and its conclusion. Only `schedule` events count: a push run that passed afterwards does not change this column. |
-| Started late by | The latest run's start minus the tick it served. |
+| Due / ran | Ticks older than the 12-hour grace period, against the runs created in the window. Due counts ticks and ran counts runs. They are not matched pairs: a run delayed from the day before the window counts in neither. |
+| Latest scheduled run | When it was created, its conclusion, and its attempt if it was re-run. Only `schedule` events count: a push run that passed afterwards does not change this column. |
+| Created late by (at least) | The latest run's creation minus the nearest preceding tick. That is a lower bound: a run does not record which tick it served, and it may have served an earlier one. It measures GitHub's scheduler, not when a runner picked the job up. |
 | Attention | Empty (`ok`), or the reasons below. |
 
 `Attention` flags:
@@ -69,7 +69,7 @@ they live in the Claude Code session.
 - fewer than half the due runs ("GitHub dropped runs");
 - a latest run that failed, was cancelled or timed out, or any non-success in
   the window;
-- a start more than 12 hours late.
+- a run created more than 12 hours after its nearest preceding tick.
 
 Lateness under 12 hours is GitHub's normal behaviour. It stays in its own
 column, unflagged.

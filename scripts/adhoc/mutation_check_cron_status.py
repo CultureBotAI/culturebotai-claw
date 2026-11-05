@@ -9,7 +9,7 @@ from a backup, never from git.
 Inputs: none; run from the claw checkout root.
 Outputs: one line per mutant, killed or SURVIVED; a nonzero exit if any
 survives.
-Serves: the cron-status skill PR. Written 2026-11-05.
+Serves: the cron-status skill, PR #820 and its review issues #821-#827. Written 2026-11-05.
 """
 from __future__ import annotations
 
@@ -24,8 +24,27 @@ MUTANTS = [
     ("DOM/DOW combined with AND", "            return in_days or in_weekdays", "            return in_days and in_weekdays"),
     ("repository failure swallowed", "            failures[repository] = str(exc).splitlines()[0][:200]\n",
      "            pass\n"),
-    ("start/step stops at its start", "            end = high if step != 1 else start", "            end = start"),
+    ("start/step stops at its start", "            end = high if has_step else start", "            end = start"),
     ("silent workflow not flagged", "    if status.expected_due and total == 0:\n", "    if False:\n"),
+    # Review of PR #820 (#821-#827).
+    ("star-prefixed weekday treated as restricted", 'not fields[4].startswith("*"))', 'fields[4] != "*")'),
+    ("next tick not reported", "    status.next_tick = min(upcoming).isoformat() if upcoming else None\n",
+     "    status.next_tick = None\n"),
+    ("any launchctl failure read as not loaded",
+     '            if "could not find service" in (listed.stderr or "").lower():\n', "            if True:\n"),
+    ("explicit /1 step collapses", "            end = high if has_step else start", "            end = high if step != 1 else start"),
+    ("skipped days summarised as daily", "        daily = (self.days == frozenset(range(1, 32))",
+     "        daily = (not self.days_restricted"),
+    ("400-day tick horizon", "HORIZON_DAYS = 366 * 9\n", "HORIZON_DAYS = 400\n"),
+    ("search cap ignored", "    if total(window) <= RUN_SEARCH_CAP:\n", "    if True:\n"),
+    ("schedule timezone ignored", "        if timezones:\n", "        if False:\n"),
+    ("crontab assignments listed as jobs", " or ASSIGNMENT.match(stripped):", ":"),
+    ("crontab shortcut split as five fields", '            if stripped.startswith("@"):', "            if False:"),
+    ("unassessed workflow not named", "        if status.error:\n            lines.append(f\"INCOMPLETE:",
+     "        if False:\n            lines.append(f\"INCOMPLETE:"),
+    ("missing crontab binary raises", "    except OSError as exc:  # no crontab binary", "    except ValueError as exc:  # no crontab binary"),
+    ("launchd interval read as minutes", 'f"every {seconds} s" if seconds < 60 else ', ""),
+    ("re-run attempt hidden", '        if (latest.get("run_attempt") or 1) > 1:\n', "        if False:\n"),
 ]
 
 original = SOURCE.read_bytes()

@@ -103,7 +103,8 @@ def test_on_schedule_daily_job_counts_per_day_and_needs_no_attention():
     assert status.runs_per_day == [1, 1, 1, 1, 1, 1, 0]
     assert status.expected_per_day == [1, 1, 1, 1, 1, 1, 0]  # today's 06:41 has not come yet
     assert status.expected_due == 6
-    assert status.started_late_minutes == 8 * 60
+    assert status.late_minutes_at_least == 8 * 60
+    assert status.next_tick == "2026-11-05T06:41:00+00:00"
     assert status.attention == []
 
 
@@ -156,8 +157,18 @@ SCHEDULED = "on:\n  schedule:\n    - cron: '41 6 * * *'\n  workflow_dispatch:\nj
 UNSCHEDULED = "on: [push]\njobs: {}\n"
 
 
+def _created_filter(endpoint: str):
+    from urllib.parse import unquote
+
+    created = unquote(endpoint.split("&created=", 1)[1])
+    if created.startswith(">="):
+        return lambda run: run["created_at"][:10] >= created[2:]
+    return lambda run: run["created_at"][:10] == created
+
+
 def fake_gh(workflows: list[dict], files: dict[str, str], runs: dict[int, list[dict]],
-            failing: set[str] = frozenset()):
+            failing: set[str] = frozenset(), window_total: int | None = None):
+    """A gh stand-in. `window_total` overrides the window query's total_count, to model the API cap."""
     def gh(args: list[str]) -> str:
         endpoint = next(arg for arg in args if arg.startswith("repos/"))
         if any(part in endpoint for part in failing):
@@ -167,7 +178,12 @@ def fake_gh(workflows: list[dict], files: dict[str, str], runs: dict[int, list[d
         if "/contents/" in endpoint:
             return files[endpoint.split("/contents/", 1)[1]]
         workflow_id = int(endpoint.split("/actions/workflows/", 1)[1].split("/", 1)[0])
-        return "\n".join(json.dumps(item) for item in runs.get(workflow_id, []))
+        selected = [item for item in runs.get(workflow_id, []) if _created_filter(endpoint)(item)]
+        if args[args.index("--jq") + 1] == ".total_count":
+            if window_total is not None and "%3E%3D" in endpoint:
+                return str(window_total)
+            return str(len(selected))
+        return "\n".join(json.dumps(item) for item in selected)
     return gh
 
 
@@ -218,6 +234,7 @@ def test_unreadable_workflow_file_is_reported_not_skipped(capsys):
     status, out = main_output(capsys, gh, "--repo", "o/r")
     assert status == 1
     assert "not assessed: could not read the workflow file" in out
+    assert "INCOMPLETE: o/r .github/workflows/audit.yaml was not assessed" in out  # #826
 
 
 def test_json_output_carries_completeness(capsys):
@@ -286,3 +303,103 @@ def test_launchd_is_reported_not_checked_rather_than_empty_without_a_directory()
 def test_a_launch_agents_dir_that_does_not_exist_makes_the_report_incomplete(tmp_path):
     _, errors = cs.collect_local(lambda command: completed(1, stderr="no crontab for me"), tmp_path / "missing")
     assert errors and "is not a directory" in errors[0]
+
+
+# ------------------------------------------------- review fixes (#821-#827) --
+def test_explicit_step_of_one_expands_to_the_field_maximum():
+    assert cs.Cron.parse("0 5/1 * * *").hours == frozenset(range(5, 24))
+    assert cs.Cron.parse("5/1 * * * *").minutes == frozenset(range(5, 60))
+
+
+@pytest.mark.parametrize("expression", ["0 0 */2 * *", "0 0 * * */2", "0 0 * 1-6 *"])
+def test_a_schedule_that_skips_days_is_not_summarised_as_daily(expression):
+    assert not cs.Cron.parse(expression).describe().startswith("daily")
+
+
+def test_star_prefixed_weekday_combines_with_day_of_month_by_and():
+    cron = cs.Cron.parse("0 0 1 * */2")  # "*/2" is star-prefixed, so AND applies
+    assert cron.runs_on(day("2026-11-01"))  # the 1st, a Sunday
+    assert not cron.runs_on(day("2027-01-01"))  # the 1st, but a Friday
+
+
+def test_a_leap_day_schedule_has_a_next_tick():
+    assert cs.Cron.parse("0 0 29 2 *").next_tick(NOW) == dt.datetime(2028, 2, 29, tzinfo=dt.UTC)
+
+
+def test_lateness_is_a_lower_bound_across_crons():
+    status = cs.WorkflowStatus("o/r", "two", ".github/workflows/t.yaml", "active", ["0 0 * * *", "0 12 * * *"])
+    cs.assess(status, [run("2026-11-05T13:00:00Z")], dt.datetime(2026, 11, 5, 14, tzinfo=dt.UTC), 1)
+    assert status.late_minutes_at_least == 60  # served 00:00 or 12:00; only "at least 60" is known
+    table = cs.render([status], {}, [], [], ["o/r"], 1, NOW, False)
+    assert "Created late by (at least)" in table
+
+
+def test_a_rerun_shows_its_attempt():
+    rerun = dict(run("2026-11-04T14:41:00Z"), run_attempt=2, run_started_at="2026-11-04T16:00:00Z")
+    status = daily_status()
+    cs.assess(status, daily_runs()[:-1] + [rerun], NOW, 7)
+    assert status.latest["run_attempt"] == 2 and status.latest["run_started_at"] == "2026-11-04T16:00:00Z"
+    assert "success (attempt 2)" in cs.render([status], {}, [], [], ["o/r"], 7, NOW, False)
+
+
+def test_more_runs_than_the_search_cap_are_counted_per_day():
+    runs = [dict(run(f"2026-11-0{d}T{h:02d}:{m:02d}:00Z"), id=f"{d}-{h}-{m}")
+            for d in range(1, 5) for h in range(24) for m in (0, 30)]
+    gh = fake_gh(WORKFLOWS, FILES, {1: runs}, window_total=cs.RUN_SEARCH_CAP + 1)
+    fetched = cs.fetch_runs(gh, "o/r", 1, "2026-10-30", NOW.date())
+    assert len(fetched) == len(runs)  # every day queried, nothing lost to the cap
+
+
+def test_a_day_beyond_the_search_cap_makes_the_report_incomplete(capsys, monkeypatch):
+    monkeypatch.setattr(cs, "RUN_SEARCH_CAP", 3)
+    runs = [dict(run(f"2026-11-04T0{h}:00:00Z"), id=h) for h in range(5)]
+    status, out = main_output(capsys, fake_gh(WORKFLOWS, FILES, {1: runs}), "--repo", "o/r")
+    assert status == 1
+    assert "INCOMPLETE: o/r .github/workflows/audit.yaml was not assessed" in out and "more than 3" in out
+
+
+def test_a_schedule_with_a_timezone_is_not_assessed_in_utc(capsys):
+    zoned = "on:\n  schedule:\n    - cron: '0 0 * * *'\n      timezone: America/Los_Angeles\njobs: {}\n"
+    files = {".github/workflows/audit.yaml": workflow_file(zoned), ".github/workflows/tests.yaml": FILES[
+        ".github/workflows/tests.yaml"]}
+    status, out = main_output(capsys, fake_gh(WORKFLOWS, files, {1: daily_runs()}), "--repo", "o/r")
+    assert status == 1
+    assert "schedule timezone America/Los_Angeles is not supported yet" in out
+
+
+def test_crontab_assignments_are_skipped_and_shortcuts_keep_their_command(tmp_path):
+    crontab = "PATH=/bin:/usr/bin\nMAILTO=\n@daily /bin/echo one two three four five\n"
+    jobs, errors = cs.collect_local(lambda command: completed(stdout=crontab), None)
+    assert errors == []
+    assert [(job.schedule, job.job) for job in jobs] == [("@daily", "/bin/echo one two three four five")]
+
+
+def test_a_launchctl_failure_is_not_read_as_not_loaded(tmp_path):
+    import plistlib
+
+    (tmp_path / "a.plist").write_bytes(plistlib.dumps({"Label": "me.job", "StartInterval": 3600}))
+
+    def denied(command):
+        if command[0] == "crontab":
+            return completed(1, stderr="crontab: no crontab for me")
+        return completed(1, stderr="Permission denied")
+
+    jobs, errors = cs.collect_local(denied, tmp_path)
+    assert jobs[0].status == "unknown" and errors == ["launchctl list me.job: Permission denied"]
+
+
+def test_a_missing_scheduler_binary_is_reported_not_raised(tmp_path):
+    def missing(command):
+        raise FileNotFoundError(command[0])
+
+    jobs, errors = cs.collect_local(missing, None)
+    assert jobs == [] and errors and errors[0].startswith("crontab:")
+
+
+@pytest.mark.parametrize("plist,schedule", [
+    ({"StartInterval": 30}, "every 30 s"),
+    ({"StartCalendarInterval": {}}, "every minute (local time)"),
+    ({"StartInterval": 3600, "StartCalendarInterval": {"Hour": 6}}, "every 1 h; Hour=6 (local time)"),
+])
+def test_launchd_triggers_are_rendered_in_full(plist, schedule):
+    assert cs._launchd_schedule(plist) == schedule
