@@ -532,8 +532,11 @@ def test_multiline_text_is_joined_with_a_space_and_not_assessed_stays_bold():
 
 
 # ---------------------------------------------------- fifth review (#834) --
-@pytest.mark.parametrize("bad", [{"Label": "bad", "StartInterval": "oops"}, ["not", "a", "dict"]])
-def test_a_malformed_launch_agent_is_named_and_the_rest_still_reported(tmp_path, bad):
+@pytest.mark.parametrize("bad,reason", [
+    ({"Label": "bad", "StartInterval": "oops"}, "StartInterval is not a positive integer: 'oops'"),
+    (["not", "a", "dict"], "top level is not a dictionary"),
+])
+def test_a_malformed_launch_agent_is_named_and_the_rest_still_reported(tmp_path, bad, reason):
     import plistlib
 
     (tmp_path / "bad.plist").write_bytes(plistlib.dumps(bad))
@@ -546,4 +549,84 @@ def test_a_malformed_launch_agent_is_named_and_the_rest_still_reported(tmp_path,
 
     jobs, errors = cs.collect_local(run_command, tmp_path)
     assert [job.job for job in jobs] == ["me.good"]
-    assert len(errors) == 1 and errors[0].startswith("bad.plist:")
+    assert errors == [f"bad.plist: {reason}"]
+
+
+# ---------------------------------------------------- sixth review (#836) --
+def _not_found(command):
+    if command[0] == "crontab":
+        return completed(1, stderr="crontab: no crontab for me")
+    return completed(113, stderr='Could not find service "x" in domain for user gui: 501')
+
+
+def _agents(tmp_path, bad: bytes) -> tuple[list, list[str]]:
+    import plistlib
+
+    (tmp_path / "bad.plist").write_bytes(bad)
+    (tmp_path / "good.plist").write_bytes(plistlib.dumps({"Label": "me.good", "StartInterval": 3600}))
+    return cs.collect_local(_not_found, tmp_path)
+
+
+@pytest.mark.parametrize("bad,reason", [
+    ({"Label": "bad", "StartCalendarInterval": "oops"}, "entry is not a dictionary: 'oops'"),
+    ({"Label": "bad", "StartCalendarInterval": ["oops", 42]}, "entry is not a dictionary: 'oops'"),
+    ({"Label": "bad", "StartCalendarInterval": [{"Hour": 6}, 42]}, "entry is not a dictionary: 42"),
+    ({"Label": "bad", "StartCalendarInterval": {"Hour": "six"}}, "Hour is not an integer in 0-23: 'six'"),
+    ({"Label": "bad", "StartCalendarInterval": {"Hour": True}}, "Hour is not an integer in 0-23: True"),
+    ({"Label": "bad", "StartCalendarInterval": {"Hours": 6}}, "unknown key: 'Hours'"),
+    ({"Label": "bad", "StartCalendarInterval": {"Hour": 24}}, "Hour is not an integer in 0-23: 24"),
+    ({"Label": "bad", "StartCalendarInterval": {"Weekday": 8}}, "Weekday is not an integer in 0-7: 8"),
+    ({"Label": "bad", "StartInterval": "60"}, "StartInterval is not a positive integer: '60'"),
+    ({"Label": "bad", "StartInterval": -1}, "StartInterval is not a positive integer: -1"),
+    ({"Label": "bad", "StartInterval": 0}, "StartInterval is not a positive integer: 0"),
+    ({"Label": "bad", "StartInterval": True}, "StartInterval is not a positive integer: True"),
+    ({"StartInterval": 60}, "Label is not a non-empty string: None"),
+    ({"Label": " ", "StartInterval": 60}, "Label is not a non-empty string: ' '"),
+    ({"Label": 7, "StartInterval": 60}, "Label is not a non-empty string: 7"),
+])
+def test_a_malformed_launchd_field_is_named_never_coerced_or_dropped(tmp_path, bad, reason):
+    import plistlib
+
+    jobs, errors = _agents(tmp_path, plistlib.dumps(bad))
+    assert [job.job for job in jobs] == ["me.good"]
+    assert len(errors) == 1 and errors[0].startswith("bad.plist: ") and errors[0].endswith(reason)
+
+
+@pytest.mark.parametrize("calendar,schedule", [
+    ({"Minute": 59, "Hour": 23, "Day": 31, "Month": 12, "Weekday": 7},
+     "Day=31 Hour=23 Minute=59 Month=12 Weekday=7 (local time)"),
+    ({"Minute": 0, "Hour": 0, "Day": 1, "Month": 1, "Weekday": 0},
+     "Day=1 Hour=0 Minute=0 Month=1 Weekday=0 (local time)"),
+    ([{"Hour": 6}, {"Hour": 18}], "Hour=6; Hour=18 (local time)"),
+])
+def test_launchd_calendar_bounds_are_accepted(calendar, schedule):
+    assert cs._launchd_schedule({"StartCalendarInterval": calendar}) == schedule
+
+
+def test_an_empty_calendar_list_is_no_trigger_rather_than_an_error(tmp_path):
+    import plistlib
+
+    (tmp_path / "idle.plist").write_bytes(plistlib.dumps({"Label": "me.idle", "StartCalendarInterval": []}))
+    assert cs.collect_local(_not_found, tmp_path) == ([], [])
+
+
+def test_a_truncated_xml_plist_is_named_and_the_rest_still_reported(tmp_path):
+    jobs, errors = _agents(tmp_path, b'<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict>')
+    assert [job.job for job in jobs] == ["me.good"]
+    assert len(errors) == 1 and errors[0].startswith("bad.plist: no element found")
+
+
+@pytest.mark.skipif(not hasattr(__import__("os"), "geteuid") or __import__("os").geteuid() == 0,
+                    reason="root reads a mode-0 directory")
+def test_an_unreadable_launch_agents_dir_is_not_read_as_empty(tmp_path):
+    import plistlib
+
+    agents = tmp_path / "LaunchAgents"
+    agents.mkdir()
+    (agents / "good.plist").write_bytes(plistlib.dumps({"Label": "me.good", "StartInterval": 3600}))
+    agents.chmod(0)
+    try:
+        jobs, errors = cs.collect_local(_not_found, agents)
+    finally:
+        agents.chmod(0o700)
+    assert jobs == [] and len(errors) == 1 and errors[0].startswith(f"launchd: cannot list {agents}:")

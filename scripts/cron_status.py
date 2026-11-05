@@ -54,6 +54,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import quote
+from xml.parsers.expat import ExpatError
 
 import yaml
 
@@ -73,6 +74,9 @@ RUN_SEARCH_CAP = 1000
 HORIZON_DAYS = 366 * 9
 RUN_FIELDS = ".workflow_runs[] | {id, created_at, run_started_at, run_attempt, status, conclusion, html_url}"
 ASSIGNMENT = re.compile(r"^\s*[A-Za-z_][A-Za-z0-9_]*\s*=")
+#: The StartCalendarInterval keys launchd(5) defines, with their ranges (0 and
+#: 7 are both Sunday). Anything else is a schedule launchd would not run (#836).
+CALENDAR_KEYS = {"Minute": (0, 59), "Hour": (0, 23), "Day": (1, 31), "Weekday": (0, 7), "Month": (1, 12)}
 
 GhRunner = Callable[[list[str]], str]
 
@@ -407,9 +411,16 @@ def collect_local(run: Callable[[list[str]], subprocess.CompletedProcess],
             jobs.append(LocalJob("crontab", fields[5] if len(fields) >= 6 else stripped, schedule, "installed"))
     elif crontab is not None and "no crontab" not in (crontab.stderr or "").lower():
         errors.append(f"crontab: {(crontab.stderr or '').strip() or 'exit ' + str(crontab.returncode)}")
+    plists: list[Path] = []
     if agents_dir is not None and not agents_dir.is_dir():
         errors.append(f"launchd: {agents_dir} is not a directory")
-    plists = sorted(agents_dir.glob("*.plist")) if agents_dir is not None and agents_dir.is_dir() else []
+    elif agents_dir is not None:
+        try:
+            # Path.glob swallows a directory it cannot read, which would read as
+            # "no LaunchAgents"; iterdir raises (#836).
+            plists = sorted(path for path in agents_dir.iterdir() if path.name.endswith(".plist"))
+        except OSError as exc:
+            errors.append(f"launchd: cannot list {agents_dir}: {exc}")
     for plist in plists:
         try:
             data = plistlib.loads(plist.read_bytes())
@@ -417,12 +428,14 @@ def collect_local(run: Callable[[list[str]], subprocess.CompletedProcess],
                 raise ValueError("top level is not a dictionary")
             # A malformed trigger is this file's problem, not the report's (#834).
             schedule = _launchd_schedule(data)
-        except (OSError, plistlib.InvalidFileException, ValueError, TypeError, AttributeError) as exc:
+            label = data.get("Label")
+            if schedule and (not isinstance(label, str) or not label.strip()):
+                raise ValueError(f"Label is not a non-empty string: {label!r}")  # never invented (#836)
+        except (OSError, plistlib.InvalidFileException, ExpatError, ValueError, TypeError, AttributeError) as exc:
             errors.append(f"{plist.name}: {exc}")
             continue
         if not schedule:
             continue
-        label = data.get("Label", plist.stem)
         try:
             listed = run(["launchctl", "list", label])
         except OSError as exc:
@@ -446,10 +459,17 @@ def collect_local(run: Callable[[list[str]], subprocess.CompletedProcess],
 
 def _launchd_schedule(data: dict) -> str:
     """Both launchd triggers, which run independently: StartInterval is in seconds,
-    and an empty StartCalendarInterval dictionary means every minute (#825)."""
+    and an empty StartCalendarInterval dictionary means every minute (#825).
+
+    Raises ValueError for a trigger launchd(5) would not accept, rather than
+    coercing or dropping it: a positive integer interval, and calendar
+    dictionaries of integer CALENDAR_KEYS within their ranges (#836).
+    """
     parts = []
     if "StartInterval" in data:
-        seconds = int(data["StartInterval"])
+        seconds = data["StartInterval"]
+        if not _is_integer(seconds) or seconds <= 0:
+            raise ValueError(f"StartInterval is not a positive integer: {seconds!r}")
         if seconds < 60:
             parts.append(f"every {seconds} s")
         elif seconds % 60:  # keep the seconds of an interval that is not whole minutes (#828)
@@ -459,11 +479,25 @@ def _launchd_schedule(data: dict) -> str:
     if "StartCalendarInterval" in data:
         calendar = data["StartCalendarInterval"]
         entries = calendar if isinstance(calendar, list) else [calendar]
+        for entry in entries:
+            if not isinstance(entry, dict):
+                raise ValueError(f"StartCalendarInterval entry is not a dictionary: {entry!r}")
+            for key, value in entry.items():
+                if key not in CALENDAR_KEYS:
+                    raise ValueError(f"StartCalendarInterval has an unknown key: {key!r}")
+                low, high = CALENDAR_KEYS[key]
+                if not _is_integer(value) or not low <= value <= high:
+                    raise ValueError(f"StartCalendarInterval {key} is not an integer in {low}-{high}: {value!r}")
         texts = [" ".join(f"{key}={value}" for key, value in sorted(entry.items())) or "every minute"
-                 for entry in entries if isinstance(entry, dict)]
+                 for entry in entries]
         if texts:
             parts.append("; ".join(texts) + " (local time)")
     return "; ".join(parts)
+
+
+def _is_integer(value: object) -> bool:
+    """A plist integer. A plist boolean arrives as a Python bool, which is an int subclass."""
+    return isinstance(value, int) and not isinstance(value, bool)
 
 
 # ---------------------------------------------------------------- output --

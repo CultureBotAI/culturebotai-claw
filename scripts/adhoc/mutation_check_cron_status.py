@@ -9,7 +9,7 @@ from a backup, never from git.
 Inputs: none; run from the claw checkout root.
 Outputs: one line per mutant, killed or SURVIVED; a nonzero exit if any
 survives.
-Serves: the cron-status skill, PR #820 and its review issues #821-#834. Written 2026-11-05.
+Serves: the cron-status skill, PR #820 and its review issues #821-#834 and #836. Written 2026-11-05.
 """
 from __future__ import annotations
 
@@ -74,9 +74,32 @@ MUTANTS = [
     ("not-assessed marker unbolded", 'f"**not assessed: {status.error}**"', 'f"not assessed: {status.error}"'),
     # Fifth review of PR #820 (#834).
     ("malformed trigger escapes the per-plist handler",
-     "        except (OSError, plistlib.InvalidFileException, ValueError, TypeError, AttributeError) as exc:",
-     "        except (OSError, plistlib.InvalidFileException) as exc:"),
+     "        except (OSError, plistlib.InvalidFileException, ExpatError, ValueError, TypeError, AttributeError) as exc:",
+     "        except (OSError, plistlib.InvalidFileException, ExpatError) as exc:"),
     ("non-dictionary plist not rejected", '                raise ValueError("top level is not a dictionary")\n', "                pass\n"),
+    # Sixth review of PR #820 (#836).
+    ("truncated XML plist escapes the per-plist handler",
+     "        except (OSError, plistlib.InvalidFileException, ExpatError, ValueError, TypeError, AttributeError) as exc:",
+     "        except (OSError, plistlib.InvalidFileException, ValueError, TypeError, AttributeError) as exc:"),
+    ("unreadable directory read as empty",
+     '            plists = sorted(path for path in agents_dir.iterdir() if path.name.endswith(".plist"))',
+     '            plists = sorted(agents_dir.glob("*.plist"))'),
+    ("missing label invented from the file name",
+     "            if schedule and (not isinstance(label, str) or not label.strip()):",
+     "            if False:"),
+    ("whitespace label accepted", "not isinstance(label, str) or not label.strip()):",
+     "not isinstance(label, str) or not label):"),
+    ("zero interval accepted", "        if not _is_integer(seconds) or seconds <= 0:",
+     "        if not _is_integer(seconds) or seconds < 0:"),
+    ("boolean read as an integer", "    return isinstance(value, int) and not isinstance(value, bool)",
+     "    return isinstance(value, int)"),
+    ("non-dictionary calendar entry not named",
+     '                raise ValueError(f"StartCalendarInterval entry is not a dictionary: {entry!r}")',
+     "                pass"),
+    ("unknown calendar key accepted", "                if key not in CALENDAR_KEYS:", "                if False:"),
+    ("calendar range unchecked", "                if not _is_integer(value) or not low <= value <= high:",
+     "                if not _is_integer(value):"),
+    ("Weekday 7 rejected", '"Weekday": (0, 7)', '"Weekday": (0, 6)'),
 ]
 
 original = SOURCE.read_bytes()

@@ -79,6 +79,15 @@ with a calendar or interval trigger. The script never assumes that directory: wi
 argument, it reports launchd as "not checked". The LaunchAgents are marked `loaded`, `not loaded`, or `unknown` when launchctl could not be asked (which makes the report incomplete). Most such LaunchAgents are
 vendor updaters. Name any that look like the user's own jobs.
 
+The script never guesses at a LaunchAgent it cannot read. Each of these is
+named on an `INCOMPLETE` line, while the rest of the report still appears:
+- a plist that does not parse;
+- a missing or empty `Label`;
+- a `StartInterval` that is not a positive integer;
+- a `StartCalendarInterval` that launchd(5) would reject.
+
+A LaunchAgents directory it cannot list is reported the same way, not as empty.
+
 ## Output
 
 Always show:
