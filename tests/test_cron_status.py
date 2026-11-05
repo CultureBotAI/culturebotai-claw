@@ -630,3 +630,56 @@ def test_an_unreadable_launch_agents_dir_is_not_read_as_empty(tmp_path):
     finally:
         agents.chmod(0o700)
     assert jobs == [] and len(errors) == 1 and errors[0].startswith(f"launchd: cannot list {agents}:")
+
+
+# -------------------------------------------------- seventh review (#837) --
+def _deep_binary_plist(depth: int = 100_000) -> bytes:
+    """A well-framed binary plist of `depth` nested one-element arrays."""
+    header = b"bplist00"
+    body, offsets, position = b"", [], len(header)
+    for index in range(depth):
+        offsets.append(position)
+        item = bytes([0xA1]) + (index + 1).to_bytes(4, "big") if index < depth - 1 else bytes([0xA0])
+        body += item
+        position += len(item)
+    table = b"".join(offset.to_bytes(4, "big") for offset in offsets)
+    trailer = bytes(6) + bytes([4, 4]) + depth.to_bytes(8, "big") + bytes(8) + position.to_bytes(8, "big")
+    return header + body + table + trailer
+
+
+@pytest.mark.parametrize("bad,reason", [
+    (b'<?xml version="1.0" encoding="bogus"?><plist><dict/></plist>', "unknown encoding: bogus"),
+    (_deep_binary_plist(), "maximum recursion depth exceeded"),
+])
+def test_any_plist_parse_failure_is_named_not_raised(tmp_path, bad, reason):
+    jobs, errors = _agents(tmp_path, bad)
+    assert [job.job for job in jobs] == ["me.good"]
+    assert len(errors) == 1 and errors[0].startswith(f"bad.plist: {reason}")
+
+
+def test_an_exception_without_a_message_is_named_by_its_type(tmp_path, monkeypatch):
+    import plistlib
+
+    def broken(data):
+        raise RuntimeError()
+
+    monkeypatch.setattr(cs, "_launchd_schedule", broken)
+    (tmp_path / "a.plist").write_bytes(plistlib.dumps({"Label": "me.job", "StartInterval": 60}))
+    assert cs.collect_local(_not_found, tmp_path) == ([], ["a.plist: RuntimeError"])
+
+
+@pytest.mark.skipif(not hasattr(__import__("os"), "geteuid") or __import__("os").geteuid() == 0,
+                    reason="root searches a mode-0 directory")
+def test_an_unsearchable_parent_of_the_launch_agents_dir_is_named_not_raised(tmp_path):
+    import plistlib
+
+    parent = tmp_path / "blocked"
+    agents = parent / "LaunchAgents"
+    agents.mkdir(parents=True)
+    (agents / "good.plist").write_bytes(plistlib.dumps({"Label": "me.good", "StartInterval": 3600}))
+    parent.chmod(0)
+    try:
+        jobs, errors = cs.collect_local(_not_found, agents)
+    finally:
+        parent.chmod(0o700)
+    assert jobs == [] and len(errors) == 1 and errors[0].startswith(f"launchd: cannot list {agents}:")

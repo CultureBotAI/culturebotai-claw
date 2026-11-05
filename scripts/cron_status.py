@@ -54,7 +54,6 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import quote
-from xml.parsers.expat import ExpatError
 
 import yaml
 
@@ -412,13 +411,15 @@ def collect_local(run: Callable[[list[str]], subprocess.CompletedProcess],
     elif crontab is not None and "no crontab" not in (crontab.stderr or "").lower():
         errors.append(f"crontab: {(crontab.stderr or '').strip() or 'exit ' + str(crontab.returncode)}")
     plists: list[Path] = []
-    if agents_dir is not None and not agents_dir.is_dir():
-        errors.append(f"launchd: {agents_dir} is not a directory")
-    elif agents_dir is not None:
+    if agents_dir is not None:
         try:
-            # Path.glob swallows a directory it cannot read, which would read as
-            # "no LaunchAgents"; iterdir raises (#836).
-            plists = sorted(path for path in agents_dir.iterdir() if path.name.endswith(".plist"))
+            # is_dir itself raises when a parent cannot be searched (#837). Path.glob
+            # swallows a directory it cannot read, which would read as "no
+            # LaunchAgents"; iterdir raises (#836).
+            if agents_dir.is_dir():
+                plists = sorted(path for path in agents_dir.iterdir() if path.name.endswith(".plist"))
+            else:
+                errors.append(f"launchd: {agents_dir} is not a directory")
         except OSError as exc:
             errors.append(f"launchd: cannot list {agents_dir}: {exc}")
     for plist in plists:
@@ -431,8 +432,13 @@ def collect_local(run: Callable[[list[str]], subprocess.CompletedProcess],
             label = data.get("Label")
             if schedule and (not isinstance(label, str) or not label.strip()):
                 raise ValueError(f"Label is not a non-empty string: {label!r}")  # never invented (#836)
-        except (OSError, plistlib.InvalidFileException, ExpatError, ValueError, TypeError, AttributeError) as exc:
-            errors.append(f"{plist.name}: {exc}")
+        except Exception as exc:
+            # plistlib raises far more than its documented InvalidFileException:
+            # ExpatError, LookupError for an unknown encoding, RecursionError for
+            # deep nesting, and more. Listing types missed one per review (#834,
+            # #836, #837). Whatever it is, it is this file's failure, and it is
+            # still reported: named here, then the report is incomplete with exit 1.
+            errors.append(f"{plist.name}: {str(exc) or type(exc).__name__}")
             continue
         if not schedule:
             continue

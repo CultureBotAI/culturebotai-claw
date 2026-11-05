@@ -9,7 +9,7 @@ from a backup, never from git.
 Inputs: none; run from the claw checkout root.
 Outputs: one line per mutant, killed or SURVIVED; a nonzero exit if any
 survives.
-Serves: the cron-status skill, PR #820 and its review issues #821-#834 and #836. Written 2026-11-05.
+Serves: the cron-status skill, PR #820 and its review issues #821-#834, #836 and #837. Written 2026-11-05.
 """
 from __future__ import annotations
 
@@ -74,16 +74,14 @@ MUTANTS = [
     ("not-assessed marker unbolded", 'f"**not assessed: {status.error}**"', 'f"not assessed: {status.error}"'),
     # Fifth review of PR #820 (#834).
     ("malformed trigger escapes the per-plist handler",
-     "        except (OSError, plistlib.InvalidFileException, ExpatError, ValueError, TypeError, AttributeError) as exc:",
-     "        except (OSError, plistlib.InvalidFileException, ExpatError) as exc:"),
+     "        except Exception as exc:\n", "        except (OSError, plistlib.InvalidFileException) as exc:\n"),
     ("non-dictionary plist not rejected", '                raise ValueError("top level is not a dictionary")\n', "                pass\n"),
     # Sixth review of PR #820 (#836).
     ("truncated XML plist escapes the per-plist handler",
-     "        except (OSError, plistlib.InvalidFileException, ExpatError, ValueError, TypeError, AttributeError) as exc:",
-     "        except (OSError, plistlib.InvalidFileException, ValueError, TypeError, AttributeError) as exc:"),
+     "        except Exception as exc:\n", "        except (OSError, ValueError, LookupError, RecursionError) as exc:\n"),
     ("unreadable directory read as empty",
-     '            plists = sorted(path for path in agents_dir.iterdir() if path.name.endswith(".plist"))',
-     '            plists = sorted(agents_dir.glob("*.plist"))'),
+     '                plists = sorted(path for path in agents_dir.iterdir() if path.name.endswith(".plist"))',
+     '                plists = sorted(agents_dir.glob("*.plist"))'),
     ("missing label invented from the file name",
      "            if schedule and (not isinstance(label, str) or not label.strip()):",
      "            if False:"),
@@ -100,6 +98,17 @@ MUTANTS = [
     ("calendar range unchecked", "                if not _is_integer(value) or not low <= value <= high:",
      "                if not _is_integer(value):"),
     ("Weekday 7 rejected", '"Weekday": (0, 7)', '"Weekday": (0, 6)'),
+    # Seventh review of PR #820 (#837).
+    ("unknown encoding escapes the per-plist handler", "        except Exception as exc:\n",
+     '        except (OSError, ValueError, RecursionError, __import__("xml.parsers.expat").parsers.expat.ExpatError)'
+     " as exc:\n"),
+    ("deep nesting escapes the per-plist handler", "        except Exception as exc:\n",
+     '        except (OSError, ValueError, LookupError, __import__("xml.parsers.expat").parsers.expat.ExpatError)'
+     " as exc:\n"),
+    ("empty exception message left blank", "{str(exc) or type(exc).__name__}", "{exc}"),
+    ("is_dir outside the directory handler",
+     "    if agents_dir is not None:\n        try:\n",
+     "    if agents_dir is not None:\n        agents_dir.is_dir()\n        try:\n"),
 ]
 
 original = SOURCE.read_bytes()
