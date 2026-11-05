@@ -74,18 +74,24 @@ narrowed.
 
 ```bash
 uv run python scripts/fleet_pages_status.py --json
+uv run python scripts/fleet_pages_status.py --with-local-audits
 uv run python scripts/fleet_pages_status.py --org CultureBotAI
 uv run python scripts/fleet_pages_status.py --repo-limit 500
 uv run python scripts/fleet_pages_status.py --deployment-limit 50
 uv run python scripts/fleet_pages_status.py --no-live-check
 ```
 
-Use `--json` for downstream processing. `--no-live-check` is appropriate only
-when HTTP reachability is explicitly out of scope; freshness still uses remote
-GitHub deployment and branch data. `GH_TOKEN` or `GITHUB_TOKEN` is used when
-present, but public CultureBotAI repositories can normally be checked without a
-token. If GitHub rate-limits an unauthenticated run, report the incomplete check
-and rerun with a read-only token; do not infer health from local clones.
+Use `--json` for downstream processing. Pass `--with-local-audits` to also run
+the offline `page_budgets` (`kg-microbe-pages audit`) and `site_contract`
+(`kg-microbe-site check`) checks against each locally configured Mech's built
+site directory (`Local Pages Budgets & Site Contract Audits`). `--no-live-check`
+is appropriate only when HTTP reachability is explicitly out of scope; freshness
+still uses remote GitHub deployment and branch data. `GH_TOKEN` or
+`GITHUB_TOKEN` is used when present; when neither is set, `GitHubClient`
+automatically uses authenticated `gh api` (without extracting tokens) before
+falling back to unauthenticated urllib requests so full 5,000 req/hr rate limits
+apply when `gh` is logged in. If GitHub rate-limits an unauthenticated run,
+report the incomplete check; do not infer health from local clones.
 
 ## Boundaries
 

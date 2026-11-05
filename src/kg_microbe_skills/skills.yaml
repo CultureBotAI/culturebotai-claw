@@ -73,9 +73,32 @@ skills:
   fleet-issue-review:
     scope: fleet
     reason: Reviews the complete manifest-defined Mech backlog with thematic prioritization and dependency-aware parallel planning.
+  fleet-maintenance-cycle:
+    scope: fleet
+    reason: >-
+      Runs the recurring fast and full maintenance tiers across claw and the
+      manifest-defined Mechs, resolving membership from the manifest through
+      its component scripts.
   fleet-repo-crud-cleanup:
     scope: fleet
     reason: Inventories local clutter across manifest-resolved Mechs and explicit new targets, then guides evidence-backed cleanup within the user-authorized scope.
+  fleet-stale-content-audit:
+    scope: fleet
+    reason: >-
+      Audits repository weight, .git bloat, legacy root test_*.py diagnostics,
+      unreferenced scripts, ungoverned YAML writers, and unapplied patch
+      backlogs across claw and the manifest-defined Mechs.
+  fleet-test-and-ci-status:
+    scope: fleet
+    reason: >-
+      Audits test suite counts, coverage floors, mypy/ruff parity, workflow
+      triggers, and CI telemetry across claw and the manifest-defined Mechs.
+  fleet-worktree-and-temp-hygiene:
+    scope: fleet
+    reason: >-
+      Audits /tmp, /private/tmp, $TMPDIR, claw/workspace/, worktrees, local
+      branches, stashes, and lock leases across claw and the manifest-defined
+      Mechs.
   fleet-pr-review:
     scope: fleet
     reason: Reviews open PRs across the manifest-defined control plane.
@@ -388,3 +411,19 @@ canonical:
       CLAW-owned schema and saver, preserving domain rules in a native profile.
       Eligibility no longer borrows curation_history: PathwayMech and CMMMech
       can review records without adopting the generic scientific write contract.
+  scalability-and-health:
+    capability: page_budgets
+    reason: >-
+      Generalizes ProteinTraitsMech's scalability-check across the Mechs that
+      declare page_budgets, combining kg-microbe-health report (Git and
+      working-tree weight) with kg-microbe-pages audit and kg-microbe-site
+      check (Pages deploy and browser shard budgets) while leaving repository
+      build recipes and shard constants outside the managed regions.
+  stats-report:
+    capability: corpus_statistics
+    reason: >-
+      Seven Mechs carry a stats-report skill and share the same core rule:
+      never quote hardcoded snapshot counts from prose, always compute live
+      counts at run time through kg-microbe-corpus report and pair them with
+      native validation and commit provenance, while keeping repository-specific
+      recipes and domain strata outside the managed regions.
