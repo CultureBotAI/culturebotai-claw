@@ -89,9 +89,8 @@ def add_observation_and_claim(bundle):
         decision.update(observation_id=observation["observation_id"], claim_ids=[claim["claim_id"]])
 
 
-def attach_review(bundle, *, scientific=False):
+def attach_review(bundle, *, scientific=False, review_id="20261104T010000Z-synthetic"):
     """Use the real canonical RecordReview validator, without mocking its rules."""
-    review_id = "20261104T010000Z-synthetic"
     for decision in bundle["decisions"]:
         decision.update(review_state="reviewed", review_ids=[review_id])
     observations = {row["observation_id"]: row for row in bundle["observations"]}
@@ -102,8 +101,8 @@ def attach_review(bundle, *, scientific=False):
             "selector": decision["occurrence_id"], "label": "Synthetic occurrence decision",
             "kind": "snapshot_row", "ownership_note": "Synthetic test, no maintained science.",
             "semantic_digest": {"algorithm": "kg-microbe-curation-decision/v1",
-                                "sha256": decision_digest(decision),
-                                "description": "Exact proposed decision without circular review IDs."},
+                                "sha256": decision_digest(decision, observations),
+                                "description": "Decision and observation without circular review IDs."},
         })
     for claim in bundle["claims"]:
         targets.append({
@@ -351,6 +350,63 @@ def test_review_reuse_is_bound_to_exact_inputs_and_current_scope(bundle, change)
     else:
         bundle["observations"][0]["native_identity"]["schema_sha256"] = "0" * 64
     with pytest.raises(CurationError, match="digest|stale|unbound"):
+        validate_bundle(bundle)
+
+
+@pytest.mark.parametrize("disposition", ["withheld", "exclude"])
+@pytest.mark.parametrize("change", [
+    "identifier", "algorithm", "normalizer_contract_sha256", "schema_sha256",
+    "prefix_map_sha256", "add", "remove",
+])
+def test_claimless_review_binds_complete_native_identity(bundle, disposition, change):
+    """Issue #811: claimless decisions must not reuse stale native provenance."""
+    add_observation_and_claim(bundle)
+    bundle["claims"] = []
+    for decision in bundle["decisions"]:
+        decision.update(claim_ids=[], disposition=disposition)
+    observation = bundle["observations"][0]
+    native_identity = deepcopy(observation["native_identity"])
+    if change == "add":
+        del observation["native_identity"]
+    attach_review(bundle)
+    validate_bundle(bundle)
+    previous_reviews = deepcopy(bundle["reviews"])
+    previous_observation_id = observation["observation_id"]
+
+    if change == "add":
+        observation["native_identity"] = native_identity
+    elif change == "remove":
+        del observation["native_identity"]
+    elif change in {"identifier", "algorithm"}:
+        observation["native_identity"][change] += "-changed"
+    else:
+        observation["native_identity"][change] = "0" * 64
+
+    assert observation["observation_id"] == previous_observation_id
+    assert bundle["reviews"] == previous_reviews
+    with pytest.raises(CurationError, match="semantic digest"):
+        validate_bundle(bundle)
+    attach_review(bundle, review_id="20261104T010000Z-synthetic-refreshed")
+    validate_bundle(bundle)
+
+
+@pytest.mark.parametrize("disposition", ["withheld", "exclude"])
+def test_claimless_review_rejects_decision_only_digest(bundle, disposition):
+    """An old digest without the observation envelope must not be a fallback."""
+    add_observation_and_claim(bundle)
+    bundle["claims"] = []
+    for decision in bundle["decisions"]:
+        decision.update(claim_ids=[], disposition=disposition)
+    attach_review(bundle)
+    review = bundle["reviews"][0]
+    decisions = {row["occurrence_id"]: row for row in bundle["decisions"]}
+    for target in review["document"]["targets"]:
+        decision = decisions[target["target_id"]]
+        target["semantic_digest"]["sha256"] = sha256_json({
+            key: value for key, value in decision.items() if key != "review_ids"
+        })
+    review["sha256"] = sha256_json(review["document"])
+    with pytest.raises(CurationError, match="semantic digest"):
         validate_bundle(bundle)
 
 

@@ -111,9 +111,17 @@ def unprocessed_decision(identifier: str) -> dict[str, Any]:
     }
 
 
-def decision_digest(decision: dict[str, Any]) -> str:
-    """Bind proposed decision bytes without its circular review references."""
-    return sha256_json({key: value for key, value in decision.items() if key != "review_ids"})
+def decision_digest(decision: dict[str, Any], observations: dict[str, dict]) -> str:
+    """Bind the decision and complete observation, excluding circular review IDs."""
+    observation_id = decision["observation_id"]
+    if observation_id is not None and observation_id not in observations:
+        raise CurationError("Cannot digest a decision with an unknown observation")
+    return sha256_json(
+        {
+            "decision": {key: value for key, value in decision.items() if key != "review_ids"},
+            "observation": observations[observation_id] if observation_id is not None else None,
+        }
+    )
 
 
 def claim_digest(claim: dict[str, Any], observations: dict[str, dict]) -> str:
@@ -206,7 +214,7 @@ def _decision_checks(
                     continue
                 if target_id == identifier:
                     algorithm = "kg-microbe-curation-decision/v1"
-                    expected = decision_digest(decision)
+                    expected = decision_digest(decision, observations)
                 else:
                     algorithm = "kg-microbe-curation-claim/v1"
                     expected = claim_digest(claims[target_id], observations)

@@ -78,6 +78,9 @@ Each bundle is limited to 10,000 selected occurrences/decisions, 50,000 entries
 per reference collection, and 16 MiB. Complete selected membership does not mean
 complete release coverage. A review digest binds the exact proposed decision,
 claim membership and native observation envelope; stale references are rejected.
+Decision digests bind the complete referenced observation even when no claims
+are present. Adding, removing or changing its native identity requires a fresh
+review; decision-only digests cannot be reused as a fallback.
 Retain/amend dispositions require explicit completed scientific review covering
 their scope. A passing schema, quote check or checksum never creates that
 disposition. The validator checks review structure/binding, not reviewer
