@@ -202,6 +202,41 @@ def test_a_repeated_prefix_is_a_layout_not_a_typo(tmp_path):
     assert check(tmp_path, {"CommunityMech": root})[0].verdict == "ok"
 
 
+def test_a_bare_repeated_prefix_names_the_checkout_itself(tmp_path):
+    """`CommunityMech/CommunityMech` is the nested checkout, written from the
+    shared parent. Stripping the repeated name leaves nothing to look up,
+    which is the checkout itself, not a missing file (#843, the cause of #835)."""
+    # A real checkout: the filesystem fallback for a non-git directory finds
+    # the empty remainder (the directory itself) and hides the bug.
+    root = _repository(tmp_path / "CommunityMech" / "CommunityMech", {"README.md": "x"})
+    _skill(tmp_path, "s", "Compare `CommunityMech/CommunityMech` with `CommunityMech/gone.csv`.\n")
+
+    verdicts = {f.reference.text: f.verdict for f in check(tmp_path, {"CommunityMech": root})}
+
+    assert verdicts == {"CommunityMech/CommunityMech": "ok", "CommunityMech/gone.csv": "missing"}
+
+
+@pytest.mark.parametrize("text", [".git/objects/pack", "OtherMech/.git/objects/pack"])
+def test_git_internal_state_is_output_not_missing(tmp_path, text):
+    """Git never tracks `.git`, so no checkout can contain `.git/objects/pack`;
+    with a downstream checkout resolvable it used to be called missing (#839)."""
+    other = _repository(tmp_path / "OtherMech", {"README.md": "x"})
+    _skill(tmp_path, "s", f"Measure `{text}`.\n")
+
+    finding = check(tmp_path, {"OtherMech": other})[0]
+
+    assert (finding.verdict, finding.detail) == ("output", "git's own state under .git/, which git never tracks")
+
+
+@pytest.mark.parametrize("text", [".github/gone.yaml", ".gitignore.d/gone", "OtherMech/.github/gone.yaml"])
+def test_a_path_that_only_starts_with_dot_git_is_still_judged(tmp_path, text):
+    """The exemption is the `.git` path segment, not the `.git` prefix (#839)."""
+    other = _repository(tmp_path / "OtherMech", {"README.md": "x"})
+    _skill(tmp_path, "s", f"Read `{text}`.\n")
+
+    assert check(tmp_path, {"OtherMech": other})[0].verdict == "missing"
+
+
 def test_an_unknown_repository_prefix_is_unverifiable_not_missing(tmp_path):
     _skill(tmp_path, "s", "Read `CultureBotHT/data/x.csv`.\n")
 

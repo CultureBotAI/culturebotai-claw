@@ -97,6 +97,11 @@ _HOSTNAME = re.compile(r"^(www\.|[\w-]+(\.[\w-]+)*\.(com|org|net|edu|gov|io|ac\.
 _OUTPUT_ROOT = "workspace"
 _SKILL_OUTPUT = re.compile(r"^reports/yaml_(?:record|category)_review(?:/.*)?$")
 
+# Git's own state. Git never tracks its `.git` directory, so a skill naming
+# `.git/objects/pack` -- where history's weight lives -- describes every
+# checkout and can never be found in one. Counted, not judged (#839).
+_GIT_DIRECTORY = ".git"
+
 # This repository, by the name a sibling checkout would use for it.
 _CLAW_LABEL = "culturebotai-claw"
 
@@ -437,6 +442,8 @@ def _resolve_path(
     declared: str | None = None,
 ) -> Finding:
     """Decide what one path reference actually points at."""
+    if _GIT_DIRECTORY in reference.text.split("/"):
+        return Finding(reference, "output", "git's own state under .git/, which git never tracks")
     # Whether or not that repository is resolvable here. If it is not,
     # `_resolve_declared` says so; falling through to claw instead would report
     # a path that is correct in its own repository as missing from this one.
@@ -472,6 +479,8 @@ def _resolve_path(
         # them until the remainder is relative to the checkout itself.
         while rest.split("/")[0] == head:
             rest = rest.partition("/")[2]
+        if not rest:  # `CommunityMech/CommunityMech` names the checkout itself (#843)
+            return Finding(reference, "ok")
         verdict = repo.verdict(rest)
         if verdict == "ok":
             return Finding(reference, "ok")
