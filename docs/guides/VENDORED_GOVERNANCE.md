@@ -109,8 +109,15 @@ It reports the pin in full or abbreviated to seven or more characters, in either
 (`manifest-snapshot`), outside the pin file and dated `reports/`. A consumer
 whose committed pin is not `--old-ref` is reported as `PIN`, since that means
 a mistyped ref or a Mech already moved on. It exits 1 on either and never
-writes. Put each reported file in that Mech's
-re-pin commit. The rollout to `cb83def3` had two: MediaIngredientMech's
+writes. Judge each hit:
+
+- Change, in that Mech's re-pin commit, a copy that the Mech's own checks
+  compare with the pin.
+- Leave unchanged a dated review or research record, provenance or a commit
+  permalink that names the old pin. It records history, and rewriting it would
+  falsify that (#795).
+
+The rollout to `cb83def3` had two couplings: MediaIngredientMech's
 `.github/workflows/qc-evidence.yaml` checks claw out at a `ref:` a test
 requires to equal the pin, and NaturalProductMech's
 `scripts/.vendored_manifest.json` must equal claw's manifest at the pin.
@@ -419,62 +426,48 @@ downstream rollout, exact-main audit, and final-state sequence. Some current
 payload comments retain historical fleet wording; changing those bytes requires
 that separate coordinated release.
 
-## Scoped evidence-validation release
+## Scoped evidence-validation release (retired)
 
-The evidence-reference-validation release has exactly one canary,
-MediaIngredientMech. Its reviewed declaration is
-`src/kg_microbe_governance/releases/evidence-reference-validation-mim-v1.json`.
-The separate read-only audit preserves the coordinated `fleet-audit` command
-and its unanimous-pin contract:
+The evidence-reference-validation canary shipped as a bounded release.
+[claw#693](https://github.com/CultureBotAI/culturebotai-claw/pull/693) let
+MediaIngredientMech alone advance from the fleet baseline
+`a5d562962c75a2ad9efd8160b548df5944315422` to the canary commit
+`16fd7c9484d98b14a53aec55616d26dae70a0af7`, checked by a separate release
+audit while every other Mech kept the baseline. That lane rejected any change to
+the evidence capability or the governance manifest, so the fleet rollout
+([#729](https://github.com/CultureBotAI/culturebotai-claw/issues/729)) retired
+it in [claw#773](https://github.com/CultureBotAI/culturebotai-claw/pull/773).
 
-```bash
-uv run python -m kg_microbe_governance.release_audit \
-  --trusted-root /path/to/trusted-claw \
-  --target-root mediaingredientmech=/path/to/MediaIngredientMech \
-  --target-root traitmech=/path/to/TraitMech \
-  ... \
-  --json-output /path/outside-audited-checkouts/release-audit.json
-```
+- The release removed the declaration and `release_audit.py`.
+- The lane's workflow steps stayed for one more PR, because the release PR
+  itself was audited against a base that still had the declaration. The
+  cleanup PR that followed the fleet's re-pin removed them.
 
-Supply every manifest-defined Mech root. The audit requires exact repository
-identities, distinct clean roots and consumer `HEAD == origin/main`. The trusted
-Claw HEAD must be on its canonical `origin/main` first-parent history; a merged
-feature parent is insufficient, while an older protected main base is valid. Callers fetch before
-inspection; the audit performs no network access or checkout mutation. Its JSON
-report records trusted, baseline and candidate revisions, manifest and policy
-digests, each consumer's pin and checks, and separate pending/adopted counts.
-
-All noncanaries must retain the declaration's exact baseline SHA. MIM may retain
-that baseline, reported as `pending`, or adopt the exact first-parent commit
-that introduced the unchanged declaration, reported as `adopted`. This derives
-the future squash commit without putting its own SHA inside its tree. Later
-unrelated Claw commits do not move the candidate; modification or reintroduction
-of this release declaration is rejected. The only allowed governance-manifest
-delta is the declaration's two complete MIM-only artifact descriptors. Current
-trusted governance bytes and the evidence capability profile must still match
-that reviewed candidate. A later governed change needs an explicit release
-policy transition; this release cannot become an indefinite exception.
-
-Historical manifests and payloads are read as Git blobs from trusted Claw
-history, checked against their digests, and compared with each consumer's
-committed blobs and modes. Native safe-working-path and permission checks also
-run. A downstream pin never selects executable audit/install code, and matching
-working files cannot hide a wrong committed artifact. Missing roots, unexpected
-pins, wider applicability and partial checks fail rather than becoming skips.
-
-During bootstrap, a pull request's trusted base has no release declaration and
-continues using the existing coordinated audit; candidate contract tests run
-separately. After merge, the workflow selects the declaration from trusted main
-and runs the scoped audit. A candidate checkout cannot activate this mode.
-`pending` validates preparation only: release completion additionally requires
-MIM's reviewed PR to merge and its own merged-revision CI to pass. The remaining
-Mechs need a separately authorized rollout; this release does not grant one.
+Every Mech re-pinned to the rollout release, and the coordinated `fleet-audit`
+above is again the only release gate. Roll a release back forward, as Rollback
+below describes, not with a plain `git revert` (#784). Historical receipts that
+cite the lane keep the revision they validated.
 
 ## Rollback
 
-Rollback means pinning every Mech to the previous reviewed claw commit; do
-not reinstate a Mech authority or use a mutable branch. The canonical bytes
-remain recoverable from every reviewed claw commit.
+Rollback rolls forward:
+
+1. Bring every Mech to the current release.
+2. Merge a reviewed claw commit that restores the previous canonical bytes.
+3. Re-pin every Mech to that commit. `sync` never deletes, so a Mech that the
+   restored manifest drops from an artifact's consumers deletes that file in
+   its re-pin. If the file is a workflow whose job is required, un-require the
+   job with a reviewed merge-queue plan and apply before that re-pin (#794).
+
+Do not reinstate a Mech authority or use a mutable branch.
+
+Re-pinning the fleet to an older claw commit does not work once claw's
+governance manifest has changed, and every governance release changes it.
+`fleet-audit` requires the manifest at the shared pin to equal the one the
+installed package carries. So every claw pull request would then fail,
+including the one restoring the old bytes. `kg-microbe-governance sync`, run
+from the current release, refuses the older ref for the same reason (#789).
+The canonical bytes remain recoverable from every reviewed claw commit.
 
 ## Governed workflow action pins
 

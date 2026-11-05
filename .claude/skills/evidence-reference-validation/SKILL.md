@@ -13,8 +13,9 @@ tags: [fleet, evidence, literature, pubmed, validation]
 Use this skill before publishing curated quotations or when auditing whether
 quoted edge evidence occurs in its cited cached source. Read the Mech's
 `evidence_reference_validation` capability in `src/kg_microbe_fleet/fleet.yaml`;
-disabled and not-applicable declarations include a reason. Only the MIM canary
-is enabled in this release. Adoption in other Mechs is a separate rollout.
+disabled and not-applicable declarations include a reason. MIM,
+CellStructureMech and HabitatMech enable it; each other Mech's reason names what
+its adoption needs.
 
 The validator is offline. It reads records and existing source caches, writes
 reports within the active Mech checkout, and does not fetch sources, repair
@@ -46,17 +47,23 @@ uv run python scripts/validate_evidence_references.py --strict
 Mech CI uses the canonical
 `src/kg_microbe_governance/artifacts/scripts/run_shared_evidence_validator.py`
 runner and `src/kg_microbe_governance/artifacts/workflows/qc-evidence.yaml`
-workflow. The workflow checks out Claw at the full commit from the consumer's
-`MediaIngredientMech/scripts/.vendored_canon_ref`; the runner requires `CLAW_ROOT` at that clean
+workflow. The workflow checks out Claw at the full commit in the consumer's own
+pin file, scripts/.vendored_canon_ref; the runner requires `CLAW_ROOT` at that clean
 pinned revision and binds validation to the Mech worktree containing it.
 
 ## What the result means
 
-Supported sources are PMID Markdown caches with a matching `# PMID:...` header
-and exactly one nonempty `## Abstract` section. A quote is compared only with
-that abstract body, using NFKC normalization, collapsed whitespace and lowercase.
-Titles, metadata and curator notes cannot establish a match. Manifest settings
-declare cache location and evidence/reference/quote field aliases.
+Supported sources are PMID and DOI Markdown caches: `PMID_<n>.md` with a
+matching `# PMID:<n>` header, or `DOI_<percent-encoded lowercase DOI>.md` with a
+matching `# DOI:<doi>` header, each with exactly one nonempty `## Abstract`
+section. DOIs are case-insensitive, and the `doi:`, bare and resolver-URL
+(`doi.org`, `www.doi.org`, `dx.doi.org`) spellings of one DOI read one cache;
+only a URL's path is the DOI (not its fragment or query), and only it is
+percent-decoded. A citation that carries a PMID is checked against
+the PMID alone; DOI values beside it are not read. A quote is compared only with that abstract
+body, using NFKC normalization, collapsed whitespace and lowercase. Titles,
+metadata and curator notes cannot establish a match. Manifest settings declare
+cache location and evidence/reference/quote field aliases.
 
 The optional `evidence_paths` selectors bound which evidence containers the
 gate measures. The MIM canary selects only `ontology_mapping.evidence`,
@@ -70,9 +77,9 @@ Evidence-field presence or an enabled capability alone does not certify them.
 | `OK` | Normalized quote occurs in the identified abstract | Pass |
 | `NO_QUOTE` | No quote; a populated citation alone is not validation | Report separately |
 | `MISSING_REFERENCE` | Quote has no citation | Fail |
-| `MISSING_CACHE` | Cited PMID cache is absent | Fail with `--strict` |
-| `UNSUPPORTED_REFERENCE` | Source format is not supported, including DOI-only citations | Fail with `--strict` |
-| `INVALID_EVIDENCE` | Malformed or conflicting evidence fields | Fail |
+| `MISSING_CACHE` | Cited PMID or DOI cache is absent | Fail with `--strict` |
+| `UNSUPPORTED_REFERENCE` | Citation is neither a PMID nor a DOI (a database record, URL or free text) | Fail with `--strict` |
+| `INVALID_EVIDENCE` | Malformed or conflicting evidence fields, including a `pmid` slot that names no PMID | Fail |
 | `INVALID_CACHE` | Cache identity/body is invalid or ambiguous | Fail |
 | `SNIPPET_NOT_IN_SOURCE` | Quote is absent from the abstract body | Fail |
 
@@ -84,9 +91,62 @@ sources as validated. There is no auto-repair mode.
 Reports are `evidence_reference_validation.json`,
 `evidence_reference_validation.tsv` and `evidence_reference_validation.md`
 under the selected checkout's `workspace/reports/` by default. They record
-verdicts and quote/cache hashes without reproducing source quotations.
+verdicts and quote/cache hashes without reproducing source quotations, and say
+how many in-scope items carry a quote at all: a pass covers only those.
 `kg-microbe-graph coverage` reports quote-validated edge evidence separately
 from an evidence field merely being populated.
+
+## Adding missing caches
+
+The gate never fetches. `kg-microbe-evidence-fetch` is the separate command that
+adds caches, and it is a dry run unless `--apply` is given:
+
+```bash
+uv run kg-microbe-evidence-fetch --mech <mech> --root <worktree>            # plan
+uv run kg-microbe-evidence-fetch --mech <mech> --root <worktree> --limit 2 --apply   # canary
+uv run kg-microbe-evidence-fetch --mech <mech> --root <worktree> --apply
+```
+
+It fetches exactly the sources the gate reports as `MISSING_CACHE` under the
+declared selectors, from NCBI E-utilities, anonymously. A DOI's abstract is
+accepted only from a single PubMed record that lists that DOI. It never rewrites
+an existing cache and writes nothing for a record without an abstract, so those
+stay `MISSING_CACHE`. When both PMIDs and DOIs are pending, `--limit` covers at
+least one DOI, so the `--limit 2` canary exercises both lookup paths; check its
+files before fanning out. Before any request, both modes check that the cache
+directory is writable; every dry run also checks the repository-lock setup that
+`--apply` takes (including the global lock), and `--apply` holds that lock. An
+NCBI error reply stops the run; it is never reported as sources not found.
+`--json` must be outside the checkout or under its `workspace/`. A cached abstract
+does not clear its redistribution rights. Follow the Mech's source policy before
+committing caches, including any hosting policy in its `LICENSE`.
+CellStructureMech, for example, hosts only licence-verified CC0, public-domain
+or CC BY text, so it records unhostable sources as `MISSING_CACHE` instead
+(claw#796).
+
+## Known findings ledger
+
+A Mech whose profile declares `known_findings` keeps a TSV
+(`record`, `reference`, `verdict`, `quote_sha256`, `issue`) of existing findings
+whose repair an issue owns. A finding listed there is reported, counted apart
+and never shown as validated, but does not block. Each row excuses exactly one occurrence, so a copy of a recorded failing
+quote blocks until it is recorded too. Any finding not listed still
+blocks, and an entry whose finding no longer occurs is stale and blocks until it
+is removed, so the ledger can only shrink by repair. Only quote or citation
+findings can be recorded (`MISSING_REFERENCE`, `MISSING_CACHE`,
+`UNSUPPORTED_REFERENCE`, `SNIPPET_NOT_IN_SOURCE`); broken input is fixed instead.
+Editing a recorded quote changes its hash, so the new text is checked afresh.
+
+```bash
+uv run kg-microbe-evidence --mech <mech> --root <worktree> --record-known-findings --issue <issue-url>          # plan
+uv run kg-microbe-evidence --mech <mech> --root <worktree> --record-known-findings --issue <issue-url> --apply  # write
+```
+
+The writer keeps entries that still occur with their existing owner, drops stale
+ones, and assigns new findings to `--issue`. After repairing quotes, rerun it
+without `--issue` to drop the repaired entries. A dry run that leaves a current
+finding without an owner exits 1, and `--apply` then refuses (exit 2); the write
+holds the Mech's repository lock.
 
 A match establishes quote occurrence only. It does not establish that the
 paper supports the asserted relationship, causal direction, organism scope,

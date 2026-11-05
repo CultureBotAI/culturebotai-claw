@@ -67,6 +67,9 @@ capability_catalogue:
         type: string_list
       evidence_paths:
         type: string_list
+      # Issue-owned findings that are reported but do not block (#729).
+      known_findings:
+        type: string
   corpus_statistics:
     settings:
       fields:
@@ -225,9 +228,12 @@ mechs:
       evidence_reference_validation:
         status: disabled
         reason: >-
-          Literature quote fields exist, but no deterministic CI gate matches
-          quotes against committed sources; the shared cache/profile
-          contract requires later rollout.
+          Measured 2026-11-04 (claw#729): the record_globs name the derived
+          merged layer, whose 91 quote-bearing items are stale, while the
+          authoritative normalized corpus holds 38,580, of which 37,626 (97.5%)
+          cite neither a PMID nor a DOI. Adoption needs the gate to read the
+          authoritative layer (claw#779) and a source adapter for web and
+          database citations.
       id_label_validation:
         status: enabled
       record_review:
@@ -524,9 +530,12 @@ mechs:
       evidence_reference_validation:
         status: disabled
         reason: >-
-          Native reference validation and committed caches exist, but validation
-          is on demand rather than a CI gate, with documented evidence-repair
-          backlog; shared CI adoption is deferred.
+          Measured 2026-11-04 (claw#729): of 8,360 PMID-cited quotes, 4,629 occur
+          in the cited abstract and 3,727 do not; 2,509 of those occur in the
+          Mech's tracked PMID text caches, which hold full texts and longer
+          abstract exports. The 1,232 DOI- and web-cited quotes were not compared.
+          Adoption needs a reviewed source adapter for those texts and the native
+          front-matter caches; the native evidence-repair backlog remains open.
       id_label_validation:
         status: enabled
       record_review:
@@ -667,9 +676,11 @@ mechs:
       evidence_reference_validation:
         status: disabled
         reason: >-
-          Verbatim-snippet reviewer instructions are not a deterministic
-          source-matching gate; a committed source-cache/profile contract and CI
-          adoption remain unverified.
+          Measured 2026-11-04 (claw#729): of 9,775 quotes, 283 cite a PMID, 5,717
+          a DOI, 933 a journal supplement or article full text, and 2,842 a web or
+          database source (mostly model files and a wiki). Adoption needs a
+          measurement of the DOI-cited quotes, a full-text and supplement source
+          adapter, and a quote-versus-database-assertion adapter.
       id_label_validation:
         status: enabled
       record_review:
@@ -829,9 +840,10 @@ mechs:
       evidence_reference_validation:
         status: disabled
         reason: >-
-          Populated supporting-text fields include source assertions; a reviewed
-          quote-versus-database-assertion adapter, committed source cache and
-          deterministic CI gate are not adopted.
+          Measured 2026-11-04 (claw#729): 601,978 of 647,311 quoted items cite a
+          database record rather than literature, so those snippets are database
+          assertions, not quotations. A reviewed quote-versus-database-assertion
+          adapter is required before a literature quote gate applies.
       id_label_validation:
         status: enabled
       record_review:
@@ -996,9 +1008,10 @@ mechs:
       evidence_reference_validation:
         status: disabled
         reason: >-
-          Literature discovery and snippet-bearing records do not establish
-          deterministic cached-source validation; shared profile/cache/CI
-          adoption is deferred.
+          Measured 2026-11-04 (claw#729): of 651 quoted items, 441 cite a database
+          or web source, 205 a DOI and 5 a PMID. A reviewed
+          quote-versus-database-assertion adapter, and a measurement of the
+          DOI-cited quotes, come before adoption.
       # These arrive with the vendoring PR this declaration obliges
       # (AntibioticMech#29). Enabled rather than disabled-with-an-absent-claim
       # (#255): a claim that the files are absent is true only until that lands,
@@ -1162,10 +1175,16 @@ mechs:
     vendored_role: consumer
     capabilities:
       evidence_reference_validation:
-        status: disabled
-        reason: >-
-          Literature-evidence authoring exists, but a deterministic CI gate
-          matching quotes against committed sources is not established.
+        status: enabled
+        settings:
+          cache_dir: references_cache
+          reference_fields: [reference]
+          snippet_fields: [snippet]
+          evidence_fields: [evidence]
+          known_findings: curation/evidence_known_findings.tsv
+          # Every evidence slot is an EvidenceItem or SupportingReference whose
+          # snippet the schema defines as a verbatim quote, so all are in scope
+          # (#729). Residual findings are owned by the issue the ledger names.
       # Enabled rather than disabled-with-an-absent-claim (#255): both arrive in
       # CellStructureMech#53, which is open and green, so a claim that the files
       # are absent is true only until that merges. An enabled declaration carries
@@ -1351,10 +1370,16 @@ mechs:
     vendored_role: consumer
     capabilities:
       evidence_reference_validation:
-        status: disabled
-        reason: >-
-          Snippet-bearing evidence is present, but shared deterministic
-          cached-source validation is not adopted in CI.
+        status: enabled
+        settings:
+          cache_dir: references_cache
+          reference_fields: [reference]
+          snippet_fields: [snippet]
+          evidence_fields: [evidence]
+          known_findings: curation/evidence_known_findings.tsv
+          # Every evidence slot is an EvidenceItem or SupportingReference whose
+          # snippet the schema defines as a verbatim quote, so all are in scope
+          # (#729). Residual findings are owned by the issue the ledger names.
       id_label_validation:
         status: enabled
       record_review:
@@ -1579,8 +1604,10 @@ mechs:
       evidence_reference_validation:
         status: disabled
         reason: >-
-          Snippet-bearing records do not establish source validation; shared
-          quote/cache profile and CI gate adoption are deferred.
+          Measured 2026-11-04 (claw#729): none of 3,554 quoted items cites a PMID;
+          2,052 cite web or database sources and 1,502 cite DOIs. A reviewed
+          adapter for those sources, and a measurement of the DOI-cited quotes,
+          come before adoption.
       id_label_validation:
         status: enabled
       record_review:
@@ -1755,9 +1782,9 @@ mechs:
       evidence_reference_validation:
         status: disabled
         reason: >-
-          The native EvidenceItem declares optional verbatim snippets beyond
-          database provenance, but the shared committed-cache quote gate is
-          not adopted.
+          Measured 2026-11-04 (claw#729): none of the 306 evidence items carries a
+          quote, so the gate would check nothing. The native EvidenceItem allows
+          optional verbatim snippets; enable once quoted literature evidence exists.
       id_label_validation:
         status: enabled
       record_review:
@@ -1926,9 +1953,9 @@ mechs:
       evidence_reference_validation:
         status: disabled
         reason: >-
-          Native evidence distinguishes quote from source_assertion and uses
-          record-local reference_id; that mapping and committed source-cache
-          validation need a reviewed adapter before enabling.
+          Measured 2026-11-04 (claw#729): 655 of 869 PMID-cited quotes are absent
+          from the cited abstract, most of them quoting the full text by
+          source_locator. Adoption needs a reviewed full-text source adapter.
       id_label_validation:
         status: disabled
         reason: >-
@@ -2128,9 +2155,10 @@ mechs:
       evidence_reference_validation:
         status: disabled
         reason: >-
-          Curated family evidence includes quote-like fields beyond seeded
-          database provenance, but the shared committed-cache quote gate
-          is not adopted.
+          Measured 2026-11-04 (claw#729): 1,658 of 1,893 PMID-cited quotes are
+          absent from the cited abstract; each quote is bound to a native full-text
+          excerpt (cache_path and cache_sha256). Adoption needs a reviewed adapter
+          for those native caches.
       id_label_validation:
         status: enabled
         reason: >-
@@ -2274,9 +2302,12 @@ mechs:
       evidence_reference_validation:
         status: disabled
         reason: >-
-          Native MechanismEvidence uses source_ref/supports/explanation without
-          a verbatim-quote slot; a reviewed quote/cache adapter is required
-          before shared gate adoption.
+          Measured 2026-11-04 (claw#729): none of the 3,526 evidence items carries
+          a quote; native MechanismEvidence (source_ref, supports, explanation) has
+          no verbatim-quote slot, so the gate would check nothing. Adoption needs
+          that slot filled with verbatim quotes, and either a PMID or DOI on each
+          evidence item or a reviewed adapter that resolves source_ref through the
+          record's sources list.
       id_label_validation:
         status: disabled
         reason: >-
@@ -2425,9 +2456,11 @@ mechs:
       evidence_reference_validation:
         status: disabled
         reason: >-
-          Current main includes maintained curated concepts with source/locator
-          citations in addition to AIO imports; a native quote/cache validation
-          adapter and deterministic CI gate are not adopted.
+          Measured 2026-11-04 (claw#729): the AIO concept records carry no
+          evidence items, so the gate would check nothing; curated concepts cite
+          sources by source_id and locator. Adoption needs gated records whose
+          evidence carries verbatim quotes, and either a PMID or DOI on each item
+          or a reviewed adapter that resolves source_id through evidence_sources.
       id_label_validation:
         status: disabled
         reason: >-
