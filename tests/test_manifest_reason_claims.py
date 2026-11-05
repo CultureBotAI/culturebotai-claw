@@ -539,11 +539,12 @@ def test_a_directory_claim_is_matched_against_its_declaration():
 
 
 def test_the_widened_scanner_found_a_real_undeclared_claim():
-    """CellStructureMech's deep_research reason says its research is "written by
-    hand under research/". True, and undeclared until #246 -- the scanner could
-    not see a path without an extension, so the forward guarantee did not reach
-    it. This pins the declaration that closed it."""
+    """CellStructureMech's deep_research reason names its research/ tree. That
+    was undeclared until #246 -- the scanner could not see a path without an
+    extension, so the forward guarantee did not reach it. This pins the
+    declaration that closed it; the reason was re-measured for #848 and now
+    claims its justfile recipes and the absent provider profile too."""
     claims = (
         MANIFEST.mechs["cellstructuremech"].capabilities["deep_research"].reason_claims
     )
-    assert claims.present == ("research",)
+    assert "research" in claims.present
