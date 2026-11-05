@@ -26,19 +26,18 @@ Report the parameters, coverage gates, and runtime health of tests and CI across
 2. **Coverage Floor, Typecheck (`mypy`), and Lint (`ruff`) Parity**:
    - Extracts `--cov-fail-under` and `--fail-under` thresholds from CI workflows and `Justfile`.
    - Checks whether `ruff` and `mypy` are configured in CI and `Justfile`.
-   - In `claw`, compares `src/kg_microbe_*` packages on disk against the `mypy` targets in `.github/workflows/tests.yaml` and flags any omitted package (`CLAW_UNTYPED_PACKAGES`).
+   - In `claw`, compares `src/kg_microbe_*` packages on disk against the `mypy` targets in `.github/workflows/tests.yaml` and flags any omitted package (`UNTYPED_SRC_PACKAGES`).
 3. **Workflow Triggers & Governed Workflow Pins**:
    - Inspects `.github/workflows/*.y*ml` for trigger coverage (`push`, `pull_request`, `schedule`, `workflow_dispatch`, `workflow_call`) and checks whether `pull_request` triggers carry path filters that could skip test execution on code or schema edits.
    - Verifies governed workflow pin alignment in `src/kg_microbe_governance/vendored_artifacts.json` via `scripts/update_governed_workflow_pins.py`.
 4. **Optional Live Local Pytest Benchmark (`--run-pytest`)**:
-   - Executes `pytest -q --durations=5` in each selected repository, capturing passed/failed/skipped counts, wall-clock duration (`duration_seconds`), and the 5 slowest test cases.
+   - Executes `pytest -q --durations=5` in each selected repository, capturing passed/failed/skipped counts, wall-clock duration (`wall_seconds`), and the 5 slowest test cases.
 5. **Optional GitHub Actions Telemetry (`--with-ci-runs`)**:
    - Queries `gh api` for recent workflow runs per repository and computes:
-     - Default-branch pass rate (`default_branch_pass_rate`)
-     - Median and p90 time-to-completion (`duration_median_s`, `duration_p90_s`)
-     - Queue delay (`queue_median_s`)
-     - Pages build/deploy workflow duration (`pages_median_s`)
-     - Currently failing workflows on `main` (`failing_workflows_on_main`, surfaced as `CI_FAILING_ON_MAIN`).
+     - Default-branch pass rate (`pass_rate`, surfaced as `LOW_CI_PASS_RATE` when `< 80%`)
+     - Median and p90 time-to-completion (`median_duration_sec`, `p90_duration_sec`)
+     - Queue delay (`median_queue_sec`)
+     - Pages build/deploy workflow duration (`pages_median_duration_sec`).
 
 ## Options
 
@@ -46,17 +45,17 @@ Report the parameters, coverage gates, and runtime health of tests and CI across
 uv run python scripts/fleet_test_ci_status.py --mech all
 uv run python scripts/fleet_test_ci_status.py --mech claw --run-pytest
 uv run python scripts/fleet_test_ci_status.py --with-ci-runs
-uv run python scripts/fleet_test_ci_status.py --with-ci-runs --ci-limit 30 --json
+uv run python scripts/fleet_test_ci_status.py --with-ci-runs --runs-limit 30 --json
 ```
 
 ## Interpreting findings
 
-- **`CLAW_UNTYPED_PACKAGES`**:
+- **`UNTYPED_SRC_PACKAGES`**:
   A `src/kg_microbe_*` package exists on disk in `claw` but is missing from the `mypy` target list in `.github/workflows/tests.yaml`, `AGENTS.md`, and `README.md`. Keep all three synchronized (`tests/test_fleet_manifest.py`).
-- **`NO_TEST_FILES`**:
-  A configured repository has zero `test_*.py` files under `tests/`.
-- **`CI_FAILING_ON_MAIN`**:
-  The newest completed run of a workflow on `main` failed. Inspect with `gh run list -R <owner/repo> --branch main` and `gh run view`.
+- **`NO_TESTS` / `PYTEST_NOT_IN_CI`**:
+  A configured repository has zero `test_*.py` files under `tests/` (`NO_TESTS`) or does not run `pytest` in any GitHub Actions workflow (`PYTEST_NOT_IN_CI`).
+- **`PYTEST_FAILED` / `LOW_CI_PASS_RATE`**:
+  A local `--run-pytest` invocation failed (`PYTEST_FAILED`) or recent default-branch GitHub Actions runs have a `< 80%` pass rate (`LOW_CI_PASS_RATE`). Inspect with `gh run list -R <owner/repo> --branch main` and `gh run view`.
 
 ## Boundaries
 

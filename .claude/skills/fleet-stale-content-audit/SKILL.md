@@ -23,18 +23,18 @@ Detect stale or drifting code, data, and repository weight across `claw` and eve
 
 1. **Tracked Repository Weight & `.git` Object Store Size**:
    - Calls `kg_microbe_health.repository.measure` (`kg-microbe-health report`) to tabulate tracked file counts, tracked bytes, top directories by bytes, and the largest tracked files.
-   - Measures `.git` object store size (`git count-objects -v`) and computes the `git_to_tracked_ratio` to spot historical binary or generated-file bloat in `<repo>/.git/objects/pack` that was deleted from HEAD but still slows clones and fetches.
+   - Measures `.git` object store size (`git count-objects -v`) and computes the `git_vs_tracked_ratio` to spot historical binary or generated-file bloat in `<repo>/.git/objects/pack` that was deleted from HEAD but still slows clones and fetches.
 2. **Legacy Diagnostics & Orphan Bytecode**:
-   - Flags `test_*.py` or `*_test.py` files tracked outside `tests/` (legacy executable diagnostics that `pytest` does not collect).
+   - Flags `test_*.py` or `*_test.py` files tracked outside `tests/` (`LEGACY_TESTS_OUTSIDE_TESTS`, legacy executable diagnostics that `pytest` does not collect).
    - Counts orphan `.pyc` files in `__pycache__` whose `.py` source no longer exists (which can cause stale import behavior).
 3. **Unreferenced Scripts & Ungoverned YAML Writers**:
-   - Cross-references `scripts/*.py` and `scripts/*.sh` against `Justfile`, `.github/workflows/`, `src/`, `tests/`, `docs/`, and `.claude/` to list scripts with zero static references (review candidates, never auto-delete targets).
-   - Runs `kg_microbe_writers.audit` (`kg-microbe-writers audit`) for Mechs enabling `writer_audit` to count governed vs ungoverned YAML record writers (`UNGOVERNED_YAML_WRITERS`).
+   - Cross-references `scripts/*.py` and `scripts/*.sh` against `Justfile`, `.github/workflows/`, `src/`, `tests/`, and `.claude/` to list scripts with zero static references (review candidates, never auto-delete targets).
+   - Runs `kg_microbe_writers.audit` (`kg-microbe-writers audit`) for Mechs enabling `writer_audit` to count governed vs ungoverned YAML record writers (`WRITERS_WITHOUT_SAFEGUARD`).
 4. **Corpus Counts & Backlog Freshness**:
    - Counts YAML corpus records via `kg_microbe_corpus.statistics.list_records` for Mechs enabling `corpus_statistics`.
    - Checks the last-commit age of `NEXT_TASKS.md` and `INFRA_TASKS.md`.
 5. **Unapplied Patch Ledger & Untracked Patch Files**:
-   - Inspects `workspace/patches/ledger.json` (`kg_microbe_patches.ledger`) and scans `workspace/patches/` for untracked `.json`/`.yaml`/`.patch`/`.diff` artifacts (`UNTRACKED_PATCH_FILES`), reporting age and whether upstream inputs have advanced since generation.
+   - Inspects `workspace/patches/patch_ledger.json` (`kg_microbe_patches.ledger.LEDGER_FILENAME`) and scans `workspace/patches/` for untracked `.json`/`.yaml`/`.patch`/`.diff` artifacts (`UNTRACKED_PATCH_FILES`), reporting age and whether upstream inputs have advanced since generation.
 
 ## Options
 
@@ -47,14 +47,14 @@ uv run python scripts/fleet_stale_content_audit.py --json
 
 ## Interpreting findings
 
-- **`LEGACY_TESTS_OUTSIDE_TESTS_DIR`**:
+- **`LEGACY_TESTS_OUTSIDE_TESTS`**:
   Either migrate the diagnostic into `tests/` with real assertions or rename/retire it via a reviewed PR so it does not masquerade as part of the test suite.
-- **`UNGOVERNED_YAML_WRITERS`**:
+- **`WRITERS_WITHOUT_SAFEGUARD`**:
   A script in a Mech writes YAML corpus records without routing through the Mech's validated writer / curation-history helper. Inspect with `uv run kg-microbe-writers audit --mech <mech> --why`.
 - **`UNREFERENCED_SCRIPTS`**:
   Zero static references is a **review hint**, not proof that a script is dead (it may be a historical migration script or an operator CLI). Always run an ignore-independent search (`rg -uu`) and check git log provenance before proposing retirement.
 - **`UNAPPLIED_PATCH_BACKLOG` / `UNTRACKED_PATCH_FILES`**:
-  Generated patches sitting in `workspace/patches/` that have not been applied to their target repository or recorded in `workspace/patches/ledger.json`.
+  Generated patches sitting in `workspace/patches/` that have not been applied to their target repository or recorded in `workspace/patches/patch_ledger.json`.
 
 ## Boundaries
 

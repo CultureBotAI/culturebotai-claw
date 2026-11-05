@@ -26,11 +26,11 @@ Orchestrate the fleet's development and repository maintenance checks in a singl
 
 1. **Git, Worktree, Branch, Stash, Lock & Temp Hygiene** (`/fleet-worktree-and-temp-hygiene`, `scripts/fleet_git_and_temp_hygiene.py`):
    - Audits `/tmp/`, `/private/tmp`, and `$TMPDIR` for provenance-sensitive helper scripts (`PROVENANCE_PROMOTE_REQUIRED`), temp checkouts, and 4-day reaper risks.
-   - Audits `workspace/` in `claw` for registered vs orphan worktrees and read-only lock lease statuses (`ACTIVE`, `STALE_DEAD_PID`, `EXPIRED`).
+   - Audits `workspace/` in `claw` for registered vs orphan worktrees and read-only lock lease statuses (`ACTIVE`, `DEAD_PID`, `EXPIRED`, `ORPHAN_GUARD`, `MALFORMED`).
    - Audits `claw`, all 14 manifest-declared Mechs, `CultureBotAI.github.io`, and `kg-microbe` for dirty trees, stashes, prunable worktrees, non-default local branches, and sibling-shadow checkouts.
 2. **Stale Content, Code, Data, Writer & Patch Audit** (`/fleet-stale-content-audit`, `scripts/fleet_stale_content_audit.py`):
    - Measures tracked repository weight (`kg-microbe-health report`) and `.git` object store size (`git count-objects -v`).
-   - Flags legacy `test_*.py` files outside `tests/`, orphan `.pyc` files, unreferenced scripts, ungoverned YAML writers (`kg-microbe-writers audit`), corpus record counts (`kg-microbe-corpus report`), and unapplied patch sets in `workspace/patches/ledger.json`.
+   - Flags legacy `test_*.py` files outside `tests/`, orphan `.pyc` files, unreferenced scripts, ungoverned YAML writers (`kg-microbe-writers audit`), corpus record counts (`kg-microbe-corpus report`), and unapplied patch sets in `workspace/patches/patch_ledger.json`.
 3. **Static Test, Coverage Floor, Typecheck & Workflow Audit** (`/fleet-test-and-ci-status`, `scripts/fleet_test_ci_status.py`):
    - Tabulates test files, AST test function counts, skip/xfail markers, coverage floors, `mypy`/`ruff` configuration, and untyped `src/kg_microbe_*` packages.
 4. **Governance & Skill Drift Checks**:

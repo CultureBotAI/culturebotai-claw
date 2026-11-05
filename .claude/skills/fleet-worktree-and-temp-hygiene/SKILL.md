@@ -28,10 +28,10 @@ Answer in one offline, zero-mutation pass:
      - `TEMP_GIT_CHECKOUT` — temporary clones or worktrees (`cross-mech-*`, `.git`-bearing directories).
      - `TOOL_CACHE_OR_PROFILE` — regenerable caches or sandbox profile directories (`*pip-audit-cache*`, `pytest_cache*`, `claude-*`, `codex*`).
      - `SCRATCH_DATA_OR_LOG` — intermediate TSV/JSON/log outputs.
-   - Flags items approaching or exceeding the **macOS 4-day (`96h`) reaper window** (`reaper_risk_4d=true`).
+   - Flags items approaching or exceeding the **macOS 4-day (`96h`) reaper window** (`reaper_risk=true` when `age_days >= 3.0`).
 2. **What is inside `workspace/` in `culturebotai-claw`?**
    - Cross-references subdirectories of `workspace/` against `git worktree list --porcelain` so active linked worktrees (`REGISTERED_WORKTREE`) are never mistaken for leftover directories (`ORPHAN_WORKTREE`) or runtime data (`RUNTIME_STATE`).
-   - Inspects `workspace/.locks/*.lock` **strictly read-only** (never calling `cleanup_expired_locks()`, never acquiring a lease, and never deleting a lock file) and classifies each lock as `ACTIVE`, `STALE_DEAD_PID`, or `EXPIRED`.
+   - Inspects `workspace/locks/*.lock` and `*.lock.guard` **strictly read-only** (never calling `cleanup_expired_locks()`, never acquiring a lease, and never deleting a lock file) and classifies each lock as `ACTIVE`, `DEAD_PID`, `EXPIRED`, `ORPHAN_GUARD`, or `MALFORMED`.
 3. **What is the local Git, worktree, branch, and stash state across every repository?**
    - Resolves `claw`, all 14 manifest-declared Mechs, the companion `CultureBotAI.github.io` checkout, and `kg-microbe`.
    - Reports current branch, dirty tracked files, untracked count, stash count, in-progress Git operations (`merge`, `rebase`, `cherry-pick`, `bisect`), registered vs prunable worktrees, non-default local branches (merged vs unmerged into `origin/main`), and duplicate sibling checkouts (`sibling_shadow`, such as a nested `CommunityMech/CommunityMech` checkout alongside the configured root).

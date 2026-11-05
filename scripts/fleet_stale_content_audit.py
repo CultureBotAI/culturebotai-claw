@@ -168,7 +168,7 @@ def find_unreferenced_scripts(root: Path, tracked_files: list[str]) -> list[str]
     if not candidates:
         return []
 
-    haystack_chunks: list[str] = []
+    file_texts: dict[str, str] = {}
     for rel in tracked_files:
         if rel.startswith(("data/", "kb/", "pages/", "docs/", "site/", "_site/")):
             continue
@@ -181,23 +181,20 @@ def find_unreferenced_scripts(root: Path, tracked_files: list[str]) -> list[str]
         }:
             continue
         try:
-            haystack_chunks.append((root / rel).read_text(encoding="utf-8", errors="ignore"))
+            file_texts[rel] = (root / rel).read_text(encoding="utf-8", errors="ignore")
         except OSError:
             continue
 
-    combined = "\n".join(haystack_chunks)
     unreferenced: list[str] = []
     for rel in candidates:
         name = Path(rel).name
         stem = Path(rel).stem
-        # Count occurrences outside the script's own file content
-        own_text = ""
-        try:
-            own_text = (root / rel).read_text(encoding="utf-8", errors="ignore")
-        except OSError:
-            pass
-        reduced = combined.replace(own_text, "", 1) if own_text else combined
-        if name not in reduced and stem not in reduced:
+        referenced = any(
+            (name in text or stem in text)
+            for other_rel, text in file_texts.items()
+            if other_rel != rel
+        )
+        if not referenced:
             unreferenced.append(rel)
     return sorted(unreferenced)
 

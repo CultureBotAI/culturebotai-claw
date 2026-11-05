@@ -191,7 +191,7 @@ uv run --extra dev mypy \
   src/kg_microbe_workflows src/kg_microbe_progress \
   src/kg_microbe_consistency src/kg_microbe_patches \
   src/kg_microbe_evidence src/kg_microbe_graph \
-  src/kg_microbe_corpus src/kg_microbe_health src/kg_microbe_kgx \
+  src/kg_microbe_corpus src/kg_microbe_curation src/kg_microbe_health src/kg_microbe_kgx \
   src/kg_microbe_pages src/kg_microbe_site src/kg_microbe_skills \
   src/kg_microbe_source_queue src/kg_microbe_sources \
   src/kg_microbe_sssom src/kg_microbe_writers \
