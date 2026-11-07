@@ -34,7 +34,7 @@ Answer in one offline, zero-mutation pass:
    - Inspects `workspace/locks/*.lock` and `*.lock.guard` **strictly read-only** (never calling `cleanup_expired_locks()`, never acquiring a lease, and never deleting a lock file) and classifies each lock as `ACTIVE`, `DEAD_PID`, `EXPIRED`, `ORPHAN_GUARD`, or `MALFORMED`.
 3. **What is the local Git, worktree, branch, and stash state across every repository?**
    - Resolves `claw`, all 14 manifest-declared Mechs, the companion `CultureBotAI.github.io` checkout, and `kg-microbe`.
-   - Reports current branch, dirty tracked files, untracked count, stash count, in-progress Git operations (`merge`, `rebase`, `cherry-pick`, `bisect`), registered vs prunable worktrees, non-default local branches (merged vs unmerged into `origin/main`), and duplicate sibling checkouts (`sibling_shadow`, such as a nested `CommunityMech/CommunityMech` checkout alongside the configured root).
+   - Reports current branch, dirty tracked files, untracked count, stash count, in-progress Git operations (`merge`, `rebase`, `cherry-pick`, `bisect`), registered vs prunable worktrees, non-default local branches (merged vs unmerged into `origin/main`), and duplicate sibling checkouts (`sibling_shadow`: a checkout at the default sibling path that is not the root `.env` configures, such as a CommunityMech clone beside claw while `.env` points at one nested a level deeper).
 
 ## Options
 
