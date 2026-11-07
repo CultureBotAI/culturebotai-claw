@@ -23,7 +23,10 @@ merged work. It checks everything first, and deletes only if every check passes:
   whether it goes to the remote's name or its URL;
 - the remote branch, if present, is exactly refs/heads/<branch> at the merged
   head; it is removed with a lease on that head, pushed to the remote's URL
-  rather than its name, which on the gits that distinguish touches no local ref.
+  rather than its name, which on the gits that distinguish touches no local
+  ref; a url.<base>.pushInsteadOf that would redirect that URL is refused,
+  since git applies it to a bare URL and not to an explicit pushurl, and after
+  the push origin is asked again, so a delete that went elsewhere is a failure.
 All of this runs under the repository's LockManager lease: the manifest key for
 a Mech, `claw` for this repository. Paths are resolved once, against the
 current directory, before anything is checked.
@@ -47,7 +50,8 @@ CellStructureMech PR 3068. Rewritten 2026-11-06 for culturebotai-claw#854,
 #855, #856 and #858, for #867-#870 and #872 from the second review round,
 for #873-#875 and #880 from the third, for #893-#895 from the fourth, for
 #920 and #921 from the fifth, and on 2026-11-07 for #931-#936 from the Codex
-review and #950 from CI's git 2.56, before its reuse on further merged PRs.
+review, #950 from CI's git 2.56, and #974-#977 from the review of that round,
+before its reuse on further merged PRs.
 """
 from __future__ import annotations
 
@@ -194,16 +198,24 @@ def symbolic_target(checkout: Path, ref: str) -> str:
     return git(checkout, "symbolic-ref", "--quiet", ref, check=False).stdout.strip()
 
 
-def branch_config(checkout: Path, branch: str) -> list[tuple[str, str]]:
-    """Every (key, value) of the branch's config section, in file order; empty when there is no section."""
-    listed = git(checkout, "config", "--get-regexp", f"^branch\\.{re.escape(branch)}\\.", check=False)
+def branch_config(checkout: Path, branch: str) -> list[tuple[str, str | None]]:
+    """Every (key, value) of the branch's config section, in file order; None for a key set without a value.
+
+    NUL-separated, so a value holding a newline (`git branch --edit-description`) is one entry, not several.
+    """
+    listed = git(checkout, "config", "-z", "--get-regexp", f"^branch\\.{re.escape(branch)}\\.", check=False)
     if listed.returncode != 0:
         return []
-    return [tuple(line.split(" ", 1)) if " " in line else (line, "") for line in listed.stdout.split("\n") if line]
+    entries: list[tuple[str, str | None]] = []
+    for entry in listed.stdout.split("\0"):
+        if entry:
+            key, newline, value = entry.partition("\n")
+            entries.append((key, value if newline else None))
+    return entries
 
 
 def recovery_for(done: list[str], checkout: Path, worktree: Path | None, branch: str, head: str, *,
-                 worktree_on_branch: bool, config_entries: list[tuple[str, str]]) -> str:
+                 worktree_on_branch: bool, config_entries: list[tuple[str, str | None]]) -> str:
     """The shell-quoted commands that put back exactly what `done` says went, in the order they must run."""
     c = str(checkout)
     steps = [f"everything removed was at {head}"]
@@ -216,8 +228,12 @@ def recovery_for(done: list[str], checkout: Path, worktree: Path | None, branch:
             steps.append("the worktree with `"
                          + shlex.join(["git", "-C", c, "worktree", "add", "--detach", str(worktree), head]) + "`")
     if any(step.startswith("removed branch.") for step in done):
-        steps.extend("its config with `" + shlex.join(["git", "-C", c, "config", "--add", key, value]) + "`"
-                     for key, value in config_entries)
+        for key, value in config_entries:
+            if value is None:  # set without a value, which git reads as true and `git config` cannot write back as such
+                steps.append("its config with `" + shlex.join(["git", "-C", c, "config", "--add", key, "true"])
+                             + "` (it was set without a value)")
+            else:
+                steps.append("its config with `" + shlex.join(["git", "-C", c, "config", "--add", key, value]) + "`")
     if any(step.startswith("deleted remote ") for step in done):
         steps.append("the remote branch with `"
                      + shlex.join(["git", "-C", c, "push", "origin", f"{head}:refs/heads/{branch}"]) + "`")
@@ -251,7 +267,8 @@ def cleanup(repo: str, number: int, checkout: Path, worktree: Path | None, *, ap
         skipped: list[str] = []
         if worktree is not None and not removing:
             if any(e["path"] == worktree for e in entries):
-                problems.append(f"{worktree} is registered but missing on disk; run `git -C {checkout} worktree prune` first")
+                problems.append(f"{worktree} is registered but missing on disk; run `"
+                                + shlex.join(["git", "-C", str(checkout), "worktree", "prune"]) + "` first")
             else:
                 skipped.append(f"worktree {worktree} is not present, skipped")
         if removing:
@@ -287,6 +304,14 @@ def cleanup(repo: str, number: int, checkout: Path, worktree: Path | None, *, ap
             if destination != tracking:
                 problems.append(f"remote.origin.fetch {spec} maps {local_ref} onto {destination}, which a push can "
                                 f"update; this tool touches only {tracking}")
+        push_url = git(checkout, "remote", "get-url", "--push", "origin").stdout.strip()
+        # git applies url.<base>.pushInsteadOf to a bare URL on the command line and not to a remote with an
+        # explicit pushurl, so the configured URL this tool pushes to could be sent elsewhere.
+        rewrites = git(checkout, "config", "-z", "--get-regexp", r"^url\..*\.pushinsteadof$", check=False).stdout
+        for entry in filter(None, rewrites.split("\0")):
+            key, _, prefix = entry.partition("\n")
+            if prefix and push_url.startswith(prefix):
+                problems.append(f"{key} {prefix} would send a push to {push_url} elsewhere; unset it first")
         if problems:
             raise Refused("; ".join(problems))
         if not apply:
@@ -295,7 +320,6 @@ def cleanup(repo: str, number: int, checkout: Path, worktree: Path | None, *, ap
                     + [f"would delete remote {branch} (at {head[:10]})" if remote else f"remote {branch} already gone"]
                     + [f"would delete {tracking} (at {head[:10]})"] * bool(tracked))
         config_entries = branch_config(checkout, branch)
-        push_url = git(checkout, "remote", "get-url", "--push", "origin").stdout.strip()
         done: list[str] = list(skipped)
         try:
             if removing:
@@ -321,6 +345,10 @@ def cleanup(repo: str, number: int, checkout: Path, worktree: Path | None, *, ap
                 # ref. On git 2.56 it still updates what the fetch refspecs map, which the checks above
                 # confined to the tracking ref; its disappearance is read back below.
                 git(checkout, "push", "-q", f"--force-with-lease={local_ref}:{head}", push_url, "--delete", local_ref)
+                still = remote_branch_sha(checkout, branch)
+                if still:
+                    raise RuntimeError(f"origin still has {branch} at {still[:10]} after the delete was accepted; "
+                                       "the push went elsewhere")
                 done.append(f"deleted remote {branch} (was {head[:10]})")
             else:
                 done.append(f"remote {branch} already gone")

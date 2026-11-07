@@ -1,4 +1,4 @@
-"""scripts/adhoc/cleanup_merged_pr_branch.py deletes only the merged work (#854-#856, #858, #867-#875, #878-#880, #891-#895, #931-#936, #950).
+"""scripts/adhoc/cleanup_merged_pr_branch.py deletes only the merged work (#854-#856, #858, #867-#875, #878-#880, #891-#895, #931-#936, #950, #974-#977).
 
 Each case is built so the unsafe and the safe behaviour differ: a remote
 branch that moved after the merge, a sibling branch whose name ends the same
@@ -592,8 +592,14 @@ def test_a_missing_worktree_path_is_reported_and_a_prunable_one_refused(fleet):
         run_cleanup(fleet, worktree=prunable, apply=False)
 
 
-def recovery_commands(recovery: str) -> list[list[str]]:
-    return [shlex.split(part.split("`")[1]) for part in recovery.split("; ") if "`" in part]
+def run_printed(recovery: str, *, only: str | None = None) -> list[str]:
+    """Run the recovery's commands exactly as printed, each through `bash -c`; `only` keeps those with that word."""
+    texts = [part.split("`")[1] for part in recovery.split("; ") if "`" in part]
+    if only is not None:
+        texts = [text for text in texts if f" {only} " in text]
+    for text in texts:
+        subprocess.run(["bash", "-c", text], check=True, capture_output=True)
+    return texts
 
 
 @pytest.mark.parametrize("spec", ["+refs/heads/feature:refs/heads/victim", "+refs/heads/*:refs/heads/victim-*",
@@ -722,10 +728,28 @@ def test_the_recovery_restores_every_entry_of_the_branch_config(fleet):
 
     assert "removed branch.feature config (4 entries)" in caught.value.done
     git(fleet["checkout"], "branch", "feature", fleet["head"])
-    for command in recovery_commands(caught.value.recovery):
-        if command[3:5] == ["config", "--add"]:
-            subprocess.run(command, check=True, capture_output=True)
+    assert len(run_printed(caught.value.recovery, only="config")) == 4
     assert git(fleet["checkout"], "config", "--get-regexp", "^branch\\.feature\\.") == before
+
+
+def test_a_multi_line_description_round_trips_through_the_recovery(fleet):
+    """`git branch --edit-description` stores newlines; the snapshot is NUL-separated so the value stays one entry."""
+    git(fleet["checkout"], "worktree", "remove", str(fleet["worktree"]))
+    git(fleet["checkout"], "config", "branch.feature.description", "first line\nsecond line")
+    before = subprocess.run(["git", "-C", str(fleet["checkout"]), "config", "-z", "--get-regexp", "^branch\\.feature\\."],
+                            text=True, capture_output=True, check=True).stdout
+    reject_pushes(fleet)
+
+    with pytest.raises(cleanup_script.PartialFailure) as caught:
+        run_cleanup(fleet, worktree=None)
+
+    assert "removed branch.feature config (3 entries)" in caught.value.done
+    git(fleet["checkout"], "branch", "feature", fleet["head"])
+    assert len(run_printed(caught.value.recovery, only="config")) == 3
+    after = subprocess.run(["git", "-C", str(fleet["checkout"]), "config", "-z", "--get-regexp", "^branch\\.feature\\."],
+                           text=True, capture_output=True, check=True).stdout
+    assert after == before
+    assert git(fleet["checkout"], "config", "--get", "branch.feature.description") == "first line\nsecond line"
 
 
 def test_a_config_section_that_will_not_go_is_a_partial_failure(fleet):
@@ -741,23 +765,39 @@ def test_a_config_section_that_will_not_go_is_a_partial_failure(fleet):
     assert git(fleet["checkout"], "config", "--get", "branch.feature.description") == "keep me"
 
 
-def test_recovery_commands_are_shell_quoted(fleet):
-    """A valid branch name with a shell metacharacter must come back as itself."""
+def test_recovery_commands_are_shell_quoted(fleet, monkeypatch):
+    """A valid branch name with a shell metacharacter comes back as itself through every printed command.
+
+    The worktree, the local branch, its config and the remote branch all go, then the tracking-ref delete fails
+    (the stand-in reports the merged head while the ref sits elsewhere), so the recovery prints all four kinds of
+    command; each is run exactly as printed, through bash.
+    """
     odd = "feature;echo"
     drop_worktree_and_local(fleet)
     git(fleet["checkout"], "branch", odd, fleet["head"])
     git(fleet["checkout"], "push", "-q", "origin", f"refs/heads/{odd}:refs/heads/{odd}")
-    reject_pushes(fleet)
+    git(fleet["checkout"], "config", f"branch.{odd}.remote", "origin")
+    git(fleet["checkout"], "config", f"branch.{odd}.merge", f"refs/heads/{odd}")
+    worktree = fleet["tmp"] / "odd wt"
+    git(fleet["checkout"], "worktree", "add", "-q", str(worktree), odd)
+    main = ref(fleet["checkout"], "origin/main")
+    git(fleet["checkout"], "update-ref", f"refs/remotes/origin/{odd}", main)
+    monkeypatch.setattr(cleanup_script, "tracking_sha", lambda checkout, branch: fleet["head"])
 
     with pytest.raises(cleanup_script.PartialFailure) as caught:
-        run_cleanup(fleet, worktree=None, headRefName=odd)
+        run_cleanup(fleet, worktree=worktree, headRefName=odd)
 
+    assert [step.split(" ")[0] for step in caught.value.done] == ["removed", "deleted", "removed", "deleted"]
+    assert ref(fleet["origin"], f"refs/heads/{odd}") is None
     assert "'feature;echo'" in caught.value.recovery
-    command = recovery_commands(caught.value.recovery)[0]
-    assert command[3:5] == ["branch", odd]
-    subprocess.run(["bash", "-c", " ".join(shlex.quote(c) for c in command)], check=True)
+    assert shlex.quote(str(worktree.resolve())) in caught.value.recovery  # the path with a space, quoted whole
+    texts = run_printed(caught.value.recovery)
+    assert len(texts) == 5  # branch, worktree, two config entries, push
     assert ref(fleet["checkout"], f"refs/heads/{odd}") == fleet["head"]
     assert ref(fleet["checkout"], "refs/heads/feature") is None
+    assert git(worktree, "symbolic-ref", "--short", "HEAD") == odd
+    assert git(fleet["checkout"], "config", "--get", f"branch.{odd}.merge") == f"refs/heads/{odd}"
+    assert ref(fleet["origin"], f"refs/heads/{odd}") == fleet["head"]
 
 
 def test_the_local_delete_does_not_follow_a_ref_made_symbolic_after_the_check(fleet, monkeypatch):
@@ -765,12 +805,75 @@ def test_the_local_delete_does_not_follow_a_ref_made_symbolic_after_the_check(fl
     git(fleet["checkout"], "worktree", "remove", str(fleet["worktree"]))
     git(fleet["checkout"], "branch", "victim", fleet["head"])
 
+    real = cleanup_script.remote_branch_sha
+    calls: list[str] = []
+
     def make_symbolic_then_report(checkout, branch):
-        git(checkout, "symbolic-ref", "refs/heads/feature", "refs/heads/victim")
-        return fleet["head"]
+        calls.append(branch)
+        if len(calls) == 1:  # the check; the read-back after the push answers truthfully
+            git(checkout, "symbolic-ref", "refs/heads/feature", "refs/heads/victim")
+            return fleet["head"]
+        return real(checkout, branch)
 
     monkeypatch.setattr(cleanup_script, "remote_branch_sha", make_symbolic_then_report)
 
     run_cleanup(fleet, worktree=None)
 
     assert ref(fleet["checkout"], "refs/heads/victim") == fleet["head"]
+
+
+def test_the_tracking_delete_does_not_follow_a_ref_made_symbolic_after_the_read_back(fleet, monkeypatch):
+    """--no-deref on the tracking delete: a symbolic tracking ref appearing after the read-back goes itself, not its target.
+
+    The stand-in makes the ref symbolic at the read-back, after the push, so the test holds on a git that removed
+    the plain ref on the push (2.56) and on one that left it (2.50).
+    """
+    drop_worktree_and_local(fleet)
+    git(fleet["checkout"], "update-ref", "refs/remotes/origin/victim", fleet["head"])
+    real = cleanup_script.tracking_sha
+    calls: list[str] = []
+
+    def make_symbolic_at_the_read_back(checkout, branch):
+        calls.append(branch)
+        if len(calls) == 2:
+            git(checkout, "symbolic-ref", f"refs/remotes/origin/{branch}", "refs/remotes/origin/victim")
+        return real(checkout, branch)
+
+    monkeypatch.setattr(cleanup_script, "tracking_sha", make_symbolic_at_the_read_back)
+
+    done = run_cleanup(fleet, worktree=None)
+
+    assert f"deleted refs/remotes/origin/feature (was {fleet['head'][:10]})" in done
+    assert ref(fleet["checkout"], "refs/remotes/origin/victim") == fleet["head"]
+    assert ref(fleet["checkout"], "refs/remotes/origin/feature") is None
+
+
+def test_a_push_insteadof_rewrite_of_the_push_url_is_refused(fleet):
+    """git applies url.<base>.pushInsteadOf to a bare URL and not to an explicit pushurl: the delete would go to the fork."""
+    drop_worktree_and_local(fleet)
+    fork = fleet["tmp"] / "fork.git"
+    subprocess.run(["git", "clone", "-q", "--bare", str(fleet["origin"]), str(fork)], check=True)
+    git(fleet["checkout"], "config", "remote.origin.pushurl", str(fleet["origin"]))
+    git(fleet["checkout"], "config", f"url.{fork}.pushInsteadOf", str(fleet["origin"]))
+
+    with pytest.raises(cleanup_script.Refused, match="pushinsteadof"):
+        run_cleanup(fleet, worktree=None)
+
+    assert ref(fleet["origin"], "refs/heads/feature") == fleet["head"]
+    assert ref(fork, "refs/heads/feature") == fleet["head"]
+
+
+def test_a_remote_branch_still_present_after_the_delete_is_a_failure(fleet, monkeypatch):
+    """Stands in for a push git sent somewhere else: origin still has the branch, so it is not reported deleted."""
+    drop_worktree_and_local(fleet)
+    real = cleanup_script.remote_branch_sha
+    calls: list[str] = []
+
+    def still_there(checkout, branch):
+        calls.append(branch)
+        return fleet["head"] if len(calls) == 2 else real(checkout, branch)
+
+    monkeypatch.setattr(cleanup_script, "remote_branch_sha", still_there)
+
+    with pytest.raises(RuntimeError, match="origin still has feature"):
+        run_cleanup(fleet, worktree=None)
