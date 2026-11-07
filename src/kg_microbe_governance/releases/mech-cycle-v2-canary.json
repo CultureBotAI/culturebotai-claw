@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "release_id": "mech-cycle-v2-dufmech",
+  "baseline_ref": "76c1ebeea3fc7f80bf1abe044688f298f390cfac",
+  "release_ref": "c26f3a0906916f9641a5f82b004b5541ae5fbe52",
+  "canary": "dufmech",
+  "parent_version": "2.0.0",
+  "manifest_sha256": "368edbac106cb49c0a4159a87c07eeba4a5ed79c343ff042c0ddbc1b6b990ebb",
+  "workflow_assets": {
+    "src/kg_microbe_workflows/templates/mech-cycle.yaml": "99b664b587c96d03acc023e56e0556c0b3a0bb9bdc03713d94f7e9546a52e266",
+    "src/kg_microbe_workflows/schema/workflow.yaml": "9dfa77d21173b16bc119a60e83ac3f512fa9718d4cdf6a339d99ad83037d8bfb",
+    "src/kg_microbe_skills/canonical/triage-and-resolve-issues.md": "69336a0cf46303a257422a5f6e330bf1ebd7c07dec2564463e63dba8869057e6",
+    "src/kg_microbe_skills/canonical/evolve-mech-workflow.md": "d3eae302ae9433b1942349d82453ccbaa882bba2ce14a89edced90be84f6fbf6"
+  }
+}
