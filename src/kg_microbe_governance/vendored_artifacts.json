@@ -58,6 +58,10 @@
     "aimech": {
       "github": "CultureBotAI/AIMech",
       "package_path": "src/aimech"
+    },
+    "edgemech": {
+      "github": "CultureBotAI/EdgeMech",
+      "package_path": "src/edgemech"
     }
   },
   "artifacts": [
