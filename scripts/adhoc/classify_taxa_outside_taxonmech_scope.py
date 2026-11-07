@@ -23,7 +23,7 @@ Viridiplantae, because TaxonMech holds protists as well as fungi.
 Inputs: claw's .env (set -a; . ./.env) for TAXONMECH_ROOT; --measure DIR
 holding protein_example_taxa.tsv and taxon_curies.tsv; --out DIR.
 Outputs: DIR/outside_scope_classified.tsv (taxon, name, merged_into, domain,
-(the summary names the digests of the two input TSVs, culturebotai-claw#915)
+(the summary names the digests of the two input TSVs, culturebotai-claw#916)
 kingdom, rank, class, nearest in-scope ancestor and its name, protein
 examples, records citing it, Mechs) and DIR/summary_classified.md.
 Read-only; writes only under DIR. The tarball is read twice (nodes, then the
