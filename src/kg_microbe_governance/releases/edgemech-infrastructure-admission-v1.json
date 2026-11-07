@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "admission_id": "edgemech-post-cutoff-infrastructure-v1",
+  "authority": "infrastructure_only",
+  "historical_declaration_sha256": "89a362436eb3df0f3b4bfdb9feeaf9a258b2476291e565a744568b41f9445697",
+  "historical_manifest_sha256": "368edbac106cb49c0a4159a87c07eeba4a5ed79c343ff042c0ddbc1b6b990ebb",
+  "source_ref": "7e672227fb246a8359ad57b6d3975ce5ed329007",
+  "source_manifest_sha256": "bfd4b703f46ce748487253d6fe093e79fe00ba7a9a88293f5cc6df176f11b519",
+  "consumer": {
+    "key": "edgemech",
+    "github": "CultureBotAI/EdgeMech",
+    "package_path": "src/edgemech"
+  },
+  "bootstrap_main_ref": "e853bf22b9f708bfd381910107aec9283a3bcee3",
+  "fleet_entry_sha256": "ea469dcd9d7c1bb54990609827c566c2c495dc10e8f5baee919e542b905a896d",
+  "excluded_native_tests": [
+    "curation_timestamp_contract",
+    "record_review_contract",
+    "skill_frontmatter_contract"
+  ]
+}

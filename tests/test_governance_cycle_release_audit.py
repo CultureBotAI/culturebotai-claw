@@ -66,7 +66,7 @@ def descriptor(identifier, source, target, payload, consumers="all"):
             "mode": "0644", "consumers": consumers}
 
 
-def build(tmp_path, alter=None, alter_policy=None, include_canary=True):
+def build(tmp_path, alter=None, alter_policy=None, include_canary=True, native_contracts=False):
     """Two declared fixture Mechs contrast canary and noncanary behavior."""
     claw = tmp_path / "trusted-claw"
     init(claw, "CultureBotAI/culturebotai-claw")
@@ -90,11 +90,18 @@ def build(tmp_path, alter=None, alter_policy=None, include_canary=True):
         },
     }
     legacy = descriptor("legacy", SOURCE + "legacy.py", "scripts/legacy.py", "legacy source\n")
+    artifacts = [legacy]
+    if native_contracts:
+        from kg_microbe_governance.infrastructure_admission import NATIVE_TESTS
+        artifacts.extend(descriptor(key, SOURCE + key + ".py", "tests/" + key + ".py", key + "\n")
+                         for key in sorted(NATIVE_TESTS))
     baseline_doc = {"version": 1, "canonical_repository": "CultureBotAI/culturebotai-claw",
-                    "pin_path": PIN, "consumers": consumers, "artifacts": [legacy]}
+                    "pin_path": PIN, "consumers": consumers, "artifacts": artifacts}
     put(claw, FLEET_PATH, yaml.safe_dump(fleet))
     put(claw, MANIFEST, json.dumps(baseline_doc))
     put(claw, legacy["source"], "legacy source\n")
+    for artifact in artifacts[1:]:
+        put(claw, artifact["source"], artifact["id"] + "\n")
     baseline = commit(claw, "baseline")
     for path in WORKFLOW_ASSETS:
         put(claw, path, "canonical fixture text\n")
@@ -118,6 +125,8 @@ def build(tmp_path, alter=None, alter_policy=None, include_canary=True):
         root = tmp_path / key
         init(root, row["github"])
         put(root, "scripts/legacy.py", "legacy source\n")
+        for artifact in artifacts[1:]:
+            put(root, artifact["target"], artifact["id"] + "\n")
         put(root, PIN, baseline + "\n")
         commit(root)
         roots[key] = root
@@ -356,9 +365,16 @@ def test_unknown_policy_fields_and_duplicate_keys_are_refused(tmp_path):
 
 
 def test_packaged_release_binds_exact_manifest_and_workflow_assets():
+    from kg_microbe_governance.infrastructure_admission import (
+        HISTORICAL_MANIFEST_PATH,
+        validate_packaged_transition,
+    )
     root = Path(__file__).resolve().parents[1]
     policy = parse_release((root / RELEASE_PATH).read_bytes())
-    assert policy["manifest_sha256"] == hashlib.sha256((root / MANIFEST).read_bytes()).hexdigest()
+    # The immutable release still binds its original bytes. Current admission
+    # is an additional checked policy, not a replacement digest in that release.
+    assert policy["manifest_sha256"] == hashlib.sha256((root / HISTORICAL_MANIFEST_PATH).read_bytes()).hexdigest()
+    validate_packaged_transition(root)
     for path, digest in policy["workflow_assets"].items():
         assert hashlib.sha256((root / path).read_bytes()).hexdigest() == digest
 

@@ -1,5 +1,13 @@
 # EdgeMech admission requires a successor to the frozen DUF cycle release
 
+Update, 2026-11-07: the user authorized implementing the bounded post-cutoff
+infrastructure admission described in
+[Infrastructure admission](guides/INFRASTRUCTURE_ADMISSION.md). The historical
+DUF declaration and payload bytes remain immutable; its lane continues. The
+new candidate declaration recognizes only EdgeMech and its exact bootstrap/data
+pins. It becomes trusted admission only after an explicitly approved protected
+merge. The original finding below records why a separate policy was required.
+
 Adversarial review of #953 for #766/#767 found a policy dependency introduced by
 #924. The immutable `mech-cycle-v2-canary.json` binds release
 `c26f3a0906916f9641a5f82b004b5541ae5fbe52`, the DUF lane, and the existing
