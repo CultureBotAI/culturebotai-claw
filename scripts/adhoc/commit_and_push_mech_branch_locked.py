@@ -11,15 +11,19 @@ unless OPENCLAW_WORKSPACE is set to an absolute path, as that .env sets it; it
 cannot tell whether the path is claw's, so exporting the .env stays the
 caller's job.
 Inputs: --mech KEY, --worktree PATH (must be on a feature branch, with staged
-changes and nothing unstaged), --message-file PATH.
+changes and nothing unstaged, untracked or hidden from status), --message-file
+PATH. Paths are resolved against the current directory.
 Outputs: one commit on the worktree's branch, pushed to origin with an explicit
-refspec; prints the new HEAD. Refuses on unstaged or untracked files, a detached
-HEAD, the default branch (main, or whatever origin/HEAD names), or an origin
-that is not the manifest's repository.
+refspec; prints the new HEAD. Refuses on unstaged or untracked files, a
+skip-worktree or assume-unchanged index entry, a detached HEAD, the default
+branch (main, or whatever origin/HEAD names), or an origin that is not the
+manifest's repository. The branch is read from the symbolic ref, so a tag
+with the branch's name cannot disguise it.
 Serves: downstream review fixes for the culturebotai-claw#729 related issues
 (first use: TraitMech#2077 on TraitMech#2076). Written 2026-11-05; checks moved
 under the lock and the default branch refused 2026-11-06 for
-culturebotai-claw#857 and #858; paths resolved at entry for #868.
+culturebotai-claw#857 and #858; paths resolved at entry for #868; the symbolic
+ref, explicit untracked listing and hidden-entry check for #876 and #877.
 """
 from __future__ import annotations
 
@@ -63,14 +67,20 @@ def main() -> int:
     worktree, message_file = args.worktree.resolve(), args.message_file.resolve()
     with LockManager().lock(args.mech, "review-fix-push"):
         RepositoryTarget(name=args.mech, path=worktree, expected_repository=slug).open()
-        branch = git(worktree, "rev-parse", "--abbrev-ref", "HEAD").stdout.strip()
-        if branch == "HEAD":
+        symbolic = git(worktree, "symbolic-ref", "--quiet", "HEAD", check=False)
+        if symbolic.returncode != 0:
             raise RuntimeError("detached HEAD")
+        branch = symbolic.stdout.strip().removeprefix("refs/heads/")
         if branch in default_branches(worktree):
             raise RuntimeError(f"{branch} is the default branch; commit review fixes on the PR's branch")
-        status = [line for line in git(worktree, "status", "--porcelain").stdout.split("\n") if line]
+        status = [line for line in git(worktree, "status", "--porcelain", "--untracked-files=normal").stdout.split("\n")
+                  if line]
         if not status or any(line[1] != " " for line in status):
             raise RuntimeError(f"need staged changes and nothing unstaged or untracked: {status}")
+        hidden = [line for line in git(worktree, "ls-files", "-v").stdout.split("\n") if line and not line.startswith("H ")]
+        if hidden:
+            raise RuntimeError(f"{len(hidden)} index entries are skip-worktree or assume-unchanged, so status "
+                               f"cannot see their changes: {', '.join(hidden[:3])}")
         git(worktree, "commit", "-q", "-F", str(message_file))
         git(worktree, "push", "-q", "origin", f"HEAD:refs/heads/{branch}")
     print(f"pushed {args.mech} {branch} {git(worktree, 'rev-parse', 'HEAD').stdout.strip()}")
