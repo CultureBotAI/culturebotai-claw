@@ -39,6 +39,10 @@ def register() -> None:
         for key in manifest.capability_names
     }
     capabilities["vendored_sync"] = {"status": "enabled"}
+    capabilities["unmapped_inventory_input"] = {
+        "status": "not_applicable",
+        "reason": "External edge accounting is not a culture-medium ingredient corpus.",
+    }
     declaration = {
         "edgemech": {
             "display_name": "EdgeMech",
