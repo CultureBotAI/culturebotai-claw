@@ -1,6 +1,7 @@
 """Goal reconstruction must not turn stale/quoted completions into transitions."""
 
 import importlib.util
+import json
 import sqlite3
 from pathlib import Path
 
@@ -179,6 +180,46 @@ def test_completed_goal_with_queued_last_step_stays_busy(tmp_path, monkeypatch):
     assert row["native_execution_state"] == "busy"
     assert row["last_step"]["status"] == "queued"
     assert not (tmp_path / "conversations" / "example.db-wal").exists()
+
+
+@pytest.mark.parametrize("status", [1, 2, 8, 9, 11])
+def test_older_active_tool_is_reported_when_latest_step_is_done(tmp_path, monkeypatch, status):
+    monkeypatch.setattr(native, "ROOT", tmp_path)
+    (tmp_path / "conversations").mkdir()
+    call = bytefield(2, b"run_command") + bytefield(3, json.dumps({
+        "toolAction": "run_command", "toolSummary": "git push", "private_argument": "omit-me",
+    }).encode())
+    payload = bytefield(5, bytefield(1, intfield(1, 1793790000)) + bytefield(4, call))
+    with sqlite3.connect(tmp_path / "conversations" / "example.db") as db:
+        db.executescript(
+            "CREATE TABLE trajectory_meta (trajectory_id text,cascade_id text);"
+            "CREATE TABLE steps (idx integer,step_type integer,status integer,step_payload blob);"
+            "CREATE TABLE trajectory_metadata_blob (id text,data blob);"
+        )
+        db.execute("INSERT INTO trajectory_meta VALUES (?,?)", ("trajectory", "example"))
+        db.execute("INSERT INTO trajectory_metadata_blob VALUES (?,?)",
+                   ("main", bytefield(7, b"file:///example/PathwayMech")))
+        db.executemany("INSERT INTO steps VALUES (?,?,?,?)", [
+            (1, 1, 3, payload),  # Completed tool is not a blocker.
+            (2, 1, status, payload),
+            (3, 15, 3, bytefield(20, bytefield(1, b"A later assistant response."))),
+        ])
+    row = native.inspect("/example/PathwayMech", "example")
+    assert row["last_step"]["status"] == "done"
+    assert row["native_execution_state"] == "busy"
+    assert len(row["active_tools"]) == 1
+    task = row["active_tools"][0]
+    assert task["step_index"] == 2 and task["status"] == native.STATUS_NAMES[status]
+    assert task["tool_name"] == "run_command" and task["toolSummary"] == "git push"
+    assert task["created_at"] and task["completed_at"] is None
+    assert "private_argument" not in task and "omit-me" not in json.dumps(row)
+
+
+@pytest.mark.parametrize("arguments", [b"[]", b"null", b"not-json", b'{"toolSummary": {"nested":"value"}}'])
+def test_tool_metadata_keeps_presence_without_retaining_unrecognized_arguments(arguments):
+    payload = bytefield(5, bytefield(4, bytefield(2, b"run_command") + bytefield(3, arguments)))
+    assert native.tool_metadata(payload) == {"tool_name": "run_command"}
+    assert native.tool_metadata(b"") is None
 
 
 @pytest.mark.parametrize(
