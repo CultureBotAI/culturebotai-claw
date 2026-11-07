@@ -389,11 +389,12 @@ def test_native_resumed_listener_count_must_be_exactly_two(tmp_path, listener_co
         composer_reason=lambda _screen: None)
     native = guard.NativeTransport(supervisor, clock=lambda: NOW)
     tab = {"window": 1, "tab": 1, "tty": row["tty"], "screen": "Gemini 3 Pro | high"}
-    native.before_quit = {"model_evidence": {"model": "same"}, "observation": {"tab": tab}}
+    native.before_quit = {"model_evidence": guard.model_evidence(tab["screen"], row["port_pressure_identity"]),
+                          "observation": {"tab": tab}}
     native.snapshot = lambda _row: tab
     started = datetime(1970, 1, 1).astimezone().timestamp()
     native.processes = lambda: [{"pid": 1042, "tty": row["tty"], "comm": "agy", "started_epoch": started}]
-    native.observe = lambda _row: {"idle": True, "verified_identity": True, "model_evidence": {"model": "same"}}
+    native.observe = lambda _row: {"idle": True, "verified_identity": True, "observation": {"tab": tab}}
     text = "p1042\ncagy\n" + "".join(
         f"f{fd}\ntIPv4\nn127.0.0.1:{50000 + fd}\nTST=LISTEN\n" for fd in range(4, 4 + listener_count))
     native.sockets = lambda *_args, **_kwargs: {"stdout": text, "stderr": "", "returncode": 0}

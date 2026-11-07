@@ -127,6 +127,7 @@ class NativeTransport:
         self.before_quit = None
         self.binding_plan = None
         self.boundary = None
+        self.excluded_repository_keys = ()
 
     def run(self, args, **kwargs):
         return self.s.runner(args, **kwargs)
@@ -211,7 +212,16 @@ class NativeTransport:
                             "another agy is live in the same directory")
                     require(self.log_id(proc["pid"]) != target["native_session_id"],
                             "conversation is already live in another agy process")
-            row["model_evidence"] = model_evidence(screen, target.get("port_pressure_identity"))
+            # Process/conversation ownership above applies to every session.
+            # Excluded targets and known busy/task/prompt displays need not
+            # expose the restart model footer. They cannot be selected, so
+            # missing restart metadata is not a fleet identity failure.
+            # Eligible idle, pre-quit and resumed sessions still prove it.
+            allowed = self.s.config.get("port_pressure", {}).get("restart_repository_keys")
+            restart_allowed = ((allowed is None or target["repository_key"] in allowed)
+                               and target["repository_key"] not in self.excluded_repository_keys)
+            if restart_allowed and not row["busy"] and not row["prompt"] and not row["blocked_tasks"]:
+                row["model_evidence"] = model_evidence(screen, target.get("port_pressure_identity"))
             row["verified_identity"] = True
             row["idle"] = base.get("ready") is True and not row["busy"] and not row["prompt"]
         except Exception as error:
@@ -233,6 +243,9 @@ class NativeTransport:
         current = self.observe(target)
         require(current["idle"] and current["verified_identity"], "session no longer verified idle")
         require(not current["prompt"] and not current["blocked_tasks"], "human prompt or background task")
+        # Transport authorization never inherits observation-only exemptions.
+        current["model_evidence"] = model_evidence(
+            current["observation"]["tab"]["screen"], target.get("port_pressure_identity"))
         if self.boundary is not None:
             observed = current["observation"]
             require(observed.get("goal_identity") == self.boundary["goal_identity"],
@@ -337,12 +350,13 @@ class NativeTransport:
                 # Auto-update startup may briefly paint a sign-in frame. Re-read
                 # once, without input; persistent sign-in and all other prompts
                 # still stop. Never erase prompt text from retained history.
-                if (not signin_reread and SIGN_IN.search(screen)
-                        and all(SIGN_IN.fullmatch(match.group()) for match in PROMPT.finditer(screen))):
+                signin_only = bool(SIGN_IN.search(screen)) and all(
+                    SIGN_IN.fullmatch(match.group()) for match in PROMPT.finditer(screen))
+                if not signin_reread and signin_only:
                     signin_reread = True
                     self.sleep(min(1.0, max(0.0, (deadline - self.clock()) / 2)))
                     continue
-                if SIGN_IN.search(screen):
+                if signin_reread and signin_only:
                     raise GuardError("sign-in evidence remains after fresh reread; current runtime is unverified")
                 raise GuardError("human prompt during resume")
             peers = [p for p in self.processes() if p["tty"] == target["tty"] and Path(p["comm"]).name == "agy"]
@@ -359,7 +373,9 @@ class NativeTransport:
                     updated = {**target, "pid": pid, "tty": live["tty"], "process_identity": live["identity"]}
                     observed = self.observe(updated)
                     require(observed["idle"] and observed["verified_identity"], "resumed session is not verified idle")
-                    require(observed["model_evidence"] == self.before_quit["model_evidence"], "model or effort changed")
+                    resumed_model = model_evidence(
+                        observed["observation"]["tab"]["screen"], target.get("port_pressure_identity"))
+                    require(resumed_model == self.before_quit["model_evidence"], "model or effort changed")
                     result = self.sockets(pid, listen=True)
                     sockets = parse_lsof(result["stdout"], returncode=result["returncode"], stderr=result["stderr"])
                     require(sum(s["state"] == "LISTEN" and s["loopback"] for s in sockets) == 2,
@@ -462,6 +478,7 @@ class PortPressureGuard:
             return {"phase": "off", "candidate": None}
         helpers = self.s._port_pressure_helpers
         self.transport.boundary = boundary
+        self.transport.excluded_repository_keys = excluded_repository_keys
         with helpers["file_lock"](self.s.runtime / "port-pressure.lock"):
             state = {}
             state_loaded = False
