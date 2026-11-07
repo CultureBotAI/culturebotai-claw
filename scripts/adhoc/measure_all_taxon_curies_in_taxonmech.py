@@ -19,6 +19,8 @@ A CURIE in a `notes:` line counts like one in a slot, so a Mech whose seeder
 records a retired id beside the current one (NaturalProductMech) shows retired
 ids here that no slot carries (culturebotai-claw#885); the slot-declared
 `kg-microbe-links taxa` check is the one that tells them apart.
+The rows are written in a deterministic order, so a re-run at the same HEADs
+produces the same bytes.
 Serves: the cross-Mech taxon-link assessment, culturebotai-claw PR 881.
 Written 2026-11-06.
 """
@@ -78,7 +80,8 @@ def main() -> int:
         writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
         writer.writerow(["mech", "taxon_id", "records_citing", "in_taxonmech_scope"])
         for key in sorted(records_citing):
-            for taxon, count in records_citing[key].most_common():
+            # Deterministic: by records descending, then numeric id, so the file's digest reproduces.
+            for taxon, count in sorted(records_citing[key].items(), key=lambda kv: (-kv[1], int(kv[0].split(":")[1]))):
                 writer.writerow([key, taxon, count, taxon in scope])
     lines = ["# Every NCBITaxon CURIE in Mech records, against TaxonMech's seed scope", "",
              f"TaxonMech scope: {len(scope)} taxa (curation/seed_scope.tsv at {heads['taxonmech']}).", "",

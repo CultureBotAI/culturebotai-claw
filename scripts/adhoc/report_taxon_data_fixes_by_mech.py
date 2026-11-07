@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Per Mech, the taxon citations that need a data fix, with the records that carry them.
+"""Per Mech, the taxon ids cited outside TaxonMech's current ids (the text-scan upper bound), with the records.
 
 Purpose: the cross-Mech taxon-link assessment
 (docs/reviews/2026-11-06-cross-mech-taxon-links.md) found records citing

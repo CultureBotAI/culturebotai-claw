@@ -2,7 +2,7 @@
 
 3730 distinct taxa cited outside the scope; scope 626048; taxdump 2026-09-13 (3013243 nodes).
 
-Inputs (SHA-256, first 16 hex): `protein_example_taxa.tsv` ca896e7743af793f, `taxon_curies.tsv` d560046e508ef525; the Mech HEADs are those the two scan summaries record.
+Inputs (SHA-256, first 16 hex): `protein_example_taxa.tsv` ca896e7743af793f, `taxon_curies.tsv` 64ff446c2ac15460; the Mech HEADs are those the two scan summaries record.
 
 | domain | kingdom | class | distinct taxa | with an in-scope ancestor | protein examples | records citing |
 |---|---|---|---:|---:|---:|---:|
@@ -54,23 +54,23 @@ Inputs (SHA-256, first 16 hex): `protein_example_taxa.tsv` ca896e7743af793f, `ta
 | NCBITaxon:284811 | Eremothecium gossypii ATCC 10895 | strain | NCBITaxon:33169 | Eremothecium gossypii | 19 | 19 | proteintraitsmech |
 | NCBITaxon:498257 | Verticillium dahliae VdLs.17 | strain | NCBITaxon:27337 | Verticillium dahliae | 17 | 17 | antibioticmech, proteintraitsmech |
 | NCBITaxon:229533 | Fusarium graminearum PH-1 | strain | NCBITaxon:5518 | Fusarium graminearum | 8 | 25 | antibioticmech, habitatmech, naturalproductmech, proteintraitsmech |
-| NCBITaxon:332648 | Botrytis cinerea B05.10 | strain | NCBITaxon:40559 | Botrytis cinerea | 3 | 26 | antibioticmech, naturalproductmech, proteintraitsmech |
 | NCBITaxon:321614 | Parastagonospora nodorum SN15 | strain | NCBITaxon:13684 | Parastagonospora nodorum | 8 | 21 | habitatmech, naturalproductmech, proteintraitsmech |
+| NCBITaxon:332648 | Botrytis cinerea B05.10 | strain | NCBITaxon:40559 | Botrytis cinerea | 3 | 26 | antibioticmech, naturalproductmech, proteintraitsmech |
 | NCBITaxon:508771 | Toxoplasma gondii ME49 | strain | NCBITaxon:5811 | Toxoplasma gondii | 17 | 10 | cellstructuremech, habitatmech, proteintraitsmech |
 | NCBITaxon:741705 | Coniophora puteana RWD-64-598 SS2 | strain | NCBITaxon:80637 | Coniophora puteana | 20 | 5 | cmmmech |
 | NCBITaxon:307796 | Saccharomyces cerevisiae YJM789 | strain | NCBITaxon:4932 | Saccharomyces cerevisiae | 10 | 11 | antibioticmech, proteintraitsmech |
 | NCBITaxon:515849 | Podospora anserina S mat+ | strain | NCBITaxon:2587412 | Podospora anserina | 10 | 10 | proteintraitsmech |
 | NCBITaxon:1344414 | Trichoderma reesei RUT C-30 | strain | NCBITaxon:51453 | Trichoderma reesei | 9 | 10 | communitymech, proteintraitsmech |
+| NCBITaxon:240176 | Coprinopsis cinerea okayama7#130 | strain | NCBITaxon:5346 | Coprinopsis cinerea | 9 | 9 | habitatmech, proteintraitsmech |
+| NCBITaxon:284591 | Yarrowia lipolytica CLIB122 | strain | NCBITaxon:4952 | Yarrowia lipolytica | 9 | 9 | proteintraitsmech |
 | NCBITaxon:431241 | Trichoderma reesei QM6a | strain | NCBITaxon:51453 | Trichoderma reesei | 9 | 9 | proteintraitsmech |
 | NCBITaxon:759273 | Colletotrichum higginsianum IMI 349063 | strain | NCBITaxon:80884 | Colletotrichum higginsianum | 2 | 16 | naturalproductmech, proteintraitsmech |
-| NCBITaxon:284591 | Yarrowia lipolytica CLIB122 | strain | NCBITaxon:4952 | Yarrowia lipolytica | 9 | 9 | proteintraitsmech |
-| NCBITaxon:240176 | Coprinopsis cinerea okayama7#130 | strain | NCBITaxon:5346 | Coprinopsis cinerea | 9 | 9 | habitatmech, proteintraitsmech |
 | NCBITaxon:331117 | Aspergillus fischeri NRRL 181 | strain | NCBITaxon:36630 | Aspergillus fischeri | 4 | 13 | habitatmech, naturalproductmech, proteintraitsmech |
 | NCBITaxon:379508 | Lodderomyces elongisporus NRRL YB-4239 | strain | NCBITaxon:36914 | Lodderomyces elongisporus | 7 | 9 | habitatmech, proteintraitsmech |
 | NCBITaxon:635003 | Fragilariopsis cylindrus CCMP1102 | strain | NCBITaxon:186039 | Fragilariopsis cylindrus | 8 | 8 | proteintraitsmech |
-| NCBITaxon:1314807 | Dendrothele bispora CBS 962.96 | strain | NCBITaxon:1314803 | Dendrothele bispora | 7 | 8 | naturalproductmech, proteintraitsmech |
 | NCBITaxon:1111077 | Claviceps purpurea 20.1 | strain | NCBITaxon:5111 | Claviceps purpurea | 2 | 13 | naturalproductmech, proteintraitsmech |
-| NCBITaxon:675120 | Dothistroma septosporum NZE10 | strain | NCBITaxon:64363 | Dothistroma septosporum | 7 | 7 | proteintraitsmech |
+| NCBITaxon:1314807 | Dendrothele bispora CBS 962.96 | strain | NCBITaxon:1314803 | Dendrothele bispora | 7 | 8 | naturalproductmech, proteintraitsmech |
+| NCBITaxon:322104 | Scheffersomyces stipitis CBS 6054 | strain | NCBITaxon:4924 | Scheffersomyces stipitis | 7 | 7 | proteintraitsmech |
 
 ## Microbial species or strains with no in-scope ancestor (scope candidates): 548 (416 protein examples, 1051 records)
 
@@ -80,42 +80,42 @@ Inputs (SHA-256, first 16 hex): `protein_example_taxa.tsv` ca896e7743af793f, `ta
 | NCBITaxon:631055 | Symbiodinium sp. CCMP2592 | Eukaryota | species | 18 | 18 | proteintraitsmech |
 | NCBITaxon:2966 | Noctiluca scintillans | Eukaryota | species | 14 | 14 | proteintraitsmech |
 | NCBITaxon:663331 | Trichophyton benhamiae CBS 112371 | Eukaryota/Fungi | strain | 14 | 13 | proteintraitsmech |
-| NCBITaxon:1519616 | Symbiodinium sp. CCMP2456 | Eukaryota | species | 11 | 11 | proteintraitsmech |
 | NCBITaxon:685588 | Galerina marginata CBS 339.88 | Eukaryota/Fungi | strain | 11 | 11 | proteintraitsmech |
+| NCBITaxon:1519616 | Symbiodinium sp. CCMP2456 | Eukaryota | species | 11 | 11 | proteintraitsmech |
 | NCBITaxon:5053 | Aspergillus aculeatus | Eukaryota/Fungi | species | 3 | 16 | antibioticmech, cmmmech, naturalproductmech, proteintraitsmech |
-| NCBITaxon:1314672 | Peniophora sp. CONT | Eukaryota/Fungi | species | 9 | 9 | proteintraitsmech |
 | NCBITaxon:5722 | Trichomonas vaginalis | Eukaryota | species | 7 | 11 | cellstructuremech, communitymech, proteintraitsmech |
-| NCBITaxon:1156394 | Saprolegnia diclina VS20 | Eukaryota | strain | 8 | 8 | proteintraitsmech |
+| NCBITaxon:1314672 | Peniophora sp. CONT | Eukaryota/Fungi | species | 9 | 9 | proteintraitsmech |
 | NCBITaxon:46433 | Reticulomyxa filosa | Eukaryota | species | 8 | 8 | proteintraitsmech |
 | NCBITaxon:718367 | Peniophora sp. CBMAI 1063 | Eukaryota/Fungi | species | 8 | 8 | proteintraitsmech |
+| NCBITaxon:1156394 | Saprolegnia diclina VS20 | Eukaryota | strain | 8 | 8 | proteintraitsmech |
 | NCBITaxon:73868 | Piromyces sp. E2 | Eukaryota/Fungi | species | 7 | 7 | proteintraitsmech |
 | NCBITaxon:690307 | Aspergillus aculeatus ATCC 16872 | Eukaryota/Fungi | strain | 1 | 12 | naturalproductmech, proteintraitsmech |
 | NCBITaxon:2046025 | Acremonium sp. | Eukaryota/Fungi | species | 0 | 11 | antibioticmech, naturalproductmech |
-| NCBITaxon:1001832 | Daldinia sp. EC12 | Eukaryota/Fungi | species | 5 | 5 | proteintraitsmech |
-| NCBITaxon:1395130 | Massarina eburnea CBS 473.64 | Eukaryota/Fungi | strain | 5 | 5 | proteintraitsmech |
 | NCBITaxon:2787 | Porphyra purpurea | Eukaryota | species | 5 | 5 | proteintraitsmech |
-| NCBITaxon:1330018 | Calocera viscosa TUFC12733 | Eukaryota/Fungi | strain | 5 | 5 | proteintraitsmech |
+| NCBITaxon:1001832 | Daldinia sp. EC12 | Eukaryota/Fungi | species | 5 | 5 | proteintraitsmech |
 | NCBITaxon:1109443 | Serendipita indica DSM 11827 | Eukaryota/Fungi | strain | 5 | 5 | proteintraitsmech |
+| NCBITaxon:1330018 | Calocera viscosa TUFC12733 | Eukaryota/Fungi | strain | 5 | 5 | proteintraitsmech |
 | NCBITaxon:1392246 | Amniculicola lignicola CBS 123094 | Eukaryota/Fungi | strain | 5 | 5 | proteintraitsmech |
+| NCBITaxon:1395130 | Massarina eburnea CBS 473.64 | Eukaryota/Fungi | strain | 5 | 5 | proteintraitsmech |
 | NCBITaxon:665079 | Sclerotinia sclerotiorum 1980 UF-70 | Eukaryota/Fungi | strain | 3 | 6 | antibioticmech, proteintraitsmech |
 | NCBITaxon:1813945 | Penicillium sp. YT-2016 | Eukaryota/Fungi | species | 0 | 9 | naturalproductmech |
-| NCBITaxon:1229662 | Pestalotiopsis fici W106-1 | Eukaryota/Fungi | strain | 3 | 5 | naturalproductmech, proteintraitsmech |
-| NCBITaxon:1344416 | Gonapodya prolifera JEL478 | Eukaryota/Fungi | strain | 4 | 4 | proteintraitsmech |
-| NCBITaxon:1001937 | Hypoxylon sp. EC38 | Eukaryota/Fungi | species | 4 | 4 | proteintraitsmech |
-| NCBITaxon:117820 | Spizellomyces sp. 'palustris' | Eukaryota/Fungi | species | 4 | 4 | proteintraitsmech |
-| NCBITaxon:1314781 | Exidia glandulosa HHB12029 | Eukaryota/Fungi | strain | 4 | 4 | proteintraitsmech |
 | NCBITaxon:5801 | Eimeria acervulina | Eukaryota | species | 4 | 4 | proteintraitsmech |
 | NCBITaxon:28574 | Talaromyces minioluteus | Eukaryota/Fungi | species | 4 | 4 | proteintraitsmech |
+| NCBITaxon:117820 | Spizellomyces sp. 'palustris' | Eukaryota/Fungi | species | 4 | 4 | proteintraitsmech |
 | NCBITaxon:765867 | Pyrenochaeta sp. DS3sAY3a | Eukaryota/Fungi | species | 4 | 4 | proteintraitsmech |
-| NCBITaxon:1116229 | Glarea lozoyensis ATCC 20868 | Eukaryota/Fungi | strain | 2 | 5 | antibioticmech, naturalproductmech, proteintraitsmech |
+| NCBITaxon:1001937 | Hypoxylon sp. EC38 | Eukaryota/Fungi | species | 4 | 4 | proteintraitsmech |
+| NCBITaxon:1229662 | Pestalotiopsis fici W106-1 | Eukaryota/Fungi | strain | 3 | 5 | naturalproductmech, proteintraitsmech |
+| NCBITaxon:1314781 | Exidia glandulosa HHB12029 | Eukaryota/Fungi | strain | 4 | 4 | proteintraitsmech |
+| NCBITaxon:1344416 | Gonapodya prolifera JEL478 | Eukaryota/Fungi | strain | 4 | 4 | proteintraitsmech |
 | NCBITaxon:578461 | Nosema bombycis CQ1 | Eukaryota/Fungi | strain | 4 | 3 | cellstructuremech |
 | NCBITaxon:860625 | Chondria armata | Eukaryota | species | 0 | 7 | naturalproductmech |
-| NCBITaxon:1810919 | Aspergillus mulundensis | Eukaryota/Fungi | species | 3 | 4 | naturalproductmech, proteintraitsmech |
+| NCBITaxon:1116229 | Glarea lozoyensis ATCC 20868 | Eukaryota/Fungi | strain | 2 | 5 | antibioticmech, naturalproductmech, proteintraitsmech |
 | NCBITaxon:1392250 | Aspergillus steynii IBT 23096 | Eukaryota/Fungi | strain | 3 | 4 | naturalproductmech, proteintraitsmech |
+| NCBITaxon:1810919 | Aspergillus mulundensis | Eukaryota/Fungi | species | 3 | 4 | naturalproductmech, proteintraitsmech |
 | NCBITaxon:2771 | Cyanidium caldarium | Eukaryota | species | 3 | 3 | proteintraitsmech |
 | NCBITaxon:2786 | Porphyra umbilicalis | Eukaryota | species | 3 | 3 | proteintraitsmech |
-| NCBITaxon:1314788 | Lophiostoma macrostomum CBS 122681 | Eukaryota/Fungi | strain | 3 | 3 | proteintraitsmech |
-| NCBITaxon:1429867 | Penicillium camemberti FM 013 | Eukaryota/Fungi | strain | 3 | 3 | proteintraitsmech |
+| NCBITaxon:40602 | Claviceps fusiformis | Eukaryota/Fungi | species | 1 | 5 | naturalproductmech, proteintraitsmech |
+| NCBITaxon:90312 | Cerrena unicolor | Eukaryota/Fungi | species | 3 | 3 | proteintraitsmech |
 
 ## Outcomes, one per taxon
 

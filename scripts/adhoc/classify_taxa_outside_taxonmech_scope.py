@@ -23,9 +23,10 @@ Viridiplantae, because TaxonMech holds protists as well as fungi.
 Inputs: claw's .env (set -a; . ./.env) for TAXONMECH_ROOT; --measure DIR
 holding protein_example_taxa.tsv and taxon_curies.tsv; --out DIR.
 Outputs: DIR/outside_scope_classified.tsv (taxon, name, merged_into, domain,
-(the summary names the digests of the two input TSVs, culturebotai-claw#916)
 kingdom, rank, class, nearest in-scope ancestor and its name, protein
-examples, records citing it, Mechs) and DIR/summary_classified.md.
+examples, records citing it, Mechs) and DIR/summary_classified.md, which names
+the digests of the two input TSVs (culturebotai-claw#916); rows are written in
+a deterministic order so the TSV's own digest reproduces.
 Read-only; writes only under DIR. The tarball is read twice (nodes, then the
 names of the ids that turned out to be needed).
 Serves: the cross-Mech taxon-link assessment, culturebotai-claw PR 881 (and
@@ -115,7 +116,7 @@ def main() -> int:
             names[int(fields[0])] = fields[1]
 
     rows = []
-    for taxon in sorted(cited, key=lambda t: -(examples[t] + records[t])):
+    for taxon in sorted(cited, key=lambda t: (-(examples[t] + records[t]), t)):  # deterministic; ties by id
         current, lineage = resolved[taxon], chains[taxon]
         merged_into = f"NCBITaxon:{current}" if current != taxon else ""
         if current not in nodes:
