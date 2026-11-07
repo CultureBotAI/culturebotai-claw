@@ -26,6 +26,9 @@ CultureBotAI/CultureBotAI.github.io#541. No fleet-wide repin, native curation,
 embedding run, deployment or merge occurred.
 
 Independent adversarial review filed and repaired #982, #984, #986 and #988.
+The first final CI run exposed a generic-workflow coupling to the admission's
+consumer name (#989); the workflow now asks only the protected generic selector,
+while the existing manifest-derived fleet assertion remains unchanged.
 Earlier #951/#952/#957/#959/#963/#964 dispositions remain recorded in the branch.
 The policy/helper implementation was reviewed before its real canary. Dry-run
 and no-op apply both verified 19 working and committed consumer artifacts plus
@@ -39,7 +42,7 @@ CI is pending the evidence push; no final full-suite pass is claimed yet.
 and [policy design](docs/guides/INFRASTRUCTURE_ADMISSION.md) record scope and pins.
 Storage, native exports and census evidence belong to CultureBotAI/EdgeMech#2.
 
-Closes #960. Closes #982. Closes #984. Closes #986. Closes #988.
+Closes #960. Closes #982. Closes #984. Closes #986. Closes #988. Closes #989.
 
 Keep this PR draft until its dependencies and final checks are reviewed.
 Merging remains an explicit user decision.

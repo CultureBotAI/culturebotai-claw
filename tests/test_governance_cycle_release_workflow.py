@@ -59,18 +59,20 @@ def test_exactly_one_audit_lane_runs_and_release_uses_trusted_code():
     assert "control/tests/test_governance_cycle_release_workflow.py" in candidate["run"]
 
 
-@pytest.mark.parametrize("trusted,emitted", [(False, "a" * 40), (True, "a" * 40),
+@pytest.mark.parametrize("trusted,emitted", [(False, "a" * 40), (True, ""), (True, "a" * 40),
                                             (True, "main"), (True, "a" * 40 + "\n" + "b" * 40)])
 def test_only_protected_preparation_selects_one_immutable_data_fetch(tmp_path, trusted, emitted):
     declaration = "src/kg_microbe_governance/releases/edgemech-infrastructure-admission-v1.json"
+    selector = "src/kg_microbe_governance/infrastructure_admission.py"
     candidate = tmp_path / "control" / declaration
     candidate.parent.mkdir(parents=True)
     candidate.write_text("candidate policy cannot select data fetch")
+    (tmp_path / "control" / selector).write_text("candidate code cannot select data fetch")
     protected = tmp_path / "fleet/trusted-claw"
     if trusted:
-        path = protected / declaration
+        path = protected / selector
         path.parent.mkdir(parents=True)
-        path.write_text("fixture protected policy")
+        path.write_text("fixture protected selector")
     binaries = tmp_path / "bin"
     binaries.mkdir()
     trace = tmp_path / "trace"
@@ -90,7 +92,9 @@ def test_only_protected_preparation_selects_one_immutable_data_fetch(tmp_path, t
     else:
         lines = trace.read_text().splitlines()
         assert lines[0] == f"run --project {protected} python -m kg_microbe_governance.infrastructure_admission --trusted-root {protected}"
-        if emitted == "a" * 40:
+        if emitted == "":
+            assert result.returncode == 0 and len(lines) == 1
+        elif emitted == "a" * 40:
             assert result.returncode == 0
             assert lines[1] == f"-C {protected} -c core.hooksPath=/dev/null fetch --no-tags --no-prune --no-write-fetch-head origin {emitted}"
         else:

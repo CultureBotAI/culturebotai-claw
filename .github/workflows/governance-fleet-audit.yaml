@@ -58,14 +58,18 @@ jobs:
         run: |
           set -euo pipefail
           trusted="$GITHUB_WORKSPACE/fleet/trusted-claw"
-          declaration="$trusted/src/kg_microbe_governance/releases/edgemech-infrastructure-admission-v1.json"
+          selector="$trusted/src/kg_microbe_governance/infrastructure_admission.py"
           # Historical trusted checkouts have no admission and need no new code.
           # Candidate policy and downstream pins cannot select this fetch target.
-          if [ ! -e "$declaration" ]; then
+          if [ ! -f "$selector" ]; then
             exit 0
           fi
           source_ref="$(uv run --project "$trusted" python -m kg_microbe_governance.infrastructure_admission \
             --trusted-root "$trusted")"
+          # A protected selector with no active declaration emits no data ref.
+          if [ -z "$source_ref" ]; then
+            exit 0
+          fi
           if ! [[ "$source_ref" =~ ^[0-9a-f]{40}$ ]]; then
             printf '%s\n' 'Refusing invalid infrastructure data ref' >&2
             exit 2

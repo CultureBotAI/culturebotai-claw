@@ -76,3 +76,20 @@ CultureBotAI/CultureBotAI.github.io#541. This policy addition does not change it
 projected fleet entry. Shared contracts remain separately reviewable in #962;
 the downstream immutable contract pin is still
 `1b5391d083ba85ac94e5279c3cba25ac4fde243c`.
+
+## Final CI follow-up
+
+The first evidence-head authoritative run at `90bf24612108653d0b608c3e1ab39042a90878f1`
+passed its protected historical audit, then failed one candidate-workflow
+assertion with 183 other tests passing. The policy filename embedded a fleet
+key in the otherwise manifest-derived workflow. Finding #989 records the exact
+run and repair; the existing assertion remains unchanged. Preparation now
+checks only the generic protected selector, whose empty/no-admission result
+skips fetching. Nonempty output retains the explicit 40-hex guard.
+
+The repaired workflow and ID-label regression suites passed all 21 tests;
+focused Ruff and diff checks passed. A fresh [workflow mutation proof](admission-generic-workflow-mutation-proof.json)
+confirms malformed-ref rejection still fails when its guard is removed. The
+policy and real canary helper digests remain identical to the verified receipts,
+so this workflow-only repair does not change the consumer synchronization
+canary. Final authoritative/full CI must run on the repaired head.
