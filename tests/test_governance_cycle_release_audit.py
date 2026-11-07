@@ -446,7 +446,11 @@ def test_unknown_policy_fields_and_duplicate_keys_are_refused(tmp_path):
 
 def test_packaged_release_preserves_approved_immutable_identity():
     root = Path(__file__).resolve().parents[1]
-    policy = parse_release((root / RELEASE_PATH).read_bytes())
+    content = (root / RELEASE_PATH).read_bytes()
+    policy = parse_release(content)
+    # Immutable declaration introduced on protected main by #924 (a521f5bb).
+    # Bind its exact bytes, including all digests, without Git/network access.
+    assert hashlib.sha256(content).hexdigest() == "89a362436eb3df0f3b4bfdb9feeaf9a258b2476291e565a744568b41f9445697"
     assert policy["baseline_ref"] == "76c1ebeea3fc7f80bf1abe044688f298f390cfac"
     assert policy["release_ref"] == "c26f3a0906916f9641a5f82b004b5541ae5fbe52"
     assert policy["canary"] == CANARY and policy["parent_version"] == "2.0.0"
