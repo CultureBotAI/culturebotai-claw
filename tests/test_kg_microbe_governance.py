@@ -158,7 +158,7 @@ def test_downstream_targets_resolve_to_nested_canonical_payloads() -> None:
         ),
     ],
 )
-def test_record_review_artifacts_are_exactly_mapped_for_every_consumer(
+def test_record_review_artifacts_are_exactly_mapped_for_applicable_consumers(
     artifact_id: str, source: str, target: str
 ) -> None:
     manifest = load_governance_manifest()
@@ -174,11 +174,17 @@ def test_record_review_artifacts_are_exactly_mapped_for_every_consumer(
     assert artifact.target == target
     assert artifact.mode == 0o644
     assert artifact.sha256 == hashlib.sha256(_asset_bytes(source)).hexdigest()
-    assert declaration["consumers"] == "all"
+    expected = set(fleet.keys)
+    if artifact_id == "record_review_contract":
+        # This artifact also asserts native profile/skill adoption (#959).
+        expected.remove("edgemech")
+        assert set(declaration["consumers"]) == expected
+    else:
+        assert declaration["consumers"] == "all"
     assert {
         key for key in fleet.keys
         if artifact in manifest.artifacts_for(manifest.consumer_for(key))
-    } == set(fleet.keys)
+    } == expected
 
 
 def test_manifest_rejects_duplicate_json_keys() -> None:
