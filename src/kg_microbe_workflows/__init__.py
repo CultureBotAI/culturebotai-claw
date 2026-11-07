@@ -1,7 +1,9 @@
 """Pinned, LinkML-validated Mech cycles and immutable goal evidence.
 
-This package validates records and artifact bytes. It never executes goals, Git,
-GitHub calls or embedded commands; remote closure remains the supervisor's gate.
+The validation APIs inspect records and artifact bytes without executing goals
+or embedded commands. The separate session_durability and commit_publication
+modules make bounded read-only Git/GitHub observations for the supervisor; they
+never push, fetch, repair state or dispatch a goal.
 """
 from __future__ import annotations
 
@@ -232,6 +234,12 @@ def _ordered_stages(stages: list[dict], version: str) -> None:
 
 def validate_parent(parent: dict, schema_path: Path = SCHEMA_PATH) -> None:
     _shape(parent, "WorkflowTemplate", schema_path)
+    if "session_state_policy" in parent and parent["session_state_policy"] != {
+        "work_root": ".temp", "separate_clone_root": "~/agent-work/<repo>",
+        "prohibit_system_temp_state": True, "push_committed_batches_same_day": True,
+        "require_origin_publication_at_closure": True, "disposable_cache_allowed": True,
+    }:
+        raise WorkflowError("session state must retain the canonical durable-root and publication policy")
     _ordered_stages(parent["stages"], parent["version"])
     if (parent["version"].startswith("1.") and parent["schema_version"] != "1.0.0") or (parent["version"] == "2.0.0" and parent["schema_version"] != VERSION):
         raise WorkflowError("parent and schema versions disagree")
@@ -314,6 +322,8 @@ def load_effective_workflow(
         result[name] = copy.deepcopy(parent[name])
     if "issue_triage_policy" in parent:
         result["issue_triage_policy"] = copy.deepcopy(parent["issue_triage_policy"])
+    if "session_state_policy" in parent:
+        result["session_state_policy"] = copy.deepcopy(parent["session_state_policy"])
     for stage in result["stages"]:
         stage["required_outputs"] = parent["stages"][stage["stage"] - 1]["required_outputs"]
     if "extension" in profile:

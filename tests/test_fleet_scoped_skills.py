@@ -133,7 +133,7 @@ def test_cross_mech_sync_fails_closed_and_uses_owned_locks():
     assert 'timeout=task_limit + 300' in text
     assert 'finally:' in text
     assert 'manager.release_lock(resource)' in text
-    assert 'mktemp -d "${TMPDIR:-/tmp}/cross-mech-${TARGET_KEY}.XXXXXX"' in text
+    assert 'mktemp -d "$DURABLE_ROOT/cross-mech-${TARGET_KEY}.XXXXXX"' in text
     assert 'gh pr create -R "$TARGET_GITHUB"' in text
     assert 'gh pr merge "$PR_NUMBER" -R "$TARGET_GITHUB"' in text
     assert '--match-head-commit "$local_head"' in text

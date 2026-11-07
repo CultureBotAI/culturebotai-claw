@@ -18,11 +18,13 @@ remain historical evidence; there is no automatic migration or implied coverage.
 
 ## Fleet Triage
 
-From a configured CLAW checkout:
+From a configured CLAW checkout, retain the exported report under the
+gitignored `<repo>/.temp/` durable work root with a session-unique filename:
 
 ```bash
+mkdir -p .temp
 uv run kg-microbe-reviews fleet --all --format json
-uv run kg-microbe-reviews fleet --all --format markdown --output /tmp/review-triage.md
+uv run kg-microbe-reviews fleet --all --format markdown --output .temp/review-triage.md
 uv run kg-microbe-reviews fleet --mech culturemech --status open --severity major --format tsv
 ```
 

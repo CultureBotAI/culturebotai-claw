@@ -119,6 +119,9 @@ classes:
       title:
         range: NonBlank
         required: true
+      session_state_policy:
+        range: SessionStatePolicy
+        inlined: true
       stages:
         range: ParentStage
         required: true
@@ -144,6 +147,27 @@ classes:
         range: IssueTriagePolicy
         required: true
         inlined: true
+  SessionStatePolicy:
+    description: Optional on retained older parents; new candidates declare the canonical durable-state policy.
+    attributes:
+      work_root:
+        range: string
+        required: true
+      separate_clone_root:
+        range: string
+        required: true
+      prohibit_system_temp_state:
+        range: boolean
+        required: true
+      push_committed_batches_same_day:
+        range: boolean
+        required: true
+      require_origin_publication_at_closure:
+        range: boolean
+        required: true
+      disposable_cache_allowed:
+        range: boolean
+        required: true
   ParentStage:
     attributes:
       stage:

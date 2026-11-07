@@ -295,6 +295,26 @@ deterministic. Inject local configuration with `environ` and `StaticProbe`, and
 inject prior functional evidence separately with `StaticAvailability` or the
 strict cached-evidence loader.
 
+## Durable session state and publication
+
+Use the gitignored `<repo>/.temp/` for new session worktrees, campaigns, batch
+state, review drafts and handoffs; use `~/agent-work/<repo>/` for a separate
+clone. Verify the ignore rule before use. Never store session state or helper scripts in `/tmp`,
+`/private/tmp` or `$TMPDIR`. Disposable caches and pytest temporary fixtures may
+use system temp roots. Retain maintained helper scripts and final evidence in
+their native tracked directories; ignored state is not a backup or publication.
+
+Push each authorized committed batch branch to `origin` the same day, even
+without a PR. Verify its exact remote head, and report a failed push as a blocker.
+Check current workflow triggers before claiming that branch pushes run no CI.
+A goal delivering commits cannot close while recorded commits exist only locally.
+No force push, merge, cleanup or additional authorization follows from this rule.
+See [durable session state](docs/guides/SESSION_STATE_DURABILITY.md).
+
+Existing CLAW service runtimes stay at their configured durable roots under
+`OPENCLAW_WORKSPACE`; moving a live runtime is a separately reviewed operation.
+Do not rewrite active session bindings or ledgers merely to adopt this convention.
+
 ## Configuration rules
 
 - Start from `.env.example`; do not commit `.env` or credentials.

@@ -68,7 +68,10 @@ session observability, or manual worktree lifecycle is required.
 ## Mode B — External tmux Agents
 
 For long-running or observable tasks. Each agent runs in its own tmux session
-with its own worktree under the portable `FLEET_WORKTREE_ROOT`.
+with its own worktree under the durable `FLEET_WORKTREE_ROOT`.
+Verify the orchestration repository ignores `.temp/` before creating state.
+For an authorized separate clone, use `~/agent-work/<repo>/`. Never use
+`/tmp/`, `/private/tmp/` or `$TMPDIR` for campaigns, worktrees or handoffs.
 
 ### Resolve fleet and set up (once per orchestration run)
 
@@ -82,7 +85,7 @@ esac
 test -n "$TARGET_KEY" || { echo "TARGET_KEY is required" >&2; exit 2; }
 ORCHESTRATION_ROOT="$(git rev-parse --show-toplevel)"
 test -f "$ORCHESTRATION_ROOT/plugins/lock_manager.py"
-FLEET_WORKTREE_ROOT="${FLEET_WORKTREE_ROOT:-${TMPDIR:-/tmp}/culturebotai-worktrees}"
+FLEET_WORKTREE_ROOT="$ORCHESTRATION_ROOT/.temp/worktrees"
 mkdir -p "$FLEET_WORKTREE_ROOT"
 TARGET_ROWS="$(uv run python -m kg_microbe_fleet targets \
   --capability coordination_hooks)"
