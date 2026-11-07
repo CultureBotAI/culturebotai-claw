@@ -8,7 +8,9 @@ below undoes one check added to cleanup_merged_pr_branch.py
 commit_and_push_mech_branch_locked.py (#857, #858, #868, #876-#878, #896). The
 named test must fail with the mutant applied, and each test file must pass
 without it. A mutant that does not parse is refused, since its kill would be an
-import error rather than the named test (#892).
+import error rather than the named test (#892); so is any pytest exit other
+than 0 or 1, which is a misnamed test or an import error, not a test failure
+(#922).
 Inputs: none; run from the claw checkout or worktree holding the script. The
 tests point OPENCLAW_ORCHESTRATION_ROOT at their own tmp_path, so no mutant
 can take a lock in this checkout's workspace/ (#879).
@@ -82,7 +84,10 @@ CLEANUP_MUTANTS = [
     ("foreign worktree accepted", "            if entry is None:\n", "            if False:\n",
      "test_a_worktree_of_another_clone_is_refused"),
     ("dry run deletes", "        if not apply:\n", "        if False:\n", "test_a_dry_run_checks_everything_and_deletes_nothing"),
-    ("partial failure unreported", "            raise PartialFailure(done, exc, recovery_for(done, checkout, worktree, branch, head)) from exc\n",
+    ("partial failure unreported",
+     "            raise PartialFailure(done, exc, recovery_for(done, checkout, worktree, branch, head,\n"
+     "                                                         worktree_on_branch=worktree_on_branch,\n"
+     "                                                         upstream=upstream)) from exc\n",
      "            raise\n", "test_a_failure_after_a_deletion_reports_what_was_done_and_how_to_recover"),
     ("first-step failure reported as partial",
      '            if not any(step.startswith(("removed ", "deleted ")) for step in done):\n                raise\n', "",
@@ -100,7 +105,7 @@ CLEANUP_MUTANTS = [
     ("worktree-only failure called nothing deleted", 'step.startswith(("removed ", "deleted "))', 'step.startswith("deleted ")',
      "test_a_failure_after_only_the_worktree_went_reports_it"),
     ("local-only failure called nothing deleted", 'step.startswith(("removed ", "deleted "))', 'step.startswith("removed ")',
-     "test_a_failure_after_only_the_local_branch_went_reports_it"),
+     "test_a_failure_with_no_config_section_names_no_config_to_restore"),
     ("detached worktree recovery names the branch",
      '            steps.append(f"the worktree with `git -C {checkout} worktree add --detach {worktree} {head}`")\n',
      '            steps.append(f"the worktree with `git -C {checkout} worktree add {worktree} {branch}`")\n',
@@ -111,6 +116,14 @@ CLEANUP_MUTANTS = [
      "                pass\n", "test_a_missing_worktree_path_is_reported_and_a_prunable_one_refused"),
     ("prunable worktree accepted", "            if any(e[\"path\"] == worktree for e in entries):\n", "            if False:\n",
      "test_a_missing_worktree_path_is_reported_and_a_prunable_one_refused"),
+    ("skipped line dropped from the output", "        done: list[str] = list(skipped)\n", "        done: list[str] = []\n",
+     "test_a_missing_worktree_path_is_reported_and_a_prunable_one_refused"),
+    ("checkout as worktree accepted", '            elif entry["path"] == checkout:\n', "            elif False:\n",
+     "test_a_linked_checkout_passed_as_its_own_worktree_is_refused"),
+    ("branch worktree recreated detached", "        if worktree_on_branch:\n", "        if False:\n",
+     "test_a_failure_after_only_the_worktree_went_reports_it"),
+    ("upstream config not restored", '    if any(step.startswith("removed branch.") for step in done):\n', "    if False:\n",
+     "test_a_failure_after_only_the_local_branch_went_reports_it"),
     ("no cache allowance", 'if line and not (line.startswith("!! ") and _regenerable(line)):', "if line:",
      "test_the_merged_branch_is_removed_everywhere_and_caches_do_not_block"),
     ("no worktree-head check", "if actual != head:", "if False:", "test_a_detached_commit_in_the_worktree_blocks_removing_it"),
@@ -174,7 +187,11 @@ def run_mutants(script: Path, test_file: str, mutants: list) -> int | None:
                 print(f"{name}: the mutant does not parse ({exc.msg}); a kill would be an import error, not the test")
                 return None
             script.write_text(mutated, encoding="utf-8")
-            killed = pytest(f"{test_file}::{test}") != 0
+            rc = pytest(f"{test_file}::{test}")
+            if rc not in (0, 1):
+                print(f"{name}: pytest exited {rc}, which is not a test failure (a misnamed test, or an import error)")
+                return None
+            killed = rc == 1
             survived += not killed
             print(f"{'KILLED  ' if killed else 'SURVIVED'} {script.name}: {name} ({test})")
     finally:

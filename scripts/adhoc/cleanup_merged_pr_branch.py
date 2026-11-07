@@ -30,13 +30,14 @@ Inputs: --repo OWNER/NAME (claw or a manifest Mech), --pr N, --checkout PATH
 Outputs: prints each planned or completed step. Exits 1 on a refusal or on a
 failure before the first deletion (both say nothing was deleted), and on a
 failure after one, which prints every step that completed and the commands
-that recreate exactly what was removed.
+that recreate exactly what was removed: the branch at the head, the worktree
+on it or detached as it was, its upstream config, the remote branch.
 Serves: the culturebotai-claw#729 related-issue PRs. Written 2026-11-05. The
 first version (commit 1396fe0534 in culturebotai-claw PR 851) cleaned up
 CellStructureMech PR 3068. Rewritten 2026-11-06 for culturebotai-claw#854,
 #855, #856 and #858, for #867-#870 and #872 from the second review round, and
-for #873-#875 and #880 from the third, and for #893-#895 from the fourth, before
-its reuse on further merged PRs.
+for #873-#875 and #880 from the third, for #893-#895 from the fourth, and for
+#920 and #921 from the fifth, before its reuse on further merged PRs.
 """
 from __future__ import annotations
 
@@ -155,15 +156,20 @@ def tracking_sha(checkout: Path, branch: str) -> str:
     return git(checkout, "rev-parse", "--verify", "--quiet", f"refs/remotes/origin/{branch}", check=False).stdout.strip()
 
 
-def recovery_for(done: list[str], checkout: Path, worktree: Path | None, branch: str, head: str) -> str:
+def recovery_for(done: list[str], checkout: Path, worktree: Path | None, branch: str, head: str, *,
+                 worktree_on_branch: bool, upstream: dict[str, str]) -> str:
+    """The commands that put back exactly what `done` says went, in the order they must run."""
     steps = [f"everything removed was at {head}"]
     if any(step.startswith("deleted local ") for step in done):
         steps.append(f"recreate the branch with `git -C {checkout} branch {branch} {head}`")
     if any(step.startswith("removed worktree ") for step in done):
-        if any(step.startswith("deleted local ") for step in done):
+        if worktree_on_branch:
             steps.append(f"the worktree with `git -C {checkout} worktree add {worktree} {branch}`")
         else:  # the worktree was detached; there is no branch to put it on
             steps.append(f"the worktree with `git -C {checkout} worktree add --detach {worktree} {head}`")
+    if any(step.startswith("removed branch.") for step in done):
+        steps.extend(f"its upstream with `git -C {checkout} config branch.{branch}.{name} {value}`"
+                     for name, value in upstream.items())
     if any(step.startswith("deleted remote ") for step in done):
         steps.append(f"the remote branch with `git -C {checkout} push origin {head}:refs/heads/{branch}`")
     return "; ".join(steps)
@@ -192,6 +198,7 @@ def cleanup(repo: str, number: int, checkout: Path, worktree: Path | None, *, ap
         problems = []
         entries = worktree_entries(checkout)
         removing = worktree is not None and worktree.exists()
+        worktree_on_branch = False
         skipped: list[str] = []
         if worktree is not None and not removing:
             if any(e["path"] == worktree for e in entries):
@@ -204,10 +211,13 @@ def cleanup(repo: str, number: int, checkout: Path, worktree: Path | None, *, ap
                 problems.append(f"{worktree} is not a worktree of {checkout}")
             elif entry["main"]:
                 problems.append(f"{worktree} is the main worktree of {checkout}")
+            elif entry["path"] == checkout:
+                problems.append(f"{worktree} is --checkout itself; name the clone it belongs to")
             elif entry["locked"]:
                 problems.append(f"{worktree} is locked; `git worktree unlock` it first if it should go")
             else:
                 problems += worktree_problems(worktree, head)
+                worktree_on_branch = entry["branch"] == f"refs/heads/{branch}"
         local = git(checkout, "rev-parse", "--verify", "--quiet", f"refs/heads/{branch}",
                     check=False).stdout.strip()
         if local and local != head:
@@ -229,6 +239,9 @@ def cleanup(repo: str, number: int, checkout: Path, worktree: Path | None, *, ap
                     + [f"would delete local {branch} (at {head[:10]})"] * bool(local)
                     + [f"would delete remote {branch} (at {head[:10]})" if remote else f"remote {branch} already gone"]
                     + [f"would delete {tracking} (at {head[:10]})"] * bool(tracked))
+        upstream = {name: git(checkout, "config", "--get", f"branch.{branch}.{name}", check=False).stdout.strip()
+                    for name in ("remote", "merge")}
+        upstream = {name: value for name, value in upstream.items() if value}
         done: list[str] = list(skipped)
         try:
             if removing:
@@ -258,7 +271,9 @@ def cleanup(repo: str, number: int, checkout: Path, worktree: Path | None, *, ap
         except Exception as exc:
             if not any(step.startswith(("removed ", "deleted ")) for step in done):
                 raise
-            raise PartialFailure(done, exc, recovery_for(done, checkout, worktree, branch, head)) from exc
+            raise PartialFailure(done, exc, recovery_for(done, checkout, worktree, branch, head,
+                                                         worktree_on_branch=worktree_on_branch,
+                                                         upstream=upstream)) from exc
     return done
 
 

@@ -493,21 +493,29 @@ def test_a_failure_after_only_the_worktree_went_reports_it(fleet):
         run_cleanup(fleet)
 
     assert caught.value.done == [f"removed worktree {fleet['worktree'].resolve()}"]
-    assert "worktree add" in caught.value.recovery and "branch feature" not in caught.value.recovery
+    assert f"worktree add {fleet['worktree'].resolve()} feature" in caught.value.recovery  # it was on the branch
+    assert "branch feature" not in caught.value.recovery.split("worktree add")[0]
     assert ref(fleet["checkout"], "refs/heads/feature") == fleet["head"]
+    (fleet["checkout"] / ".git" / "refs" / "heads" / "feature.lock").unlink()
+    git(fleet["checkout"], "worktree", "add", "-q", str(fleet["worktree"]), "feature")
+    assert git(fleet["worktree"], "symbolic-ref", "--short", "HEAD") == "feature"
 
 
 def test_a_failure_after_only_the_local_branch_went_reports_it(fleet, monkeypatch, capsys):
     git(fleet["checkout"], "worktree", "remove", str(fleet["worktree"]))
-    git(fleet["checkout"], "config", "--remove-section", "branch.feature")
     reject_pushes(fleet)
 
     assert run_main(fleet, monkeypatch, worktree=None) == 1
 
     out, err = capsys.readouterr()
-    assert "deleted local feature" in out and "no branch.feature config to remove" in out
+    assert "deleted local feature" in out and "removed branch.feature config" in out
     assert "failed after the steps above" in err and f"branch feature {fleet['head']}" in err
+    assert "config branch.feature.remote origin" in err and "config branch.feature.merge refs/heads/main" in err
     assert ref(fleet["checkout"], "refs/heads/feature") is None
+    git(fleet["checkout"], "branch", "feature", fleet["head"])
+    git(fleet["checkout"], "config", "branch.feature.remote", "origin")
+    git(fleet["checkout"], "config", "branch.feature.merge", "refs/heads/main")
+    assert git(fleet["checkout"], "rev-parse", "--abbrev-ref", "feature@{upstream}") == "origin/main"
 
 
 def test_a_detached_worktree_s_recovery_does_not_name_the_branch(fleet):
@@ -525,6 +533,25 @@ def test_a_detached_worktree_s_recovery_does_not_name_the_branch(fleet):
     assert git(fleet["worktree"], "rev-parse", "HEAD") == fleet["head"]
 
 
+def test_a_failure_with_no_config_section_names_no_config_to_restore(fleet, monkeypatch, capsys):
+    git(fleet["checkout"], "worktree", "remove", str(fleet["worktree"]))
+    git(fleet["checkout"], "config", "--remove-section", "branch.feature")
+    reject_pushes(fleet)
+
+    assert run_main(fleet, monkeypatch, worktree=None) == 1
+
+    out, err = capsys.readouterr()
+    assert "no branch.feature config to remove" in out and "config branch." not in err
+
+
+def test_a_linked_checkout_passed_as_its_own_worktree_is_refused(fleet):
+    for apply in (False, True):
+        with pytest.raises(cleanup_script.Refused, match="--checkout itself"):
+            cleanup_script.cleanup(REPO, 1, fleet["worktree"], fleet["worktree"], apply=apply,
+                                   pr_view=merged(fleet), verify_origin=fleet["verify"])
+    assert untouched(fleet)
+
+
 def test_a_missing_config_section_is_reported_as_such(fleet):
     git(fleet["checkout"], "config", "--remove-section", "branch.feature")
 
@@ -539,8 +566,11 @@ def test_a_missing_worktree_path_is_reported_and_a_prunable_one_refused(fleet):
     nowhere = fleet["tmp"] / "nowhere"
 
     plan = run_cleanup(fleet, worktree=nowhere, apply=False)
-
     assert plan[0] == f"worktree {nowhere.resolve()} is not present, skipped"
+
+    done = run_cleanup(fleet, worktree=nowhere)
+
+    assert done[0] == f"worktree {nowhere.resolve()} is not present, skipped"
     prunable = fleet["tmp"] / "prunable"
     git(fleet["checkout"], "worktree", "add", "-q", "--detach", str(prunable), fleet["head"])
     shutil.rmtree(prunable)
