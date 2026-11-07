@@ -1,6 +1,6 @@
 ---
 name: cross-mech-taxon-links
-description: "Judge every taxon a Mech's records cite against what TaxonMech holds: a record, a strain whose species is a record, a rank above species, a taxon outside TaxonMech's domain, an unattested microbe, a retired NCBI id, or an id absent from the pinned taxdump. Runs kg-microbe-links taxa over the slots each Mech declares in the fleet manifest's taxon_links capability. Read-only; reads TaxonMech's checkout and fetches nothing."
+description: "Judge every taxon a Mech's records cite against what TaxonMech holds: a retired NCBI id, a record, a strain whose nearest ancestor is a record, a rank above species, a taxon outside TaxonMech's domain, an unplaced metagenome or unclassified sequence, an unattested microbe, or an id absent from the pinned taxdump. Runs kg-microbe-links taxa over the slots each Mech declares in the fleet manifest's taxon_links capability. Read-only; reads TaxonMech's checkout and fetches nothing."
 category: quality
 requires_database: false
 requires_internet: false
@@ -24,8 +24,9 @@ the dotted slot paths in which its records name a taxon (`[]` visits each list
 element, as in `causal_graphs[].nodes[].protein_examples[].taxon_id`). Those
 paths were measured from the records, not guessed from the schema, so a path
 the schema allows but no record uses is not listed; when a Mech adds one,
-the declaration changes with it. A taxon in prose, in a citation, or in a
-mixed identifier slot is not a link and is not read.
+the declaration changes with it. A taxon in prose or in a citation is not a
+link and is not read; a mixed identifier slot is declared where a taxon in it
+is a link, and its other identifiers are counted, never judged.
 
 ```python
 from kg_microbe_fleet import load_fleet_manifest
@@ -50,7 +51,7 @@ each read costs tens of seconds.
 
 ```bash
 uv run kg-microbe-links taxa --mech habitatmech              # one Mech, JSON on stdout
-uv run kg-microbe-links taxa --mech habitatmech --strict     # exit 1 on retired, absent or malformed
+uv run kg-microbe-links taxa --mech habitatmech --strict     # exit 1 on retired, absent, malformed, or an unreadable record
 uv run kg-microbe-links taxa --all                           # every Mech with an enabled declaration
 uv run kg-microbe-links taxa --mech traitmech --root "$SNAP" # a `git archive origin/main` snapshot
 ```

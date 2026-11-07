@@ -21,11 +21,12 @@ def main(argv: list[str] | None = None) -> int:
         prog="kg-microbe-links",
         description=(
             "Judge every taxon a Mech's records cite, in the slots its manifest "
-            "taxon_links declaration names, against what TaxonMech holds: a "
-            "record, a strain whose species is a record, a rank above species, "
-            "a taxon outside TaxonMech's domain, an unattested microbe, a retired "
-            "id, or an id absent from the pinned taxdump. Reads TaxonMech's "
-            "checkout only; nothing is fetched. Deterministic JSON on stdout."
+            "taxon_links declaration names, against what TaxonMech holds: a retired "
+            "id, a record, a strain whose nearest ancestor is a record, a rank above "
+            "species, a taxon outside TaxonMech's domain, an unplaced metagenome or "
+            "unclassified sequence, an unattested microbe, or an id absent from the "
+            "pinned taxdump. Reads TaxonMech's checkout only; nothing is fetched. "
+            "Deterministic JSON on stdout."
         ),
     )
     parser.add_argument("command", choices=["taxa"])
@@ -66,10 +67,10 @@ def main(argv: list[str] | None = None) -> int:
             root = resolve_mech_root(key, claw_root=CLAW_ROOT, manifest=manifest, explicit=args.root)
             report = collect(key, root, list(mech.record_globs), list(capability.settings.get("slots", ())),
                              index, sample=args.sample)
+            payload = report.as_dict(index)  # may read the taxdump, which can be missing: still exit 2
         except (MechRootError, TaxonLinksError) as exc:
             print(str(exc), file=sys.stderr)
             return 2
-        payload = report.as_dict(index)
         reports[key] = payload
         verdicts = payload["verdicts"]
         print(f"{key}: {payload['records']} records; "

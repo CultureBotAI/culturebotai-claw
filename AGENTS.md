@@ -424,7 +424,7 @@ TaxonMech), `unplaced` (a metagenome, unclassified sequence or vector under no
 domain), `unattested_microbial` (a bacterium, archaeon, fungus or protist no
 TaxonMech source attests, the only kind a scope change could admit) and
 `absent` (not in the pinned taxdump); `--strict` fails on retired, absent and
-malformed values. A value in a declared slot that is
+malformed values and on a record that will not parse. A value in a declared slot that is
 not an `NCBITaxon` CURIE is another identifier, counted, never a finding.
 Only the declared slots are read, because a taxon in prose or in a citation
 is not a link; the slots were measured from the records and are listed in

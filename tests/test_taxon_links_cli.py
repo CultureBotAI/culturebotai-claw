@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import io
 import json
+import tarfile
 from pathlib import Path
 
 import pytest
@@ -65,6 +67,40 @@ def test_strict_fails_on_a_retired_id_and_passes_without_one(tmp_path, taxonmech
     assert main(["taxa", "--mech", "dufmech", "--root", str(stale), "--taxonmech-root", str(taxonmech), "--strict"]) == 1
     assert main(["taxa", "--mech", "dufmech", "--root", str(clean), "--taxonmech-root", str(taxonmech), "--strict"]) == 0
 
+
+@pytest.mark.parametrize("value", ["NCBITaxon:424242", "NCBITaxon:bogus"])
+def test_strict_fails_on_an_absent_or_malformed_id(tmp_path, taxonmech, value):  # noqa: F811
+    root = _mech(tmp_path, "dufmech", {"data/families/a.yaml": {"causal_graphs": [{"taxon": value}]}})
+    assert main(["taxa", "--mech", "dufmech", "--root", str(root), "--taxonmech-root", str(taxonmech), "--strict"]) == 1
+    assert main(["taxa", "--mech", "dufmech", "--root", str(root), "--taxonmech-root", str(taxonmech)]) == 0
+
+
+def test_an_unusable_mech_root_is_exit_two(tmp_path, taxonmech, capsys):  # noqa: F811
+    assert main(["taxa", "--mech", "dufmech", "--root", str(tmp_path / "nowhere"), "--taxonmech-root", str(taxonmech)]) == 2
+    assert "not a directory" in capsys.readouterr().err
+
+
+def test_a_taxdump_needed_only_for_names_that_is_missing_is_exit_two(tmp_path, taxonmech, capsys):  # noqa: F811
+    """names.dmp is read only in as_dict, for a strain outside the inventory; a tarball without it is exit 2.
+
+    A missing conf file or nodes.dmp fails inside collect, which cannot tell where the guard ends.
+    """
+    tar_path = taxonmech / "data" / "source_snapshots" / "taxdump.tar.gz"
+    with tarfile.open(tar_path, "r:gz") as tar:
+        kept = [(info, tar.extractfile(info).read()) for info in tar.getmembers() if info.name != "names.dmp"]
+    with tarfile.open(tar_path, "w:gz") as tar:
+        for info, payload in kept:
+            tar.addfile(info, io.BytesIO(payload))
+    root = _mech(tmp_path, "dufmech", {"data/families/a.yaml": {"causal_graphs": [{"taxon": "NCBITaxon:511145"}]}})
+    assert main(["taxa", "--mech", "dufmech", "--root", str(root), "--taxonmech-root", str(taxonmech)]) == 2
+    assert "names.dmp" in capsys.readouterr().err
+
+
+def test_a_taxdump_that_is_not_a_tarball_is_exit_two(tmp_path, taxonmech, capsys):  # noqa: F811
+    (taxonmech / "data" / "source_snapshots" / "taxdump.tar.gz").write_bytes(b"not a tarball")
+    root = _mech(tmp_path, "dufmech", {"data/families/a.yaml": {"causal_graphs": [{"taxon": "NCBITaxon:511145"}]}})
+    assert main(["taxa", "--mech", "dufmech", "--root", str(root), "--taxonmech-root", str(taxonmech)]) == 2
+    assert "not a gzipped tar" in capsys.readouterr().err
 
 def test_strict_fails_when_the_only_record_will_not_parse(tmp_path, taxonmech):  # noqa: F811
     root = tmp_path / "dufmech"

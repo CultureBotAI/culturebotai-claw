@@ -49,6 +49,7 @@ TAXA = {
     10665: ("Enterobacteria phage T4", "species", 10239),
     777: ("Escherichia coli (old name)", "species", 561),
     999: ("marine metagenome", "species", 1),
+    998: ("unclassified sequences", "no rank", 1),
 }
 SCOPE = {562, 1280, 4932, 777}  # 777 is also retired: TaxonMech's scope keeps some merged ids
 INVENTORY = {1, 131567, 2, 2759, 543, 561, 562, 1279, 1280, 4751, 4930, 4932}
@@ -149,10 +150,20 @@ def test_a_retired_id_that_the_scope_still_lists_is_retired_not_a_record(index):
     assert (judgement.current, judgement.current_verdict) == (562, links.Verdict.RECORD)
 
 
-def test_a_metagenome_under_no_domain_is_unplaced(index):
+def test_a_metagenome_under_no_domain_is_unplaced_but_a_rank_above_species_there_is_above_species(index):
     judgement = judge(index, "NCBITaxon:999")
     assert judgement.verdict is links.Verdict.UNPLACED
     assert judgement.domain == "other"
+    assert judge(index, "NCBITaxon:998").verdict is links.Verdict.ABOVE_SPECIES
+
+
+def test_the_merge_table_is_the_only_merge_source(taxonmech):
+    """A header-only TSV means no merges, before and after the taxdump is read: a verdict never changes."""
+    (taxonmech / "data" / "raw" / "ncbi_merged_ids.tsv").write_text("old_taxon_id\tcurrent_taxon_id\n", encoding="utf-8")
+    index = links.TaxonIndex(taxonmech)
+    assert judge(index, "NCBITaxon:46170").verdict is links.Verdict.ABSENT
+    judge(index, "NCBITaxon:511145")  # reads the taxdump's nodes
+    assert judge(index, "NCBITaxon:46170").verdict is links.Verdict.ABSENT
 
 
 def test_an_unknown_id_is_absent(index):
@@ -265,6 +276,25 @@ def test_findings_are_sorted_and_resolvable_is_most_cited_first(tmp_path, index)
     assert [r["taxon"] for r in report["resolvable"]] == ["NCBITaxon:559292", "NCBITaxon:511145"]
 
 
+def test_unattested_taxa_are_listed_most_cited_first(tmp_path, index):
+    root = _corpus(tmp_path, {"data/a.yaml": {"t": [{"id": "NCBITaxon:1423"}, {"id": "NCBITaxon:5478"}, {"id": "NCBITaxon:5478"}]}})
+
+    report = links.collect("m", root, ["data/**/*.yaml"], ["t[].id"], index).as_dict(index)
+
+    assert [r["taxon"] for r in report["unattested_microbial"]] == ["NCBITaxon:5478", "NCBITaxon:1423"]
+
+
+def test_findings_need_no_taxdump_names(tmp_path, taxonmech, monkeypatch):
+    """A corpus whose only out-of-inventory taxon is a retired id never opens the taxdump."""
+    index = links.TaxonIndex(taxonmech)
+    (taxonmech / "conf" / "ncbi_taxdump.yaml").unlink()
+    root = _corpus(tmp_path, {"data/a.yaml": {"taxon_id": "NCBITaxon:46170"}})
+
+    report = links.collect("m", root, ["data/**/*.yaml"], ["taxon_id"], index).as_dict(index)
+
+    assert report["findings"][0]["verdict"] == "retired"
+
+
 def test_a_null_value_is_neither_a_link_nor_a_finding(tmp_path, index):
     root = _corpus(tmp_path, {"data/a.yaml": {"taxon_id": None, "organisms": [{"term": {"id": None}}]}})
 
@@ -303,7 +333,7 @@ def test_collect_refuses_an_unusable_corpus_before_walking(tmp_path, index):
 
 def test_the_report_is_the_same_whatever_order_the_files_arrive_in(tmp_path, index):
     records = {f"data/{n}.yaml": {"taxon_id": f"NCBITaxon:{t}"} for n, t in
-               (("z", 562), ("a", 511145), ("m", 46170), ("k", 9606))}
+               (("z", 562), ("a", 511145), ("m", 46170), ("k", 9606), ("u", 1423), ("v", 5478))}
     first = links.collect("m", _corpus(tmp_path / "1", records), ["data/**/*.yaml"], ["taxon_id"], index).as_dict(index)
     reversed_records = dict(reversed(list(records.items())))
     second = links.collect("m", _corpus(tmp_path / "2", reversed_records), ["data/**/*.yaml"], ["taxon_id"],

@@ -22,7 +22,8 @@ Each cited `NCBITaxon` CURIE gets one verdict:
 - `malformed`: a value that is not an `NCBITaxon:<digits>` CURIE.
 
 Everything is read from TaxonMech's checkout: `curation/seed_scope.tsv` (the
-scope), `data/raw/ncbi_merged_ids.tsv` (merges), `data/raw/ncbitaxon_taxa.tsv`
+scope), `data/raw/ncbi_merged_ids.tsv` (merges; the only merge source, so a
+verdict cannot change within a process), `data/raw/ncbitaxon_taxa.tsv`
 (rank and parent for every attested taxon) and, only for taxa outside that
 inventory, the NCBI taxdump snapshot `conf/ncbi_taxdump.yaml` pins. Nothing is
 fetched, so the verdict is the same on a laptop and in CI. The taxdump's nodes
@@ -88,8 +89,15 @@ class Judgement:
 
 
 def _dmp_rows(tar_path: Path, member: str) -> Iterator[list[str]]:
-    with tarfile.open(tar_path, "r:gz") as tar:
-        handle = tar.extractfile(member)
+    try:
+        tar = tarfile.open(tar_path, "r:gz")
+    except tarfile.TarError as exc:
+        raise TaxonLinksError(f"{tar_path} is not a gzipped tar: {exc}") from exc
+    with tar:
+        try:
+            handle = tar.extractfile(member)  # KeyError for an absent name; None for a non-file member
+        except KeyError:
+            handle = None
         if handle is None:
             raise TaxonLinksError(f"{tar_path} has no member {member}")
         for raw in handle:
@@ -148,8 +156,6 @@ class TaxonIndex:
             if not path.is_file():
                 raise TaxonLinksError(f"TaxonMech's pinned taxdump {path} is not present")
             self._nodes = {int(f[0]): (f[2], int(f[1])) for f in _dmp_rows(path, "nodes.dmp")}
-            if not self.merged:
-                self.merged = {int(old): int(new) for old, new in _dmp_rows(path, "merged.dmp")}
         return self._nodes
 
     def node(self, taxon: int) -> tuple[str, int] | None:
@@ -262,8 +268,9 @@ class TaxonLinksReport:
     taxa_by_verdict: dict[str, set] = field(default_factory=lambda: defaultdict(set))
 
     def as_dict(self, index: TaxonIndex) -> dict:
-        named = index.names(sorted(set(self.resolvable) | set(self.resolvable_ancestor.values())
-                                   | set(self.unattested) | {f["taxon"] for f in self.findings if f.get("taxon")}))
+        # Findings carry no name, so their taxa are not looked up: a corpus whose only
+        # out-of-inventory taxa are retired ids never needs the taxdump's names.
+        named = index.names(sorted(set(self.resolvable) | set(self.resolvable_ancestor.values()) | set(self.unattested)))
         return {
             "mech": self.mech,
             "taxonmech_root": self.taxonmech_root,

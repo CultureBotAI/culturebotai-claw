@@ -6,10 +6,11 @@ where the two sides differ, and mutation is how that is shown. Each mutant
 below undoes one rule in src/kg_microbe_links/taxa.py or __main__.py; the
 named test must fail with the mutant applied, and the two test files must
 pass without it. The list includes every mutant the first review of PR 897
-(culturebotai-claw#910) found surviving.
+(culturebotai-claw#910) found surviving, and those the second (#939-#944) did.
 Inputs: none; run from the claw checkout or worktree holding the script.
 Outputs: one line per mutant (KILLED or SURVIVED) and a nonzero exit if any
-survives, a mutant does not parse, or an unmutated test file fails. Each
+survives, a mutant does not parse, a named test cannot be collected, or an
+unmutated test file fails. Each
 source file is restored after every mutant, also on error. Each run is a
 fresh Python process running pytest.
 Serves: culturebotai-claw PR 897. Written 2026-11-07.
@@ -36,7 +37,7 @@ MUTANTS = [
      f"{UNIT}::test_a_strain_resolves_to_its_scoped_species[511145-562]"),
     (TAXA, "genus not above species", 'if rank != "species" and not below_species:', "if False:",
      f"{UNIT}::test_a_genus_or_family_is_above_species[561]"),
-    (TAXA, "metagenome not unplaced", 'if domain == "other":', "if False:", f"{UNIT}::test_a_metagenome_under_no_domain_is_unplaced"),
+    (TAXA, "metagenome not unplaced", 'if domain == "other":', "if False:", f"{UNIT}::test_a_metagenome_under_no_domain_is_unplaced_but_a_rank_above_species_there_is_above_species"),
     (TAXA, "protist outside the domain", "(domain == \"Eukaryota\" and kingdom not in NON_MICROBIAL_KINGDOMS)", "False",
      f"{UNIT}::test_an_unscoped_fungus_or_protist_is_unattested_but_an_animal_and_a_virus_are_outside_the_domain"),
     (TAXA, "animal unattested", 'NON_MICROBIAL_KINGDOMS = {"Metazoa", "Viridiplantae"}', "NON_MICROBIAL_KINGDOMS = set()",
@@ -69,10 +70,35 @@ MUTANTS = [
      f"{CLI_TESTS}::test_strict_fails_when_the_only_record_will_not_parse"),
     (CLI, "strict ignores findings", "    return 1 if args.strict and blocking else 0", "    return 0",
      f"{CLI_TESTS}::test_strict_fails_on_a_retired_id_and_passes_without_one"),
+    (CLI, "strict ignores absent", 'BLOCKING = {Verdict.RETIRED.value, Verdict.ABSENT.value, Verdict.MALFORMED.value}',
+     'BLOCKING = {Verdict.RETIRED.value, Verdict.MALFORMED.value}',
+     f"{CLI_TESTS}::test_strict_fails_on_an_absent_or_malformed_id[NCBITaxon:424242]"),
+    (CLI, "strict ignores malformed", 'BLOCKING = {Verdict.RETIRED.value, Verdict.ABSENT.value, Verdict.MALFORMED.value}',
+     'BLOCKING = {Verdict.RETIRED.value, Verdict.ABSENT.value}',
+     f"{CLI_TESTS}::test_strict_fails_on_an_absent_or_malformed_id[NCBITaxon:bogus]"),
+    (CLI, "per-Mech error exits 0", "            return 2\n        reports[key] = payload",
+     "            return 0\n        reports[key] = payload",
+     f"{CLI_TESTS}::test_an_unusable_mech_root_is_exit_two"),
+    (CLI, "as_dict outside the guard",
+     "            payload = report.as_dict(index)  # may read the taxdump, which can be missing: still exit 2\n        except (MechRootError, TaxonLinksError) as exc:\n            print(str(exc), file=sys.stderr)\n            return 2\n        reports[key] = payload",
+     "        except (MechRootError, TaxonLinksError) as exc:\n            print(str(exc), file=sys.stderr)\n            return 2\n        payload = report.as_dict(index)\n        reports[key] = payload",
+     f"{CLI_TESTS}::test_a_taxdump_needed_only_for_names_that_is_missing_is_exit_two"),
+    (TAXA, "unplaced before above_species", '        if rank != "species" and not below_species:\n            return Judgement(Verdict.ABOVE_SPECIES, taxon, rank=rank, domain=domain, kingdom=kingdom)\n        if domain == "other":\n            return Judgement(Verdict.UNPLACED, taxon, rank=rank, domain=domain, kingdom=kingdom)\n',
+     '        if domain == "other":\n            return Judgement(Verdict.UNPLACED, taxon, rank=rank, domain=domain, kingdom=kingdom)\n        if rank != "species" and not below_species:\n            return Judgement(Verdict.ABOVE_SPECIES, taxon, rank=rank, domain=domain, kingdom=kingdom)\n',
+     f"{UNIT}::test_a_metagenome_under_no_domain_is_unplaced_but_a_rank_above_species_there_is_above_species"),
+    (TAXA, "unattested unsorted", "for t, n in sorted(self.unattested.items(), key=lambda kv: (-kv[1], kv[0]))]",
+     "for t, n in self.unattested.items()]", f"{UNIT}::test_unattested_taxa_are_listed_most_cited_first"),
+    (TAXA, "findings' taxa looked up", "| set(self.unattested)))", "| set(self.unattested) | {f['taxon'] for f in self.findings if f.get('taxon')}))",
+     f"{UNIT}::test_findings_need_no_taxdump_names"),
     (CLI, "--all dumps the last Mech only", "json.dump(reports if args.all else reports.get(keys[0], {}),",
      "json.dump(reports.get(keys[-1], {}),", f"{CLI_TESTS}::test_all_reports_every_enabled_mech_and_skips_the_rest"),
     (CLI, "--all stops at a non-enabled Mech", "            if not args.all:\n                print(", "            if True:\n                print(",
      f"{CLI_TESTS}::test_all_reports_every_enabled_mech_and_skips_the_rest"),
+    (TAXA, "absent taxdump member is a KeyError", "        try:\n            handle = tar.extractfile(member)  # KeyError for an absent name; None for a non-file member\n        except KeyError:\n            handle = None\n",
+     "        handle = tar.extractfile(member)\n", f"{CLI_TESTS}::test_a_taxdump_needed_only_for_names_that_is_missing_is_exit_two"),
+    (TAXA, "corrupt taxdump is a TarError", "    except tarfile.TarError as exc:\n        raise TaxonLinksError(f\"{tar_path} is not a gzipped tar: {exc}\") from exc\n",
+     "    except ValueError as exc:\n        raise TaxonLinksError(f\"{tar_path} is not a gzipped tar: {exc}\") from exc\n",
+     f"{CLI_TESTS}::test_a_taxdump_that_is_not_a_tarball_is_exit_two"),
     (CLI, "--sample dropped", "index, sample=args.sample)", "index)", f"{CLI_TESTS}::test_sample_is_honoured_and_recorded"),
     (CLI, "missing TaxonMech file not exit 2", "    except (MechRootError, TaxonLinksError) as exc:\n        print(str(exc), file=sys.stderr)\n        return 2\n\n    keys",
      "    except (MechRootError, TaxonLinksError) as exc:\n        print(str(exc), file=sys.stderr)\n        return 0\n\n    keys",
@@ -106,9 +132,13 @@ def main() -> int:
                 return 1
             (ROOT / path).write_text(mutated, encoding="utf-8")
             try:
-                killed = pytest(test) != 0
+                rc = pytest(test)
             finally:
                 (ROOT / path).write_text(original, encoding="utf-8")
+            if rc not in (0, 1):
+                print(f"{name}: pytest exited {rc} for {test}, which is neither a pass nor a failure")
+                return 1
+            killed = rc == 1
             survived += not killed
             print(f"{'KILLED  ' if killed else 'SURVIVED'} {name} ({test.split('::')[1]})")
     finally:

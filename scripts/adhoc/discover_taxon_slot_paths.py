@@ -16,8 +16,8 @@ Inputs: claw's .env (set -a; . ./.env) for the Mech roots; --out DIR.
 Outputs: DIR/taxon_slot_paths.tsv (mech, path, kind, records, occurrences,
 distinct taxa) and DIR/taxon_slot_paths.md with the proposed `slots:` list per
 Mech. Read-only; writes only under DIR.
-Serves: the taxon_links capability (Phase 1 of
-docs/reviews/2026-11-06-cross-mech-taxon-links.md). Written 2026-11-06.
+Serves: the taxon_links capability, Phase 1 of the cross-Mech taxon-link
+assessment in culturebotai-claw PR 881. Written 2026-11-06.
 """
 from __future__ import annotations
 
