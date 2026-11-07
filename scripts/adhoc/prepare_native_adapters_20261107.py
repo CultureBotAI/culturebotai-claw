@@ -28,6 +28,7 @@ def main() -> None:
     parser.add_argument("--base", help="Explicit new-worktree base; defaults to the validated root HEAD")
     parser.add_argument("--fetch", action="store_true", help="Fetch origin/main under the repository lock before creating the worktree")
     parser.add_argument("--create", action="store_true")
+    parser.add_argument("--hold", action="store_true", help="Hold an edit lease until stdin says release")
     parser.add_argument("--locks-dir", type=Path, required=True)
     parser.add_argument("--run", nargs=argparse.REMAINDER)
     args = parser.parse_args()
@@ -73,12 +74,18 @@ def main() -> None:
             if created.active_branch.name != args.branch or created.head.commit.hexsha != base:
                 raise ValueError("Created worktree failed branch/base verification")
             print(f"Created {created.working_tree_dir} on {created.active_branch.name}")
-    if args.run:
+    if args.run or args.hold:
         if repository.active_branch.name in {"main", "master"}:
             raise ValueError("Adapter commands require a feature branch")
         with manager.lock(args.repository, "native_adapter_command"):
             target.open()
-            subprocess.run(args.run, cwd=target.path, env=environment, check=True)
+            if args.hold:
+                print(f"Edit lease held for {args.repository}", flush=True)
+                for line in sys.stdin:
+                    if line.strip() == "release":
+                        break
+            else:
+                subprocess.run(args.run, cwd=target.path, env=environment, check=True)
 
 
 if __name__ == "__main__":

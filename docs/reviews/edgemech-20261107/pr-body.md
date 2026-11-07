@@ -9,8 +9,8 @@ future embedding rollout metadata without running any embeddings. Companion
 site admission is CultureBotAI/CultureBotAI.github.io#541. Neither PR is ready
 to merge while #960 remains unresolved.
 
-Shared artifact/native assertion contracts have been extracted into a separate
-contracts-only PR based directly on current main. Downstream implementations
+Shared artifact/native assertion contracts have been extracted into #962,
+a contracts-only PR based directly on current main. Downstream implementations
 retain the reviewed immutable source pin
 `1b5391d083ba85ac94e5279c3cba25ac4fde243c`; existing occurrence identities and
 scientific RecordReview authority remain unchanged.
