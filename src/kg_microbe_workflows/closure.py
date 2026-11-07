@@ -11,6 +11,13 @@ PR_FIELDS = {"number", "head_sha", "branch", "base"}
 MEMBER_FIELDS = PR_FIELDS | {"merge_commit_sha", "review", "validation", "cleanup"}
 
 
+def receipt_path(value: Any) -> bool:
+    return (isinstance(value, str) and bool(value) and "\\" not in value
+            and not any(ord(char) < 32 for char in value)
+            and not PurePosixPath(value).is_absolute()
+            and not any(part in {"", ".", ".."} for part in value.split("/")))
+
+
 def multi_pr_members(receipt: dict[str, Any]) -> list[dict[str, Any]]:
     """Return checked members, or [] for an unchanged single-PR receipt.
 
@@ -66,6 +73,20 @@ def multi_pr_members(receipt: dict[str, Any]) -> list[dict[str, Any]]:
             not isinstance(issue, dict) or type(issue.get("pr_number")) is not int
             or issue["pr_number"] not in numbers for issue in issues):
         raise ValueError("every issue must name its exact ordered PR")
+    for issue in issues:
+        superseded = issue.get("superseded_paths", [])
+        if (not isinstance(superseded, list) or len(superseded) > 256
+                or ("superseded_paths" in issue and not superseded)):
+            raise ValueError("superseded paths require 1..256 exact entries when present")
+        seen_paths: set[str] = set()
+        for item in superseded:
+            if (not isinstance(item, dict) or set(item) != {"path", "pr_number", "commit_sha"}
+                    or not receipt_path(item["path"]) or item["path"] in seen_paths
+                    or type(item["pr_number"]) is not int or item["pr_number"] != issue["pr_number"]
+                    or not isinstance(item["commit_sha"], str) or not SHA.fullmatch(item["commit_sha"])
+                    or item["commit_sha"] == issue.get("fix_commit_sha")):
+                raise ValueError("invalid, repeated or self-referential same-PR fix supersession")
+            seen_paths.add(item["path"])
     attributions = receipt.get("evidence_attributions")
     if not isinstance(attributions, list):
         raise ValueError("ordered PRs require explicit evidence attributions")
@@ -74,8 +95,7 @@ def multi_pr_members(receipt: dict[str, Any]) -> list[dict[str, Any]]:
         if not isinstance(item, dict) or set(item) != {"path", "sha256", "pr_number", "commit_sha"}:
             raise ValueError("evidence attribution fields are incomplete or unknown")
         path = item["path"]
-        if (not isinstance(path, str) or not path or path in paths or "\\" in path or "\x00" in path
-                or PurePosixPath(path).is_absolute() or any(part in {"", ".", ".."} for part in path.split("/"))
+        if (not receipt_path(path) or path in paths
                 or type(item["pr_number"]) is not int or item["pr_number"] not in numbers
                 or not isinstance(item["sha256"], str) or not DIGEST.fullmatch(item["sha256"])
                 or not isinstance(item["commit_sha"], str) or not SHA.fullmatch(item["commit_sha"])):

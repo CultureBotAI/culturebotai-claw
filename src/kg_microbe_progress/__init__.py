@@ -244,6 +244,11 @@ def _receipt(directory: Path, record: dict[str, Any], ledger: dict[str, Any]) ->
 def _closure(directory: Path, record: dict[str, Any], ledger: dict[str, Any],
              github: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     receipt = _receipt(directory, record, ledger)
+    from kg_microbe_workflows.closure import multi_pr_members
+    try:
+        members = multi_pr_members(receipt)
+    except ValueError as error:
+        raise ProgressError(str(error)) from error
     verification = record.get("verification", {})
     outcome = verification.get("status")
     if outcome not in {"merged", "no_changes"}:
@@ -279,11 +284,6 @@ def _closure(directory: Path, record: dict[str, Any], ledger: dict[str, Any],
             "observed_at": verification["verified_at"], "source": "supervisor_closure",
         }
         observations.append(observation)
-        from kg_microbe_workflows.closure import multi_pr_members
-        try:
-            members = multi_pr_members(receipt)
-        except ValueError as error:
-            raise ProgressError(str(error)) from error
         if members:
             proofs = verification.get("prs")
             if not isinstance(proofs, list) or len(proofs) != len(members):
@@ -307,6 +307,8 @@ def _closure(directory: Path, record: dict[str, Any], ledger: dict[str, Any],
             raise ProgressError("single closure contains unexpected ordered proofs")
     elif receipt.get("status") != "no_changes" or receipt.get("pr") is not None:
         raise ProgressError("no-change closure contains a PR")
+    elif "prs" in verification:
+        raise ProgressError("no-change closure contains ordered proofs")
     return event, observations
 
 

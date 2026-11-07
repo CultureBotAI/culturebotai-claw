@@ -1310,7 +1310,10 @@ def closure_time(value, label: str) -> datetime:
         raise SupervisorError(f"invalid {label} timestamp") from error
 
 
-def commit_changes(root: str, commit: str, runner) -> dict[str, tuple[str, str]]:
+GitEntry = tuple[str, str] | None
+
+
+def commit_changes(root: str, commit: str, runner) -> dict[str, tuple[GitEntry, GitEntry]]:
     """Complete non-merge, non-rename content changes at an exact commit.
 
     A merge's combined diff can omit paths; rename/copy attribution has multiple
@@ -1333,18 +1336,26 @@ def commit_changes(root: str, commit: str, runner) -> dict[str, tuple[str, str]]
                 or any(part in {"", ".", ".."} for part in path.split("/"))
                 or any(ord(char) < 32 for char in path)):
             raise SupervisorError("ambiguous rename, merge, mode or path in producer changes")
-        changes[path] = (match[3], match[4])
+        old = None if match[1] == "000000" and match[3] == "0" * 40 else (match[1], match[3])
+        new = None if match[2] == "000000" and match[4] == "0" * 40 else (match[2], match[4])
+        if ((old is not None and (old[0] == "000000" or old[1] == "0" * 40))
+                or (new is not None and (new[0] == "000000" or new[1] == "0" * 40))
+                or (match[5] == "A" and (old is not None or new is None))
+                or (match[5] == "D" and (old is None or new is not None))
+                or (match[5] == "M" and (old is None or new is None))):
+            raise SupervisorError("producer entry modes, blobs and change kind disagree")
+        changes[path] = (old, new)
     return changes
 
 
-def tree_blob(root: str, head: str, path: str, runner) -> str | None:
+def tree_entry(root: str, head: str, path: str, runner) -> GitEntry:
     raw = runner(["git", "-C", root, "ls-tree", "-z", head, "--", path]).stdout
     if not raw:
         return None
-    match = re.fullmatch(r"(?:100644|100755) blob ([0-9a-f]{40})\t" + re.escape(path) + "\x00", raw)
+    match = re.fullmatch(r"(100644|100755) blob ([0-9a-f]{40})\t" + re.escape(path) + "\x00", raw)
     if not match:
         raise SupervisorError("exact regular-file blob unavailable")
-    return match[1]
+    return match[1], match[2]
 
 
 def verify_ordered_prs(receipt: dict, ledger: dict, target: dict, runtime: Path | None,
@@ -1419,21 +1430,58 @@ def verify_ordered_prs(receipt: dict, ledger: dict, target: dict, runtime: Path 
             raise SupervisorError("evidence producer is not in its attributed PR")
         if commit not in changed:
             changed[commit] = commit_changes(root, commit, read)
-        blobs = changed[commit].get(path)
-        final_blob = tree_blob(root, final, path, read)
-        if not blobs or blobs[0] == blobs[1] or blobs[1] == "0" * 40 or blobs[1] != final_blob:
+        entries = changed[commit].get(path)
+        final_entry = tree_entry(root, final, path, read)
+        if (not entries or entries[1] is None or entries[1] != final_entry
+                or (entries[0] is not None and entries[0][1] == entries[1][1])):
             raise SupervisorError("evidence was not produced with the final bytes by its attributed commit")
+    member_by_number = {item["number"]: item for item in members}
+    member_order = {item["number"]: index for index, item in enumerate(members)}
+    evidence_by_path = {item["path"]: item for item in receipt["evidence_attributions"]}
+    attributed_fixes = {(item["pr_number"], item["fix_commit_sha"]) for item in receipt["issues"]}
     for issue in receipt["issues"]:
         commit = issue["fix_commit_sha"]
         if commit not in changed:
             changed[commit] = commit_changes(root, commit, read)
         changes = changed[commit]
         if not changes or not any(old != new for old, new in changes.values()):
-            raise SupervisorError("issue fix commit has no content changes")
-        member = next(item for item in members if item["number"] == issue["pr_number"])
-        for path in changes:
-            if path not in expected and tree_blob(root, member["head_sha"], path, read) != tree_blob(root, final, path, read):
-                raise SupervisorError("final integration head no longer retains an earlier reviewed fix")
+            raise SupervisorError("issue fix commit has no entry changes")
+        member = member_by_number[issue["pr_number"]]
+        superseded = {item["path"]: item for item in issue.get("superseded_paths", [])}
+        if not superseded.keys() <= changes.keys() or superseded.keys() & expected.keys():
+            raise SupervisorError("fix supersession must name original non-evidence changed paths")
+        for path, (old, produced) in changes.items():
+            if path in expected:
+                producer = evidence_by_path[path]
+                successor = producer["commit_sha"]
+                if producer["pr_number"] == issue["pr_number"]:
+                    ancestor = commit
+                elif member_order[producer["pr_number"]] > member_order[issue["pr_number"]]:
+                    ancestor = member["merge_commit_sha"]
+                else:
+                    raise SupervisorError("evidence supersession precedes its affected fix")
+                if read(["git", "-C", root, "merge-base", "--is-ancestor", ancestor, successor], check=False).returncode:
+                    raise SupervisorError("evidence producer does not descend from its affected fix")
+                continue
+            retained = produced
+            if path in superseded:
+                successor = superseded[path]
+                successor_sha = successor["commit_sha"]
+                if ((successor["pr_number"], successor_sha) not in attributed_fixes
+                        or successor["pr_number"] != issue["pr_number"] or successor_sha == commit
+                        or read(["git", "-C", root, "merge-base", "--is-ancestor", commit, successor_sha], check=False).returncode):
+                    raise SupervisorError("fix successor must be another descendant attributed fix in the same PR")
+                if successor_sha not in changed:
+                    changed[successor_sha] = commit_changes(root, successor_sha, read)
+                successor_change = changed[successor_sha].get(path)
+                if (old == produced or not successor_change or successor_change[0] == successor_change[1]
+                        or successor_change[1] == produced):
+                    raise SupervisorError("fix supersession is unchanged, unrelated or unnecessary")
+                retained = successor_change[1]
+            if tree_entry(root, member["head_sha"], path, read) != retained:
+                raise SupervisorError("member reviewed head does not retain the attributed fix producer entry")
+            if tree_entry(root, final, path, read) != retained:
+                raise SupervisorError("final integration head no longer retains an earlier reviewed fix entry")
     return {**proofs[-1], "prs": proofs, "evidence_attributions": copy.deepcopy(receipt["evidence_attributions"])}
 
 

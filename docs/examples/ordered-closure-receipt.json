@@ -106,6 +106,19 @@
       "number": 23,
       "disposition": "addressed",
       "fix_commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "pr_number": 41,
+      "superseded_paths": [
+        {
+          "path": "reviews/structured/example/review.yaml",
+          "pr_number": 41,
+          "commit_sha": "1111111111111111111111111111111111111111"
+        }
+      ]
+    },
+    {
+      "number": 24,
+      "disposition": "addressed",
+      "fix_commit_sha": "1111111111111111111111111111111111111111",
       "pr_number": 41
     }
   ],

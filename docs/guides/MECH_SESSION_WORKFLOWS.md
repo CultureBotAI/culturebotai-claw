@@ -456,12 +456,31 @@ refused rather than treated as complete.
 
 Every earlier merge commit must be an ancestor of the following reviewed head.
 For squash merges this uses the merge commit, not the original feature commit.
-Paths changed by an issue fix must retain their bytes from that member's
-reviewed head at the final head; this also checks deletions. Current-stage
-evidence may change only through the explicit verified final producer above.
-An overlapping later code change therefore needs a freshly reviewed closure
-arrangement instead of an inferred waiver. Exact content reintroduction is
-accepted; a final reverted fix is refused. Producer/fix merge commits,
+Every changed path of an issue fix must retain the entry actually produced by
+that fix commit at both its member's reviewed head and the final head. Entries
+include the blob and executable mode, or exact absence for deletions. Comparing
+only the two reviewed heads would incorrectly accept a fix reverted before
+review. Exact content and mode reintroduction is accepted; a reverted fix is
+refused even if the two reviewed trees agree.
+
+A subsequent issue fix in the **same PR** may deliberately replace a path from
+an earlier fix. Declare each necessary replacement in that earlier issue's
+optional `superseded_paths` list, with one to 256 exact entries containing only
+`path`, `pr_number`, and `commit_sha`. The successor must itself be another
+independently verified attributed issue-fix commit in this receipt, strictly
+descend from the original fix, and actually change that original changed path.
+Its produced entry must survive at both the member and final reviewed heads.
+Unknown paths, duplicate or self references, unnecessary or unchanged
+replacements, unlisted mismatches, and cross-PR code replacements are refused.
+No path prefix grants an exemption. DUFMech's PR365 is the motivating example:
+its eight structured review files are explicitly replaced by the later fix
+for issue366, while the scientific-data fixes retain their original entries.
+
+Current-stage evidence uses only the separate `evidence_attributions` mechanism.
+Its producer must be at or after the affected fix in the same PR, or belong to
+a later ordered PR and descend from the affected PR's verified merge. An
+unrelated earlier producer cannot waive a lost fix. This permits PR367's exact
+manifest repair without attributing PR365's issue fixes to it. Producer/fix merge commits,
 rename/copy diffs, symlinks, and submodules are refused because their attribution
 is ambiguous under this deliberately bounded format.
 

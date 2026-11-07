@@ -26,6 +26,8 @@ from kg_microbe_workflows.closure import multi_pr_members
 
 SOURCE = json.loads((Path(__file__).parent / "fixtures/duf_c3s5_multi_pr.json").read_text())
 FIRST, LAST = SOURCE["prs"]
+EARLY_FIX = FIRST["fix_commits"]["361"]
+LATER_FIX = FIRST["fix_commits"]["366"]
 ZERO = "0" * 40
 
 
@@ -44,6 +46,7 @@ class OrderedRemote:
         self.local_fail = set()
         self.page_headers = {}
         self.trees = {}
+        self.modes = {}
         self.current_tree = {str(path.relative_to(state.repo)): self.blob(path.read_bytes())
                              for path in state.repo.rglob("*") if path.is_file()}
         for source in SOURCE["prs"]:
@@ -65,6 +68,13 @@ class OrderedRemote:
             self.add_change(fix, "src/fixed.py", ZERO, self.blob(b"correct code\n"))
             for tree in self.trees.values():
                 tree["src/fixed.py"] = self.blob(b"correct code\n")
+        for path in SOURCE["overlapping_review_paths"]:
+            earlier = self.blob((path + " original reviewed fix\n").encode())
+            later = self.blob((path + " successor issue-fix review\n").encode())
+            self.add_change(EARLY_FIX, path, ZERO, earlier)
+            self.add_change(LATER_FIX, path, earlier, later)
+            for tree in self.trees.values():
+                tree[path] = later
         # The first PR contains the old manifest bytes, so the final manifest
         # cannot truthfully be attributed to it even though most outputs persist.
         manifest = state.receipt["goal_outputs"]["goal_evidence"]["path"]
@@ -110,7 +120,7 @@ class OrderedRemote:
             elif command[:1] == ["ls-tree"]:
                 head, path = command[2], command[-1]
                 blob = self.trees[head].get(path)
-                out = f"100644 blob {blob}\t{path}\0" if blob else ""
+                out = f"{self.modes.get((head, path), '100644')} blob {blob}\t{path}\0" if blob else ""
             else:
                 raise AssertionError(args)
         elif args[:3] == ["gh", "pr", "checks"]:
@@ -188,6 +198,10 @@ def duf(cycle_setup, monkeypatch):  # noqa: F811 -- imported pytest fixture
                          **{key: copy.deepcopy(members[-1][key]) for key in ("review", "validation", "cleanup")})
     state.receipt["issues"] = [{"number": int(number), "disposition": "addressed", "fix_commit_sha": sha, "pr_number": 365}
                                for number, sha in FIRST["fix_commits"].items()]
+    for issue in state.receipt["issues"]:
+        if issue["fix_commit_sha"] == EARLY_FIX:
+            issue["superseded_paths"] = [{"path": path, "pr_number": 365, "commit_sha": LATER_FIX}
+                                         for path in SOURCE["overlapping_review_paths"]]
     evidence = supervisor.goal_output_data(state.receipt, state.ledger, state.target)
     state.receipt["evidence_attributions"] = [
         {**state.receipt["goal_outputs"]["goal_evidence"], "pr_number": 367, "commit_sha": LAST["head_sha"]},
@@ -260,7 +274,7 @@ def test_malformed_multi_never_falls_back_to_single(duf, change):
     (lambda s: s.remote.local_fail.add("refs/heads/" + FIRST["branch"]), "local branch"),
     (lambda s: s.remote.ancestry_fail.add((FIRST["merge_commit_sha"], LAST["head_sha"])), "unordered"),
     (lambda s: s.remote.ancestry_fail.add((next(iter(FIRST["fix_commits"].values())), FIRST["head_sha"])), "reviewed head"),
-    (lambda s: s.receipt["issues"][0].update(pr_number=367), "not closed with a fix"),
+    (lambda s: s.receipt["issues"][0].update(pr_number=367, superseded_paths=[]), "superseded paths"),
     (lambda s: s.receipt["evidence_attributions"].pop(), "attribution set"),
     (lambda s: s.receipt["evidence_attributions"][0].update(sha256="a" * 64), "attribution set"),
     (lambda s: s.receipt["evidence_attributions"][0].update(pr_number=365), "producer is not"),
@@ -359,7 +373,7 @@ def test_commit_change_parser_uses_real_git_and_refuses_rename_and_merge(tmp_pat
     git("commit", "-m", "test root")
     first = git("rev-parse", "HEAD")
     changes = supervisor.commit_changes(str(repo), first, supervisor.command)
-    assert changes == {"a.txt": (ZERO, git("rev-parse", "HEAD:a.txt"))}
+    assert changes == {"a.txt": (None, ("100644", git("rev-parse", "HEAD:a.txt")))}
     git("mv", "a.txt", "b.txt")
     git("commit", "-m", "test rename")
     with pytest.raises(supervisor.SupervisorError, match="inventory|ambiguous"):
@@ -415,4 +429,152 @@ def test_pr_creation_before_goal_cannot_be_relabelled_by_registry(duf):
 def test_unintegrated_previous_merge_fails_despite_valid_member_proofs(duf):
     duf.remote.ancestry_fail.add((FIRST["merge_commit_sha"], LAST["head_sha"]))
     with pytest.raises(supervisor.SupervisorError, match="unordered"):
+        verify(duf)
+
+
+def test_fix_reverted_before_member_review_is_rejected(duf):
+    bad = duf.remote.blob(b"old unfixed code\n")
+    for head in (FIRST["head_sha"], LAST["head_sha"]):
+        duf.remote.trees[head]["src/fixed.py"] = bad
+    with pytest.raises(supervisor.SupervisorError, match="member reviewed head"):
+        verify(duf)
+
+
+def test_mixed_fix_executable_mode_must_survive(duf):
+    for fix in (EARLY_FIX, LATER_FIX):
+        duf.remote.raw_changes[fix] = duf.remote.raw_changes[fix].replace(
+            f" 100644 {ZERO} {duf.remote.blob(b'correct code' + bytes([10]))}",
+            f" 100755 {ZERO} {duf.remote.blob(b'correct code' + bytes([10]))}")
+    duf.remote.modes[(FIRST["head_sha"], "src/fixed.py")] = "100755"
+    with pytest.raises(supervisor.SupervisorError, match="final integration head"):
+        verify(duf)
+    duf.remote.modes[(LAST["head_sha"], "src/fixed.py")] = "100755"
+    assert verify(duf)["pr_number"] == 367
+
+
+def test_member_already_lost_executable_fix_is_rejected(duf):
+    for fix in (EARLY_FIX, LATER_FIX):
+        before = f":000000 100644 {ZERO} {duf.remote.blob(b'correct code' + bytes([10]))} A"
+        after = before.replace("100644", "100755")
+        duf.remote.raw_changes[fix] = duf.remote.raw_changes[fix].replace(before, after)
+    with pytest.raises(supervisor.SupervisorError, match="member reviewed head"):
+        verify(duf)
+
+
+def test_real_duf_eight_path_supersession_is_explicit_and_necessary(duf):
+    assert len(SOURCE["overlapping_review_paths"]) == 8
+    assert verify(duf)["pr_number"] == 367
+    duf.receipt["issues"][0]["superseded_paths"].pop()
+    with pytest.raises(supervisor.SupervisorError, match="member reviewed head"):
+        verify(duf)
+
+
+@pytest.mark.parametrize("attack", ["unrelated_commit", "wrong_pr", "not_descendant", "not_changed", "reverted",
+                                    "deleted", "mode", "unknown_path", "unchanged", "self", "redundant"])
+def test_fix_supersession_never_grants_a_blanket_waiver(duf, attack):
+    item = duf.receipt["issues"][0]["superseded_paths"][0]
+    path = item["path"]
+    if attack == "unrelated_commit":
+        item["commit_sha"] = FIRST["head_sha"]
+    elif attack == "wrong_pr":
+        item["pr_number"] = 367
+    elif attack == "not_descendant":
+        duf.remote.ancestry_fail.add((EARLY_FIX, LATER_FIX))
+    elif attack == "not_changed":
+        duf.remote.raw_changes[LATER_FIX] = ""
+        duf.remote.add_change(LATER_FIX, "src/fixed.py", ZERO, duf.remote.blob(b"correct code\n"))
+    elif attack in {"reverted", "deleted", "mode"}:
+        if attack == "reverted":
+            duf.remote.trees[LAST["head_sha"]][path] = duf.remote.blob(b"reverted review\n")
+        elif attack == "deleted":
+            duf.remote.trees[LAST["head_sha"]].pop(path)
+        else:
+            duf.remote.modes[(LAST["head_sha"], path)] = "100755"
+    elif attack == "unknown_path":
+        item["path"] = "not-changed.txt"
+    elif attack == "self":
+        item["commit_sha"] = EARLY_FIX
+    else:
+        changes = supervisor.commit_changes(str(duf.repo), LATER_FIX, duf.remote)
+        old, new = changes[path]
+        replacement = new if attack == "unchanged" else old
+        assert replacement is not None
+        duf.remote.raw_changes[LATER_FIX] = duf.remote.raw_changes[LATER_FIX].replace(
+            f"{old[1]} {new[1]} M\0{path}\0", f"{replacement[1]} {replacement[1]} M\0{path}\0")
+    with pytest.raises(supervisor.SupervisorError):
+        verify(duf)
+
+
+def test_evidence_override_must_descend_from_the_affected_fix(duf):
+    attribution = duf.receipt["evidence_attributions"][0]
+    path = attribution["path"]
+    duf.remote.add_change(EARLY_FIX, path, ZERO, duf.remote.blob(b"original manifest\n"))
+    producer = "9" * 40
+    attribution["commit_sha"] = producer
+    duf.remote.parents[producer] = [HEAD]
+    duf.remote.raw_changes[producer] = ""
+    duf.remote.add_change(producer, path, ZERO, duf.remote.current_tree[path])
+    duf.remote.commits[367].append({"sha": producer, "commit": {"committer": {"date": LAST["created_at"]}}})
+    duf.remote.prs[367]["commits"] += 1
+    duf.remote.ancestry_fail.add((FIRST["merge_commit_sha"], producer))
+    with pytest.raises(supervisor.SupervisorError, match="does not descend"):
+        verify(duf)
+
+
+def test_same_pr_evidence_override_requires_actual_later_producer(duf):
+    attribution = duf.receipt["evidence_attributions"][1]
+    path = attribution["path"]
+    duf.remote.add_change(EARLY_FIX, path, ZERO, duf.remote.blob(b"original payload\n"))
+    producer = "8" * 40
+    attribution["commit_sha"] = producer
+    duf.remote.parents[producer] = [HEAD]
+    duf.remote.raw_changes[producer] = ""
+    duf.remote.add_change(producer, path, ZERO, duf.remote.current_tree[path])
+    duf.remote.commits[365].append({"sha": producer, "commit": {"committer": {"date": FIRST["created_at"]}}})
+    duf.remote.prs[365]["commits"] += 1
+    duf.remote.ancestry_fail.add((EARLY_FIX, producer))
+    with pytest.raises(supervisor.SupervisorError, match="does not descend"):
+        verify(duf)
+
+
+def test_issue_fix_cannot_be_assigned_to_the_evidence_repair_pr(duf):
+    duf.receipt["issues"][-1]["pr_number"] = 367
+    with pytest.raises(supervisor.SupervisorError, match="not closed with a fix"):
+        verify(duf)
+
+
+def test_fix_deletion_requires_exact_absence_at_both_reviewed_heads(duf):
+    path = "src/obsolete.py"
+    old = duf.remote.blob(b"obsolete unsafe content\n")
+    duf.remote.raw_changes[EARLY_FIX] += f":100644 000000 {old} {ZERO} D\0{path}\0"
+    assert verify(duf)["pr_number"] == 367
+    duf.remote.trees[LAST["head_sha"]][path] = old
+    with pytest.raises(supervisor.SupervisorError, match="earlier reviewed fix"):
+        verify(duf)
+
+
+def test_evidence_supersession_cannot_also_claim_issue_path_override(duf):
+    item = duf.receipt["evidence_attributions"][0]
+    duf.remote.add_change(EARLY_FIX, item["path"], ZERO, duf.remote.blob(b"original evidence\n"))
+    duf.receipt["issues"][0]["superseded_paths"].append(
+        {"path": item["path"], "pr_number": 365, "commit_sha": LATER_FIX})
+    with pytest.raises(supervisor.SupervisorError, match="non-evidence changed paths"):
+        verify(duf)
+
+
+def test_successor_that_changes_path_still_needs_its_own_verified_issue_fix(duf):
+    item = duf.receipt["issues"][0]["superseded_paths"][0]
+    path = item["path"]
+    old, new = supervisor.commit_changes(str(duf.repo), LATER_FIX, duf.remote)[path]
+    assert old is not None and new is not None
+    item["commit_sha"] = FIRST["head_sha"]
+    duf.remote.add_change(FIRST["head_sha"], path, old[1], new[1])
+    with pytest.raises(supervisor.SupervisorError, match="another descendant attributed fix"):
+        verify(duf)
+
+
+def test_unnecessary_supersession_cannot_hide_an_unchanged_original_claim(duf):
+    duf.receipt["issues"][0]["superseded_paths"].append(
+        {"path": "src/fixed.py", "pr_number": 365, "commit_sha": LATER_FIX})
+    with pytest.raises(supervisor.SupervisorError, match="unnecessary"):
         verify(duf)
