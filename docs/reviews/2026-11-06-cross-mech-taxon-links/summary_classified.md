@@ -7,8 +7,8 @@
 | Eukaryota | Metazoa | species | 676 | 0 | 224014 | 124377 |
 | Eukaryota | Viridiplantae | species | 643 | 0 | 46693 | 21197 |
 | Eukaryota | Fungi | below-species | 265 | 192 | 24850 | 17172 |
-| Viruses | - | below-species | 609 | 0 | 2176 | 2127 |
-| Bacteria | - | higher | 498 | 0 | 0 | 2658 |
+| Viruses | - | below-species | 609 | 0 | 2178 | 2127 |
+| Bacteria | - | higher | 498 | 0 | 0 | 2661 |
 | Eukaryota | - | below-species | 38 | 30 | 1180 | 965 |
 | Eukaryota | Fungi | species | 386 | 0 | 146 | 677 |
 | other | - | species | 15 | 0 | 335 | 338 |
@@ -121,11 +121,11 @@
 |---|---:|---:|---:|
 | resolvable one rank up | 222 | 25868 | 17935 |
 | retired id | 181 | 182 | 345 |
-| above species | 690 | 0 | 3271 |
+| above species | 690 | 0 | 3274 |
 | microbial, not attested | 548 | 416 | 1051 |
-| outside TaxonMech's domain | 2087 | 273775 | 148635 |
+| outside TaxonMech's domain | 2087 | 273777 | 148635 |
 | not in taxdump | 2 | 21 | 22 |
-| total | 3730 | 300262 | 171259 |
+| total | 3730 | 300264 | 171262 |
 
 ## Per Mech: record citations of a taxon, by where that taxon falls
 
@@ -134,10 +134,10 @@
 | antibioticmech | 543 | 71 | 0 | 70 | 15 | 42 | 0 |
 | cellstructuremech | 1028 | 296 | 0 | 418 | 41 | 110 | 0 |
 | cmmmech | 466 | 8 | 0 | 13 | 16 | 2 | 0 |
-| communitymech | 977 | 2 | 2 | 728 | 13 | 44 | 0 |
+| communitymech | 988 | 2 | 2 | 731 | 13 | 44 | 0 |
 | culturemech | 55 | 2 | 1 | 0 | 0 | 3 | 0 |
 | dufmech | 182 | 3 | 0 | 0 | 0 | 36 | 0 |
-| habitatmech | 11627 | 19 | 87 | 976 | 104 | 415 | 1 |
+| habitatmech | 11640 | 19 | 87 | 976 | 104 | 415 | 1 |
 | mediaingredientmech | 0 | 0 | 0 | 0 | 0 | 1 | 0 |
 | naturalproductmech | 4692 | 219 | 76 | 1044 | 452 | 642 | 0 |
 | pathwaymech | 351 | 86 | 0 | 9 | 0 | 0 | 0 |

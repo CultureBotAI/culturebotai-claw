@@ -9,7 +9,7 @@ TaxonMech scope: 626048 taxa (curation/seed_scope.tsv at 4895ee09fec7).
 | communitymech | fc0c501b9dea | 515 | 202 | 0 | 0 | 0 | 0 | 0 | 0 |
 | traitmech | 0c20b4c82a8b | 1130 | 520 | 210 | 90 | 209 | 1 | 0 | 0 |
 | proteintraitsmech | 8d08b33cfbee | 429421 | 142411 | 420162 | 9368 | 70116 | 298658 | 0 | 51388 |
-| antibioticmech | 9d3d0205b298 | 3105 | 191 | 352 | 45 | 250 | 102 | 0 | 0 |
+| antibioticmech | 9d3d0205b298 | 3105 | 191 | 385 | 53 | 281 | 104 | 0 | 0 |
 | cellstructuremech | 3b1731a6325f | 1022 | 621 | 2392 | 99 | 925 | 1467 | 0 | 0 |
 | habitatmech | 30fbe25f4c53 | 3209 | 46 | 87 | 31 | 79 | 8 | 0 | 0 |
 | naturalproductmech | 18ca5dd6b902 | 3136 | 3123 | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -18,7 +18,7 @@ TaxonMech scope: 626048 taxa (curation/seed_scope.tsv at 4895ee09fec7).
 | cmmmech | 8287b17e542a | 698 | 322 | 1198 | 47 | 1172 | 26 | 0 | 0 |
 | aimech | 6fcaa4797e37 | 442 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 
-## Taxa outside the scope: 1947 distinct, 300262 examples
+## Taxa outside the scope: 1947 distinct, 300264 examples
 
 | taxon | label | examples | Mechs |
 |---|---|---:|---|

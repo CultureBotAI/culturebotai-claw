@@ -3,7 +3,7 @@
 
 Purpose: the cross-Mech taxon-link assessment
 (docs/reviews/2026-11-06-cross-mech-taxon-links.md) found records citing
-retired NCBI ids (merged into a taxon that is a TaxonMech record), ids absent
+retired NCBI ids (whatever their merge target), ids deleted from or absent
 from the pinned taxdump, and ProteinTraitsMech canonical examples with no
 taxon. Each becomes an issue in its Mech; an issue needs the exact ids, the
 merge targets, and record paths, which the assessment's summaries do not list.
@@ -14,7 +14,9 @@ Inputs: claw's .env (set -a; . ./.env) for the Mech roots; --classified PATH
 (outside_scope_classified.tsv); --curies PATH (taxon_curies.tsv); --examples
 PATH (protein_example_taxa.tsv from the tightened run); --out DIR.
 Outputs: DIR/data_fixes_by_mech.md, printed too. Read-only; writes only under DIR.
-Serves: the Phase 3 issues of the taxon-link plan. Written 2026-11-06.
+Serves: the Phase 3 issues of the taxon-link plan, culturebotai-claw PR 881.
+Written 2026-11-06; the four retired and absent classes of the corrected
+classifier read since the same day (culturebotai-claw#899).
 """
 from __future__ import annotations
 
@@ -46,7 +48,7 @@ def main() -> int:
     fixes: dict[str, dict[str, dict]] = defaultdict(dict)  # mech -> taxon -> row
     with args.classified.open(encoding="utf-8") as handle:
         for row in csv.DictReader(handle, delimiter="\t"):
-            if row["class"] in ("in scope after merge", "not-in-taxdump"):
+            if row["class"] in ("in scope after merge", "retired, target not a record", "deleted", "not-in-taxdump"):
                 for mech in row["mechs"].split(", "):
                     fixes[mech][row["taxon_id"]] = row
     citing: dict[str, dict[str, int]] = defaultdict(dict)
@@ -80,7 +82,10 @@ def main() -> int:
         lines += [f"## {manifest.mechs[mech].display_name} ({manifest.mechs[mech].github})", "",
                   "| cited id | name | status | records citing | sample records |", "|---|---|---|---:|---|"]
         for taxon, row in sorted(fixes[mech].items(), key=lambda kv: -citing[mech].get(kv[0], 0)):
-            status = (f"merged into {row['merged_into']}" if row["merged_into"] else "absent from the taxdump")
+            status = (f"merged into {row['merged_into']}" + ("" if row["class"] == "in scope after merge" else
+                                                              f" ({row['rank'] or 'no rank'}, not a record)")
+                      if row["merged_into"] else
+                      "deleted from NCBI's taxonomy" if row["class"] == "deleted" else "absent from the taxdump")
             lines.append(f"| {taxon} | {row['name'] or '(no current name)'} | {status} | "
                          f"{citing[mech].get(taxon, 0)} | {', '.join(f'`{p}`' for p in samples[taxon])} |")
         lines.append("")

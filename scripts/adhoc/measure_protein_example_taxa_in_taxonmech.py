@@ -10,7 +10,8 @@ taxon is a data problem in the Mech.
 Method: walk every record under each Mech's manifest record_globs, parse the
 YAML, and treat a mapping as a protein example when it carries an explicit
 UniProt key (uniprot_id, uniprot_term, uniprot_accession) or a generic one
-(accession, protein_id) whose value is shaped like a UniProtKB accession; a
+(accession, protein_id, protein_accession) whose value is shaped like a
+UniProtKB accession; a
 generic key holding a dataset DOI, a culture-collection number or a MIBiG id
 is not a protein. Nothing nested inside a matched example is counted again
 (ProteinTraitsMech's trait_occurrences carry the parent's protein id). The
@@ -24,13 +25,13 @@ Outputs: DIR/protein_example_taxa.tsv (one row per example: mech, record path,
 record id, slot key, uniprot, taxon id, taxon label, in_taxonmech_scope),
 DIR/summary.md (per-Mech counts, the Mech HEADs read, and the most-cited taxa
 outside the scope). Read-only; it writes only under DIR.
-Not covered either (culturebotai-claw#889): slots that hold a bare accession
-string rather than a mapping, such as NaturalProductMech's
-`molecular_targets[].protein_examples[]`, `biosynthetic_pathway[].enzyme_id`
-and `bioactivities[].target_enzyme`, AntibioticMech's
-`resistance_mechanisms[].protein_accession`, CellStructureMech's Complex
-Portal participants, and CommunityMech's `kb/taxa/*.yaml`, which lies outside
-its manifest record globs. None of those carries a per-example taxon.
+Not covered either (culturebotai-claw#889, #900): slots that hold a bare
+accession string rather than a mapping, such as NaturalProductMech's
+`molecular_targets[].protein_examples[]` (whose taxon sits on the parent
+target), `biosynthetic_pathway[].enzyme_id` and `bioactivities[].target_enzyme`,
+CellStructureMech's Complex Portal participants, and CommunityMech's
+`kb/taxa/*.yaml`, which lies outside its manifest record globs; the last two
+carry no taxon at all.
 Serves: the cross-Mech taxon-link assessment, culturebotai-claw PR 881.
 Written 2026-11-06.
 """
@@ -52,7 +53,7 @@ from plugins.repository_settings import RepositorySettings  # noqa: E402
 
 Loader = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
 EXPLICIT_KEYS = ("uniprot_id", "uniprot_term", "uniprot_accession")
-GENERIC_KEYS = ("accession", "protein_id")
+GENERIC_KEYS = ("accession", "protein_id", "protein_accession")
 PROTEIN_KEYS = EXPLICIT_KEYS + GENERIC_KEYS
 TAXON_KEYS = ("taxon_id", "organism_term", "target_organism", "organism_id")
 LABEL_KEYS = ("taxon_label", "taxon_name", "organism_label")
