@@ -13,8 +13,8 @@ Each cited `NCBITaxon` CURIE gets one verdict:
 - `above_species`: a genus or higher, never a record by TaxonMech's rule;
 - `outside_domain`: an animal, plant or virus, which TaxonMech's sources never
   attest, so TaxonMech is not where it resolves;
-- `unplaced`: a species-rank entry under no cellular domain and not a virus: a
-  metagenome, an uncultured or unclassified sequence, a vector;
+- `unplaced`: an entry at species rank or below under no cellular domain and
+  not a virus: a metagenome, an uncultured or unclassified sequence, a vector;
 - `unattested_microbial`: a bacterial, archaeal, fungal or protist species or
   strain that no TaxonMech source attests, the only kind a scope change could
   admit (TaxonMech holds protists: Plasmodium, Paramecium, diatoms);
@@ -36,6 +36,7 @@ from __future__ import annotations
 import csv
 import re
 import tarfile
+import zlib
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
@@ -89,19 +90,21 @@ class Judgement:
 
 
 def _dmp_rows(tar_path: Path, member: str) -> Iterator[list[str]]:
+    """Rows of one taxdump member. Every way the archive can be unusable is a TaxonLinksError, so one accessor decides."""
+    if not tar_path.is_file():
+        raise TaxonLinksError(f"TaxonMech's pinned taxdump {tar_path} is not present")
     try:
-        tar = tarfile.open(tar_path, "r:gz")
-    except tarfile.TarError as exc:
-        raise TaxonLinksError(f"{tar_path} is not a gzipped tar: {exc}") from exc
-    with tar:
-        try:
-            handle = tar.extractfile(member)  # KeyError for an absent name; None for a non-file member
-        except KeyError:
-            handle = None
-        if handle is None:
-            raise TaxonLinksError(f"{tar_path} has no member {member}")
-        for raw in handle:
-            yield raw.decode("utf-8", "replace").rstrip("\t|\n").split("\t|\t")
+        with tarfile.open(tar_path, "r:gz") as tar:
+            try:
+                handle = tar.extractfile(member)  # KeyError for an absent name; None for a non-file member
+            except KeyError:
+                handle = None
+            if handle is None:
+                raise TaxonLinksError(f"{tar_path} has no member {member}")
+            for raw in handle:
+                yield raw.decode("utf-8", "replace").rstrip("\t|\n").split("\t|\t")
+    except (tarfile.TarError, EOFError, OSError, zlib.error) as exc:  # corrupt or truncated, at open or mid-stream
+        raise TaxonLinksError(f"{tar_path} cannot be read as a gzipped tar: {exc}") from exc
 
 
 def _int_id(curie: str) -> int:
@@ -152,10 +155,7 @@ class TaxonIndex:
 
     def _taxdump_nodes(self) -> dict[int, tuple[str, int]]:
         if self._nodes is None:
-            path = self.taxdump_path
-            if not path.is_file():
-                raise TaxonLinksError(f"TaxonMech's pinned taxdump {path} is not present")
-            self._nodes = {int(f[0]): (f[2], int(f[1])) for f in _dmp_rows(path, "nodes.dmp")}
+            self._nodes = {int(f[0]): (f[2], int(f[1])) for f in _dmp_rows(self.taxdump_path, "nodes.dmp")}
         return self._nodes
 
     def node(self, taxon: int) -> tuple[str, int] | None:
@@ -181,8 +181,8 @@ class TaxonIndex:
         return chain
 
     def names(self, taxa: Sequence[int]) -> dict[int, str]:
-        """Scientific names, from the inventory where present, else from the taxdump, read once."""
-        if self._names is None and any(t not in self._inventory_names for t in taxa) and self.taxdump_path.is_file():
+        """Scientific names, from the inventory where present, else from the taxdump, read once (and refused like nodes)."""
+        if self._names is None and any(t not in self._inventory_names for t in taxa):
             self._names = {int(f[0]): f[1] for f in _dmp_rows(self.taxdump_path, "names.dmp")
                            if f[3] == "scientific name"}
         taxdump_names = self._names or {}

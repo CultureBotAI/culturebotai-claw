@@ -49,6 +49,7 @@ TAXA = {
     10665: ("Enterobacteria phage T4", "species", 10239),
     777: ("Escherichia coli (old name)", "species", 561),
     999: ("marine metagenome", "species", 1),
+    9991: ("marine metagenome isolate 9991", "strain", 999),
     998: ("unclassified sequences", "no rank", 1),
 }
 SCOPE = {562, 1280, 4932, 777}  # 777 is also retired: TaxonMech's scope keeps some merged ids
@@ -158,12 +159,24 @@ def test_a_metagenome_under_no_domain_is_unplaced_but_a_rank_above_species_there
 
 
 def test_the_merge_table_is_the_only_merge_source(taxonmech):
-    """A header-only TSV means no merges, before and after the taxdump is read: a verdict never changes."""
+    """A header-only TSV means no merges: the same verdict on the judgement that reads the taxdump and on the one after.
+
+    46170 is outside the inventory, so the first judgement reads nodes.dmp, which is where a merged.dmp fallback
+    would fill the merges; the second judgement would then say retired.
+    """
     (taxonmech / "data" / "raw" / "ncbi_merged_ids.tsv").write_text("old_taxon_id\tcurrent_taxon_id\n", encoding="utf-8")
     index = links.TaxonIndex(taxonmech)
+    assert index._nodes is None
     assert judge(index, "NCBITaxon:46170").verdict is links.Verdict.ABSENT
-    judge(index, "NCBITaxon:511145")  # reads the taxdump's nodes
+    assert index._nodes is not None
     assert judge(index, "NCBITaxon:46170").verdict is links.Verdict.ABSENT
+
+
+def test_a_strain_under_a_metagenome_is_unplaced_too(index):
+    """Below species under no domain: not a strain of any record, not above species, not in a domain."""
+    judgement = judge(index, "NCBITaxon:9991")
+    assert judgement.verdict is links.Verdict.UNPLACED
+    assert judgement.rank == "strain"
 
 
 def test_an_unknown_id_is_absent(index):
@@ -267,21 +280,24 @@ def test_collect_counts_occurrences_records_and_findings(tmp_path, index):
 def test_findings_are_sorted_and_resolvable_is_most_cited_first(tmp_path, index):
     root = _corpus(tmp_path, {"data/a.yaml": {
         "z_slot": "NCBITaxon:999001", "a_slot": "NCBITaxon:46170",
-        "strains": [{"id": "NCBITaxon:511145"}, {"id": "NCBITaxon:559292"}, {"id": "NCBITaxon:559292"}],
+        "strains": [{"id": "NCBITaxon:511145"}, {"id": "NCBITaxon:559292"}, {"id": "NCBITaxon:559292"},
+                    {"id": "NCBITaxon:83333"}],  # cited once, like 511145, and after it: the tie breaks on the id
     }})
 
     report = links.collect("m", root, ["data/**/*.yaml"], ["z_slot", "a_slot", "strains[].id"], index).as_dict(index)
 
     assert [f["slot"] for f in report["findings"]] == ["a_slot", "z_slot"]
-    assert [r["taxon"] for r in report["resolvable"]] == ["NCBITaxon:559292", "NCBITaxon:511145"]
+    assert [r["taxon"] for r in report["resolvable"]] == ["NCBITaxon:559292", "NCBITaxon:83333", "NCBITaxon:511145"]
 
 
 def test_unattested_taxa_are_listed_most_cited_first(tmp_path, index):
-    root = _corpus(tmp_path, {"data/a.yaml": {"t": [{"id": "NCBITaxon:1423"}, {"id": "NCBITaxon:5478"}, {"id": "NCBITaxon:5478"}]}})
+    # 5833 and 1423 are cited once each, 5833 first in the record: the tie breaks on the id, not on arrival.
+    root = _corpus(tmp_path, {"data/a.yaml": {"t": [{"id": "NCBITaxon:5833"}, {"id": "NCBITaxon:1423"},
+                                                    {"id": "NCBITaxon:5478"}, {"id": "NCBITaxon:5478"}]}})
 
     report = links.collect("m", root, ["data/**/*.yaml"], ["t[].id"], index).as_dict(index)
 
-    assert [r["taxon"] for r in report["unattested_microbial"]] == ["NCBITaxon:5478", "NCBITaxon:1423"]
+    assert [r["taxon"] for r in report["unattested_microbial"]] == ["NCBITaxon:5478", "NCBITaxon:1423", "NCBITaxon:5833"]
 
 
 def test_findings_need_no_taxdump_names(tmp_path, taxonmech, monkeypatch):
@@ -333,7 +349,7 @@ def test_collect_refuses_an_unusable_corpus_before_walking(tmp_path, index):
 
 def test_the_report_is_the_same_whatever_order_the_files_arrive_in(tmp_path, index):
     records = {f"data/{n}.yaml": {"taxon_id": f"NCBITaxon:{t}"} for n, t in
-               (("z", 562), ("a", 511145), ("m", 46170), ("k", 9606), ("u", 1423), ("v", 5478))}
+               (("z", 562), ("a", 511145), ("m", 46170), ("k", 9606))}
     first = links.collect("m", _corpus(tmp_path / "1", records), ["data/**/*.yaml"], ["taxon_id"], index).as_dict(index)
     reversed_records = dict(reversed(list(records.items())))
     second = links.collect("m", _corpus(tmp_path / "2", reversed_records), ["data/**/*.yaml"], ["taxon_id"],

@@ -1,6 +1,6 @@
 ---
 name: cross-mech-taxon-links
-description: "Judge every taxon a Mech's records cite against what TaxonMech holds: a retired NCBI id, a record, a strain whose nearest ancestor is a record, a rank above species, a taxon outside TaxonMech's domain, an unplaced metagenome or unclassified sequence, an unattested microbe, or an id absent from the pinned taxdump. Runs kg-microbe-links taxa over the slots each Mech declares in the fleet manifest's taxon_links capability. Read-only; reads TaxonMech's checkout and fetches nothing."
+description: "Judge every taxon a Mech's records cite against what TaxonMech holds: a retired NCBI id, a record, a strain resolved to its nearest ancestor that is a record, a rank above species, a taxon outside TaxonMech's domain, an unplaced metagenome or unclassified sequence, an unattested microbe, or an id absent from the pinned taxdump. Runs kg-microbe-links taxa over the slots each Mech declares in the fleet manifest's taxon_links capability. Read-only; reads TaxonMech's checkout and fetches nothing."
 category: quality
 requires_database: false
 requires_internet: false
@@ -68,7 +68,7 @@ report says it was sampled.
 | `species_of_strain` | below species; its nearest ancestor that is a record (usually its species) holds it | link that record, and say the cited taxon is a strain of it |
 | `above_species` | genus or higher, never a record by TaxonMech's rule | a lineage search, or no link |
 | `outside_domain` | animal, plant or virus | resolve to NCBI Taxonomy or UniProt, not TaxonMech |
-| `unplaced` | a species-rank entry under no cellular domain and not a virus: a metagenome, an uncultured or unclassified sequence, a vector | resolve to NCBI Taxonomy; nothing in the fleet owns it |
+| `unplaced` | an entry at species rank or below under no cellular domain and not a virus: a metagenome, an uncultured or unclassified sequence, a vector | resolve to NCBI Taxonomy; nothing in the fleet owns it |
 | `unattested_microbial` | bacterium, archaeon, fungus or protist that no TaxonMech source attests | the only kind a TaxonMech scope change could admit; report to TaxonMech's owner |
 | `retired` | NCBI merged the id into another; the current id and its own verdict are given (judged first: TaxonMech's own scope still lists fourteen retired ids) | fix the record to cite the current id |
 | `absent` | the pinned taxdump has no such id | find the intended taxon from the record's source |
@@ -84,7 +84,7 @@ as `other_identifiers` and is never a finding.
   path and slot. File them in the Mech that owns the record, one issue per
   Mech, with the table; the issues the 2026-11-06 cross-Mech taxon-link
   assessment filed (claw PR 881) show the shape.
-- `resolvable` lists the strains whose nearest ancestor is a record, most-cited
+- `resolvable` lists the strains resolved to their nearest ancestor that is a record, most-cited
   first, with that ancestor. That is what a renderer needs to link one rank up.
 - `unattested_microbial` is the list for TaxonMech's owner.
 - The report is deterministic JSON. Keep one per Mech per run under

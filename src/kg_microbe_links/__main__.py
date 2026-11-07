@@ -22,7 +22,7 @@ def main(argv: list[str] | None = None) -> int:
         description=(
             "Judge every taxon a Mech's records cite, in the slots its manifest "
             "taxon_links declaration names, against what TaxonMech holds: a retired "
-            "id, a record, a strain whose nearest ancestor is a record, a rank above "
+            "id, a record, a strain resolved to its nearest ancestor that is a record, a rank above "
             "species, a taxon outside TaxonMech's domain, an unplaced metagenome or "
             "unclassified sequence, an unattested microbe, or an id absent from the "
             "pinned taxdump. Reads TaxonMech's checkout only; nothing is fetched. "

@@ -100,7 +100,32 @@ def test_a_taxdump_that_is_not_a_tarball_is_exit_two(tmp_path, taxonmech, capsys
     (taxonmech / "data" / "source_snapshots" / "taxdump.tar.gz").write_bytes(b"not a tarball")
     root = _mech(tmp_path, "dufmech", {"data/families/a.yaml": {"causal_graphs": [{"taxon": "NCBITaxon:511145"}]}})
     assert main(["taxa", "--mech", "dufmech", "--root", str(root), "--taxonmech-root", str(taxonmech)]) == 2
-    assert "not a gzipped tar" in capsys.readouterr().err
+    assert "cannot be read as a gzipped tar" in capsys.readouterr().err
+
+
+def test_a_truncated_taxdump_tarball_is_exit_two(tmp_path, taxonmech, capsys):  # noqa: F811
+    """gzip fails mid-stream, not at open: still exit 2."""
+    tar_path = taxonmech / "data" / "source_snapshots" / "taxdump.tar.gz"
+    payload = tar_path.read_bytes()
+    tar_path.write_bytes(payload[: len(payload) // 2])
+    root = _mech(tmp_path, "dufmech", {"data/families/a.yaml": {"causal_graphs": [{"taxon": "NCBITaxon:511145"}]}})
+    assert main(["taxa", "--mech", "dufmech", "--root", str(root), "--taxonmech-root", str(taxonmech)]) == 2
+    assert "cannot be read as a gzipped tar" in capsys.readouterr().err
+
+
+def test_an_absent_taxdump_tarball_is_exit_two(tmp_path, taxonmech, capsys):  # noqa: F811
+    """TaxonMech gitignores data/source_snapshots/, so a fresh clone has the conf and no tarball."""
+    (taxonmech / "data" / "source_snapshots" / "taxdump.tar.gz").unlink()
+    root = _mech(tmp_path, "dufmech", {"data/families/a.yaml": {"causal_graphs": [{"taxon": "NCBITaxon:511145"}]}})
+    assert main(["taxa", "--mech", "dufmech", "--root", str(root), "--taxonmech-root", str(taxonmech)]) == 2
+    assert "is not present" in capsys.readouterr().err
+
+
+def test_strict_passes_on_every_non_blocking_verdict(tmp_path, taxonmech):  # noqa: F811
+    """A strain, a genus, an animal, a metagenome and an unattested bacterium: none fails --strict."""
+    taxa = ["NCBITaxon:511145", "NCBITaxon:561", "NCBITaxon:9606", "NCBITaxon:999", "NCBITaxon:1423"]
+    root = _mech(tmp_path, "dufmech", {"data/families/a.yaml": {"causal_graphs": [{"taxon": t} for t in taxa]}})
+    assert main(["taxa", "--mech", "dufmech", "--root", str(root), "--taxonmech-root", str(taxonmech), "--strict"]) == 0
 
 def test_strict_fails_when_the_only_record_will_not_parse(tmp_path, taxonmech):  # noqa: F811
     root = tmp_path / "dufmech"
