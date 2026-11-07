@@ -138,3 +138,14 @@ def test_apply_failure_exits_nonzero_including_after_loop_stops(tmp_path, monkey
     monkeypatch.setattr(supervisor.time, "monotonic", lambda: next(times))
     args = ["--config", str(config_path), "--apply"] + (["--loop"] if loop else [])
     assert supervisor.main(args) == 1
+
+
+def test_hot_reload_rejects_unknown_canary_key_before_transport(tmp_path, monkeypatch):
+    path = tmp_path / 'config.json'
+    path.write_text(json.dumps({'port_pressure': {'mode': 'restart', 'restart_repository_keys': ['typo']}}))
+    config = {'runtime_dir': str(tmp_path), '_config_path': str(path),
+              'targets': [{'repository_key': 'traitmech'}], 'port_pressure': {'mode': 'off'}}
+    instance = supervisor.Supervisor(config, native=SimpleNamespace(), notifier=SimpleNamespace())
+    monkeypatch.setattr(supervisor, 'import_file', lambda *_: pytest.fail('invalid reload reached transport'))
+    with pytest.raises(supervisor.SupervisorError, match='unconfigured target'):
+        instance.port_pressure(apply=True)

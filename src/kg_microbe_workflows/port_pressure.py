@@ -17,6 +17,8 @@ DEFAULTS: dict[str, Any] = {
     "mode": "report",
     "host_ratio": 0.5,
     "per_pid_limit": 1000,
+    "goal_boundary_limit": 500,
+    "restart_repository_keys": None,
     "cooldown_seconds": 3600,
     "hourly_cap": 2,
 }
@@ -67,6 +69,13 @@ def normalize_config(config: Mapping[str, Any] | None = None) -> dict[str, Any]:
     if not 0 < ratio <= 1:
         raise ValueError("host_ratio must be greater than zero and at most one")
     _integer(result["per_pid_limit"], "per_pid_limit", minimum=1)
+    _integer(result["goal_boundary_limit"], "goal_boundary_limit", minimum=3)
+    allowed = result["restart_repository_keys"]
+    if allowed is not None and (not isinstance(allowed, list)
+                               or any(not isinstance(key, str) or not re.fullmatch(r"[a-z][a-z0-9_-]*", key)
+                                      for key in allowed)
+                               or len(set(allowed)) != len(allowed)):
+        raise ValueError("restart_repository_keys must be null or a list of unique repository keys")
     _number(result["cooldown_seconds"], "cooldown_seconds", minimum=1)
     _integer(result["hourly_cap"], "hourly_cap", minimum=1)
     return result
@@ -245,6 +254,8 @@ def _history(state: Mapping[str, Any], now: float) -> list[dict[str, Any]]:
 def decide(
     config: Mapping[str, Any], measurement: Mapping[str, Any],
     sessions: Sequence[Mapping[str, Any]], state: Mapping[str, Any], *, now: float,
+    boundary: Mapping[str, Any] | None = None,
+    excluded_repository_keys: Sequence[str] = (),
 ) -> dict[str, Any]:
     """Report at most one eligible restart; no state or input object is mutated."""
     result: dict[str, Any] = {
@@ -268,6 +279,17 @@ def decide(
         if not isinstance(state, Mapping) or not isinstance(measurement, Mapping):
             raise ValueError("guard state and measurement must be objects")
         settings = normalize_config(config)
+        if (not isinstance(excluded_repository_keys, (list, tuple))
+                or any(not isinstance(key, str) for key in excluded_repository_keys)):
+            raise ValueError("per-tick excluded repository keys are invalid")
+        if boundary is not None:
+            if (not isinstance(boundary, Mapping) or not isinstance(boundary.get("repository_key"), str)
+                    or not boundary["repository_key"]):
+                raise ValueError("goal boundary target is invalid")
+            boundary_pid = _pid(boundary.get("pid"))
+            if sum(session.get("repository_key") == boundary["repository_key"]
+                   and session.get("pid") == boundary_pid for session in sessions) != 1:
+                raise ValueError("goal boundary target is missing or ambiguous")
         timestamp = _number(now, "current time")
         if settings["mode"] == "off":
             result["phase"] = "off"
@@ -278,6 +300,10 @@ def decide(
             result.update(phase="disabled", disable_reason=reason or "guard is latched off")
             return result
         history = _history(state, timestamp)
+        allowed = settings["restart_repository_keys"]
+        if boundary is not None and allowed is not None and boundary["repository_key"] not in allowed:
+            result.update(phase="off", reason="goal-boundary target is outside restart_repository_keys")
+            return result
         if measurement.get("known") is not True:
             raise ValueError("listener measurement is unknown: " + str(measurement.get("error", "missing observation")))
         host = _integer(measurement.get("host_listeners"), "host listener count")
@@ -321,6 +347,10 @@ def decide(
             if any(not isinstance(value, str) or not value.strip() for value in values):
                 raise ValueError(f"{key}: all three conversation IDs are required")
             reasons = []
+            if key in excluded_repository_keys:
+                reasons.append("workflow dispatch was attempted in this supervisor tick")
+            if allowed is not None and key not in allowed:
+                reasons.append("repository is outside restart_repository_keys")
             if session.get("verified_identity") is not True:
                 reasons.append("process identity is not verified")
             if session.get("idle") is not True:
@@ -351,6 +381,15 @@ def decide(
             result["triggers"].append("agy process above per-PID listener limit")
         result["offender_pids"] = offenders
         result["unmanaged_offender_pids"] = [pid for pid in offenders if pid not in seen_pids]
+        if boundary is not None:
+            # Goal-boundary maintenance belongs only to the completed session.
+            # An unrelated host/per-PID offender cannot redirect this operation.
+            result["triggers"] = []
+            if counts[boundary_pid] >= settings["goal_boundary_limit"]:
+                result["triggers"].append("completed goal at or above goal-boundary listener threshold")
+            eligible = [session for session in eligible if session["pid"] == boundary_pid
+                        and session["repository_key"] == boundary["repository_key"]]
+            result["boundary"] = {"repository_key": boundary["repository_key"], "pid": boundary_pid}
         if not result["triggers"]:
             result.update(phase="healthy", healthy=True)
             return result
@@ -360,7 +399,7 @@ def decide(
             result["limit_reason"] = "hourly restart cap"
             return result
         # A per-PID-only trigger cannot justify recycling unrelated quiet sessions.
-        if ratio < settings["host_ratio"]:
+        if boundary is None and ratio < settings["host_ratio"]:
             eligible = [session for session in eligible if session["pid"] in offenders]
         if not eligible:
             result["phase"] = "blocked"

@@ -240,7 +240,12 @@ The supervisor itself does not approve command, file, or URL menus.
 The optional [agy port-pressure guard](MECH_PORT_PRESSURE.md) adds a separate
 report-only maintenance command and an explicitly enabled exact-ID restart
 transaction. It preserves the adopted goal and never dispatches goal text during
-a maintenance tick. Existing configurations keep this guard off.
+a maintenance transaction. At a verified completed-goal boundary, an eligible
+agy session with at least the configured 500 listeners is recycled before the
+supervisor's fresh checks and dispatch of its legitimate next goal. The idle
+pressure scan remains a fallback; both paths share their limits and failure
+latch. A report-mode boundary reports and holds instead of sending input.
+Existing configurations keep this guard off.
 
 Blocked progress requires operator assessment. At most three closure-repair
 messages are allowed per stage, each after new native progress and the minimum

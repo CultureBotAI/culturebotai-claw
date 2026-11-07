@@ -32,7 +32,7 @@ UUID = r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}"
 # Same prompt vocabulary as XMechBay's mac-orchestration guard, with native agy
 # approval/tool menus included. There is deliberately no override path here.
 PROMPT = re.compile(
-    r"Sign in with|authentication required|Log in to continue|Select a login|"
+    r"Sign in with|authentication required|Log in to continue|Select (?:a )?login|not signed in|"
     r"Trust this folder|Do you trust|trust the (?:files|contents)|"
     r"Update available|Skip until next version|Update now|"
     r"approval request|Allow command|Requesting permission|Do you want to|"
@@ -42,11 +42,14 @@ PROMPT = re.compile(
     r"Queued follow-up|⇧← to answer|request_user_input|"
     r"^\s*(?:Question|Questions|QUESTION)\b|Type your answer|to submit answer|"
     r"to navigate questions|Select Model|Select Reasoning|"
-    r"How's the CLI experience|^\s*\?\s+(?:Which|.*question)|"
+    r"How['’]s the CLI experience|^\s*\[0\]\s+Skip\b|^\s*\?\s+(?:Which|.*question)|"
     r"^\s*(?:Select|Choose) (?:an? option|one of the following)|"
     r"^\s*[›❯>]?\s*\d+[.)]\s+(?:Yes|No|Allow|Deny|Approve|Reject|Cancel)\b",
     re.I | re.M,
 )
+
+
+SIGN_IN = re.compile(r"Sign in with|authentication required|Log in to continue|Select (?:a )?login|not signed in", re.I)
 
 
 class GuardError(RuntimeError):
@@ -81,7 +84,8 @@ def model_evidence(screen, identity):
     footer = lines[max(composers[-1] + 1 if composers else 0, len(lines) - 9):]
     # Native model/effort are complete footer fields, never substrings of a
     # different model or effort (e.g. Pro Max or highest).
-    model_lines = [line for line in footer if re.search(r"\bGemini\b", line)]
+    model_lines = [line for line in footer if re.search(r"\bGemini\b", line)
+                   and not line.strip(" │┃").startswith("Meet Gemini 4 Argon")]
     value = model_lines[-1][model_lines[-1].index("Gemini"):].strip() if model_lines else ""
     fields = [part.strip() for part in re.split(r"[|·]", value)]
     delimited = len(fields) >= 2 and fields[:2] == [identity["model_label"], identity["effort_label"]]
@@ -122,6 +126,7 @@ class NativeTransport:
         self.helpers = supervisor._port_pressure_helpers
         self.before_quit = None
         self.binding_plan = None
+        self.boundary = None
 
     def run(self, args, **kwargs):
         return self.s.runner(args, **kwargs)
@@ -228,6 +233,14 @@ class NativeTransport:
         current = self.observe(target)
         require(current["idle"] and current["verified_identity"], "session no longer verified idle")
         require(not current["prompt"] and not current["blocked_tasks"], "human prompt or background task")
+        if self.boundary is not None:
+            observed = current["observation"]
+            require(observed.get("goal_identity") == self.boundary["goal_identity"],
+                    "completed goal identity changed before boundary recycle")
+            allowed = {"completed"}
+            if self.boundary.get("completion_authority") == "verified_receipt_override":
+                allowed.add("active")
+            require(observed.get("goal_state") in allowed, "completed goal state changed before boundary recycle")
         identity = target["port_pressure_identity"]
         executable = Path(identity["agy_executable"])
         require(executable.is_absolute() and executable.is_file() and os.access(executable, os.X_OK),
@@ -310,6 +323,7 @@ class NativeTransport:
 
     def wait_resumed(self, target, timeout):
         deadline = self.clock() + timeout
+        signin_reread = False
         while self.clock() < deadline:
             tab = self.snapshot(target)
             original_tab = self.before_quit["observation"]["tab"]
@@ -318,7 +332,19 @@ class NativeTransport:
             # Read current output after the former shell screen; history of an
             # earlier prompt must not substitute for the resumed runtime state.
             screen = tab["screen"]
-            require(not PROMPT.search(screen), "human prompt during resume")
+            prompt = PROMPT.search(screen)
+            if prompt:
+                # Auto-update startup may briefly paint a sign-in frame. Re-read
+                # once, without input; persistent sign-in and all other prompts
+                # still stop. Never erase prompt text from retained history.
+                if (not signin_reread and SIGN_IN.search(screen)
+                        and all(SIGN_IN.fullmatch(match.group()) for match in PROMPT.finditer(screen))):
+                    signin_reread = True
+                    self.sleep(min(1.0, max(0.0, (deadline - self.clock()) / 2)))
+                    continue
+                if SIGN_IN.search(screen):
+                    raise GuardError("sign-in evidence remains after fresh reread; current runtime is unverified")
+                raise GuardError("human prompt during resume")
             peers = [p for p in self.processes() if p["tty"] == target["tty"] and Path(p["comm"]).name == "agy"]
             require(len(peers) <= 1, "multiple resumed agy processes")
             if peers:
@@ -424,14 +450,18 @@ class PortPressureGuard:
         self.clock = clock
         raw = supervisor.config.get("port_pressure", {"mode": "off"})
         self.config = normalize_config({k: v for k, v in raw.items() if k != "binding_files"})
+        allowed = self.config["restart_repository_keys"]
+        require(allowed is None or set(allowed) <= {target["repository_key"] for target in supervisor.config["targets"]},
+                "restart_repository_keys contains an unconfigured target")
         self.transport = transport or NativeTransport(supervisor, clock=clock)
         self.state_path = supervisor.runtime / "port-pressure-state.json"
         self.disable_path = supervisor.runtime / "port-pressure-disabled.json"
 
-    def tick(self, *, apply=False):
+    def tick(self, *, apply=False, boundary=None, excluded_repository_keys=()):
         if self.config["mode"] == "off":
             return {"phase": "off", "candidate": None}
         helpers = self.s._port_pressure_helpers
+        self.transport.boundary = boundary
         with helpers["file_lock"](self.s.runtime / "port-pressure.lock"):
             state = {}
             state_loaded = False
@@ -446,7 +476,8 @@ class PortPressureGuard:
                     raise GuardError("unfinished prior restart; manual reconciliation required")
                 measurement, observations = self.transport.collect()
                 report.update(measurement=measurement)
-                decision = decide(self.config, measurement, observations, state, now=self.clock())
+                decision = decide(self.config, measurement, observations, state, now=self.clock(), boundary=boundary,
+                                  excluded_repository_keys=excluded_repository_keys)
                 report.update(decision)
                 if isinstance(report.get("candidate"), dict):
                     report["candidate"] = {k: v for k, v in report["candidate"].items() if k != "observation"}

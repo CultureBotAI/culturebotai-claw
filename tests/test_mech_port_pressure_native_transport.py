@@ -423,3 +423,118 @@ def test_production_transaction_quits_resumes_and_rebinds_all_three_files(eviden
     assert status["goal_identity"]["conversation_id"] == CID
     assert status["port_pressure_restart"]["old_pid"] == 100
     assert status["port_pressure_restart"]["new_pid"] == 200
+
+
+ANNOUNCEMENT = 'Meet Gemini 4 Argon …\nesc to dismiss\n'
+BOXED_ANNOUNCEMENT = '┌─────────────────────────────┐\n│ Meet Gemini 4 Argon …       │\n│ esc to dismiss              │\n└─────────────────────────────┘\n'
+SURVEY = "How's the CLI experience so far?\n[0] Skip\n"
+
+
+@pytest.mark.parametrize('announcement', [ANNOUNCEMENT, BOXED_ANNOUNCEMENT])
+def test_resume_accepts_known_announcement_without_dismissing_or_confusing_model(evidence, announcement):
+    evidence.transport.preflight(evidence.target)
+    evidence.exited()
+    evidence.resumed()
+    evidence.screen = IDLE + announcement
+    new = evidence.transport.wait_resumed(evidence.target, 2)
+    assert new['listeners'] == 2 and new['pid'] == 200
+    assert evidence.inputs == []
+    assert evidence.transport.observe({**evidence.target, **new})['model_evidence']['model_label'] == 'Gemini 3 Pro'
+
+
+def test_feedback_survey_blocks_resume_without_answer_or_second_read(evidence):
+    evidence.transport.preflight(evidence.target)
+    evidence.exited()
+    evidence.resumed()
+    evidence.screen = IDLE + SURVEY
+    evidence.transport.sleep = lambda _: pytest.fail('feedback survey must hold immediately')
+    with pytest.raises(guard.GuardError, match='human prompt'):
+        evidence.transport.wait_resumed(evidence.target, 2)
+    assert evidence.inputs == []
+
+
+def test_transient_signin_is_reread_without_keys_then_accepts_fresh_idle_runtime(evidence):
+    evidence.transport.preflight(evidence.target)
+    evidence.exited()
+    evidence.resumed()
+    evidence.screen = 'Select login\nSign in with your organization\n'
+    reads = []
+    original = evidence.transport.snapshot
+    def snapshot(target):
+        reads.append(evidence.screen)
+        return original(target)
+    evidence.transport.snapshot = snapshot
+    def redraw(seconds):
+        evidence.sleep(seconds)
+        evidence.screen = IDLE
+    evidence.transport.sleep = redraw
+    assert evidence.transport.wait_resumed(evidence.target, 2)['listeners'] == 2
+    assert len(reads) == 2 and 'Sign in' in reads[0] and reads[1] == IDLE
+    assert evidence.inputs == []
+
+
+@pytest.mark.parametrize('second_frame', ['Sign in with your organization\n',
+                                         'Sign in with your organization\n' + IDLE])
+def test_retained_or_persistent_signin_remains_unverified_after_fresh_reread(evidence, second_frame):
+    evidence.transport.preflight(evidence.target)
+    evidence.exited()
+    evidence.resumed()
+    evidence.screen = 'Sign in with your organization\n'
+    reads = []
+    original = evidence.transport.snapshot
+    def snapshot(target):
+        reads.append(evidence.screen)
+        return original(target)
+    evidence.transport.snapshot = snapshot
+    def redraw(seconds):
+        evidence.sleep(seconds)
+        evidence.screen = second_frame
+    evidence.transport.sleep = redraw
+    with pytest.raises(guard.GuardError, match='after fresh reread; current runtime is unverified'):
+        evidence.transport.wait_resumed(evidence.target, 2)
+    assert len(reads) == 2 and evidence.inputs == []
+
+
+def test_new_same_conversation_completed_goal_cannot_pass_final_boundary_preflight(evidence):
+    evidence.transport.boundary = {'goal_identity': dict(evidence.target['initial_goal_identity']),
+                                   'completion_authority': 'native_completed'}
+    evidence.native['current_goal']['start_step_index'] += 1
+    with pytest.raises(guard.GuardError, match='goal identity changed'):
+        evidence.transport.quit(evidence.target)
+    assert evidence.inputs == []
+
+
+@pytest.mark.parametrize('second', [SURVEY, 'Allow command?\n', 'Sign in with your organization\n' + SURVEY])
+def test_startup_signin_grace_never_answers_changed_or_mixed_human_prompt(evidence, second):
+    evidence.transport.preflight(evidence.target)
+    evidence.exited()
+    evidence.resumed()
+    evidence.screen = 'Sign in with your organization\n'
+    sleeps = []
+    def change(seconds):
+        sleeps.append(seconds)
+        evidence.sleep(seconds)
+        evidence.screen = second
+    evidence.transport.sleep = change
+    with pytest.raises(guard.GuardError):
+        evidence.transport.wait_resumed(evidence.target, 45)
+    assert sleeps == [1.0] and evidence.inputs == []
+
+
+def test_mixed_signin_and_feedback_never_receives_startup_grace(evidence):
+    evidence.transport.preflight(evidence.target)
+    evidence.exited()
+    evidence.resumed()
+    evidence.screen = 'Sign in with your organization\n' + SURVEY
+    evidence.transport.sleep = lambda _: pytest.fail('mixed human prompt must hold immediately')
+    with pytest.raises(guard.GuardError):
+        evidence.transport.wait_resumed(evidence.target, 45)
+    assert evidence.inputs == []
+
+
+@pytest.mark.parametrize('survey', [SURVEY, SURVEY.replace("How's", 'How’s'), '[0] Skip\n'])
+def test_feedback_survey_is_reported_as_prompt_and_never_idle(evidence, survey):
+    evidence.screen = IDLE + survey
+    row = evidence.transport.observe(evidence.target)
+    assert row['prompt'] is True and row['idle'] is False
+    assert evidence.inputs == []

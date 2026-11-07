@@ -290,3 +290,70 @@ def test_restart_history_preserves_prior_rows_and_requires_new_pid():
     assert result["restart_history"][-1]["new_pid"] == 42
     with pytest.raises(ValueError, match="new process"):
         record_restart(state, "traitmech", 42, 42, now=NOW)
+
+
+@pytest.mark.parametrize('count,phase', [(499, 'healthy'), (500, 'candidate'), (501, 'candidate')])
+def test_goal_boundary_threshold_is_inclusive_without_host_warning(count, phase):
+    result = decide({}, measurement({42: count, 43: 4000}), [session(), session(43, 'culturemech')],
+                    {}, now=NOW, boundary={'repository_key': 'traitmech', 'pid': 42})
+    assert result['phase'] == phase
+    if phase == 'candidate':
+        assert result['candidate']['pid'] == 42  # Never the unrelated larger offender.
+
+
+def test_goal_boundary_limit_is_configurable_and_validated():
+    config = {'goal_boundary_limit': 700}
+    args = (config, measurement({42: 600}), [session()], {})
+    assert decide(*args, now=NOW, boundary={'repository_key': 'traitmech', 'pid': 42})['phase'] == 'healthy'
+    for invalid in [0, 2, True, '500', float('nan')]:
+        with pytest.raises(ValueError):
+            normalize_config({'goal_boundary_limit': invalid})
+
+
+@pytest.mark.parametrize('change', [{'busy': True}, {'idle': False}, {'prompt': True},
+                                  {'blocked_tasks': [{'task': 'pr', 'age_seconds': 68400}]}])
+def test_boundary_never_substitutes_another_target_for_unsafe_completed_session(change):
+    result = decide({}, measurement({42: 500, 43: 4000}), [session(**change), session(43, 'culturemech')],
+                    {}, now=NOW, boundary={'repository_key': 'traitmech', 'pid': 42})
+    assert result['phase'] == 'blocked' and result['candidate'] is None
+
+
+@pytest.mark.parametrize('state,phase', [
+    ({'restart_history': [{'repository_key': 'traitmech', 'completed_at': NOW - 1}]}, 'blocked'),
+    ({'restart_history': [{'repository_key': 'other', 'completed_at': NOW - i} for i in (1, 2)]}, 'limited'),
+    ({'disabled': True, 'failure': {'reason': 'prior failure'}}, 'disabled'),
+])
+def test_boundary_shares_fallback_cooldown_cap_and_latch(state, phase):
+    result = decide({}, measurement({42: 500}), [session()], state, now=NOW,
+                    boundary={'repository_key': 'traitmech', 'pid': 42})
+    assert result['phase'] == phase and result['candidate'] is None
+
+
+def test_boundary_unknown_measurement_and_identity_mismatch_are_never_healthy():
+    for measured, row in [(measurement(known=False), session()),
+                          (measurement(), session(conversation_ids={'index': 'one', 'supervisor': 'one', 'log': 'two'}))]:
+        result = decide({}, measured, [row], {}, now=NOW,
+                        boundary={'repository_key': 'traitmech', 'pid': 42})
+        assert result['phase'] == 'unknown' and result['healthy'] is None
+
+
+@pytest.mark.parametrize('allowed,phase,selected', [(['traitmech'], 'candidate', 42),
+                                                   ([], 'blocked', None), (None, 'candidate', 43)])
+def test_canary_allowlist_preserves_all_measurements_and_limits_selection(allowed, phase, selected):
+    result = choose([session(), session(43, 'culturemech')], measured=measurement({42: 1200, 43: 4000}),
+                    config={'restart_repository_keys': allowed})
+    assert result['phase'] == phase
+    assert (result['candidate'] or {}).get('pid') == selected
+    assert result['offender_pids'] == [42, 43]
+
+
+def test_noncanary_boundary_is_off_without_claiming_health_or_holding_normal_work():
+    result = decide({'restart_repository_keys': ['culturemech']}, measurement({42: 500}), [session()], {},
+                    now=NOW, boundary={'repository_key': 'traitmech', 'pid': 42})
+    assert result['phase'] == 'off' and result['candidate'] is None and result['healthy'] is None
+
+
+@pytest.mark.parametrize('allowed', ['traitmech', ['traitmech', 'traitmech'], [''], [True], ['../unsafe']])
+def test_invalid_canary_allowlist_is_rejected(allowed):
+    with pytest.raises(ValueError, match='restart_repository_keys'):
+        normalize_config({'restart_repository_keys': allowed})

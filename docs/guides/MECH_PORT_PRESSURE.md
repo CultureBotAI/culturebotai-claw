@@ -2,9 +2,15 @@
 
 The session supervisor can report leaked loopback listeners and, after an
 operator-approved canary, recycle one verified-idle agy session by exact ID.
+Its preferred opportunity is a verified goal boundary: after accepting the
+completed goal's closure and before dispatching the next goal, it checks that
+session against the configurable 500-listener threshold. An idle scan remains
+available when host or per-process pressure exceeds its fallback thresholds.
 This is a workaround for #725, not a change to the enterprise sandbox policy.
 It never sends signals to an agent, changes the port range, or answers prompts.
-It never submits goal text during a maintenance transaction.
+The restart transaction never submits goal text. After a successful boundary
+restart and rebind, the supervisor performs fresh dispatch checks for the one
+legitimate next goal; it never replays the completed goal.
 
 Existing supervisor configurations without `port_pressure` keep the guard off.
 An explicit `port_pressure` object defaults to `mode: report`. The single off
@@ -23,8 +29,10 @@ and input lock directory. Add this object to that supervisor configuration:
     "mode": "report",
     "host_ratio": 0.5,
     "per_pid_limit": 1000,
+    "goal_boundary_limit": 500,
     "cooldown_seconds": 3600,
     "hourly_cap": 2,
+    "restart_repository_keys": null,
     "binding_files": [
       {"role": "monitor", "path": "/absolute/path/to/monitor-targets.json"},
       {"role": "approval", "path": "/absolute/path/to/approval-targets.json"}
@@ -32,6 +40,14 @@ and input lock directory. Add this object to that supervisor configuration:
   }
 }
 ```
+
+`restart_repository_keys` optionally restricts recycling to named, configured
+repository keys. `null` allows all configured targets; an empty list allows
+none. Measurements and blocked-task reports still cover all targets. A target
+outside the allowlist retains ordinary goal dispatch without a boundary recycle.
+For a separately approved one-session canary, set this list to that session's
+single repository key and set `hourly_cap` to `1`. Keep the full supervisor
+target list and the original binding files; do not remove other monitored sessions.
 
 Both binding files must use the native target-list format: either a list or an
 object containing `targets`. Their exact old PID, start identity, TTY and cwd
@@ -103,10 +119,28 @@ row count divided by range size, not a claim about distinct occupied ports.
 The XMechBay watch's `occupancy_ratio` has different semantics and is not silently
 imported. Failed, partial, malformed or missing measurements remain unknown.
 
-The report identifies threshold offenders, unmanaged offenders, the largest
-eligible candidate and excluded sessions. A host ratio at or above 0.5, or any
-agy process strictly above 1,000 loopback listeners, triggers consideration.
-Sessions at the two-listener baseline are not useful restart candidates.
+The standalone report identifies fallback threshold offenders, unmanaged
+offenders, the largest eligible candidate and excluded sessions. A host ratio
+at or above 0.5, or any agy process strictly above 1,000 loopback listeners,
+triggers the idle-scan fallback. Sessions at the two-listener baseline are not
+useful restart candidates.
+
+During ordinary supervision, a verified completed goal awaiting its next
+`start_goal` dispatch is a separate trigger. At or above `goal_boundary_limit`
+(500 by default), that exact session must recycle first, even when host pressure
+is low. Native completion alone is insufficient: the supervisor's closure
+verification must have accepted the prior goal. Stage zero, closure repair and
+unrelated sessions are not boundary authority. The boundary uses stage keys
+and retained closure identity, so it does not depend on six- or seven-stage
+numbering.
+
+Boundary recycling takes precedence over the idle fallback. Both paths share
+the same one-recycle tick budget, transaction lock, cooldown, hourly cap and
+first-failure latch. A boundary blocked by a prompt, background task, limit or
+unknown measurement holds next-goal dispatch. In `mode: report`, an eligible
+boundary reports that it would recycle and holds the next goal without sending
+input; `mode: off` leaves ordinary goal dispatch unchanged. A successful recycle
+does not allow a second fallback recycle in the same tick.
 
 `blocked_tasks` reports active native tools, Terminal task indicators and verified
 descendant processes. Ages use a full native timestamp or process start time;
@@ -114,15 +148,23 @@ an ambiguous displayed time remains unknown. Socket states are attributed only
 when an observed child connection's remote endpoint matches this agy process's
 loopback listener. A missing socket is unknown, not CLOSED. Even a confirmed
 CLOSED connection never authorizes selecting or killing that running task.
+This includes a shell whose child is `/usr/bin/pr`: a quoted inline GitHub body
+containing backticks can invoke command substitution and leave that child
+reading the tty for hours. An empty composer or newer completed native step
+does not erase the live process ancestry. The guard reports the authoritative
+age and socket evidence, and leaves the task alone. The separate prevention
+proposal is [#913](https://github.com/CultureBotAI/culturebotai-claw/issues/913):
+prepare PR and issue bodies in a file and pass `--body-file` so prose is not
+interpreted as shell code.
 
 ## Approved canary and subsequent operation
 
 Deployment, Intel reporting, the canary and enabling automatic restarts require
 separate operator approval. This PR's offline tests are not hardware acceptance.
-After approval, scope the assessed guard configuration to the one chosen canary,
-set `mode: restart`, and use `--port-pressure-restart` for a single maintenance
-tick. That command cannot fall through to workflow/goal dispatch, even if no
-restart is selected. It also cannot override `mode: off`.
+The standalone `--port-pressure-restart` command remains a single idle-scan
+maintenance tick. It cannot fall through to workflow/goal dispatch, even if no
+restart is selected, and cannot override `mode: off`. Below its host/per-process
+fallback thresholds it does not exercise the new 500-listener boundary path.
 
 Before input, the guard repeats identity, idle, background-task, prompt, model
 and three-source ID checks under the shared input lease. Its final interaction
@@ -130,7 +172,19 @@ is `/quit`. It requires fresh printed `agy --conversation=<id>` output, old PID
 exit, and the same verified returned shell/cwd before sending an explicitly
 quoted conversation/model/effort command. It verifies the new PID, current
 identity/footer, absence of human prompts, and exactly two loopback listeners
-before rebinding. No `/goal`, `--continue`, `--last` or signal fallback exists.
+before rebinding. The restart transaction contains no `/goal`, `--continue`,
+`--last` or signal fallback.
+
+A recognized dismissible `Meet Gemini 4 Argon` announcement may remain visible
+while the current empty composer and model/effort footer prove readiness. The
+guard neither fails merely because that announcement is present nor sends
+Escape to dismiss it. A feedback survey such as `How's the CLI experience so
+far?` with `[0] Skip` is a human prompt: hold and report, without selecting Skip.
+After resume, an apparent sign-in screen is read again within a bounded startup
+check before being classified as persistent. The guard never answers it; a
+persistent sign-in, another prompt or failed readiness proof stops the
+transaction. A historical sign-in line must not replace the current runtime
+screen as evidence.
 
 At most one restart occurs per tick. Successful restart history enforces the
 per-session cooldown across PID changes and the rolling hourly cap. Durable
@@ -140,14 +194,42 @@ and emits an alert in the JSON report. Corrupt state is preserved for inspection
 Do not delete state to bypass a limit or retry an uncertain restart. Reconcile
 the old/new processes, IDs, all bindings and journal before an approved recovery.
 
-For the canary, independently verify effective monitor/approval bindings, exactly
-two listeners, unchanged model/effort/conversation and no submitted goal text.
-Only after that approval may normal supervisor apply ticks use `mode: restart`.
+Proposed goal-boundary canary, after its separate approval:
+
+1. Select one existing assessed agy session that has reached verified goal
+   closure and naturally holds at least 500 loopback listeners. Record its
+   current identity, three agreeing IDs, model/effort, idle/task state, listener
+   counts and exact pending next goal. Preserve the established ledger and
+   evidence; do not manufacture completion or reset an intervention state.
+2. Confirm the earlier approved report-only observations and the effective
+   monitor/approval reload and shared-input-lock contracts. Set
+   `restart_repository_keys` to only the approved canary's key, `hourly_cap` to
+   `1`, and `mode: restart` through the owned existing supervisor;
+   do not launch a competing loop or alter unrelated sessions.
+3. Observe one authorized supervisor boundary dispatch. Require `/quit`, old-PID
+   exit, fresh matching printed ID, explicit-ID resume with unchanged model and
+   effort, exactly two listeners and all binding read-backs before the fresh
+   next-goal dispatch checks.
+4. Independently verify effective live monitor/approval bindings, unchanged
+   conversation and goal history, exactly one legitimate next goal accepted,
+   and no replay of the completed goal. Confirm the shared cooldown/cap history
+   and that no second session recycled in that tick. On a prompt, mismatch or
+   failure, retain the latch and evidence for operator reconciliation.
+
+Only after approved canary acceptance may broader automatic recycling be
+considered. Deployment, reporting and canary approvals are distinct; offline
+tests or a transport-only fallback restart do not supply those approvals.
 Remove the workaround after a fixed agy build is confirmed to stay at two
 listeners after sandboxed commands.
 
 The published procedure used for implementation is XMechBay PR5's
 `mac-orchestration` graceful-exit contract and `docs/port-pressure-recovery.md`.
-The separately referenced `scripts/adhoc/agy_exact_restart.sh` still
-requires source reconciliation before deployment; its unavailable contents
-must not be represented as having been read or tested.
+The supplied read-only `agy_exact_restart.sh` reference was reconciled on
+2026-11-07, SHA-256
+`4a7aa17b6dfa2c91e157639b73b768630266eb55db86f4cbf7efdb38e99ca555`.
+The implementation retains its identity/idle/quit/printed-ID/explicit-resume
+sequence while requiring all three IDs, treating model drift as failure,
+verifying exactly two listeners and rebinding the assessed runtime. Those are
+stricter checks than the shell reference's optional supervisor-ID comparison
+and model-drift warning. The supplied November 4 and November 6 restart logs
+are historical corroboration, not a live acceptance test of this implementation.

@@ -456,12 +456,23 @@ def test_native_exit_refuses_another_live_agy_on_same_tty(tmp_path):
         native.wait_exit(row, 30)
 
 
-def test_native_resume_stops_at_signin_menu_without_further_observation(tmp_path):
+def test_native_resume_rereads_signin_once_without_process_or_input_actions(tmp_path):
     supervisor = SupervisorFixture(tmp_path)
     native = guard.NativeTransport(supervisor, clock=lambda: NOW)
     tab = {"window": 1, "tab": 1, "tty": "/dev/ttys042", "screen": "Sign in with your organization"}
     native.before_quit = {"observation": {"tab": tab}}
-    native.snapshot = lambda _row: tab
+    reads = []
+    native.snapshot = lambda _row: reads.append(tab) or tab
+    native.sleep = lambda _: None
     native.processes = lambda: pytest.fail("sign-in menu must stop processing")
-    with pytest.raises(guard.GuardError, match="human prompt"):
+    with pytest.raises(guard.GuardError, match="after fresh reread"):
         native.wait_resumed(supervisor.config["targets"][0], 45)
+    assert len(reads) == 2
+
+
+def test_unknown_canary_target_fails_before_any_observation(tmp_path):
+    supervisor = SupervisorFixture(tmp_path, restart_repository_keys=['not_configured'])
+    transport = TransportFixture(supervisor)
+    with pytest.raises(guard.GuardError, match='unconfigured target'):
+        guard.PortPressureGuard(supervisor, transport=transport)
+    assert transport.calls == [] and transport.inputs == []
