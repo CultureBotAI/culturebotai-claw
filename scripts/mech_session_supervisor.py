@@ -312,6 +312,17 @@ def migrate_ledger(ledger: dict, target: dict, effective: dict) -> dict:
 
 
 def validate_config(config: dict, *, resolve_repositories: bool = True) -> dict:
+    from kg_microbe_workflows.port_pressure import normalize_config
+
+    pressure = config.get("port_pressure", {"mode": "off"})
+    if not isinstance(pressure, dict):
+        raise SupervisorError("port_pressure must be an object")
+    try:
+        config["port_pressure"] = normalize_config({key: value for key, value in pressure.items() if key != "binding_files"})
+        if "binding_files" in pressure:
+            config["port_pressure"]["binding_files"] = pressure["binding_files"]
+    except ValueError as error:
+        raise SupervisorError(str(error)) from error
     config.setdefault("native_reader_path", str(ROOT / "scripts/mech_session_native.py"))
     config.setdefault("notifier_path", str(ROOT / "scripts/mech_session_terminal.py"))
     for field in ("run_id", "runtime_dir", "native_reader_path", "notifier_path", "input_lock_dir", "targets"):
@@ -372,6 +383,9 @@ def validate_config(config: dict, *, resolve_repositories: bool = True) -> dict:
                 raise SupervisorError(f"{key}: stage skill_paths missing")
         if not Path(target["root"]).is_absolute():
             raise SupervisorError(f"{key}: repository root must be absolute")
+    allowed = config["port_pressure"]["restart_repository_keys"]
+    if allowed is not None and not set(allowed) <= seen:
+        raise SupervisorError("restart_repository_keys contains an unconfigured target")
     if resolve_repositories:
         sys.path.insert(0, str(ROOT))
         from kg_microbe_fleet import load_fleet_manifest
@@ -1276,6 +1290,14 @@ function run(argv) {
             groups = system.doShellScript('/bin/ps -p ' + expected.pid + ' -o pgid=,tpgid=').trim().split(/\s+/);
         } catch (error) { return 'process-unavailable'; }
         if (identity !== expected.identity || cwd.length !== 1 || cwd[0] !== expected.cwd || groups.length !== 2 || groups[0] !== groups[1]) return 'identity-changed';
+        if (expected.agy_inventory) {
+            let inventory;
+            try {
+                inventory = system.doShellScript('/bin/ps -ax -o pid=,tty=,lstart=,comm=').split(/\r?\n|\r/)
+                    .map(x => x.trim()).filter(x => /(?:^|\s)agy$/.test(x)).sort();
+            } catch (error) { return 'process-inventory-unavailable'; }
+            if (JSON.stringify(inventory) !== JSON.stringify(expected.agy_inventory)) return 'process-inventory-changed';
+        }
         let currentScreen, expectedScreen;
         try {
             currentScreen = currentTail(tab);
@@ -1357,6 +1379,36 @@ class Supervisor:
         self.runner = runner
         self.stop_requested = stop_requested or (lambda: False)
         self.native_cache: dict[str, tuple[tuple, dict]] = {}
+        self._port_pressure_helpers = {
+            "read_json": read_json, "atomic_json": atomic_json, "file_lock": file_lock,
+            "send_js": SEND_JS, "busy": terminal_busy_reason,
+        }
+
+    def port_pressure(self, *, apply: bool = False, report_only: bool = False, boundary: dict | None = None,
+                      excluded_repository_keys: tuple[str, ...] = ()) -> dict:
+        from kg_microbe_workflows.port_pressure import normalize_config
+
+        # The one-setting off switch is reread each tick, not just at startup.
+        if self.config.get("_config_path"):
+            source = read_json(Path(self.config["_config_path"]))
+            self.config["port_pressure"] = source.get("port_pressure", {"mode": "off"})
+        if report_only:
+            self.config["port_pressure"] = {**self.config.get("port_pressure", {}), "mode": "report"}
+        raw = self.config.get("port_pressure", {"mode": "off"})
+        normalized = normalize_config({key: value for key, value in raw.items() if key != "binding_files"})
+        allowed = normalized["restart_repository_keys"]
+        if allowed is not None and not set(allowed) <= {target["repository_key"] for target in self.config["targets"]}:
+            raise SupervisorError("restart_repository_keys contains an unconfigured target")
+        self.config["port_pressure"] = {**raw, **normalized}
+        if normalized["mode"] == "off":
+            return {"phase": "off", "candidate": None}
+        adapter = import_file(ROOT / "scripts/mech_session_port_pressure.py", "supervisor_port_pressure")
+        kwargs = {"apply": apply and not report_only}
+        if boundary is not None:
+            kwargs["boundary"] = boundary
+        if excluded_repository_keys:
+            kwargs["excluded_repository_keys"] = excluded_repository_keys
+        return adapter.PortPressureGuard(self).tick(**kwargs)
 
     def stopping(self) -> bool:
         return self.stop_requested() or (self.runtime / "STOP").exists()
@@ -1549,9 +1601,89 @@ class Supervisor:
         except Exception as error:
             return {"authority": "ignored", "error": str(error)[:300]}
 
+    def goal_boundary(self, target: dict, ledger: dict, decision: dict) -> dict | None:
+        """Bind maintenance to the retained verified closure, never a stage number."""
+        if decision.get("action") != "start_goal" or not ledger.get("awaiting_goal"):
+            return None
+        records = ledger.get("completed_stages", [])
+        if not records:
+            return None  # Initial adoption is not a completed-goal boundary.
+        closed = records[-1]
+        if (closed.get("goal_identity") != ledger.get("adopted_goal")
+                or closed.get("verification", {}).get("status") not in {"merged", "no_changes"}
+                or closed.get("completion_authority") not in {"native_completed", "verified_receipt_override"}
+                or not re.fullmatch(r"[0-9a-f]{64}", closed.get("receipt_sha256", ""))):
+            raise SupervisorError("goal-boundary recycling requires the retained verified completion")
+        stage = stage_profile(target, ledger["stage"], ledger)
+        key = stage.get("key") if stage else None
+        if not key:
+            raise SupervisorError("goal-boundary recycling requires a canonical stage key")
+        return {"repository_key": target["repository_key"], "pid": target["pid"],
+                "action_id": decision["action_id"], "next_stage_key": key,
+                "receipt_sha256": closed["receipt_sha256"],
+                "completion_authority": closed["completion_authority"],
+                "goal_identity": copy.deepcopy(closed["goal_identity"])}
+
+    def boundary_maintenance(self, target: dict, ledger: dict, decision: dict) -> dict | None:
+        if self.config.get("port_pressure", {"mode": "off"}).get("mode") == "off":
+            return None
+        allowed = self.config["port_pressure"].get("restart_repository_keys")
+        if allowed is not None and target["repository_key"] not in allowed:
+            return None  # Canary scope does not hold other sessions' normal goals.
+        boundary = self.goal_boundary(target, ledger, decision)
+        if boundary is None:
+            return None
+        self._port_pressure_boundary_seen = True
+        fresh = self.observe(target, fresh=True, allow_redraw=False)
+        fresh["agent_progress"] = self.progress(target, ledger)
+        reason = None
+        if decide(ledger, fresh).get("action_id") != decision.get("action_id"):
+            reason = "goal prerequisite changed before boundary maintenance"
+        else:
+            errors = self.skill_errors(target, ledger["stage"], ledger)
+            if (boundary["next_stage_key"] == "resolve_review_findings"
+                    and not previous_evidence(ledger, ledger["stage"])):
+                errors.append("next goal requires the verified review manifest")
+            try:
+                self.check_workflow(target, ledger)
+            except Exception as error:
+                errors.append(str(error))
+            reason = "; ".join(errors) if errors else None
+        if reason:
+            report = {"phase": "blocked", "reason": reason}
+            marker = {**boundary, **report, "updated_at": now()}
+            ledger["port_pressure_boundary"] = marker
+            self.save(target, ledger)
+            self._port_pressure_boundary_report = marker
+            return marker
+        prior = ledger.get("port_pressure_boundary", {})
+        if (prior.get("action_id") == boundary["action_id"]
+                and prior.get("receipt_sha256") == boundary["receipt_sha256"]
+                and prior.get("phase") == "restarted"
+                and prior.get("new_pid") == target["pid"]
+                and prior.get("process_identity") == target["process_identity"]):
+            self._port_pressure_boundary_report = prior
+            return prior  # A failed goal send must not spend another restart.
+        if getattr(self, "_port_pressure_recycled", False):
+            report = {"phase": "limited", "limit_reason": "one recycle per supervisor tick"}
+        else:
+            report = self.port_pressure(apply=True, boundary=boundary)
+        if report["phase"] == "restarted":
+            self._port_pressure_recycled = True
+        marker = {**boundary, **report, "process_identity": target["process_identity"], "updated_at": now()}
+        # Durable hold/restart proof survives a failed send or supervisor tick.
+        ledger["port_pressure_boundary"] = marker
+        self.save(target, ledger)
+        self._port_pressure_boundary_report = marker
+        return marker
+
     def dispatch(self, target: dict, ledger: dict, decision: dict) -> dict:
         if self.stopping():
             return {"state": "not-sent", "reason": "supervisor stop requested"}
+        boundary = self.boundary_maintenance(target, ledger, decision)
+        if boundary and boundary["phase"] not in {"off", "healthy", "restarted"}:
+            return {"state": "not-sent", "reason": "goal boundary held for port-pressure maintenance",
+                    "port_pressure": boundary}
         lock = Path(self.config["input_lock_dir"]) / (Path(target["tty"]).name + ".lock")
         with file_lock(lock):
             observation = self.observe(target, fresh=True, allow_redraw=True, lock_held=True)
@@ -1746,7 +1878,25 @@ class Supervisor:
                 raise SupervisorError("next-cycle profile/extension is not committed at the verified closure head")
 
     def sweep(self, *, apply: bool = False) -> dict:
+        self._port_pressure_recycled = False
+        self._port_pressure_boundary_seen = False
+        self._port_pressure_boundary_report = None
+        fallback_attempted = False
+        # Observe pressure first, but do not let an idle-scan candidate preempt
+        # a session whose verified goal boundary is established below.
+        pressure = self.port_pressure(apply=False)
+        initial_pressure = pressure
+        if (self.config.get("port_pressure", {}).get("mode") == "restart"
+                and pressure["phase"] in {"restarted", "disabled", "unknown"}):
+            # A maintenance tick never sends ordinary workflow/goal text. An
+            # uncertain transaction stays stopped for operator reconciliation.
+            result = {"run_id": self.config["run_id"], "updated_at": now(),
+                      "mode": "apply" if apply else "observe", "sessions": [],
+                      "port_pressure": pressure}
+            self.write(self.runtime / "dashboard.json", result)
+            return result
         rows = []
+        deliveries = []
         for target in self.config["targets"]:
             if self.stopping():
                 break
@@ -1840,11 +1990,16 @@ class Supervisor:
                       "completed_stages": ledger["completed_stages"], "updated_at": now()}
             self.write(directory / "status.json", status)
             if apply and decision.get("action"):
-                try:
-                    status["delivery"] = self.dispatch(target, ledger, decision)
-                except Exception as error:
-                    status["delivery"] = {"state": "not-sent", "reason": str(error)[:700]}
-                self.write(directory / "status.json", status)
+                if self.config.get("port_pressure", {}).get("mode") == "off":
+                    # Disabled deployments retain the existing per-target STOP
+                    # and dispatch order; observation adds no maintenance lane.
+                    try:
+                        status["delivery"] = self.dispatch(target, ledger, decision)
+                    except Exception as error:
+                        status["delivery"] = {"state": "not-sent", "reason": str(error)[:700]}
+                    self.write(directory / "status.json", status)
+                else:
+                    deliveries.append((target, ledger, decision, status))
             rows.append({"repository": target["repository_key"], "stage": ledger["stage"], "cycle": ledger.get("cycle", 1),
                          "phase": decision["phase"], "reason": decision.get("reason"),
                          "goal_state": observation.get("goal_state"),
@@ -1853,7 +2008,53 @@ class Supervisor:
             self.write(self.runtime / "heartbeat.json", {"pid": os.getpid(), "updated_at": now(),
                 "running": True, "mode": "apply" if apply else "observe", "sweep_in_progress": True,
                 "repositories_observed": len(rows), "repositories_total": len(self.config["targets"])})
-        dashboard = {"run_id": self.config["run_id"], "updated_at": now(), "mode": "apply" if apply else "observe", "sessions": rows}
+        # Goal starts run first irrespective of target-list order. They retain
+        # their closure proof and use their own target-specific maintenance.
+        deliveries.sort(key=lambda entry: entry[2].get("action") != "start_goal")
+        attempted = []
+        boundary_reports = []
+        for target, ledger, decision, status in deliveries:
+            if self.stopping():
+                break
+            if (decision.get("action") != "start_goal"
+                    and not self._port_pressure_recycled and not fallback_attempted
+                    and initial_pressure.get("phase") == "candidate"
+                    and pressure.get("phase") not in {"disabled", "unknown"}):
+                fallback_attempted = True
+                pressure = self.port_pressure(apply=apply, excluded_repository_keys=tuple(attempted))
+                self._port_pressure_recycled = pressure.get("phase") == "restarted"
+                if pressure.get("phase") in {"restarted", "disabled", "unknown"}:
+                    break
+            try:
+                attempted.append(target["repository_key"])
+                self._port_pressure_boundary_report = None
+                status["delivery"] = self.dispatch(target, ledger, decision)
+            except Exception as error:
+                status["delivery"] = {"state": "not-sent", "reason": str(error)[:700]}
+            directory = self.directory(target)
+            current_status = read_json(directory / "status.json")
+            if current_status.get("port_pressure_restart"):
+                status["port_pressure_restart"] = current_status["port_pressure_restart"]
+            if ledger.get("port_pressure_boundary"):
+                status["port_pressure_boundary"] = ledger["port_pressure_boundary"]
+            self.write(directory / "status.json", status)
+            next(row for row in rows if row["repository"] == target["repository_key"])["delivery"] = status["delivery"]["state"]
+            if self._port_pressure_boundary_report:
+                pressure = self._port_pressure_boundary_report
+                boundary_reports.append(pressure)
+            if pressure.get("phase") in {"disabled", "unknown"}:
+                break
+        if (apply and not self.stopping()
+                and not self._port_pressure_recycled and not fallback_attempted
+                and initial_pressure.get("phase") == "candidate"
+                and pressure.get("phase") not in {"disabled", "unknown"}):
+            pressure = self.port_pressure(apply=True, excluded_repository_keys=tuple(attempted))
+            self._port_pressure_recycled = pressure.get("phase") == "restarted"
+        if boundary_reports:
+            pressure = {**pressure, "initial_idle_scan": initial_pressure, "goal_boundaries": boundary_reports,
+                        "recycle_performed_this_tick": self._port_pressure_recycled}
+        dashboard = {"run_id": self.config["run_id"], "updated_at": now(), "mode": "apply" if apply else "observe", "sessions": rows,
+                     "port_pressure": pressure}
         self.write(self.runtime / "dashboard.json", dashboard)
         lines = ["# Mech session workflow", "", f"Updated: {dashboard['updated_at']}", "",
                  "| Repository | Stage | Phase | Native goal | Detail |", "|---|---:|---|---|---|"]
@@ -1879,14 +2080,20 @@ def main(argv=None) -> int:
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--observe", action="store_true", help="read-only observation (default)")
     mode.add_argument("--apply", action="store_true", help="submit guarded instructions at idle composers")
+    mode.add_argument("--port-pressure-report", action="store_true",
+                      help="only report port pressure and blocked tasks; never send session input")
+    mode.add_argument("--port-pressure-restart", action="store_true",
+                      help="only run the explicitly enabled maintenance guard; never dispatch goal text")
     parser.add_argument("--loop", action="store_true")
     parser.add_argument("--interval", type=float, default=30)
     args = parser.parse_args(argv)
     if not 5 <= args.interval <= 60:
         parser.error("--interval must be between 5 and 60 seconds")
     config = validate_config(read_json(args.config))
+    config["_config_path"] = str(args.config.resolve())
     stopped = False
     supervisor = Supervisor(config, stop_requested=lambda: stopped)
+    guard_failed = False
 
     def stop(_signal, _frame):
         nonlocal stopped
@@ -1894,10 +2101,26 @@ def main(argv=None) -> int:
 
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
+    if args.port_pressure_report or args.port_pressure_restart:
+        # A standalone observation must not acquire the workflow loop's lock or
+        # overwrite its heartbeat. The guard owns a separate transaction lock.
+        while not stopped and not supervisor.stopping():
+            result = supervisor.port_pressure(report_only=args.port_pressure_report,
+                                              apply=args.port_pressure_restart)
+            print(json.dumps(result), flush=True)
+            guard_failed = guard_failed or result.get("phase") in {"unknown", "disabled"}
+            if not args.loop:
+                return int(guard_failed)
+            deadline = time.monotonic() + args.interval
+            while not stopped and time.monotonic() < deadline:
+                time.sleep(min(0.5, max(0, deadline - time.monotonic())))
+        return int(guard_failed)
     with file_lock(supervisor.runtime / "supervisor.lock"):
         try:
             while not stopped and not (supervisor.runtime / "STOP").exists():
-                print(json.dumps(supervisor.sweep(apply=args.apply)), flush=True)
+                result = supervisor.sweep(apply=args.apply)
+                print(json.dumps(result), flush=True)
+                guard_failed = guard_failed or result.get("port_pressure", {}).get("phase") in {"unknown", "disabled"}
                 if not args.loop:
                     break
                 deadline = time.monotonic() + args.interval
@@ -1906,7 +2129,7 @@ def main(argv=None) -> int:
         finally:
             supervisor.write(supervisor.runtime / "heartbeat.json", {"pid": os.getpid(), "updated_at": now(),
                 "running": False, "mode": "apply" if args.apply else "observe"})
-    return 0
+    return int(guard_failed)
 
 
 if __name__ == "__main__":
