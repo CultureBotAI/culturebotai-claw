@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterable
 
 from kg_microbe_fleet import FleetManifest, load_fleet_manifest
+from kg_microbe_progress import ProgressError, _cycle_version, _stage_keys
 
 REGISTRY_NAME = "pr-associations.jsonl"
 MAX_BYTES = 16 * 1024 * 1024
@@ -119,7 +120,7 @@ def _validate_context(context: dict, *, allow_missing_workflow: bool = False) ->
     if (not isinstance(context.get("run_id"), str) or not context["run_id"]
             or len(context["run_id"]) > 200 or not isinstance(context.get("repository_key"), str)
             or not _positive(context.get("cycle")) or type(context.get("stage")) is not int
-            or context["stage"] not in range(1, 7)
+            or context["stage"] not in range(1, 8)
             or not valid_workflow):
         raise AssociationError("association workflow identity is incomplete")
     if (not isinstance(goal, dict)
@@ -138,6 +139,7 @@ def _retained_contexts(ledger: dict) -> list[dict]:
     # Absence supplies no current context; non-null malformed goals still fail.
     if current["goal_identity"] is not None:
         _validate_context(current)
+        _validate_cycle_stage(ledger)
         contexts.append(current)
     completed = ledger.get("completed_stages")
     if not isinstance(completed, list):
@@ -150,9 +152,20 @@ def _retained_contexts(ledger: dict) -> list[dict]:
         # identity, but never invent a pin or use them as registry authority.
         legacy = "workflow_sha256" not in item
         _validate_context(context, allow_missing_workflow=legacy)
+        _validate_cycle_stage(ledger, item)
         if not legacy:
             contexts.append(context)
     return contexts
+
+
+def _validate_cycle_stage(ledger: dict, record: dict | None = None) -> None:
+    try:
+        version = _cycle_version(ledger, record)
+        source = ledger if record is None else record
+        if source["stage"] > len(_stage_keys({"parent_version": version})):
+            raise ProgressError("stage is outside the pinned cycle")
+    except ProgressError as error:
+        raise AssociationError(str(error)) from error
 
 
 def _validate_record(record: Any, ledger: dict, *, require_retained: bool = True) -> dict:
@@ -361,7 +374,7 @@ def fetch_pr_observations(
             raise AssociationError("PR query is outside the canonical fleet")
         stage = association.get("stage", association.get("stage_number"))
         if (not _positive(association.get("cycle")) or type(stage) is not int
-                or stage not in range(1, 7)
+                or stage not in range(1, 8)
                 or ("stage" in association and "stage_number" in association
                     and association["stage"] != association["stage_number"])):
             raise AssociationError("PR query has no explicit goal stage")

@@ -7,7 +7,7 @@ the supervisor verifies evidence before starting the next goal. Importing the
 committed Terminal adapter performs no UI actions. This guide can serve as the
 legacy agent's `workflow_prompt_path`; canonical cycles use the validated YAML contract and immutable runtime snapshot described below.
 
-See [the shared workflow contract](MECH_WORKFLOW_CONTRACT.md) for the six goals,
+See [the shared workflow contract](MECH_WORKFLOW_CONTRACT.md) for parent v2's seven goals,
 versioned review outputs, infrastructure intake, and cycle restart. Its YAML
 parent and LinkML schema are the source of truth.
 
@@ -36,7 +36,8 @@ repository paths from their names.
 The following creates a **TraitMech example** configuration using an existing
 process. First inspect `/bin/ps ax -o pid=,tty=,lstart=,comm=` and the relevant
 Terminal tab, then set `MECH_SESSION_PID` to its observed numeric PID and
-`MECH_INITIAL_STAGE` to the stage matching its actual last goal (1–6).
+`MECH_INITIAL_STAGE` to the stage matching its actual last goal in the pinned
+parent version (1–7 for v2, 1–6 for v1).
 Never relabel a different existing goal merely to fit the example. Stage 0 is
 available for closing unrelated adopted work before starting stage 1.
 Set `MECH_MANIFEST_PATH` to the verified manifest if needed.
@@ -114,9 +115,10 @@ PY
 ```
 
 Review the printed goal and generated configuration before running it. The
-profile supplies all six stages; do not copy a second stage list into the runtime
+profile supplies every stage; do not copy a second stage list into the runtime
 configuration. The active cycle retains an immutable effective-profile snapshot;
-`workflow_next_profile_path` selects the candidate to validate after stage 6.
+`workflow_next_profile_path` selects the candidate to validate after the active
+infrastructure goal's closure (v2 stage 7; v1 stage 6).
 `native_reader_path` and `notifier_path` default to the committed sibling
 scripts; explicit overrides remain supported for a reviewed local adapter.
 For other Mechs, assess native skills and domain applicability separately.
@@ -126,12 +128,57 @@ objective, its appropriate local review skill, and an evidence-backed no-change
 result. Do not invent graph fields
 or UniProt annotations to satisfy a generic sequence.
 
-## Migrating an existing four-stage run
+## Migrating a six-goal cycle to seven goals
+
+An active v1 cycle stays on its saved effective workflow while a v2 profile is
+prepared and reviewed. Do not edit its snapshot, shift its stage, replace its
+native goal, rewrite old receipts or rename historical evidence directories.
+The ledger's `cycle_versions` records each cycle's parent version, and status
+exposes `parent_version` and `stage_key` so a stage number is not mistaken for
+the same goal across versions. Stage 0 remains not started.
+
+Configure the target's reviewed `workflow_parent_migration` for the exact old
+and candidate effective workflow hashes and its review artifact:
+
+```json
+{
+  "workflow_parent_migration": {
+    "from_sha256": "<old effective workflow digest>",
+    "to_sha256": "<candidate effective workflow digest>",
+    "reviewed_by": "<reviewer>",
+    "reason": "<reviewed migration rationale>",
+    "review": {"artifact": "<review artifact path>", "sha256": "<64 hex>"}
+  }
+}
+```
+
+The review artifact must be inside the Mech repository and committed at the
+verified final closure head. Set `workflow_next_parent_path` and
+`workflow_next_schema_path` when the candidate parent/schema inputs differ
+from the active ones; these are target settings, with configuration defaults.
+The supervisor
+validates that candidate against the verified infrastructure closure commit.
+Only after the current v1 infrastructure goal closes can it increment the
+cycle, pin v2 and dispatch stage 1 `open_issue_triage`. Missing, changed or
+invalid migration evidence blocks activation; it never replaces the active
+goal as a recovery action. Keep the ordinary cycle-boundary review and all
+existing closure gates effective.
+
+Release and deployment are separate from preparing this code. DUFMech is the
+chosen test Mech after a reviewed release and explicit adoption, followed by
+the remaining fleet only after a complete stage-1 test closure. No downstream
+pin is changed by the phase-1 Claw PR.
+
+## Migrating an existing four-stage run to pinned v1
 
 Stop the goal supervisor and save its configuration, ledgers, receipts, and
 status before migration. Preserve the current run, conversation, native goal,
 stage, and action history. Validate every repository profile and review the
 proposed binding before changing the configuration.
+
+This legacy mapping adopts a reviewed six-goal v1 profile first. It does not
+reinterpret the four old stage numbers against v2's inserted first goal. Use
+the six-to-seven boundary migration above only after that pinned cycle closes.
 
 For each legacy target, add `workflow_profile_path`,
 `workflow_next_profile_path`, and `workflow_migration`. The migration contains
@@ -280,18 +327,35 @@ not completion claims.
 }
 ```
 
-All canonical receipts include `goal_outputs.infra_tasks`. Stages 4–6 also
+All canonical receipts include `goal_outputs.infra_tasks`. The open_issue_triage,
+record_review, resolve_review_findings and infrastructure goals also
 include `goal_outputs.goal_evidence` with the repository-relative path and
 SHA-256 of the versioned LinkML evidence manifest. The manifest binds the
-stage's required reports and data artifacts. Stage 5 must point to this cycle's
-exact verified stage-4 manifest. Stage 6 uses the supervisor's frozen intake
+stage's required reports and data artifacts. Resolve_review_findings must point
+to this cycle's exact verified record_review manifest. Infrastructure uses the supervisor's frozen intake
 snapshot from status, accounts for every outstanding task in it, and retains
 new tasks in the current notebook for the next cycle.
+
+For open_issue_triage (v2 stage 1), status supplies `issue_scope` with the exact
+frozen queue content, hash and cutoff. Retain those bytes as issue_inventory;
+save reviewed severity/reasons, stable groups, plans, dispositions and the
+shared four-hour budget in the structured issue_triage evidence. A critical or
+high blocker retains its prerequisite and prevents goal closure. The budget
+starts only after critical/high work is resolved, is shared across both
+workers, and cannot reset for a second group or another worker. Stage-1 work
+does not alter the current cycle's later review-findings or infrastructure
+policy. See the [contract](MECH_WORKFLOW_CONTRACT.md) and the stage's
+triage-and-resolve-issues skill for selection and label rules.
+
+The selected-group list and work intervals are cumulative across revisions.
+Previously worked groups remain within the two-group cap even if later blocked;
+new selections and intervals append without rewriting earlier work or clock
+origins.
 
 Use `python -m kg_microbe_workflows validate-evidence <manifest> --root <repo>`
 from the reviewed CLAW environment; supply `--previous <manifest>` when required
 for finding continuity. Packaged examples under
-`src/kg_microbe_workflows/examples/` show the three stage-specific records.
+`src/kg_microbe_workflows/examples/` show versioned stage-specific records.
 Validation checks shape and evidence; it does not replace Git and GitHub closure.
 
 Use `issues: []` when the PR adversarial review found no issues. For a proven no-change goal, use
@@ -325,7 +389,7 @@ By default the native goal must also be completed. The opt-in target setting
 `allow_receipt_completion_override: true` permits a fully verified receipt for
 an active goal only after a matching accepted instruction; use it only after
 assessing why ordinary continuation left native goal state active.
-A canonical six-stage run advances only after each verified closure. Stage 6
+A canonical run advances only after each verified closure. Its infrastructure goal
 then increments `cycle`, validates and pins the committed next-cycle profile,
 and returns to stage 1. Actions, progress, receipts, archives, and reports carry
 the cycle identity, so older evidence cannot complete a later cycle. Legacy
