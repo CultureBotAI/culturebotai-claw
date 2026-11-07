@@ -1427,7 +1427,9 @@ def verify_ordered_prs(receipt: dict, ledger: dict, target: dict, runtime: Path 
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             raise SupervisorError("ordered closure verification exceeded its deadline")
-        kwargs["timeout"] = max(1, min(45, int(remaining)))
+        # Publication queries impose a tighter bound than ordinary member
+        # verification; preserve it within the shared ordered-closure deadline.
+        kwargs["timeout"] = min(kwargs.get("timeout", 45), 45, remaining)
         result = runner(args, **kwargs)
         if result.returncode and kwargs.get("check", True):
             raise SupervisorError("ordered closure query failed")

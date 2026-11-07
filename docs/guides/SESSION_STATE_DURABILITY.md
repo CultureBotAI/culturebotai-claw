@@ -136,10 +136,15 @@ this optional local view does not change that bundle's schema.
 
 The new parent policy requires `deliverable_commits` in the goal receipt: every
 delivered batch commit's full SHA, including the reviewed PR head. A no-change
-receipt lists none. The supervisor verifies each against the independently
-verified merged PR's commit list (which survives squash and branch deletion),
-or freshly advertised origin branch tips and GitHub's server-side ancestry
-comparison. Stale local remote refs and local graft/replace metadata do not
+receipt lists none. The supervisor verifies each against independently verified
+merged PR commit lists (which survive squash and branch deletion), or freshly advertised origin
+branch tips and GitHub's server-side ancestry comparison. Ordered multi-PR
+receipts use the union of member commit inventories only after every member's
+merge, review, validation, cleanup, same-goal membership, time window and exact
+evidence/fix retention have passed. An earlier member's squash-source commits
+remain published even when absent from the final PR inventory; additional
+recorded batches outside the verified union still need fresh origin proof. Stale
+local remote refs and local graft/replace metadata do not
 prove publication. Unknown, malformed, unavailable or bounded-out evidence
 holds closure. Additional published batches do not waive the existing primary
 PR review/merge/cleanup requirements. Historic pinned contracts remain readable;
