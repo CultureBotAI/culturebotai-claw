@@ -1,0 +1,7 @@
+Prerequisite read-only review for #766 at CLAW `c26f3a0906916f9641a5f82b004b5541ae5fbe52` found that the existing SQLite `audit()` deliberately verifies counters, membership and foreign keys, not source-row identities or complete history replay. Using its success as migration acceptance would miss altered row text, bundle documents or revision/current-state projections.
+
+The SQLite occurrence table also omits per-row source manifest/member digests; a migrator needs the verified occurrence export and original source-manifest descriptors to recompute exact IDs.
+
+Acceptance: bind the input SQLite and occurrence export hashes, revalidate every source row and occurrence ID, preserve all five authoritative tables and exact canonical bundle bytes, verify revision ancestry and replay the full decision history, reconcile the final current-state projection and counters, and compare logical table hashes after Parquet migration. Empty observations/claims/reviews in the real canary must remain empty. Publish only a complete hash-verified immutable artifact manifest, atomically; preserve older generations. Add corruption, missing-source, history/current-state mismatch and interrupted-publication controls.
+
+This is a new migration boundary; the existing audit's documented scope is not itself a false claim. The implementation belongs in #766's storage path and additive canonical artifact contract, without changing occurrence identity v1.
