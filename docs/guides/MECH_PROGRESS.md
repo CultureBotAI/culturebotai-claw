@@ -69,6 +69,14 @@ observations, or timestamps more than one minute in the future. Retain those
 warnings when quoting a stale summary. Exit 1 means data could not be verified
 and prints no counts; exit 2 means invalid arguments.
 
+The optional `--durability-runtime PATH` appends saved local per-Mech alerts
+for unpublished commits and owned temporary files approaching cleanup. Supply
+the actual verified supervisor runtime; the command reads it without scanning
+or changing sessions. Missing or stale observations remain unknown and exit 3.
+The public bundle schema and counters are unchanged. See
+[session-state durability](SESSION_STATE_DURABILITY.md) for ownership inventory,
+read-only boundaries and publication requirements.
+
 ## Register every PR in the coding session
 
 As soon as a goal opens a PR, including every follow-up PR, register it using the

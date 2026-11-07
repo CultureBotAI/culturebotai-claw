@@ -479,6 +479,15 @@ Candidate CI separately exercises the lane's policy and workflow regressions.
 The ordinary `kg-microbe-governance fleet-audit` command keeps its one-pin
 contract; it will reject the intentionally split canary cohort.
 
+Later protected Claw revisions may update canonical payloads and their matching
+checksums while this lane is active. Current payload checksums are still
+validated, and every other manifest field remains fixed: authority, consumers,
+artifact IDs, source/target paths, modes and applicability. This preserves the
+layout used by the audit's sparse checkouts. It does not advance the canary or
+the fleet: target bytes and pins are checked against the immutable historical
+baseline/release, and workflow-asset digests against the declared release
+commit. Never refresh the release declaration to match current source files.
+
 With all consumer roots freshly fetched into clean audit worktrees, run the
 separate release audit from the merged lane revision:
 
