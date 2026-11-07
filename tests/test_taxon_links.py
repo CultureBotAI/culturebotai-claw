@@ -49,7 +49,7 @@ TAXA = {
     10665: ("Enterobacteria phage T4", "species", 10239),
     777: ("Escherichia coli (old name)", "species", 561),
     999: ("marine metagenome", "species", 1),
-    9991: ("marine metagenome isolate 9991", "strain", 999),
+    9991: ("marine metagenome isolate 9991", "subspecies", 999),  # the real taxdump's 22 below-species unplaced are subspecies
     998: ("unclassified sequences", "no rank", 1),
 }
 SCOPE = {562, 1280, 4932, 777}  # 777 is also retired: TaxonMech's scope keeps some merged ids
@@ -176,7 +176,29 @@ def test_a_strain_under_a_metagenome_is_unplaced_too(index):
     """Below species under no domain: not a strain of any record, not above species, not in a domain."""
     judgement = judge(index, "NCBITaxon:9991")
     assert judgement.verdict is links.Verdict.UNPLACED
-    assert judgement.rank == "strain"
+    assert judgement.rank == "subspecies"
+
+
+def test_names_refuse_an_absent_tarball_as_nodes_do(index, taxonmech):
+    """One accessor decides: after the nodes were read, a tarball that has gone is refused by names() too, not blank."""
+    assert judge(index, "NCBITaxon:511145").verdict is links.Verdict.SPECIES_OF_STRAIN  # reads nodes.dmp
+    (taxonmech / "data" / "source_snapshots" / "taxdump.tar.gz").unlink()
+    with pytest.raises(links.TaxonLinksError, match="is not present"):
+        index.names([511145, 562])
+
+
+def test_a_pinned_sha256_is_checked_once_per_process(taxonmech):
+    """With the digest in the conf, the first taxdump read verifies the file; later reads do not hash it again."""
+    import hashlib
+    tar_path = taxonmech / "data" / "source_snapshots" / "taxdump.tar.gz"
+    conf = taxonmech / "conf" / "ncbi_taxdump.yaml"
+    conf.write_text(conf.read_text(encoding="utf-8") + f"sha256: {hashlib.sha256(tar_path.read_bytes()).hexdigest()}\n",
+                    encoding="utf-8")
+    index = links.TaxonIndex(taxonmech)
+    assert judge(index, "NCBITaxon:511145").verdict is links.Verdict.SPECIES_OF_STRAIN
+    assert index._taxdump_verified
+    tar_path.write_bytes(b"replaced after the check")  # a second access must not hash again
+    assert index.taxdump_path == tar_path
 
 
 def test_an_unknown_id_is_absent(index):

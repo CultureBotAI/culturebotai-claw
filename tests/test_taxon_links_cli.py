@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import tarfile
 from pathlib import Path
 
@@ -101,6 +102,56 @@ def test_a_taxdump_that_is_not_a_tarball_is_exit_two(tmp_path, taxonmech, capsys
     root = _mech(tmp_path, "dufmech", {"data/families/a.yaml": {"causal_graphs": [{"taxon": "NCBITaxon:511145"}]}})
     assert main(["taxa", "--mech", "dufmech", "--root", str(root), "--taxonmech-root", str(taxonmech)]) == 2
     assert "cannot be read as a gzipped tar" in capsys.readouterr().err
+
+
+def _rewrite_tarball(root: Path, **members: bytes | None) -> None:
+    """Replace (bytes) or drop (None) members of the fixture tarball under `root`, keeping the rest."""
+    tar_path = root / "data" / "source_snapshots" / "taxdump.tar.gz"
+    with tarfile.open(tar_path, "r:gz") as tar:
+        kept = [(info, tar.extractfile(info).read()) for info in tar.getmembers()]
+    with tarfile.open(tar_path, "w:gz") as tar:
+        for info, payload in kept:
+            if info.name in members:
+                if members[info.name] is None:
+                    continue
+                payload = members[info.name]
+                info.size = len(payload)
+            tar.addfile(info, io.BytesIO(payload))
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root reads a mode-0 file")
+def test_an_unreadable_taxdump_tarball_is_exit_two(tmp_path, taxonmech, capsys):  # noqa: F811
+    """PermissionError is an OSError, the branch gzip.BadGzipFile also takes: exit 2, not a traceback."""
+    tar_path = taxonmech / "data" / "source_snapshots" / "taxdump.tar.gz"
+    tar_path.chmod(0)
+    root = _mech(tmp_path, "dufmech", {"data/families/a.yaml": {"causal_graphs": [{"taxon": "NCBITaxon:511145"}]}})
+    try:
+        assert main(["taxa", "--mech", "dufmech", "--root", str(root), "--taxonmech-root", str(taxonmech)]) == 2
+    finally:
+        tar_path.chmod(0o644)
+    assert "cannot be read as a gzipped tar" in capsys.readouterr().err
+
+
+def test_a_member_that_is_not_taxdump_shaped_is_exit_two(tmp_path, taxonmech, capsys):  # noqa: F811
+    """Without a pinned digest, a nodes.dmp holding garbage is refused at the row parse, not a ValueError traceback."""
+    _rewrite_tarball(taxonmech, **{"nodes.dmp": b"garbage\n"})
+    root = _mech(tmp_path, "dufmech", {"data/families/a.yaml": {"causal_graphs": [{"taxon": "NCBITaxon:511145"}]}})
+    assert main(["taxa", "--mech", "dufmech", "--root", str(root), "--taxonmech-root", str(taxonmech)]) == 2
+    assert "is not in taxdump format" in capsys.readouterr().err
+
+
+def test_a_tarball_that_does_not_match_the_pinned_sha256_is_exit_two(tmp_path, taxonmech, capsys):  # noqa: F811
+    """TaxonMech's conf pins the snapshot's sha256; a corrupt, truncated or wrong file fails that check first."""
+    import hashlib
+    tar_path = taxonmech / "data" / "source_snapshots" / "taxdump.tar.gz"
+    conf = taxonmech / "conf" / "ncbi_taxdump.yaml"
+    conf.write_text(conf.read_text(encoding="utf-8") + f"sha256: {hashlib.sha256(tar_path.read_bytes()).hexdigest()}\n",
+                    encoding="utf-8")
+    root = _mech(tmp_path, "dufmech", {"data/families/a.yaml": {"causal_graphs": [{"taxon": "NCBITaxon:511145"}]}})
+    assert main(["taxa", "--mech", "dufmech", "--root", str(root), "--taxonmech-root", str(taxonmech)]) == 0
+    _rewrite_tarball(taxonmech, **{"nodes.dmp": b"garbage\n"})  # same shape of damage, now caught before any parse
+    assert main(["taxa", "--mech", "dufmech", "--root", str(root), "--taxonmech-root", str(taxonmech)]) == 2
+    assert "does not match the sha256" in capsys.readouterr().err
 
 
 def test_a_truncated_taxdump_tarball_is_exit_two(tmp_path, taxonmech, capsys):  # noqa: F811

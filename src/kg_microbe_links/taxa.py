@@ -28,12 +28,15 @@ verdict cannot change within a process), `data/raw/ncbitaxon_taxa.tsv`
 inventory, the NCBI taxdump snapshot `conf/ncbi_taxdump.yaml` pins. Nothing is
 fetched, so the verdict is the same on a laptop and in CI. The taxdump's nodes
 and names are each read at most once per process, lazily, and cost tens of
-seconds each.
+seconds each; when the conf pins a `sha256`, the archive is checked against it
+once per process before the first read, which is what catches a truncated,
+corrupt or wrong snapshot whose damage a gzip reader would not notice.
 """
 
 from __future__ import annotations
 
 import csv
+import hashlib
 import re
 import tarfile
 import zlib
@@ -41,7 +44,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Iterator, Sequence
+from typing import Any, Callable, Iterator, Sequence
 
 import yaml
 
@@ -89,8 +92,21 @@ class Judgement:
     ancestor_name: str = ""
 
 
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def _dmp_rows(tar_path: Path, member: str) -> Iterator[list[str]]:
-    """Rows of one taxdump member. Every way the archive can be unusable is a TaxonLinksError, so one accessor decides."""
+    """Rows of one taxdump member, split on the `\t|\t` separator.
+
+    An absent, unreadable, truncated or corrupt archive and a missing member are TaxonLinksError here. A
+    member whose bytes decompress but hold the wrong content is caught by the sha256 check in
+    `TaxonIndex.taxdump_path` when the conf pins one, and by the row-shape check in the callers otherwise.
+    """
     if not tar_path.is_file():
         raise TaxonLinksError(f"TaxonMech's pinned taxdump {tar_path} is not present")
     try:
@@ -118,6 +134,7 @@ class TaxonIndex:
         self.root = Path(taxonmech_root)
         self._nodes: dict[int, tuple[str, int]] | None = None  # taxdump, lazily
         self._names: dict[int, str] | None = None  # every scientific name in the taxdump, lazily
+        self._taxdump_verified = False  # the conf's sha256, checked once per process before the first read
         self._inventory_names: dict[int, str] = {}
         self.scope = self._read_scope()
         self.merged = self._read_merged()
@@ -151,11 +168,29 @@ class TaxonIndex:
     @property
     def taxdump_path(self) -> Path:
         conf = yaml.safe_load(self._require(TAXDUMP_CONF).read_text(encoding="utf-8"))
-        return self.root / conf["path"]
+        path = self.root / conf["path"]
+        expected = conf.get("sha256")
+        if expected and not self._taxdump_verified:
+            if not path.is_file():
+                raise TaxonLinksError(f"TaxonMech's pinned taxdump {path} is not present")
+            actual = _sha256(path)
+            if actual != expected:
+                raise TaxonLinksError(f"{path} does not match the sha256 pinned in {TAXDUMP_CONF} "
+                                      f"({actual[:12]}... against {expected[:12]}...): corrupt, truncated or not the snapshot")
+            self._taxdump_verified = True
+        return path
+
+    def _dmp_table(self, member: str, convert: Callable[[list[str]], tuple[int, Any] | None]) -> dict[int, Any]:
+        """One member parsed into a dict; a row that is not taxdump-shaped is refused, not a traceback."""
+        path = self.taxdump_path
+        try:
+            return dict(entry for entry in (convert(fields) for fields in _dmp_rows(path, member)) if entry is not None)
+        except (ValueError, IndexError) as exc:
+            raise TaxonLinksError(f"{path} member {member} is not in taxdump format: {exc}") from exc
 
     def _taxdump_nodes(self) -> dict[int, tuple[str, int]]:
         if self._nodes is None:
-            self._nodes = {int(f[0]): (f[2], int(f[1])) for f in _dmp_rows(self.taxdump_path, "nodes.dmp")}
+            self._nodes = self._dmp_table("nodes.dmp", lambda f: (int(f[0]), (f[2], int(f[1]))))
         return self._nodes
 
     def node(self, taxon: int) -> tuple[str, int] | None:
@@ -183,8 +218,7 @@ class TaxonIndex:
     def names(self, taxa: Sequence[int]) -> dict[int, str]:
         """Scientific names, from the inventory where present, else from the taxdump, read once (and refused like nodes)."""
         if self._names is None and any(t not in self._inventory_names for t in taxa):
-            self._names = {int(f[0]): f[1] for f in _dmp_rows(self.taxdump_path, "names.dmp")
-                           if f[3] == "scientific name"}
+            self._names = self._dmp_table("names.dmp", lambda f: (int(f[0]), f[1]) if f[3] == "scientific name" else None)
         taxdump_names = self._names or {}
         return {t: self._inventory_names.get(t) or taxdump_names.get(t, "") for t in taxa}
 

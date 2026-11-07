@@ -6,7 +6,7 @@ where the two sides differ, and mutation is how that is shown. Each mutant
 below undoes one rule in src/kg_microbe_links/taxa.py or __main__.py; the
 named test must fail with the mutant applied, and the two test files must
 pass without it. The list includes every mutant the first review of PR 897
-(culturebotai-claw#910) found surviving, those the second (#939-#944) did, and those the third (#968-#973) did.
+(culturebotai-claw#910) found surviving, those the second (#939-#944) did, those the third (#968-#973) did, and those the fourth (#991-#993) did.
 Inputs: none; run from the claw checkout or worktree holding the script.
 Outputs: one line per mutant (KILLED or SURVIVED) and a nonzero exit if any
 survives, a mutant does not parse, a named test cannot be collected, or an
@@ -102,9 +102,20 @@ MUTANTS = [
      f"{CLI_TESTS}::test_a_truncated_taxdump_tarball_is_exit_two"),
     (TAXA, "absent tarball yields absent", "    if not tar_path.is_file():\n        raise TaxonLinksError(f\"TaxonMech's pinned taxdump {tar_path} is not present\")\n",
      "    if not tar_path.is_file():\n        return\n", f"{CLI_TESTS}::test_an_absent_taxdump_tarball_is_exit_two"),
-    (TAXA, "names() swallows a taxdump error", '            self._names = {int(f[0]): f[1] for f in _dmp_rows(self.taxdump_path, "names.dmp")\n                           if f[3] == "scientific name"}\n',
-     '            try:\n                self._names = {int(f[0]): f[1] for f in _dmp_rows(self.taxdump_path, "names.dmp")\n                               if f[3] == "scientific name"}\n            except TaxonLinksError:\n                self._names = {}\n',
+    (TAXA, "names() swallows a taxdump error", '            self._names = self._dmp_table("names.dmp", lambda f: (int(f[0]), f[1]) if f[3] == "scientific name" else None)\n',
+     '            try:\n                self._names = self._dmp_table("names.dmp", lambda f: (int(f[0]), f[1]) if f[3] == "scientific name" else None)\n            except TaxonLinksError:\n                self._names = {}\n',
      f"{CLI_TESTS}::test_a_taxdump_needed_only_for_names_that_is_missing_is_exit_two"),
+    (TAXA, "names() guard re-added", "        if self._names is None and any(t not in self._inventory_names for t in taxa):",
+     "        if self._names is None and any(t not in self._inventory_names for t in taxa) and self.taxdump_path.is_file():",
+     f"{UNIT}::test_names_refuse_an_absent_tarball_as_nodes_do"),
+    (TAXA, "OSError dropped from the archive errors", "    except (tarfile.TarError, EOFError, OSError, zlib.error) as exc:", "    except (tarfile.TarError, EOFError, zlib.error) as exc:",
+     f"{CLI_TESTS}::test_an_unreadable_taxdump_tarball_is_exit_two"),
+    (TAXA, "row parse errors not mapped", "        except (ValueError, IndexError) as exc:", "        except () as exc:",
+     f"{CLI_TESTS}::test_a_member_that_is_not_taxdump_shaped_is_exit_two"),
+    (TAXA, "pinned sha256 not checked", "        if expected and not self._taxdump_verified:", "        if False:",
+     f"{CLI_TESTS}::test_a_tarball_that_does_not_match_the_pinned_sha256_is_exit_two"),
+    (TAXA, "sha256 re-hashed on every access", "            self._taxdump_verified = True\n", "            self._taxdump_verified = False\n",
+     f"{UNIT}::test_a_pinned_sha256_is_checked_once_per_process"),
     (CLI, "strict blocks every verdict but record", 'BLOCKING = {Verdict.RETIRED.value, Verdict.ABSENT.value, Verdict.MALFORMED.value}',
      'BLOCKING = {v.value for v in Verdict} - {Verdict.RECORD.value}', f"{CLI_TESTS}::test_strict_passes_on_every_non_blocking_verdict"),
     (TAXA, "unplaced only at species rank", '        if domain == "other":', '        if domain == "other" and rank == "species":',
@@ -113,8 +124,8 @@ MUTANTS = [
      "for t, n in sorted(self.resolvable.items(), key=lambda kv: -kv[1])]", f"{UNIT}::test_findings_are_sorted_and_resolvable_is_most_cited_first"),
     (TAXA, "unattested tie not broken on the id", "for t, n in sorted(self.unattested.items(), key=lambda kv: (-kv[1], kv[0]))]",
      "for t, n in sorted(self.unattested.items(), key=lambda kv: -kv[1])]", f"{UNIT}::test_unattested_taxa_are_listed_most_cited_first"),
-    (TAXA, "merged.dmp fallback restored", '            self._nodes = {int(f[0]): (f[2], int(f[1])) for f in _dmp_rows(self.taxdump_path, "nodes.dmp")}\n',
-     '            self._nodes = {int(f[0]): (f[2], int(f[1])) for f in _dmp_rows(self.taxdump_path, "nodes.dmp")}\n            if not self.merged:\n                self.merged = {int(o): int(n) for o, n in _dmp_rows(self.taxdump_path, "merged.dmp")}\n',
+    (TAXA, "merged.dmp fallback restored", '            self._nodes = self._dmp_table("nodes.dmp", lambda f: (int(f[0]), (f[2], int(f[1]))))\n',
+     '            self._nodes = self._dmp_table("nodes.dmp", lambda f: (int(f[0]), (f[2], int(f[1]))))\n            if not self.merged:\n                self.merged = {int(o): int(n) for o, n in _dmp_rows(self.taxdump_path, "merged.dmp")}\n',
      f"{UNIT}::test_the_merge_table_is_the_only_merge_source"),
     (CLI, "--sample dropped", "index, sample=args.sample)", "index)", f"{CLI_TESTS}::test_sample_is_honoured_and_recorded"),
     (CLI, "missing TaxonMech file not exit 2", "    except (MechRootError, TaxonLinksError) as exc:\n        print(str(exc), file=sys.stderr)\n        return 2\n\n    keys",
