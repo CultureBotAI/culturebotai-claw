@@ -3,29 +3,35 @@
 
 Purpose: the Git workflow ends each PR by deleting its branch, remote and local.
 This does that for one merged PR, and deletes nothing it cannot show is the
-merged work. It checks everything first and deletes only if every check passes:
+merged work. It checks everything first, and deletes only if every check passes:
 - GitHub reports the PR MERGED, from a branch of the same repository (not a fork);
 - --checkout's fetch and push origin is --repo (RepositoryTarget);
 - the worktree, if given, is at the merged head, with nothing modified or
-  untracked, and no ignored file other than a regenerable cache;
+  untracked, no ignored file other than a regenerable cache, and no index entry
+  hidden from `git status` (skip-worktree or assume-unchanged);
 - the local branch, if present, is at the merged head and checked out nowhere
-  else; it is removed with a compare-and-delete;
+  else; it is removed with a compare-and-delete, and its config section after it;
 - the remote branch, if present, is exactly refs/heads/<branch> at the merged
   head; it is removed with a lease on that head, so a later push survives.
 All of this runs under the repository's LockManager lease: the manifest key for
-a Mech, `claw` for this repository.
+a Mech, `claw` for this repository. Paths are resolved once, against the
+current directory, before anything is checked.
+Without --apply it is a dry run: every check runs, under the lock, and it prints
+what --apply would delete. A dry run therefore refuses wherever --apply would.
 Requires: claw's .env exported first (set -a; . ./.env). It refuses to run
-unless OPENCLAW_WORKSPACE is an absolute path, so the lock is the shared one
-rather than a private workspace/ under whichever checkout holds this script.
+unless OPENCLAW_WORKSPACE is set to an absolute path, as that .env sets it; it
+cannot tell whether the path is claw's, so exporting the .env stays the
+caller's job.
 Inputs: --repo OWNER/NAME (claw or a manifest Mech), --pr N, --checkout PATH
-(the clone the worktree belongs to), --worktree PATH (optional).
-Outputs: removes the worktree, deletes the local and remote branch and the
-remote-tracking ref, and prints what it did. Exits nonzero, deleting nothing,
-on any failed check.
+(the clone the worktree belongs to), --worktree PATH (optional), --apply.
+Outputs: prints each planned or completed step. Exits 1 on a refusal (nothing
+deleted) or on a failure; a failure after the first deletion prints every step
+that completed and how to recreate what was removed.
 Serves: the culturebotai-claw#729 related-issue PRs. Written 2026-11-05. The
 first version (commit 1396fe0534 in culturebotai-claw PR 851) cleaned up
 CellStructureMech PR 3068. Rewritten 2026-11-06 for culturebotai-claw#854,
-#855, #856 and #858, before its reuse on further merged PRs.
+#855, #856 and #858, and for #867-#870 and #872 from the second review round,
+before its reuse on further merged PRs.
 """
 from __future__ import annotations
 
@@ -47,10 +53,20 @@ CLAW_KEY = "claw"
 REGENERABLE_DIRECTORIES = {".venv", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "htmlcov"}
 REGENERABLE_FILES = (".coverage", ".DS_Store")
 REGENERABLE_SUFFIXES = (".egg-info",)
+# Explicit, so no status.showUntrackedFiles setting can hide untracked or ignored files.
+STATUS = ("status", "--porcelain", "--ignored=traditional", "--untracked-files=normal")
 
 
 class Refused(RuntimeError):
     """A check failed; nothing has been deleted."""
+
+
+class PartialFailure(RuntimeError):
+    """A deletion failed after the checks passed; `done` lists what had completed."""
+
+    def __init__(self, done: list[str], error: Exception, recovery: str):
+        super().__init__(str(error))
+        self.done, self.error, self.recovery = done, error, recovery
 
 
 def run(*args: str, check: bool = True) -> subprocess.CompletedProcess:
@@ -70,7 +86,7 @@ def gh_pr_view(repo: str, number: int) -> dict:
 
 
 def open_target(key: str, path: Path, repo: str) -> None:
-    RepositoryTarget(name=key, path=path.resolve(), expected_repository=repo).open()
+    RepositoryTarget(name=key, path=path, expected_repository=repo).open()
 
 
 def lock_key(repo: str) -> str:
@@ -94,9 +110,13 @@ def worktree_problems(worktree: Path, head: str) -> list[str]:
     actual = git(worktree, "rev-parse", "HEAD").stdout.strip()
     if actual != head:
         problems.append(f"{worktree} is at {actual[:10]}, not the merged head {head[:10]}")
-    for line in git(worktree, "status", "--porcelain", "--ignored").stdout.split("\n"):
+    for line in git(worktree, *STATUS).stdout.split("\n"):
         if line and not (line.startswith("!! ") and _regenerable(line)):
             problems.append(f"{worktree}: {line}")
+    hidden = [line for line in git(worktree, "ls-files", "-v").stdout.split("\n") if line and not line.startswith("H ")]
+    if hidden:
+        problems.append(f"{worktree}: {len(hidden)} index entries are skip-worktree or assume-unchanged, "
+                        f"so status cannot see their changes: {', '.join(hidden[:3])}")
     return problems
 
 
@@ -118,9 +138,13 @@ def worktrees_on(checkout: Path, branch: str) -> list[Path]:
     return found
 
 
-def cleanup(repo: str, number: int, checkout: Path, worktree: Path | None, *,
-            pr_view: Callable[[str, int], dict] = gh_pr_view,
-            verify_origin: Callable[[str, Path, str], None] = open_target) -> list[str]:
+def cleanup(repo: str, number: int, checkout: Path, worktree: Path | None, *, apply: bool = False,
+            pr_view: Callable[[str, int], dict] | None = None,
+            verify_origin: Callable[[str, Path, str], None] | None = None) -> list[str]:
+    pr_view = pr_view or gh_pr_view
+    verify_origin = verify_origin or open_target
+    checkout = checkout.resolve()
+    worktree = worktree.resolve() if worktree is not None else None
     workspace = os.environ.get("OPENCLAW_WORKSPACE", "")
     if not Path(workspace).is_absolute():
         raise Refused("OPENCLAW_WORKSPACE is not an absolute path; export claw's .env first")
@@ -131,7 +155,6 @@ def cleanup(repo: str, number: int, checkout: Path, worktree: Path | None, *,
     if pr["isCrossRepository"]:
         raise Refused(f"{repo}#{number} is from a fork; its branch is not in {repo}")
     branch, head = pr["headRefName"], pr["headRefOid"]
-    done = []
     with LockManager().lock(key, "cleanup-merged-branch"):
         verify_origin(key, checkout, repo)
         problems = []
@@ -142,8 +165,7 @@ def cleanup(repo: str, number: int, checkout: Path, worktree: Path | None, *,
                     check=False).stdout.strip()
         if local and local != head:
             problems.append(f"local {branch} is {local[:10]}, not the merged head {head[:10]}")
-        others = [path for path in worktrees_on(checkout, branch)
-                  if not (removing and path == worktree.resolve())]
+        others = [path for path in worktrees_on(checkout, branch) if not (removing and path == worktree)]
         if local and others:
             problems.append(f"{branch} is also checked out in {', '.join(map(str, others))}")
         remote = remote_branch_sha(checkout, branch)
@@ -151,21 +173,38 @@ def cleanup(repo: str, number: int, checkout: Path, worktree: Path | None, *,
             problems.append(f"origin {branch} is {remote[:10]}, not the merged head {head[:10]}")
         if problems:
             raise Refused("; ".join(problems))
-        if removing:
-            git(checkout, "worktree", "remove", str(worktree))
-            done.append(f"removed worktree {worktree}")
-        if local:
-            git(checkout, "update-ref", "-d", f"refs/heads/{branch}", head)
-            done.append(f"deleted local {branch} (was {head[:10]})")
-        if remote:
-            git(checkout, "push", "-q", f"--force-with-lease=refs/heads/{branch}:{head}",
-                "origin", "--delete", f"refs/heads/{branch}")
-            done.append(f"deleted remote {branch} (was {head[:10]})")
-        else:
-            done.append(f"remote {branch} already gone")
-        tracking = f"refs/remotes/origin/{branch}"
-        if git(checkout, "rev-parse", "--verify", "--quiet", tracking, check=False).returncode == 0:
-            git(checkout, "update-ref", "-d", tracking)
+        if not apply:
+            return ([f"would remove worktree {worktree}"] * removing
+                    + [f"would delete local {branch} (at {head[:10]})"] * bool(local)
+                    + [f"would delete remote {branch} (at {head[:10]})" if remote else f"remote {branch} already gone"])
+        recovery = (f"everything removed was at {head}, which is still in {repo}#{number}; recreate the branch "
+                    f"with `git -C {checkout} branch {branch} {head}`"
+                    + (f" and the worktree with `git -C {checkout} worktree add {worktree} {branch}`" if removing else ""))
+        done: list[str] = []
+        try:
+            if removing:
+                git(checkout, "worktree", "remove", str(worktree))
+                done.append(f"removed worktree {worktree}")
+            if local:
+                git(checkout, "update-ref", "-d", f"refs/heads/{branch}", head)
+                # update-ref leaves the branch's upstream config; `branch -D` would have removed it.
+                git(checkout, "config", "--remove-section", f"branch.{branch}", check=False)
+                leftover = [name for name in ("remote", "merge")
+                            if git(checkout, "config", "--get", f"branch.{branch}.{name}", check=False).returncode == 0]
+                if leftover:
+                    raise RuntimeError(f"branch.{branch}.{leftover[0]} is still set")
+                done.append(f"deleted local {branch} (was {head[:10]})")
+            if remote:
+                git(checkout, "push", "-q", f"--force-with-lease=refs/heads/{branch}:{head}",
+                    "origin", "--delete", f"refs/heads/{branch}")
+                done.append(f"deleted remote {branch} (was {head[:10]})")
+            else:
+                done.append(f"remote {branch} already gone")
+            tracking = f"refs/remotes/origin/{branch}"
+            if git(checkout, "rev-parse", "--verify", "--quiet", tracking, check=False).returncode == 0:
+                git(checkout, "update-ref", "-d", tracking)
+        except Exception as exc:
+            raise PartialFailure(done, exc, recovery) from exc
     return done
 
 
@@ -175,11 +214,21 @@ def main() -> int:
     parser.add_argument("--pr", type=int, required=True)
     parser.add_argument("--checkout", type=Path, required=True)
     parser.add_argument("--worktree", type=Path)
+    parser.add_argument("--apply", action="store_true", help="delete; without it, check and print the plan")
     args = parser.parse_args()
     try:
-        done = cleanup(args.repo, args.pr, args.checkout, args.worktree)
+        done = cleanup(args.repo, args.pr, args.checkout, args.worktree, apply=args.apply)
     except Refused as exc:
         print(f"refused, nothing deleted: {exc}", file=sys.stderr)
+        return 1
+    except PartialFailure as exc:
+        for step in exc.done:
+            print(step)
+        print(f"failed after the steps above: {exc.error}", file=sys.stderr)
+        print(f"recovery: {exc.recovery}", file=sys.stderr)
+        return 1
+    except Exception as exc:  # raised before the first deletion
+        print(f"failed, nothing deleted: {exc}", file=sys.stderr)
         return 1
     print("\n".join(done))
     return 0

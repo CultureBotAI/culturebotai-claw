@@ -4,8 +4,9 @@
 Purpose: AGENTS.md requires a test for a distinction to be driven by an input
 where the two sides differ, and mutation is how that is shown. Each mutant
 below undoes one check added to cleanup_merged_pr_branch.py
-(culturebotai-claw#854-#856, #858) or commit_and_push_mech_branch_locked.py
-(#857, #858). The named test must fail with the mutant applied, and each test
+(culturebotai-claw#854-#856, #858, #867-#872) or
+commit_and_push_mech_branch_locked.py (#857, #858, #868, #871). The named test
+must fail with the mutant applied, and each test
 file must pass without it.
 Inputs: none; run from the claw checkout or worktree holding the script.
 Outputs: one line per mutant (KILLED or SURVIVED) and a nonzero exit if any
@@ -35,8 +36,26 @@ CLEANUP_MUTANTS = [
     ("suffix match", ('git(checkout, "ls-remote", "origin", ref)', 'if line.endswith(f"\\t{ref}")'),
      ('git(checkout, "ls-remote", "--heads", "origin", branch)', "if line"),
      "test_only_the_exact_branch_name_is_matched_on_the_remote"),
-    ("no ignored files", '"status", "--porcelain", "--ignored"', '"status", "--porcelain"',
+    ("no ignored files", 'STATUS = ("status", "--porcelain", "--ignored=traditional", "--untracked-files=normal")',
+     'STATUS = ("status", "--porcelain", "--untracked-files=normal")',
      "test_an_ignored_result_file_blocks_removing_the_worktree"),
+    ("status obeys config", 'STATUS = ("status", "--porcelain", "--ignored=traditional", "--untracked-files=normal")',
+     'STATUS = ("status", "--porcelain", "--ignored")', "test_a_status_setting_cannot_hide_untracked_or_ignored_files"),
+    ("no hidden-entry check", "    if hidden:\n", "    if False:\n",
+     "test_an_edit_hidden_by_skip_worktree_blocks_removing_the_worktree"),
+    ("paths unresolved", "    worktree = worktree.resolve() if worktree is not None else None\n", "",
+     "test_a_relative_worktree_is_the_one_checked_and_the_one_removed"),
+    ("no lock", 'with LockManager().lock(key, "cleanup-merged-branch"):', "with open(os.devnull):",
+     "test_a_held_lock_on_the_repository_stops_everything"),
+    ("constant lock key", 'LockManager().lock(key, "cleanup-merged-branch")', 'LockManager().lock("x", "cleanup-merged-branch")',
+     "test_a_held_lock_on_the_repository_stops_everything"),
+    ("update-ref without old value", 'git(checkout, "update-ref", "-d", f"refs/heads/{branch}", head)',
+     'git(checkout, "update-ref", "-d", f"refs/heads/{branch}")', "test_the_local_delete_compares_against_the_merged_head"),
+    ("branch config kept", '                git(checkout, "config", "--remove-section", f"branch.{branch}", check=False)\n', "",
+     "test_the_merged_branch_is_removed_everywhere_and_caches_do_not_block"),
+    ("dry run deletes", "        if not apply:\n", "        if False:\n", "test_a_dry_run_checks_everything_and_deletes_nothing"),
+    ("partial failure unreported", "            raise PartialFailure(done, exc, recovery) from exc\n", "            raise\n",
+     "test_a_failure_after_a_deletion_reports_what_was_done_and_how_to_recover"),
     ("no cache allowance", 'if line and not (line.startswith("!! ") and _regenerable(line)):', "if line:",
      "test_the_merged_branch_is_removed_everywhere_and_caches_do_not_block"),
     ("no worktree-head check", "if actual != head:", "if False:", "test_a_detached_commit_in_the_worktree_blocks_removing_it"),
@@ -54,6 +73,14 @@ COMMIT_MUTANTS = [
      "test_a_default_branch_named_by_origin_head_is_refused"),
     ("no workspace check", 'if not Path(os.environ.get("OPENCLAW_WORKSPACE", "")).is_absolute():', "if False:",
      "test_without_an_absolute_workspace_nothing_is_committed"),
+    ("main not hardcoded", 'names = {"main"}', "names = set()", "test_main_is_refused_even_when_origin_names_no_default"),
+    ("detached accepted", 'if branch == "HEAD":', "if False:", "test_a_detached_head_is_refused"),
+    ("status unchecked", 'if not status or any(line[1] != " " for line in status):', "if False:",
+     "test_unstaged_or_untracked_work_beside_the_staged_change_is_refused"),
+    ("no lock", 'with LockManager().lock(args.mech, "review-fix-push"):', "with open(os.devnull):",
+     "test_a_held_lock_on_the_mech_stops_the_commit"),
+    ("message file unresolved", "args.message_file.resolve()", "args.message_file",
+     "test_a_relative_message_file_is_read_from_the_current_directory"),
 ]
 SUITES = [(CLEANUP, CLEANUP_MUTANTS), (COMMIT, COMMIT_MUTANTS)]
 

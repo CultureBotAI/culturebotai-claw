@@ -7,8 +7,9 @@ repository. This does exactly one commit-and-push of an existing worktree
 feature branch under those two conditions, for review fixes on downstream PRs.
 Every check runs inside the lock, so none can go stale before the commit.
 Requires: claw's .env exported first (set -a; . ./.env). It refuses to run
-unless OPENCLAW_WORKSPACE is an absolute path, so the lock is the shared one
-rather than a private workspace/ under whichever checkout holds this script.
+unless OPENCLAW_WORKSPACE is set to an absolute path, as that .env sets it; it
+cannot tell whether the path is claw's, so exporting the .env stays the
+caller's job.
 Inputs: --mech KEY, --worktree PATH (must be on a feature branch, with staged
 changes and nothing unstaged), --message-file PATH.
 Outputs: one commit on the worktree's branch, pushed to origin with an explicit
@@ -18,7 +19,7 @@ that is not the manifest's repository.
 Serves: downstream review fixes for the culturebotai-claw#729 related issues
 (first use: TraitMech#2077 on TraitMech#2076). Written 2026-11-05; checks moved
 under the lock and the default branch refused 2026-11-06 for
-culturebotai-claw#857 and #858.
+culturebotai-claw#857 and #858; paths resolved at entry for #868.
 """
 from __future__ import annotations
 
@@ -58,7 +59,8 @@ def main() -> int:
     if not Path(os.environ.get("OPENCLAW_WORKSPACE", "")).is_absolute():
         raise RuntimeError("OPENCLAW_WORKSPACE is not an absolute path; export claw's .env first")
     slug = load_fleet_manifest().mechs[args.mech].github
-    worktree = args.worktree.resolve()
+    # Resolved here, against the current directory: `git -C <worktree>` would read a relative path from the worktree.
+    worktree, message_file = args.worktree.resolve(), args.message_file.resolve()
     with LockManager().lock(args.mech, "review-fix-push"):
         RepositoryTarget(name=args.mech, path=worktree, expected_repository=slug).open()
         branch = git(worktree, "rev-parse", "--abbrev-ref", "HEAD").stdout.strip()
@@ -69,7 +71,7 @@ def main() -> int:
         status = [line for line in git(worktree, "status", "--porcelain").stdout.split("\n") if line]
         if not status or any(line[1] != " " for line in status):
             raise RuntimeError(f"need staged changes and nothing unstaged or untracked: {status}")
-        git(worktree, "commit", "-q", "-F", str(args.message_file))
+        git(worktree, "commit", "-q", "-F", str(message_file))
         git(worktree, "push", "-q", "origin", f"HEAD:refs/heads/{branch}")
     print(f"pushed {args.mech} {branch} {git(worktree, 'rev-parse', 'HEAD').stdout.strip()}")
     return 0

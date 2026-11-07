@@ -1,4 +1,4 @@
-"""scripts/adhoc/commit_and_push_mech_branch_locked.py commits only on a feature branch (#857, #858).
+"""scripts/adhoc/commit_and_push_mech_branch_locked.py commits only on a feature branch (#857, #858, #868, #871).
 
 The repositories are real (a bare origin and a clone under tmp_path). Only the
 origin-identity check is replaced, because a local origin can never be the
@@ -13,6 +13,8 @@ import sys
 from pathlib import Path
 
 import pytest
+
+from plugins.lock_manager import LockManager
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts/adhoc/commit_and_push_mech_branch_locked.py"
@@ -101,6 +103,67 @@ def test_a_default_branch_named_by_origin_head_is_refused(clone, monkeypatch):
         run_helper(clone, monkeypatch)
 
     assert git(clone["checkout"], "rev-parse", "HEAD") == before
+
+
+def test_main_is_refused_even_when_origin_names_no_default(clone, monkeypatch):
+    git(clone["checkout"], "remote", "set-head", "origin", "-d")
+    before = git(clone["checkout"], "rev-parse", "HEAD")
+    stage_change(clone["checkout"])
+
+    with pytest.raises(RuntimeError, match="main is the default branch"):
+        run_helper(clone, monkeypatch)
+
+    assert git(clone["checkout"], "rev-parse", "HEAD") == before
+
+
+def test_a_detached_head_is_refused(clone, monkeypatch):
+    git(clone["checkout"], "checkout", "-q", "--detach")
+    before = git(clone["checkout"], "rev-parse", "HEAD")
+    stage_change(clone["checkout"])
+
+    with pytest.raises(RuntimeError, match="detached HEAD"):
+        run_helper(clone, monkeypatch)
+
+    assert git(clone["checkout"], "rev-parse", "HEAD") == before
+
+
+@pytest.mark.parametrize("extra", ["unstaged", "untracked"])
+def test_unstaged_or_untracked_work_beside_the_staged_change_is_refused(clone, monkeypatch, extra):
+    git(clone["checkout"], "switch", "-q", "-c", "fix/x")
+    before = git(clone["checkout"], "rev-parse", "HEAD")
+    stage_change(clone["checkout"])
+    if extra == "unstaged":
+        (clone["checkout"] / "a.txt").write_text("changed again\n", encoding="utf-8")
+    else:
+        (clone["checkout"] / "new.txt").write_text("new\n", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="nothing unstaged or untracked"):
+        run_helper(clone, monkeypatch)
+
+    assert git(clone["checkout"], "rev-parse", "HEAD") == before
+
+
+def test_a_held_lock_on_the_mech_stops_the_commit(clone, monkeypatch):
+    git(clone["checkout"], "switch", "-q", "-c", "fix/x")
+    before = git(clone["checkout"], "rev-parse", "HEAD")
+    stage_change(clone["checkout"])
+
+    with LockManager().lock("traitmech", "held-by-test"):
+        with pytest.raises(RuntimeError, match="Failed to acquire lock on traitmech"):
+            run_helper(clone, monkeypatch)
+
+    assert git(clone["checkout"], "rev-parse", "HEAD") == before
+
+
+def test_a_relative_message_file_is_read_from_the_current_directory(clone, monkeypatch):
+    git(clone["checkout"], "switch", "-q", "-c", "fix/x")
+    stage_change(clone["checkout"])
+    monkeypatch.chdir(clone["message"].parent)
+    monkeypatch.setattr(sys, "argv", ["commit_and_push_mech_branch_locked.py", "--mech", "traitmech",
+                                      "--worktree", str(clone["checkout"]), "--message-file", clone["message"].name])
+
+    assert helper.main() == 0
+    assert git(clone["checkout"], "log", "-1", "--format=%s") == "Review fix"
 
 
 def test_without_an_absolute_workspace_nothing_is_committed(clone, monkeypatch):
