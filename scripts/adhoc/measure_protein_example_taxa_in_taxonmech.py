@@ -23,8 +23,8 @@ Not covered: PathwayMech's pathway participants, which name proteins as
 Inputs: claw's .env (set -a; . ./.env) for the Mech roots; --out DIR.
 Outputs: DIR/protein_example_taxa.tsv (one row per example: mech, record path,
 record id, slot key, uniprot, taxon id, taxon label, in_taxonmech_scope),
-DIR/summary.md (per-Mech counts, the Mech HEADs read, and the most-cited taxa
-outside the scope). Read-only; it writes only under DIR.
+DIR/summary_protein_example_taxa.md (per-Mech counts, the Mech HEADs read, and
+the most-cited taxa outside the scope), the name it is committed under. Read-only; it writes only under DIR.
 Not covered either (culturebotai-claw#889, #900): slots that hold a bare
 accession string rather than a mapping, such as NaturalProductMech's
 `molecular_targets[].protein_examples[]` (whose taxon sits on the parent
@@ -197,7 +197,7 @@ def main() -> int:
     if malformed:
         lines += ["", "## Taxa that are not NCBITaxon CURIEs", "", "| Mech | value | examples |", "|---|---|---:|"]
         lines += [f"| {m} | `{v}` | {c} |" for (m, v), c in malformed.most_common(30)]
-    (args.out / "summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    (args.out / "summary_protein_example_taxa.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))
     return 0
 

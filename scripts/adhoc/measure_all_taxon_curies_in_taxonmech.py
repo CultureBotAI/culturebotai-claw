@@ -70,7 +70,7 @@ def main() -> int:
             continue
         heads[key] = head_of(root)
         for pattern in mech.record_globs:
-            for path in root.glob(pattern):
+            for path in sorted(root.glob(pattern)):
                 if not path.is_file():
                     continue
                 files[key] += 1
@@ -102,7 +102,8 @@ def main() -> int:
                      f"{sum(outside.values())} |")
     lines += ["", f"## Taxa outside the scope: {len(fleet_outside)} distinct across the fleet", "",
               "| taxon | records citing it | Mechs |", "|---|---:|---|"]
-    lines += [f"| {t} | {c} | {', '.join(sorted(mechs_of[t]))} |" for t, c in fleet_outside.most_common(40)]
+    top = sorted(fleet_outside.items(), key=lambda kv: (-kv[1], int(kv[0].split(":")[1])))[:40]  # ties by id
+    lines += [f"| {t} | {c} | {', '.join(sorted(mechs_of[t]))} |" for t, c in top]
     (args.out / "summary_all_curies.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))
     return 0
