@@ -51,7 +51,7 @@ The fleet audit is dated evidence, not an invariant to assume forever. Avoiding
 CI is not a reason to leave an authorized committed batch only on the host.
 
 The [published fleet audit](../reviews/2026-11-07-session-state-fleet-audit.md)
-on 2026-11-07 inspected all 14 Mechs and found:
+on 2026-11-07 inspected every manifest Mech and found:
 
 | Published workflow scope | Non-main branch push event |
 |---|---|
