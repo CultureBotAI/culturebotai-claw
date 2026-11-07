@@ -458,7 +458,8 @@ Every earlier merge commit must be an ancestor of the following reviewed head.
 For squash merges this uses the merge commit, not the original feature commit.
 Every changed path of an issue fix must retain the entry actually produced by
 that fix commit at both its member's reviewed head and the final head. Entries
-include the blob and executable mode, or exact absence for deletions. Comparing
+include the blob and executable mode, or exact absence for deletions. Git paths
+are looked up literally, including names containing pathspec magic or globs. Comparing
 only the two reviewed heads would incorrectly accept a fix reverted before
 review. Exact content and mode reintroduction is accepted; a reverted fix is
 refused even if the two reviewed trees agree.

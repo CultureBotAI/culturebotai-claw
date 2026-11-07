@@ -92,6 +92,8 @@ class OrderedRemote:
         code = 0
         if args[0] == "git":
             command = args[3:]
+            if command[:1] == ["--literal-pathspecs"]:
+                command = command[1:]
             if command == ["remote", "get-url", "origin"]:
                 out = f"https://github.com/{SOURCE['repository']}.git\n"
             elif command[:1] == ["status"]:

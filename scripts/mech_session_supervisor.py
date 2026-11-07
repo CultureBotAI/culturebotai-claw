@@ -1349,7 +1349,9 @@ def commit_changes(root: str, commit: str, runner) -> dict[str, tuple[GitEntry, 
 
 
 def tree_entry(root: str, head: str, path: str, runner) -> GitEntry:
-    raw = runner(["git", "-C", root, "ls-tree", "-z", head, "--", path]).stdout
+    # Even after --, Git parses pathspec magic and globs. A literal lookup is
+    # essential when absence is used as evidence that a deletion survives.
+    raw = runner(["git", "-C", root, "--literal-pathspecs", "ls-tree", "-z", head, "--", path]).stdout
     if not raw:
         return None
     match = re.fullmatch(r"(100644|100755) blob ([0-9a-f]{40})\t" + re.escape(path) + "\x00", raw)
