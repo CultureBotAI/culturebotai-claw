@@ -148,23 +148,11 @@ CONSUMERS = sorted(MANIFEST["consumers"])
 
 
 def test_the_manifest_declares_the_consumers_the_fleet_expects():
-    """Offline, so it runs everywhere. Names the set rather than counting it."""
-    assert CONSUMERS == [
-        "aimech",
-        "antibioticmech",
-        "cellstructuremech",
-        "cmmmech",
-        "communitymech",
-        "culturemech",
-        "dufmech",
-        "habitatmech",
-        "mediaingredientmech",
-        "naturalproductmech",
-        "pathwaymech",
-        "proteintraitsmech",
-        "taxonmech",
-        "traitmech",
-    ]
+    """The canonical fleet defines the expected consumer identities, not a fixed count."""
+    assert CONSUMERS == sorted(
+        key for key, mech in load_fleet_manifest().mechs.items()
+        if mech.vendored_role == "consumer"
+    )
 
 
 def bad_scopes(manifest: dict) -> list[str]:

@@ -2594,6 +2594,12 @@ mechs:
     record_globs:
     - curation/packets/*.yaml
     vendored_role: consumer
+    serialization:
+      verified: false
+      reason: >-
+        EdgeMech preserves canonical JSON bundles and immutable external ledger
+        artifacts. Shared YAML record emit options have not been verified;
+        no native scientific corpus serialization is declared.
     capabilities:
       id_label_validation:
         status: disabled

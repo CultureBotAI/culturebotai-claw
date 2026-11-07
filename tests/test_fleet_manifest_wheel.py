@@ -13,6 +13,8 @@ from pathlib import Path
 
 from test_record_review import review as review  # noqa: F401
 
+from kg_microbe_fleet import load_fleet_manifest
+
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -252,22 +254,7 @@ validate_bundle({
     "observations": [], "claims": [], "reviews": [],
 })
 manifest = load_fleet_manifest()
-assert manifest.keys == (
-    "culturemech",
-    "mediaingredientmech",
-    "communitymech",
-    "traitmech",
-    "proteintraitsmech",
-    "antibioticmech",
-    "cellstructuremech",
-    "habitatmech",
-    "naturalproductmech",
-    "taxonmech",
-    "pathwaymech",
-    "dufmech",
-    "cmmmech",
-    "aimech",
-)
+assert manifest.keys == tuple(json.loads(sys.argv[4]))
 assert default_manifest_path() == module_path.parent / "fleet.yaml"
 # Importing an editable package or merely declaring package-data can hide a
 # missing policy. Exercise the default loader using only the unpacked wheel.
@@ -414,6 +401,9 @@ assert validated.exit_code == 0, validated.output
             str(unpacked),
             str(tmp_path / "wheel-history"),
             str(review_input),
+            json.dumps(load_fleet_manifest(
+                REPOSITORY_ROOT / "src/kg_microbe_fleet/fleet.yaml"
+            ).keys),
         ],
         cwd=tmp_path,
         env=smoke_environment,
