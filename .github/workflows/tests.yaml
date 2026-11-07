@@ -79,6 +79,7 @@ jobs:
           src/kg_microbe_curation
           src/kg_microbe_health
           src/kg_microbe_kgx
+          src/kg_microbe_links
           src/kg_microbe_pages
           src/kg_microbe_site
           src/kg_microbe_skills
