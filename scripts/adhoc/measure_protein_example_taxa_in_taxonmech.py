@@ -24,8 +24,15 @@ Outputs: DIR/protein_example_taxa.tsv (one row per example: mech, record path,
 record id, slot key, uniprot, taxon id, taxon label, in_taxonmech_scope),
 DIR/summary.md (per-Mech counts, the Mech HEADs read, and the most-cited taxa
 outside the scope). Read-only; it writes only under DIR.
-Serves: planning cross-Mech taxon links (asked 2026-11-06, following
-culturebotai-claw#729). Written 2026-11-06.
+Not covered either (culturebotai-claw#889): slots that hold a bare accession
+string rather than a mapping, such as NaturalProductMech's
+`molecular_targets[].protein_examples[]`, `biosynthetic_pathway[].enzyme_id`
+and `bioactivities[].target_enzyme`, AntibioticMech's
+`resistance_mechanisms[].protein_accession`, CellStructureMech's Complex
+Portal participants, and CommunityMech's `kb/taxa/*.yaml`, which lies outside
+its manifest record globs. None of those carries a per-example taxon.
+Serves: the cross-Mech taxon-link assessment, culturebotai-claw PR 881.
+Written 2026-11-06.
 """
 from __future__ import annotations
 
@@ -175,15 +182,16 @@ def main() -> int:
         distinct = {r[6] for r in rows if r[0] == key and r[6]}
         lines.append(f"| {key} | {heads[key]} | {s['files']} | {s['parsed']} | {s['examples']} | {len(distinct)} | "
                      f"{s['in_scope']} | {s['outside_scope']} | {s['malformed_taxon']} | {s['no_taxon']} |")
-    outside = Counter((r[6], r[7]) for r in rows if r[6] and NCBITAXON.match(r[6]) and not r[8])
+    outside = Counter(r[6] for r in rows if r[6] and NCBITAXON.match(r[6]) and not r[8])
+    labels = {t: Counter(r[7] for r in rows if r[6] == t).most_common(1)[0][0] for t in outside}
     mechs_of = defaultdict(set)
     for r in rows:
         if r[6] and not r[8]:
             mechs_of[r[6]].add(r[0])
     lines += ["", f"## Taxa outside the scope: {len(outside)} distinct, {sum(outside.values())} examples", "",
               "| taxon | label | examples | Mechs |", "|---|---|---:|---|"]
-    for (taxon, label), count in outside.most_common(40):
-        lines.append(f"| {taxon} | {label} | {count} | {', '.join(sorted(mechs_of[taxon]))} |")
+    for taxon, count in outside.most_common(40):
+        lines.append(f"| {taxon} | {labels[taxon]} | {count} | {', '.join(sorted(mechs_of[taxon]))} |")
     malformed = Counter((r[0], r[6]) for r in rows if r[6] and not NCBITAXON.match(r[6]))
     if malformed:
         lines += ["", "## Taxa that are not NCBITaxon CURIEs", "", "| Mech | value | examples |", "|---|---|---:|"]

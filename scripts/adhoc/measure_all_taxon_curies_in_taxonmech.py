@@ -15,8 +15,12 @@ Inputs: claw's .env (set -a; . ./.env) for the Mech roots; --out DIR.
 Outputs: DIR/taxon_curies.tsv (mech, taxon id, records citing it, in scope)
 and DIR/summary_all_curies.md (per-Mech distinct taxa, how many are in scope,
 and the most-cited taxa outside it). Read-only; writes only under DIR.
-Serves: planning cross-Mech taxon links (asked 2026-11-06, following
-culturebotai-claw#729). Written 2026-11-06.
+A CURIE in a `notes:` line counts like one in a slot, so a Mech whose seeder
+records a retired id beside the current one (NaturalProductMech) shows retired
+ids here that no slot carries (culturebotai-claw#885); the slot-declared
+`kg-microbe-links taxa` check is the one that tells them apart.
+Serves: the cross-Mech taxon-link assessment, culturebotai-claw PR 881.
+Written 2026-11-06.
 """
 from __future__ import annotations
 

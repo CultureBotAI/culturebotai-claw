@@ -15,7 +15,11 @@ and parent, names.dmp for the scientific name, merged.dmp for retired ids.
 TaxonMech's own attested inventory cannot do this, because it holds only the
 scope and its lineage. Walk parents to find the domain, the kingdom for
 eukaryotes, the nearest ancestor in the scope, and the class: species,
-below-species, higher, or not in the taxdump.
+below-species, higher, or not in the taxdump. A retired id is always reported
+as retired, whatever its merge target is; an id absent from nodes.dmp is looked
+up in delnodes.dmp so a deleted id is told from one newer than the snapshot.
+Microbial means bacterial, archaeal, or a eukaryote outside Metazoa and
+Viridiplantae, because TaxonMech holds protists as well as fungi.
 Inputs: claw's .env (set -a; . ./.env) for TAXONMECH_ROOT; --measure DIR
 holding protein_example_taxa.tsv and taxon_curies.tsv; --out DIR.
 Outputs: DIR/outside_scope_classified.tsv (taxon, name, merged_into, domain,
@@ -23,8 +27,10 @@ kingdom, rank, class, nearest in-scope ancestor and its name, protein
 examples, records citing it, Mechs) and DIR/summary_classified.md.
 Read-only; writes only under DIR. The tarball is read twice (nodes, then the
 names of the ids that turned out to be needed).
-Serves: planning cross-Mech taxon links (asked 2026-11-06, following
-culturebotai-claw#729). Written 2026-11-06.
+Serves: the cross-Mech taxon-link assessment, culturebotai-claw PR 881 (and
+#655 for routes). Written 2026-11-06; retired ids whose target is not a record,
+protists, deleted ids and the mutually exclusive outcome table added for
+#884-#887 the same day.
 """
 from __future__ import annotations
 
@@ -85,6 +91,7 @@ def main() -> int:
     cited = set(examples) | set(records)
 
     merged = {int(old): int(new) for old, new in dmp_rows(tar_path, "merged.dmp")}
+    deleted = {int(fields[0]) for fields in dmp_rows(tar_path, "delnodes.dmp")}
     nodes: dict[int, tuple[int, str]] = {}
     for fields in dmp_rows(tar_path, "nodes.dmp"):
         nodes[int(fields[0])] = (int(fields[1]), fields[2])
@@ -110,7 +117,8 @@ def main() -> int:
         current, lineage = resolved[taxon], chains[taxon]
         merged_into = f"NCBITaxon:{current}" if current != taxon else ""
         if current not in nodes:
-            rows.append((f"NCBITaxon:{taxon}", "", merged_into, "not in taxdump", "", "", "not-in-taxdump", "", "",
+            klass = "deleted" if current in deleted else "not-in-taxdump"
+            rows.append((f"NCBITaxon:{taxon}", "", merged_into, "not in taxdump", "", "", klass, "", "",
                          examples[taxon], records[taxon], ", ".join(sorted(mechs[taxon]))))
             continue
         rank = nodes[current][1]
@@ -119,6 +127,8 @@ def main() -> int:
         ancestor = next((a for a in lineage[1:] if a in scope), 0)
         if current in scope:
             klass = "in scope after merge"
+        elif merged_into:
+            klass = "retired, target not a record"
         elif rank == "species":
             klass = "species"
         elif any(nodes[a][1] == "species" for a in lineage[1:]):
@@ -146,36 +156,47 @@ def main() -> int:
     for key, cell in sorted(cells.items(), key=lambda kv: -sum(r[9] + r[10] for r in kv[1])):
         lines.append(f"| {key[0]} | {key[1]} | {key[2]} | {len(cell)} | {sum(1 for r in cell if r[7])} | "
                      f"{sum(r[9] for r in cell)} | {sum(r[10] for r in cell)} |")
-    resolvable = [r for r in rows if r[7]]
+    resolvable = [r for r in rows if r[7] and not r[2]]  # a retired id is counted as retired, not here
     lines += ["", f"## Resolvable one rank up: {len(resolvable)} taxa whose nearest in-scope ancestor is a record "
                   f"({sum(r[9] for r in resolvable)} protein examples, {sum(r[10] for r in resolvable)} records)", "",
               "| taxon | name | rank | ancestor | ancestor name | protein examples | records | Mechs |",
               "|---|---|---|---|---|---:|---:|---|"]
     lines += [f"| {r[0]} | {r[1]} | {r[5]} | {r[7]} | {r[8]} | {r[9]} | {r[10]} | {r[11]} |" for r in resolvable[:30]]
     candidates = [r for r in rows if r[6] in ("species", "below-species") and not r[7]
-                  and (r[3] in ("Bacteria", "Archaea") or r[4] == "Fungi")]
+                  and (r[3] in ("Bacteria", "Archaea") or (r[3] == "Eukaryota" and r[4] not in ("Metazoa", "Viridiplantae")))]
     lines += ["", f"## Microbial species or strains with no in-scope ancestor (scope candidates): {len(candidates)} "
                   f"({sum(r[9] for r in candidates)} protein examples, {sum(r[10] for r in candidates)} records)", "",
               "| taxon | name | domain | rank | protein examples | records | Mechs |", "|---|---|---|---|---:|---:|---|"]
     lines += [f"| {r[0]} | {r[1]} | {r[3]}{'/' + r[4] if r[4] else ''} | {r[5]} | {r[9]} | {r[10]} | {r[11]} |"
               for r in candidates[:40]]
-    # Per Mech: where its cited taxa fall, counting records from taxon_curies.tsv.
+    # One outcome per taxon, mutually exclusive, in this order; the tables below are built from it.
     outcome = {}
     for r in rows:
-        if r[6] == "in scope after merge":
+        if r[6] in ("in scope after merge", "retired, target not a record"):
             outcome[r[0]] = "retired id"
+        elif r[6] in ("deleted", "not-in-taxdump"):
+            outcome[r[0]] = "not in taxdump"
         elif r[7]:
             outcome[r[0]] = "resolvable one rank up"
         elif r[6] == "higher":
             outcome[r[0]] = "above species"
-        elif r[6] == "not-in-taxdump":
-            outcome[r[0]] = "not in taxdump"
-        elif r[3] in ("Bacteria", "Archaea") or r[4] == "Fungi":
+        elif r[3] in ("Bacteria", "Archaea") or (r[3] == "Eukaryota" and r[4] not in ("Metazoa", "Viridiplantae")):
             outcome[r[0]] = "microbial, not attested"
         else:
             outcome[r[0]] = "outside TaxonMech's domain"
     columns = ["in scope", "resolvable one rank up", "retired id", "above species", "microbial, not attested",
                "outside TaxonMech's domain", "not in taxdump"]
+    totals: dict[str, list[int]] = {c: [0, 0, 0] for c in columns[1:]}
+    for r in rows:
+        cell = totals[outcome[r[0]]]
+        cell[0] += 1
+        cell[1] += r[9]
+        cell[2] += r[10]
+    lines += ["", "## Outcomes, one per taxon", "", "| outcome | distinct taxa | protein examples | records citing |",
+              "|---|---:|---:|---:|"]
+    lines += [f"| {c} | {totals[c][0]} | {totals[c][1]} | {totals[c][2]} |" for c in columns[1:]]
+    lines.append(f"| total | {sum(v[0] for v in totals.values())} | {sum(v[1] for v in totals.values())} | "
+                 f"{sum(v[2] for v in totals.values())} |")
     per_mech: dict[str, Counter] = defaultdict(Counter)
     with (args.measure / "taxon_curies.tsv").open(encoding="utf-8") as handle:
         for row in csv.DictReader(handle, delimiter="\t"):
