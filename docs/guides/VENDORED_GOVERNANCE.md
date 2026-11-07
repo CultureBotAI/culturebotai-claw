@@ -448,6 +448,78 @@ above is again the only release gate. Roll a release back forward, as Rollback
 below describes, not with a plain `git revert` (#784). Historical receipts that
 cite the lane keep the revision they validated.
 
+## Scoped seven-goal-cycle release
+
+The `mech-cycle-v2.0.0` release identifies Claw commit
+`c26f3a0906916f9641a5f82b004b5541ae5fbe52`, carrying parent v2.0.0 from
+[claw#866](https://github.com/CultureBotAI/culturebotai-claw/pull/866).
+This is a workflow-contract release; the orchestration package version remains
+0.1.0. Its governance manifest and canonical payload bytes equal the fleet's
+baseline `76c1ebeea3fc7f80bf1abe044688f298f390cfac`.
+
+The strict declaration in
+`src/kg_microbe_governance/releases/mech-cycle-v2-canary.json` permits only
+DUFMech to move from that baseline to that exact release commit. All other
+manifest-defined consumers must retain the baseline. The declaration binds the
+parent, schema and both canonical workflow skills by SHA-256. It does not
+permit an arbitrary descendant commit, another Mech, or a workflow version
+chosen by a consumer. Changing or deleting and reintroducing the declaration
+is refused. Native workflow snapshots and skills are not governed sync targets:
+the DUFMech adoption PR must prepare those and its own stage-1 text separately.
+
+The required `fleet-audit` job selects this lane only when its trusted protected
+base/main contains the declaration. A candidate PR cannot activate its own
+exception. Until activation, the existing unanimous-pin audit still runs.
+After activation, a separate release audit checks every committed Mech main,
+root identity, clean state, immutable pin, payload byte and Git mode against the
+appropriate historical snapshot. The trusted execution revision, release and
+lane introduction must belong to protected first-parent main history; neither
+a downstream pin nor an unmerged candidate supplies executable audit code.
+Candidate CI separately exercises the lane's policy and workflow regressions.
+The ordinary `kg-microbe-governance fleet-audit` command keeps its one-pin
+contract; it will reject the intentionally split canary cohort.
+
+With all consumer roots freshly fetched into clean audit worktrees, run the
+separate release audit from the merged lane revision:
+
+```bash
+uv run python -m kg_microbe_governance.cycle_release_audit \
+  --trusted-root /path/to/trusted-claw \
+  --target-root <manifest-key>=/path/to/exact-main-worktree \
+  ... \
+  --json-output /path/outside/audited/checkouts/cycle-release-audit.json
+```
+
+Supply every manifest key exactly once. The audit reports DUFMech as `pending`
+at baseline or `adopted` at the release, and the remaining consumers as
+`retained`. Here `adopted` means only that committed governance bytes and pin
+passed; it does not establish supervisor deployment, cycle-boundary migration
+or verified completion of the new issue-triage goal. Those require separate
+native workflow and runtime evidence. The guard performs no deployment, native
+goal dispatch or research call.
+
+Prepare the DUFMech re-pin using `pin-coupling` and dry-run/apply `sync` from the
+published release commit. Its PR depends on the lane PR and must not merge
+before the lane is trusted. Preserve the current active six-goal cycle and its
+evidence; activate the seven-goal candidate only at the verified cycle boundary.
+Do not create the remaining adoption issues or begin the other Mech re-pins
+until DUFMech's first issue-triage goal has verified closure.
+
+Retire this exception deliberately before the coordinated fleet rollout.
+Following the #773 precedent, remove the declaration in a reviewed transition
+while preserving the selection/execution steps needed by that PR's trusted
+base. Converge the fleet on the reviewed rollout release, prove the normal
+exact-main audit, then remove the obsolete lane implementation and workflow
+steps. Do not merge the implementation-removal cleanup while a trusted base
+still needs its lane. This scoped PR does not authorize those later merges.
+
+Before canary adoption, abandoning this lane needs only a reviewed declaration
+retirement while every consumer remains at baseline. After adoption, do not
+use a plain revert, delete a supervisor ledger, rewrite an active cycle, or
+silently downgrade DUFMech's workflow. Preserve the pinned active contract and
+prepare an explicitly reviewed forward recovery with native migration and
+evidence checks. A successful pin audit is not authority for runtime rollback.
+
 ## Rollback
 
 Rollback rolls forward:
