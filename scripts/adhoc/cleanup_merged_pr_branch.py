@@ -35,7 +35,8 @@ Serves: the culturebotai-claw#729 related-issue PRs. Written 2026-11-05. The
 first version (commit 1396fe0534 in culturebotai-claw PR 851) cleaned up
 CellStructureMech PR 3068. Rewritten 2026-11-06 for culturebotai-claw#854,
 #855, #856 and #858, for #867-#870 and #872 from the second review round, and
-for #873-#875 and #880 from the third, before its reuse on further merged PRs.
+for #873-#875 and #880 from the third, and for #893-#895 from the fourth, before
+its reuse on further merged PRs.
 """
 from __future__ import annotations
 
@@ -159,7 +160,10 @@ def recovery_for(done: list[str], checkout: Path, worktree: Path | None, branch:
     if any(step.startswith("deleted local ") for step in done):
         steps.append(f"recreate the branch with `git -C {checkout} branch {branch} {head}`")
     if any(step.startswith("removed worktree ") for step in done):
-        steps.append(f"the worktree with `git -C {checkout} worktree add {worktree} {branch}`")
+        if any(step.startswith("deleted local ") for step in done):
+            steps.append(f"the worktree with `git -C {checkout} worktree add {worktree} {branch}`")
+        else:  # the worktree was detached; there is no branch to put it on
+            steps.append(f"the worktree with `git -C {checkout} worktree add --detach {worktree} {head}`")
     if any(step.startswith("deleted remote ") for step in done):
         steps.append(f"the remote branch with `git -C {checkout} push origin {head}:refs/heads/{branch}`")
     return "; ".join(steps)
@@ -188,6 +192,12 @@ def cleanup(repo: str, number: int, checkout: Path, worktree: Path | None, *, ap
         problems = []
         entries = worktree_entries(checkout)
         removing = worktree is not None and worktree.exists()
+        skipped: list[str] = []
+        if worktree is not None and not removing:
+            if any(e["path"] == worktree for e in entries):
+                problems.append(f"{worktree} is registered but missing on disk; run `git -C {checkout} worktree prune` first")
+            else:
+                skipped.append(f"worktree {worktree} is not present, skipped")
         if removing:
             entry = next((e for e in entries if e["path"] == worktree), None)
             if entry is None:
@@ -215,11 +225,11 @@ def cleanup(repo: str, number: int, checkout: Path, worktree: Path | None, *, ap
         if problems:
             raise Refused("; ".join(problems))
         if not apply:
-            return ([f"would remove worktree {worktree}"] * removing
+            return (skipped + [f"would remove worktree {worktree}"] * removing
                     + [f"would delete local {branch} (at {head[:10]})"] * bool(local)
                     + [f"would delete remote {branch} (at {head[:10]})" if remote else f"remote {branch} already gone"]
                     + [f"would delete {tracking} (at {head[:10]})"] * bool(tracked))
-        done: list[str] = []
+        done: list[str] = list(skipped)
         try:
             if removing:
                 git(checkout, "worktree", "remove", str(worktree))
@@ -228,12 +238,12 @@ def cleanup(repo: str, number: int, checkout: Path, worktree: Path | None, *, ap
                 git(checkout, "update-ref", "-d", f"refs/heads/{branch}", head)
                 done.append(f"deleted local {branch} (was {head[:10]})")
                 # update-ref leaves the branch's upstream config; `branch -D` would have removed it.
-                git(checkout, "config", "--remove-section", f"branch.{branch}", check=False)
+                removed = git(checkout, "config", "--remove-section", f"branch.{branch}", check=False).returncode == 0
                 leftover = [name for name in ("remote", "merge")
                             if git(checkout, "config", "--get", f"branch.{branch}.{name}", check=False).returncode == 0]
                 if leftover:
                     raise RuntimeError(f"branch.{branch}.{leftover[0]} is still set")
-                done.append(f"removed branch.{branch} config")
+                done.append(f"removed branch.{branch} config" if removed else f"no branch.{branch} config to remove")
             if remote:
                 git(checkout, "push", "-q", f"--force-with-lease=refs/heads/{branch}:{head}",
                     "origin", "--delete", f"refs/heads/{branch}")

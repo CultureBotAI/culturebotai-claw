@@ -23,7 +23,8 @@ Serves: downstream review fixes for the culturebotai-claw#729 related issues
 (first use: TraitMech#2077 on TraitMech#2076). Written 2026-11-05; checks moved
 under the lock and the default branch refused 2026-11-06 for
 culturebotai-claw#857 and #858; paths resolved at entry for #868; the symbolic
-ref, explicit untracked listing and hidden-entry check for #876 and #877.
+ref, explicit untracked listing and hidden-entry check for #876 and #877; a
+rejected push reported as a local-only commit for #896.
 """
 from __future__ import annotations
 
@@ -82,8 +83,13 @@ def main() -> int:
             raise RuntimeError(f"{len(hidden)} index entries are skip-worktree or assume-unchanged, so status "
                                f"cannot see their changes: {', '.join(hidden[:3])}")
         git(worktree, "commit", "-q", "-F", str(message_file))
-        git(worktree, "push", "-q", "origin", f"HEAD:refs/heads/{branch}")
-    print(f"pushed {args.mech} {branch} {git(worktree, 'rev-parse', 'HEAD').stdout.strip()}")
+        sha = git(worktree, "rev-parse", "HEAD").stdout.strip()
+        pushed = git(worktree, "push", "-q", "origin", f"HEAD:refs/heads/{branch}", check=False)
+        if pushed.returncode != 0:
+            print(f"committed {sha} on {branch}; push failed: {pushed.stderr.strip()}; the commit is local only",
+                  file=sys.stderr)
+            return 1
+    print(f"pushed {args.mech} {branch} {sha}")
     return 0
 
 

@@ -1,4 +1,4 @@
-"""scripts/adhoc/commit_and_push_mech_branch_locked.py commits only on a feature branch (#857, #858, #868, #871, #876-#878).
+"""scripts/adhoc/commit_and_push_mech_branch_locked.py commits only on a feature branch (#857, #858, #868, #871, #876-#878, #896).
 
 The repositories are real (a bare origin and a clone under tmp_path). The
 origin-identity check is replaced in every test but one, because a local
@@ -250,3 +250,23 @@ def test_without_an_absolute_workspace_nothing_is_committed(clone, monkeypatch):
         run_helper(clone, monkeypatch)
 
     assert git(clone["checkout"], "rev-parse", "HEAD") == before
+
+
+def test_a_rejected_push_reports_a_local_only_commit(clone, monkeypatch, capsys):
+    git(clone["checkout"], "switch", "-q", "-c", "fix/x")
+    git(clone["checkout"], "push", "-q", "origin", "HEAD:refs/heads/fix/x")
+    other = clone["checkout"].parent / "other"
+    subprocess.run(["git", "clone", "-q", "-b", "fix/x", str(clone["origin"]), str(other)], check=True)
+    (other / "b.txt").write_text("moved ahead\n", encoding="utf-8")
+    git(other, "add", "b.txt")
+    git(other, "commit", "-q", "-m", "moved ahead")
+    git(other, "push", "-q", "origin", "fix/x")
+    before = git(clone["checkout"], "rev-parse", "HEAD")
+    stage_change(clone["checkout"])
+
+    assert run_helper(clone, monkeypatch) == 1
+
+    out, err = capsys.readouterr()
+    assert out == "" and "committed" in err and "local only" in err
+    assert git(clone["checkout"], "rev-parse", "HEAD") != before
+    assert git(clone["origin"], "rev-parse", "refs/heads/fix/x") == git(other, "rev-parse", "HEAD")

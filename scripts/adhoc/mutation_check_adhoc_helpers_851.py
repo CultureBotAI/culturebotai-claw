@@ -4,9 +4,11 @@
 Purpose: AGENTS.md requires a test for a distinction to be driven by an input
 where the two sides differ, and mutation is how that is shown. Each mutant
 below undoes one check added to cleanup_merged_pr_branch.py
-(culturebotai-claw#854-#856, #858, #867-#875, #878, #880) or
-commit_and_push_mech_branch_locked.py (#857, #858, #868, #876-#878). The named
-test must fail with the mutant applied, and each test file must pass without it.
+(culturebotai-claw#854-#856, #858, #867-#875, #878, #880, #891, #893-#895) or
+commit_and_push_mech_branch_locked.py (#857, #858, #868, #876-#878, #896). The
+named test must fail with the mutant applied, and each test file must pass
+without it. A mutant that does not parse is refused, since its kill would be an
+import error rather than the named test (#892).
 Inputs: none; run from the claw checkout or worktree holding the script. The
 tests point OPENCLAW_ORCHESTRATION_ROOT at their own tmp_path, so no mutant
 can take a lock in this checkout's workspace/ (#879).
@@ -18,6 +20,7 @@ Serves: culturebotai-claw PR 851. Written 2026-11-06.
 """
 from __future__ import annotations
 
+import ast
 import subprocess
 import sys
 from pathlib import Path
@@ -63,8 +66,9 @@ CLEANUP_MUTANTS = [
      "test_the_merged_branch_is_removed_everywhere_and_caches_do_not_block"),
     ("update-ref without old value", 'git(checkout, "update-ref", "-d", f"refs/heads/{branch}", head)',
      'git(checkout, "update-ref", "-d", f"refs/heads/{branch}")', "test_the_local_delete_compares_against_the_merged_head"),
-    ("branch config kept", '                git(checkout, "config", "--remove-section", f"branch.{branch}", check=False)\n', "",
-     "test_the_merged_branch_is_removed_everywhere_and_caches_do_not_block"),
+    ("branch config kept",
+     '                removed = git(checkout, "config", "--remove-section", f"branch.{branch}", check=False).returncode == 0\n',
+     "                removed = False\n", "test_the_merged_branch_is_removed_everywhere_and_caches_do_not_block"),
     ("config-leftover check disabled", "                if leftover:\n", "                if False:\n",
      "test_a_config_lock_still_reports_the_local_branch_deletion"),
     ("local step reported after config", '                done.append(f"deleted local {branch} (was {head[:10]})")\n', "",
@@ -84,8 +88,29 @@ CLEANUP_MUTANTS = [
      '            if not any(step.startswith(("removed ", "deleted ")) for step in done):\n                raise\n', "",
      "test_a_failure_before_any_deletion_says_nothing_was_deleted"),
     ("recovery without the worktree command",
-     '        steps.append(f"the worktree with `git -C {checkout} worktree add {worktree} {branch}`")\n', "",
-     "test_a_failure_after_a_deletion_reports_what_was_done_and_how_to_recover"),
+     '            steps.append(f"the worktree with `git -C {checkout} worktree add {worktree} {branch}`")\n',
+     "            pass\n", "test_a_failure_after_a_deletion_reports_what_was_done_and_how_to_recover"),
+    ("recovery without the push command",
+     '        steps.append(f"the remote branch with `git -C {checkout} push origin {head}:refs/heads/{branch}`")\n',
+     "        pass\n", "test_the_recovery_names_the_push_when_the_remote_branch_was_deleted"),
+    ("main worktree accepted", 'elif entry["main"]:', "elif False:", "test_the_main_worktree_is_refused"),
+    ("main worktree not marked", '"main": not entries', '"main": False', "test_the_main_worktree_is_refused"),
+    ("tracking ref deleted without old value", 'git(checkout, "update-ref", "-d", tracking, head)',
+     'git(checkout, "update-ref", "-d", tracking)', "test_the_tracking_ref_delete_compares_against_the_merged_head"),
+    ("worktree-only failure called nothing deleted", 'step.startswith(("removed ", "deleted "))', 'step.startswith("deleted ")',
+     "test_a_failure_after_only_the_worktree_went_reports_it"),
+    ("local-only failure called nothing deleted", 'step.startswith(("removed ", "deleted "))', 'step.startswith("removed ")',
+     "test_a_failure_after_only_the_local_branch_went_reports_it"),
+    ("detached worktree recovery names the branch",
+     '            steps.append(f"the worktree with `git -C {checkout} worktree add --detach {worktree} {head}`")\n',
+     '            steps.append(f"the worktree with `git -C {checkout} worktree add {worktree} {branch}`")\n',
+     "test_a_detached_worktree_s_recovery_does_not_name_the_branch"),
+    ("config step reported without a section", 'if removed else f"no branch.{branch} config to remove"', 'if True else ""',
+     "test_a_missing_config_section_is_reported_as_such"),
+    ("missing worktree dropped silently", '                skipped.append(f"worktree {worktree} is not present, skipped")\n',
+     "                pass\n", "test_a_missing_worktree_path_is_reported_and_a_prunable_one_refused"),
+    ("prunable worktree accepted", "            if any(e[\"path\"] == worktree for e in entries):\n", "            if False:\n",
+     "test_a_missing_worktree_path_is_reported_and_a_prunable_one_refused"),
     ("no cache allowance", 'if line and not (line.startswith("!! ") and _regenerable(line)):', "if line:",
      "test_the_merged_branch_is_removed_everywhere_and_caches_do_not_block"),
     ("no worktree-head check", "if actual != head:", "if False:", "test_a_detached_commit_in_the_worktree_blocks_removing_it"),
@@ -119,6 +144,8 @@ COMMIT_MUTANTS = [
      "test_a_held_lock_on_the_mech_stops_the_commit"),
     ("message file unresolved", "args.message_file.resolve()", "args.message_file",
      "test_a_relative_message_file_is_read_from_the_current_directory"),
+    ("rejected push uncaught", "        if pushed.returncode != 0:\n", "        if False:\n",
+     "test_a_rejected_push_reports_a_local_only_commit"),
 ]
 SUITES = [(CLEANUP, CLEANUP_MUTANTS), (COMMIT, COMMIT_MUTANTS)]
 
@@ -141,6 +168,11 @@ def run_mutants(script: Path, test_file: str, mutants: list) -> int | None:
                     print(f"{name}: anchor {anchor!r} occurs {original.count(anchor)} times")
                     return None
                 mutated = mutated.replace(anchor, replacement)
+            try:
+                ast.parse(mutated)
+            except SyntaxError as exc:
+                print(f"{name}: the mutant does not parse ({exc.msg}); a kill would be an import error, not the test")
+                return None
             script.write_text(mutated, encoding="utf-8")
             killed = pytest(f"{test_file}::{test}") != 0
             survived += not killed

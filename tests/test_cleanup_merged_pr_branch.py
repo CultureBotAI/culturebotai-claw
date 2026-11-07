@@ -1,4 +1,4 @@
-"""scripts/adhoc/cleanup_merged_pr_branch.py deletes only the merged work (#854-#856, #858, #867-#875, #878-#880).
+"""scripts/adhoc/cleanup_merged_pr_branch.py deletes only the merged work (#854-#856, #858, #867-#875, #878-#880, #891-#895).
 
 Each case is built so the unsafe and the safe behaviour differ: a remote
 branch that moved after the merge, a sibling branch whose name ends the same
@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -437,3 +438,111 @@ def test_the_lock_key_is_claw_or_the_manifest_mech():
     assert cleanup_script.lock_key(REPO.lower()) == MECH
     with pytest.raises(cleanup_script.Refused, match="neither claw nor a manifest Mech"):
         cleanup_script.lock_key("CultureBotAI/not-in-the-fleet")
+
+
+def reject_pushes(fleet) -> None:
+    hook = fleet["origin"] / "hooks" / "pre-receive"
+    hook.write_text("#!/bin/sh\necho rejected >&2\nexit 1\n", encoding="utf-8")
+    hook.chmod(0o755)
+
+
+def test_the_main_worktree_is_refused(fleet):
+    git(fleet["checkout"], "worktree", "remove", str(fleet["worktree"]))
+    git(fleet["checkout"], "switch", "-q", "feature")
+
+    for apply in (False, True):
+        with pytest.raises(cleanup_script.Refused, match="main worktree"):
+            run_cleanup(fleet, worktree=fleet["checkout"], apply=apply)
+
+    assert git(fleet["checkout"], "symbolic-ref", "--short", "HEAD") == "feature"
+    assert ref(fleet["origin"], "refs/heads/feature") == fleet["head"]
+
+
+def test_the_recovery_names_the_push_when_the_remote_branch_was_deleted(fleet, monkeypatch):
+    """A failure at the tracking-ref step, after push --delete succeeded, must say how to put the branch back."""
+    monkeypatch.setattr(cleanup_script, "tracking_sha", lambda checkout, branch: fleet["head"])
+
+    with pytest.raises(cleanup_script.PartialFailure) as caught:
+        run_cleanup(fleet)
+
+    assert f"deleted remote feature (was {fleet['head'][:10]})" in caught.value.done
+    assert f"push origin {fleet['head']}:refs/heads/feature" in caught.value.recovery
+    assert ref(fleet["origin"], "refs/heads/feature") is None
+    git(fleet["checkout"], "push", "-q", "origin", f"{fleet['head']}:refs/heads/feature")
+    assert ref(fleet["origin"], "refs/heads/feature") == fleet["head"]
+
+
+def test_the_tracking_ref_delete_compares_against_the_merged_head(fleet, monkeypatch):
+    """A tracking ref that moved between the check and the delete survives."""
+    later = push_follow_up(fleet)
+    git(fleet["checkout"], "fetch", "-q", "origin")
+    git(fleet["tmp"] / "other", "push", "-q", "origin", "--delete", "feature")
+    drop_worktree_and_local(fleet)
+    monkeypatch.setattr(cleanup_script, "tracking_sha", lambda checkout, branch: fleet["head"])
+
+    with pytest.raises(RuntimeError, match="update-ref"):
+        run_cleanup(fleet, worktree=None)
+
+    assert ref(fleet["checkout"], "refs/remotes/origin/feature") == later
+
+
+def test_a_failure_after_only_the_worktree_went_reports_it(fleet):
+    (fleet["checkout"] / ".git" / "refs" / "heads" / "feature.lock").write_text("", encoding="utf-8")
+
+    with pytest.raises(cleanup_script.PartialFailure) as caught:
+        run_cleanup(fleet)
+
+    assert caught.value.done == [f"removed worktree {fleet['worktree'].resolve()}"]
+    assert "worktree add" in caught.value.recovery and "branch feature" not in caught.value.recovery
+    assert ref(fleet["checkout"], "refs/heads/feature") == fleet["head"]
+
+
+def test_a_failure_after_only_the_local_branch_went_reports_it(fleet, monkeypatch, capsys):
+    git(fleet["checkout"], "worktree", "remove", str(fleet["worktree"]))
+    git(fleet["checkout"], "config", "--remove-section", "branch.feature")
+    reject_pushes(fleet)
+
+    assert run_main(fleet, monkeypatch, worktree=None) == 1
+
+    out, err = capsys.readouterr()
+    assert "deleted local feature" in out and "no branch.feature config to remove" in out
+    assert "failed after the steps above" in err and f"branch feature {fleet['head']}" in err
+    assert ref(fleet["checkout"], "refs/heads/feature") is None
+
+
+def test_a_detached_worktree_s_recovery_does_not_name_the_branch(fleet):
+    git(fleet["worktree"], "checkout", "-q", "--detach")
+    git(fleet["checkout"], "branch", "-q", "-D", "feature")
+    git(fleet["checkout"], "update-ref", "-d", "refs/remotes/origin/feature")
+    reject_pushes(fleet)
+
+    with pytest.raises(cleanup_script.PartialFailure) as caught:
+        run_cleanup(fleet)
+
+    command = f"worktree add --detach {fleet['worktree'].resolve()} {fleet['head']}"
+    assert command in caught.value.recovery and "branch feature" not in caught.value.recovery
+    git(fleet["checkout"], "worktree", "add", "-q", "--detach", str(fleet["worktree"]), fleet["head"])
+    assert git(fleet["worktree"], "rev-parse", "HEAD") == fleet["head"]
+
+
+def test_a_missing_config_section_is_reported_as_such(fleet):
+    git(fleet["checkout"], "config", "--remove-section", "branch.feature")
+
+    done = run_cleanup(fleet)
+
+    assert "no branch.feature config to remove" in done
+    assert not any(step.startswith("removed branch.") for step in done)
+
+
+def test_a_missing_worktree_path_is_reported_and_a_prunable_one_refused(fleet):
+    git(fleet["checkout"], "worktree", "remove", str(fleet["worktree"]))
+    nowhere = fleet["tmp"] / "nowhere"
+
+    plan = run_cleanup(fleet, worktree=nowhere, apply=False)
+
+    assert plan[0] == f"worktree {nowhere.resolve()} is not present, skipped"
+    prunable = fleet["tmp"] / "prunable"
+    git(fleet["checkout"], "worktree", "add", "-q", "--detach", str(prunable), fleet["head"])
+    shutil.rmtree(prunable)
+    with pytest.raises(cleanup_script.Refused, match="worktree prune"):
+        run_cleanup(fleet, worktree=prunable, apply=False)
