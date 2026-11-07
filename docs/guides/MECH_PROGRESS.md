@@ -342,3 +342,11 @@ Test fixtures cover duplicate collection, multiple PRs per goal, restart history
 incomplete cycle coverage, invalid receipt evidence, private-field rejection,
 GitHub state changes, and publication failures. Browser checks cover the actual
 built desktop/mobile site, controls, disclosures, and failed data loads.
+
+An accepted [ordered multi-PR closure](MECH_SESSION_WORKFLOWS.md#ordered-multi-pr-closure-receipts)
+contributes every independently verified member PR to the existing PR event and
+association history. The goal closure remains one event naming the final
+integration PR, so public schemas and single-PR history are unchanged. Member
+identity and order must match the hash-bound archived receipt; an incomplete or
+mismatched stored proof fails collection. A working multi-PR receipt may report
+its member associations but never grants completion authority.
