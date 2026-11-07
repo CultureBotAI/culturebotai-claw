@@ -66,12 +66,15 @@ snapshot date. Do not claim a complete current queue from cached evidence.
 ### 2. Fetch the entire queue and all comments
 
 Use explicit repository arguments. Save raw paginated results in a fresh local
-directory; do not assume a large `--limit` proves completeness.
+directory under the gitignored `<repo>/.temp/` durable root; verify the
+ignore rule before use. Do not assume a large `--limit` proves completeness.
 
 ```bash
 set -o pipefail
 review_repo=CultureBotAI/culturebotai-claw
-review_dir=$(mktemp -d "${TMPDIR:-/tmp}/claw-issue-review.XXXXXX")
+review_root="$(git rev-parse --show-toplevel)/.temp"
+mkdir -p "$review_root"
+review_dir=$(mktemp -d "$review_root/claw-issue-review.XXXXXX")
 gh repo view "$review_repo" --json nameWithOwner,url,defaultBranchRef
 gh api --method GET --paginate --slurp \
   "repos/$review_repo/issues?state=open&per_page=100" \
