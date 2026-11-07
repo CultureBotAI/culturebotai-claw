@@ -561,6 +561,8 @@ mechs:
             - ecological_interactions[].target_taxon.gtdb_classification.ncbi_source_id
             - host.term.id
             - engineering_design.counter_selection[].excluded_taxon.term.id
+            # Found but not declared: external_resources[].resource_id holds
+            # the ids of external resources, not taxon links.
       evidence_reference_validation:
         status: disabled
         reason: >-
@@ -882,6 +884,8 @@ mechs:
         settings:
           slots:
             - canonical_examples[].taxon_id
+            # Found but not declared: xrefs[] (four records) is a mixed
+            # cross-reference slot.
       evidence_reference_validation:
         status: disabled
         reason: >-
@@ -1062,6 +1066,8 @@ mechs:
             - resistance_mechanisms[].strain_taxon_id
             - activity_spectrum[].taxon_id
             - structural_observations[].taxon_id
+            # Found but not declared: resistance_mechanisms[].evidence[].reference
+            # is a citation slot.
       evidence_reference_validation:
         status: disabled
         reason: >-
@@ -1241,6 +1247,7 @@ mechs:
             - images[].taxon_id
             - complex_compositions[].taxon_id
             - related_records[].target_taxon_id
+            # Found but not declared: evidence[].reference is a citation slot.
       evidence_reference_validation:
         status: enabled
         settings:
@@ -1442,6 +1449,7 @@ mechs:
           slots:
             - characteristic_taxa[].taxon_id
             - causal_graphs[].nodes[].protein_examples[].taxon_id
+            # Found but not declared: xrefs[] is a mixed cross-reference slot.
       evidence_reference_validation:
         status: enabled
         settings:
@@ -1682,6 +1690,8 @@ mechs:
             - biosynthetic_gene_clusters[].organism_taxon_id
             - occurrences[].taxon_id
             - molecular_targets[].taxon_id
+            # Mixed node ids; an ORGANISM node names a taxon.
+            - causal_graphs[].nodes[].identifier
       evidence_reference_validation:
         status: disabled
         reason: >-
@@ -2042,6 +2052,12 @@ mechs:
             - taxa[].id
             - mechanistic_edges[].evidence[].assay_taxon
             - mechanistic_edges[].endpoint_qualifiers[].evidence[].assay_taxon
+            # Edge endpoints are mixed node ids; a taxon there is a pathway's
+            # native species (part_of edges), so it is a link.
+            - mechanistic_edges[].subject
+            - mechanistic_edges[].object
+            # Found but not declared: references[].id and
+            # mechanistic_edges[].evidence[].reference_id are citation slots.
       evidence_reference_validation:
         status: disabled
         reason: >-

@@ -3,17 +3,21 @@
 A Mech names taxa in the slots its manifest `taxon_links` declaration lists.
 Each cited `NCBITaxon` CURIE gets one verdict:
 
+- `retired`: an id NCBI has merged into another, judged first, since TaxonMech's
+  own scope still lists fourteen such ids; the record should cite the current
+  id, whose own verdict is reported beside it;
 - `record`: TaxonMech's seed scope holds it, so a link resolves to a record;
-- `species_of_strain`: it is below species and its nearest ancestor in the
-  scope is a record, so a link resolves one rank up, and should say so;
+- `species_of_strain`: it is below species and its nearest ancestor that is a
+  record (usually its species; a strain's forma or an unranked taxon in a few
+  cases) holds it, so a link resolves up to that record, and should say so;
 - `above_species`: a genus or higher, never a record by TaxonMech's rule;
 - `outside_domain`: an animal, plant or virus, which TaxonMech's sources never
   attest, so TaxonMech is not where it resolves;
+- `unplaced`: a species-rank entry under no cellular domain and not a virus: a
+  metagenome, an uncultured or unclassified sequence, a vector;
 - `unattested_microbial`: a bacterial, archaeal, fungal or protist species or
   strain that no TaxonMech source attests, the only kind a scope change could
   admit (TaxonMech holds protists: Plasmodium, Paramecium, diatoms);
-- `retired`: an id NCBI has merged into another; the record should cite the
-  current id, whose own verdict is reported beside it;
 - `absent`: an id the pinned taxdump does not contain;
 - `malformed`: a value that is not an `NCBITaxon:<digits>` CURIE.
 
@@ -21,8 +25,9 @@ Everything is read from TaxonMech's checkout: `curation/seed_scope.tsv` (the
 scope), `data/raw/ncbi_merged_ids.tsv` (merges), `data/raw/ncbitaxon_taxa.tsv`
 (rank and parent for every attested taxon) and, only for taxa outside that
 inventory, the NCBI taxdump snapshot `conf/ncbi_taxdump.yaml` pins. Nothing is
-fetched, so the verdict is the same on a laptop and in CI. Reading the taxdump
-costs tens of seconds and happens once per run, lazily.
+fetched, so the verdict is the same on a laptop and in CI. The taxdump's nodes
+and names are each read at most once per process, lazily, and cost tens of
+seconds each.
 """
 
 from __future__ import annotations
@@ -61,6 +66,7 @@ class Verdict(str, Enum):
     SPECIES_OF_STRAIN = "species_of_strain"
     ABOVE_SPECIES = "above_species"
     OUTSIDE_DOMAIN = "outside_domain"
+    UNPLACED = "unplaced"
     UNATTESTED_MICROBIAL = "unattested_microbial"
     RETIRED = "retired"
     ABSENT = "absent"
@@ -100,7 +106,7 @@ class TaxonIndex:
     def __init__(self, taxonmech_root: Path) -> None:
         self.root = Path(taxonmech_root)
         self._nodes: dict[int, tuple[str, int]] | None = None  # taxdump, lazily
-        self._names: dict[int, str] = {}
+        self._names: dict[int, str] | None = None  # every scientific name in the taxdump, lazily
         self._inventory_names: dict[int, str] = {}
         self.scope = self._read_scope()
         self.merged = self._read_merged()
@@ -169,24 +175,23 @@ class TaxonIndex:
         return chain
 
     def names(self, taxa: Sequence[int]) -> dict[int, str]:
-        """Scientific names, from the inventory where present, else one pass over the taxdump."""
-        wanted = {t for t in taxa if t not in self._inventory_names and t not in self._names}
-        if wanted and self.taxdump_path.is_file():
-            for fields in _dmp_rows(self.taxdump_path, "names.dmp"):
-                if fields[3] == "scientific name" and int(fields[0]) in wanted:
-                    self._names[int(fields[0])] = fields[1]
-        return {t: self._inventory_names.get(t) or self._names.get(t, "") for t in taxa}
+        """Scientific names, from the inventory where present, else from the taxdump, read once."""
+        if self._names is None and any(t not in self._inventory_names for t in taxa) and self.taxdump_path.is_file():
+            self._names = {int(f[0]): f[1] for f in _dmp_rows(self.taxdump_path, "names.dmp")
+                           if f[3] == "scientific name"}
+        taxdump_names = self._names or {}
+        return {t: self._inventory_names.get(t) or taxdump_names.get(t, "") for t in taxa}
 
     def judge(self, value: Any) -> Judgement:
         if not isinstance(value, str) or not CURIE.match(value):
             return Judgement(Verdict.MALFORMED)
         taxon = _int_id(value)
-        if taxon in self.scope:
-            return Judgement(Verdict.RECORD, taxon)
-        if taxon in self.merged:
+        if taxon in self.merged:  # before the scope: TaxonMech's scope still lists some retired ids
             current = self.merged[taxon]
             inner = self.judge(f"NCBITaxon:{current}")
             return Judgement(Verdict.RETIRED, taxon, current=current, current_verdict=inner.verdict)
+        if taxon in self.scope:
+            return Judgement(Verdict.RECORD, taxon)
         node = self.node(taxon)
         if node is None:
             return Judgement(Verdict.ABSENT, taxon)
@@ -196,11 +201,13 @@ class TaxonIndex:
         kingdom = next((KINGDOMS[a] for a in chain if a in KINGDOMS), "")
         ancestor = next((a for a in chain[1:] if a in self.scope), None)
         below_species = rank != "species" and any(self._rank(a) == "species" for a in chain[1:])
-        if ancestor is not None and (rank == "species" or below_species):
+        if ancestor is not None and below_species:
             return Judgement(Verdict.SPECIES_OF_STRAIN, taxon, rank=rank, domain=domain, kingdom=kingdom,
                              ancestor=ancestor)
         if rank != "species" and not below_species:
             return Judgement(Verdict.ABOVE_SPECIES, taxon, rank=rank, domain=domain, kingdom=kingdom)
+        if domain == "other":
+            return Judgement(Verdict.UNPLACED, taxon, rank=rank, domain=domain, kingdom=kingdom)
         if domain in MICROBIAL_DOMAINS or (domain == "Eukaryota" and kingdom not in NON_MICROBIAL_KINGDOMS):
             return Judgement(Verdict.UNATTESTED_MICROBIAL, taxon, rank=rank, domain=domain, kingdom=kingdom)
         return Judgement(Verdict.OUTSIDE_DOMAIN, taxon, rank=rank, domain=domain, kingdom=kingdom)
@@ -212,8 +219,9 @@ def resolve_all(record: Any, dotted: str) -> list[Any]:
     if not parts:
         raise TaxonLinksError("a slot path must name at least one key")
     for part in parts:
-        name = part.rstrip("[]")
-        if not name or (len(part) - len(name)) % 2:
+        lists = part.count("[]")
+        name = part[:len(part) - 2 * lists]
+        if not name or "[" in name or "]" in name or part != name + "[]" * lists:
             raise TaxonLinksError(f"bad slot path {dotted!r}: each part is a key, optionally followed by [] per list")
 
     def descend(node: Any, lists: int, rest: list[str]) -> Iterator[Any]:
@@ -228,10 +236,11 @@ def resolve_all(record: Any, dotted: str) -> list[Any]:
             yield node
             return
         head, rest = remaining[0], remaining[1:]
-        name = head.rstrip("[]")
+        lists = head.count("[]")
+        name = head[:len(head) - 2 * lists]
         if not isinstance(node, dict) or name not in node:
             return
-        yield from descend(node[name], (len(head) - len(name)) // 2, rest)
+        yield from descend(node[name], lists, rest)
 
     return list(walk(record, parts))
 
@@ -241,6 +250,7 @@ class TaxonLinksReport:
     mech: str
     taxonmech_root: str
     scope_size: int
+    sample: int | None = None
     slots: dict[str, Counter] = field(default_factory=lambda: defaultdict(Counter))
     verdicts: dict[str, Counter] = field(default_factory=lambda: defaultdict(Counter))
     findings: list[dict] = field(default_factory=list)  # retired, absent, malformed: one per record x value
@@ -258,6 +268,7 @@ class TaxonLinksReport:
             "mech": self.mech,
             "taxonmech_root": self.taxonmech_root,
             "scope_size": self.scope_size,
+            "sample": self.sample,
             "records": self.records,
             "unreadable": sorted(self.unreadable),
             "slots": {slot: dict(sorted(counter.items())) for slot, counter in sorted(self.slots.items())},
@@ -286,7 +297,7 @@ def collect(mech: str, root: Path, globs: Sequence[str], slots: Sequence[str], i
         raise TaxonLinksError(f"{mech}: no taxon_links slots declared; the manifest says where the taxa are")
     for slot in slots:
         resolve_all({}, slot)  # a bad path fails before the walk, not on the first record
-    report = TaxonLinksReport(mech=mech, taxonmech_root=str(index.root), scope_size=len(index.scope))
+    report = TaxonLinksReport(mech=mech, taxonmech_root=str(index.root), scope_size=len(index.scope), sample=sample)
     for path, record in iter_records(root, globs, sample=sample):
         relative = path.relative_to(root).as_posix()
         if record is None:

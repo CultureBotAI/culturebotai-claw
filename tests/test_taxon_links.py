@@ -47,10 +47,12 @@ TAXA = {
     9605: ("Homo", "genus", 33208),
     9606: ("Homo sapiens", "species", 9605),
     10665: ("Enterobacteria phage T4", "species", 10239),
+    777: ("Escherichia coli (old name)", "species", 561),
+    999: ("marine metagenome", "species", 1),
 }
-SCOPE = {562, 1280, 4932}
+SCOPE = {562, 1280, 4932, 777}  # 777 is also retired: TaxonMech's scope keeps some merged ids
 INVENTORY = {1, 131567, 2, 2759, 543, 561, 562, 1279, 1280, 4751, 4930, 4932}
-MERGED = {46170: 1280, 999001: 999002}
+MERGED = {46170: 1280, 999001: 999002, 777: 562}
 
 
 def _dmp(rows: list[list[str]]) -> bytes:
@@ -141,6 +143,18 @@ def test_a_retired_id_reports_its_current_id_and_that_id_s_own_verdict(index):
     assert (merged_into_nothing.current, merged_into_nothing.current_verdict) == (999002, links.Verdict.ABSENT)
 
 
+def test_a_retired_id_that_the_scope_still_lists_is_retired_not_a_record(index):
+    judgement = judge(index, "NCBITaxon:777")
+    assert judgement.verdict is links.Verdict.RETIRED
+    assert (judgement.current, judgement.current_verdict) == (562, links.Verdict.RECORD)
+
+
+def test_a_metagenome_under_no_domain_is_unplaced(index):
+    judgement = judge(index, "NCBITaxon:999")
+    assert judgement.verdict is links.Verdict.UNPLACED
+    assert judgement.domain == "other"
+
+
 def test_an_unknown_id_is_absent(index):
     assert judge(index, "NCBITaxon:424242").verdict is links.Verdict.ABSENT
 
@@ -165,9 +179,11 @@ def test_a_missing_taxonmech_file_is_a_clear_refusal(taxonmech):
         links.TaxonIndex(taxonmech)
 
 
-def test_names_come_from_the_inventory_or_the_taxdump(index):
+def test_names_come_from_the_inventory_or_the_taxdump_read_once(index, monkeypatch):
     assert index.names([562, 511145, 424242]) == {562: "Escherichia coli",
                                                     511145: "Escherichia coli str. K-12 substr. MG1655", 424242: ""}
+    monkeypatch.setattr(links, "_dmp_rows", lambda *a, **k: (_ for _ in ()).throw(AssertionError("taxdump read again")))
+    assert index.names([9606, 424242]) == {9606: "Homo sapiens", 424242: ""}
 
 
 RECORD = {
@@ -187,7 +203,7 @@ def test_resolve_all_visits_every_list_element_and_skips_absent_keys():
     assert links.resolve_all("not a record", "taxon_id") == []
 
 
-@pytest.mark.parametrize("path", ["", "[]", "a[", "a.[].b", "a[][]["])
+@pytest.mark.parametrize("path", ["", "[]", "a[", "a.[].b", "a[][][", "a]].b", "a[]x", "[]a"])
 def test_a_bad_slot_path_is_refused_before_any_record_is_read(path):
     with pytest.raises(links.TaxonLinksError):
         links.resolve_all({}, path)
@@ -237,6 +253,38 @@ def test_collect_counts_occurrences_records_and_findings(tmp_path, index):
                                "taxon_id": {"occurrences": 2}}
 
 
+def test_findings_are_sorted_and_resolvable_is_most_cited_first(tmp_path, index):
+    root = _corpus(tmp_path, {"data/a.yaml": {
+        "z_slot": "NCBITaxon:999001", "a_slot": "NCBITaxon:46170",
+        "strains": [{"id": "NCBITaxon:511145"}, {"id": "NCBITaxon:559292"}, {"id": "NCBITaxon:559292"}],
+    }})
+
+    report = links.collect("m", root, ["data/**/*.yaml"], ["z_slot", "a_slot", "strains[].id"], index).as_dict(index)
+
+    assert [f["slot"] for f in report["findings"]] == ["a_slot", "z_slot"]
+    assert [r["taxon"] for r in report["resolvable"]] == ["NCBITaxon:559292", "NCBITaxon:511145"]
+
+
+def test_a_null_value_is_neither_a_link_nor_a_finding(tmp_path, index):
+    root = _corpus(tmp_path, {"data/a.yaml": {"taxon_id": None, "organisms": [{"term": {"id": None}}]}})
+
+    report = links.collect("m", root, ["data/**/*.yaml"], ["taxon_id", "organisms[].term.id"], index).as_dict(index)
+
+    assert report["slots"] == {} and report["findings"] == []
+    assert all(v["occurrences"] == 0 for v in report["verdicts"].values())
+
+
+def test_a_sample_reads_the_first_records_and_says_so(tmp_path, index):
+    records = {f"data/{n}.yaml": {"taxon_id": "NCBITaxon:562"} for n in "abc"}
+    root = _corpus(tmp_path, records)
+
+    sampled = links.collect("m", root, ["data/**/*.yaml"], ["taxon_id"], index, sample=2).as_dict(index)
+    whole = links.collect("m", root, ["data/**/*.yaml"], ["taxon_id"], index).as_dict(index)
+
+    assert (sampled["records"], sampled["sample"]) == (2, 2)
+    assert (whole["records"], whole["sample"]) == (3, None)
+
+
 def test_collect_refuses_an_unusable_corpus_before_walking(tmp_path, index):
     root = _corpus(tmp_path, {"data/a.yaml": RECORD})
     with pytest.raises(links.TaxonLinksError, match="no taxon_links slots"):
@@ -245,6 +293,10 @@ def test_collect_refuses_an_unusable_corpus_before_walking(tmp_path, index):
         links.collect("m", root, [], SLOTS, index)
     with pytest.raises(links.TaxonLinksError, match="bad slot path"):
         links.collect("m", root, ["data/**/*.yaml"], ["a["], index)
+    empty = tmp_path / "empty"  # no record to trip over: only the check before the walk can refuse
+    (empty / "data").mkdir(parents=True)
+    with pytest.raises(links.TaxonLinksError, match="bad slot path"):
+        links.collect("m", empty, ["data/**/*.yaml"], ["a["], index)
     with pytest.raises(links.TaxonLinksError, match="not a directory"):
         links.collect("m", root / "nowhere", ["data/**/*.yaml"], SLOTS, index)
 
