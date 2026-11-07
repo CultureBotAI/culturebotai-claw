@@ -505,13 +505,22 @@ evidence; activate the seven-goal candidate only at the verified cycle boundary.
 Do not create the remaining adoption issues or begin the other Mech re-pins
 until DUFMech's first issue-triage goal has verified closure.
 
-Retire this exception deliberately before the coordinated fleet rollout.
-Following the #773 precedent, remove the declaration in a reviewed transition
-while preserving the selection/execution steps needed by that PR's trusted
-base. Converge the fleet on the reviewed rollout release, prove the normal
-exact-main audit, then remove the obsolete lane implementation and workflow
-steps. Do not merge the implementation-removal cleanup while a trusted base
-still needs its lane. This scoped PR does not authorize those later merges.
+Retirement after adoption remains separate, unresolved rollout work. Prepare
+an independently reviewed transition or bridge policy that specifies the exact
+acceptable intermediate cohorts and the gates executed from each trusted base
+before changing the declaration or advancing another consumer. Deleting the
+declaration while DUFMech alone is adopted makes the ordinary one-pin audit fail;
+advancing another consumer while this lane remains active fails its exact-cohort
+check. Declaration deletion alone does not provide a continuously green cutover.
+The #773 precedent explicitly documented its expected red rollout window; do not
+silently assume that a similar window or gate waiver is approved here (#930).
+
+Once that separately reviewed transition has converged the fleet on its approved
+release and the normal exact-main audit passes, remove the obsolete declaration,
+implementation and workflow steps in the order proven by that transition. Keep
+any selector/execution needed by each cleanup PR's trusted base until it is no
+longer required. This scoped canary PR implements no broader rollout bridge and
+authorizes none of those later merges.
 
 Before canary adoption, abandoning this lane needs only a reviewed declaration
 retirement while every consumer remains at baseline. After adoption, do not
