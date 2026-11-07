@@ -1,4 +1,4 @@
-"""scripts/adhoc/commit_and_push_mech_branch_locked.py commits only on a feature branch (#857, #858, #868, #871, #876-#878, #896).
+"""scripts/adhoc/commit_and_push_mech_branch_locked.py commits only on a feature branch (#857, #858, #868, #871, #876-#878, #896, #937).
 
 The repositories are real (a bare origin and a clone under tmp_path). The
 origin-identity check is replaced in every test but one, because a local
@@ -32,11 +32,18 @@ def git(path: Path, *args: str) -> str:
 
 
 class _AnyOrigin:
-    def __init__(self, **kwargs):
-        pass
+    """Stands in for the origin check; records that the Mech lock was held when it ran."""
+
+    def __init__(self, *, name, path, expected_repository):
+        self.name = name
 
     def open(self):
-        return None
+        try:
+            with LockManager().lock(self.name, "probe"):
+                held = False
+        except RuntimeError:
+            held = True
+        assert held, "the origin check ran outside the lock"
 
 
 @pytest.fixture

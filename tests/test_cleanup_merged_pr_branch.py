@@ -1,4 +1,4 @@
-"""scripts/adhoc/cleanup_merged_pr_branch.py deletes only the merged work (#854-#856, #858, #867-#875, #878-#880, #891-#895).
+"""scripts/adhoc/cleanup_merged_pr_branch.py deletes only the merged work (#854-#856, #858, #867-#875, #878-#880, #891-#895, #931-#936).
 
 Each case is built so the unsafe and the safe behaviour differ: a remote
 branch that moved after the merge, a sibling branch whose name ends the same
@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -154,9 +155,9 @@ def test_the_merged_branch_is_removed_everywhere_and_caches_do_not_block(fleet):
     assert "branch.feature." not in git(fleet["checkout"], "config", "--get-regexp", "^branch\\.")
     assert "branch.main.merge" in git(fleet["checkout"], "config", "--get-regexp", "^branch\\.")
     assert done == [f"removed worktree {fleet['worktree'].resolve()}",
-                    f"deleted local feature (was {fleet['head'][:10]})", "removed branch.feature config",
+                    f"deleted local feature (was {fleet['head'][:10]})", "removed branch.feature config (2 entries)",
                     f"deleted remote feature (was {fleet['head'][:10]})",
-                    f"refs/remotes/origin/feature went with the remote branch (was {fleet['head'][:10]})"]
+                    f"deleted refs/remotes/origin/feature (was {fleet['head'][:10]})"]
     assert fleet["origin_calls"] == [(MECH, fleet["checkout"].resolve(), REPO, True)]
 
 
@@ -255,7 +256,7 @@ def test_a_failure_before_any_deletion_says_nothing_was_deleted(fleet, monkeypat
 def test_a_config_lock_still_reports_the_local_branch_deletion(fleet):
     (fleet["checkout"] / ".git" / "config.lock").write_text("", encoding="utf-8")
 
-    with pytest.raises(cleanup_script.PartialFailure, match="branch.feature.remote is still set") as caught:
+    with pytest.raises(cleanup_script.PartialFailure, match="branch.feature config is still set") as caught:
         run_cleanup(fleet)
 
     assert caught.value.done == [f"removed worktree {fleet['worktree'].resolve()}",
@@ -459,13 +460,16 @@ def test_the_main_worktree_is_refused(fleet):
 
 
 def test_the_recovery_names_the_push_when_the_remote_branch_was_deleted(fleet, monkeypatch):
-    """A failure at the tracking-ref step, after push --delete succeeded, must say how to put the branch back."""
+    """A tracking ref that moved after the check survives the remote delete, and the recovery says how to push the branch back."""
+    main = ref(fleet["checkout"], "origin/main")
+    git(fleet["checkout"], "update-ref", "refs/remotes/origin/feature", main)
     monkeypatch.setattr(cleanup_script, "tracking_sha", lambda checkout, branch: fleet["head"])
 
     with pytest.raises(cleanup_script.PartialFailure) as caught:
         run_cleanup(fleet)
 
     assert f"deleted remote feature (was {fleet['head'][:10]})" in caught.value.done
+    assert ref(fleet["checkout"], "refs/remotes/origin/feature") == main  # the push touched no local ref
     assert f"push origin {fleet['head']}:refs/heads/feature" in caught.value.recovery
     assert ref(fleet["origin"], "refs/heads/feature") is None
     git(fleet["checkout"], "push", "-q", "origin", f"{fleet['head']}:refs/heads/feature")
@@ -510,7 +514,7 @@ def test_a_failure_after_only_the_local_branch_went_reports_it(fleet, monkeypatc
     out, err = capsys.readouterr()
     assert "deleted local feature" in out and "removed branch.feature config" in out
     assert "failed after the steps above" in err and f"branch feature {fleet['head']}" in err
-    assert "config branch.feature.remote origin" in err and "config branch.feature.merge refs/heads/main" in err
+    assert "config --add branch.feature.remote origin" in err and "config --add branch.feature.merge refs/heads/main" in err
     assert ref(fleet["checkout"], "refs/heads/feature") is None
     git(fleet["checkout"], "branch", "feature", fleet["head"])
     git(fleet["checkout"], "config", "branch.feature.remote", "origin")
@@ -541,7 +545,7 @@ def test_a_failure_with_no_config_section_names_no_config_to_restore(fleet, monk
     assert run_main(fleet, monkeypatch, worktree=None) == 1
 
     out, err = capsys.readouterr()
-    assert "no branch.feature config to remove" in out and "config branch." not in err
+    assert "no branch.feature config to remove" in out and "config --add branch." not in err
 
 
 def test_a_linked_checkout_passed_as_its_own_worktree_is_refused(fleet):
@@ -576,3 +580,125 @@ def test_a_missing_worktree_path_is_reported_and_a_prunable_one_refused(fleet):
     shutil.rmtree(prunable)
     with pytest.raises(cleanup_script.Refused, match="worktree prune"):
         run_cleanup(fleet, worktree=prunable, apply=False)
+
+
+def recovery_commands(recovery: str) -> list[list[str]]:
+    return [shlex.split(part.split("`")[1]) for part in recovery.split("; ") if "`" in part]
+
+
+def test_the_remote_delete_changes_no_local_ref_through_the_fetch_refspec(fleet):
+    """With a fetch refspec mapping feature onto `victim`, a push through the remote name would delete victim."""
+    drop_worktree_and_local(fleet)
+    main = ref(fleet["checkout"], "origin/main")
+    git(fleet["checkout"], "branch", "victim", main)
+    git(fleet["checkout"], "config", "remote.origin.fetch", "+refs/heads/feature:refs/heads/victim")
+
+    done = run_cleanup(fleet, worktree=None)
+
+    assert any(step.startswith("deleted remote feature") for step in done)
+    assert ref(fleet["checkout"], "refs/heads/victim") == main
+    assert ref(fleet["origin"], "refs/heads/feature") is None
+
+
+def test_a_symbolic_branch_ref_is_refused_and_its_target_kept(fleet):
+    git(fleet["checkout"], "worktree", "remove", str(fleet["worktree"]))
+    git(fleet["checkout"], "branch", "victim", fleet["head"])
+    git(fleet["checkout"], "symbolic-ref", "refs/heads/feature", "refs/heads/victim")
+
+    with pytest.raises(cleanup_script.Refused, match="symbolic ref"):
+        run_cleanup(fleet, worktree=None)
+
+    assert ref(fleet["checkout"], "refs/heads/victim") == fleet["head"]
+    assert git(fleet["checkout"], "symbolic-ref", "refs/heads/feature") == "refs/heads/victim"
+
+
+def test_a_symbolic_tracking_ref_is_refused(fleet):
+    drop_worktree_and_local(fleet)
+    git(fleet["checkout"], "symbolic-ref", "refs/remotes/origin/feature", "refs/remotes/origin/main")
+
+    with pytest.raises(cleanup_script.Refused, match="refs/remotes/origin/feature is a symbolic ref"):
+        run_cleanup(fleet, worktree=None)
+
+    assert ref(fleet["origin"], "refs/heads/feature") == fleet["head"]
+
+
+def test_a_worktree_that_changes_after_the_check_is_not_removed(fleet, monkeypatch):
+    """A commit made in the worktree while the remote is being queried is kept; nothing is deleted."""
+    def detach_and_commit_then_report(checkout, branch):
+        git(fleet["worktree"], "checkout", "-q", "--detach")
+        commit(fleet["worktree"], "late")
+        return fleet["head"]
+
+    monkeypatch.setattr(cleanup_script, "remote_branch_sha", detach_and_commit_then_report)
+
+    with pytest.raises(RuntimeError, match="changed after the check"):
+        run_cleanup(fleet)
+
+    assert fleet["worktree"].exists() and (fleet["worktree"] / "late").exists()
+    assert untouched(fleet)
+
+
+def test_the_recovery_restores_every_entry_of_the_branch_config(fleet):
+    git(fleet["checkout"], "worktree", "remove", str(fleet["worktree"]))
+    git(fleet["checkout"], "config", "branch.feature.rebase", "true")
+    git(fleet["checkout"], "config", "branch.feature.description", "keep me")
+    before = git(fleet["checkout"], "config", "--get-regexp", "^branch\\.feature\\.")
+    reject_pushes(fleet)
+
+    with pytest.raises(cleanup_script.PartialFailure) as caught:
+        run_cleanup(fleet, worktree=None)
+
+    assert "removed branch.feature config (4 entries)" in caught.value.done
+    git(fleet["checkout"], "branch", "feature", fleet["head"])
+    for command in recovery_commands(caught.value.recovery):
+        if command[3:5] == ["config", "--add"]:
+            subprocess.run(command, check=True, capture_output=True)
+    assert git(fleet["checkout"], "config", "--get-regexp", "^branch\\.feature\\.") == before
+
+
+def test_a_config_section_that_will_not_go_is_a_partial_failure(fleet):
+    git(fleet["checkout"], "worktree", "remove", str(fleet["worktree"]))
+    git(fleet["checkout"], "config", "--remove-section", "branch.feature")
+    git(fleet["checkout"], "config", "branch.feature.description", "keep me")
+    (fleet["checkout"] / ".git" / "config.lock").write_text("", encoding="utf-8")
+
+    with pytest.raises(cleanup_script.PartialFailure, match="still set: branch.feature.description") as caught:
+        run_cleanup(fleet, worktree=None)
+
+    assert "deleted local feature" in caught.value.done[0]
+    assert git(fleet["checkout"], "config", "--get", "branch.feature.description") == "keep me"
+
+
+def test_recovery_commands_are_shell_quoted(fleet):
+    """A valid branch name with a shell metacharacter must come back as itself."""
+    odd = "feature;echo"
+    drop_worktree_and_local(fleet)
+    git(fleet["checkout"], "branch", odd, fleet["head"])
+    git(fleet["checkout"], "push", "-q", "origin", f"refs/heads/{odd}:refs/heads/{odd}")
+    reject_pushes(fleet)
+
+    with pytest.raises(cleanup_script.PartialFailure) as caught:
+        run_cleanup(fleet, worktree=None, headRefName=odd)
+
+    assert "'feature;echo'" in caught.value.recovery
+    command = recovery_commands(caught.value.recovery)[0]
+    assert command[3:5] == ["branch", odd]
+    subprocess.run(["bash", "-c", " ".join(shlex.quote(c) for c in command)], check=True)
+    assert ref(fleet["checkout"], f"refs/heads/{odd}") == fleet["head"]
+    assert ref(fleet["checkout"], "refs/heads/feature") is None
+
+
+def test_the_local_delete_does_not_follow_a_ref_made_symbolic_after_the_check(fleet, monkeypatch):
+    """The pre-check refuses a symbolic ref; --no-deref is what protects when one appears later."""
+    git(fleet["checkout"], "worktree", "remove", str(fleet["worktree"]))
+    git(fleet["checkout"], "branch", "victim", fleet["head"])
+
+    def make_symbolic_then_report(checkout, branch):
+        git(checkout, "symbolic-ref", "refs/heads/feature", "refs/heads/victim")
+        return fleet["head"]
+
+    monkeypatch.setattr(cleanup_script, "remote_branch_sha", make_symbolic_then_report)
+
+    run_cleanup(fleet, worktree=None)
+
+    assert ref(fleet["checkout"], "refs/heads/victim") == fleet["head"]

@@ -6,16 +6,19 @@ This does that for one merged PR, and deletes nothing it cannot show is the
 merged work. It checks everything first, and deletes only if every check passes:
 - GitHub reports the PR MERGED, from a branch of the same repository (not a fork);
 - --checkout's fetch and push origin is --repo (RepositoryTarget);
-- the worktree, if given, is a linked, unlocked worktree of --checkout, at the
-  merged head, with nothing modified or untracked, no ignored file other than
-  a regenerable cache, and no index entry hidden from `git status`
-  (skip-worktree or assume-unchanged);
-- the local branch, if present, is at the merged head and checked out nowhere
-  else; it is removed with a compare-and-delete, and its config section after it;
-- the remote-tracking ref, if present, is at the merged head; it is removed
-  with a compare-and-delete;
+- the worktree, if given, is a linked, unlocked worktree of --checkout and not
+  --checkout itself, at the merged head, with nothing modified or untracked,
+  no ignored file other than a regenerable cache, and no index entry hidden
+  from `git status` (skip-worktree or assume-unchanged); it is checked again
+  immediately before it is removed;
+- the local branch, if present, is a plain ref (not symbolic) at the merged
+  head and checked out nowhere else; it is removed with a compare-and-delete
+  that does not follow symbolic refs, and its config section after it;
+- the remote-tracking ref, if present, is a plain ref at the merged head; it is
+  removed with the same compare-and-delete;
 - the remote branch, if present, is exactly refs/heads/<branch> at the merged
-  head; it is removed with a lease on that head, so a later push survives.
+  head; it is removed with a lease on that head, pushed to the remote's URL
+  rather than its name, so that git updates no local ref as a side effect.
 All of this runs under the repository's LockManager lease: the manifest key for
 a Mech, `claw` for this repository. Paths are resolved once, against the
 current directory, before anything is checked.
@@ -29,21 +32,25 @@ Inputs: --repo OWNER/NAME (claw or a manifest Mech), --pr N, --checkout PATH
 (the clone the worktree belongs to), --worktree PATH (optional), --apply.
 Outputs: prints each planned or completed step. Exits 1 on a refusal or on a
 failure before the first deletion (both say nothing was deleted), and on a
-failure after one, which prints every step that completed and the commands
-that recreate exactly what was removed: the branch at the head, the worktree
-on it or detached as it was, its upstream config, the remote branch.
+failure after one, which prints every step that completed and the shell-quoted
+commands that recreate exactly what was removed: the branch at the head, the
+worktree on it or detached as it was, every entry of its config section, the
+remote branch.
 Serves: the culturebotai-claw#729 related-issue PRs. Written 2026-11-05. The
 first version (commit 1396fe0534 in culturebotai-claw PR 851) cleaned up
 CellStructureMech PR 3068. Rewritten 2026-11-06 for culturebotai-claw#854,
-#855, #856 and #858, for #867-#870 and #872 from the second review round, and
-for #873-#875 and #880 from the third, for #893-#895 from the fourth, and for
-#920 and #921 from the fifth, before its reuse on further merged PRs.
+#855, #856 and #858, for #867-#870 and #872 from the second review round,
+for #873-#875 and #880 from the third, for #893-#895 from the fourth, for
+#920 and #921 from the fifth, and on 2026-11-07 for #931-#936 from the Codex
+review, before its reuse on further merged PRs.
 """
 from __future__ import annotations
 
 import argparse
 import json
 import os
+import re
+import shlex
 import subprocess
 import sys
 from pathlib import Path, PurePosixPath
@@ -156,22 +163,38 @@ def tracking_sha(checkout: Path, branch: str) -> str:
     return git(checkout, "rev-parse", "--verify", "--quiet", f"refs/remotes/origin/{branch}", check=False).stdout.strip()
 
 
+def symbolic_target(checkout: Path, ref: str) -> str:
+    """What a symbolic ref points at, or '' for a plain ref (or no ref)."""
+    return git(checkout, "symbolic-ref", "--quiet", ref, check=False).stdout.strip()
+
+
+def branch_config(checkout: Path, branch: str) -> list[tuple[str, str]]:
+    """Every (key, value) of the branch's config section, in file order; empty when there is no section."""
+    listed = git(checkout, "config", "--get-regexp", f"^branch\\.{re.escape(branch)}\\.", check=False)
+    if listed.returncode != 0:
+        return []
+    return [tuple(line.split(" ", 1)) if " " in line else (line, "") for line in listed.stdout.split("\n") if line]
+
+
 def recovery_for(done: list[str], checkout: Path, worktree: Path | None, branch: str, head: str, *,
-                 worktree_on_branch: bool, upstream: dict[str, str]) -> str:
-    """The commands that put back exactly what `done` says went, in the order they must run."""
+                 worktree_on_branch: bool, config_entries: list[tuple[str, str]]) -> str:
+    """The shell-quoted commands that put back exactly what `done` says went, in the order they must run."""
+    c = str(checkout)
     steps = [f"everything removed was at {head}"]
     if any(step.startswith("deleted local ") for step in done):
-        steps.append(f"recreate the branch with `git -C {checkout} branch {branch} {head}`")
+        steps.append("recreate the branch with `" + shlex.join(["git", "-C", c, "branch", branch, head]) + "`")
     if any(step.startswith("removed worktree ") for step in done):
         if worktree_on_branch:
-            steps.append(f"the worktree with `git -C {checkout} worktree add {worktree} {branch}`")
+            steps.append("the worktree with `" + shlex.join(["git", "-C", c, "worktree", "add", str(worktree), branch]) + "`")
         else:  # the worktree was detached; there is no branch to put it on
-            steps.append(f"the worktree with `git -C {checkout} worktree add --detach {worktree} {head}`")
+            steps.append("the worktree with `"
+                         + shlex.join(["git", "-C", c, "worktree", "add", "--detach", str(worktree), head]) + "`")
     if any(step.startswith("removed branch.") for step in done):
-        steps.extend(f"its upstream with `git -C {checkout} config branch.{branch}.{name} {value}`"
-                     for name, value in upstream.items())
+        steps.extend("its config with `" + shlex.join(["git", "-C", c, "config", "--add", key, value]) + "`"
+                     for key, value in config_entries)
     if any(step.startswith("deleted remote ") for step in done):
-        steps.append(f"the remote branch with `git -C {checkout} push origin {head}:refs/heads/{branch}`")
+        steps.append("the remote branch with `"
+                     + shlex.join(["git", "-C", c, "push", "origin", f"{head}:refs/heads/{branch}"]) + "`")
     return "; ".join(steps)
 
 
@@ -192,7 +215,7 @@ def cleanup(repo: str, number: int, checkout: Path, worktree: Path | None, *, ap
     if pr["isCrossRepository"]:
         raise Refused(f"{repo}#{number} is from a fork; its branch is not in {repo}")
     branch, head = pr["headRefName"], pr["headRefOid"]
-    tracking = f"refs/remotes/origin/{branch}"
+    local_ref, tracking = f"refs/heads/{branch}", f"refs/remotes/origin/{branch}"
     with LockManager().lock(key, "cleanup-merged-branch"):
         verify_origin(key, checkout, repo)
         problems = []
@@ -217,13 +240,15 @@ def cleanup(repo: str, number: int, checkout: Path, worktree: Path | None, *, ap
                 problems.append(f"{worktree} is locked; `git worktree unlock` it first if it should go")
             else:
                 problems += worktree_problems(worktree, head)
-                worktree_on_branch = entry["branch"] == f"refs/heads/{branch}"
-        local = git(checkout, "rev-parse", "--verify", "--quiet", f"refs/heads/{branch}",
-                    check=False).stdout.strip()
+                worktree_on_branch = entry["branch"] == local_ref
+        for ref in (local_ref, tracking):
+            target = symbolic_target(checkout, ref)
+            if target:
+                problems.append(f"{ref} is a symbolic ref to {target}; this tool deletes only plain refs")
+        local = git(checkout, "rev-parse", "--verify", "--quiet", local_ref, check=False).stdout.strip()
         if local and local != head:
             problems.append(f"local {branch} is {local[:10]}, not the merged head {head[:10]}")
-        others = [e["path"] for e in entries
-                  if e["branch"] == f"refs/heads/{branch}" and not (removing and e["path"] == worktree)]
+        others = [e["path"] for e in entries if e["branch"] == local_ref and not (removing and e["path"] == worktree)]
         if local and others:
             problems.append(f"{branch} is also checked out in {', '.join(map(str, others))}")
         tracked = tracking_sha(checkout, branch)
@@ -239,41 +264,44 @@ def cleanup(repo: str, number: int, checkout: Path, worktree: Path | None, *, ap
                     + [f"would delete local {branch} (at {head[:10]})"] * bool(local)
                     + [f"would delete remote {branch} (at {head[:10]})" if remote else f"remote {branch} already gone"]
                     + [f"would delete {tracking} (at {head[:10]})"] * bool(tracked))
-        upstream = {name: git(checkout, "config", "--get", f"branch.{branch}.{name}", check=False).stdout.strip()
-                    for name in ("remote", "merge")}
-        upstream = {name: value for name, value in upstream.items() if value}
+        config_entries = branch_config(checkout, branch)
+        push_url = git(checkout, "remote", "get-url", "--push", "origin").stdout.strip()
         done: list[str] = list(skipped)
         try:
             if removing:
+                again = worktree_problems(worktree, head)
+                if again:
+                    raise RuntimeError(f"{worktree} changed after the check: " + "; ".join(again))
                 git(checkout, "worktree", "remove", str(worktree))
                 done.append(f"removed worktree {worktree}")
             if local:
-                git(checkout, "update-ref", "-d", f"refs/heads/{branch}", head)
+                git(checkout, "update-ref", "--no-deref", "-d", local_ref, head)
                 done.append(f"deleted local {branch} (was {head[:10]})")
-                # update-ref leaves the branch's upstream config; `branch -D` would have removed it.
-                removed = git(checkout, "config", "--remove-section", f"branch.{branch}", check=False).returncode == 0
-                leftover = [name for name in ("remote", "merge")
-                            if git(checkout, "config", "--get", f"branch.{branch}.{name}", check=False).returncode == 0]
-                if leftover:
-                    raise RuntimeError(f"branch.{branch}.{leftover[0]} is still set")
-                done.append(f"removed branch.{branch} config" if removed else f"no branch.{branch} config to remove")
+                # update-ref leaves the branch's config section; `branch -D` would have removed it.
+                if config_entries:
+                    git(checkout, "config", "--remove-section", f"branch.{branch}", check=False)
+                    leftover = branch_config(checkout, branch)
+                    if leftover:
+                        raise RuntimeError(f"branch.{branch} config is still set: " + ", ".join(k for k, _ in leftover))
+                    done.append(f"removed branch.{branch} config ({len(config_entries)} entries)")
+                else:
+                    done.append(f"no branch.{branch} config to remove")
             if remote:
-                git(checkout, "push", "-q", f"--force-with-lease=refs/heads/{branch}:{head}",
-                    "origin", "--delete", f"refs/heads/{branch}")
+                # To the URL, not the remote name: a push through the name also updates
+                # whatever local refs the fetch refspec maps, behind the compare-and-delete.
+                git(checkout, "push", "-q", f"--force-with-lease={local_ref}:{head}", push_url, "--delete", local_ref)
                 done.append(f"deleted remote {branch} (was {head[:10]})")
             else:
                 done.append(f"remote {branch} already gone")
-            if tracked and not tracking_sha(checkout, branch):
-                done.append(f"{tracking} went with the remote branch (was {head[:10]})")  # push --delete drops it
-            elif tracked:
-                git(checkout, "update-ref", "-d", tracking, head)
+            if tracked:
+                git(checkout, "update-ref", "--no-deref", "-d", tracking, head)
                 done.append(f"deleted {tracking} (was {head[:10]})")
         except Exception as exc:
             if not any(step.startswith(("removed ", "deleted ")) for step in done):
                 raise
             raise PartialFailure(done, exc, recovery_for(done, checkout, worktree, branch, head,
                                                          worktree_on_branch=worktree_on_branch,
-                                                         upstream=upstream)) from exc
+                                                         config_entries=config_entries)) from exc
     return done
 
 
