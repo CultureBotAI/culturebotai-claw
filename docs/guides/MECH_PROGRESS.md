@@ -2,18 +2,26 @@
 
 [The Mech progress dashboard](https://culturebotai.github.io/culturebotai-claw/)
 shows the manifest-defined fleet's current goal, verified goal closures, complete
-six-goal cycles, and distinct pull requests. Its data contract is
+versioned goal cycles, and distinct pull requests. Its data contract is
 [`progress.yaml`](../../src/kg_microbe_progress/schema/progress.yaml), a packaged
 LinkML schema. The sequence itself remains governed by
 [the workflow contract](MECH_WORKFLOW_CONTRACT.md).
 
 ## What the counts mean
 
-A **goal** is one stage of one cycle in one supervised run. The six stages are
-add records, causal graphs, protein examples, record review, resolve review
-findings, and infrastructure. A **completed cycle** requires verified closures
-for all six stages of that same run and cycle. The current stage number never
-stands in for missing completion evidence.
+A **goal** is one stage of one cycle in one supervised run. Parent v2 adds open
+issue triage before add records, causal graphs, protein examples, record review,
+resolve review findings, and infrastructure. A **completed cycle** requires
+verified closures for all stages of that run and cycle: six for pinned v1 cycles,
+seven for v2. Six v2 closures do not constitute a complete cycle. The current
+stage number never stands in for missing completion evidence.
+
+Each new v2 cursor and closure carries its cycle's `parent_version`. Historical
+public records without that field retain v1 stage meanings and remain unchanged.
+The collector reads the supervisor's per-cycle version history rather than
+applying the current cycle's stage numbers to earlier evidence. A version change
+inside an observed cycle is rejected. This PR changes accounting compatibility;
+it does not migrate live runs, re-pin Mechs, or publish progress data.
 
 A **PR round** is a distinct `(repository, PR number)`, not a commit. Several PRs
 can belong to one goal, and one PR associated with multiple goals still counts
@@ -178,6 +186,12 @@ reader accepts existing bundles that omit it. A matching version string alone
 therefore does not establish compatibility; pin consumers to the reviewed code.
 This release chooses a coordinated consumer upgrade rather than introducing a
 history migration or downgrade mechanism.
+
+The cycle-v2 `parent_version` fields and seventh stage have the same upgrade
+boundary. New readers accept unchanged v1 history, but six-stage readers cannot
+read v2 bundles or correctly count them. Upgrade consumers before the first v2
+cycle is collected. Keep old closures and receipt hashes unchanged; do not
+renumber them or strip their cycle version to make an old reader accept them.
 
 Before the updated publisher first writes a bundle to the production state
 directory or publishes one, upgrade **every consumer** to the merged main commit

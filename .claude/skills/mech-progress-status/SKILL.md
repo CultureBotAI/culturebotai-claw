@@ -1,6 +1,6 @@
 ---
 name: mech-progress-status
-description: "Report tracked Mech sequence progress in one line: Mechs, distinct PRs by state, completed goals, and completed six-goal cycles. Use for a progress summary or round counts, rather than a full open-PR inventory."
+description: "Report tracked Mech sequence progress in one line: Mechs, distinct PRs by state, completed goals, and completed versioned cycles. Use for a progress summary or round counts, rather than a full open-PR inventory."
 metadata:
   tags: [fleet, progress, reporting, read-only]
 ---
@@ -30,7 +30,9 @@ Use newly read values, never this example or a previous response. The command
 validates the history and snapshot together; its validator uses
 `load_fleet_manifest` to require the complete canonical fleet. Counts cover explicitly tracked
 activity; earlier history remains unknown. PRs are distinct repository/number
-pairs, goals require verified closure, and a cycle requires all six goals.
+pairs, goals require verified closure, and a cycle requires every goal under its
+pinned parent: six for v1 and seven for v2. Historical stage numbers retain their
+original meanings; a current v2 cycle does not relabel old closures.
 Closed PRs that were not merged appear separately when present.
 
 For a tracker running a pinned release, the command uses its bundle-adjacent

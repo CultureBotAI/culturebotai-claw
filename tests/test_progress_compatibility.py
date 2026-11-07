@@ -10,7 +10,7 @@ import pytest
 from jsonschema.validators import validator_for
 from linkml.generators.jsonschemagen import JsonSchemaGenerator
 from linkml_runtime.linkml_model.meta import SchemaDefinition
-from test_progress_model import KEY, collect, runtime
+from test_progress_model import KEY, collect, runtime, save_ledger
 
 import kg_microbe_progress as progress
 from kg_microbe_workflows import load_document
@@ -39,6 +39,16 @@ def test_updated_reader_accepts_existing_old_bundle(tmp_path):
     old_reader("ProgressHistory").validate(history)
     old_reader("ProgressSnapshot").validate(snapshot)
     progress.validate_bundle(history, snapshot)
+
+
+def test_cycle_v2_requires_updated_consumers_without_rewriting_v1_history(tmp_path):
+    root, ledger = runtime(tmp_path, stage=7)
+    ledger.update(parent_version="2.0.0", cycle_versions={"1": "2.0.0"})
+    save_ledger(root, ledger)
+    history, snapshot = collect(root)
+    progress.validate_bundle(history, snapshot)
+    for class_name, document in (("ProgressHistory", history), ("ProgressSnapshot", snapshot)):
+        assert list(old_reader(class_name).iter_errors(document))
 
 
 @pytest.mark.parametrize("count", [0, 2])

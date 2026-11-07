@@ -771,7 +771,9 @@ class CycleGitHubFixture(GitHubFixture):
 
 @pytest.fixture
 def cycle_setup(setup):
-    from kg_microbe_workflows import PARENT_PATH, SCHEMA_PATH, STAGE_KEYS
+    from kg_microbe_workflows import LEGACY_PARENT_PATH as PARENT_PATH
+    from kg_microbe_workflows import LEGACY_SCHEMA_PATH as SCHEMA_PATH
+    from kg_microbe_workflows import stage_keys_for_version
     parent = __import__("yaml").safe_load(PARENT_PATH.read_text())
     profile = {"schema_version": "1.0.0", "profile_id": "traitmech-workflow", "profile_version": "1.0.0",
                "repository_key": "traitmech", "github_repository": "CultureBotAI/TraitMech",
@@ -782,11 +784,12 @@ def cycle_setup(setup):
                "adaptation_skill": ".claude/skills/example/SKILL.md",
                "stages": [{"stage": stage, "key": key, "goal_text": f"Use the canonical skill for stage {stage}",
                            "skill_paths": [".claude/skills/example/SKILL.md"], "applicability": "enabled"}
-                          for stage, key in enumerate(STAGE_KEYS, 1)]}
+                          for stage, key in enumerate(stage_keys_for_version("1.0.0"), 1)]}
     path = setup.repo / "workflow/mech-workflow.yaml"
     path.parent.mkdir()
     path.write_text(json.dumps(profile))
     setup.target.update(workflow_profile_path=str(path), workflow_next_profile_path=str(path))
+    setup.config.update(workflow_parent_path=str(PARENT_PATH), workflow_schema_path=str(SCHEMA_PATH))
     effective = supervisor.load_effective(setup.config, setup.target)
     setup.target.update(_workflow=effective, stages=effective["stages"])
     ledger = supervisor.new_ledger(setup.config, setup.target)
@@ -802,7 +805,7 @@ def cycle_setup(setup):
 
 
 def write_goal_evidence(setup, ledger, *, findings=None, groups=None, infra_tasks=None):
-    from kg_microbe_workflows import REQUIRED_OUTPUTS, evidence_directory
+    from kg_microbe_workflows import evidence_directory
     stage, cycle = ledger["stage"], ledger["cycle"]
     if stage == 6 and not ledger.get("infra_scope"):
         ledger["infra_scope"] = supervisor.freeze_infrastructure(setup.target)
@@ -814,7 +817,7 @@ def write_goal_evidence(setup, ledger, *, findings=None, groups=None, infra_task
         return receipt
     directory = evidence_directory(ledger["run_id"], cycle, stage, 1)
     artifacts = []
-    for kind in sorted(set(REQUIRED_OUTPUTS.get(stage, [])) | set(required_outputs)):
+    for kind in sorted(set(required_outputs)):
         path = setup.repo / directory / (kind + ".md")
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text((setup.repo / "INFRA_TASKS.md").read_text() if kind == "infra_snapshot"
