@@ -48,7 +48,7 @@ The classifier sorts the 3,730 distinct taxa that any record cites outside the s
 Two facts shape the plan:
 
 - **Bacteria and archaea are complete.** Not one bacterial or archaeal species or strain cited by any Mech is outside TaxonMech's scope, except retired ids and ranks above species. TaxonMech's inventory is kg-microbe's NCBITaxon extract (the Bacteria and Archaea subtrees, 640,815 taxa attested as `ncbitaxon`) plus taxa attested by GTDB, GOLD, Madin, LPSN, BacDive, MediaDive and BactoTraits. Eukaryotes enter only through those sources, which is why the 222 resolvable strains are almost all fungi, and the 548 unattested taxa are 459 fungi and 89 protists.
-- **Protein examples name strains; TaxonMech records species.** `Saccharomyces cerevisiae S288C` (NCBITaxon:559292) alone is 23,459 protein examples and 15,684 records across eight Mechs; its species NCBITaxon:4932 is a record, and that record lists no strains. The same holds for *S. pombe* 972h-, *C. albicans* SC5314, *A. fumigatus* Af293, *A. nidulans* FGSC A4 and 217 more. A taxon link that insists on an exact record would miss all of them; one that resolves to the species, and says so, catches 25,868 examples.
+- **Protein examples name strains; TaxonMech records species.** `Saccharomyces cerevisiae S288C` (NCBITaxon:559292) alone is 23,459 protein examples in five Mechs and 15,684 records across eight; its species NCBITaxon:4932 is a record, and that record lists no strains. The same holds for *S. pombe* 972h-, *C. albicans* SC5314, *A. fumigatus* Af293, *A. nidulans* FGSC A4 and 217 more. A taxon link that insists on an exact record would miss all of them; one that resolves to the species, and says so, catches 25,868 examples.
 
 ### 2.3 Per Mech
 

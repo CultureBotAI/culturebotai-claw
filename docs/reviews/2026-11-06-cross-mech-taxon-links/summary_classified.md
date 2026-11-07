@@ -2,6 +2,8 @@
 
 3730 distinct taxa cited outside the scope; scope 626048; taxdump 2026-09-13 (3013243 nodes).
 
+Inputs (SHA-256, first 16 hex): `protein_example_taxa.tsv` ca896e7743af793f, `taxon_curies.tsv` d560046e508ef525; the Mech HEADs are those the two scan summaries record.
+
 | domain | kingdom | class | distinct taxa | with an in-scope ancestor | protein examples | records citing |
 |---|---|---|---:|---:|---:|---:|
 | Eukaryota | Metazoa | species | 676 | 0 | 224014 | 124377 |

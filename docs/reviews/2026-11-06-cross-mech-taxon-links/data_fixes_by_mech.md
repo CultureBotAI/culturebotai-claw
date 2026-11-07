@@ -1,4 +1,8 @@
-# Taxon citations needing a data fix, per Mech
+# Taxon ids cited outside TaxonMech's current ids, per Mech: the text-scan upper bound
+
+A hit in a `notes:` line or in prose counts here like one in a slot, so a Mech whose seeder or curator records a retired id beside the current one appears below without a defect; the slot-declared check (`kg-microbe-links taxa`, culturebotai-claw PR 897) decides which rows are citations to fix.
+
+Inputs (SHA-256, first 16 hex): `outside_scope_classified.tsv` a56688e21dae7697, `taxon_curies.tsv` d560046e508ef525, `protein_example_taxa.tsv` ca896e7743af793f.
 
 ## CommunityMech (CultureBotAI/CommunityMech)
 

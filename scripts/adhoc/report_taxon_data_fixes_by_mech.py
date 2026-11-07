@@ -5,8 +5,9 @@ Purpose: the cross-Mech taxon-link assessment
 (docs/reviews/2026-11-06-cross-mech-taxon-links.md) found records citing
 retired NCBI ids (whatever their merge target), ids deleted from or absent
 from the pinned taxdump, and ProteinTraitsMech canonical examples with no
-taxon. Each becomes an issue in its Mech; an issue needs the exact ids, the
-merge targets, and record paths, which the assessment's summaries do not list.
+taxon. Those in slots become issues in their Mechs; an issue needs the exact
+ids, the merge targets and record paths, which the summaries do not list. This
+is the text-scan upper bound, and says so; the slot-declared check decides.
 Method: read the classifier's outside_scope_classified.tsv and the measurement
 TSVs, then walk each Mech's manifest record_globs once, scanning file text for
 the target ids, to collect up to three record paths per id.
@@ -22,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import re
 import sys
 from collections import defaultdict
@@ -61,7 +63,12 @@ def main() -> int:
             if row["mech"] == "proteintraitsmech" and row["slot"] == "canonical_examples[]" and not row["taxon_id"]:
                 taxonless.append((row["record_path"], row["uniprot"]))
 
-    lines = ["# Taxon citations needing a data fix, per Mech", ""]
+    digests = {p.name: hashlib.sha256(p.read_bytes()).hexdigest()[:16] for p in (args.classified, args.curies, args.examples)}
+    lines = ["# Taxon ids cited outside TaxonMech's current ids, per Mech: the text-scan upper bound", "",
+             "A hit in a `notes:` line or in prose counts here like one in a slot, so a Mech whose seeder or curator "
+             "records a retired id beside the current one appears below without a defect; the slot-declared check "
+             "(`kg-microbe-links taxa`, culturebotai-claw PR 897) decides which rows are citations to fix.", "",
+             "Inputs (SHA-256, first 16 hex): " + ", ".join(f"`{n}` {d}" for n, d in digests.items()) + ".", ""]
     for mech in sorted(fixes):
         root = settings.paths.get(mech)
         if root is None:

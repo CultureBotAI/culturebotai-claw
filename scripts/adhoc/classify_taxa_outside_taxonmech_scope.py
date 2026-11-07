@@ -23,6 +23,7 @@ Viridiplantae, because TaxonMech holds protists as well as fungi.
 Inputs: claw's .env (set -a; . ./.env) for TAXONMECH_ROOT; --measure DIR
 holding protein_example_taxa.tsv and taxon_curies.tsv; --out DIR.
 Outputs: DIR/outside_scope_classified.tsv (taxon, name, merged_into, domain,
+(the summary names the digests of the two input TSVs, culturebotai-claw#915)
 kingdom, rank, class, nearest in-scope ancestor and its name, protein
 examples, records citing it, Mechs) and DIR/summary_classified.md.
 Read-only; writes only under DIR. The tarball is read twice (nodes, then the
@@ -36,6 +37,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import sys
 import tarfile
 from collections import Counter, defaultdict
@@ -148,9 +150,13 @@ def main() -> int:
     cells: dict[tuple, list] = defaultdict(list)
     for r in rows:
         cells[(r[3], r[4] or "-", r[6])].append(r)
+    digests = {name: hashlib.sha256((args.measure / name).read_bytes()).hexdigest()[:16]
+               for name in ("protein_example_taxa.tsv", "taxon_curies.tsv")}
     lines = ["# Taxa outside TaxonMech's scope, by domain, kingdom and rank class", "",
              f"{len(rows)} distinct taxa cited outside the scope; scope {len(scope)}; taxdump {snapshot['snapshot']} "
              f"({len(nodes)} nodes).", "",
+             "Inputs (SHA-256, first 16 hex): " + ", ".join(f"`{n}` {d}" for n, d in digests.items())
+             + "; the Mech HEADs are those the two scan summaries record.", "",
              "| domain | kingdom | class | distinct taxa | with an in-scope ancestor | protein examples | records citing |",
              "|---|---|---|---:|---:|---:|---:|"]
     for key, cell in sorted(cells.items(), key=lambda kv: -sum(r[9] + r[10] for r in kv[1])):
