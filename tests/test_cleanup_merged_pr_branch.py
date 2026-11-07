@@ -1,4 +1,4 @@
-"""scripts/adhoc/cleanup_merged_pr_branch.py deletes only the merged work (#854-#856, #858, #867-#875, #878-#880, #891-#895, #931-#936).
+"""scripts/adhoc/cleanup_merged_pr_branch.py deletes only the merged work (#854-#856, #858, #867-#875, #878-#880, #891-#895, #931-#936, #950).
 
 Each case is built so the unsafe and the safe behaviour differ: a remote
 branch that moved after the merge, a sibling branch whose name ends the same
@@ -13,9 +13,13 @@ The repositories are real: a bare origin and a clone under tmp_path. What is
 replaced: `gh pr view` always; the origin-identity check everywhere except the
 test that runs the real one, since a local origin can never be a GitHub
 repository (the stub records its arguments and whether the repository lock was
-held when it ran); and, in three race tests, `remote_branch_sha` or
+held when it ran); and, in the race tests, `remote_branch_sha` or
 `tracking_sha`, to stand in for a change landing between the check and the
-delete.
+delete, or for git 2.56 removing the tracking ref on the push, which the local
+git does not do (#950).
+
+Where git versions differ (2.56 removes the tracking ref on the push, 2.50
+does not) an assertion names both outcomes, so the suite holds on either.
 """
 
 from __future__ import annotations
@@ -136,6 +140,11 @@ def push_follow_up(fleet) -> str:
     return later
 
 
+def tracking_went(fleet) -> set[str]:
+    return {f"deleted refs/remotes/origin/feature (was {fleet['head'][:10]})",
+            f"refs/remotes/origin/feature went with the remote branch (was {fleet['head'][:10]})"}
+
+
 def drop_worktree_and_local(fleet) -> None:
     git(fleet["checkout"], "worktree", "remove", str(fleet["worktree"]))
     git(fleet["checkout"], "branch", "-q", "-D", "feature")
@@ -154,10 +163,10 @@ def test_the_merged_branch_is_removed_everywhere_and_caches_do_not_block(fleet):
     assert ref(fleet["checkout"], "refs/remotes/origin/feature") is None
     assert "branch.feature." not in git(fleet["checkout"], "config", "--get-regexp", "^branch\\.")
     assert "branch.main.merge" in git(fleet["checkout"], "config", "--get-regexp", "^branch\\.")
-    assert done == [f"removed worktree {fleet['worktree'].resolve()}",
-                    f"deleted local feature (was {fleet['head'][:10]})", "removed branch.feature config (2 entries)",
-                    f"deleted remote feature (was {fleet['head'][:10]})",
-                    f"deleted refs/remotes/origin/feature (was {fleet['head'][:10]})"]
+    assert done[:-1] == [f"removed worktree {fleet['worktree'].resolve()}",
+                         f"deleted local feature (was {fleet['head'][:10]})", "removed branch.feature config (2 entries)",
+                         f"deleted remote feature (was {fleet['head'][:10]})"]
+    assert done[-1] in tracking_went(fleet)  # git 2.50 leaves it to the compare-and-delete; 2.56 removes it on the push
     assert fleet["origin_calls"] == [(MECH, fleet["checkout"].resolve(), REPO, True)]
 
 
@@ -460,7 +469,7 @@ def test_the_main_worktree_is_refused(fleet):
 
 
 def test_the_recovery_names_the_push_when_the_remote_branch_was_deleted(fleet, monkeypatch):
-    """A tracking ref that moved after the check survives the remote delete, and the recovery says how to push the branch back."""
+    """A tracking ref that moved after the check is not compare-and-deleted, and the recovery says how to push the branch back."""
     main = ref(fleet["checkout"], "origin/main")
     git(fleet["checkout"], "update-ref", "refs/remotes/origin/feature", main)
     monkeypatch.setattr(cleanup_script, "tracking_sha", lambda checkout, branch: fleet["head"])
@@ -469,7 +478,8 @@ def test_the_recovery_names_the_push_when_the_remote_branch_was_deleted(fleet, m
         run_cleanup(fleet)
 
     assert f"deleted remote feature (was {fleet['head'][:10]})" in caught.value.done
-    assert ref(fleet["checkout"], "refs/remotes/origin/feature") == main  # the push touched no local ref
+    # git 2.50 leaves the moved ref for the compare-and-delete to refuse; 2.56 removes it on the push itself
+    assert ref(fleet["checkout"], "refs/remotes/origin/feature") in (main, None)
     assert f"push origin {fleet['head']}:refs/heads/feature" in caught.value.recovery
     assert ref(fleet["origin"], "refs/heads/feature") is None
     git(fleet["checkout"], "push", "-q", "origin", f"{fleet['head']}:refs/heads/feature")
@@ -586,18 +596,80 @@ def recovery_commands(recovery: str) -> list[list[str]]:
     return [shlex.split(part.split("`")[1]) for part in recovery.split("; ") if "`" in part]
 
 
-def test_the_remote_delete_changes_no_local_ref_through_the_fetch_refspec(fleet):
-    """With a fetch refspec mapping feature onto `victim`, a push through the remote name would delete victim."""
+@pytest.mark.parametrize("spec", ["+refs/heads/feature:refs/heads/victim", "+refs/heads/*:refs/heads/victim-*",
+                                  "refs/heads/fea*:refs/remotes/origin/mirror/*"])
+def test_a_fetch_refspec_that_maps_the_branch_elsewhere_is_refused(fleet, spec):
+    """git 2.56 applies origin's fetch refspecs to a push even to its URL (#950), so such a refspec is refused first."""
     drop_worktree_and_local(fleet)
     main = ref(fleet["checkout"], "origin/main")
     git(fleet["checkout"], "branch", "victim", main)
-    git(fleet["checkout"], "config", "remote.origin.fetch", "+refs/heads/feature:refs/heads/victim")
+    git(fleet["checkout"], "config", "remote.origin.fetch", spec)
+
+    with pytest.raises(cleanup_script.Refused, match=r"maps refs/heads/feature onto refs/(heads/victim|remotes/origin/mirror/ture)"):
+        run_cleanup(fleet, worktree=None)
+
+    assert ref(fleet["checkout"], "refs/heads/victim") == main
+    assert ref(fleet["origin"], "refs/heads/feature") == fleet["head"]
+
+
+def test_fetch_refspecs_that_map_the_branch_only_onto_its_tracking_ref_are_accepted(fleet):
+    """The default glob, an exact spec onto the tracking ref, a negative spec and a destination-less one map nothing else."""
+    drop_worktree_and_local(fleet)
+    git(fleet["checkout"], "config", "--add", "remote.origin.fetch", "+refs/heads/feature:refs/remotes/origin/feature")
+    git(fleet["checkout"], "config", "--add", "remote.origin.fetch", "^refs/heads/feature")
+    git(fleet["checkout"], "config", "--add", "remote.origin.fetch", "refs/heads/feature")
+    git(fleet["checkout"], "config", "--add", "remote.origin.fetch", "+refs/heads/featur:refs/heads/victim")
+
+    assert cleanup_script.fetch_mappings(fleet["checkout"], "refs/heads/feature") == [
+        ("+refs/heads/*:refs/remotes/origin/*", "refs/remotes/origin/feature"),
+        ("+refs/heads/feature:refs/remotes/origin/feature", "refs/remotes/origin/feature")]
+    plan = run_cleanup(fleet, worktree=None, apply=False)
+    assert plan[0] == f"would delete remote feature (at {fleet['head'][:10]})"
+
+
+def test_a_tracking_ref_git_removed_on_the_push_is_recorded_not_deleted(fleet, monkeypatch):
+    """Stands in for git 2.56, which removes the tracking ref on the push; the local git leaves it."""
+    drop_worktree_and_local(fleet)
+    real = cleanup_script.tracking_sha
+    calls: list[str] = []
+
+    def removed_by_the_push(checkout, branch):
+        calls.append(branch)
+        if len(calls) == 2:  # the read-back after the push
+            git(checkout, "update-ref", "-d", f"refs/remotes/origin/{branch}")
+            return ""
+        return real(checkout, branch)
+
+    monkeypatch.setattr(cleanup_script, "tracking_sha", removed_by_the_push)
 
     done = run_cleanup(fleet, worktree=None)
 
-    assert any(step.startswith("deleted remote feature") for step in done)
-    assert ref(fleet["checkout"], "refs/heads/victim") == main
-    assert ref(fleet["origin"], "refs/heads/feature") is None
+    assert done == [f"deleted remote feature (was {fleet['head'][:10]})",
+                    f"refs/remotes/origin/feature went with the remote branch (was {fleet['head'][:10]})"]
+    assert ref(fleet["checkout"], "refs/remotes/origin/feature") is None
+    assert calls == ["feature", "feature"]
+
+
+def test_a_tracking_ref_that_moved_during_the_push_is_left_in_place(fleet, monkeypatch):
+    """The read-back after the push finds another commit: a partial failure that names it, and the ref stays."""
+    drop_worktree_and_local(fleet)
+    other = git(fleet["checkout"], "rev-parse", "origin/main")
+    real = cleanup_script.tracking_sha
+    calls: list[str] = []
+
+    def moved_during_the_push(checkout, branch):
+        calls.append(branch)
+        if len(calls) == 2:
+            git(checkout, "update-ref", f"refs/remotes/origin/{branch}", other)
+        return real(checkout, branch)
+
+    monkeypatch.setattr(cleanup_script, "tracking_sha", moved_during_the_push)
+
+    with pytest.raises(cleanup_script.PartialFailure, match=f"is {other[:10]} after the push") as caught:
+        run_cleanup(fleet, worktree=None)
+
+    assert caught.value.done == [f"deleted remote feature (was {fleet['head'][:10]})"]
+    assert ref(fleet["checkout"], "refs/remotes/origin/feature") == other
 
 
 def test_a_symbolic_branch_ref_is_refused_and_its_target_kept(fleet):

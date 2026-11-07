@@ -14,11 +14,16 @@ merged work. It checks everything first, and deletes only if every check passes:
 - the local branch, if present, is a plain ref (not symbolic) at the merged
   head and checked out nowhere else; it is removed with a compare-and-delete
   that does not follow symbolic refs, and its config section after it;
-- the remote-tracking ref, if present, is a plain ref at the merged head; it is
-  removed with the same compare-and-delete;
+- the remote-tracking ref, if present, is a plain ref at the merged head; after
+  the remote delete it is removed with the same compare-and-delete if git left
+  it, and recorded as gone with the remote branch if git removed it on the
+  push (git 2.56 does, 2.50 does not, even for a push to the remote's URL);
+- origin's fetch refspecs map refs/heads/<branch> nowhere but its tracking
+  ref, since a push updates whatever local refs they map, on some git versions
+  whether it goes to the remote's name or its URL;
 - the remote branch, if present, is exactly refs/heads/<branch> at the merged
   head; it is removed with a lease on that head, pushed to the remote's URL
-  rather than its name, so that git updates no local ref as a side effect.
+  rather than its name, which on the gits that distinguish touches no local ref.
 All of this runs under the repository's LockManager lease: the manifest key for
 a Mech, `claw` for this repository. Paths are resolved once, against the
 current directory, before anything is checked.
@@ -42,7 +47,7 @@ CellStructureMech PR 3068. Rewritten 2026-11-06 for culturebotai-claw#854,
 #855, #856 and #858, for #867-#870 and #872 from the second review round,
 for #873-#875 and #880 from the third, for #893-#895 from the fourth, for
 #920 and #921 from the fifth, and on 2026-11-07 for #931-#936 from the Codex
-review, before its reuse on further merged PRs.
+review and #950 from CI's git 2.56, before its reuse on further merged PRs.
 """
 from __future__ import annotations
 
@@ -163,6 +168,27 @@ def tracking_sha(checkout: Path, branch: str) -> str:
     return git(checkout, "rev-parse", "--verify", "--quiet", f"refs/remotes/origin/{branch}", check=False).stdout.strip()
 
 
+def fetch_mappings(checkout: Path, ref: str) -> list[tuple[str, str]]:
+    """Where origin's fetch refspecs map `ref` locally: (refspec, destination) for each that matches it.
+
+    A push updates these refs as a side effect; on git 2.56 even a push to the remote's URL does.
+    A negative refspec (^src, which git allows no destination) and a destination-less one map nothing.
+    """
+    mappings = []
+    for spec in filter(None, git(checkout, "config", "--get-all", "remote.origin.fetch", check=False).stdout.split("\n")):
+        body = spec[1:] if spec.startswith("+") else spec
+        if ":" not in body:
+            continue
+        src, dst = body.split(":", 1)
+        if "*" in src:
+            prefix, suffix = src.split("*", 1)
+            if ref.startswith(prefix) and ref.endswith(suffix) and len(ref) >= len(prefix) + len(suffix):
+                mappings.append((spec, dst.replace("*", ref[len(prefix):len(ref) - len(suffix)], 1)))
+        elif src == ref:
+            mappings.append((spec, dst))
+    return mappings
+
+
 def symbolic_target(checkout: Path, ref: str) -> str:
     """What a symbolic ref points at, or '' for a plain ref (or no ref)."""
     return git(checkout, "symbolic-ref", "--quiet", ref, check=False).stdout.strip()
@@ -257,6 +283,10 @@ def cleanup(repo: str, number: int, checkout: Path, worktree: Path | None, *, ap
         remote = remote_branch_sha(checkout, branch)
         if remote and remote != head:
             problems.append(f"origin {branch} is {remote[:10]}, not the merged head {head[:10]}")
+        for spec, destination in fetch_mappings(checkout, local_ref):
+            if destination != tracking:
+                problems.append(f"remote.origin.fetch {spec} maps {local_ref} onto {destination}, which a push can "
+                                f"update; this tool touches only {tracking}")
         if problems:
             raise Refused("; ".join(problems))
         if not apply:
@@ -287,15 +317,23 @@ def cleanup(repo: str, number: int, checkout: Path, worktree: Path | None, *, ap
                 else:
                     done.append(f"no branch.{branch} config to remove")
             if remote:
-                # To the URL, not the remote name: a push through the name also updates
-                # whatever local refs the fetch refspec maps, behind the compare-and-delete.
+                # To the URL, not the remote name: on the gits that distinguish, that updates no local
+                # ref. On git 2.56 it still updates what the fetch refspecs map, which the checks above
+                # confined to the tracking ref; its disappearance is read back below.
                 git(checkout, "push", "-q", f"--force-with-lease={local_ref}:{head}", push_url, "--delete", local_ref)
                 done.append(f"deleted remote {branch} (was {head[:10]})")
             else:
                 done.append(f"remote {branch} already gone")
             if tracked:
-                git(checkout, "update-ref", "--no-deref", "-d", tracking, head)
-                done.append(f"deleted {tracking} (was {head[:10]})")
+                now = tracking_sha(checkout, branch)
+                if not now:
+                    done.append(f"{tracking} went with the remote branch (was {head[:10]})")
+                elif now != head:
+                    raise RuntimeError(f"{tracking} is {now[:10]} after the push, not the merged head {head[:10]}; "
+                                       "left in place")
+                else:
+                    git(checkout, "update-ref", "--no-deref", "-d", tracking, head)
+                    done.append(f"deleted {tracking} (was {head[:10]})")
         except Exception as exc:
             if not any(step.startswith(("removed ", "deleted ")) for step in done):
                 raise
