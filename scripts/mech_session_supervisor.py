@@ -968,6 +968,17 @@ def validate_receipt(receipt: dict, ledger: dict, target: dict, runtime: Path) -
             goal_output_data(receipt, ledger, target)
         except Exception as error:
             errors.append("goal outputs: " + str(error))
+    try:
+        from kg_microbe_workflows.closure import multi_pr_members
+        members = multi_pr_members(receipt)
+        for member in members:
+            if member["base"] != target["default_branch"]:
+                errors.append("ordered PR base differs from configured default branch")
+            errors += artifact_errors(member["review"], roots, f"PR {member['number']} review")
+            for validation in member["validation"]:
+                errors += artifact_errors(validation, roots, f"PR {member['number']} validation")
+    except ValueError as error:
+        errors.append(str(error))
     return errors
 
 
@@ -1143,7 +1154,8 @@ def verify_remote_issue_triage(evidence: dict, github: str, runner=command) -> d
             "severity_labels_verified": True, "dispositions_verified": True, "sub_issue_relationships_verified": True}
 
 
-def verify_remote_receipt(receipt: dict, ledger: dict, target: dict, runner=command) -> dict:
+def verify_remote_receipt(receipt: dict, ledger: dict, target: dict, runner=command,
+                          *, runtime: Path | None = None) -> dict:
     """Read-only independent checks. Query failure is never branch absence."""
     root, github = target["root"], target["github_repository"]
 
@@ -1200,7 +1212,23 @@ def verify_remote_receipt(receipt: dict, ledger: dict, target: dict, runner=comm
             raise SupervisorError("open PR exists for no-change branch")
         return {"verified_at": now(), "status": "no_changes", "head_sha": head,
                 **({"issue_triage": triage_verification} if triage_verification is not None else {})}
-    pr = receipt["pr"]
+    if "prs" in receipt:
+        proof = verify_ordered_prs(receipt, ledger, target, runtime, evidence, runner)
+    else:
+        proof, _, _ = verify_pr_member(receipt["pr"], receipt["issues"], target, runner)
+    return {**proof, **({"issue_triage": triage_verification} if triage_verification is not None else {})}
+
+
+def verify_pr_member(pr: dict, issues: list[dict], target: dict, runner=command, *, ordered=False):
+    """The existing single-PR gates, repeated independently for every member."""
+    root, github = target["root"], target["github_repository"]
+
+    def git(*args, **kwargs):
+        return runner(["git", "-C", root, *args], **kwargs)
+
+    def gh_json(*args):
+        return json.loads(runner(["gh", *args]).stdout)
+
     live = gh_json("api", f"repos/{github}/pulls/{pr['number']}")
     if (live.get("merged") is not True or not live.get("merged_at")
             or live.get("base", {}).get("ref") != pr["base"]
@@ -1241,9 +1269,22 @@ def verify_remote_receipt(receipt: dict, ledger: dict, target: dict, runner=comm
         by_name = {check["name"]: check for check in all_checks}
         if any(name not in by_name or by_name[name].get("bucket") != "pass" for name in declared_checks):
             raise SupervisorError("repository-declared CI policy is not satisfied")
-    commits = gh_json("api", "--paginate", "--slurp", f"repos/{github}/pulls/{pr['number']}/commits?per_page=100")
-    commit_shas = {item["sha"] for page in commits for item in page}
-    for issue in receipt["issues"]:
+    if ordered:
+        commits = bounded_api_pages(f"repos/{github}/pulls/{pr['number']}/commits",
+                                    lambda args: runner(args).stdout, label="ordered PR commits")
+        commit_shas = {item.get("sha") for item in commits}
+        # GitHub's PR commit endpoint is capped at 250. Never mistake a
+        # successful last page for a complete larger PR.
+        count = live.get("commits")
+        if (type(count) is not int or not 1 <= count <= 250 or len(commits) != count
+                or len(commit_shas) != count or pr["head_sha"] not in commit_shas
+                or any(not isinstance(sha, str) or not SHA.fullmatch(sha) for sha in commit_shas)):
+            raise SupervisorError("ordered PR commit inventory is incomplete or repeated")
+    else:
+        pages = gh_json("api", "--paginate", "--slurp", f"repos/{github}/pulls/{pr['number']}/commits?per_page=100")
+        commits = [item for page in pages for item in page]
+        commit_shas = {item["sha"] for item in commits}
+    for issue in issues:
         live_issue = gh_json("api", f"repos/{github}/issues/{issue['number']}")
         if (live_issue.get("state") != "closed" or "pull_request" in live_issue
                 or issue["fix_commit_sha"] not in commit_shas):
@@ -1254,10 +1295,146 @@ def verify_remote_receipt(receipt: dict, ledger: dict, target: dict, runner=comm
     local = git("show-ref", "--verify", "--quiet", f"refs/heads/{pr['branch']}", check=False)
     if local.returncode != 1:
         raise SupervisorError("local branch still exists or absence query failed")
-    return {"verified_at": now(), "status": "merged", "pr_number": pr["number"],
-            "head_sha": pr["head_sha"], "merge_commit_sha": live.get("merge_commit_sha"),
-            "merged_at": live["merged_at"], "checks": checks,
-            **({"issue_triage": triage_verification} if triage_verification is not None else {})}
+    return ({"verified_at": now(), "status": "merged", "pr_number": pr["number"],
+             "head_sha": pr["head_sha"], "merge_commit_sha": live.get("merge_commit_sha"),
+             "merged_at": live["merged_at"], "checks": checks}, live, commits)
+
+
+def closure_time(value, label: str) -> datetime:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            raise ValueError("timezone absent")
+        return parsed
+    except (AttributeError, TypeError, ValueError) as error:
+        raise SupervisorError(f"invalid {label} timestamp") from error
+
+
+def commit_changes(root: str, commit: str, runner) -> dict[str, tuple[str, str]]:
+    """Complete non-merge, non-rename content changes at an exact commit.
+
+    A merge's combined diff can omit paths; rename/copy attribution has multiple
+    names. Refuse those ambiguous producers instead of inferring authorship.
+    """
+    identity = runner(["git", "-C", root, "rev-list", "--parents", "-n", "1", commit]).stdout.strip().split()
+    if (not 1 <= len(identity) <= 2 or identity[0] != commit
+            or any(not SHA.fullmatch(item) for item in identity)):
+        raise SupervisorError("evidence/fix producer must be an exact non-merge commit")
+    raw = runner(["git", "-C", root, "diff-tree", "--root", "--no-commit-id", "--raw",
+                  "--no-abbrev", "-r", "-M", "-z", commit]).stdout
+    parts = raw.split("\0")
+    if parts[-1] != "" or len(parts) > 20001 or len(parts) % 2 != 1:
+        raise SupervisorError("invalid or incomplete producer change inventory")
+    changes = {}
+    for index in range(0, len(parts) - 1, 2):
+        meta, path = parts[index:index + 2]
+        match = re.fullmatch(r":(000000|100644|100755) (000000|100644|100755) ([0-9a-f]{40}) ([0-9a-f]{40}) ([AMD])", meta)
+        if (not match or not path or path in changes or path.startswith("/")
+                or any(part in {"", ".", ".."} for part in path.split("/"))
+                or any(ord(char) < 32 for char in path)):
+            raise SupervisorError("ambiguous rename, merge, mode or path in producer changes")
+        changes[path] = (match[3], match[4])
+    return changes
+
+
+def tree_blob(root: str, head: str, path: str, runner) -> str | None:
+    raw = runner(["git", "-C", root, "ls-tree", "-z", head, "--", path]).stdout
+    if not raw:
+        return None
+    match = re.fullmatch(r"(?:100644|100755) blob ([0-9a-f]{40})\t" + re.escape(path) + "\x00", raw)
+    if not match:
+        raise SupervisorError("exact regular-file blob unavailable")
+    return match[1]
+
+
+def verify_ordered_prs(receipt: dict, ledger: dict, target: dict, runtime: Path | None,
+                       evidence: dict | None, runner=command) -> dict:
+    """Corroborated same-goal membership plus independent remote and Git proof."""
+    from kg_microbe_progress.prs import AssociationError, require_current_pr_associations
+    from kg_microbe_workflows.closure import multi_pr_members
+    try:
+        members = multi_pr_members(receipt)
+        if runtime is None:
+            raise ValueError("ordered closure requires the supervisor's session directory")
+        errors = validate_receipt(receipt, ledger, target, runtime)
+        if errors:
+            raise ValueError("; ".join(errors))
+        require_current_pr_associations(runtime, ledger, {item["number"] for item in members})
+    except (AssociationError, ValueError) as error:
+        raise SupervisorError(str(error)) from error
+    root = target["root"]
+    start = closure_time(ledger["adopted_goal"]["started_at"], "goal start")
+    cutoff = closure_time(now(), "verification")
+    deadline = time.monotonic() + 300
+
+    def read(args, **kwargs):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise SupervisorError("ordered closure verification exceeded its deadline")
+        kwargs["timeout"] = max(1, min(45, int(remaining)))
+        result = runner(args, **kwargs)
+        if result.returncode and kwargs.get("check", True):
+            raise SupervisorError("ordered closure query failed")
+        return result
+
+    expected = {}
+    if evidence:
+        current = [receipt["goal_outputs"]["goal_evidence"], *evidence["artifacts"]]
+        expected = {item["path"]: item["sha256"] for item in current}
+    attributed = {item["path"]: item["sha256"] for item in receipt["evidence_attributions"]}
+    if attributed != expected:
+        raise SupervisorError("evidence attribution set differs from exact current-stage outputs")
+    proofs, commits_by_pr, changed = [], {}, {}
+    previous = None
+    for member in members:
+        issues = [item for item in receipt["issues"] if item["pr_number"] == member["number"]]
+        proof, live, commits = verify_pr_member(member, issues, target, read, ordered=True)
+        if member["merge_commit_sha"] != proof["merge_commit_sha"]:
+            raise SupervisorError("ordered PR merge commit differs from independently verified merge")
+        created, merged = closure_time(live.get("created_at"), "PR creation"), closure_time(live.get("merged_at"), "PR merge")
+        if not start <= created <= merged <= cutoff:
+            raise SupervisorError("ordered PR lies outside the adopted-goal closure window")
+        for sha in (member["head_sha"], member["merge_commit_sha"]):
+            if read(["git", "-C", root, "cat-file", "-t", sha]).stdout.strip() != "commit":
+                raise SupervisorError("ordered PR identity is not a commit")
+        if previous and (closure_time(previous["merged_at"], "previous merge") > merged
+                or read(["git", "-C", root, "merge-base", "--is-ancestor", previous["merge_commit_sha"],
+                         member["head_sha"]], check=False).returncode != 0):
+            raise SupervisorError("ordered PRs are unordered or final integration omits an earlier merge")
+        commit_shas = set()
+        for item in commits:
+            when = closure_time((item.get("commit") or {}).get("committer", {}).get("date"), "PR commit")
+            if not start <= when <= merged:
+                raise SupervisorError("ordered PR commit lies outside the adopted-goal closure window")
+            if read(["git", "-C", root, "merge-base", "--is-ancestor", item["sha"], member["head_sha"]], check=False).returncode:
+                raise SupervisorError("PR commit is not in its reviewed head")
+            commit_shas.add(item["sha"])
+        commits_by_pr[member["number"]] = commit_shas
+        proofs.append(proof)
+        previous = proof
+    final = members[-1]["head_sha"]
+    for attribution in receipt["evidence_attributions"]:
+        commit, path = attribution["commit_sha"], attribution["path"]
+        if commit not in commits_by_pr[attribution["pr_number"]]:
+            raise SupervisorError("evidence producer is not in its attributed PR")
+        if commit not in changed:
+            changed[commit] = commit_changes(root, commit, read)
+        blobs = changed[commit].get(path)
+        final_blob = tree_blob(root, final, path, read)
+        if not blobs or blobs[0] == blobs[1] or blobs[1] == "0" * 40 or blobs[1] != final_blob:
+            raise SupervisorError("evidence was not produced with the final bytes by its attributed commit")
+    for issue in receipt["issues"]:
+        commit = issue["fix_commit_sha"]
+        if commit not in changed:
+            changed[commit] = commit_changes(root, commit, read)
+        changes = changed[commit]
+        if not changes or not any(old != new for old, new in changes.values()):
+            raise SupervisorError("issue fix commit has no content changes")
+        member = next(item for item in members if item["number"] == issue["pr_number"])
+        for path in changes:
+            if path not in expected and tree_blob(root, member["head_sha"], path, read) != tree_blob(root, final, path, read):
+                raise SupervisorError("final integration head no longer retains an earlier reviewed fix")
+    return {**proofs[-1], "prs": proofs, "evidence_attributions": copy.deepcopy(receipt["evidence_attributions"])}
 
 
 SEND_JS = r'''
@@ -1942,7 +2119,7 @@ class Supervisor:
                     receipt_errors = [] if archived else validate_receipt(receipt, ledger, target, directory)
                     if not archived and not receipt_errors and observation.get("ready"):
                         authority = completion_authority(target, ledger, observation)
-                        verification = verify_remote_receipt(receipt, ledger, target, self.runner)
+                        verification = verify_remote_receipt(receipt, ledger, target, self.runner, runtime=self.directory(target))
                         ledger = self.advance(target, ledger, receipt, verification, authority)
                         # Do not delete the producer's file; mismatched old receipts
                         # are ignored only while a new goal is awaiting acceptance.

@@ -241,6 +241,39 @@ def gather_associations(runtime_dirs: Iterable[Path], *, fleet: FleetManifest | 
     return collect_associations(runtime_dirs, fleet=fleet).records
 
 
+def require_current_pr_associations(session: Path, ledger: dict, numbers: set[int]) -> None:
+    """Corroborate multi-PR membership without granting closure authority.
+
+    The supervisor supplies its own session directory and ledger, never a path
+    from a receipt. Every input row is validated, including unrelated orphans.
+    A current retained binding wins over an orphaned native identity in the
+    same stage, as in collection. Another stage or retained goal never does.
+    """
+    if session.is_symlink() or not session.is_dir():
+        raise AssociationError("association session must be a real directory")
+    current = _context(ledger)
+    _validate_context(current)
+    retained = _retained_contexts(ledger)
+    records = _records(_read(session / REGISTRY_NAME), ledger, require_retained=False)
+    found = set()
+    for record in records:
+        if record["pr_number"] in numbers:
+            context = {key: record[key] for key in CONTEXT_FIELDS}
+            if context != current:
+                if (context in retained or any(context[key] != current[key] for key in
+                                               ("cycle", "stage", "workflow_sha256"))):
+                    raise AssociationError("ordered PR is associated with another retained goal or stage")
+                continue
+            found.add(record["pr_number"])
+    for closed in ledger["completed_stages"]:
+        proof = closed.get("verification") or {}
+        prior = [proof.get("pr_number")] + [item.get("pr_number") for item in proof.get("prs", [])]
+        if numbers.intersection(prior):
+            raise AssociationError("ordered PR already belongs to a verified closure")
+    if found != numbers:
+        raise AssociationError("ordered PR lacks its current goal registry association")
+
+
 def collect_associations(runtime_dirs: Iterable[Path], *, fleet: FleetManifest | None = None) -> AssociationCollection:
     """Read explicit registries and exact version-2 receipt candidate bindings.
 
@@ -272,11 +305,16 @@ def collect_associations(runtime_dirs: Iterable[Path], *, fleet: FleetManifest |
                 try:
                     candidate = _json(candidate_raw)
                     if isinstance(candidate, dict) and candidate.get("schema_version") == 2:
-                        record = {key: candidate.get(key) for key in CONTEXT_FIELDS}
-                        record.update(schema_version=1, pr_number=candidate.get("pr", {}).get("number"),
-                                      reported_at=ledger.get("last_observed_at", ledger.get("created_at")))
-                        records.append(_validate_record(record, ledger))
-                except (AssociationError, AttributeError):
+                        from kg_microbe_workflows.closure import multi_pr_members
+                        members = multi_pr_members(candidate) or [candidate.get("pr", {})]
+                        candidates = []
+                        for member in members:
+                            record = {key: candidate.get(key) for key in CONTEXT_FIELDS}
+                            record.update(schema_version=1, pr_number=member.get("number"),
+                                          reported_at=ledger.get("last_observed_at", ledger.get("created_at")))
+                            candidates.append(_validate_record(record, ledger))
+                        records.extend(candidates)
+                except (AssociationError, AttributeError, ValueError):
                     # A working receipt may be incomplete. It is never a
                     # fallback source of weaker, inferred goal associations.
                     pass

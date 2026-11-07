@@ -404,3 +404,70 @@ then increments `cycle`, validates and pins the committed next-cycle profile,
 and returns to stage 1. Actions, progress, receipts, archives, and reports carry
 the cycle identity, so older evidence cannot complete a later cycle. Legacy
 four-stage configurations remain supported until explicitly migrated.
+
+## Ordered multi-PR closure receipts
+
+A goal whose fixes and final evidence land in separate PRs may use the additive
+version-2 `prs` and `evidence_attributions` fields. Existing single-PR receipts,
+including their archived shape and public goal event, remain unchanged. This
+format changes neither native completion authority nor stage dispatch: a native
+goal mismatch still needs the documented operator assessment before closure.
+
+Start from the supervisor's ordinary receipt template. Keep its top-level `pr`,
+`review`, `validation`, and `cleanup` as the **final integration PR**. Add `prs`
+with two to sixteen members, ordered by merge and integration ancestry. Every
+member contains exactly `number`, `head_sha`, `branch`, `base`,
+`merge_commit_sha`, `review`, `validation`, and `cleanup`. Copy the final
+member's identity and proofs to the top-level fields without alteration. Each
+member needs its own saved review and validation evidence at that exact head.
+See [the illustrative receipt](../examples/ordered-closure-receipt.json); its
+synthetic hashes and artifact names must be replaced with observed evidence.
+
+Each `issues` entry additionally names `pr_number`. Its `fix_commit_sha` must
+belong to that exact PR's independently queried complete commit inventory; an
+issue fixed by an earlier PR must never be attributed to the evidence-repair PR.
+Each `evidence_attributions` entry contains exactly `path`, `sha256`, `pr_number`,
+and `commit_sha`. The set must equal the current goal evidence manifest plus
+its current artifact payloads. The producer commit must belong to that PR,
+actually change the path's blob, and produce the exact bytes retained at the
+final reviewed head. Merely finding an inherited matching file in a later
+commit does not prove production. `INFRA_TASKS.md`, earlier stage evidence,
+and ancestor manifests remain independently checked at the final head; do not
+claim that a current PR produced those retained files.
+
+The supervisor reads only its configured session's private PR registry. Every
+member must have the current run, repository, cycle, stage, adopted native goal,
+and workflow digest recorded there. A conflicting retained goal, another stage
+or workflow, or an already verified earlier closure blocks this multi-PR path.
+A current valid binding takes precedence over an orphaned native identity in
+the same cycle, stage and workflow; the orphan alone supplies no membership. This corroboration is not completion authority: every PR still
+needs independent merged/base/head, exact merge commit, passing required and
+repository-declared checks, issue-fix membership, and local/remote branch-cleanup
+verification. A malformed or unsafe registry fails closed without being edited.
+
+The goal window starts at the retained adopted goal's timestamp and ends at the
+verification timestamp sampled once for this closure attempt. PR creation,
+merge, and each PR commit's GitHub committer timestamp must be coherent within
+that window. Evidence-repair PRs may merge after native goal completion while
+the same stage awaits closure. No receipt assertion can extend the window or
+borrow a prior-stage PR. Commit inventories are paginated and checked against
+GitHub's exact PR commit count; PRs above the endpoint's 250-commit limit are
+refused rather than treated as complete.
+
+Every earlier merge commit must be an ancestor of the following reviewed head.
+For squash merges this uses the merge commit, not the original feature commit.
+Paths changed by an issue fix must retain their bytes from that member's
+reviewed head at the final head; this also checks deletions. Current-stage
+evidence may change only through the explicit verified final producer above.
+An overlapping later code change therefore needs a freshly reviewed closure
+arrangement instead of an inferred waiver. Exact content reintroduction is
+accepted; a final reverted fix is refused. Producer/fix merge commits,
+rename/copy diffs, symlinks, and submodules are refused because their attribution
+is ambiguous under this deliberately bounded format.
+
+The retained supervisor verification records every member's independently
+verified merge plus the exact evidence attributions. Progress collection exports
+all member PR observations and associations, but still only one goal closure,
+whose existing top-level PR is the final integration PR. A candidate receipt
+contributes informational associations only. No runtime ledger, registry,
+counter, active workflow, or migration is rewritten by this feature.

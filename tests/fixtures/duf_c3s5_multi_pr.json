@@ -1,0 +1,12 @@
+{
+  "description": "DUFMech cycle 3 stage 5 provenance split, using public PR identities. All runtime identities, review artifacts and scientific payloads in the test harness are synthetic; no claim about live completion authority or registry state is made.",
+  "repository": "CultureBotAI/DUFMech",
+  "cycle": 3,
+  "stage": 5,
+  "prs": [
+    {"number": 365, "branch": "cycle3-stage5-resolve-review-findings", "base": "main", "head_sha": "f13b1ac5486faccabc7d78db5eab7f3c1b771bef", "merge_commit_sha": "727be704e25587e6e796087b4b61aab3b9c406cd", "created_at": "2026-10-25T17:30:00Z", "merged_at": "2026-10-25T18:27:13Z", "fix_commits": {"361": "a813667bafdf952818dfe781facff3af5369d83e", "362": "a813667bafdf952818dfe781facff3af5369d83e", "363": "a813667bafdf952818dfe781facff3af5369d83e", "364": "a813667bafdf952818dfe781facff3af5369d83e", "366": "4c55df7022d82724b598a60bc99e607d139cc5cb"}},
+    {"number": 367, "branch": "cycle3-stage5-evidence-kind-fix", "base": "main", "head_sha": "028b31681bc9816ec07b20e9eeab770811ea9bdd", "merge_commit_sha": "0b3ed0fb1dcbba49fff4f3123806aa8b7f3663e4", "created_at": "2026-10-25T18:40:00Z", "merged_at": "2026-10-25T19:04:23Z", "fix_commits": {}}
+  ],
+  "synthetic_timestamps": ["created_at", "commit committer dates"],
+  "provenance": "PR 365 contains the fixes; PR 367 repairs the final evidence.yaml. The later PR does not own the earlier issue fix commits."
+}
