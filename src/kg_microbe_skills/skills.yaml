@@ -46,6 +46,11 @@ skills:
   cross-mech-sync:
     scope: fleet
     reason: Propagates a vendored artifact across manifest-declared consumers.
+  cross-mech-taxon-links:
+    scope: fleet
+    reason: >-
+      Runs kg-microbe-links taxa over every Mech whose manifest taxon_links
+      declaration is enabled, resolved from the manifest.
   cross-repo-sync:
     scope: claw
     reason: >-

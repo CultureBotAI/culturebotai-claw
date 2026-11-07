@@ -159,6 +159,7 @@ uv run --extra dev mypy \
   src/kg_microbe_consistency src/kg_microbe_patches \
   src/kg_microbe_evidence src/kg_microbe_graph \
   src/kg_microbe_corpus src/kg_microbe_curation src/kg_microbe_health src/kg_microbe_kgx \
+  src/kg_microbe_links \
   src/kg_microbe_pages src/kg_microbe_site src/kg_microbe_skills \
   src/kg_microbe_source_queue src/kg_microbe_sources \
   src/kg_microbe_sssom src/kg_microbe_writers \
@@ -327,6 +328,7 @@ Key shared console scripts:
 uv run kg-microbe-consistency --help
 uv run kg-microbe-research --help
 uv run kg-microbe-history --help
+uv run kg-microbe-links --help
 uv run kg-microbe-governance --help
 uv run kg-microbe-kgscan --help
 uv run kg-microbe-graph --help
@@ -408,6 +410,30 @@ the eleven columns both existing queues share, one spelling per licence class,
 and the adoption gate -- an `ADOPTED` source must have terms someone checked and
 the date they checked them. A candidate that intends to seed before its licence
 is read is not a finding; that is what verification is for.
+
+`kg-microbe-links taxa --mech X` (or `--all`) judges every taxon a Mech's
+records cite, in the slots its manifest `taxon_links` declaration names,
+against what TaxonMech holds: `retired` (an id NCBI merged into another,
+judged first because TaxonMech's own scope still lists some, reported with the
+current id and its own verdict), `record` (in TaxonMech's seed scope),
+`species_of_strain` (below species, and its nearest ancestor that is a record,
+usually its species, holds it, so a link resolves up to that record and should
+say so), `above_species` (never a record by TaxonMech's rule),
+`outside_domain` (an animal, plant or virus, which resolves to NCBI, not
+TaxonMech), `unplaced` (a metagenome, unclassified sequence or vector under no
+domain), `unattested_microbial` (a bacterium, archaeon, fungus or protist no
+TaxonMech source attests, the only kind a scope change could admit) and
+`absent` (not in the pinned taxdump); `--strict` fails on retired, absent and
+malformed values and on a record that will not parse. A value in a declared slot that is
+not an `NCBITaxon` CURIE is another identifier, counted, never a finding.
+Only the declared slots are read, because a taxon in prose or in a citation
+is not a link; the slots were measured from the records and are listed in
+the manifest beside the capability. Everything is read from TaxonMech's
+checkout (`curation/seed_scope.tsv`, `data/raw/ncbi_merged_ids.tsv`,
+`data/raw/ncbitaxon_taxa.tsv`, and, only for taxa outside that inventory,
+the taxdump snapshot `conf/ncbi_taxdump.yaml` pins), so the verdict is the
+same on a laptop and in CI and nothing is fetched. The taxdump's nodes and
+names are each read at most once per process, tens of seconds apiece.
 
 `kg-microbe-kgx check` judges an exported KGX graph. Its subject is mostly
 whether a TSV means the same thing to whoever reads it: a bare carriage return,

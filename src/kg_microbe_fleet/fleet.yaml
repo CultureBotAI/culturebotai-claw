@@ -70,6 +70,16 @@ capability_catalogue:
       # Issue-owned findings that are reported but do not block (#729).
       known_findings:
         type: string
+  # Every slot in which a record names a taxon, read by `kg-microbe-links
+  # taxa`. Only the slots listed are read: a taxon mentioned in prose, a
+  # citation or a mixed identifier slot is not a link. Measured from the
+  # records, not the schema (scripts/adhoc/discover_taxon_slot_paths.py,
+  # 2026-11-06); a slot the schema allows but no record uses is not listed.
+  taxon_links:
+    settings:
+      slots:
+        type: string_list
+        required_when_enabled: true
   corpus_statistics:
     settings:
       fields:
@@ -225,6 +235,11 @@ mechs:
       - data/merge_yaml/merged/*.yaml
     vendored_role: consumer
     capabilities:
+      taxon_links:
+        status: enabled
+        settings:
+          slots:
+            - target_organisms[].term.id
       evidence_reference_validation:
         status: disabled
         reason: >-
@@ -379,6 +394,12 @@ mechs:
       - data/ingredients/**/*.yaml
     vendored_role: consumer
     capabilities:
+      taxon_links:
+        status: disabled
+        reason: >-
+          Measured 2026-11-06: no record slot holds an NCBITaxon CURIE. The schema's
+          causal-graph organism_scope and protein-example taxa exist, and no record
+          carries one yet. Enable, with the slots, once one does.
       evidence_reference_validation:
         status: enabled
         settings:
@@ -527,6 +548,21 @@ mechs:
       - data/isolates/*.yaml
     vendored_role: consumer
     capabilities:
+      taxon_links:
+        status: enabled
+        settings:
+          slots:
+            - taxonomy[].taxon_term.term.id
+            - taxonomy[].taxon_term.gtdb_classification.ncbi_source_id
+            - ecological_interactions[].participating_taxa[].term.id
+            - ecological_interactions[].participating_taxa[].gtdb_classification.ncbi_source_id
+            - ecological_interactions[].source_taxon.term.id
+            - ecological_interactions[].target_taxon.term.id
+            - ecological_interactions[].target_taxon.gtdb_classification.ncbi_source_id
+            - host.term.id
+            - engineering_design.counter_selection[].excluded_taxon.term.id
+            # Found but not declared: external_resources[].resource_id holds
+            # the ids of external resources, not taxon links.
       evidence_reference_validation:
         status: disabled
         reason: >-
@@ -673,6 +709,12 @@ mechs:
       - data/traits/**/*.yaml
     vendored_role: consumer
     capabilities:
+      taxon_links:
+        status: enabled
+        settings:
+          slots:
+            - canonical_examples[].taxon_id
+            - causal_graphs[].nodes[].protein_examples[].taxon_id
       evidence_reference_validation:
         status: disabled
         reason: >-
@@ -837,6 +879,13 @@ mechs:
       - data/traits/**/*.yaml
     vendored_role: consumer
     capabilities:
+      taxon_links:
+        status: enabled
+        settings:
+          slots:
+            - canonical_examples[].taxon_id
+            # Found but not declared: xrefs[] (four records) is a mixed
+            # cross-reference slot.
       evidence_reference_validation:
         status: disabled
         reason: >-
@@ -1005,6 +1054,20 @@ mechs:
       - data/antibiotics/**/*.yaml
     vendored_role: consumer
     capabilities:
+      taxon_links:
+        status: enabled
+        settings:
+          slots:
+            - producer_organisms[].taxon_id
+            - molecular_targets[].taxon_id
+            - molecular_targets[].protein_examples[].taxon_id
+            - causal_graphs[].nodes[].protein_examples[].taxon_id
+            - resistance_mechanisms[].taxon_id
+            - resistance_mechanisms[].strain_taxon_id
+            - activity_spectrum[].taxon_id
+            - structural_observations[].taxon_id
+            # Found but not declared: resistance_mechanisms[].evidence[].reference
+            # is a citation slot.
       evidence_reference_validation:
         status: disabled
         reason: >-
@@ -1174,6 +1237,17 @@ mechs:
       - data/structures/**/*.yaml
     vendored_role: consumer
     capabilities:
+      taxon_links:
+        status: enabled
+        settings:
+          slots:
+            - canonical_examples[].taxon_id
+            - taxonomic_distribution[].taxon_id
+            - components[].protein_examples[].taxon_id
+            - images[].taxon_id
+            - complex_compositions[].taxon_id
+            - related_records[].target_taxon_id
+            # Found but not declared: evidence[].reference is a citation slot.
       evidence_reference_validation:
         status: enabled
         settings:
@@ -1369,6 +1443,13 @@ mechs:
       - data/habitats/**/*.yaml
     vendored_role: consumer
     capabilities:
+      taxon_links:
+        status: enabled
+        settings:
+          slots:
+            - characteristic_taxa[].taxon_id
+            - causal_graphs[].nodes[].protein_examples[].taxon_id
+            # Found but not declared: xrefs[] is a mixed cross-reference slot.
       evidence_reference_validation:
         status: enabled
         settings:
@@ -1601,6 +1682,16 @@ mechs:
         allow_unicode: true
         width: 80
     capabilities:
+      taxon_links:
+        status: enabled
+        settings:
+          slots:
+            - producer_organisms[].taxon_id
+            - biosynthetic_gene_clusters[].organism_taxon_id
+            - occurrences[].taxon_id
+            - molecular_targets[].taxon_id
+            # Mixed node ids; an ORGANISM node names a taxon.
+            - causal_graphs[].nodes[].identifier
       evidence_reference_validation:
         status: disabled
         reason: >-
@@ -1779,6 +1870,10 @@ mechs:
         generic serialization must not bypass the native seeder and corpus
         reproduction gate.
     capabilities:
+      taxon_links:
+        status: not_applicable
+        reason: >-
+          TaxonMech's records are the taxa; the links point here.
       evidence_reference_validation:
         status: disabled
         reason: >-
@@ -1950,6 +2045,19 @@ mechs:
         already written in safe_dump's style; 79 use block scalars or
         indented sequences that safe_dump never emits. Measured on joining.
     capabilities:
+      taxon_links:
+        status: enabled
+        settings:
+          slots:
+            - taxa[].id
+            - mechanistic_edges[].evidence[].assay_taxon
+            - mechanistic_edges[].endpoint_qualifiers[].evidence[].assay_taxon
+            # Edge endpoints are mixed node ids; a taxon there is a pathway's
+            # native species (part_of edges), so it is a link.
+            - mechanistic_edges[].subject
+            - mechanistic_edges[].object
+            # Found but not declared: references[].id and
+            # mechanistic_edges[].evidence[].reference_id are citation slots.
       evidence_reference_validation:
         status: disabled
         reason: >-
@@ -2152,6 +2260,11 @@ mechs:
       verified: false
       reason: Generated family projections use native seeding and reproduction gates; shared writers must not reserialize them.
     capabilities:
+      taxon_links:
+        status: enabled
+        settings:
+          slots:
+            - causal_graphs[].taxon
       evidence_reference_validation:
         status: disabled
         reason: >-
@@ -2299,6 +2412,13 @@ mechs:
         Material records exist, but shared round-trip options have not been
         verified against the native validation and authoring contract.
     capabilities:
+      taxon_links:
+        status: enabled
+        settings:
+          slots:
+            - mechanisms[].organisms[].id
+            - mechanisms[].protein_examples[].target_organism.id
+            - causal_graphs[].nodes[].protein_examples[].target_organism.id
       evidence_reference_validation:
         status: disabled
         reason: >-
@@ -2453,6 +2573,11 @@ mechs:
         and reproduction; shared round-trip serialization is not an authoring
         contract for generated records.
     capabilities:
+      taxon_links:
+        status: not_applicable
+        reason: >-
+          AI-concept records cite no organism (measured 2026-11-06: no record slot holds
+          an NCBITaxon CURIE, and the schemas declare no biological prefix).
       evidence_reference_validation:
         status: disabled
         reason: >-
