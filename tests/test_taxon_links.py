@@ -83,7 +83,8 @@ def taxonmech(tmp_path: Path) -> Path:
     with tarfile.open(tar_path, "w:gz") as tar:
         for member, payload in (
             ("nodes.dmp", _dmp([[str(t), str(p), r] for t, (_, r, p) in sorted(TAXA.items())])),
-            ("names.dmp", _dmp([[str(t), n, "", "scientific name"] for t, (n, _, _) in sorted(TAXA.items())])),
+            ("names.dmp", _dmp([[str(t), n, "", "scientific name"] for t, (n, _, _) in sorted(TAXA.items())]
+                               + [["1423", "Bacillus globigii", "", "synonym"]])),  # a synonym the names must skip
             ("merged.dmp", _dmp([[str(o), str(n)] for o, n in MERGED.items()])),
         ):
             info = tarfile.TarInfo(member)
@@ -185,6 +186,26 @@ def test_names_refuse_an_absent_tarball_as_nodes_do(index, taxonmech):
     (taxonmech / "data" / "source_snapshots" / "taxdump.tar.gz").unlink()
     with pytest.raises(links.TaxonLinksError, match="is not present"):
         index.names([511145, 562])
+
+
+def test_a_synonym_row_never_names_a_taxon(index):
+    """names.dmp holds synonyms beside scientific names; only the scientific name is a taxon's name."""
+    assert index.names([1423]) == {1423: "Bacillus subtilis"}
+
+
+def test_a_pinned_digest_is_checked_lazily_not_at_construction(taxonmech, monkeypatch):
+    """A fresh clone has the conf and no tarball; a Mech whose taxa are all in the inventory must still be judged."""
+    import hashlib
+    tar_path = taxonmech / "data" / "source_snapshots" / "taxdump.tar.gz"
+    conf = taxonmech / "conf" / "ncbi_taxdump.yaml"
+    conf.write_text(conf.read_text(encoding="utf-8") + f"sha256: {hashlib.sha256(tar_path.read_bytes()).hexdigest()}\n",
+                    encoding="utf-8")
+    monkeypatch.setattr(links, "_sha256", lambda path: (_ for _ in ()).throw(AssertionError("hashed before a taxdump read")))
+    index = links.TaxonIndex(taxonmech)
+    assert judge(index, "NCBITaxon:562").verdict is links.Verdict.RECORD
+    assert judge(index, "NCBITaxon:561").verdict is links.Verdict.ABOVE_SPECIES  # inventory node, no taxdump
+    assert index.names([562, 561]) == {562: "Escherichia coli", 561: "Escherichia"}
+    assert not index._taxdump_verified
 
 
 def test_a_pinned_sha256_is_checked_once_per_process(taxonmech):

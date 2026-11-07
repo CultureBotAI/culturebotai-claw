@@ -6,7 +6,7 @@ where the two sides differ, and mutation is how that is shown. Each mutant
 below undoes one rule in src/kg_microbe_links/taxa.py or __main__.py; the
 named test must fail with the mutant applied, and the two test files must
 pass without it. The list includes every mutant the first review of PR 897
-(culturebotai-claw#910) found surviving, those the second (#939-#944) did, those the third (#968-#973) did, and those the fourth (#991-#993) did.
+(culturebotai-claw#910) found surviving, those the second (#939-#944) did, those the third (#968-#973) did, those the fourth (#991-#993) did, and those the fifth (#994, #995 and its surviving mutants) did.
 Inputs: none; run from the claw checkout or worktree holding the script.
 Outputs: one line per mutant (KILLED or SURVIVED) and a nonzero exit if any
 survives, a mutant does not parse, a named test cannot be collected, or an
@@ -112,10 +112,27 @@ MUTANTS = [
      f"{CLI_TESTS}::test_an_unreadable_taxdump_tarball_is_exit_two"),
     (TAXA, "row parse errors not mapped", "        except (ValueError, IndexError) as exc:", "        except () as exc:",
      f"{CLI_TESTS}::test_a_member_that_is_not_taxdump_shaped_is_exit_two"),
-    (TAXA, "pinned sha256 not checked", "        if expected and not self._taxdump_verified:", "        if False:",
+    (TAXA, "pinned sha256 not checked", "        if pinned is not None and not self._taxdump_verified:", "        if False:",
      f"{CLI_TESTS}::test_a_tarball_that_does_not_match_the_pinned_sha256_is_exit_two"),
     (TAXA, "sha256 re-hashed on every access", "            self._taxdump_verified = True\n", "            self._taxdump_verified = False\n",
      f"{UNIT}::test_a_pinned_sha256_is_checked_once_per_process"),
+    (TAXA, "unreadable tarball under a pin is a traceback", "            try:\n                actual = _sha256(path)\n            except OSError as exc:\n                raise TaxonLinksError(f\"{path} cannot be read to check its sha256: {exc}\") from exc\n",
+     "            actual = _sha256(path)\n", f"{CLI_TESTS}::test_an_unreadable_tarball_under_a_pinned_digest_is_exit_two"),
+    (TAXA, "malformed pin not refused", "            if not SHA256_HEX.fullmatch(expected):", "            if False:",
+     f"{CLI_TESTS}::test_a_pinned_digest_is_validated_before_it_is_compared[0000000000000000000000000000000000000000-2]"),
+    (TAXA, "pin compared case-sensitively", "            expected = str(pinned).lower()", "            expected = str(pinned)",
+     f"{CLI_TESTS}::test_a_pinned_digest_is_validated_before_it_is_compared[UPPER-0]"),
+    (TAXA, "absent tarball under a pin falls through", "            if not path.is_file():\n                raise TaxonLinksError(f\"TaxonMech's pinned taxdump {path} is not present\")\n            try:",
+     "            try:", f"{CLI_TESTS}::test_an_absent_tarball_under_a_pinned_digest_is_exit_two"),
+    (TAXA, "digest verified at construction", "        self.inventory = self._read_inventory()  # taxon -> (rank, parent)\n",
+     "        self.inventory = self._read_inventory()  # taxon -> (rank, parent)\n        self.taxdump_path\n",
+     f"{UNIT}::test_a_pinned_digest_is_checked_lazily_not_at_construction"),
+    (TAXA, "IndexError not mapped at the parse", "        except (ValueError, IndexError) as exc:", "        except ValueError as exc:",
+     f"{CLI_TESTS}::test_a_short_row_is_not_taxdump_shaped_either"),
+    (TAXA, "archive error re-wrapped by the parse", "        except (ValueError, IndexError) as exc:", "        except (ValueError, IndexError, TaxonLinksError) as exc:",
+     f"{CLI_TESTS}::test_a_taxdump_that_is_not_a_tarball_is_exit_two"),
+    (TAXA, "synonyms named", 'lambda f: (int(f[0]), f[1]) if f[3] == "scientific name" else None)', 'lambda f: (int(f[0]), f[1]))',
+     f"{UNIT}::test_a_synonym_row_never_names_a_taxon"),
     (CLI, "strict blocks every verdict but record", 'BLOCKING = {Verdict.RETIRED.value, Verdict.ABSENT.value, Verdict.MALFORMED.value}',
      'BLOCKING = {v.value for v in Verdict} - {Verdict.RECORD.value}', f"{CLI_TESTS}::test_strict_passes_on_every_non_blocking_verdict"),
     (TAXA, "unplaced only at species rank", '        if domain == "other":', '        if domain == "other" and rank == "species":',

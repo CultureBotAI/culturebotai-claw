@@ -98,10 +98,12 @@ def test_a_taxdump_needed_only_for_names_that_is_missing_is_exit_two(tmp_path, t
 
 
 def test_a_taxdump_that_is_not_a_tarball_is_exit_two(tmp_path, taxonmech, capsys):  # noqa: F811
-    (taxonmech / "data" / "source_snapshots" / "taxdump.tar.gz").write_bytes(b"not a tarball")
+    tar_path = taxonmech / "data" / "source_snapshots" / "taxdump.tar.gz"
+    tar_path.write_bytes(b"not a tarball")
     root = _mech(tmp_path, "dufmech", {"data/families/a.yaml": {"causal_graphs": [{"taxon": "NCBITaxon:511145"}]}})
     assert main(["taxa", "--mech", "dufmech", "--root", str(root), "--taxonmech-root", str(taxonmech)]) == 2
-    assert "cannot be read as a gzipped tar" in capsys.readouterr().err
+    # the archive error reaches the user as itself, not re-wrapped by the row parse
+    assert capsys.readouterr().err.startswith(f"{tar_path} cannot be read as a gzipped tar")
 
 
 def _rewrite_tarball(root: Path, **members: bytes | None) -> None:
@@ -132,6 +134,56 @@ def test_an_unreadable_taxdump_tarball_is_exit_two(tmp_path, taxonmech, capsys):
     assert "cannot be read as a gzipped tar" in capsys.readouterr().err
 
 
+def _pin_digest(root: Path, digest: str | None = None) -> None:
+    """Append a sha256 pin to the fixture conf: the tarball's own digest unless one is given."""
+    import hashlib
+    tar_path = root / "data" / "source_snapshots" / "taxdump.tar.gz"
+    conf = root / "conf" / "ncbi_taxdump.yaml"
+    digest = hashlib.sha256(tar_path.read_bytes()).hexdigest() if digest is None else digest
+    conf.write_text(conf.read_text(encoding="utf-8") + f"sha256: {digest}\n", encoding="utf-8")
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root reads a mode-0 file")
+def test_an_unreadable_tarball_under_a_pinned_digest_is_exit_two(tmp_path, taxonmech, capsys):  # noqa: F811
+    """The configuration TaxonMech has: the digest check runs first and must refuse what it cannot read."""
+    _pin_digest(taxonmech)
+    tar_path = taxonmech / "data" / "source_snapshots" / "taxdump.tar.gz"
+    tar_path.chmod(0)
+    root = _mech(tmp_path, "dufmech", {"data/families/a.yaml": {"causal_graphs": [{"taxon": "NCBITaxon:511145"}]}})
+    try:
+        assert main(["taxa", "--mech", "dufmech", "--root", str(root), "--taxonmech-root", str(taxonmech)]) == 2
+    finally:
+        tar_path.chmod(0o644)
+    assert "cannot be read to check its sha256" in capsys.readouterr().err
+
+
+def test_an_absent_tarball_under_a_pinned_digest_is_exit_two(tmp_path, taxonmech, capsys):  # noqa: F811
+    _pin_digest(taxonmech)
+    (taxonmech / "data" / "source_snapshots" / "taxdump.tar.gz").unlink()
+    root = _mech(tmp_path, "dufmech", {"data/families/a.yaml": {"causal_graphs": [{"taxon": "NCBITaxon:511145"}]}})
+    assert main(["taxa", "--mech", "dufmech", "--root", str(root), "--taxonmech-root", str(taxonmech)]) == 2
+    assert "is not present" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("pin,outcome", [
+    ("UPPER", 0),                     # the right digest in upper-case hex is the right digest
+    ("0" * 40, 2),                    # too short: malformed, blamed on the conf
+    ("not-a-digest", 2),
+    ("1" * 64, 2),                    # YAML reads 64 digits as an int: well-formed hex that does not match, no traceback
+])
+def test_a_pinned_digest_is_validated_before_it_is_compared(tmp_path, taxonmech, capsys, pin, outcome):  # noqa: F811
+    import hashlib
+    tar_path = taxonmech / "data" / "source_snapshots" / "taxdump.tar.gz"
+    _pin_digest(taxonmech, hashlib.sha256(tar_path.read_bytes()).hexdigest().upper() if pin == "UPPER" else pin)
+    root = _mech(tmp_path, "dufmech", {"data/families/a.yaml": {"causal_graphs": [{"taxon": "NCBITaxon:511145"}]}})
+    assert main(["taxa", "--mech", "dufmech", "--root", str(root), "--taxonmech-root", str(taxonmech)]) == outcome
+    err = capsys.readouterr().err
+    if pin in ("0" * 40, "not-a-digest"):
+        assert "pins a malformed sha256" in err and "conf/ncbi_taxdump.yaml" in err
+    elif pin == "1" * 64:
+        assert "does not match the sha256" in err
+
+
 def test_a_member_that_is_not_taxdump_shaped_is_exit_two(tmp_path, taxonmech, capsys):  # noqa: F811
     """Without a pinned digest, a nodes.dmp holding garbage is refused at the row parse, not a ValueError traceback."""
     _rewrite_tarball(taxonmech, **{"nodes.dmp": b"garbage\n"})
@@ -140,13 +192,17 @@ def test_a_member_that_is_not_taxdump_shaped_is_exit_two(tmp_path, taxonmech, ca
     assert "is not in taxdump format" in capsys.readouterr().err
 
 
+def test_a_short_row_is_not_taxdump_shaped_either(tmp_path, taxonmech, capsys):  # noqa: F811
+    """A names.dmp row with three fields is an IndexError at the parse, mapped like a ValueError."""
+    _rewrite_tarball(taxonmech, **{"names.dmp": b"511145\t|\tshort row\t|\n"})
+    root = _mech(tmp_path, "dufmech", {"data/families/a.yaml": {"causal_graphs": [{"taxon": "NCBITaxon:511145"}]}})
+    assert main(["taxa", "--mech", "dufmech", "--root", str(root), "--taxonmech-root", str(taxonmech)]) == 2
+    assert "names.dmp is not in taxdump format" in capsys.readouterr().err
+
+
 def test_a_tarball_that_does_not_match_the_pinned_sha256_is_exit_two(tmp_path, taxonmech, capsys):  # noqa: F811
     """TaxonMech's conf pins the snapshot's sha256; a corrupt, truncated or wrong file fails that check first."""
-    import hashlib
-    tar_path = taxonmech / "data" / "source_snapshots" / "taxdump.tar.gz"
-    conf = taxonmech / "conf" / "ncbi_taxdump.yaml"
-    conf.write_text(conf.read_text(encoding="utf-8") + f"sha256: {hashlib.sha256(tar_path.read_bytes()).hexdigest()}\n",
-                    encoding="utf-8")
+    _pin_digest(taxonmech)
     root = _mech(tmp_path, "dufmech", {"data/families/a.yaml": {"causal_graphs": [{"taxon": "NCBITaxon:511145"}]}})
     assert main(["taxa", "--mech", "dufmech", "--root", str(root), "--taxonmech-root", str(taxonmech)]) == 0
     _rewrite_tarball(taxonmech, **{"nodes.dmp": b"garbage\n"})  # same shape of damage, now caught before any parse

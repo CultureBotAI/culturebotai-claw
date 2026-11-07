@@ -60,6 +60,7 @@ SCOPE_PATH = "curation/seed_scope.tsv"
 MERGED_PATH = "data/raw/ncbi_merged_ids.tsv"
 INVENTORY_PATH = "data/raw/ncbitaxon_taxa.tsv"
 TAXDUMP_CONF = "conf/ncbi_taxdump.yaml"
+SHA256_HEX = re.compile(r"[0-9a-f]{64}")
 
 
 class TaxonLinksError(RuntimeError):
@@ -169,11 +170,17 @@ class TaxonIndex:
     def taxdump_path(self) -> Path:
         conf = yaml.safe_load(self._require(TAXDUMP_CONF).read_text(encoding="utf-8"))
         path = self.root / conf["path"]
-        expected = conf.get("sha256")
-        if expected and not self._taxdump_verified:
+        pinned = conf.get("sha256")
+        if pinned is not None and not self._taxdump_verified:
+            expected = str(pinned).lower()  # YAML may hand back an int for a digits-only pin
+            if not SHA256_HEX.fullmatch(expected):
+                raise TaxonLinksError(f"{TAXDUMP_CONF} pins a malformed sha256 ({str(pinned)[:20]!r}); 64 hex digits expected")
             if not path.is_file():
                 raise TaxonLinksError(f"TaxonMech's pinned taxdump {path} is not present")
-            actual = _sha256(path)
+            try:
+                actual = _sha256(path)
+            except OSError as exc:
+                raise TaxonLinksError(f"{path} cannot be read to check its sha256: {exc}") from exc
             if actual != expected:
                 raise TaxonLinksError(f"{path} does not match the sha256 pinned in {TAXDUMP_CONF} "
                                       f"({actual[:12]}... against {expected[:12]}...): corrupt, truncated or not the snapshot")
