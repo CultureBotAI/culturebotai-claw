@@ -26,6 +26,10 @@ TAXA = {
     131567: ("cellular organisms", "no rank", 1),
     2: ("Bacteria", "superkingdom", 131567),
     2759: ("Eukaryota", "superkingdom", 131567),
+    2157: ("Archaea", "superkingdom", 131567),
+    2285: ("Sulfolobus acidocaldarius", "species", 2157),
+    33090: ("Viridiplantae", "kingdom", 2759),
+    3702: ("Arabidopsis thaliana", "species", 33090),
     10239: ("Viruses", "superkingdom", 1),
     543: ("Enterobacteriaceae", "family", 2),
     561: ("Escherichia", "genus", 543),
@@ -34,6 +38,8 @@ TAXA = {
     511145: ("Escherichia coli str. K-12 substr. MG1655", "strain", 83333),
     1279: ("Staphylococcus", "genus", 2),
     1280: ("Staphylococcus aureus", "species", 1279),
+    1281: ("Staphylococcus aureus subsp. aureus", "subspecies", 1280),  # also a record: two scoped ancestors above 1282
+    1282: ("Staphylococcus aureus NCTC 8325", "strain", 1281),
     1386: ("Bacillus", "genus", 2),
     1423: ("Bacillus subtilis", "species", 1386),
     4751: ("Fungi", "kingdom", 2759),
@@ -52,7 +58,7 @@ TAXA = {
     9991: ("marine metagenome isolate 9991", "subspecies", 999),  # the real taxdump's 22 below-species unplaced are subspecies
     998: ("unclassified sequences", "no rank", 1),
 }
-SCOPE = {562, 1280, 4932, 777}  # 777 is also retired: TaxonMech's scope keeps some merged ids
+SCOPE = {562, 1280, 1281, 4932, 777}  # 777 is also retired: TaxonMech's scope keeps some merged ids
 INVENTORY = {1, 131567, 2, 2759, 543, 561, 562, 1279, 1280, 4751, 4930, 4932}
 MERGED = {46170: 1280, 999001: 999002, 777: 562}
 
@@ -118,6 +124,21 @@ def test_a_strain_resolves_to_its_scoped_species(index, strain, species):
 @pytest.mark.parametrize("taxon", [561, 1386, 543])
 def test_a_genus_or_family_is_above_species(index, taxon):
     assert judge(index, f"NCBITaxon:{taxon}").verdict is links.Verdict.ABOVE_SPECIES
+
+
+def test_a_strain_resolves_to_its_nearest_scoped_ancestor_not_the_farthest(index):
+    """1282 sits under the subspecies 1281 and the species 1280, both records: the link goes to 1281."""
+    judgement = judge(index, "NCBITaxon:1282")
+    assert judgement.verdict is links.Verdict.SPECIES_OF_STRAIN
+    assert judgement.ancestor == 1281
+    assert judge(index, "NCBITaxon:1281").verdict is links.Verdict.RECORD
+
+
+def test_an_unscoped_archaeon_is_unattested_and_a_plant_is_outside_the_domain(index):
+    archaeon = judge(index, "NCBITaxon:2285")
+    assert (archaeon.verdict, archaeon.domain) == (links.Verdict.UNATTESTED_MICROBIAL, "Archaea")
+    plant = judge(index, "NCBITaxon:3702")
+    assert (plant.verdict, plant.kingdom) == (links.Verdict.OUTSIDE_DOMAIN, "Viridiplantae")
 
 
 def test_an_unscoped_bacterial_species_is_unattested_not_above_species(index):
@@ -222,11 +243,48 @@ def test_a_pinned_sha256_is_checked_once_per_process(taxonmech):
     assert index.taxdump_path == tar_path
 
 
+@pytest.mark.parametrize("table", [
+    "old_taxon_id\tcurrent_taxon_id\nNCBITaxon:562\tNCBITaxon:562\n",
+    "old_taxon_id\tcurrent_taxon_id\nNCBITaxon:777\tNCBITaxon:778\nNCBITaxon:778\tNCBITaxon:777\n",
+])
+def test_a_self_mapping_or_cyclic_merge_table_is_refused(taxonmech, table):
+    (taxonmech / "data" / "raw" / "ncbi_merged_ids.tsv").write_text(table, encoding="utf-8")
+    with pytest.raises(links.TaxonLinksError, match="in a cycle"):
+        links.TaxonIndex(taxonmech)
+
+
+@pytest.mark.parametrize("relative,content,message", [
+    ("curation/seed_scope.tsv", "wrong_column\nNCBITaxon:562\n", "has no identifier column"),
+    ("curation/seed_scope.tsv", "", "has no identifier column"),
+    ("curation/seed_scope.tsv", "identifier\tadded\treason\n", "lists no taxa"),
+    ("curation/seed_scope.tsv", "identifier\n562\n", "row 2: '562' is not an NCBITaxon CURIE"),
+    ("data/raw/ncbitaxon_taxa.tsv", "taxon_id\tlabel\n", "has no rank, parent_id column"),
+    ("data/raw/ncbi_merged_ids.tsv", "old_taxon_id\n", "has no current_taxon_id column"),
+])
+def test_a_malformed_taxonmech_tsv_is_refused_not_a_traceback(taxonmech, relative, content, message):
+    (taxonmech / relative).write_text(content, encoding="utf-8")
+    with pytest.raises(links.TaxonLinksError, match=message):
+        links.TaxonIndex(taxonmech)
+
+
+@pytest.mark.parametrize("content,message", [
+    ("path: [\n", "cannot be parsed"),
+    ("", "must be a mapping with a path"),
+    ("snapshot: '2026-09-13'\n", "must be a mapping with a path"),
+    ("- a list\n", "must be a mapping with a path"),
+])
+def test_a_malformed_taxdump_conf_is_refused_not_a_traceback(index, taxonmech, content, message):
+    (taxonmech / "conf" / "ncbi_taxdump.yaml").write_text(content, encoding="utf-8")
+    with pytest.raises(links.TaxonLinksError, match=message):
+        judge(index, "NCBITaxon:511145")  # outside the inventory, so the taxdump is needed
+
+
 def test_an_unknown_id_is_absent(index):
     assert judge(index, "NCBITaxon:424242").verdict is links.Verdict.ABSENT
 
 
-@pytest.mark.parametrize("value", ["NCBITaxon:0", "NCBITaxon:", "taxon:562", "NCBITaxon:562 ", 562, None, ""])
+@pytest.mark.parametrize("value", ["NCBITaxon:0", "NCBITaxon:", "taxon:562", "NCBITaxon:562 ", "NCBITaxon:562\n",
+                                   "NCBITaxon:" + "1" * 5000, 562, None, ""])
 def test_anything_but_a_curie_is_malformed(index, value):
     assert judge(index, value).verdict is links.Verdict.MALFORMED
 

@@ -19,7 +19,8 @@ Each cited `NCBITaxon` CURIE gets one verdict:
   strain that no TaxonMech source attests, the only kind a scope change could
   admit (TaxonMech holds protists: Plasmodium, Paramecium, diatoms);
 - `absent`: an id the pinned taxdump does not contain;
-- `malformed`: a value that is not an `NCBITaxon:<digits>` CURIE.
+- `malformed`: a value that is not exactly an `NCBITaxon:<digits>` CURIE (no
+  surrounding whitespace, at most twelve digits).
 
 Everything is read from TaxonMech's checkout: `curation/seed_scope.tsv` (the
 scope), `data/raw/ncbi_merged_ids.tsv` (merges; the only merge source, so a
@@ -50,7 +51,7 @@ import yaml
 
 from kg_microbe_corpus.statistics import iter_records
 
-CURIE = re.compile(r"^NCBITaxon:([1-9][0-9]*)$")
+CURIE = re.compile(r"NCBITaxon:([1-9][0-9]{0,11})")  # fullmatch: no trailing newline, no oversized id
 DOMAINS = {2: "Bacteria", 2157: "Archaea", 2759: "Eukaryota", 10239: "Viruses"}
 KINGDOMS = {4751: "Fungi", 33090: "Viridiplantae", 33208: "Metazoa"}
 MICROBIAL_DOMAINS = {"Bacteria", "Archaea"}
@@ -128,6 +129,13 @@ def _int_id(curie: str) -> int:
     return int(curie.split(":", 1)[1])
 
 
+def _curie_id(value: Any, where: str) -> int:
+    """The integer id of an NCBITaxon CURIE read from one of TaxonMech's own files; anything else is unusable."""
+    if not isinstance(value, str) or not CURIE.fullmatch(value):
+        raise TaxonLinksError(f"{where}: {value!r} is not an NCBITaxon CURIE")
+    return _int_id(value)
+
+
 class TaxonIndex:
     """What TaxonMech holds, read once from its checkout."""
 
@@ -147,28 +155,54 @@ class TaxonIndex:
             raise TaxonLinksError(f"TaxonMech checkout {self.root} has no {relative}")
         return path
 
+    def _read_tsv(self, relative: str, columns: Sequence[str], *, may_be_empty: bool) -> list[dict[str, str]]:
+        """Rows of one of TaxonMech's TSVs, with the columns the reader needs present; a file with no rows is
+        unusable unless `may_be_empty` (a header-only merge table means no merges)."""
+        with self._require(relative).open(encoding="utf-8") as handle:
+            reader = csv.DictReader(handle, delimiter="\t")
+            missing = [c for c in columns if c not in (reader.fieldnames or [])]
+            if missing:
+                raise TaxonLinksError(f"{relative} has no {', '.join(missing)} column")
+            rows = list(reader)
+        if not rows and not may_be_empty:
+            raise TaxonLinksError(f"{relative} lists no taxa")
+        return rows
+
     def _read_scope(self) -> set[int]:
-        with self._require(SCOPE_PATH).open(encoding="utf-8") as handle:
-            return {_int_id(row["identifier"]) for row in csv.DictReader(handle, delimiter="\t")}
+        return {_curie_id(row["identifier"], f"{SCOPE_PATH} row {n}")
+                for n, row in enumerate(self._read_tsv(SCOPE_PATH, ["identifier"], may_be_empty=False), 2)}
 
     def _read_merged(self) -> dict[int, int]:
-        with self._require(MERGED_PATH).open(encoding="utf-8") as handle:
-            return {_int_id(row["old_taxon_id"]): _int_id(row["current_taxon_id"])
-                    for row in csv.DictReader(handle, delimiter="\t")}
+        merged = {_curie_id(row["old_taxon_id"], f"{MERGED_PATH} row {n}"): _curie_id(row["current_taxon_id"], f"{MERGED_PATH} row {n}")
+                  for n, row in enumerate(self._read_tsv(MERGED_PATH, ["old_taxon_id", "current_taxon_id"], may_be_empty=True), 2)}
+        for start in merged:  # a self-map or a cycle would make judge() follow merges forever
+            seen = {start}
+            taxon = merged[start]
+            while taxon in merged:
+                if taxon in seen:
+                    raise TaxonLinksError(f"{MERGED_PATH} maps NCBITaxon:{start} in a cycle")
+                seen.add(taxon)
+                taxon = merged[taxon]
+        return merged
 
     def _read_inventory(self) -> dict[int, tuple[str, int]]:
         inventory: dict[int, tuple[str, int]] = {}
-        with self._require(INVENTORY_PATH).open(encoding="utf-8") as handle:
-            for row in csv.DictReader(handle, delimiter="\t"):
-                taxon = _int_id(row["taxon_id"])
-                parent = _int_id(row["parent_id"]) if row["parent_id"] else ROOT_TAXON
-                inventory[taxon] = ((row["rank"] or "NO_RANK").lower().replace("_", " "), parent)
-                self._inventory_names[taxon] = row["label"]
+        rows = self._read_tsv(INVENTORY_PATH, ["taxon_id", "label", "rank", "parent_id"], may_be_empty=False)
+        for n, row in enumerate(rows, 2):
+            taxon = _curie_id(row["taxon_id"], f"{INVENTORY_PATH} row {n}")
+            parent = _curie_id(row["parent_id"], f"{INVENTORY_PATH} row {n}") if row["parent_id"] else ROOT_TAXON
+            inventory[taxon] = ((row["rank"] or "NO_RANK").lower().replace("_", " "), parent)
+            self._inventory_names[taxon] = row["label"]
         return inventory
 
     @property
     def taxdump_path(self) -> Path:
-        conf = yaml.safe_load(self._require(TAXDUMP_CONF).read_text(encoding="utf-8"))
+        try:
+            conf = yaml.safe_load(self._require(TAXDUMP_CONF).read_text(encoding="utf-8"))
+        except yaml.YAMLError as exc:
+            raise TaxonLinksError(f"{TAXDUMP_CONF} cannot be parsed: {str(exc).splitlines()[0]}") from exc
+        if not isinstance(conf, dict) or not isinstance(conf.get("path"), str):
+            raise TaxonLinksError(f"{TAXDUMP_CONF} must be a mapping with a path")
         path = self.root / conf["path"]
         pinned = conf.get("sha256")
         if pinned is not None and not self._taxdump_verified:
@@ -230,7 +264,7 @@ class TaxonIndex:
         return {t: self._inventory_names.get(t) or taxdump_names.get(t, "") for t in taxa}
 
     def judge(self, value: Any) -> Judgement:
-        if not isinstance(value, str) or not CURIE.match(value):
+        if not isinstance(value, str) or not CURIE.fullmatch(value):  # fullmatch: "NCBITaxon:562\n" is malformed
             return Judgement(Verdict.MALFORMED)
         taxon = _int_id(value)
         if taxon in self.merged:  # before the scope: TaxonMech's scope still lists some retired ids

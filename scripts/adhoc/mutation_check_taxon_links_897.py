@@ -6,7 +6,7 @@ where the two sides differ, and mutation is how that is shown. Each mutant
 below undoes one rule in src/kg_microbe_links/taxa.py or __main__.py; the
 named test must fail with the mutant applied, and the two test files must
 pass without it. The list includes every mutant the first review of PR 897
-(culturebotai-claw#910) found surviving, those the second (#939-#944) did, those the third (#968-#973) did, those the fourth (#991-#993) did, and those the fifth (#994, #995 and its surviving mutants) did.
+(culturebotai-claw#910) found surviving, those the second (#939-#944) did, those the third (#968-#973) did, those the fourth (#991-#993) did, those the fifth (#994, #995 and its surviving mutants) did, and those the Codex review (#998-#1003) did.
 Inputs: none; run from the claw checkout or worktree holding the script.
 Outputs: one line per mutant (KILLED or SURVIVED) and a nonzero exit if any
 survives, a mutant does not parse, a named test cannot be collected, or an
@@ -131,6 +131,28 @@ MUTANTS = [
      f"{CLI_TESTS}::test_a_short_row_is_not_taxdump_shaped_either"),
     (TAXA, "archive error re-wrapped by the parse", "        except (ValueError, IndexError) as exc:", "        except (ValueError, IndexError, TaxonLinksError) as exc:",
      f"{CLI_TESTS}::test_a_taxdump_that_is_not_a_tarball_is_exit_two"),
+    (TAXA, "trailing newline accepted", "        if not isinstance(value, str) or not CURIE.fullmatch(value):", "        if not isinstance(value, str) or not CURIE.match(value):",
+     f"{UNIT}::test_anything_but_a_curie_is_malformed[NCBITaxon:562\\n]"),
+    (TAXA, "oversized id accepted", 'CURIE = re.compile(r"NCBITaxon:([1-9][0-9]{0,11})")', 'CURIE = re.compile(r"NCBITaxon:([1-9][0-9]*)")',
+     f"{UNIT}::test_anything_but_a_curie_is_malformed[NCBITaxon:" + "1" * 5000 + "]"),
+    (TAXA, "missing column is a KeyError", "            if missing:\n", "            if False:\n",
+     f"{UNIT}::test_a_malformed_taxonmech_tsv_is_refused_not_a_traceback[curation/seed_scope.tsv-wrong_column\\nNCBITaxon:562\\n-has no identifier column]"),
+    (TAXA, "empty scope accepted", "        if not rows and not may_be_empty:", "        if False:",
+     f"{UNIT}::test_a_malformed_taxonmech_tsv_is_refused_not_a_traceback[curation/seed_scope.tsv-identifier\\tadded\\treason\\n-lists no taxa]"),
+    (TAXA, "merge cycle not refused", "                if taxon in seen:\n                    raise TaxonLinksError(f\"{MERGED_PATH} maps NCBITaxon:{start} in a cycle\")\n                seen.add(taxon)\n                taxon = merged[taxon]\n",
+     "                break\n", f"{UNIT}::test_a_self_mapping_or_cyclic_merge_table_is_refused[old_taxon_id\\tcurrent_taxon_id\\nNCBITaxon:562\\tNCBITaxon:562\\n]"),
+    (TAXA, "YAML error not mapped", "        except yaml.YAMLError as exc:", "        except () as exc:",
+     f"{UNIT}::test_a_malformed_taxdump_conf_is_refused_not_a_traceback[path: [\\n-cannot be parsed]"),
+    (TAXA, "conf shape not checked", '        if not isinstance(conf, dict) or not isinstance(conf.get("path"), str):', "        if False:",
+     f"{UNIT}::test_a_malformed_taxdump_conf_is_refused_not_a_traceback[-must be a mapping with a path]"),
+    (TAXA, "farthest scoped ancestor", "        ancestor = next((a for a in chain[1:] if a in self.scope), None)", "        ancestor = next((a for a in reversed(chain[1:]) if a in self.scope), None)",
+     f"{UNIT}::test_a_strain_resolves_to_its_nearest_scoped_ancestor_not_the_farthest"),
+    (TAXA, "archaea not microbial", 'MICROBIAL_DOMAINS = {"Bacteria", "Archaea"}', 'MICROBIAL_DOMAINS = {"Bacteria"}',
+     f"{UNIT}::test_an_unscoped_archaeon_is_unattested_and_a_plant_is_outside_the_domain"),
+    (TAXA, "plants microbial", 'NON_MICROBIAL_KINGDOMS = {"Metazoa", "Viridiplantae"}', 'NON_MICROBIAL_KINGDOMS = {"Metazoa"}',
+     f"{UNIT}::test_an_unscoped_archaeon_is_unattested_and_a_plant_is_outside_the_domain"),
+    (CLI, "negative sample accepted", "    if args.sample is not None and args.sample < 1:\n", "    if False:\n",
+     f"{CLI_TESTS}::test_a_sample_below_one_is_a_usage_error"),
     (TAXA, "synonyms named", 'lambda f: (int(f[0]), f[1]) if f[3] == "scientific name" else None)', 'lambda f: (int(f[0]), f[1]))',
      f"{UNIT}::test_a_synonym_row_never_names_a_taxon"),
     (CLI, "strict blocks every verdict but record", 'BLOCKING = {Verdict.RETIRED.value, Verdict.ABSENT.value, Verdict.MALFORMED.value}',

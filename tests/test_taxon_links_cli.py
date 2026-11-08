@@ -243,6 +243,15 @@ def test_strict_fails_when_the_only_record_will_not_parse(tmp_path, taxonmech): 
     assert main(["taxa", "--mech", "dufmech", "--root", str(root), "--taxonmech-root", str(taxonmech)]) == 0
 
 
+def test_a_sample_below_one_is_a_usage_error(tmp_path, taxonmech):  # noqa: F811
+    """A negative sample would reach Python slicing and mean "all but the last N"."""
+    root = _mech(tmp_path, "dufmech", {"data/families/a.yaml": {"causal_graphs": [{"taxon": "NCBITaxon:562"}]}})
+    for bad in ("-1", "0"):
+        with pytest.raises(SystemExit) as caught:
+            main(["taxa", "--mech", "dufmech", "--root", str(root), "--taxonmech-root", str(taxonmech), "--sample", bad])
+        assert caught.value.code == 2
+
+
 def test_sample_is_honoured_and_recorded(tmp_path, taxonmech, capsys):  # noqa: F811
     root = _mech(tmp_path, "dufmech", {f"data/families/{n}.yaml": {"causal_graphs": [{"taxon": "NCBITaxon:562"}]}
                                         for n in "abc"})

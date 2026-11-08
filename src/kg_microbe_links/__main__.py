@@ -41,6 +41,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.all and args.root:
         parser.error("--root names one checkout; it cannot go with --all")
+    if args.sample is not None and args.sample < 1:
+        parser.error("--sample must be at least 1")
 
     try:
         taxonmech_root = resolve_mech_root("taxonmech", claw_root=CLAW_ROOT, manifest=manifest,
