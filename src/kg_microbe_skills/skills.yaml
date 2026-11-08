@@ -143,6 +143,12 @@ skills:
   kg-microbe-sync:
     scope: claw
     reason: Snapshots kg-microbe files into claw's own workspace.
+  lbnl-literature-and-db-access:
+    scope: fleet
+    reason: >-
+      Combines CBORG MCP servers (valency, tavily, context7), anonymous public
+      literature APIs, local Zotero PDFs, and LBNL-licensed databases and TDM
+      APIs for evidence-backed curation across manifest-resolved Mechs.
   map-ingredients:
     scope: domain
     reason: Runs the unified ingredient-mapping pipeline over MIM.

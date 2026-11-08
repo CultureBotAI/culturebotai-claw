@@ -29,6 +29,7 @@ from kg_microbe_skills.catalogue import (
     CANONICAL_DIR,
     SCOPES,
     CatalogueError,
+    _present_skill_names,
     applicable_mechs,
     canonical_regions,
     canonical_text,
@@ -56,12 +57,31 @@ def _write_catalogue(tmp_path: Path, body: dict) -> Path:
 
 def test_every_skill_on_disk_is_declared():
     catalogue = load_catalogue()
-    present = {p.name for p in SKILLS_DIR.iterdir() if p.is_dir()}
+    present = _present_skill_names(SKILLS_DIR)
 
     assert present == set(catalogue), (
         "the catalogue and .claude/skills must agree exactly; the hardcoded set "
         "this replaces went stale precisely because nothing checked"
     )
+
+
+def test_a_pycache_only_leftover_directory_is_ignored(tmp_path):
+    """Switching away from a branch that had a skill with a helper script leaves
+    `.claude/skills/<name>/scripts/__pycache__/*.pyc` behind; git does not clean
+    ignored bytecode, so `load_catalogue` must not mistake it for an undeclared
+    skill (#1016)."""
+    skills = tmp_path / "skills"
+    (skills / "real").mkdir(parents=True)
+    (skills / "real" / "SKILL.md").write_text("---\nname: real\n---\n", encoding="utf-8")
+    pycache = skills / "retired-branch-skill" / "scripts" / "__pycache__"
+    pycache.mkdir(parents=True)
+    (pycache / "helper.cpython-313.pyc").write_bytes(b"0000")
+    catalogue = _write_catalogue(
+        tmp_path, {"version": 1, "skills": {"real": {"scope": "claw", "reason": "x"}}}
+    )
+
+    loaded = load_catalogue(catalogue, skills_dir=skills)
+    assert set(loaded) == {"real"}
 
 
 def test_an_undeclared_skill_is_an_error(tmp_path):
