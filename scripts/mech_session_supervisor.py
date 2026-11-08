@@ -120,7 +120,13 @@ def terminal_busy_reason(screen: str) -> str | None:
     while lines and not lines[-1].strip():
         lines.pop()
     footer = "\n".join(lines[-32:])
-    if re.search(r"esc to interrupt|Compacting conversation|\b(?:messages?|tasks?) queued\b|\bqueued (?:messages?|tasks?)\b|"
+    # Queue wording and counts also occur in completed thoughts/replies.
+    # Counts must occupy a complete status line or a middle-dot footer field.
+    queue_count = re.search(
+        r"(?:^|·)\s*(?:[1-9]\d* (?:messages?|tasks?) queued|"
+        r"queued (?:messages?|tasks?):\s*[1-9]\d*)\s*(?=$|·)", footer, re.I | re.M,
+    )
+    if queue_count or re.search(r"esc to interrupt|Compacting conversation|"
                  r"alt\+m to send immediately|Press up to edit queued messages|"
                  r"\b[1-9]\d* (?:background )?task\(s\)|\b[1-9]\d* background tasks?\b|"
                  r"\bbackground tasks?:\s*[1-9]\d*|^\s*● .* running\s*$", footer, re.I | re.M):
