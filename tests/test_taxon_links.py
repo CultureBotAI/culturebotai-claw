@@ -270,7 +270,11 @@ def test_a_long_merge_chain_is_read_in_linear_time(taxonmech):
     index = links.TaxonIndex(taxonmech)
     assert time.perf_counter() - started < 30
     assert len(index.merged) == n
-    assert judge(index, "NCBITaxon:10000000").current == 10_000_000 + n  # the end of the chain, found iteratively
+    assert judge(index, "NCBITaxon:10000000").current == 10_000_000 + n  # the end of the chain, compressed when read
+    started = time.perf_counter()
+    for i in range(10_000_000, 10_002_000):  # 2,000 citations on the chain: one lookup each, not a re-walk (23 s)
+        assert judge(index, f"NCBITaxon:{i}").current == 10_000_000 + n
+    assert time.perf_counter() - started < 5
 
 
 @pytest.mark.parametrize("relative,content,message", [
@@ -278,6 +282,12 @@ def test_a_long_merge_chain_is_read_in_linear_time(taxonmech):
     ("curation/seed_scope.tsv", "", "has no identifier column"),
     ("curation/seed_scope.tsv", "identifier\tadded\treason\n", "lists no taxa"),
     ("curation/seed_scope.tsv", "identifier\n562\n", "row 2: '562' is not an NCBITaxon CURIE"),
+    ("curation/seed_scope.tsv", "identifier\nNCBITaxon:562x\n", "row 2: 'NCBITaxon:562x' is not an NCBITaxon CURIE"),
+    ("curation/seed_scope.tsv", "identifier\nNCBITaxon:" + "1" * 200_000 + "\n", "cannot be read as a TSV"),
+    ("data/raw/ncbitaxon_taxa.tsv", "taxon_id\tlabel\trank\tparent_id\nNCBITaxon:1423\tBacillus subtilis\n",
+     "row 2 has a different number of cells than the header"),
+    ("data/raw/ncbitaxon_taxa.tsv", "taxon_id\tlabel\trank\tparent_id\nNCBITaxon:1423\tBacillus subtilis\tSPECIES\tNCBITaxon:1386\textra\n",
+     "row 2 has a different number of cells than the header"),
     ("data/raw/ncbitaxon_taxa.tsv", "taxon_id\tlabel\n", "has no rank, parent_id column"),
     ("data/raw/ncbi_merged_ids.tsv", "old_taxon_id\n", "has no current_taxon_id column"),
 ])
@@ -287,11 +297,19 @@ def test_a_malformed_taxonmech_tsv_is_refused_not_a_traceback(taxonmech, relativ
         links.TaxonIndex(taxonmech)
 
 
+def test_a_tsv_that_is_not_utf8_is_refused_not_a_traceback(taxonmech):
+    (taxonmech / "curation" / "seed_scope.tsv").write_bytes(b"identifier\nNCBITaxon:562\xff\n")
+    with pytest.raises(links.TaxonLinksError, match="seed_scope.tsv cannot be read as a TSV"):
+        links.TaxonIndex(taxonmech)
+
+
 @pytest.mark.parametrize("content,message", [
     ("path: [\n", "cannot be parsed"),
     ("", "must be a mapping with a path"),
     ("snapshot: '2026-09-13'\n", "must be a mapping with a path"),
     ("- a list\n", "must be a mapping with a path"),
+    ("path: 5\n", "must be a mapping with a path"),
+    ("snapshot: 2026-13-45\npath: data/source_snapshots/taxdump.tar.gz\n", "cannot be parsed"),
 ])
 def test_a_malformed_taxdump_conf_is_refused_not_a_traceback(index, taxonmech, content, message):
     (taxonmech / "conf" / "ncbi_taxdump.yaml").write_text(content, encoding="utf-8")
@@ -299,12 +317,23 @@ def test_a_malformed_taxdump_conf_is_refused_not_a_traceback(index, taxonmech, c
         judge(index, "NCBITaxon:511145")  # outside the inventory, so the taxdump is needed
 
 
+def test_a_conf_that_is_not_utf8_is_refused_not_a_traceback(index, taxonmech):
+    (taxonmech / "conf" / "ncbi_taxdump.yaml").write_bytes(b"path: data/source_snapshots/taxdump.tar.gz\xff\n")
+    with pytest.raises(links.TaxonLinksError, match="cannot be parsed"):
+        judge(index, "NCBITaxon:511145")
+
+
+def test_a_twelve_digit_id_is_within_the_bound(index):
+    """NCBI's ids have at most nine digits today; twelve is the generous bound, so it is judged, not malformed."""
+    assert judge(index, "NCBITaxon:" + "9" * 12).verdict is links.Verdict.ABSENT
+
+
 def test_an_unknown_id_is_absent(index):
     assert judge(index, "NCBITaxon:424242").verdict is links.Verdict.ABSENT
 
 
 @pytest.mark.parametrize("value", ["NCBITaxon:0", "NCBITaxon:", "taxon:562", "NCBITaxon:562 ", "NCBITaxon:562\n",
-                                   "NCBITaxon:" + "1" * 5000, 562, None, ""])
+                                   "NCBITaxon:" + "1" * 13, "NCBITaxon:" + "1" * 5000, 562, None, ""])
 def test_anything_but_a_curie_is_malformed(index, value):
     assert judge(index, value).verdict is links.Verdict.MALFORMED
 

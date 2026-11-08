@@ -1,3 +1,4 @@
+# Historical: ran against PR 897 at c1b3ce6b47; its fixes landed in round 7, so a re-run at head fails by design.
 """Independent PR 897 mutations, 2026-11-07; only mutates the disposable .temp copy.
 Inputs: copied head and its tests. Outputs: mutation results under .temp/review897.
 """

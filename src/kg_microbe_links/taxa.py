@@ -89,7 +89,7 @@ class Judgement:
     rank: str = ""
     domain: str = ""
     kingdom: str = ""
-    current: int | None = None  # for RETIRED: the id it merged into
+    current: int | None = None  # for RETIRED: the end of its merge chain, the id a record should cite
     current_verdict: Verdict | None = None
     ancestor: int | None = None  # for SPECIES_OF_STRAIN: the in-scope ancestor
     ancestor_name: str = ""
@@ -160,11 +160,17 @@ class TaxonIndex:
         """Rows of one of TaxonMech's TSVs, with the columns the reader needs present; a file with no rows is
         unusable unless `may_be_empty` (a header-only merge table means no merges)."""
         with self._require(relative).open(encoding="utf-8") as handle:
-            reader = csv.DictReader(handle, delimiter="\t")
-            missing = [c for c in columns if c not in (reader.fieldnames or [])]
-            if missing:
-                raise TaxonLinksError(f"{relative} has no {', '.join(missing)} column")
-            rows = list(reader)
+            try:
+                reader = csv.DictReader(handle, delimiter="\t")
+                missing = [c for c in columns if c not in (reader.fieldnames or [])]
+                if missing:
+                    raise TaxonLinksError(f"{relative} has no {', '.join(missing)} column")
+                rows = list(reader)
+            except (csv.Error, UnicodeDecodeError) as exc:  # a field over csv's limit, bytes that are not UTF-8
+                raise TaxonLinksError(f"{relative} cannot be read as a TSV: {exc}") from exc
+        for n, row in enumerate(rows, 2):
+            if None in row or None in row.values():  # extra cells land under the key None; missing ones are None
+                raise TaxonLinksError(f"{relative} row {n} has a different number of cells than the header")
         if not rows and not may_be_empty:
             raise TaxonLinksError(f"{relative} lists no taxa")
         return rows
@@ -176,20 +182,21 @@ class TaxonIndex:
     def _read_merged(self) -> dict[int, int]:
         merged = {_curie_id(row["old_taxon_id"], f"{MERGED_PATH} row {n}"): _curie_id(row["current_taxon_id"], f"{MERGED_PATH} row {n}")
                   for n, row in enumerate(self._read_tsv(MERGED_PATH, ["old_taxon_id", "current_taxon_id"], may_be_empty=True), 2)}
-        # A self-map or a cycle would make judge() follow merges forever. Each id is walked once
-        # (1: on the chain being followed, 2: known to end), so a long chain costs linear time.
-        state: dict[int, int] = {}
+        # A self-map or a cycle would make judge() follow merges forever. Every id on a walked chain
+        # is then pointed straight at the chain's end, so a judgement is one lookup and a later walk
+        # through it stops at once: a long chain costs linear time however the rows are ordered.
         for start in merged:
             path: list[int] = []
+            on_path: set[int] = set()
             taxon = start
-            while taxon in merged and state.get(taxon) != 2:
-                if state.get(taxon) == 1:
+            while taxon in merged:
+                if taxon in on_path:
                     raise TaxonLinksError(f"{MERGED_PATH} maps NCBITaxon:{taxon} in a cycle")
-                state[taxon] = 1
+                on_path.add(taxon)
                 path.append(taxon)
                 taxon = merged[taxon]
             for walked in path:
-                state[walked] = 2
+                merged[walked] = taxon  # the end: not itself merged
         return merged
 
     def _read_inventory(self) -> dict[int, tuple[str, int]]:
@@ -206,7 +213,7 @@ class TaxonIndex:
     def taxdump_path(self) -> Path:
         try:
             conf = yaml.safe_load(self._require(TAXDUMP_CONF).read_text(encoding="utf-8"))
-        except yaml.YAMLError as exc:
+        except (yaml.YAMLError, ValueError) as exc:  # ValueError: PyYAML's timestamp constructor, or bytes that are not UTF-8
             raise TaxonLinksError(f"{TAXDUMP_CONF} cannot be parsed: {str(exc).splitlines()[0]}") from exc
         if not isinstance(conf, dict) or not isinstance(conf.get("path"), str):
             raise TaxonLinksError(f"{TAXDUMP_CONF} must be a mapping with a path")
@@ -275,9 +282,7 @@ class TaxonIndex:
             return Judgement(Verdict.MALFORMED)
         taxon = _int_id(value)
         if taxon in self.merged:  # before the scope: TaxonMech's scope still lists some retired ids
-            current = taxon
-            while current in self.merged:  # to the end of the chain; acyclic since the table was read
-                current = self.merged[current]
+            current = self.merged[taxon]  # the end of its merge chain: the table was compressed when read
             inner = self.judge(f"NCBITaxon:{current}")  # not merged, so no further recursion
             return Judgement(Verdict.RETIRED, taxon, current=current, current_verdict=inner.verdict)
         if taxon in self.scope:

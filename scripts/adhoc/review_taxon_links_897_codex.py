@@ -1,3 +1,4 @@
+# Historical: ran against PR 897 at c1b3ce6b47; its fixes landed in round 7, so a re-run at head fails by design.
 """Read-only PR 897 probes; inputs: bundled fixtures; outputs: scratch CLI results.
 Independent review 2026-11-07; only scratch fixtures are changed.
 """

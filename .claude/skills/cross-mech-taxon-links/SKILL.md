@@ -70,9 +70,9 @@ report says it was sampled.
 | `outside_domain` | animal, plant or virus | resolve to NCBI Taxonomy or UniProt, not TaxonMech |
 | `unplaced` | an entry at species rank or below under no cellular domain and not a virus: a metagenome, an uncultured or unclassified sequence, a vector | resolve to NCBI Taxonomy; nothing in the fleet owns it |
 | `unattested_microbial` | bacterium, archaeon, fungus or protist that no TaxonMech source attests | the only kind a TaxonMech scope change could admit; report to TaxonMech's owner |
-| `retired` | NCBI merged the id into another; the current id and its own verdict are given (judged first: TaxonMech's own scope still lists fourteen retired ids) | fix the record to cite the current id |
+| `retired` | NCBI merged the id into another; the current id (the end of the merge chain, when it was merged more than once) and its own verdict are given (judged first: TaxonMech's own scope still lists fourteen retired ids) | fix the record to cite the current id |
 | `absent` | the pinned taxdump has no such id | find the intended taxon from the record's source |
-| `malformed` | the value is `NCBITaxon:`-prefixed but not a CURIE | fix the record |
+| `malformed` | the value is not exactly an `NCBITaxon:<digits>` CURIE (no surrounding whitespace, at most twelve digits) | fix the record |
 
 A value in a declared slot that does not start with `NCBITaxon:` is another
 identifier (a GTDB or CHEBI id in a mixed slot); it is counted under the slot

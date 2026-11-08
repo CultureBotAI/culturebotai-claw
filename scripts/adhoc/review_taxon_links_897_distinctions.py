@@ -1,3 +1,4 @@
+# Historical: ran against PR 897 at c1b3ce6b47; its fixes landed in round 7, so a re-run at head fails by design.
 """PR 897 contrast fixtures for surviving mutants; 2026-11-07.
 Inputs: disposable source copy. Outputs: fresh pytest runs; no tracked files edited.
 """
