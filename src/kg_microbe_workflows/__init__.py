@@ -1,7 +1,9 @@
 """Pinned, LinkML-validated Mech cycles and immutable goal evidence.
 
-This package validates records and artifact bytes. It never executes goals, Git,
-GitHub calls or embedded commands; remote closure remains the supervisor's gate.
+The validation APIs inspect records and artifact bytes without executing goals
+or embedded commands. The separate session_durability and commit_publication
+modules make bounded read-only Git/GitHub observations for the supervisor; they
+never push, fetch, repair state or dispatch a goal.
 """
 from __future__ import annotations
 
@@ -27,17 +29,24 @@ from linkml_runtime.linkml_model.meta import SchemaDefinition
 
 SCHEMA_PATH = Path(__file__).parent / "schema/workflow.yaml"
 PARENT_PATH = Path(__file__).parent / "templates/mech-cycle.yaml"
-VERSION = "1.0.0"
-STAGE_KEYS = (
+VERSION = "2.0.0"
+LEGACY_SCHEMA_PATH = SCHEMA_PATH.with_name("workflow-v1.yaml")
+LEGACY_PARENT_PATH = PARENT_PATH.with_name("mech-cycle-v1.yaml")
+LEGACY_STAGE_KEYS = (
     "add_records", "causal_graphs", "protein_examples", "record_review",
     "resolve_review_findings", "infrastructure",
 )
+STAGE_KEYS = ("open_issue_triage", *LEGACY_STAGE_KEYS)
 CLOSURE_STEPS = (
     "commit_and_push_pr", "independent_adversarial_review", "make_issues", "address_issues",
     "independent_rereview", "verify_checks", "merge", "delete_branch",
 )
-REQUIRED_OUTPUTS = {4: {"review_report", "review_findings"}, 5: {"issue_map", "validation"},
-                    6: {"infra_snapshot", "implementation_plan", "validation"}}
+REQUIRED_OUTPUTS = {
+    "open_issue_triage": {"issue_inventory", "issue_groups", "group_plans", "dispositions", "validation"},
+    "record_review": {"review_report", "review_findings"},
+    "resolve_review_findings": {"issue_map", "validation"},
+    "infrastructure": {"infra_snapshot", "implementation_plan", "validation"},
+}
 OPEN = {"open", "deferred"}
 
 
@@ -163,24 +172,80 @@ def _validator(schema_text: str, class_name: str):
 
 def _shape(data: dict, class_name: str, schema_path: Path = SCHEMA_PATH) -> None:
     # Always validate the canonical shape even if a caller supplies a pinned copy.
-    texts = {_read_regular(SCHEMA_PATH).decode(), _read_regular(schema_path).decode()}
+    version = data.get("schema_version")
+    if version not in {"1.0.0", VERSION}:
+        raise WorkflowError(f"unsupported schema_version: {version!r}")
+    canonical = LEGACY_SCHEMA_PATH if version == "1.0.0" else SCHEMA_PATH
+    texts = {_read_regular(canonical).decode()}
+    # The default path means the appropriate installed canonical schema. An
+    # explicitly pinned historical schema is an additional constraint.
+    if Path(schema_path) != SCHEMA_PATH:
+        texts.add(_read_regular(schema_path).decode())
     for text in texts:
         errors = sorted(_validator(text, class_name).iter_errors(data), key=lambda e: str(e.path))
         if errors:
             error = errors[0]
             raise WorkflowError(f"{class_name} {list(error.path)}: {error.message}")
-    if data.get("schema_version") != VERSION:
-        raise WorkflowError(f"unsupported schema_version; expected {VERSION}")
 
 
-def _ordered_stages(stages: list[dict]) -> None:
-    if [(s["stage"], s["key"]) for s in stages] != list(enumerate(STAGE_KEYS, 1)):
-        raise WorkflowError("exactly six canonical stages in order are required")
+def stage_keys_for_version(version: str) -> tuple[str, ...]:
+    if isinstance(version, str) and re.fullmatch(r"1\.\d+\.\d+", version):
+        return LEGACY_STAGE_KEYS
+    if version == "2.0.0":
+        return STAGE_KEYS
+    raise WorkflowError(f"unsupported parent version: {version!r}")
+
+
+def stage_count_for_version(version: str) -> int:
+    return len(stage_keys_for_version(version))
+
+
+def stage_key(workflow: dict, stage: int) -> str:
+    keys = stage_keys_for_version(workflow["parent_version"])
+    if type(stage) is not int or not 1 <= stage <= len(keys):
+        raise WorkflowError("stage is outside the pinned parent sequence")
+    return keys[stage - 1]
+
+
+def evidence_stage_key(data: dict) -> str:
+    version = data.get("parent_version", "1.0.0")
+    if data.get("schema_version") == "2.0.0":
+        if version != "2.0.0" or "stage_key" not in data:
+            raise WorkflowError("v2 evidence requires explicit parent_version and stage_key")
+    number = data.get("stage")
+    if not isinstance(number, int) or isinstance(number, bool):
+        raise WorkflowError("evidence stage must be an integer")
+    key = stage_key({"parent_version": version}, number)
+    if "stage_key" in data and data["stage_key"] != key:
+        raise WorkflowError("evidence stage_key disagrees with its parent version and stage")
+    return key
+
+
+def _evidence_class(data: dict) -> str:
+    return {"record_review": "ReviewReport", "resolve_review_findings": "FindingGroupResolution",
+            "infrastructure": "InfrastructurePlan", "open_issue_triage": "IssueTriageEvidence"}.get(
+                evidence_stage_key(data), "GoalEvidence")
+
+
+def _ordered_stages(stages: list[dict], version: str) -> None:
+    if [(s["stage"], s["key"]) for s in stages] != list(enumerate(stage_keys_for_version(version), 1)):
+        raise WorkflowError("exactly the canonical stages for the pinned parent version are required")
 
 
 def validate_parent(parent: dict, schema_path: Path = SCHEMA_PATH) -> None:
     _shape(parent, "WorkflowTemplate", schema_path)
-    _ordered_stages(parent["stages"])
+    if "session_state_policy" in parent and parent["session_state_policy"] != {
+        "work_root": ".temp", "separate_clone_root": "~/agent-work/<repo>",
+        "prohibit_system_temp_state": True, "push_committed_batches_same_day": True,
+        "require_origin_publication_at_closure": True, "disposable_cache_allowed": True,
+    }:
+        raise WorkflowError("session state must retain the canonical durable-root and publication policy")
+    _ordered_stages(parent["stages"], parent["version"])
+    if (parent["version"].startswith("1.") and parent["schema_version"] != "1.0.0") or (parent["version"] == "2.0.0" and parent["schema_version"] != VERSION):
+        raise WorkflowError("parent and schema versions disagree")
+    if parent["version"] == "2.0.0":
+        from .issue_triage import validate_triage_policy
+        validate_triage_policy(parent.get("issue_triage_policy"))
     if parent["id"] != "mech-goal-cycle":
         raise WorkflowError("unrecognized parent identity")
     if parent["closure_policy"]["steps"] != list(CLOSURE_STEPS):
@@ -199,12 +264,13 @@ def validate_parent(parent: dict, schema_path: Path = SCHEMA_PATH) -> None:
     if parent["cycle_policy"]["restart_stage"] != 1:
         raise WorkflowError("the next cycle must restart at stage 1")
     allowed_outputs = {"review_report", "review_findings", "issue_map", "infra_snapshot",
-                       "implementation_plan", "validation", "supporting"}
+                       "implementation_plan", "validation", "supporting", "issue_inventory",
+                       "issue_groups", "group_plans", "dispositions"}
     for stage in parent["stages"]:
         outputs = stage["required_outputs"]
         if len(outputs) != len(set(outputs)) or not set(outputs) <= allowed_outputs:
             raise WorkflowError("parent outputs must name unique supported artifact kinds")
-        if not REQUIRED_OUTPUTS.get(stage["stage"], set()) <= set(stage["required_outputs"]):
+        if not REQUIRED_OUTPUTS.get(stage["key"], set()) <= set(stage["required_outputs"]):
             raise WorkflowError("parent cannot remove required review/infrastructure outputs")
 
 
@@ -217,7 +283,9 @@ def load_effective_workflow(
     parent, profile = load_document(parent_raw), load_document(profile_raw)
     validate_parent(parent, schema_path)
     _shape(profile, "WorkflowProfile", schema_path)
-    _ordered_stages(profile["stages"])
+    _ordered_stages(profile["stages"], parent["version"])
+    if profile["schema_version"] != parent["schema_version"]:
+        raise WorkflowError("profile and parent schema versions disagree")
     pin = profile["parent"]
     if (pin["id"] != parent["id"] or pin["version"] != parent["version"]
             or pin["sha256"] != sha256(parent_raw)
@@ -235,7 +303,7 @@ def load_effective_workflow(
             relative_path(path)
         if stage["applicability"] != "enabled" and not stage.get("applicability_reason"):
             raise WorkflowError("non-enabled stages need an explicit applicability reason")
-        if stage["stage"] >= 4 and stage["applicability"] != "enabled":
+        if stage["key"] in REQUIRED_OUTPUTS and stage["applicability"] != "enabled":
             raise WorkflowError("review, issue resolution, and infrastructure stages are mandatory")
     result = {
         "parent_id": parent["id"], "parent_version": parent["version"],
@@ -252,6 +320,10 @@ def load_effective_workflow(
     }
     for name in ("closure_policy", "review_policy", "infrastructure_policy", "cycle_policy"):
         result[name] = copy.deepcopy(parent[name])
+    if "issue_triage_policy" in parent:
+        result["issue_triage_policy"] = copy.deepcopy(parent["issue_triage_policy"])
+    if "session_state_policy" in parent:
+        result["session_state_policy"] = copy.deepcopy(parent["session_state_policy"])
     for stage in result["stages"]:
         stage["required_outputs"] = parent["stages"][stage["stage"] - 1]["required_outputs"]
     if "extension" in profile:
@@ -284,7 +356,7 @@ def evidence_directory(run_id: str, cycle: int, stage: int, revision: int) -> st
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,159}", run_id):
         raise WorkflowError("invalid run_id")
     if (type(cycle) is not int or cycle < 1 or type(revision) is not int or revision < 1
-            or type(stage) is not int or stage not in range(1, 7)):
+            or type(stage) is not int or stage not in range(1, len(STAGE_KEYS) + 1)):
         raise WorkflowError("invalid evidence cycle, stage, or revision")
     return (f"reviews/workflow/{run_id}/cycle-{cycle:06d}/stage-{stage:02d}"
             f"/revision-{revision:04d}")
@@ -322,9 +394,11 @@ def _validate_evidence_record(
     This validates recorded claims, not remote issue closure or Git tracking.
     The caller must verify those claims against the reviewed final commit.
     """
-    top = {4: "ReviewReport", 5: "FindingGroupResolution", 6: "InfrastructurePlan"}.get(
-        data.get("stage", 0), "GoalEvidence")
+    current_stage_key = evidence_stage_key(data)
+    top = _evidence_class(data)
     _shape(data, top, schema_path)
+    if data["outcome"] == "blocked" and current_stage_key != "open_issue_triage":
+        raise WorkflowError("blocked outcome belongs to the issue-triage contract")
     for key, value in (expected or {}).items():
         if data.get(key) != value:
             raise WorkflowError(f"evidence scope mismatch: {key}")
@@ -339,7 +413,7 @@ def _validate_evidence_record(
             if sha256(raw) != artifact["sha256"]:
                 raise WorkflowError(f"artifact checksum mismatch: {path}")
     kinds = {item["kind"] for item in artifacts.values()}
-    required = REQUIRED_OUTPUTS.get(data["stage"], set()) | set(required_outputs or [])
+    required = REQUIRED_OUTPUTS.get(current_stage_key, set()) | set(required_outputs or [])
     if not required <= kinds:
         raise WorkflowError("required goal output artifacts are missing")
     findings, groups = _unique(data["findings"], "finding_id"), _unique(data["groups"], "group_id")
@@ -350,7 +424,7 @@ def _validate_evidence_record(
         raise WorkflowError("carry_forward_ids must exactly retain open and deferred finding IDs")
     if data["outcome"] == "no_findings" and (findings or groups or tasks):
         raise WorkflowError("no_findings cannot hide findings, issue groups, or infrastructure tasks")
-    if data["stage"] >= 4 and data["outcome"] == "not_applicable":
+    if current_stage_key in REQUIRED_OUTPUTS and data["outcome"] == "not_applicable":
         raise WorkflowError("the review and backlog stages cannot be skipped as not applicable")
     for item in findings.values():
         if "issue_url" in item:
@@ -367,8 +441,7 @@ def _validate_evidence_record(
             if previous is not None and load_document(raw) != previous:
                 raise WorkflowError("supplied previous evidence differs from the pinned bytes")
     if previous is not None:
-        _shape(previous, {4: "ReviewReport", 5: "FindingGroupResolution"}.get(
-            previous.get("stage", 0), "GoalEvidence"), schema_path)
+        _shape(previous, _evidence_class(previous))
         if "previous_evidence" not in data:
             raise WorkflowError("previous evidence must be pinned by path and SHA256")
         if previous["repository_key"] != data["repository_key"]:
@@ -380,14 +453,14 @@ def _validate_evidence_record(
         for key in pending:
             if findings[key].get("carried_from") != key:
                 raise WorkflowError("carried findings must preserve their stable identity")
-        if data["stage"] == 4:
-            next_cycle = (previous["stage"] in {4, 5}
+        if current_stage_key == "record_review":
+            next_cycle = (evidence_stage_key(previous) in {"record_review", "resolve_review_findings"}
                           and previous["cycle"] == data["cycle"] - 1)
             if previous["run_id"] != data["run_id"] or not next_cycle:
                 raise WorkflowError("review lineage must reference the prior cycle")
-    elif data["stage"] == 5:
-        raise WorkflowError("review resolution requires the pinned stage-4 review evidence")
-    elif data["stage"] == 4 and data["cycle"] > 1:
+    elif current_stage_key == "resolve_review_findings":
+        raise WorkflowError("review resolution requires the pinned record_review evidence")
+    elif current_stage_key == "record_review" and data["cycle"] > 1:
         raise WorkflowError("later-cycle review requires prior-cycle evidence")
     if data["revision"] > 1:
         if supersedes is None or "supersedes_evidence" not in data:
@@ -407,7 +480,7 @@ def _validate_evidence_record(
                 current = findings.get(finding["finding_id"], {})
                 if current.get("carried_from") != finding["finding_id"]:
                     raise WorkflowError("unresolved finding disappeared from the preceding revision")
-        if data["stage"] == 6:
+        if current_stage_key == "infrastructure":
             old_snapshot = [a["sha256"] for a in supersedes["artifacts"]
                             if a["kind"] == "infra_snapshot"]
             new_snapshot = [a["sha256"] for a in data["artifacts"] if a["kind"] == "infra_snapshot"]
@@ -415,7 +488,7 @@ def _validate_evidence_record(
                 raise WorkflowError("infrastructure revisions must preserve their frozen input scope")
     elif supersedes is not None or "supersedes_evidence" in data:
         raise WorkflowError("revision 1 cannot supersede another revision")
-    if data["stage"] in {5, 6}:
+    if current_stage_key in {"resolve_review_findings", "infrastructure", "open_issue_triage"}:
         frozen = data.get("scope_frozen_at", "")
         if not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z", frozen):
             raise WorkflowError("resolution scope requires a frozen UTC timestamp")
@@ -423,11 +496,11 @@ def _validate_evidence_record(
             datetime.fromisoformat(frozen.replace("Z", "+00:00"))
         except ValueError as exc:
             raise WorkflowError("invalid scope freeze timestamp") from exc
-    if data["stage"] == 5:
+    if current_stage_key == "resolve_review_findings":
         assert previous is not None  # Required and checked before this stage-specific branch.
-        if (previous["stage"] != 4 or previous["run_id"] != data["run_id"]
+        if (evidence_stage_key(previous) != "record_review" or previous["run_id"] != data["run_id"]
                 or previous["cycle"] != data["cycle"]):
-            raise WorkflowError("resolution must reference stage 4 of the same run and cycle")
+            raise WorkflowError("resolution must reference record_review of the same run and cycle")
         if findings.keys() != prior_findings.keys():
             raise WorkflowError("resolution scope must exactly match the frozen review findings")
         covered = []
@@ -447,7 +520,7 @@ def _validate_evidence_record(
             raise WorkflowError("groups must cover every review finding exactly once")
     elif groups:
         raise WorkflowError("issue groups belong to the review-resolution stage")
-    if data["stage"] == 6:
+    if current_stage_key == "infrastructure":
         snapshots = [a for a in artifacts.values() if a["kind"] == "infra_snapshot"]
         if len(snapshots) != 1:
             raise WorkflowError("exactly one frozen infrastructure notebook snapshot is required")
@@ -465,15 +538,19 @@ def _validate_evidence_record(
             _issue(task["issue_url"], data["github_repository"])
             _resolved(task, set(artifacts))
     elif tasks:
-        raise WorkflowError("infrastructure tasks belong to stage 6")
+        raise WorkflowError("infrastructure tasks belong to the infrastructure stage")
+    if current_stage_key == "open_issue_triage":
+        from .issue_triage import validate_issue_triage
+        validate_issue_triage(data, repository_root=repository_root, previous=previous, supersedes=supersedes)
+    elif "issue_triage" in data:
+        raise WorkflowError("issue triage data belongs to open_issue_triage")
 
 
 
 def _evidence_graph(data: dict, repository_root: Path) -> tuple[dict, dict]:
     """Read a bounded, hash-pinned ancestry DAG without recursively trusting claims."""
     def identity(document):
-        _shape(document, {4: "ReviewReport", 5: "FindingGroupResolution", 6: "InfrastructurePlan"}.get(
-            document.get("stage", 0), "GoalEvidence"))
+        _shape(document, _evidence_class(document))
         return evidence_directory(document["run_id"], document["cycle"], document["stage"],
                                   document["revision"]) + "/evidence.yaml"
 
@@ -538,7 +615,7 @@ def validate_goal_evidence(
         prior = documents.get(document.get("previous_evidence", {}).get("path"))
         supersedes = documents.get(document.get("supersedes_evidence", {}).get("path"))
         _validate_evidence_record(document, repository_root=repository_root, previous=prior,
-                                  supersedes=supersedes, schema_path=schema_path,
+                                  supersedes=supersedes, schema_path=schema_path if path == first else SCHEMA_PATH,
                                   expected=expected if path == first else None,
                                   required_outputs=required_outputs if path == first else None)
 
@@ -647,3 +724,15 @@ def read_infra_notebook(
     path: Path | str, github_repository: str, repository_root: Path | None = None,
 ) -> dict:
     return validate_infra_notebook(_read_regular(Path(path), repository_root), github_repository)
+
+
+def issue_triage_blockers(data: dict) -> list[int]:
+    """Return explicitly blocked mandatory issues; these hold supervisor closure."""
+    from .issue_triage import issue_triage_blockers as blockers
+    return blockers(data)
+
+
+def validate_issue_snapshot(snapshot: dict, github_repository: str) -> None:
+    """Validate the complete, immutable stage-start open-issue capture."""
+    from .issue_triage import validate_issue_snapshot as validate
+    validate(snapshot, github_repository)

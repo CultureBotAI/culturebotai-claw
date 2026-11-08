@@ -167,6 +167,7 @@ STATUS_NAMES = {
     11: "queued",
     12: "interrupted",
 }
+ACTIVE_TOOL_STATUSES = (1, 2, 8, 9, 11)
 GOAL_DECLARATION = b"The user has marked this task with /goal"
 COMPLETE = "<!-- GOAL_COMPLETE -->"
 CANCELLED = "<!-- GOAL_CANCELLED -->"
@@ -175,6 +176,23 @@ CANCELLED = "<!-- GOAL_CANCELLED -->"
 def metadata_times(payload):
     md = one(payload, 5, b"")
     return {"created_at": stamp(one(md, 1)), "completed_at": stamp(one(md, 8))}
+
+
+def tool_metadata(payload):
+    """Read installed tool-call metadata without retaining arbitrary arguments."""
+    call = one(one(payload, 5, b""), 4)
+    if not call:
+        return None
+    action = {"tool_name": text(one(call, 2, b""))}
+    try:
+        args = json.loads(text(one(call, 3, b"{}")))
+        if isinstance(args, dict):
+            for key in ("toolAction", "toolSummary"):
+                if isinstance(args.get(key), str):
+                    action[key] = args[key]
+    except (ValueError, TypeError):
+        pass
+    return action
 
 
 def public_response(payload):
@@ -429,28 +447,36 @@ def inspect(repo, cid):
             if len(public) >= 3:
                 break
         row["latest_public_messages"] = public
-        # Step completion alone does not prove session idle: background tools and queued input require live UI checks.
+        # An older background tool can still be running after the latest step is
+        # done. Inspect every active tool, retaining metadata rather than its
+        # arbitrary command arguments. Completed tools are not active evidence.
+        active_tools = []
+        for index, step_type, status, payload in c.execute(
+            "select idx,step_type,status,step_payload from steps "
+            "where status in (" + ",".join("?" for _ in ACTIVE_TOOL_STATUSES) + ") order by idx",
+            ACTIVE_TOOL_STATUSES,
+        ):
+            action = tool_metadata(payload)
+            if action is not None:
+                active_tools.append({
+                    "step_index": index, "type_number": step_type,
+                    "status": STATUS_NAMES[status], **metadata_times(payload), **action,
+                })
+        row["active_tools"] = active_tools
+        # Native completion still cannot rule out background processes or queued
+        # input absent from this snapshot: live UI/process checks remain required.
         state = STATUS_NAMES.get(latest[2], "unknown")
         row["native_execution_state"] = (
             "busy"
-            if state in {"pending", "running", "generating", "waiting", "queued"}
+            if active_tools or state in {"pending", "running", "generating", "waiting", "queued"}
             else (
                 "interrupted"
                 if state in {"cancelled", "error", "interrupted"}
                 else "idle_candidate" if state == "done" else "unknown"
             )
         )
-        md = one(latest[3], 5, b"")
-        call = one(md, 4)
-        if call:
-            action = {"tool_name": text(one(call, 2, b""))}
-            try:
-                args = json.loads(text(one(call, 3, b"{}")))
-                for k in ["toolAction", "toolSummary"]:
-                    if k in args:
-                        action[k] = args[k]
-            except (ValueError, TypeError):
-                pass
+        action = tool_metadata(latest[3])
+        if action is not None:
             row["last_action"] = action
         else:
             row["last_action"] = {

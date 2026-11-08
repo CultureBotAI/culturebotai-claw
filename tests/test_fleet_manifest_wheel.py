@@ -64,6 +64,7 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path, review)
         )
     )
     assert "src/kg_microbe_governance/vendored_artifacts.json" in source_names
+    assert "src/kg_microbe_governance/releases/mech-cycle-v2-canary.json" in source_names
     for artifact in governance_document["artifacts"]:
         assert artifact["source"] in source_names
     assert "src/kg_microbe_config/openclaw_config.yaml" in source_names
