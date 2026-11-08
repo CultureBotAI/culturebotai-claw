@@ -777,6 +777,137 @@ def previous_evidence(ledger: dict, stage: int) -> dict | None:
     return eligible[-1] if eligible else None
 
 
+HISTORICAL_RESOLUTION_FIELDS = {
+    "github_repository", "pr_number", "base", "head_sha", "merge_commit_sha", "receipt_sha256",
+}
+
+
+def historical_resolution_record(issue: dict, receipt: dict, ledger: dict, target: dict) -> dict:
+    """Select one earlier, verified remediation closure; never another goal's PR member."""
+    historical = issue.get("historical_resolution")
+    if (not isinstance(historical, dict) or set(historical) != HISTORICAL_RESOLUTION_FIELDS
+            or ledger.get("schema_version") != 2 or receipt.get("schema_version") != 2
+            or workflow_stage_key(ledger) != "resolve_review_findings"
+            or receipt.get("status") != "completed" or "prs" in receipt
+            or type(historical.get("pr_number")) is not int or historical["pr_number"] <= 0
+            or historical["pr_number"] == (receipt.get("pr") or {}).get("number")
+            or historical.get("github_repository") != target["github_repository"]
+            or historical.get("base") != target["default_branch"]
+            or any(not SHA.fullmatch(str(historical.get(key, ""))) for key in ("head_sha", "merge_commit_sha"))
+            or not DIGEST.fullmatch(str(historical.get("receipt_sha256", "")))):
+        raise SupervisorError("historical resolution requires a completed single-PR remediation receipt and exact prior identity")
+    records = [record for record in ledger.get("completed_stages", [])
+               if record.get("receipt_sha256") == historical["receipt_sha256"]]
+    if len(records) != 1:
+        raise SupervisorError("historical resolution must bind one prior verified closure")
+    record = records[0]
+    verified = record.get("verification") or {}
+    if (type(record.get("cycle")) is not int or not 1 <= record["cycle"] < ledger["cycle"]
+            or record_stage_key(ledger, record) != "resolve_review_findings"
+            or record.get("completion_authority") not in {"native_completed", "verified_receipt_override"}
+            or verified.get("status") != "merged" or not verified.get("merged_at")
+            or any(verified.get(key) != historical[key] for key in ("pr_number", "head_sha", "merge_commit_sha"))):
+        raise SupervisorError("historical resolution differs from its earlier verified remediation closure")
+    closure_time(verified["merged_at"], "historical merge")
+    return record
+
+
+def historical_finding_scope(issue: dict, receipt: dict, ledger: dict, target: dict,
+                             evidence: dict, previous_data: dict | None) -> dict:
+    """Require the same already-resolved finding group in retained bytes and this cycle's review."""
+    record = historical_resolution_record(issue, receipt, ledger, target)
+    descriptor = record.get("goal_evidence") or {}
+    root = Path(target["root"])
+    path = (root / descriptor.get("path", "")).resolve()
+    if not path.is_relative_to(root.resolve()) or not path.is_file():
+        raise SupervisorError("historical finding evidence must be a retained repository file")
+    # Read once, hash and parse those bytes; a ledger snapshot alone is not evidence.
+    flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0)
+    with os.fdopen(os.open(path, flags), "rb") as stream:
+        if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+            raise SupervisorError("historical finding evidence must be a regular file")
+        raw = stream.read()
+    from kg_microbe_workflows import load_document
+    retained = load_document(raw)
+    if (hashlib.sha256(raw).hexdigest() != descriptor.get("sha256")
+            or retained != record.get("goal_evidence_snapshot")
+            or retained.get("repository_key") != ledger["repository_key"]
+            or retained.get("github_repository") != target["github_repository"]
+            or retained.get("run_id") != ledger["run_id"]
+            or retained.get("cycle") != record["cycle"] or retained.get("stage") != record["stage"]):
+        raise SupervisorError("historical finding snapshot differs from its pinned evidence or closure context")
+    url = f"https://github.com/{target['github_repository']}/issues/{issue['number']}"
+    current = [item for item in evidence.get("groups", []) if item.get("issue_url") == url]
+    if len(current) != 1 or current[0].get("status") != "resolved":
+        raise SupervisorError("historical issue must identify exactly one current resolved group")
+    identities = set(current[0].get("finding_ids", []))
+    old = [item for item in retained.get("groups", []) if item.get("issue_url") == url
+           and item.get("status") == "resolved" and set(item.get("finding_ids", [])) == identities]
+    before = {item["finding_id"]: item for item in retained.get("findings", [])}
+    frozen = {item["finding_id"]: item for item in (previous_data or {}).get("findings", [])}
+    after = {item["finding_id"]: item for item in evidence.get("findings", [])}
+    if (len(old) != 1 or not identities or any(
+            key not in before or key not in frozen or key not in after
+            or any(row.get("status") != "resolved" or row.get("issue_url") != url
+                   for row in (before[key], frozen[key], after[key]))
+            or before[key].get("summary") != frozen[key].get("summary")
+            or frozen[key].get("summary") != after[key].get("summary") for key in identities)):
+        raise SupervisorError("historical resolution must carry the same already-resolved finding scope")
+    return record
+
+
+def verify_historical_issue_resolutions(receipt: dict, ledger: dict, target: dict,
+                                        evidence: dict | None, current_live: dict, runner) -> list[dict]:
+    """Fresh read-only identity, membership and ancestry checks after current-PR gates."""
+    historical_issues = [issue for issue in receipt["issues"] if "historical_resolution" in issue]
+    if not historical_issues:
+        return []
+    if not evidence:
+        raise SupervisorError("historical resolutions require verified finding evidence")
+    previous = previous_evidence(ledger, ledger["stage"])
+    proofs = []
+    github, root = target["github_repository"], target["root"]
+    for issue in historical_issues:
+        record = historical_finding_scope(issue, receipt, ledger, target, evidence,
+                                           previous.get("goal_evidence_snapshot") if previous else None)
+        historical = issue["historical_resolution"]
+        prior = json.loads(runner(["gh", "api", f"repos/{github}/pulls/{historical['pr_number']}"]).stdout)
+        if (prior.get("merged") is not True or not prior.get("merged_at")
+                or prior.get("base", {}).get("ref") != historical["base"]
+                or prior.get("base", {}).get("repo", {}).get("full_name") != github
+                or (prior.get("head", {}).get("repo") or {}).get("full_name") != github
+                or prior.get("head", {}).get("sha") != historical["head_sha"]
+                or prior.get("merge_commit_sha") != historical["merge_commit_sha"]
+                or closure_time(prior["merged_at"], "historical merge") !=
+                closure_time(record["verification"]["merged_at"], "retained historical merge")
+                or closure_time(prior["merged_at"], "historical merge") >=
+                closure_time(current_live["merged_at"], "current merge")):
+            raise SupervisorError("historical PR differs from the pinned verified merge")
+        commits = bounded_api_pages(f"repos/{github}/pulls/{historical['pr_number']}/commits",
+                                    lambda args: runner(args).stdout, label="historical PR commits")
+        shas = {item.get("sha") for item in commits}
+        count = prior.get("commits")
+        if (type(count) is not int or not 1 <= count <= 250 or len(commits) != count
+                or len(shas) != count or historical["head_sha"] not in shas
+                or any(not isinstance(sha, str) or not SHA.fullmatch(sha) for sha in shas)
+                or issue["fix_commit_sha"] not in shas):
+            raise SupervisorError("historical issue fix is not in a complete pinned PR commit inventory")
+        live_issue = json.loads(runner(["gh", "api", f"repos/{github}/issues/{issue['number']}"]).stdout)
+        if (live_issue.get("state") != "closed" or "pull_request" in live_issue
+                or live_issue.get("number") != issue["number"]
+                or live_issue.get("html_url") != f"https://github.com/{github}/issues/{issue['number']}"):
+            raise SupervisorError("historical issue is not actually closed in the expected repository")
+        base = current_live.get("base", {}).get("sha", "")
+        if not isinstance(base, str) or not SHA.fullmatch(base):
+            raise SupervisorError("current PR base commit unavailable for historical ancestry")
+        for descendant in (receipt["pr"]["head_sha"], base, "HEAD"):
+            if runner(["git", "-C", root, "merge-base", "--is-ancestor", historical["merge_commit_sha"],
+                       descendant], check=False).returncode:
+                raise SupervisorError("historical merge is absent from current reviewed head/base/default checkout")
+        proofs.append({**historical, "number": issue["number"], "fix_commit_sha": issue["fix_commit_sha"]})
+    return proofs
+
+
 def goal_output_data(receipt: dict, ledger: dict, target: dict) -> dict | None:
     if ledger.get("schema_version") != 2 or ledger["stage"] == 0:
         return None
@@ -845,6 +976,9 @@ def goal_output_data(receipt: dict, ledger: dict, target: dict) -> dict | None:
             match = re.fullmatch(r"https://github\.com/" + re.escape(target["github_repository"]) + r"/issues/([1-9]\d*)", url, re.I)
             if not match or int(match[1]) not in {issue["number"] for issue in receipt.get("issues", [])}:
                 raise SupervisorError("resolved review/infra groups require matching independently verified closure issues")
+    for issue in receipt.get("issues", []):
+        if "historical_resolution" in issue:
+            historical_finding_scope(issue, receipt, ledger, target, data, previous_data)
     return data
 
 
@@ -968,6 +1102,11 @@ def validate_receipt(receipt: dict, ledger: dict, target: dict, runtime: Path) -
                     or issue.get("disposition") != "addressed"
                     or not SHA.fullmatch(str(issue.get("fix_commit_sha", "")))):
                 errors.append("each issue needs unique number and addressed fix commit")
+            if "historical_resolution" in issue:
+                try:
+                    historical_resolution_record(issue, receipt, ledger, target)
+                except SupervisorError as error:
+                    errors.append(str(error))
             if isinstance(number, int):
                 numbers.add(number)
     if status == "no_changes":
@@ -1247,7 +1386,11 @@ def verify_remote_receipt(receipt: dict, ledger: dict, target: dict, runner=comm
     if "prs" in receipt:
         proof = verify_ordered_prs(receipt, ledger, target, runtime, evidence, runner)
     else:
-        proof, _, commits = verify_pr_member(receipt["pr"], receipt["issues"], target, runner)
+        current_issues = [item for item in receipt["issues"] if "historical_resolution" not in item]
+        proof, live, commits = verify_pr_member(receipt["pr"], current_issues, target, runner)
+        historical = verify_historical_issue_resolutions(receipt, ledger, target, evidence, live, runner)
+        if historical:
+            proof["historical_issue_resolutions"] = historical
         proof["commit_publication"] = verify_receipt_publication(
             receipt, target, {item["sha"] for item in commits}, runner)
     return {**proof, **({"issue_triage": triage_verification} if triage_verification is not None else {})}

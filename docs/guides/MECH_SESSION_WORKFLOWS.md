@@ -405,6 +405,56 @@ and returns to stage 1. Actions, progress, receipts, archives, and reports carry
 the cycle identity, so older evidence cannot complete a later cycle. Legacy
 four-stage configurations remain supported until explicitly migrated.
 
+## Previously resolved findings in later remediation goals
+
+A completed single-PR `resolve_review_findings` receipt may identify an issue
+whose same finding scope was already resolved in an earlier verified cycle.
+Keep the current PR as the current goal's sole PR; a prior cycle's PR is not
+an ordered same-goal member. Use the issue's top-level `fix_commit_sha` for
+the actual fixing commit in the earlier PR, with this exact descriptor:
+
+```json
+{
+  "number": 23,
+  "disposition": "addressed",
+  "fix_commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "historical_resolution": {
+    "github_repository": "CultureBotAI/ExampleMech",
+    "pr_number": 42,
+    "base": "main",
+    "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "merge_commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+    "receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  }
+}
+```
+
+These values are illustrative placeholders, not evidence. There is no nested
+`fix_commit_sha`, alternative fixing PR, or automatic fallback when the
+current PR lacks a claimed commit. The descriptor must bind exactly one earlier
+verified remediation closure by canonical receipt digest, PR head and merge.
+The retained manifest bytes must match its recorded snapshot. Its resolved
+group and stable finding IDs, issue and summaries must match the current
+cycle's frozen review and the current resolution group; a reopened or different
+finding cannot inherit historical credit.
+
+The verifier freshly checks the prior merged repository/base/head/merge,
+complete bounded commit inventory, actual issue closure, and that the merge
+is an ancestor of the current reviewed head, PR base and checkout. The issue's
+fix must be in that historical PR. This proves declared provenance and
+retention of the reviewed finding scope; commit membership alone is not a new
+scientific review. Current-goal review, final-head artifacts, checks, merge,
+cleanup, publication and native-goal gates still apply. Successful verification
+retains `historical_issue_resolutions` in the new closure proof without rewriting
+old records. Existing ordinary receipts and previously retained historical
+proofs stay unchanged. This additive path is deliberately not combined with
+ordered multi-PR receipts.
+
+Incorrect existing receipts require a separately reviewed exact correction
+record and user approval before any runtime replacement. Preparing or testing
+this compatibility code grants no authority to edit a receipt, reset a repair
+budget, replay a goal, or deploy it. See claw issue #1031.
+
 ## Ordered multi-PR closure receipts
 
 A goal whose fixes and final evidence land in separate PRs may use the additive
