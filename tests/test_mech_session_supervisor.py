@@ -561,7 +561,10 @@ def test_repair_dispatch_uses_same_reason_and_receipt_hash_then_refuses_changed_
     receipt_hash = hashlib.sha256(path.read_bytes()).hexdigest()
     decision = supervisor.repair_decision(setup.ledger, setup.observation, "missing validation", receipt_hash)
     assert instance.dispatch(setup.target, setup.ledger, decision)["state"] == "uncertain"
-    assert "missing validation" in sent[0]
+    action = setup.ledger["actions"][decision["action_id"]]
+    assert sent[0] == action["message"]
+    instruction = json.loads(Path(action["instruction_artifact"]["path"]).read_text())
+    assert "missing validation" in instruction["instruction"]
     path.write_text('{"corrected": true}')
     assert instance.dispatch(setup.target, setup.ledger, decision)["state"] == "not-sent"
     assert len(sent) == 1
@@ -1678,3 +1681,85 @@ def test_legacy_accepted_goal_keeps_original_acceptance_when_exact_proof_arrives
     assert action["delivery_proof"]["native_step_index"] == 40
     assert action["delivery_verified_at"] != action["accepted_at"]
     assert action["accepted_goal_identity"] == setup.observation["goal_identity"]
+
+
+def test_dispatch_sends_short_exact_reference_preserving_full_instruction(setup, monkeypatch):
+    from kg_microbe_workflows.instructions import MAX_WIRE_BYTES
+    sent = []
+    instance = make_instance(setup, monkeypatch, lambda source, value: sent.append(value["message"]) or "sent")
+    decision = supervisor.decide(setup.ledger, setup.observation)
+    full = supervisor.message_for(setup.target, setup.ledger, decision, setup.runtime / "traitmech")
+    assert len(full.encode()) > MAX_WIRE_BYTES
+    action = instance.dispatch(setup.target, setup.ledger, decision)
+    assert action["state"] == "uncertain"
+    assert sent == [action["message"]] and len(sent[0].encode()) <= MAX_WIRE_BYTES
+    assert sent[0] != full
+    artifact = json.loads(Path(action["instruction_artifact"]["path"]).read_text())
+    assert artifact["instruction"] == full
+    assert artifact["goal_identity"] == GOAL
+    assert artifact["instruction_sha256"] == action["instruction_sha256"]
+    assert supervisor.native_delivery_proof(action, setup.target, setup.observation) is None
+    record_native_input(setup, action)
+    assert supervisor.native_delivery_proof(action, setup.target, setup.observation)
+    # A received short reference does not claim consumption of the artifact.
+    assert "artifact_consumed" not in action
+
+
+@pytest.mark.parametrize("fault", ["control", "oversize", "collision"])
+def test_instruction_preflight_failure_spends_no_action_or_repair_budget(setup, monkeypatch, fault):
+    from kg_microbe_workflows import instructions
+    instance = make_instance(setup, monkeypatch, lambda *_: pytest.fail("no input on preparation refusal"))
+    if fault == "control":
+        monkeypatch.setattr(supervisor, "message_for", lambda *_: "bad\x1binput")
+    elif fault == "oversize":
+        monkeypatch.setattr(instructions, "MAX_WIRE_BYTES", 5)
+    else:
+        decision = supervisor.decide(setup.ledger, setup.observation)
+        path = setup.runtime / "traitmech/instructions" / (decision["action_id"] + ".json")
+        path.parent.mkdir(parents=True)
+        path.write_text("preexisting different content")
+    before = copy.deepcopy(setup.ledger["actions"])
+    result = instance.dispatch(setup.target, setup.ledger, supervisor.decide(setup.ledger, setup.observation))
+    assert result["state"] == "not-sent" and "instruction preparation refused" in result["reason"]
+    assert setup.ledger["actions"] == before
+
+
+@pytest.mark.parametrize("change", ["changed", "missing"])
+def test_instruction_change_after_reservation_is_definitely_not_sent(setup, monkeypatch, change):
+    instance = make_instance(setup, monkeypatch, lambda *_: pytest.fail("no input for changed artifact"))
+    original = instance.save
+    changed = False
+    def save(target, ledger):
+        nonlocal changed
+        original(target, ledger)
+        if not changed and ledger["actions"]:
+            action = next(iter(ledger["actions"].values()))
+            if action.get("state") == "reserved":
+                path = Path(action["instruction_artifact"]["path"])
+                if change == "changed":
+                    path.write_text("tampered")
+                else:
+                    path.unlink()
+                changed = True
+    monkeypatch.setattr(instance, "save", save)
+    action = instance.dispatch(setup.target, setup.ledger, supervisor.decide(setup.ledger, setup.observation))
+    assert action["state"] == "not-sent" and action["outcome"] == "instruction-artifact-rejected"
+    assert supervisor.repair_decision(setup.ledger, setup.observation, "pending")["phase"] == "closure_blocked"
+
+
+def test_reference_goal_requires_real_native_declaration_not_literal_or_mixed_input(setup, monkeypatch):
+    instance = make_instance(setup, monkeypatch, lambda *_: "sent")
+    setup.ledger.update(awaiting_goal=True, stage=2)
+    action = instance.dispatch(setup.target, setup.ledger, supervisor.decide(setup.ledger, setup.observation))
+    assert action["kind"] == "start_goal" and action["message"].startswith("/goal [MECH-WORKFLOW-")
+    entry = record_native_input(setup, action, declaration=False)
+    assert supervisor.native_delivery_proof(action, setup.target, setup.observation) is None
+    entry["native_goal_declaration"] = True
+    assert supervisor.native_delivery_proof(action, setup.target, setup.observation)
+    entry["supported_input_shape"] = False
+    assert supervisor.native_delivery_proof(action, setup.target, setup.observation) is None
+    entry["supported_input_shape"] = True
+    full = json.loads(Path(action["instruction_artifact"]["path"]).read_text())["instruction"]
+    for bad in [action["message"][:-9], "<file>existing.yaml:4: " + action["message"] * 2, full]:
+        entry.update(text_sha256=hashlib.sha256(bad.encode()).hexdigest(), text_length=len(bad))
+        assert supervisor.native_delivery_proof(action, setup.target, setup.observation) is None
