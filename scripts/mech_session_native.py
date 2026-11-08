@@ -489,6 +489,69 @@ def inspect(repo, cid):
         return row
 
 
+def reconciliation_evidence(repo, cid, historical, current):
+    """Fresh native proof for one completed goal followed by one external goal.
+
+    Reads stable copies only. Public markers alone do not grant PR closure or
+    permission to send input. An active/cancelled/resumed or intervening goal
+    makes this deliberately narrow operation unavailable.
+    """
+    observed = inspect(repo, cid)
+    def identity(g):
+        return {"conversation_id": cid, "start_step_index": g["start_step_index"],
+                "started_at": g["started_at"]}
+    if (not observed.get("current_goal") or identity(observed["current_goal"]) != current
+            or observed["current_goal"]["state"] != "completed"
+            or observed["native_execution_state"] != "idle_candidate"):
+        raise ValueError("current native goal is not the exact completed idle goal")
+    old_step, new_step = historical["start_step_index"], current["start_step_index"]
+    if historical["conversation_id"] != cid or current["conversation_id"] != cid or old_step >= new_step:
+        raise ValueError("historical and current native identities are not ordered")
+    checkpoints, events, declarations = [], [], []
+    with snapshot(ROOT / "conversations" / f"{cid}.db") as (connection, source):
+        if source["native_files"] != observed["snapshot"]["native_files"]:
+            raise ValueError("native source changed during reconciliation proof")
+        for index, kind, status, payload in connection.execute(
+                "select idx,step_type,status,step_payload from steps where idx>? order by idx", (old_step,)):
+            if status != 3:
+                continue
+            if kind == 14 and native_goal_declaration(payload):
+                declarations.append(index)
+            if kind == 23 and ANY_TYPE in payload:
+                matches = [g for g in find_goals(payload) if g["start_step_index"] == old_step]
+                if matches:
+                    if any(identity(g) != historical or g["state"] != matches[0]["state"] for g in matches):
+                        raise ValueError("conflicting historical native identity/state")
+                    checkpoints.append({"step_index": index, "state": matches[0]["state"],
+                        "payload_sha256": hashlib.sha256(payload).hexdigest()})
+            if kind == 15:
+                visible = public_response(payload)
+                marker = terminal_marker(visible)
+                if marker:
+                    events.append({"step_index": index, "state": "completed" if marker == COMPLETE else "cancelled",
+                                   "text_sha256": hashlib.sha256(visible.encode()).hexdigest()})
+    if declarations != [new_step]:
+        raise ValueError("expected exactly one later native goal declaration")
+    completed = [c for c in checkpoints if c["state"] == "completed" and c["step_index"] < new_step]
+    if not completed:
+        raise ValueError("historical completion lacks a checkpoint before the external goal")
+    if any(c["state"] != "completed" for c in checkpoints if c["step_index"] >= completed[0]["step_index"]):
+        raise ValueError("historical goal was resumed or cancelled after completion")
+    before = [e for e in events if e["step_index"] < new_step]
+    after = [e for e in events if e["step_index"] > new_step]
+    if (not before or not after or any(e["state"] != "completed" for e in before + after)):
+        raise ValueError("completed public native evidence is missing or ambiguous")
+    latest = observed.get("latest_goal_snapshot") or {}
+    retained = [g for g in latest.get("goals", []) if g["start_step_index"] == old_step]
+    if not retained or any(identity(g) != historical or g["state"] != "completed" for g in retained):
+        raise ValueError("latest native checkpoint does not retain historical completion")
+    return {"schema_version": "1.0.0", "repository_root": str(Path(repo).resolve()),
+            "historical_goal_identity": historical, "current_goal_identity": current,
+            "historical_checkpoints": checkpoints, "historical_completions": before,
+            "current_completions": after, "latest_checkpoint_step": latest["step_index"],
+            "last_step": observed["last_step"], "native_execution_state": "idle_candidate"}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
