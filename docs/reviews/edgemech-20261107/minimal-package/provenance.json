@@ -1,0 +1,31 @@
+{
+  "builder_sha256": "4d7471290cfc47a9df2278446ec81fd4f3a5075a658ba68edd0eff37dd5d61e6",
+  "distribution": "kg-microbe-curation-contracts",
+  "files": {
+    "kg_microbe_curation/__init__.py": "fd05790537bfaa2eb7d05fc1595d75b30e4f4b785e18805006b6ef444c5c51c7",
+    "kg_microbe_curation/__main__.py": "a2e7939d0f432e188a04abd9297d14a59ae5e94a34bdd4cfc2b20772d03b2863",
+    "kg_microbe_curation/artifact.py": "dbbf5b31256258ec75325a7bb5222d4adc43773731f7780100afbe0dd3f27ee5",
+    "kg_microbe_curation/contract.py": "d9eb93add3fbb438cbd6008767b28a0c4eadfbc03688462d490c965ff034268e",
+    "kg_microbe_curation/identity.py": "9c760f3e82051d24b3c1cc79d787e96b35e24529b4ead9254ff55adc1266b948",
+    "kg_microbe_curation/ledger.py": "626f473e4e32ce70518c2413cd4980700726d0d8d5c22be48a62400742b8f9d1",
+    "kg_microbe_curation/native.py": "c6b3d6efabebc26fd5b9e3a8b3e5ab559b8cf6559e22cab77538d761cd5a61a0",
+    "kg_microbe_curation/schema/artifact.json": "36f1542e2b570e58ba4a59846a1916a79e1fd51c4c56f4450131993912bf4d08",
+    "kg_microbe_curation/schema/bundle.json": "04db51cdeebf19b36d68ea8dae88ebabb9910e8f4eb03e31aff8d46f2902fb5e",
+    "kg_microbe_curation/schema/native_assertion.json": "0bb7ebf25e0e1bea9fea17d47981b2773b16f3fa8cdbed31686bccdaeaaa5124",
+    "kg_microbe_governance/__init__.py": "9b6a7259a9b22ae627862a7d3df48cef56ed18debfea0d9e3998f00aa8c5ec81",
+    "kg_microbe_governance/artifacts/__init__.py": "4e47389554e9e8d6e05a90ecf7dc6ad5708f08e56d012d9129970d58b9c6d069",
+    "kg_microbe_governance/artifacts/schema/record_review.yaml": "229baf9b69118a1fe318e4c31085c0820e4e3d1365e7b04d6ace451b7c35f9bb",
+    "kg_microbe_governance/artifacts/scripts/__init__.py": "f04a7a4160750e47ff2bee761c610ed7f4d12f6f50b914dd3527ec672ebc1af2",
+    "kg_microbe_governance/artifacts/scripts/check_vendored_sync.py": "673ecd7ea0b34a29ebef8d1068d8d8973a460680e956237c8e09d97a8a22deb3",
+    "kg_microbe_governance/artifacts/scripts/record_review.py": "95a4ec41e38ec47ba3578e76838c46a0adbf47e49ad3636524735d08cfcb1c4d",
+    "kg_microbe_reviews/__init__.py": "00d7e11fa36a0424fb28fbbe3ca4fb381bc77bc3bd588ab1b46c65a58de141aa"
+  },
+  "format": "kg-microbe-curation-distribution/v1",
+  "project_sha256": "0e21a3de5bd57e0fed9fc458bea55f18a1cd9f8349eeae571c23bbb3e51d3995",
+  "readme_sha256": "62abdd0c07335ad930ac68f1eaeaaf6c90acf043aa4d8e38852d6a7d8132c44f",
+  "repository": "CultureBotAI/culturebotai-claw",
+  "scientific_approval": false,
+  "source_commit": "1b5391d083ba85ac94e5279c3cba25ac4fde243c",
+  "template_sha256": "995124ce5ac8364c1069696a833a7e50f9eed549f006c6e3ef71a5484d58fa17",
+  "version": "0.1.0+g1b5391d083ba85ac94e5279c3cba25ac4fde243c"
+}
