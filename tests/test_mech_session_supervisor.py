@@ -1537,7 +1537,8 @@ def test_transport_return_without_native_input_is_uncertain_and_not_retried(setu
 
 @pytest.mark.parametrize("invalid", [None, "partial", "different", "duplicate", "old_step", "old_time",
     "naive_time", "wrong_conversation", "wrong_workspace", "goal_changed", "bounded_out", "message_changed",
-    "pending_duplicate", "queued_duplicate", "unknown_duplicate", "unsupported_shape"])
+    "pending_duplicate", "queued_duplicate", "unknown_duplicate", "unsupported_shape",
+    "missing_time_duplicate", "old_time_duplicate", "naive_time_duplicate"])
 def test_exact_native_input_required_for_delivery_acceptance(setup, monkeypatch, invalid):
     instance = make_instance(setup, monkeypatch, lambda *_: pytest.fail("must not type"))
     action = {"state": "uncertain", "stage": 1, "kind": "finalize", "marker": "MECH-WORKFLOW-test",
@@ -1555,6 +1556,12 @@ def test_exact_native_input_required_for_delivery_acceptance(setup, monkeypatch,
     elif invalid in {"pending_duplicate", "queued_duplicate", "unknown_duplicate"}:
         native["user_input_evidence"]["inputs"].append({**entry, "step_index": 22,
             "status_number": {"pending_duplicate": 1, "queued_duplicate": 11, "unknown_duplicate": 99}[invalid]})
+    elif invalid in {"missing_time_duplicate", "old_time_duplicate", "naive_time_duplicate"}:
+        duplicate = {**entry, "step_index": 22}
+        duplicate["created_at"] = {"missing_time_duplicate": None,
+            "old_time_duplicate": "1970-01-01T00:00:00+00:00",
+            "naive_time_duplicate": "1970-01-01T00:00:01"}[invalid]
+        native["user_input_evidence"]["inputs"].append(duplicate)
     elif invalid == "unsupported_shape":
         entry["supported_input_shape"] = False
     elif invalid == "old_step":

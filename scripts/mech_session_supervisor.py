@@ -268,9 +268,9 @@ def native_delivery_proof(action: dict, target: dict, observation: dict) -> dict
         try:
             created = datetime.fromisoformat(entry["created_at"].replace("Z", "+00:00"))
             if created.tzinfo is None or created.timestamp() * 1000 < reserved:
-                continue
+                return None
         except (KeyError, TypeError, ValueError, AttributeError):
-            continue
+            return None
         matches.append(entry)
     if len(matches) != 1:
         return None
