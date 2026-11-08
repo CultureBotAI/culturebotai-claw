@@ -51,7 +51,8 @@ CellStructureMech PR 3068. Rewritten 2026-11-06 for culturebotai-claw#854,
 for #873-#875 and #880 from the third, for #893-#895 from the fourth, for
 #920 and #921 from the fifth, and on 2026-11-07 for #931-#936 from the Codex
 review, #950 from CI's git 2.56, #974-#977 from the review of that round, and
-#1010-#1014 from the review of that one, before its reuse on further merged PRs.
+#1010-#1014 from the review of that one, and #1037-#1039 from the review of that,
+before its reuse on further merged PRs.
 """
 from __future__ import annotations
 
@@ -349,7 +350,7 @@ def cleanup(repo: str, number: int, checkout: Path, worktree: Path | None, *, ap
                 git(checkout, "push", "-q", f"--force-with-lease={local_ref}:{head}", push_url, "--delete", local_ref)
                 try:
                     still = remote_branch_sha(checkout, branch)
-                except Exception as exc:
+                except BaseException as exc:  # an interrupt here must leave the record too
                     # The delete was accepted; the recovery must still name the push that puts the branch back.
                     done.append(f"deleted remote {branch} (was {head[:10]}; accepted, not confirmed)")
                     raise RuntimeError(f"origin accepted the delete but could not be asked again: {exc}") from exc
@@ -369,7 +370,7 @@ def cleanup(repo: str, number: int, checkout: Path, worktree: Path | None, *, ap
                 else:
                     git(checkout, "update-ref", "--no-deref", "-d", tracking, head)
                     done.append(f"deleted {tracking} (was {head[:10]})")
-        except Exception as exc:
+        except BaseException as exc:  # a KeyboardInterrupt after a deletion still gets the record and the recovery
             if not any(step.startswith(("removed ", "deleted ")) for step in done):
                 raise
             raise PartialFailure(done, exc, recovery_for(done, checkout, worktree, branch, head,

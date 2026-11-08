@@ -1,4 +1,4 @@
-"""scripts/adhoc/cleanup_merged_pr_branch.py deletes only the merged work (#854-#856, #858, #867-#875, #878-#880, #891-#895, #931-#936, #950, #974-#977, #1010-#1014).
+"""scripts/adhoc/cleanup_merged_pr_branch.py deletes only the merged work (#854-#856, #858, #867-#875, #878-#880, #891-#895, #931-#936, #950, #974-#977, #1010-#1014, #1037-#1039).
 
 Each case is built so the unsafe and the safe behaviour differ: a remote
 branch that moved after the merge, a sibling branch whose name ends the same
@@ -603,7 +603,8 @@ def run_printed(recovery: str, *, only: str | None = None) -> list[str]:
 
 
 @pytest.mark.parametrize("spec", ["+refs/heads/feature:refs/heads/victim", "+refs/heads/*:refs/heads/victim-*",
-                                  "refs/heads/fea*:refs/remotes/origin/mirror/*"])
+                                  "refs/heads/fea*:refs/remotes/origin/mirror/*",
+                                  "+refs/heads/feature*:refs/heads/victim*"])  # `*` matches the empty string
 def test_a_fetch_refspec_that_maps_the_branch_elsewhere_is_refused(fleet, spec):
     """git 2.56 applies origin's fetch refspecs to a push even to its URL (#950), so such a refspec is refused first."""
     drop_worktree_and_local(fleet)
@@ -859,14 +860,15 @@ def test_the_tracking_delete_does_not_follow_a_ref_made_symbolic_after_the_read_
     assert ref(fleet["checkout"], "refs/remotes/origin/feature") is None
 
 
-def test_a_push_insteadof_rewrite_of_the_push_url_is_refused(fleet):
+@pytest.mark.parametrize("trim", [0, 4])  # the whole URL, and a proper prefix (`.git` left off): git rewrites on both
+def test_a_push_insteadof_rewrite_of_the_push_url_is_refused(fleet, trim):
     """git applies url.<base>.pushInsteadOf to a bare URL and not to an explicit pushurl: the delete would go to the fork."""
     drop_worktree_and_local(fleet)
     fork = fleet["tmp"] / "fork.git"
     subprocess.run(["git", "clone", "-q", "--bare", str(fleet["origin"]), str(fork)], check=True)
     git(fleet["checkout"], "config", "remote.origin.pushurl", str(fleet["origin"]))
-    # a proper prefix, as git matches it: the base swaps `.../origin` for `.../fork`, so `.git` stays
-    git(fleet["checkout"], "config", f"url.{str(fork)[:-4]}.pushInsteadOf", str(fleet["origin"])[:-4])
+    base, value = str(fork), str(fleet["origin"])
+    git(fleet["checkout"], "config", f"url.{base[:len(base) - trim]}.pushInsteadOf", value[:len(value) - trim])
 
     with pytest.raises(cleanup_script.Refused, match="pushinsteadof"):
         run_cleanup(fleet, worktree=None)
@@ -875,8 +877,13 @@ def test_a_push_insteadof_rewrite_of_the_push_url_is_refused(fleet):
     assert ref(fork, "refs/heads/feature") == fleet["head"]
 
 
-@pytest.mark.parametrize("local_present", [True, False])
-def test_a_read_back_failure_after_an_accepted_delete_still_names_the_push(fleet, monkeypatch, local_present):
+class _Interrupt(BaseException):
+    """Stands in for KeyboardInterrupt where a mutant that lets it escape must read as a test failure, not as pytest interrupted."""
+
+
+@pytest.mark.parametrize("local_present,failure",
+                         [(True, RuntimeError), (False, RuntimeError), (False, KeyboardInterrupt), (False, _Interrupt)])
+def test_a_read_back_failure_after_an_accepted_delete_still_names_the_push(fleet, monkeypatch, local_present, failure):
     """A network blip right after the push: the branch is gone from origin, and the recovery must say how to put it back."""
     git(fleet["checkout"], "worktree", "remove", str(fleet["worktree"]))
     if not local_present:
@@ -887,7 +894,7 @@ def test_a_read_back_failure_after_an_accepted_delete_still_names_the_push(fleet
     def blip_at_the_read_back(checkout, branch):
         calls.append(branch)
         if len(calls) == 2:
-            raise RuntimeError("ls-remote origin refs/heads/feature failed: could not read from remote")
+            raise failure("ls-remote origin refs/heads/feature failed: could not read from remote")
         return real(checkout, branch)
 
     monkeypatch.setattr(cleanup_script, "remote_branch_sha", blip_at_the_read_back)
@@ -900,6 +907,28 @@ def test_a_read_back_failure_after_an_accepted_delete_still_names_the_push(fleet
     assert ref(fleet["origin"], "refs/heads/feature") is None
     run_printed(caught.value.recovery)
     assert ref(fleet["origin"], "refs/heads/feature") == fleet["head"]
+
+
+def test_an_interrupt_after_the_remote_delete_still_reports_the_recovery(fleet, monkeypatch):
+    """A Ctrl-C landing after the push, outside the read-back's own handler: the record and the push-back line survive."""
+    drop_worktree_and_local(fleet)
+    real = cleanup_script.tracking_sha
+    calls: list[str] = []
+
+    def interrupt_at_the_tracking_read_back(checkout, branch):
+        calls.append(branch)
+        if len(calls) == 2:
+            raise _Interrupt("Ctrl-C")
+        return real(checkout, branch)
+
+    monkeypatch.setattr(cleanup_script, "tracking_sha", interrupt_at_the_tracking_read_back)
+
+    with pytest.raises(cleanup_script.PartialFailure) as caught:
+        run_cleanup(fleet, worktree=None)
+
+    assert caught.value.done == [f"deleted remote feature (was {fleet['head'][:10]})"]
+    assert f"push origin {fleet['head']}:refs/heads/feature" in caught.value.recovery
+    assert ref(fleet["origin"], "refs/heads/feature") is None
 
 
 def test_a_remote_branch_still_present_after_the_delete_is_a_failure(fleet, monkeypatch):
