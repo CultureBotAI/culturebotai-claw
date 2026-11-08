@@ -176,6 +176,9 @@ def test_empty_normal_footer_is_not_busy():
     "○ Thought for 16.6s (Realizing Queued Message Timing)",
     "○ Thought for 9s (Reviewing queued tasks)",
     "  The messages queued earlier have all finished.",
+    "  The 2 tasks queued earlier have finished.",
+    "○ Thought for 3s (Reviewing 2 messages queued earlier)",
+    "  Queued messages: 3 were processed successfully.",
 ])
 def test_completed_queue_prose_does_not_make_idle_composer_busy(historical_text):
     # Sanitized CMM reproduction: completed thought remains within the 32-row
@@ -217,8 +220,9 @@ def test_live_queue_controls_still_block_with_an_empty_composer(controls):
 
 
 @pytest.mark.parametrize("status", ["1 message queued", "2 tasks queued", "Queued messages: 3", "queued task: 1"])
-def test_positive_queue_count_still_blocks(status):
-    screen = f"border\n>\nborder\nGemini high · {status}\n"
+@pytest.mark.parametrize("layout", ["{status}", "Gemini high · {status}", "{status} · Gemini high", "Gemini high · {status} · /tasks"])
+def test_positive_queue_count_still_blocks(status, layout):
+    screen = "border\n>\nborder\n" + layout.format(status=status) + "\n"
     assert supervisor.terminal_busy_reason(screen) == "busy, background, or queued terminal state"
 
 
