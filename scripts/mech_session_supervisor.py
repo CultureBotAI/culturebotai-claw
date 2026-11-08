@@ -1888,8 +1888,9 @@ class Supervisor:
             proof = native_delivery_proof(action, target, observation)
             if proof is None:
                 continue
-            action.update(state="accepted", accepted_at=now(), acceptance="native_exact_user_input",
-                          delivery_proof=proof)
+            if action["state"] != "accepted":
+                action.update(state="accepted", accepted_at=now(), acceptance="native_exact_user_input")
+            action.update(delivery_proof=proof, delivery_verified_at=now())
             if action["kind"] == "policy_update":
                 ledger["policy_notification_required"] = False
             if adopting and native_id and native_id != ledger["adopted_goal"]:

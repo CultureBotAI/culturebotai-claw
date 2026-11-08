@@ -1593,3 +1593,21 @@ def test_start_goal_needs_real_native_declaration_not_literal_goal_or_marker(set
     instance.reconcile(setup.target, setup.ledger, setup.observation)
     assert setup.ledger["awaiting_goal"] is not declaration
     assert action["state"] == ("accepted" if declaration else "uncertain")
+
+
+def test_legacy_accepted_goal_keeps_original_acceptance_when_exact_proof_arrives(setup, monkeypatch):
+    instance = make_instance(setup, monkeypatch, lambda *_: pytest.fail("must not type"))
+    setup.ledger.update(stage=2, awaiting_goal=True)
+    action = {"kind": "start_goal", "stage": 2, "state": "accepted", "marker": "MECH-WORKFLOW-next",
+              "reserved_epoch_ms": 1, "native_session_id": setup.target["native_session_id"],
+              "message": "/goal next objective [MECH-WORKFLOW-next]", "native_step_index": 12,
+              "accepted_at": "1970-01-01T00:00:00.001+00:00", "acceptance": "native_workspace_history_marker"}
+    setup.ledger["actions"]["next"] = action
+    record_native_input(setup, action, index=40, declaration=True)
+    instance.reconcile(setup.target, setup.ledger, setup.observation)
+    assert not setup.ledger["awaiting_goal"]
+    assert action["accepted_at"] == "1970-01-01T00:00:00.001+00:00"
+    assert action["acceptance"] == "native_workspace_history_marker"
+    assert action["delivery_proof"]["native_step_index"] == 40
+    assert action["delivery_verified_at"] != action["accepted_at"]
+    assert action["accepted_goal_identity"] == setup.observation["goal_identity"]
