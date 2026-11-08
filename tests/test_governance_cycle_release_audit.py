@@ -66,7 +66,7 @@ def descriptor(identifier, source, target, payload, consumers="all"):
             "mode": "0644", "consumers": consumers}
 
 
-def build(tmp_path, alter=None, alter_policy=None, include_canary=True, native_contracts=False):
+def build(tmp_path, alter=None, alter_policy=None, include_canary=True, native_contracts=False, extra_artifact=False):
     """Two declared fixture Mechs contrast canary and noncanary behavior."""
     claw = tmp_path / "trusted-claw"
     init(claw, "CultureBotAI/culturebotai-claw")
@@ -97,11 +97,16 @@ def build(tmp_path, alter=None, alter_policy=None, include_canary=True, native_c
                          for key in sorted(NATIVE_TESTS))
     baseline_doc = {"version": 1, "canonical_repository": "CultureBotAI/culturebotai-claw",
                     "pin_path": PIN, "consumers": consumers, "artifacts": artifacts}
+    if extra_artifact:
+        additional = descriptor("additional", SOURCE + "additional.py", "scripts/additional.py", "extra source\n")
+        baseline_doc["artifacts"].append(additional)
+        put(claw, additional["source"], "extra source\n")
     put(claw, FLEET_PATH, yaml.safe_dump(fleet))
     put(claw, MANIFEST, json.dumps(baseline_doc))
     put(claw, legacy["source"], "legacy source\n")
     for artifact in artifacts[1:]:
-        put(claw, artifact["source"], artifact["id"] + "\n")
+        if artifact["id"] != "additional":
+            put(claw, artifact["source"], artifact["id"] + "\n")
     baseline = commit(claw, "baseline")
     for path in WORKFLOW_ASSETS:
         put(claw, path, "canonical fixture text\n")
@@ -126,7 +131,7 @@ def build(tmp_path, alter=None, alter_policy=None, include_canary=True, native_c
         init(root, row["github"])
         put(root, "scripts/legacy.py", "legacy source\n")
         for artifact in artifacts[1:]:
-            put(root, artifact["target"], artifact["id"] + "\n")
+            put(root, artifact["target"], (claw / artifact["source"]).read_text())
         put(root, PIN, baseline + "\n")
         commit(root)
         roots[key] = root
@@ -195,20 +200,103 @@ def test_release_on_merged_side_parent_is_not_protected_first_parent(tmp_path):
         audit_release(claw, roots)
 
 
-@pytest.mark.parametrize("surface", ["manifest", "payload"])
-def test_later_main_cannot_change_active_governance(tmp_path, surface):
-    claw, roots, _, _ = build(tmp_path)
+def evolve_payload(claw, *, update_digest=True):
+    """Publish different valid current bytes while release history stays fixed."""
     document = json.loads((claw / MANIFEST).read_text())
-    if surface == "manifest":
-        document["artifacts"][0]["target"] = "scripts/different.py"
-    else:
-        payload = "changed canonical source\n"
-        put(claw, document["artifacts"][0]["source"], payload)
+    payload = "changed canonical source\n"
+    put(claw, document["artifacts"][0]["source"], payload)
+    if update_digest:
         document["artifacts"][0]["sha256"] = hashlib.sha256(payload.encode()).hexdigest()
     put(claw, MANIFEST, json.dumps(document))
-    commit(claw)
-    with pytest.raises(GovernanceError, match="differs from the active cycle"):
+    return commit(claw, "publish future canonical payload"), payload
+
+
+@pytest.mark.parametrize("adopted", [False, True])
+def test_later_valid_payload_and_digest_keep_exact_historical_cohort(tmp_path, adopted):
+    claw, roots, baseline, candidate = build(tmp_path)
+    if adopted:
+        adopt(claw, roots[CANARY], candidate)
+    declaration = (claw / RELEASE_PATH).read_bytes()
+    newer, payload = evolve_payload(claw)
+    assert (claw / RELEASE_PATH).read_bytes() == declaration
+    result = audit_release(claw, roots)
+    assert result["ok"] and result["trusted_head"] == newer
+    assert result["candidate_ref"] == candidate and result["baseline_ref"] == baseline
+    assert all((root / "scripts/legacy.py").read_text() != payload for root in roots.values())
+    assert result["counts"]["adopted"] == int(adopted)
+
+
+def test_later_current_payload_still_requires_its_own_checksum(tmp_path):
+    claw, roots, _, _ = build(tmp_path)
+    evolve_payload(claw, update_digest=False)
+    with pytest.raises(GovernanceError, match="checksum drift"):
         audit_release(claw, roots)
+
+
+@pytest.mark.parametrize("key", [CANARY, "traitmech"])
+def test_new_current_payload_cannot_replace_pinned_target_bytes(tmp_path, key):
+    claw, roots, _, candidate = build(tmp_path)
+    adopt(claw, roots[CANARY], candidate)
+    _, payload = evolve_payload(claw)
+    put(roots[key], "scripts/legacy.py", payload)
+    commit(roots[key], "wrong new payload under unchanged historical pin")
+    result = audit_release(claw, roots)
+    assert not result["ok"]
+    row = next(row for row in result["repositories"] if row["key"] == key)
+    assert any(issue["code"] == "committed_drift" for issue in row["issues"])
+
+
+@pytest.mark.parametrize("field", [
+    "id", "source", "target", "mode", "consumers", "add_artifact", "remove_artifact",
+    "github", "package_path", "consumer_key", "pin_path",
+])
+def test_later_main_cannot_change_any_active_authority_or_layout(tmp_path, field):
+    claw, roots, _, _ = build(tmp_path, extra_artifact=True)
+    document = json.loads((claw / MANIFEST).read_text())
+    fleet = yaml.safe_load((claw / FLEET_PATH).read_text())
+    artifact = document["artifacts"][0]
+    if field in {"id", "target"}:
+        artifact[field] = "different" if field == "id" else "scripts/different.py"
+    elif field == "source":
+        artifact["source"] = SOURCE + "different.py"
+        put(claw, artifact["source"], "legacy source\n")
+    elif field == "mode":
+        artifact["mode"] = "0755"
+        (claw / artifact["source"]).chmod(0o755)
+    elif field == "consumers":
+        artifact["consumers"] = [CANARY]
+    elif field == "add_artifact":
+        added = descriptor("new", SOURCE + "new.py", "scripts/new.py", "new source\n")
+        document["artifacts"].append(added)
+        put(claw, added["source"], "new source\n")
+    elif field == "remove_artifact":
+        document["artifacts"].pop()
+    elif field in {"github", "package_path"}:
+        value = "CultureBotAI/OtherMech" if field == "github" else "src/different"
+        document["consumers"]["traitmech"][field] = value
+        fleet["mechs"]["traitmech"][field] = value
+    elif field == "consumer_key":
+        document["consumers"]["different"] = document["consumers"].pop("traitmech")
+        fleet["mechs"]["different"] = fleet["mechs"].pop("traitmech")
+    else:
+        document["pin_path"] = "scripts/different-pin"
+        fleet["vendored_governance"]["pin_path"] = document["pin_path"]
+    put(claw, MANIFEST, json.dumps(document))
+    put(claw, FLEET_PATH, yaml.safe_dump(fleet))
+    commit(claw)
+    with pytest.raises(GovernanceError, match="authority/layout differs"):
+        audit_release(claw, roots)
+
+
+def test_later_workflow_assets_are_not_substitutes_for_pinned_release_assets(tmp_path):
+    claw, roots, _, candidate = build(tmp_path)
+    for path in WORKFLOW_ASSETS:
+        put(claw, path, "future workflow source; intentionally not a valid v2 parent\n")
+    newer = commit(claw, "publish future workflow assets")
+    adopt(claw, roots[CANARY], candidate)
+    result = audit_release(claw, roots)
+    assert result["ok"] and result["trusted_head"] == newer
+    assert result["candidate_ref"] == candidate
 
 
 @pytest.mark.parametrize("key", [CANARY, "traitmech"])
@@ -375,8 +463,22 @@ def test_packaged_release_binds_exact_manifest_and_workflow_assets():
     # is an additional checked policy, not a replacement digest in that release.
     assert policy["manifest_sha256"] == hashlib.sha256((root / HISTORICAL_MANIFEST_PATH).read_bytes()).hexdigest()
     validate_packaged_transition(root)
-    for path, digest in policy["workflow_assets"].items():
-        assert hashlib.sha256((root / path).read_bytes()).hexdigest() == digest
+
+
+def test_packaged_release_preserves_approved_immutable_identity():
+    root = Path(__file__).resolve().parents[1]
+    content = (root / RELEASE_PATH).read_bytes()
+    policy = parse_release(content)
+    # Immutable declaration introduced on protected main by #924 (a521f5bb).
+    # Bind its exact bytes, including all digests, without Git/network access.
+    assert hashlib.sha256(content).hexdigest() == "89a362436eb3df0f3b4bfdb9feeaf9a258b2476291e565a744568b41f9445697"
+    assert policy["baseline_ref"] == "76c1ebeea3fc7f80bf1abe044688f298f390cfac"
+    assert policy["release_ref"] == "c26f3a0906916f9641a5f82b004b5541ae5fbe52"
+    assert policy["canary"] == CANARY and policy["parent_version"] == "2.0.0"
+    # Digests bind blobs at release_ref, not today's files. Historical audit
+    # fixtures below enforce every declared digest without shallow-clone or
+    # network dependencies; the real release gate checks protected Git history.
+    assert set(policy["workflow_assets"]) == WORKFLOW_ASSETS
 
 
 @pytest.mark.parametrize("path", sorted(WORKFLOW_ASSETS))

@@ -69,6 +69,14 @@ observations, or timestamps more than one minute in the future. Retain those
 warnings when quoting a stale summary. Exit 1 means data could not be verified
 and prints no counts; exit 2 means invalid arguments.
 
+The optional `--durability-runtime PATH` appends saved local per-Mech alerts
+for unpublished commits and owned temporary files approaching cleanup. Supply
+the actual verified supervisor runtime; the command reads it without scanning
+or changing sessions. Missing or stale observations remain unknown and exit 3.
+The public bundle schema and counters are unchanged. See
+[session-state durability](SESSION_STATE_DURABILITY.md) for ownership inventory,
+read-only boundaries and publication requirements.
+
 ## Register every PR in the coding session
 
 As soon as a goal opens a PR, including every follow-up PR, register it using the
@@ -252,7 +260,9 @@ This is an operator procedure, not an automatic deployment command. First merge
 the reviewed change and complete the consumer upgrades above. Choose the exact
 reviewed main commit, not a moving branch name. Use a separate review checkout
 to obtain its archive; never switch the checkout used by running monitors.
-Preserve the state directory and every configured `--runtime` argument. The
+Preserve the state directory and every configured `--runtime` argument.
+Keep the release archive and assessed dry-run bundle under the review
+checkout's gitignored `.temp/` durable root; verify its ignore rule first. The
 example below has one runtime; repeat that argument when the existing deployment
 has more.
 
@@ -271,7 +281,9 @@ git -C "$REVIEW_CHECKOUT" merge-base --is-ancestor "$REVIEWED_COMMIT" origin/mai
 test ! -e "$RELEASE"
 mkdir -p "$STATE/releases"
 mkdir "$RELEASE"
-ARCHIVE="$(mktemp "${TMPDIR:-/tmp}/mech-progress-release.XXXXXX")"
+DURABLE_ROOT="$REVIEW_CHECKOUT/.temp"
+mkdir -p "$DURABLE_ROOT"
+ARCHIVE="$(mktemp "$DURABLE_ROOT/mech-progress-release.XXXXXX")"
 git -C "$REVIEW_CHECKOUT" archive --format=tar --output="$ARCHIVE" "$REVIEWED_COMMIT"
 tar -xf "$ARCHIVE" -C "$RELEASE"
 printf '%s\n' "$REVIEWED_COMMIT" > "$RELEASE/REVISION"
@@ -279,7 +291,7 @@ shasum -a 256 "$ARCHIVE" > "$RELEASE/archive.sha256"
 UV_PROJECT_ENVIRONMENT="$RELEASE/.venv" uv sync --project "$RELEASE" --locked
 PYTHON="$RELEASE/.venv/bin/python"
 
-DRY_STATE="$(mktemp -d "${TMPDIR:-/tmp}/mech-progress-dry-run.XXXXXX")"
+DRY_STATE="$(mktemp -d "$DURABLE_ROOT/mech-progress-dry-run.XXXXXX")"
 cp -p "$STATE/bundle.json" "$DRY_STATE/bundle.json"
 cp "$RELEASE/src/kg_microbe_fleet/fleet.yaml" "$DRY_STATE/fleet.yaml"
 env PYTHONPATH="$RELEASE/src:$RELEASE" "$PYTHON" \
@@ -334,7 +346,7 @@ uv run --extra dev python -m pytest -q \
   tests/test_progress_model.py tests/test_progress_prs.py \
   tests/test_progress_publish.py tests/test_progress_site.py
 uv run --extra dev mypy src/kg_microbe_progress
-uv run python scripts/build_mech_progress_site.py --output /tmp/mech-progress-site
+uv run python scripts/build_mech_progress_site.py --output .temp/mech-progress-site
 ```
 
 The build requires an initialized data branch and read access through `gh`.
@@ -342,3 +354,11 @@ Test fixtures cover duplicate collection, multiple PRs per goal, restart history
 incomplete cycle coverage, invalid receipt evidence, private-field rejection,
 GitHub state changes, and publication failures. Browser checks cover the actual
 built desktop/mobile site, controls, disclosures, and failed data loads.
+
+An accepted [ordered multi-PR closure](MECH_SESSION_WORKFLOWS.md#ordered-multi-pr-closure-receipts)
+contributes every independently verified member PR to the existing PR event and
+association history. The goal closure remains one event naming the final
+integration PR, so public schemas and single-PR history are unchanged. Member
+identity and order must match the hash-bound archived receipt; an incomplete or
+mismatched stored proof fails collection. A working multi-PR receipt may report
+its member associations but never grants completion authority.

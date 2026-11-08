@@ -7,8 +7,11 @@ authorized designing and implementing this separate admission on 2026-11-07.
 Activation still requires an explicitly approved merge onto protected main.
 Candidate validation alone cannot authorize its own deployment.
 
-The immutable `releases/mech-cycle-v2-canary.json` and all its workflow and
-governance payload bytes remain unchanged. Its original governance manifest is
+The immutable `releases/mech-cycle-v2-canary.json` and its pinned historical
+workflow and governance payload bytes remain unchanged. Current main may publish
+future checksum-valid payload revisions under the authority/layout rule added
+by PR 956; these do not replace any consumer's allowed historical or admission
+data pin. Its original governance manifest is
 also packaged byte-for-byte as `releases/mech-cycle-v2-governance-manifest.json`,
 with the historical SHA256 `368edbac106cb49c0a4159a87c07eeba4a5ed79c343ff042c0ddbc1b6b990ebb`.
 The existing fourteen consumers retain their exact identities, artifact targets,
@@ -32,8 +35,9 @@ The new `releases/edgemech-infrastructure-admission-v1.json` binds:
 - The exact empty EdgeMech main bootstrap commit
   `e853bf22b9f708bfd381910107aec9283a3bcee3`.
 
-Every other member, identity, capability, payload, mode, target or applicability
-delta is refused. Changing the admitted fleet entry requires another reviewed
+Every other member, identity, capability, mode, target or applicability delta
+is refused. The admitted source payload hashes remain exact even when current
+canonical payload hashes evolve. Changing the admitted fleet entry requires another reviewed
 policy transition; enabling a scientific worker is not an admission side effect.
 
 `cycle_release_audit` requires a clean trusted CLAW checkout on protected
@@ -57,6 +61,17 @@ mapping, refusing an absent source or mismatched snapshot. It never
 executes or installs code selected by the downstream pin. A different pin or
 changed source-manifest hash fails. The preparation helper verified the actual
 source commit's manifest and every payload before creating the declaration.
+
+The admitted manifest is also packaged byte-for-byte as
+`releases/edgemech-infrastructure-source-manifest.json`, bound to the unchanged
+declaration's `source_manifest_sha256`. Candidate/package checks compare that
+snapshot to the frozen historical manifest, then require the current manifest
+to preserve its complete authority/layout apart from payload digests. Every
+current payload must still match its own digest. The protected audit separately
+authenticates the actual source commit and its exact historical payloads before
+serving data under its URLs. Tests reject newer current bytes substituted under
+any historical or admitted pin. This separation resolves the current-main
+integration finding in PR 953 under issue 997 without repinning a consumer.
 
 The infrastructure result has two distinct states:
 

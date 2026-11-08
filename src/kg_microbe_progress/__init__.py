@@ -242,8 +242,13 @@ def _receipt(directory: Path, record: dict[str, Any], ledger: dict[str, Any]) ->
 
 
 def _closure(directory: Path, record: dict[str, Any], ledger: dict[str, Any],
-             github: str) -> tuple[dict[str, Any], dict[str, Any] | None]:
+             github: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     receipt = _receipt(directory, record, ledger)
+    from kg_microbe_workflows.closure import multi_pr_members
+    try:
+        members = multi_pr_members(receipt)
+    except ValueError as error:
+        raise ProgressError(str(error)) from error
     verification = record.get("verification", {})
     outcome = verification.get("status")
     if outcome not in {"merged", "no_changes"}:
@@ -260,7 +265,7 @@ def _closure(directory: Path, record: dict[str, Any], ledger: dict[str, Any],
         "stage_id": key_for_stage, "outcome": outcome,
         "verified_at": verification["verified_at"], "receipt_sha256": record["receipt_sha256"],
     }
-    observation = None
+    observations = []
     if outcome == "merged":
         number = _positive(verification.get("pr_number"), "PR number")
         if (receipt.get("status") != "completed"
@@ -278,9 +283,33 @@ def _closure(directory: Path, record: dict[str, Any], ledger: dict[str, Any],
             "head_sha": head, "merge_commit_sha": merge, "merged_at": verification["merged_at"],
             "observed_at": verification["verified_at"], "source": "supervisor_closure",
         }
+        observations.append(observation)
+        if members:
+            proofs = verification.get("prs")
+            if not isinstance(proofs, list) or len(proofs) != len(members):
+                raise ProgressError("ordered closure lacks all verified PRs")
+            observations = []
+            for member, proof in zip(members, proofs, strict=True):
+                if (not isinstance(proof, dict) or proof.get("status") != "merged"
+                        or type(proof.get("pr_number")) is not int or proof["pr_number"] != member["number"]
+                        or proof.get("head_sha") != member["head_sha"]
+                        or proof.get("merge_commit_sha") != member["merge_commit_sha"]):
+                    raise ProgressError("ordered receipt PR differs from verified member")
+                _date(proof.get("merged_at"))
+                _date(proof.get("verified_at"))
+                observations.append({**observation, "number": member["number"],
+                                     "head_sha": member["head_sha"], "merge_commit_sha": member["merge_commit_sha"],
+                                     "merged_at": proof["merged_at"], "observed_at": proof["verified_at"]})
+            if any(proofs[-1].get(field) != verification.get(field) for field in
+                   ("pr_number", "head_sha", "merge_commit_sha", "merged_at", "verified_at")):
+                raise ProgressError("ordered closure final proof differs from top-level proof")
+        elif "prs" in verification:
+            raise ProgressError("single closure contains unexpected ordered proofs")
     elif receipt.get("status") != "no_changes" or receipt.get("pr") is not None:
         raise ProgressError("no-change closure contains a PR")
-    return event, observation
+    elif "prs" in verification:
+        raise ProgressError("no-change closure contains ordered proofs")
+    return event, observations
 
 
 def _pr_id(key: str, number: int) -> str:
@@ -669,7 +698,7 @@ def collect_progress(
             if not isinstance(records, list):
                 raise ProgressError("ledger has no completed-stage history")
             for record in records:
-                event, observation = _closure(directory, record, ledger, fleet.mechs[key].github)
+                event, closure_observations = _closure(directory, record, ledger, fleet.mechs[key].github)
                 if (event["cycle"], event["stage_number"]) >= (cycle, stage):
                     raise ProgressError("closure is not before the current goal")
                 if event["id"] in found:
@@ -681,8 +710,7 @@ def collect_progress(
                 if old is None:
                     history["closures"].append(event)
                     old_closures[event["id"]] = event
-                if observation:
-                    observations.append(observation)
+                observations.extend(closure_observations)
             prior_ids = {event["id"] for event in history["closures"]
                          if event["repository_key"] == key and event["run_key"] == run}
             if not prior_ids <= found:

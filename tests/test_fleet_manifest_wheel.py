@@ -67,6 +67,8 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path, review)
     )
     assert "src/kg_microbe_governance/vendored_artifacts.json" in source_names
     assert "src/kg_microbe_governance/releases/mech-cycle-v2-canary.json" in source_names
+    admitted_snapshot = "kg_microbe_governance/releases/edgemech-infrastructure-source-manifest.json"
+    assert "src/" + admitted_snapshot in source_names
     for artifact in governance_document["artifacts"]:
         assert artifact["source"] in source_names
     assert "src/kg_microbe_config/openclaw_config.yaml" in source_names
@@ -127,6 +129,7 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path, review)
             == (REPOSITORY_ROOT / "src/kg_microbe_merge_queue/policy.json").read_bytes()
         )
         assert "kg_microbe_governance/vendored_artifacts.json" in names
+        assert wheel.read(admitted_snapshot) == (REPOSITORY_ROOT / "src" / admitted_snapshot).read_bytes()
         assert "kg_microbe_evidence/__init__.py" in names
         assert "kg_microbe_evidence/__main__.py" in names
         assert "kg_microbe_evidence/fetch.py" in names

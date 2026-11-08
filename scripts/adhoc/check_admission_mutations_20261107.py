@@ -23,7 +23,8 @@ WORKFLOW = ROOT / ".github/workflows/governance-fleet-audit.yaml"
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--only", choices=["capability", "payload", "bootstrap", "source_snapshot", "receipt", "workflow_guard"])
+    parser.add_argument("--only", choices=["capability", "payload", "bootstrap", "source_snapshot", "receipt",
+                                           "workflow_guard", "current_layout", "current_checksum"])
     args = parser.parse_args()
     output = args.output.absolute()
     if not output.is_relative_to(ROOT / "workspace") or ".." in output.parts:
@@ -40,8 +41,12 @@ def main():
         ("bootstrap", 'if main != policy["bootstrap_main_ref"]:', "if False:",
          "test_candidate_completeness_distinguishes_exact_bootstrap_from_changed_main"),
         ("source_snapshot", "    from .cycle_release_audit import _snapshot\n",
-         "    return parse_manifest(current_manifest), dict(current_payloads)\n    from .cycle_release_audit import _snapshot\n",
+         "    return parse_manifest(admitted_manifest), dict(historical_payloads)\n    from .cycle_release_audit import _snapshot\n",
          "test_initial_admission_source_ref_must_authenticate_actual_objects[absent]"),
+        ("current_layout", "if layout(current) != layout(admitted):", "if False:",
+         "test_future_current_manifest_cannot_change_admitted_authority_or_layout[target]"),
+        ("current_checksum", "if sha((root / artifact.source).read_bytes()) != artifact.sha256:", "if False:",
+         "test_future_payload_requires_valid_current_checksum_even_with_admission"),
     ]
     reports = []
     for name, old, new, node in cases:

@@ -45,11 +45,13 @@ from .fleet_audit import (
 from .infrastructure_admission import (
     ADMISSION_PATH,
     ADMITTED,
+    ADMITTED_MANIFEST_PATH,
     HISTORICAL_MANIFEST_PATH,
     admission_anchor,
     bind_source_snapshot,
     bootstrap_pending,
     parse_admission,
+    validate_current_layout,
     validate_transition,
 )
 
@@ -172,6 +174,11 @@ def _snapshot(root: Path, ref: str) -> tuple[GovernanceManifest, dict[str, bytes
     return manifest, payloads, raw
 
 
+def _authority_layout(manifest: GovernanceManifest) -> GovernanceManifest:
+    """Keep every authority/layout field; only payload digests may evolve."""
+    return replace(manifest, artifacts=tuple(replace(artifact, sha256="") for artifact in manifest.artifacts))
+
+
 def _validate_release_assets(root: Path, ref: str, policy: Mapping[str, Any]) -> None:
     for path, digest in policy["workflow_assets"].items():
         if _sha(_blob(root, ref, path)) != digest:
@@ -216,15 +223,17 @@ def audit_release(trusted_root: Path, roots: Mapping[str, Path]) -> dict[str, An
     if (base_raw != candidate_raw or base_payloads != candidate_payloads
             or _sha(candidate_raw) != policy["manifest_sha256"]):
         raise GovernanceError("Cycle release must preserve exact baseline governance bytes and authority")
-    current, current_payloads, current_raw = _snapshot(trusted, head)
+    # Current payloads checksum-validate independently; their publication does
+    # not replace the immutable historical or admitted downstream data pins.
+    current, _, current_raw = _snapshot(trusted, head)
     admission: dict[str, Any] | None = None
     admission_report = None
     admission_entry = _head_blob(trusted, head, ADMISSION_PATH)
     if admission_entry is None:
         if _run_git(trusted, ("log", "-1", "--format=%H", head, "--", ADMISSION_PATH)):
             raise GovernanceError("Infrastructure admission declaration was deleted")
-        if current_raw != candidate_raw or current_payloads != candidate_payloads:
-            raise GovernanceError("Current trusted governance differs from the active cycle release")
+        if _authority_layout(current) != _authority_layout(candidate):
+            raise GovernanceError("Current trusted governance authority/layout differs from the active cycle release")
     else:
         admission_content = _blob(trusted, head, ADMISSION_PATH)
         admission = parse_admission(admission_content)
@@ -234,12 +243,10 @@ def audit_release(trusted_root: Path, roots: Mapping[str, Path]) -> dict[str, An
             raise GovernanceError("Infrastructure admission is outside protected post-cutoff history")
         if _blob(trusted, head, HISTORICAL_MANIFEST_PATH) != candidate_raw:
             raise GovernanceError("Packaged historical governance snapshot differs from its frozen release")
-        validate_transition(admission, content, candidate_raw, current_raw, _blob(trusted, head, FLEET_PATH))
-        if {k: v for k, v in current_payloads.items() if k != CANONICAL_MANIFEST_PATH} != {
-            k: v for k, v in candidate_payloads.items() if k != CANONICAL_MANIFEST_PATH
-        }:
-            raise GovernanceError("Infrastructure admission changed historical payload bytes")
-        _validate_release_assets(trusted, head, policy)
+        admitted_raw = _blob(trusted, head, ADMITTED_MANIFEST_PATH)
+        admitted = validate_transition(admission, content, candidate_raw, admitted_raw,
+                                      _blob(trusted, head, FLEET_PATH))
+        validate_current_layout(admitted, current_raw)
         admission_report = {
             "admission_id": admission["admission_id"], "authority": admission["authority"],
             "activation": "protected_first_parent_introduction", "anchor": admitted_at,
@@ -293,7 +300,7 @@ def audit_release(trusted_root: Path, roots: Mapping[str, Path]) -> dict[str, An
         # This one reviewed data pin is declared by protected policy, so squash
         # merging its source branch cannot select arbitrary executable code.
         historical[admission["source_ref"]] = bind_source_snapshot(
-            trusted, admission["source_ref"], current_raw, current_payloads,
+            trusted, admission["source_ref"], admitted_raw, candidate_payloads,
         )
     canonical = {
         raw_url(ref, path): payload

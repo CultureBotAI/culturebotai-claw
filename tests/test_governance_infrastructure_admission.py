@@ -13,6 +13,7 @@ from test_governance_cycle_release_audit import (
     RELEASE_PATH,
     build,
     commit,
+    evolve_payload,
     git,
     init,
     put,
@@ -24,6 +25,7 @@ from kg_microbe_governance.infrastructure_admission import (
     ADMISSION_ID,
     ADMISSION_PATH,
     ADMITTED,
+    ADMITTED_MANIFEST_PATH,
     HISTORICAL_MANIFEST_PATH,
     NATIVE_TESTS,
     canonical_sha,
@@ -77,6 +79,7 @@ def admitted(tmp_path, *, installed=False, squash=False, source_kind=None):
         "excluded_native_tests": sorted(NATIVE_TESTS),
     }
     put(claw, HISTORICAL_MANIFEST_PATH, historic.decode())
+    put(claw, ADMITTED_MANIFEST_PATH, (claw / MANIFEST).read_text())
     put(claw, ADMISSION_PATH, json.dumps(policy))
     anchor = commit(claw, "approve bounded infrastructure admission")
     if installed:
@@ -258,3 +261,81 @@ def test_candidate_completeness_distinguishes_exact_bootstrap_from_changed_main(
     commit(roots[ADMITTED.key])
     with pytest.raises(AssertionError, match="does not track"):
         completeness.test_a_declared_consumer_carries_every_artifact_that_applies_to_it(ADMITTED.key)
+
+
+@pytest.mark.parametrize("installed", [False, True])
+@pytest.mark.parametrize("squash", [False, True])
+def test_future_payload_publication_preserves_exact_admitted_data(tmp_path, installed, squash):
+    claw, roots, policy, baseline, candidate, _ = admitted(tmp_path, installed=installed, squash=squash)
+    snapshots = {path: (claw / path).read_bytes() for path in
+                 (RELEASE_PATH, ADMISSION_PATH, HISTORICAL_MANIFEST_PATH, ADMITTED_MANIFEST_PATH)}
+    newer, payload = evolve_payload(claw)
+    assert validate_packaged_transition(claw) == policy
+    assert trusted_source_ref(claw) == policy["source_ref"]
+    result = audit_release(claw, roots)
+    assert result["ok"] and result["trusted_head"] == newer
+    assert result["baseline_ref"] == baseline and result["candidate_ref"] == candidate
+    edge = next(row for row in result["repositories"] if row["key"] == ADMITTED.key)
+    assert edge["installation_verified"] is installed
+    assert edge["pin"] == (policy["source_ref"] if installed else None)
+    assert all((claw / path).read_bytes() == content for path, content in snapshots.items())
+    assert (roots["traitmech"] / "scripts/legacy.py").read_text() != payload
+    if installed:
+        assert (roots[ADMITTED.key] / "scripts/legacy.py").read_text() != payload
+
+
+def test_future_payload_requires_valid_current_checksum_even_with_admission(tmp_path):
+    claw, roots, *_ = admitted(tmp_path, installed=True)
+    evolve_payload(claw, update_digest=False)
+    with pytest.raises(GovernanceError, match="checksum drift"):
+        validate_packaged_transition(claw)
+    with pytest.raises(GovernanceError, match="checksum drift"):
+        audit_release(claw, roots)
+
+
+@pytest.mark.parametrize("key", ["traitmech", "dufmech", ADMITTED.key])
+def test_new_current_payload_never_substitutes_for_any_admitted_or_historical_pin(tmp_path, key):
+    claw, roots, *_ = admitted(tmp_path, installed=True)
+    _, payload = evolve_payload(claw)
+    put(roots[key], "scripts/legacy.py", payload)
+    commit(roots[key])
+    result = audit_release(claw, roots)
+    assert not result["ok"]
+    row = next(row for row in result["repositories"] if row["key"] == key)
+    assert any(issue["code"] == "committed_drift" for issue in row["issues"])
+
+
+@pytest.mark.parametrize("field", ["target", "mode", "consumers", "consumer_identity", "extra_member", "pin_path"])
+def test_future_current_manifest_cannot_change_admitted_authority_or_layout(tmp_path, field):
+    claw, roots, *_ = admitted(tmp_path)
+    manifest = json.loads((claw / MANIFEST).read_bytes())
+    if field in {"target", "mode", "consumers"}:
+        artifact = manifest["artifacts"][0]
+        artifact[field] = {"target": "scripts/other.py", "mode": "0755", "consumers": [ADMITTED.key]}[field]
+        if field == "mode":
+            (claw / artifact["source"]).chmod(0o755)
+    elif field == "consumer_identity":
+        manifest["consumers"][ADMITTED.key]["github"] = "CultureBotAI/OtherMech"
+    elif field == "extra_member":
+        manifest["consumers"]["othermech"] = {"github": "CultureBotAI/OtherMech", "package_path": "src/othermech"}
+    else:
+        manifest["pin_path"] = "scripts/other-pin"
+    put(claw, MANIFEST, json.dumps(manifest))
+    commit(claw)
+    with pytest.raises(GovernanceError):
+        validate_packaged_transition(claw)
+    with pytest.raises(GovernanceError):
+        trusted_source_ref(claw)
+    with pytest.raises(GovernanceError):
+        audit_release(claw, roots)
+
+
+def test_packaged_admitted_snapshot_remains_bound_to_original_declaration(tmp_path):
+    claw, roots, *_ = admitted(tmp_path)
+    evolve_payload(claw)
+    put(claw, ADMITTED_MANIFEST_PATH, (claw / MANIFEST).read_text())
+    commit(claw)
+    for validate in (lambda: validate_packaged_transition(claw), lambda: trusted_source_ref(claw),
+                     lambda: audit_release(claw, roots)):
+        with pytest.raises(GovernanceError, match="source manifest hash differs"):
+            validate()

@@ -10,6 +10,7 @@ import hashlib
 import json
 import re
 from collections.abc import Mapping
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +34,7 @@ from .fleet_audit import _commit_at, _head_blob
 
 ADMISSION_PATH = "src/kg_microbe_governance/releases/edgemech-infrastructure-admission-v1.json"
 HISTORICAL_MANIFEST_PATH = "src/kg_microbe_governance/releases/mech-cycle-v2-governance-manifest.json"
+ADMITTED_MANIFEST_PATH = "src/kg_microbe_governance/releases/edgemech-infrastructure-source-manifest.json"
 ADMISSION_ID = "edgemech-post-cutoff-infrastructure-v1"
 ADMITTED = Consumer("edgemech", "CultureBotAI/EdgeMech", "src/edgemech")
 NATIVE_TESTS = frozenset({
@@ -153,18 +155,31 @@ def validate_transition(
     return new
 
 
+def validate_current_layout(admitted: GovernanceManifest, current_content: bytes) -> GovernanceManifest:
+    """Permit checksum-valid future payloads, never new authority or applicability."""
+    current = parse_manifest(current_content)
+
+    def layout(manifest: GovernanceManifest) -> GovernanceManifest:
+        return replace(manifest, artifacts=tuple(replace(a, sha256="") for a in manifest.artifacts))
+
+    if layout(current) != layout(admitted):
+        raise GovernanceError("Current trusted governance authority/layout differs from the admitted snapshot")
+    return current
+
+
 def validate_packaged_transition(root: Path) -> dict[str, Any]:
     """Validate candidate/package bytes, without asserting protected activation."""
     from .cycle_release_audit import FLEET_PATH, RELEASE_PATH, parse_release
 
     historical = (root / RELEASE_PATH).read_bytes()
-    release = parse_release(historical)
-    for path, digest in release["workflow_assets"].items():
-        if sha((root / path).read_bytes()) != digest:
-            raise GovernanceError("Admission changed a frozen release workflow asset")
+    parse_release(historical)
     policy = parse_admission((root / ADMISSION_PATH).read_bytes())
-    validate_transition(policy, historical, (root / HISTORICAL_MANIFEST_PATH).read_bytes(),
-                        (root / CANONICAL_MANIFEST_PATH).read_bytes(), (root / FLEET_PATH).read_bytes())
+    admitted = validate_transition(policy, historical, (root / HISTORICAL_MANIFEST_PATH).read_bytes(),
+                                   (root / ADMITTED_MANIFEST_PATH).read_bytes(), (root / FLEET_PATH).read_bytes())
+    current = validate_current_layout(admitted, (root / CANONICAL_MANIFEST_PATH).read_bytes())
+    for artifact in current.artifacts:
+        if sha((root / artifact.source).read_bytes()) != artifact.sha256:
+            raise GovernanceError(f"Current canonical payload checksum drift: {artifact.source}")
     return policy
 
 
@@ -187,7 +202,7 @@ def admission_anchor(root: Path, head: str, content: bytes) -> str:
 
 
 def bind_source_snapshot(
-    root: Path, source_ref: str, current_manifest: bytes, current_payloads: Mapping[str, bytes],
+    root: Path, source_ref: str, admitted_manifest: bytes, historical_payloads: Mapping[str, bytes],
 ) -> tuple[GovernanceManifest, dict[str, bytes]]:
     """Authenticate actual immutable source objects before creating any URL binding."""
     from .cycle_release_audit import _snapshot
@@ -195,7 +210,9 @@ def bind_source_snapshot(
     if _commit_at(root, source_ref) != source_ref:
         raise GovernanceError("Infrastructure data ref is not the exact declared commit")
     source, payloads, raw = _snapshot(root, source_ref)
-    if raw != current_manifest or payloads != dict(current_payloads):
+    if raw != admitted_manifest or {
+        k: v for k, v in payloads.items() if k != CANONICAL_MANIFEST_PATH
+    } != {k: v for k, v in historical_payloads.items() if k != CANONICAL_MANIFEST_PATH}:
         raise GovernanceError("Actual infrastructure source snapshot differs from the admitted bytes")
     return source, payloads
 
@@ -236,8 +253,9 @@ def trusted_source_ref(root: Path) -> str | None:
     baseline = _blob(root, release["release_ref"], CANONICAL_MANIFEST_PATH)
     if _blob(root, head, HISTORICAL_MANIFEST_PATH) != baseline:
         raise GovernanceError("Data preparation historical snapshot differs")
-    validate_transition(policy, historical, baseline, _blob(root, head, CANONICAL_MANIFEST_PATH),
-                        _blob(root, head, FLEET_PATH))
+    admitted = validate_transition(policy, historical, baseline, _blob(root, head, ADMITTED_MANIFEST_PATH),
+                                   _blob(root, head, FLEET_PATH))
+    validate_current_layout(admitted, _blob(root, head, CANONICAL_MANIFEST_PATH))
     _require_clean_worktree(root)
     if _commit_at(root, "HEAD") != head or _commit_at(root, "refs/remotes/origin/main") != main:
         raise GovernanceError("Trusted history changed during data preparation")

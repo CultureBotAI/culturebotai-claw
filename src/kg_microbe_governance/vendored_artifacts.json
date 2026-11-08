@@ -169,7 +169,7 @@
       "source": "src/kg_microbe_governance/artifacts/prompts/backlog-loop-goal.md",
       "target": "prompts/backlog-loop-goal.md",
       "consumers": "all",
-      "sha256": "0babff88b826007cba9f6e1d83f761cc3a951e19d0c37da072a9c39a8781ff88",
+      "sha256": "0b75a1976f71ad8595ec9d1f293afcddafed4287ae0e67fc8bb348a6467df610",
       "mode": "0644"
     },
     {
@@ -257,7 +257,7 @@
       "source": "src/kg_microbe_governance/artifacts/docs/record-reviews.md",
       "target": "docs/record-reviews.md",
       "consumers": "all",
-      "sha256": "452a19ab688276747b7c4308523a14d4d99c1c39ef6909ae8a90b85b7a9b3e9b",
+      "sha256": "eaedec5783b40925a3f0e159dfd1202c315a12e98c8859526378ceea5c547822",
       "mode": "0644"
     },
     {

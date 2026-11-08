@@ -823,7 +823,7 @@ def write_goal_evidence(setup, ledger, *, findings=None, groups=None, infra_task
         path.write_text((setup.repo / "INFRA_TASKS.md").read_text() if kind == "infra_snapshot"
                         else f"{kind} evidence for cycle {cycle} stage {stage}\n")
         artifacts.append({"path": str(path.relative_to(setup.repo)), "sha256": hashlib.sha256(path.read_bytes()).hexdigest(), "kind": kind})
-    data = {"schema_version": "1.0.0", "repository_key": "traitmech", "github_repository": "CultureBotAI/TraitMech",
+    data = {"schema_version": "1.0.0", "repository_key": setup.target["repository_key"], "github_repository": setup.target["github_repository"],
             "run_id": ledger["run_id"], "cycle": cycle, "stage": stage, "revision": 1,
             "outcome": "completed" if findings or groups or infra_tasks else "no_findings",
             "summary": "Bounded review evidence", "source_revision": HEAD, "artifacts": artifacts,
