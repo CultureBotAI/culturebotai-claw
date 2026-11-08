@@ -38,7 +38,8 @@ def test_seven_goal_migration_dispatches_new_stage_key_through_boundary(cycle_se
     monkeypatch.setattr(instance, 'port_pressure', pressure)
     decision = supervisor.decide(ledger, fixture.observation)
     result = instance.dispatch(fixture.target, ledger, decision)
-    assert result['state'] == 'sent'
+    assert result['state'] == 'uncertain'  # Transport succeeded; native acceptance is still unproven.
+    assert 'action' not in supervisor.decide(ledger, fixture.observation)
     assert len(boundaries) == len(sent) == 1
     assert boundaries[0]['next_stage_key'] == 'open_issue_triage'
     assert sent[0]['message'].startswith('/goal Use the native skill for open_issue_triage')
