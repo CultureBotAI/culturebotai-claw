@@ -237,6 +237,32 @@ def native_goal_declaration(payload):
     return False
 
 
+
+# Bounded, hash-only proof of actual user input, separate from workspace history.
+USER_INPUT_LIMIT = 200
+
+
+def user_input_evidence(index, status, payload):
+    """Retain exact text identity without publishing arbitrary user messages.
+
+    Native /goal input stores the slash command in structured metadata and the
+    text suffix in items. Reconstruct that prefix only when the real declaration
+    exists; a literal /goal string is not a native goal declaration.
+    """
+    value = "\n".join(user_parts(payload))
+    declaration = native_goal_declaration(payload)
+    if declaration and not value.startswith("/goal"):
+        value = "/goal" + value
+    return {
+        "step_index": index,
+        "status_number": status,
+        "text_sha256": hashlib.sha256(value.encode("utf-8")).hexdigest(),
+        "text_length": len(value),
+        "native_goal_declaration": declaration,
+        **metadata_times(payload),
+    }
+
+
 def terminal_marker(visible):
     """Accept only a column-zero native marker outside recognized code fences.
 
@@ -447,6 +473,17 @@ def inspect(repo, cid):
             if len(public) >= 3:
                 break
         row["latest_public_messages"] = public
+        inputs = c.execute(
+            "select idx,status,step_payload from steps where step_type=14 "
+            "order by idx desc limit ?", (USER_INPUT_LIMIT + 1,),
+        ).fetchall()
+        row["user_input_evidence"] = {
+            "schema_version": 1,
+            "limit": USER_INPUT_LIMIT,
+            "truncated": len(inputs) > USER_INPUT_LIMIT,
+            "inputs": [user_input_evidence(idx, status, payload)
+                       for idx, status, payload in reversed(inputs[:USER_INPUT_LIMIT])],
+        }
         # An older background tool can still be running after the latest step is
         # done. Inspect every active tool, retaining metadata rather than its
         # arbitrary command arguments. Completed tools are not active evidence.

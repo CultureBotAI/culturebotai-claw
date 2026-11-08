@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -46,7 +47,7 @@ def setup(tmp_path):
     ledger = supervisor.new_ledger(config, target)
     ledger.update(adopted_goal=copy.deepcopy(GOAL), baseline_status="", baseline_head=HEAD)
     observation = {"ready": True, "observed_at": supervisor.now(), "goal_identity": copy.deepcopy(GOAL),
-                   "goal_state": "completed", "native": {"conversation_id": GOAL["conversation_id"],
+                   "goal_state": "completed", "native": {"conversation_id": GOAL["conversation_id"], "last_step": {"index": 12},
                        "current_goal": {**GOAL, "state": "completed", "goal_text": "original goal"}},
                    "tab": {"window": 1, "tab": 1, "tty": target["tty"], "screen": "idle screen"}}
     artifact = repo / "review.txt"
@@ -304,6 +305,27 @@ def make_instance(setup, monkeypatch, send):
     return instance
 
 
+
+def record_native_input(setup, action, *, index=None, declaration=None):
+    """Fixture actual native text proof, deliberately distinct from history."""
+    action.setdefault("message", "/goal next objective [" + action["marker"] + "]")
+    action.setdefault("native_step_index", 12)
+    action.setdefault("goal_identity", copy.deepcopy(setup.observation["goal_identity"]))
+    declaration = action["kind"] == "start_goal" if declaration is None else declaration
+    index = index if index is not None else action["native_step_index"] + 1
+    created = datetime.fromtimestamp((action["reserved_epoch_ms"] + 1) / 1000, timezone.utc).isoformat()
+    native = setup.observation["native"]
+    native.update(root=setup.target["root"], workspace_identity={"verified": True},
+                  user_input_evidence={"schema_version": 1, "truncated": False, "inputs": [{
+                      "step_index": index, "status_number": 3, "created_at": created,
+                      "text_sha256": hashlib.sha256(action["message"].encode()).hexdigest(),
+                      "text_length": len(action["message"]), "native_goal_declaration": declaration}]})
+    if action["kind"] == "start_goal":
+        setup.observation["goal_identity"].update(start_step_index=index, started_at=created)
+        native["current_goal"].update(start_step_index=index, started_at=created)
+    return native["user_input_evidence"]["inputs"][0]
+
+
 def test_dispatch_reserves_durable_intent_before_input_and_timeout_is_not_retried(setup, monkeypatch):
     def timeout(*args):
         saved = json.loads((setup.runtime / "traitmech/ledger.json").read_text())
@@ -335,7 +357,7 @@ def test_shared_input_lock_prevents_concurrent_terminal_writer(setup, monkeypatc
             instance.dispatch(setup.target, setup.ledger, decision)
 
 
-def test_native_history_marker_reconciles_uncertain_without_duplicate(setup, monkeypatch):
+def test_native_history_marker_alone_does_not_accept_or_retry(setup, monkeypatch):
     instance = make_instance(setup, monkeypatch, lambda *_: pytest.fail("must not type"))
     action = {"state": "uncertain", "stage": 1, "kind": "finalize", "marker": "MECH-WORKFLOW-test",
               "reserved_epoch_ms": 100, "native_session_id": setup.target["native_session_id"]}
@@ -344,7 +366,7 @@ def test_native_history_marker_reconciles_uncertain_without_duplicate(setup, mon
         "conversationId": setup.target["native_session_id"],
         "timestamp": 101, "display": "[MECH-WORKFLOW-test] instruction"}) + "\n")
     instance.reconcile(setup.target, setup.ledger, setup.observation)
-    assert action["state"] == "accepted"
+    assert action["state"] == "uncertain"
     assert "action" not in supervisor.decide(setup.ledger, setup.observation)
 
 
@@ -375,6 +397,7 @@ def test_new_goal_marker_adoption_preserves_pre_goal_clean_baseline(setup, monke
         "native_session_id": setup.target["native_session_id"]}
     setup.observation["goal_identity"]["start_step_index"] = 40
     setup.observation["native"]["current_goal"].update(start_step_index=40, goal_text="next MECH-WORKFLOW-next")
+    record_native_input(setup, setup.ledger["actions"]["next"], index=40)
     instance.reconcile(setup.target, setup.ledger, setup.observation)
     assert not setup.ledger["awaiting_goal"]
     assert setup.ledger["adopted_goal"]["start_step_index"] == 40
@@ -483,7 +506,7 @@ def test_repair_dispatch_uses_same_reason_and_receipt_hash_then_refuses_changed_
     path.write_text('{"incomplete": true}')
     receipt_hash = hashlib.sha256(path.read_bytes()).hexdigest()
     decision = supervisor.repair_decision(setup.ledger, setup.observation, "missing validation", receipt_hash)
-    assert instance.dispatch(setup.target, setup.ledger, decision)["state"] == "sent"
+    assert instance.dispatch(setup.target, setup.ledger, decision)["state"] == "uncertain"
     assert "missing validation" in sent[0]
     path.write_text('{"corrected": true}')
     assert instance.dispatch(setup.target, setup.ledger, decision)["state"] == "not-sent"
@@ -590,7 +613,7 @@ def test_definitively_unsent_repair_retries_without_waiting_for_acceptance(setup
     # occur because of this attempt, so the same repair must remain retryable.
     retry = supervisor.decide(setup.ledger, setup.observation)
     assert retry["action"] == "repair_closure" and retry["action_id"] == first["action_id"]
-    assert instance.dispatch(setup.target, setup.ledger, retry)["state"] == "sent"
+    assert instance.dispatch(setup.target, setup.ledger, retry)["state"] == "uncertain"
 
 
 def test_definitively_unsent_repairs_do_not_exhaust_delivery_allowance(setup, monkeypatch):
@@ -727,6 +750,7 @@ def test_fifo_artifact_is_rejected_promptly_in_fresh_process(setup):
     probe = """
 import importlib.util,json,sys
 from pathlib import Path
+from datetime import datetime, timezone
 spec=importlib.util.spec_from_file_location("reviewed_supervisor",sys.argv[1])
 module=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
@@ -867,11 +891,12 @@ def test_two_full_six_goal_cycles_keep_all_identity_and_closure_history(cycle_se
             decision = supervisor.decide(ledger, setup.observation)
             starts.append(decision["action_id"])
             action = instance.dispatch(setup.target, ledger, decision)
-            assert action["state"] == "sent"
+            assert action["state"] == "uncertain"
             setup.observation["goal_identity"]["start_step_index"] += 10
             setup.observation["native"]["current_goal"].update(
                 start_step_index=setup.observation["goal_identity"]["start_step_index"],
                 goal_text="new native objective " + action["marker"])
+            record_native_input(setup, action, index=setup.observation["goal_identity"]["start_step_index"])
             instance.reconcile(setup.target, ledger, setup.observation)
             assert not ledger["awaiting_goal"]
             instance.save(setup.target, ledger)
@@ -1004,6 +1029,7 @@ def test_migration_preserves_native_goal_and_old_receipts_but_handoff_is_not_com
     Path(setup.config["history_path"]).write_text(json.dumps({"workspace": setup.target["root"],
         "conversationId": setup.target["native_session_id"], "timestamp": action["reserved_epoch_ms"] + 1,
         "display": action["marker"]}) + "\n")
+    record_native_input(setup, action)
     instance.reconcile(setup.target, migrated, setup.observation)
     assert not migrated["policy_notification_required"]
     setup.observation["goal_state"] = "active"
@@ -1130,6 +1156,7 @@ def test_nonregular_runtime_input_cannot_block_the_fleet(cycle_setup):
     probe = '''
 import importlib.util,sys
 from pathlib import Path
+from datetime import datetime, timezone
 spec=importlib.util.spec_from_file_location("supervisor",sys.argv[1])
 module=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
@@ -1159,6 +1186,7 @@ def test_migrated_pending_next_goal_is_reconciled_without_new_identifier_resend(
         start_step_index=setup.observation["goal_identity"]["start_step_index"],
         goal_text="already started MECH-WORKFLOW-old-v1-identifier")
     instance = cycle_instance(setup, monkeypatch)
+    record_native_input(setup, ledger["actions"]["old-v1-identifier"], index=setup.observation["goal_identity"]["start_step_index"])
     instance.reconcile(setup.target, ledger, setup.observation)
     assert not ledger["awaiting_goal"]
     assert ledger["actions"]["old-v1-identifier"]["state"] == "accepted"
@@ -1497,3 +1525,65 @@ def test_send_js_and_redraw_js_use_history_tail_and_restore_rows(setup):
     assert res_redraw["currentRows"] == 22
     assert res_redraw["out"]["screen"].endswith("\nrefreshed tail")
 
+
+
+def test_transport_return_without_native_input_is_uncertain_and_not_retried(setup, monkeypatch):
+    calls = []
+    instance = make_instance(setup, monkeypatch, lambda *args: calls.append(args) or "sent")
+    action = instance.dispatch(setup.target, setup.ledger, supervisor.decide(setup.ledger, setup.observation))
+    assert action["state"] == "uncertain"
+    assert action["message_sha256"] == hashlib.sha256(action["message"].encode()).hexdigest()
+    assert "action" not in supervisor.decide(setup.ledger, setup.observation)
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize("invalid", [None, "partial", "different", "duplicate", "old_step", "old_time",
+    "naive_time", "wrong_conversation", "wrong_workspace", "goal_changed", "bounded_out", "message_changed"])
+def test_exact_native_input_required_for_delivery_acceptance(setup, monkeypatch, invalid):
+    instance = make_instance(setup, monkeypatch, lambda *_: pytest.fail("must not type"))
+    action = {"state": "uncertain", "stage": 1, "kind": "finalize", "marker": "MECH-WORKFLOW-test",
+              "reserved_epoch_ms": 100, "native_session_id": setup.target["native_session_id"],
+              "message": "[MECH-WORKFLOW-test] complete the whole authorized instruction", "native_step_index": 20,
+              "goal_identity": copy.deepcopy(GOAL)}
+    setup.ledger["actions"]["test"] = action
+    entry = record_native_input(setup, action)
+    native = setup.observation["native"]
+    if invalid in {"partial", "different"}:
+        text = action["message"][:-12] if invalid == "partial" else "Quote " + action["message"]
+        entry.update(text_sha256=hashlib.sha256(text.encode()).hexdigest(), text_length=len(text))
+    elif invalid == "duplicate":
+        native["user_input_evidence"]["inputs"].append({**entry, "step_index": 22})
+    elif invalid == "old_step": entry["step_index"] = 20
+    elif invalid == "old_time": entry["created_at"] = "1970-01-01T00:00:00+00:00"
+    elif invalid == "naive_time": entry["created_at"] = "1970-01-01T00:00:01"
+    elif invalid == "wrong_conversation": native["conversation_id"] = "other"
+    elif invalid == "wrong_workspace": native["root"] = "/other/repository"
+    elif invalid == "goal_changed": setup.observation["goal_identity"]["start_step_index"] += 1
+    elif invalid == "bounded_out": native["user_input_evidence"]["truncated"] = True
+    elif invalid == "message_changed": action["message_sha256"] = "f" * 64
+    # Even an exact history display cannot compensate for an invalid native input.
+    Path(setup.config["history_path"]).write_text(json.dumps({"workspace": setup.target["root"],
+        "conversationId": setup.target["native_session_id"], "timestamp": 101, "display": action["message"]}) + "\n")
+    instance.reconcile(setup.target, setup.ledger, setup.observation)
+    assert action["state"] == ("accepted" if invalid is None else "uncertain")
+    if invalid is None:
+        accepted = copy.deepcopy(action)
+        instance.reconcile(setup.target, setup.ledger, setup.observation)
+        assert action == accepted  # no repeated rewriting of accepted_at
+        assert action["acceptance"] == "native_exact_user_input"
+    assert "action" not in supervisor.decide(setup.ledger, setup.observation)
+
+
+@pytest.mark.parametrize("declaration", [False, True])
+def test_start_goal_needs_real_native_declaration_not_literal_goal_or_marker(setup, monkeypatch, declaration):
+    instance = make_instance(setup, monkeypatch, lambda *_: pytest.fail("must not type"))
+    setup.ledger.update(stage=2, awaiting_goal=True)
+    action = {"kind": "start_goal", "stage": 2, "state": "uncertain", "marker": "MECH-WORKFLOW-next",
+              "reserved_epoch_ms": 1, "native_session_id": setup.target["native_session_id"],
+              "message": "/goal the whole next objective [MECH-WORKFLOW-next]", "native_step_index": 12}
+    setup.ledger["actions"]["next"] = action
+    record_native_input(setup, action, index=40, declaration=declaration)
+    setup.observation["native"]["current_goal"]["goal_text"] = action["message"]
+    instance.reconcile(setup.target, setup.ledger, setup.observation)
+    assert setup.ledger["awaiting_goal"] is not declaration
+    assert action["state"] == ("accepted" if declaration else "uncertain")
