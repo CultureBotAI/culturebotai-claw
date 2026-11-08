@@ -750,7 +750,6 @@ def test_fifo_artifact_is_rejected_promptly_in_fresh_process(setup):
     probe = """
 import importlib.util,json,sys
 from pathlib import Path
-from datetime import datetime, timezone
 spec=importlib.util.spec_from_file_location("reviewed_supervisor",sys.argv[1])
 module=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
@@ -1156,7 +1155,6 @@ def test_nonregular_runtime_input_cannot_block_the_fleet(cycle_setup):
     probe = '''
 import importlib.util,sys
 from pathlib import Path
-from datetime import datetime, timezone
 spec=importlib.util.spec_from_file_location("supervisor",sys.argv[1])
 module=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)

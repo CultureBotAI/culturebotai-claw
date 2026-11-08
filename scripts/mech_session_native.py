@@ -251,7 +251,7 @@ def user_input_evidence(index, status, payload):
     """
     value = "\n".join(user_parts(payload))
     declaration = native_goal_declaration(payload)
-    if declaration and not value.startswith("/goal"):
+    if declaration:
         value = "/goal" + value
     return {
         "step_index": index,

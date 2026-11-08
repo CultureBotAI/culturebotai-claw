@@ -379,3 +379,12 @@ def test_recent_input_evidence_is_bounded_and_excludes_assistant_text(tmp_path, 
     assert evidence["truncated"] is True
     assert [row["step_index"] for row in evidence["inputs"]] == [11, 12]
     assert "instruction" not in json.dumps(evidence)
+
+
+def test_structured_goal_prefix_does_not_collapse_literal_prefix_in_suffix():
+    suffix = "/goal review [MECH-WORKFLOW-example]"
+    payload = bytefield(19, bytefield(3, bytefield(1, suffix.encode())) + goal_context())
+    proof = native.user_input_evidence(40, 3, payload)
+    assert proof["text_sha256"] == hashlib.sha256(("/goal" + suffix).encode()).hexdigest()
+    assert proof["text_sha256"] != hashlib.sha256(suffix.encode()).hexdigest()
+    assert proof["text_length"] == len(suffix) + len("/goal")
