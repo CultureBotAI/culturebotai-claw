@@ -182,9 +182,11 @@ from contextlib import redirect_stdout
 from datetime import datetime, timedelta, timezone
 from importlib.metadata import distribution
 from io import StringIO
+import hashlib
 import json
 import os
 from pathlib import Path
+import subprocess
 import sys
 
 import cli as cli_package
@@ -300,6 +302,29 @@ assert review_entry.load()(["render", "--content", sys.argv[3]]) == 0
 assert default_config_path().is_relative_to(unpacked)
 governance = load_governance_manifest(fleet_manifest=manifest)
 assert len(governance.artifacts) == 26
+# Exercise admitted sync through installed resources, with only immutable
+# fixture DATA supplied from outside the unpacked wheel. No repository imports
+# or network calls can satisfy this installed-package proof.
+admitted_path = unpacked / "kg_microbe_governance/releases/edgemech-infrastructure-source-manifest.json"
+admitted_raw = admitted_path.read_bytes()
+admitted_document = json.loads(admitted_raw)
+admitted_payloads = {"src/kg_microbe_governance/vendored_artifacts.json": admitted_raw}
+for artifact in admitted_document["artifacts"]:
+    payload = (unpacked / artifact["source"].removeprefix("src/")).read_bytes()
+    if hashlib.sha256(payload).hexdigest() != artifact["sha256"]:
+        payload = (Path(sys.argv[5]) / Path(artifact["source"]).name).read_bytes()
+    assert hashlib.sha256(payload).hexdigest() == artifact["sha256"]
+    admitted_payloads[artifact["source"]] = payload
+kg_microbe_governance.fetch_url = lambda url: admitted_payloads[url.split("/", 6)[-1]]
+edge_root = Path(sys.argv[2]).parent / "wheel-edge-consumer"
+subprocess.run(["git", "init", "-q", str(edge_root)], check=True)
+subprocess.run(["git", "-C", str(edge_root), "remote", "add", "origin",
+                "https://github.com/CultureBotAI/EdgeMech"], check=True)
+assert len(kg_microbe_governance.plan_sync("edgemech", edge_root,
+           "7e672227fb246a8359ad57b6d3975ce5ed329007")) == 20
+assert not (edge_root / "scripts").exists()
+for name in ("kg_microbe_governance.infrastructure_admission", "kg_microbe_governance.cycle_release_audit"):
+    assert Path(sys.modules[name].__file__).resolve().is_relative_to(unpacked)
 from kg_microbe_evidence import EvidenceConfig, EvidenceValidator
 assert Path(sys.modules["kg_microbe_evidence"].__file__).resolve().is_relative_to(unpacked)
 assert EvidenceValidator(unpacked, EvidenceConfig("references_cache")).check_item({"pmid": "1"}).verdict == "NO_QUOTE"
@@ -407,6 +432,7 @@ assert validated.exit_code == 0, validated.output
             json.dumps(load_fleet_manifest(
                 REPOSITORY_ROOT / "src/kg_microbe_fleet/fleet.yaml"
             ).keys),
+            str(REPOSITORY_ROOT / "tests/fixtures/edgemech-admitted-source"),
         ],
         cwd=tmp_path,
         env=smoke_environment,

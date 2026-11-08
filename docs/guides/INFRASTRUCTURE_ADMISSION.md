@@ -73,6 +73,17 @@ serving data under its URLs. Tests reject newer current bytes substituted under
 any historical or admitted pin. This separation resolves the current-main
 integration finding in PR 953 under issue 997 without repinning a consumer.
 
+The public sync APIs also distinguish this exact admitted source. Only the
+declared EdgeMech identity requesting the declaration's exact source ref may
+select its packaged frozen manifest. Current package checksums and admission
+layout still validate; the fetched manifest must match that snapshot exactly,
+and every fetched payload must match its frozen digest. The same authenticated
+bytes then flow through planning, the existing transactional writer and
+post-write verification. No current package bytes are written under the old
+pin. Other repository/ref pairs and `verify_canonical_ref` retain strict
+installed-package equality. Issue 1004 records the real dry-run failure that
+exposed this missing sync path before any target write or receipt.
+
 The infrastructure result has two distinct states:
 
 | State | Required evidence | What is established |

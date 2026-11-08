@@ -1,0 +1,10 @@
+{
+  "exit_code": 1,
+  "expected_failure": "Canonical artifact checksum drift",
+  "format": "edgemech-admitted-sync-mutation/v1",
+  "guard": "postverify",
+  "log_sha256": "71359182b0488362b240adbdf4b96c877302d6d11535955c57baba4ffb088466",
+  "node": "test_public_admitted_plan_install_and_noop_keep_same_old_source",
+  "production_source_unchanged": true,
+  "source_sha256": "cd4e9b3f22d247804a792565daf867a161d9cc9ac99f9b49276c5a768ef7faf9"
+}
