@@ -19,6 +19,11 @@ current goals, verified six-goal cycles, and distinct PR rounds across the fleet
 See the [progress accounting and publication guide](docs/guides/MECH_PROGRESS.md)
 for evidence rules, historical coverage, and automatic refresh.
 
+Session working state belongs in a durable repository-owned location, and
+committed batches should be published promptly. See the
+[session-state and publication guide](docs/guides/SESSION_STATE_DURABILITY.md)
+for the work-root policy, read-only risk reporting and closure requirements.
+
 ## Current support status
 
 | Surface | Status |

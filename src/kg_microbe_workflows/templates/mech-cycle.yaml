@@ -2,6 +2,13 @@ schema_version: 2.0.0
 id: mech-goal-cycle
 version: 2.0.0
 title: Shared seven-goal Mech cycle
+session_state_policy:
+  work_root: .temp
+  separate_clone_root: ~/agent-work/<repo>
+  prohibit_system_temp_state: true
+  push_committed_batches_same_day: true
+  require_origin_publication_at_closure: true
+  disposable_cache_allowed: true
 stages:
 - stage: 1
   key: open_issue_triage

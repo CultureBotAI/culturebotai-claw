@@ -172,6 +172,60 @@ def test_empty_normal_footer_is_not_busy():
     assert supervisor.terminal_busy_reason("border\n>\nborder\n? for shortcuts Gemini high\n\n") is None
 
 
+@pytest.mark.parametrize("historical_text", [
+    "○ Thought for 16.6s (Realizing Queued Message Timing)",
+    "○ Thought for 9s (Reviewing queued tasks)",
+    "  The messages queued earlier have all finished.",
+    "  The 2 tasks queued earlier have finished.",
+    "○ Thought for 3s (Reviewing 2 messages queued earlier)",
+    "  Queued messages: 3 were processed successfully.",
+])
+def test_completed_queue_prose_does_not_make_idle_composer_busy(historical_text):
+    # Sanitized CMM reproduction: completed thought remains within the 32-row
+    # footer window above an empty composer. No live queue controls are present.
+    screen = (
+        f"{historical_text}\n"
+        "● Explored 2 files (status.json, completion.json) (ctrl+o to expand)\n"
+        "\n▸ Thought for 9s, 267 tokens\n"
+        "  Verified that the completed closure receipt is synchronized.\n"
+        "────────────────────────────────────────────────────────────────\n"
+        ">\n"
+        "────────────────────────────────────────────────────────────────\n"
+        "? for shortcuts                         Gemini 4 Argon · high\n"
+    )
+    assert supervisor.terminal_busy_reason(screen) is None
+
+
+@pytest.mark.parametrize("controls", ["both", "send_immediately", "edit_queued"])
+def test_live_queue_controls_still_block_with_an_empty_composer(controls):
+    # Sanitized Community reproduction. Each actual queue control must be
+    # sufficient even if the other is clipped out of the terminal snapshot.
+    queued = (
+        "▸ [MECH-WORKFLOW-example] Read current status... "
+        "(alt+m to send immediately)\n"
+        if controls in {"both", "send_immediately"} else ""
+    )
+    footer = ("Press up to edit queued messages" if controls in {"both", "edit_queued"}
+              else "? for shortcuts")
+    screen = (
+        "○ Thought for 5m (Analyzing Current State)\n"
+        "● Explored 1 file (status.json) (ctrl+o to expand)\n"
+        f"{queued}"
+        "────────────────────────────────────────────────────────────────\n"
+        ">\n"
+        "────────────────────────────────────────────────────────────────\n"
+        f"  {footer}                         Gemini 4 Argon · high\n"
+    )
+    assert supervisor.terminal_busy_reason(screen) == "busy, background, or queued terminal state"
+
+
+@pytest.mark.parametrize("status", ["1 message queued", "2 tasks queued", "Queued messages: 3", "queued task: 1"])
+@pytest.mark.parametrize("layout", ["{status}", "Gemini high · {status}", "{status} · Gemini high", "Gemini high · {status} · /tasks"])
+def test_positive_queue_count_still_blocks(status, layout):
+    screen = "border\n>\nborder\n" + layout.format(status=status) + "\n"
+    assert supervisor.terminal_busy_reason(screen) == "busy, background, or queued terminal state"
+
+
 @pytest.mark.parametrize("reason", ["native execution is busy", "nonempty composer", "approval menu", "queued task"])
 def test_unready_sessions_never_receive_transition(setup, reason):
     setup.observation.update(ready=False, readiness_reason=reason)
@@ -823,7 +877,7 @@ def write_goal_evidence(setup, ledger, *, findings=None, groups=None, infra_task
         path.write_text((setup.repo / "INFRA_TASKS.md").read_text() if kind == "infra_snapshot"
                         else f"{kind} evidence for cycle {cycle} stage {stage}\n")
         artifacts.append({"path": str(path.relative_to(setup.repo)), "sha256": hashlib.sha256(path.read_bytes()).hexdigest(), "kind": kind})
-    data = {"schema_version": "1.0.0", "repository_key": "traitmech", "github_repository": "CultureBotAI/TraitMech",
+    data = {"schema_version": "1.0.0", "repository_key": setup.target["repository_key"], "github_repository": setup.target["github_repository"],
             "run_id": ledger["run_id"], "cycle": cycle, "stage": stage, "revision": 1,
             "outcome": "completed" if findings or groups or infra_tasks else "no_findings",
             "summary": "Bounded review evidence", "source_revision": HEAD, "artifacts": artifacts,

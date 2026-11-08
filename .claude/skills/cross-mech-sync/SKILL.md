@@ -93,6 +93,13 @@ prepared offline, but it is not a completed cross-Mech sync.
 
 ### A. Prepare the validated scope
 
+Keep the audit, worktrees, operation helpers and PR handoffs under the
+gitignored `<repo>/.temp/` durable root; verify that ignore rule before use.
+Use `~/agent-work/<repo>/` for a separately cloned repository. Never use
+`/tmp/`, `/private/tmp/` or `$TMPDIR` for this retained session state.
+Push every authorized committed batch branch the same day, even before
+opening its PR; verify publication and retain any failed-push blocker.
+
 ```bash
 CAPABILITY="${CAPABILITY:-}"
 TASK_SLUG="${TASK_SLUG:-}"
@@ -104,7 +111,9 @@ case "$TASK_SLUG" in
 esac
 ORCHESTRATION_ROOT="$(git rev-parse --show-toplevel)"
 test -f "$ORCHESTRATION_ROOT/plugins/lock_manager.py"
-AUDIT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/cross-mech-audit.XXXXXX")"
+DURABLE_ROOT="$ORCHESTRATION_ROOT/.temp"
+mkdir -p "$DURABLE_ROOT"
+AUDIT_DIR="$(mktemp -d "$DURABLE_ROOT/cross-mech-audit.XXXXXX")"
 FLEET_TSV="$AUDIT_DIR/fleet.tsv"
 uv run python -m kg_microbe_fleet targets \
   --capability "$CAPABILITY" > "$FLEET_TSV"
@@ -260,7 +269,7 @@ case "$TARGET_GITHUB" in
   *) echo "Invalid owner/repository identity: $TARGET_GITHUB" >&2; exit 2 ;;
 esac
 
-SYNC_DIR="$(mktemp -d "${TMPDIR:-/tmp}/cross-mech-${TARGET_KEY}.XXXXXX")"
+SYNC_DIR="$(mktemp -d "$DURABLE_ROOT/cross-mech-${TARGET_KEY}.XXXXXX")"
 WT="$SYNC_DIR/worktree"
 OPERATION_SCRIPT="$SYNC_DIR/apply-reviewed-change.sh"
 PR_BODY_FILE="$SYNC_DIR/pr-body.md"

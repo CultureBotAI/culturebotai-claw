@@ -161,6 +161,11 @@ def _snapshot(root: Path, ref: str) -> tuple[GovernanceManifest, dict[str, bytes
     return manifest, payloads, raw
 
 
+def _authority_layout(manifest: GovernanceManifest) -> GovernanceManifest:
+    """Keep every authority/layout field; only payload digests may evolve."""
+    return replace(manifest, artifacts=tuple(replace(artifact, sha256="") for artifact in manifest.artifacts))
+
+
 def _validate_release_assets(root: Path, ref: str, policy: Mapping[str, Any]) -> None:
     for path, digest in policy["workflow_assets"].items():
         if _sha(_blob(root, ref, path)) != digest:
@@ -205,9 +210,12 @@ def audit_release(trusted_root: Path, roots: Mapping[str, Path]) -> dict[str, An
     if (base_raw != candidate_raw or base_payloads != candidate_payloads
             or _sha(candidate_raw) != policy["manifest_sha256"]):
         raise GovernanceError("Cycle release must preserve exact baseline governance bytes and authority")
-    _, current_payloads, current_raw = _snapshot(trusted, head)
-    if current_raw != candidate_raw or current_payloads != candidate_payloads:
-        raise GovernanceError("Current trusted governance differs from the active cycle release")
+    # Current trusted code may publish future payload revisions without changing
+    # this immutable release. Validate their checksums but retain the exact
+    # authority/layout used for sparse checkout and the frozen target cohort.
+    current, _, _ = _snapshot(trusted, head)
+    if _authority_layout(current) != _authority_layout(candidate):
+        raise GovernanceError("Current trusted governance authority/layout differs from the active cycle release")
     _validate_release_assets(trusted, candidate_ref, policy)
     if set(roots) != set(candidate.consumers):
         raise GovernanceError(

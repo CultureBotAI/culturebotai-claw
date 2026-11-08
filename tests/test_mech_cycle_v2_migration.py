@@ -290,6 +290,7 @@ def stage_one_receipt(setup, *, empty=False, blocked=False):
     path.write_text(json.dumps(data))
     receipt = copy.deepcopy(setup.receipt)
     receipt.update(run_id=ledger["run_id"], workflow_sha256=ledger["workflow"]["sha256"],
+                   deliverable_commits=[HEAD, FIX],
                    issues=[] if empty else [{"number": 1, "disposition": "addressed", "fix_commit_sha": FIX}])
     receipt["goal_outputs"]["goal_evidence"] = {"path": str(path.relative_to(setup.repo)),
                                                 "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
