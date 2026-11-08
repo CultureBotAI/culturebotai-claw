@@ -39,7 +39,9 @@ def native_assertion_id(assertion: dict[str, Any]) -> str:
 
 def _file_key(locator: dict[str, Any]) -> tuple[str, str, str]:
     validate_relative_path(locator["path"])
-    return locator["repository"], locator["commit"], locator["path"]
+    # GitHub owner/repository names are case-insensitive. Preserve the original
+    # envelope and exact Git path; only the internal file lookup is normalized.
+    return locator["repository"].casefold(), locator["commit"], locator["path"]
 
 
 def validate_native_assertion(assertion: dict[str, Any]) -> None:
