@@ -172,6 +172,56 @@ def test_empty_normal_footer_is_not_busy():
     assert supervisor.terminal_busy_reason("border\n>\nborder\n? for shortcuts Gemini high\n\n") is None
 
 
+@pytest.mark.parametrize("historical_text", [
+    "○ Thought for 16.6s (Realizing Queued Message Timing)",
+    "○ Thought for 9s (Reviewing queued tasks)",
+    "  The messages queued earlier have all finished.",
+])
+def test_completed_queue_prose_does_not_make_idle_composer_busy(historical_text):
+    # Sanitized CMM reproduction: completed thought remains within the 32-row
+    # footer window above an empty composer. No live queue controls are present.
+    screen = (
+        f"{historical_text}\n"
+        "● Explored 2 files (status.json, completion.json) (ctrl+o to expand)\n"
+        "\n▸ Thought for 9s, 267 tokens\n"
+        "  Verified that the completed closure receipt is synchronized.\n"
+        "────────────────────────────────────────────────────────────────\n"
+        ">\n"
+        "────────────────────────────────────────────────────────────────\n"
+        "? for shortcuts                         Gemini 4 Argon · high\n"
+    )
+    assert supervisor.terminal_busy_reason(screen) is None
+
+
+@pytest.mark.parametrize("controls", ["both", "send_immediately", "edit_queued"])
+def test_live_queue_controls_still_block_with_an_empty_composer(controls):
+    # Sanitized Community reproduction. Each actual queue control must be
+    # sufficient even if the other is clipped out of the terminal snapshot.
+    queued = (
+        "▸ [MECH-WORKFLOW-example] Read current status... "
+        "(alt+m to send immediately)\n"
+        if controls in {"both", "send_immediately"} else ""
+    )
+    footer = ("Press up to edit queued messages" if controls in {"both", "edit_queued"}
+              else "? for shortcuts")
+    screen = (
+        "○ Thought for 5m (Analyzing Current State)\n"
+        "● Explored 1 file (status.json) (ctrl+o to expand)\n"
+        f"{queued}"
+        "────────────────────────────────────────────────────────────────\n"
+        ">\n"
+        "────────────────────────────────────────────────────────────────\n"
+        f"  {footer}                         Gemini 4 Argon · high\n"
+    )
+    assert supervisor.terminal_busy_reason(screen) == "busy, background, or queued terminal state"
+
+
+@pytest.mark.parametrize("status", ["1 message queued", "2 tasks queued", "Queued messages: 3", "queued task: 1"])
+def test_positive_queue_count_still_blocks(status):
+    screen = f"border\n>\nborder\nGemini high · {status}\n"
+    assert supervisor.terminal_busy_reason(screen) == "busy, background, or queued terminal state"
+
+
 @pytest.mark.parametrize("reason", ["native execution is busy", "nonempty composer", "approval menu", "queued task"])
 def test_unready_sessions_never_receive_transition(setup, reason):
     setup.observation.update(ready=False, readiness_reason=reason)
