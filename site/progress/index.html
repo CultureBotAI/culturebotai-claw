@@ -45,17 +45,18 @@
           <article class="metric"><p>Mechs observed</p><div><strong id="metric-mechs">—</strong><span id="metric-fleet-size"></span></div><small id="metric-attention">Within the published fleet</small></article>
           <article class="metric"><p>Goals completed</p><div><strong id="metric-goals">—</strong><span>verified closures</span></div><small id="metric-no-change">Includes verified no-change outcomes</small></article>
           <article class="metric"><p>PRs merged</p><div><strong id="metric-prs">—</strong><span>unique pull requests</span></div><small id="metric-open-prs">Associated with tracked goals</small></article>
-          <article class="metric"><p>Cycles completed</p><div><strong id="metric-cycles">—</strong><span>all six goals closed</span></div><small>A new cycle starts after infrastructure</small></article>
+          <article class="metric"><p>Cycles completed</p><div><strong id="metric-cycles">—</strong><span>all cycle goals closed</span></div><small>A new cycle starts after infrastructure</small></article>
         </section>
         <section class="sequence-panel" aria-labelledby="sequence-heading">
-          <div class="section-kicker"><h2 id="sequence-heading">One continuous cycle</h2><span>Each goal closes after verification</span></div>
+          <div class="section-kicker"><h2 id="sequence-heading">The seven-goal cycle</h2><span>Active v1 cycles retain their six goals</span></div>
           <ol class="sequence">
-            <li><span class="sequence-number">01</span><span>Add records<small>Discover &amp; curate</small></span></li>
-            <li><span class="sequence-number">02</span><span>Causal graphs<small>Connect mechanisms</small></span></li>
-            <li><span class="sequence-number">03</span><span>Protein examples<small>Ground in UniProt</small></span></li>
-            <li><span class="sequence-number">04</span><span>Record review<small>Version the findings</small></span></li>
-            <li><span class="sequence-number">05</span><span>Resolve findings<small>Group issues &amp; fix</small></span></li>
-            <li><span class="sequence-number">06</span><span>Infrastructure<small>Plan, improve, repeat</small></span></li>
+            <li><span class="sequence-number">01</span><span>Open-issue triage<small>Prioritize &amp; resolve</small></span></li>
+            <li><span class="sequence-number">02</span><span>Add records<small>Discover &amp; curate</small></span></li>
+            <li><span class="sequence-number">03</span><span>Causal graphs<small>Connect mechanisms</small></span></li>
+            <li><span class="sequence-number">04</span><span>Protein examples<small>Ground in UniProt</small></span></li>
+            <li><span class="sequence-number">05</span><span>Record review<small>Version the findings</small></span></li>
+            <li><span class="sequence-number">06</span><span>Resolve findings<small>Group issues &amp; fix</small></span></li>
+            <li><span class="sequence-number">07</span><span>Infrastructure<small>Plan, improve, repeat</small></span></li>
           </ol>
         </section>
         <section id="fleet" class="fleet-section" aria-labelledby="fleet-heading">
@@ -73,7 +74,7 @@
         </section>
         <aside class="coverage-note" aria-labelledby="coverage-heading">
           <div class="info-mark" aria-hidden="true">i</div>
-          <div><h2 id="coverage-heading">Progress you can trace</h2><p>Counts cover verified goal closures and explicitly associated PRs in the retained tracking history. A commit is not a PR; several PRs may belong to one goal. A cycle counts only when all six goals have verified closures. Earlier history is unknown, so these totals are lower bounds—not lifetime totals.</p><p>Stages preceding an adopted goal remain unverified until evidence is recorded. An observed waiting session does not mean its goal is complete.</p></div>
+          <div><h2 id="coverage-heading">Progress you can trace</h2><p>Counts cover verified goal closures and explicitly associated PRs in the retained tracking history. A commit is not a PR; several PRs may belong to one goal. A cycle counts only when every goal under its pinned parent has verified closure: six for v1 and seven for v2. Earlier history is unknown, so these totals are lower bounds—not lifetime totals.</p><p>Stages preceding an adopted goal remain unverified until evidence is recorded. An observed waiting session does not mean its goal is complete.</p></div>
         </aside>
       </div>
     </main>
