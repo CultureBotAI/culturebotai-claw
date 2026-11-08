@@ -6,7 +6,7 @@ where the two sides differ, and mutation is how that is shown. Each mutant
 below undoes one rule in src/kg_microbe_links/taxa.py or __main__.py; the
 named test must fail with the mutant applied, and the two test files must
 pass without it. The list includes every mutant the first review of PR 897
-(culturebotai-claw#910) found surviving, those the second (#939-#944) did, those the third (#968-#973) did, those the fourth (#991-#993) did, those the fifth (#994, #995 and its surviving mutants) did, those the Codex review (#998-#1003) did, the merge-chain pair found after it (#1017, #1018), and the review of those two rounds (#1019-#1023).
+(culturebotai-claw#910) found surviving, those the second (#939-#944) did, those the third (#968-#973) did, those the fourth (#991-#993) did, those the fifth (#994, #995 and its surviving mutants) did, those the Codex review (#998-#1003) did, the merge-chain pair found after it (#1017, #1018), the review of those two rounds (#1019-#1023), and the verification of that (#1042).
 Inputs: none; run from the claw checkout or worktree holding the script.
 Outputs: one line per mutant (KILLED or SURVIVED) and a nonzero exit if any
 survives, a mutant does not parse, a named test cannot be collected, or an
@@ -149,7 +149,9 @@ MUTANTS = [
     (TAXA, "merge chains not compressed, so every start re-walks", "            for walked in path:\n                merged[walked] = taxon  # the end: not itself merged\n", "",
      f"{UNIT}::test_a_long_merge_chain_is_read_in_linear_time"),
     (TAXA, "short row placed under the root", "            if None in row or None in row.values():", "            if False:",
-     f"{UNIT}::test_a_malformed_taxonmech_tsv_is_refused_not_a_traceback[data/raw/ncbitaxon_taxa.tsv-taxon_id\\tlabel\\trank\\tparent_id\\nNCBITaxon:1423\\tBacillus subtilis\\n-row 2 has a different number of cells than the header]"),
+     f"{UNIT}::test_a_malformed_taxonmech_tsv_is_refused_not_a_traceback[data/raw/ncbitaxon_taxa.tsv-taxon_id\\tlabel\\trank\\tparent_id\\nNCBITaxon:1\\troot\\tNO_RANK\\t\\nNCBITaxon:1423\\tBacillus subtilis\\n-row 3 has a different number of cells than the header]"),
+    (TAXA, "only the first row's shape checked", "        for n, row in enumerate(rows, 2):\n            if None in row", "        for n, row in enumerate(rows[:1], 2):\n            if None in row",
+     f"{UNIT}::test_a_malformed_taxonmech_tsv_is_refused_not_a_traceback[data/raw/ncbitaxon_taxa.tsv-taxon_id\\tlabel\\trank\\tparent_id\\nNCBITaxon:1\\troot\\tNO_RANK\\t\\nNCBITaxon:1423\\tBacillus subtilis\\n-row 3 has a different number of cells than the header]"),
     (TAXA, "csv errors not mapped", "            except (csv.Error, UnicodeDecodeError) as exc:", "            except UnicodeDecodeError as exc:",
      f"{UNIT}::test_a_malformed_taxonmech_tsv_is_refused_not_a_traceback[curation/seed_scope.tsv-identifier\\nNCBITaxon:" + "1" * 200_000 + "\\n-cannot be read as a TSV]"),
     (TAXA, "bad bytes in a TSV not mapped", "            except (csv.Error, UnicodeDecodeError) as exc:", "            except csv.Error as exc:",

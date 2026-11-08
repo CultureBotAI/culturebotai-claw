@@ -247,6 +247,9 @@ def test_a_pinned_sha256_is_checked_once_per_process(taxonmech):
 @pytest.mark.parametrize("table", [
     "old_taxon_id\tcurrent_taxon_id\nNCBITaxon:562\tNCBITaxon:562\n",
     "old_taxon_id\tcurrent_taxon_id\nNCBITaxon:777\tNCBITaxon:778\nNCBITaxon:778\tNCBITaxon:777\n",
+    # rho-shaped: the start is not on the cycle, so a check that only watches for a return to the start never ends
+    "old_taxon_id\tcurrent_taxon_id\nNCBITaxon:901\tNCBITaxon:902\nNCBITaxon:902\tNCBITaxon:903\n"
+    "NCBITaxon:903\tNCBITaxon:904\nNCBITaxon:904\tNCBITaxon:902\n",
 ])
 def test_a_self_mapping_or_cyclic_merge_table_is_refused(taxonmech, table):
     (taxonmech / "data" / "raw" / "ncbi_merged_ids.tsv").write_text(table, encoding="utf-8")
@@ -284,8 +287,8 @@ def test_a_long_merge_chain_is_read_in_linear_time(taxonmech):
     ("curation/seed_scope.tsv", "identifier\n562\n", "row 2: '562' is not an NCBITaxon CURIE"),
     ("curation/seed_scope.tsv", "identifier\nNCBITaxon:562x\n", "row 2: 'NCBITaxon:562x' is not an NCBITaxon CURIE"),
     ("curation/seed_scope.tsv", "identifier\nNCBITaxon:" + "1" * 200_000 + "\n", "cannot be read as a TSV"),
-    ("data/raw/ncbitaxon_taxa.tsv", "taxon_id\tlabel\trank\tparent_id\nNCBITaxon:1423\tBacillus subtilis\n",
-     "row 2 has a different number of cells than the header"),
+    ("data/raw/ncbitaxon_taxa.tsv", "taxon_id\tlabel\trank\tparent_id\nNCBITaxon:1\troot\tNO_RANK\t\nNCBITaxon:1423\tBacillus subtilis\n",
+     "row 3 has a different number of cells than the header"),  # a torn LAST line, after a good row
     ("data/raw/ncbitaxon_taxa.tsv", "taxon_id\tlabel\trank\tparent_id\nNCBITaxon:1423\tBacillus subtilis\tSPECIES\tNCBITaxon:1386\textra\n",
      "row 2 has a different number of cells than the header"),
     ("data/raw/ncbitaxon_taxa.tsv", "taxon_id\tlabel\n", "has no rank, parent_id column"),
