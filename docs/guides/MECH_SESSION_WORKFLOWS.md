@@ -230,7 +230,7 @@ until the native reader proves one exact full user input after the reserved
 step and time, in the same workspace, conversation and goal context. Hash-only
 input evidence is bounded to the latest 200 user steps; a reservation older
 than that window remains held for operator assessment. Missing, partial,
-different or duplicate inputs never authorize a retry or an automatic Enter.
+different or duplicate inputs never authorize a retry or an automatic Enter. Matching pending, queued or unknown-status inputs also defeat uniqueness. Only the observed plain-text input shape, or one SYSTEM goal declaration followed by its plain-text suffix, is supported; extra file or unknown scopes fail closed even when their displayed text has the same hash.
 Workspace-history markers alone are not acceptance authority.
 
 A `start_goal` additionally requires actual native SYSTEM `/goal` metadata and

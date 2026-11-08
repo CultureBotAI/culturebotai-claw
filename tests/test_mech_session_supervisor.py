@@ -317,7 +317,7 @@ def record_native_input(setup, action, *, index=None, declaration=None):
     native = setup.observation["native"]
     native.update(root=setup.target["root"], workspace_identity={"verified": True},
                   user_input_evidence={"schema_version": 1, "truncated": False, "inputs": [{
-                      "step_index": index, "status_number": 3, "created_at": created,
+                      "step_index": index, "status_number": 3, "created_at": created, "supported_input_shape": True,
                       "text_sha256": hashlib.sha256(action["message"].encode()).hexdigest(),
                       "text_length": len(action["message"]), "native_goal_declaration": declaration}]})
     if action["kind"] == "start_goal":
@@ -1536,7 +1536,8 @@ def test_transport_return_without_native_input_is_uncertain_and_not_retried(setu
 
 
 @pytest.mark.parametrize("invalid", [None, "partial", "different", "duplicate", "old_step", "old_time",
-    "naive_time", "wrong_conversation", "wrong_workspace", "goal_changed", "bounded_out", "message_changed"])
+    "naive_time", "wrong_conversation", "wrong_workspace", "goal_changed", "bounded_out", "message_changed",
+    "pending_duplicate", "queued_duplicate", "unknown_duplicate", "unsupported_shape"])
 def test_exact_native_input_required_for_delivery_acceptance(setup, monkeypatch, invalid):
     instance = make_instance(setup, monkeypatch, lambda *_: pytest.fail("must not type"))
     action = {"state": "uncertain", "stage": 1, "kind": "finalize", "marker": "MECH-WORKFLOW-test",
@@ -1551,6 +1552,11 @@ def test_exact_native_input_required_for_delivery_acceptance(setup, monkeypatch,
         entry.update(text_sha256=hashlib.sha256(text.encode()).hexdigest(), text_length=len(text))
     elif invalid == "duplicate":
         native["user_input_evidence"]["inputs"].append({**entry, "step_index": 22})
+    elif invalid in {"pending_duplicate", "queued_duplicate", "unknown_duplicate"}:
+        native["user_input_evidence"]["inputs"].append({**entry, "step_index": 22,
+            "status_number": {"pending_duplicate": 1, "queued_duplicate": 11, "unknown_duplicate": 99}[invalid]})
+    elif invalid == "unsupported_shape":
+        entry["supported_input_shape"] = False
     elif invalid == "old_step":
         entry["step_index"] = 20
     elif invalid == "old_time":

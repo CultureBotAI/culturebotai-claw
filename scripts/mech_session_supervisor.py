@@ -262,7 +262,6 @@ def native_delivery_proof(action: dict, target: dict, observation: dict) -> dict
     for entry in inputs:
         index = entry.get("step_index")
         if (type(index) is not int or index <= boundary
-                or entry.get("status_number") != 3
                 or entry.get("text_sha256") != expected_hash
                 or entry.get("text_length") != len(message)):
             continue
@@ -276,6 +275,8 @@ def native_delivery_proof(action: dict, target: dict, observation: dict) -> dict
     if len(matches) != 1:
         return None
     proof = matches[0]
+    if proof.get("status_number") != 3 or proof.get("supported_input_shape") is not True:
+        return None
     if action.get("kind") == "start_goal":
         identity = observation.get("goal_identity") or {}
         if (proof.get("native_goal_declaration") is not True

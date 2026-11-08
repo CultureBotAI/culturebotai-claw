@@ -242,6 +242,44 @@ def native_goal_declaration(payload):
 USER_INPUT_LIMIT = 200
 
 
+
+def supported_user_input_shape(payload):
+    """Only the observed plain item or SYSTEM goal plus plain item is supported.
+
+    File/unknown scopes and multiple text items must not collapse to the same
+    text hash as a generated plain instruction. Other UserInput body metadata
+    is not an input item; deprecated query text is explicitly unsupported.
+    """
+    body = fields(one(payload, 19, b""))
+    if any(number == 1 for number, _, _ in body):
+        return False
+    items = []
+    for number, wire, item in body:
+        if number == 3:
+            if wire != 2:
+                return False
+            items.append(fields(item))
+    if not items or len(items) > 2:
+        return False
+    plain = items[-1]
+    if len(plain) != 1 or plain[0][:2] != (1, 2):
+        return False
+    if len(items) == 1:
+        return True
+    scope_item = items[0]
+    if len(scope_item) != 1 or scope_item[0][:2] != (2, 2):
+        return False
+    scope = fields(scope_item[0][2])
+    if len(scope) != 1 or scope[0][:2] != (27, 2):
+        return False
+    command = fields(scope[0][2])
+    if len(command) != 1 or command[0][:2] != (1, 2):
+        return False
+    info = fields(command[0][2])
+    return ([(n, w) for n, w, _ in info] == [(1, 2), (2, 2), (3, 0)]
+            and native_goal_declaration(payload))
+
+
 def user_input_evidence(index, status, payload):
     """Retain exact text identity without publishing arbitrary user messages.
 
@@ -259,6 +297,7 @@ def user_input_evidence(index, status, payload):
         "text_sha256": hashlib.sha256(value.encode("utf-8")).hexdigest(),
         "text_length": len(value),
         "native_goal_declaration": declaration,
+        "supported_input_shape": supported_user_input_shape(payload),
         **metadata_times(payload),
     }
 

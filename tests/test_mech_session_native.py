@@ -388,3 +388,27 @@ def test_structured_goal_prefix_does_not_collapse_literal_prefix_in_suffix():
     assert proof["text_sha256"] == hashlib.sha256(("/goal" + suffix).encode()).hexdigest()
     assert proof["text_sha256"] != hashlib.sha256(suffix.encode()).hexdigest()
     assert proof["text_length"] == len(suffix) + len("/goal")
+
+
+@pytest.mark.parametrize("shape", ["plain", "goal", "file", "unknown", "two_goals", "split_text", "legacy", "reordered_goal"])
+def test_delivery_proof_rejects_extra_scopes_and_ambiguous_text_shapes(shape):
+    text = bytefield(3, bytefield(1, b" review [MECH-WORKFLOW-example]"))
+    body = text
+    if shape == "goal":
+        body = goal_context() + text
+    elif shape == "file":
+        body = text + bytefield(3, bytefield(2, bytefield(11, b"file context")))
+    elif shape == "unknown":
+        body = text + bytefield(3, bytefield(99, b"unknown context"))
+    elif shape == "two_goals":
+        body = goal_context() + goal_context() + text
+    elif shape == "split_text":
+        body = text + bytefield(3, bytefield(1, b"second segment"))
+    elif shape == "legacy":
+        body = bytefield(1, b"legacy text") + text
+    elif shape == "reordered_goal":
+        body = text + goal_context()
+    proof = native.user_input_evidence(40, 3, bytefield(19, body))
+    assert proof["supported_input_shape"] is (shape in {"plain", "goal"})
+    if shape in {"plain", "file", "unknown"}:
+        assert proof["text_sha256"] == hashlib.sha256(b" review [MECH-WORKFLOW-example]").hexdigest()
