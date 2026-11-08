@@ -63,7 +63,9 @@ uv run python scripts/mech_goal_reconcile.py --config "$CONFIG" --record "$RECOR
 
 The second command is read-only. It validates fresh native evidence, all recorded
 fingerprints, the independent review, the deployed clean implementation, and the
-normal ordered receipt. Native proof requires an old completed checkpoint before
+normal ordered receipt. It also reuses the supervisor’s pinned profile, retained
+legacy inputs and immutable workflow snapshot checks without eager writes;
+matching snapshots remain untouched. Native proof requires an old completed checkpoint before
 exactly one later declaration, terminal public completion evidence on both sides,
 a latest checkpoint retaining the old completion, and the exact completed idle
 current goal. Ambiguous, active, cancelled, resumed, or additional goals refuse.
@@ -103,7 +105,9 @@ consumed by an existing external goal repeating a marker.
 The writer prepares and validates everything before any mutation. Append-only
 receipt, frozen-scope and audit artifacts are written with a recovery journal;
 the single atomic ledger replacement occurs **last** and is the authoritative
-commit point. This is not a multi-file filesystem transaction. Fresh fingerprint
+commit point. The immutable audit records `prepared` and the expected canonical
+ledger digest; only a matching committed ledger proves application, and the CLI
+returns `applied` only after that replacement succeeds. This is not a multi-file filesystem transaction. Fresh fingerprint
 and native-proof checks run before auxiliary writes and immediately before the
 ledger replacement. A changed fact or write failure retains the old ledger and
 STOP; partial auxiliary files are evidence for reviewed recovery, not authority

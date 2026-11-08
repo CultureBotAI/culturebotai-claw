@@ -110,6 +110,9 @@ def test_dry_run_and_atomic_closure_preserve_historical_identity(case):
     result = apply(case)
     ledger = read_ledger(case)
     assert result['status'] == 'applied'
+    audit = json.loads(next((case.session / 'operator-reconciliations').glob('*/audit.json')).read_text())
+    assert audit['result']['status'] == 'prepared'
+    assert audit['result']['ledger_after_sha256'] == rec.canonical(ledger)
     assert ledger['adopted_goal']['start_step_index'] == 10144
     assert ledger['completed_stages'][-1]['goal_identity']['start_step_index'] == 10144
     assert ledger['completed_stages'][:-1] == case.ledger['completed_stages']
@@ -238,7 +241,11 @@ def test_post_auxiliary_drift_leaves_ledger_uncommitted_and_retry_held(case):
     with pytest.raises(rec.ReconciliationError, match='before ledger commit'):
         apply(case)
     assert (case.session / 'ledger.json').read_bytes() == original
-    assert list((case.session / 'operator-reconciliations').glob('*/audit.json'))
+    audits = list((case.session / 'operator-reconciliations').glob('*/audit.json'))
+    assert len(audits) == 1
+    audit = json.loads(audits[0].read_text())
+    assert audit['result']['status'] == 'prepared'
+    assert audit['commit_point'] == 'atomic ledger replacement'
     case.instance.native.reconciliation_evidence = lambda *args: case.proof
     with pytest.raises(rec.ReconciliationError, match='append-only'):
         apply(case)
@@ -318,3 +325,59 @@ def test_progress_counts_only_historical_stage5_and_both_ordered_prs(case):
     assert 'synthetic-duf-native-goal' not in public and 'start_step_index' not in public
     assert '11642' not in public
     assert '#387' not in public and '/pull/387' not in public
+
+
+@pytest.mark.parametrize('drift', ['profile', 'snapshot', 'archive'])
+def test_ordinary_workflow_pin_drift_cannot_reconcile(case, drift):
+    case.target.pop('workflow_next_profile_path', None)
+    case.config_path.write_text(json.dumps(case.config))
+    case.record['fingerprints'] = rec.fingerprints(case.config_path, case.session, case.target, case.proof)
+    write_record(case)
+    case.instance.check_workflow(case.target, case.ledger)
+    if drift == 'profile':
+        path = Path(case.target['workflow_profile_path'])
+        profile = json.loads(path.read_text())
+        profile['stages'][0]['goal_text'] += ' unreviewed change'
+        path.write_text(json.dumps(profile))
+    else:
+        path = (case.session / 'effective-workflow.json' if drift == 'snapshot' else
+                case.session / 'cycles/cycle-000003/effective-workflow.json')
+        data = json.loads(path.read_text())
+        data['effective']['stages'][0]['goal_text'] += ' unreviewed change'
+        path.write_text(json.dumps(data))
+    before = tree(case.runtime)
+    with pytest.raises((supervisor.SupervisorError, rec.ReconciliationError), match='pinned|archived'):
+        apply(case)
+    assert tree(case.runtime) == before
+
+
+def test_matching_workflow_snapshots_are_not_rewritten_and_queued_profile_is_retained(case):
+    case.instance.check_workflow(case.target, case.ledger)
+    paths = [case.session / 'effective-workflow.json', case.session / 'cycles/cycle-000003/effective-workflow.json']
+    before = [(path.read_bytes(), path.stat().st_mtime_ns) for path in paths]
+    # Existing supported same-path queued candidate does not rewrite active contract.
+    profile = Path(case.target['workflow_profile_path'])
+    profile.write_text(profile.read_text() + '\n')
+    apply(case)
+    assert [(path.read_bytes(), path.stat().st_mtime_ns) for path in paths] == before
+
+
+@pytest.mark.parametrize('missing', [False, True])
+def test_workflow_drift_during_auxiliary_commit_is_still_held(case, monkeypatch, missing):
+    original = (case.session / 'ledger.json').read_bytes()
+    real_commit = rec.ValidatedWriteTransaction.commit
+    def drift(*args, **kwargs):
+        result = real_commit(*args, **kwargs)
+        path = case.session / 'cycles/cycle-000003/effective-workflow.json'
+        data = json.loads(path.read_text())
+        data['effective']['stages'][0]['goal_text'] += ' changed after verification'
+        if missing:
+            path.unlink()
+        else:
+            path.write_text(json.dumps(data))
+        return result
+    monkeypatch.setattr(rec.ValidatedWriteTransaction, 'commit', drift)
+    with pytest.raises((supervisor.SupervisorError, rec.ReconciliationError), match='archived|disappeared'):
+        apply(case)
+    assert (case.session / 'ledger.json').read_bytes() == original
+    assert json.loads(next((case.session / 'operator-reconciliations').glob('*/audit.json')).read_text())['result']['status'] == 'prepared'

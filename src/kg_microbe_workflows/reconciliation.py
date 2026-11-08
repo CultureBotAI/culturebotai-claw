@@ -237,6 +237,25 @@ def prepare(supervisor: Any, helpers: Any, config_path: Path, record_path: Path,
     require(fingerprints(config_path, directory, target, proof) == expected, "live fingerprint differs from approved assessment")
     original = copy.deepcopy(ledger)
     outputs: dict[Path, dict] = {}
+
+    def check_workflow(*, capture_missing=True):
+        # Reuse every ordinary pin/archive guard without its eager writes.
+        # Matching snapshots are immutable inputs, not rewrite candidates.
+        previous_write = supervisor.write
+        def capture(path, value):
+            if path.exists() or path.is_symlink():
+                require(decode(regular_bytes(path, boundary=directory)) == value,
+                        "pinned workflow snapshot changed")
+            else:
+                require(capture_missing, "workflow snapshot disappeared before ledger commit")
+                outputs[path] = copy.deepcopy(value)
+        supervisor.write = capture
+        try:
+            supervisor.check_workflow(target, original)
+        finally:
+            supervisor.write = previous_write
+
+    check_workflow()
     if record["operation"] == "close_historical_goal":
         require(not ledger.get("awaiting_goal") and "historical_goal_boundary" not in ledger, "historical closure is not eligible")
         stages = ledger["workflow"]["effective"]["stages"]
@@ -292,12 +311,14 @@ def prepare(supervisor: Any, helpers: Any, config_path: Path, record_path: Path,
     require(ledger["actions"] == original["actions"] and ledger["workflow"] == original["workflow"]
             and ledger["adopted_goal"] == original["adopted_goal"]
             and ledger["completed_stages"][:len(original["completed_stages"])] == original["completed_stages"], "protected history changed")
+    check_workflow()
     require(fingerprints(config_path, directory, target, prove()) == expected, "live facts changed during verification")
     result = {"status": "applied" if apply else "dry_run", "record_sha256": sha(raw), "reconciliation_sha256": record_id,
               "operation": record["operation"], "from_stage": original["stage"], "to_stage": ledger["stage"],
               "ledger_before_sha256": expected["ledger_sha256"], "ledger_after_sha256": canonical(ledger), "sent_input": False}
     audit = directory / "operator-reconciliations" / record_id / "audit.json"
-    outputs[audit] = {"result": result, "assessment": record, "native_evidence": proof}
+    outputs[audit] = {"result": {**result, "status": "prepared"},
+                      "commit_point": "atomic ledger replacement", "assessment": record, "native_evidence": proof}
     for path in outputs:
         require(path.resolve().is_relative_to(directory) and not path.exists() and not path.is_symlink(), "append-only reconciliation output exists or escapes")
     if apply:
@@ -308,6 +329,7 @@ def prepare(supervisor: Any, helpers: Any, config_path: Path, record_path: Path,
         for path, value in outputs.items():
             transaction.stage(path, json.dumps(value, indent=2, sort_keys=True) + "\n")
         transaction.commit(apply=True)
+        check_workflow(capture_missing=False)
         require(fingerprints(config_path, directory, target, prove()) == expected, "live facts changed before ledger commit; hold for reviewed recovery")
         regular_bytes(supervisor.runtime / "STOP")
         helpers.atomic_json(directory / "ledger.json", ledger, boundary=supervisor.runtime)
