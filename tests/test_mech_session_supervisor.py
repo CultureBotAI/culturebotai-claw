@@ -7,8 +7,8 @@ import os
 import shutil
 import subprocess
 import sys
-from pathlib import Path
 from datetime import datetime, timezone
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -1553,14 +1553,22 @@ def test_exact_native_input_required_for_delivery_acceptance(setup, monkeypatch,
         entry.update(text_sha256=hashlib.sha256(text.encode()).hexdigest(), text_length=len(text))
     elif invalid == "duplicate":
         native["user_input_evidence"]["inputs"].append({**entry, "step_index": 22})
-    elif invalid == "old_step": entry["step_index"] = 20
-    elif invalid == "old_time": entry["created_at"] = "1970-01-01T00:00:00+00:00"
-    elif invalid == "naive_time": entry["created_at"] = "1970-01-01T00:00:01"
-    elif invalid == "wrong_conversation": native["conversation_id"] = "other"
-    elif invalid == "wrong_workspace": native["root"] = "/other/repository"
-    elif invalid == "goal_changed": setup.observation["goal_identity"]["start_step_index"] += 1
-    elif invalid == "bounded_out": native["user_input_evidence"]["truncated"] = True
-    elif invalid == "message_changed": action["message_sha256"] = "f" * 64
+    elif invalid == "old_step":
+        entry["step_index"] = 20
+    elif invalid == "old_time":
+        entry["created_at"] = "1970-01-01T00:00:00+00:00"
+    elif invalid == "naive_time":
+        entry["created_at"] = "1970-01-01T00:00:01"
+    elif invalid == "wrong_conversation":
+        native["conversation_id"] = "other"
+    elif invalid == "wrong_workspace":
+        native["root"] = "/other/repository"
+    elif invalid == "goal_changed":
+        setup.observation["goal_identity"]["start_step_index"] += 1
+    elif invalid == "bounded_out":
+        native["user_input_evidence"]["truncated"] = True
+    elif invalid == "message_changed":
+        action["message_sha256"] = "f" * 64
     # Even an exact history display cannot compensate for an invalid native input.
     Path(setup.config["history_path"]).write_text(json.dumps({"workspace": setup.target["root"],
         "conversationId": setup.target["native_session_id"], "timestamp": 101, "display": action["message"]}) + "\n")
