@@ -1696,7 +1696,9 @@ def test_dispatch_sends_short_exact_reference_preserving_full_instruction(setup,
     assert sent[0] != full
     artifact = json.loads(Path(action["instruction_artifact"]["path"]).read_text())
     assert artifact["instruction"] == full
-    assert artifact["goal_identity"] == GOAL
+    assert artifact["reservation_goal_identity"] == GOAL
+    assert "goal_identity" not in artifact
+    assert action["goal_identity"] == GOAL
     assert artifact["instruction_sha256"] == action["instruction_sha256"]
     assert supervisor.native_delivery_proof(action, setup.target, setup.observation) is None
     record_native_input(setup, action)
@@ -1763,3 +1765,20 @@ def test_reference_goal_requires_real_native_declaration_not_literal_or_mixed_in
     for bad in [action["message"][:-9], "<file>existing.yaml:4: " + action["message"] * 2, full]:
         entry.update(text_sha256=hashlib.sha256(bad.encode()).hexdigest(), text_length=len(bad))
         assert supervisor.native_delivery_proof(action, setup.target, setup.observation) is None
+
+
+def test_reference_artifact_predecessor_remains_distinct_from_adopted_receipt_identity(setup, monkeypatch):
+    instance = make_instance(setup, monkeypatch, lambda *_: "sent")
+    setup.ledger.update(awaiting_goal=True, stage=2)
+    action = instance.dispatch(setup.target, setup.ledger, supervisor.decide(setup.ledger, setup.observation))
+    artifact = json.loads(Path(action["instruction_artifact"]["path"]).read_text())
+    assert artifact["reservation_goal_identity"] == GOAL
+    assert "goal_identity" not in artifact
+    assert action["goal_identity"] == GOAL
+    record_native_input(setup, action)
+    instance.reconcile(setup.target, setup.ledger, setup.observation)
+    receipt = supervisor.receipt_template(setup.ledger, setup.target)
+    assert action["state"] == "accepted"
+    assert receipt["goal_identity"] == setup.observation["goal_identity"]
+    assert receipt["goal_identity"] != artifact["reservation_goal_identity"]
+    assert action["goal_identity"] == artifact["reservation_goal_identity"] == GOAL

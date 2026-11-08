@@ -12,7 +12,7 @@ from kg_microbe_workflows import instructions as instructions
 def context():
     return {"action_id": "a" * 24, "kind": "finalize", "run_id": "run-one",
             "repository_key": "traitmech", "cycle": 3, "stage": 4,
-            "native_session_id": "conversation-one", "goal_identity": {"start_step_index": 12},
+            "native_session_id": "conversation-one", "reservation_goal_identity": {"start_step_index": 12},
             "workflow_sha256": "b" * 64, "instruction_sha256": "c" * 64}
 
 
@@ -131,3 +131,17 @@ def test_multiline_unicode_objective_preserved_and_fixed_metadata_cannot_be_over
     assert raw["schema_version"] == "1.0.0"
     assert raw["delivery_format"] == instructions.FORMAT
     assert "\n" not in result["message"] and "\t" not in result["message"]
+
+
+@pytest.mark.parametrize("predecessor", [None, {"start_step_index": 12}])
+def test_start_goal_artifact_explicitly_labels_predecessor_not_receipt_identity(tmp_path, context, predecessor):
+    context.update(kind="start_goal", reservation_goal_identity=predecessor)
+    result = instructions.prepare_instruction(tmp_path / "session", context, "/goal Full objective")
+    artifact = json.loads(open(result["instruction_artifact"]["path"]).read())
+    assert artifact["reservation_goal_identity"] == predecessor
+    assert "goal_identity" not in artifact
+    note = artifact["execution_note"]
+    assert "pre-dispatch/predecessor identity" in note and "possibly null" in note
+    assert "not the newly adopted goal identity" in note
+    assert "current status.json receipt_template" in note
+    assert "do not copy this predecessor identity into a new-goal receipt" in note

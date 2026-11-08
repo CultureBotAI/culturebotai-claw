@@ -2223,7 +2223,7 @@ class Supervisor:
                        "cycle": ledger.get("cycle", 1), "stage": ledger["stage"],
                        "stage_key": workflow_stage_key(ledger),
                        "native_session_id": target["native_session_id"],
-                       "goal_identity": copy.deepcopy(ledger["adopted_goal"]),
+                       "reservation_goal_identity": copy.deepcopy(ledger["adopted_goal"]),
                        "instruction_sha256": instruction_hash,
                        "workflow_sha256": ledger.get("workflow", {}).get("sha256")}
             try:

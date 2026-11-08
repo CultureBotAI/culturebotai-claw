@@ -235,7 +235,12 @@ Workspace-history markers alone are not acceptance authority.
 
 New dispatches use an immutable `instructions/<action-id>.json` artifact for the
 full objective and closure instructions. It records the action/run/repository,
-cycle/stage, adopted native identity, and pinned workflow/instruction digest.
+cycle/stage, pre-dispatch `reservation_goal_identity`, and pinned
+workflow/instruction digest. For `start_goal`, this is the predecessor identity
+and may be null; it is not the newly adopted goal's receipt identity. The agent
+must use the current `status.json` `receipt_template` after adoption rather than
+copying the immutable artifact's predecessor identity into a new-goal receipt.
+The existing ledger action's `goal_identity` field is unchanged.
 The actual `action.message` sent to Terminal is a JSON-quoted absolute file
 reference plus its SHA-256, capped at 512 UTF-8 bytes. `start_goal` keeps the
 literal `/goal` command in this short reference; the artifact explains that the

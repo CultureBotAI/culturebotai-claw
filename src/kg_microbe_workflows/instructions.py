@@ -125,7 +125,11 @@ def prepare_instruction(session: Path, context: dict, instruction: str) -> dict:
     payload = {**context, "schema_version": "1.0.0", "delivery_format": FORMAT,
                "instruction": instruction,
                "execution_note": ("The native /goal was already established by this reference. "
-                                  "Carry out the full objective below; do not replay its /goal prefix."
+                                  "Carry out the full objective below; do not replay its /goal prefix. "
+                                  "reservation_goal_identity is the pre-dispatch/predecessor identity, "
+                                  "possibly null, not the newly adopted goal identity. After adoption, "
+                                  "use the current status.json receipt_template for the receipt identity; "
+                                  "do not copy this predecessor identity into a new-goal receipt."
                                   if kind == "start_goal" else
                                   "Continue only the existing adopted goal; do not start or replay a goal.")}
     raw = (json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=True) + "\n").encode()
