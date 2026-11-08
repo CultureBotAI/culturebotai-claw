@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import io
 import tarfile
+import time
 from pathlib import Path
 
 import pytest
@@ -60,7 +61,7 @@ TAXA = {
 }
 SCOPE = {562, 1280, 1281, 4932, 777}  # 777 is also retired: TaxonMech's scope keeps some merged ids
 INVENTORY = {1, 131567, 2, 2759, 543, 561, 562, 1279, 1280, 4751, 4930, 4932}
-MERGED = {46170: 1280, 999001: 999002, 777: 562}
+MERGED = {46170: 1280, 999001: 999002, 777: 562, 776: 777}  # 776 was merged twice: into 777, then into 562
 
 
 def _dmp(rows: list[list[str]]) -> bytes:
@@ -251,6 +252,25 @@ def test_a_self_mapping_or_cyclic_merge_table_is_refused(taxonmech, table):
     (taxonmech / "data" / "raw" / "ncbi_merged_ids.tsv").write_text(table, encoding="utf-8")
     with pytest.raises(links.TaxonLinksError, match="in a cycle"):
         links.TaxonIndex(taxonmech)
+
+
+def test_a_retired_id_merged_twice_reports_the_end_of_the_chain(index):
+    """776 -> 777 -> 562: the record should cite 562, a record, not the intermediate retired id."""
+    judgement = judge(index, "NCBITaxon:776")
+    assert judgement.verdict is links.Verdict.RETIRED
+    assert (judgement.current, judgement.current_verdict) == (562, links.Verdict.RECORD)
+
+
+def test_a_long_merge_chain_is_read_in_linear_time(taxonmech):
+    """200,000 ids each merged into the next: walked once each, not once per start (which would take hours)."""
+    n = 200_000
+    rows = "".join(f"NCBITaxon:{i}\tNCBITaxon:{i + 1}\n" for i in range(10_000_000, 10_000_000 + n))
+    (taxonmech / "data" / "raw" / "ncbi_merged_ids.tsv").write_text("old_taxon_id\tcurrent_taxon_id\n" + rows, encoding="utf-8")
+    started = time.perf_counter()
+    index = links.TaxonIndex(taxonmech)
+    assert time.perf_counter() - started < 30
+    assert len(index.merged) == n
+    assert judge(index, "NCBITaxon:10000000").current == 10_000_000 + n  # the end of the chain, found iteratively
 
 
 @pytest.mark.parametrize("relative,content,message", [

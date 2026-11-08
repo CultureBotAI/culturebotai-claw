@@ -5,7 +5,8 @@ Each cited `NCBITaxon` CURIE gets one verdict:
 
 - `retired`: an id NCBI has merged into another, judged first, since TaxonMech's
   own scope still lists fourteen such ids; the record should cite the current
-  id, whose own verdict is reported beside it;
+  id (the end of the merge chain, when an id was merged more than once), whose
+  own verdict is reported beside it;
 - `record`: TaxonMech's seed scope holds it, so a link resolves to a record;
 - `species_of_strain`: it is below species and its nearest ancestor that is a
   record (usually its species; a strain's forma or an unranked taxon in a few
@@ -175,14 +176,20 @@ class TaxonIndex:
     def _read_merged(self) -> dict[int, int]:
         merged = {_curie_id(row["old_taxon_id"], f"{MERGED_PATH} row {n}"): _curie_id(row["current_taxon_id"], f"{MERGED_PATH} row {n}")
                   for n, row in enumerate(self._read_tsv(MERGED_PATH, ["old_taxon_id", "current_taxon_id"], may_be_empty=True), 2)}
-        for start in merged:  # a self-map or a cycle would make judge() follow merges forever
-            seen = {start}
-            taxon = merged[start]
-            while taxon in merged:
-                if taxon in seen:
-                    raise TaxonLinksError(f"{MERGED_PATH} maps NCBITaxon:{start} in a cycle")
-                seen.add(taxon)
+        # A self-map or a cycle would make judge() follow merges forever. Each id is walked once
+        # (1: on the chain being followed, 2: known to end), so a long chain costs linear time.
+        state: dict[int, int] = {}
+        for start in merged:
+            path: list[int] = []
+            taxon = start
+            while taxon in merged and state.get(taxon) != 2:
+                if state.get(taxon) == 1:
+                    raise TaxonLinksError(f"{MERGED_PATH} maps NCBITaxon:{taxon} in a cycle")
+                state[taxon] = 1
+                path.append(taxon)
                 taxon = merged[taxon]
+            for walked in path:
+                state[walked] = 2
         return merged
 
     def _read_inventory(self) -> dict[int, tuple[str, int]]:
@@ -268,8 +275,10 @@ class TaxonIndex:
             return Judgement(Verdict.MALFORMED)
         taxon = _int_id(value)
         if taxon in self.merged:  # before the scope: TaxonMech's scope still lists some retired ids
-            current = self.merged[taxon]
-            inner = self.judge(f"NCBITaxon:{current}")
+            current = taxon
+            while current in self.merged:  # to the end of the chain; acyclic since the table was read
+                current = self.merged[current]
+            inner = self.judge(f"NCBITaxon:{current}")  # not merged, so no further recursion
             return Judgement(Verdict.RETIRED, taxon, current=current, current_verdict=inner.verdict)
         if taxon in self.scope:
             return Judgement(Verdict.RECORD, taxon)

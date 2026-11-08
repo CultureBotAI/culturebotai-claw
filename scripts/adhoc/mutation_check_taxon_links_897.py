@@ -6,11 +6,12 @@ where the two sides differ, and mutation is how that is shown. Each mutant
 below undoes one rule in src/kg_microbe_links/taxa.py or __main__.py; the
 named test must fail with the mutant applied, and the two test files must
 pass without it. The list includes every mutant the first review of PR 897
-(culturebotai-claw#910) found surviving, those the second (#939-#944) did, those the third (#968-#973) did, those the fourth (#991-#993) did, those the fifth (#994, #995 and its surviving mutants) did, and those the Codex review (#998-#1003) did.
+(culturebotai-claw#910) found surviving, those the second (#939-#944) did, those the third (#968-#973) did, those the fourth (#991-#993) did, those the fifth (#994, #995 and its surviving mutants) did, those the Codex review (#998-#1003) did, and the merge-chain pair found after it (#1017, #1018).
 Inputs: none; run from the claw checkout or worktree holding the script.
 Outputs: one line per mutant (KILLED or SURVIVED) and a nonzero exit if any
 survives, a mutant does not parse, a named test cannot be collected, or an
-unmutated test file fails. Each
+unmutated test file fails. A mutant whose test runs past TIMEOUT seconds (an
+endless loop) is a kill: the test did not pass. Each
 source file is restored after every mutant, also on error. Each run is a
 fresh Python process running pytest.
 Serves: culturebotai-claw PR 897. Written 2026-11-07.
@@ -139,8 +140,13 @@ MUTANTS = [
      f"{UNIT}::test_a_malformed_taxonmech_tsv_is_refused_not_a_traceback[curation/seed_scope.tsv-wrong_column\\nNCBITaxon:562\\n-has no identifier column]"),
     (TAXA, "empty scope accepted", "        if not rows and not may_be_empty:", "        if False:",
      f"{UNIT}::test_a_malformed_taxonmech_tsv_is_refused_not_a_traceback[curation/seed_scope.tsv-identifier\\tadded\\treason\\n-lists no taxa]"),
-    (TAXA, "merge cycle not refused", "                if taxon in seen:\n                    raise TaxonLinksError(f\"{MERGED_PATH} maps NCBITaxon:{start} in a cycle\")\n                seen.add(taxon)\n                taxon = merged[taxon]\n",
-     "                break\n", f"{UNIT}::test_a_self_mapping_or_cyclic_merge_table_is_refused[old_taxon_id\\tcurrent_taxon_id\\nNCBITaxon:562\\tNCBITaxon:562\\n]"),
+    # Without the refusal a cycle is an endless walk; the runner's timeout counts that as a kill (the test cannot pass).
+    (TAXA, "merge cycle not refused", "                if state.get(taxon) == 1:\n", "                if False:\n",
+     f"{UNIT}::test_a_self_mapping_or_cyclic_merge_table_is_refused[old_taxon_id\\tcurrent_taxon_id\\nNCBITaxon:562\\tNCBITaxon:562\\n]"),
+    (TAXA, "merge followed one hop only", "            while current in self.merged:  # to the end of the chain; acyclic since the table was read\n                current = self.merged[current]\n",
+     "            current = self.merged[current]\n", f"{UNIT}::test_a_retired_id_merged_twice_reports_the_end_of_the_chain"),
+    (TAXA, "merge chains walked once per start", "            while taxon in merged and state.get(taxon) != 2:", "            while taxon in merged:",
+     f"{UNIT}::test_a_long_merge_chain_is_read_in_linear_time"),
     (TAXA, "YAML error not mapped", "        except yaml.YAMLError as exc:", "        except () as exc:",
      f"{UNIT}::test_a_malformed_taxdump_conf_is_refused_not_a_traceback[path: [\\n-cannot be parsed]"),
     (TAXA, "conf shape not checked", '        if not isinstance(conf, dict) or not isinstance(conf.get("path"), str):', "        if False:",
@@ -173,9 +179,15 @@ MUTANTS = [
 ]
 
 
+TIMEOUT = 120  # seconds; a normal case takes about two, so a mutant that hangs (an endless merge walk) is a kill
+
+
 def pytest(selector: str) -> int:
-    return subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", selector],
-                          cwd=ROOT, capture_output=True, text=True, check=False).returncode
+    try:
+        return subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", selector],
+                              cwd=ROOT, capture_output=True, text=True, check=False, timeout=TIMEOUT).returncode
+    except subprocess.TimeoutExpired:
+        return 1  # the named test did not pass within the limit
 
 
 def main() -> int:
