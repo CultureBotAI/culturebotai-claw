@@ -559,3 +559,11 @@ all member PR observations and associations, but still only one goal closure,
 whose existing top-level PR is the final integration PR. A candidate receipt
 contributes informational associations only. No runtime ledger, registry,
 counter, active workflow, or migration is rewritten by this feature.
+
+## Historical identity reconciliation
+
+A completed supervised goal followed by a separately directed native goal has a
+separate, explicitly approved [historical reconciliation procedure](HISTORICAL_GOAL_RECONCILIATION.md).
+It preserves ordinary closure evidence, installs a held next-goal boundary, and
+requires a second reviewed release. Neither operation sends input. The real
+DUFMech historical notebook versus later adoption intake remains blocked by #1005.

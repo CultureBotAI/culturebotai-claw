@@ -538,7 +538,12 @@ def decide(ledger: dict, observation: dict) -> dict:
             return {"phase": "awaiting_native_acceptance", "reason": "workflow policy handoff requires native acceptance"}
         return {"phase": "ready_to_dispatch", "action": "policy_update", "action_id": identifier}
     if ledger.get("awaiting_goal"):
-        if observation.get("goal_identity") != ledger["adopted_goal"]:
+        from kg_microbe_workflows.reconciliation import ReconciliationError, boundary_goal
+        try:
+            expected_goal = boundary_goal(ledger) or ledger["adopted_goal"]
+        except (ReconciliationError, KeyError, TypeError, ValueError) as error:
+            return {"phase": "blocked", "reason": "historical dispatch boundary: " + str(error)}
+        if observation.get("goal_identity") != expected_goal:
             return {"phase": "blocked", "reason": "a different native goal appeared before next-goal dispatch"}
         prior = ledger["completed_stages"][-1] if ledger["completed_stages"] else {}
         override = (prior.get("completion_authority") == "verified_receipt_override"
@@ -2038,6 +2043,16 @@ class Supervisor:
             proof = native_delivery_proof(action, target, observation)
             if proof is None:
                 continue
+            if adopting and ledger.get("historical_goal_boundary") is not None:
+                from kg_microbe_workflows.reconciliation import ReconciliationError, boundary_goal, timestamp
+                try:
+                    previous = boundary_goal(ledger)
+                    if (not native_id or native_id["conversation_id"] != previous["conversation_id"]
+                            or native_id["start_step_index"] <= previous["start_step_index"]
+                            or timestamp(native_id["started_at"]) <= timestamp(previous["started_at"])):
+                        continue
+                except (ReconciliationError, KeyError, TypeError, ValueError):
+                    continue
             if action["state"] != "accepted":
                 action.update(state="accepted", accepted_at=now(), acceptance="native_exact_user_input")
             action.update(delivery_proof=proof, delivery_verified_at=now())
@@ -2046,6 +2061,7 @@ class Supervisor:
             if adopting and native_id and native_id != ledger["adopted_goal"]:
                 action["accepted_goal_identity"] = native_id
                 ledger.update(adopted_goal=native_id, awaiting_goal=False)
+                ledger.pop("historical_goal_boundary", None)
 
     def baseline(self, target: dict, ledger: dict) -> None:
         if "baseline_head" not in ledger:
