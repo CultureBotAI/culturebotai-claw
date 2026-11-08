@@ -153,3 +153,58 @@ def test_oversized_native_transport_fails_before_identity_validation(assertion):
     assertion["payload"]["context"]["large_native_context"] = "x" * MAX_NATIVE_BYTES
     with pytest.raises(CurationError, match="16 MiB byte limit"):
         validate_native_assertion(assertion)
+
+
+@pytest.mark.parametrize("index", [0, 1])
+def test_repository_case_aliases_cannot_hide_conflicting_file_digests(assertion, index):
+    alias = deepcopy(assertion["evidence"][index])
+    alias["evidence_id"] = "case-alias"
+    alias["locator"]["repository"] = alias["locator"]["repository"].lower()
+    alias["sha256"] = "9" * 64
+    assertion["evidence"].append(alias)
+    rebind(assertion)
+    with pytest.raises(CurationError, match="Conflicting native evidence file digests"):
+        validate_native_assertion(assertion)
+
+
+@pytest.mark.parametrize("index", [0, 1])
+def test_source_and_review_closure_accept_repository_case_aliases(assertion, index):
+    locator = assertion["evidence"][index]["locator"]
+    locator["repository"] = locator["repository"].lower()
+    rebind(assertion)
+    before = deepcopy(assertion)
+    validate_native_assertion(assertion)
+    assert assertion == before
+
+
+def test_consistent_repository_aliases_preserve_exact_transport(assertion):
+    alias = deepcopy(assertion["evidence"][0])
+    alias["evidence_id"] = "same-file-alias"
+    alias["locator"]["repository"] = alias["locator"]["repository"].upper()
+    assertion["evidence"].append(alias)
+    rebind(assertion)
+    before = deepcopy(assertion)
+    validate_native_assertion(assertion)
+    assert assertion == before
+
+
+def test_file_paths_remain_case_sensitive_when_repository_aliases_agree(assertion):
+    other = deepcopy(assertion["evidence"][0])
+    other["evidence_id"] = "distinct-case-sensitive-path"
+    other["locator"]["repository"] = other["locator"]["repository"].lower()
+    other["locator"]["path"] = other["locator"]["path"].upper()
+    other["sha256"] = "9" * 64
+    assertion["evidence"].append(other)
+    rebind(assertion)
+    validate_native_assertion(assertion)
+
+
+def test_repository_alias_lookup_does_not_normalize_assertion_identity(assertion):
+    original_id = assertion["assertion_id"]
+    locator = assertion["native_locator"]
+    locator["repository"] = locator["repository"].lower()
+    rebind(assertion)
+    assert assertion["assertion_id"] != original_id
+    before = deepcopy(assertion)
+    validate_native_assertion(assertion)
+    assert assertion == before

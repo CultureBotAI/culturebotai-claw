@@ -105,7 +105,10 @@ transport is bounded to 16 MiB and does not contact repositories or providers.
 
 Source and review files must appear in the evidence closure with matching
 digests. Different selectors in one file cannot assert different whole-file
-hashes. Native review payloads retain their original owner-record hash,
+hashes. GitHub owner/repository names are compared case-insensitively for
+file consistency and source/review closure; Git paths remain case-sensitive.
+This lookup does not rewrite the original envelope or its assertion identity.
+Native review payloads retain their original owner-record hash,
 review reason, evidence references and other fields. The adapter must verify
 the complete native dependency inventory before emitting assertions; a review
 document hash binds that inventory without expanding every dependency into
