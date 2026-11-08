@@ -1,4 +1,4 @@
-"""scripts/adhoc/cleanup_merged_pr_branch.py deletes only the merged work (#854-#856, #858, #867-#875, #878-#880, #891-#895, #931-#936, #950, #974-#977).
+"""scripts/adhoc/cleanup_merged_pr_branch.py deletes only the merged work (#854-#856, #858, #867-#875, #878-#880, #891-#895, #931-#936, #950, #974-#977, #1010-#1014).
 
 Each case is built so the unsafe and the safe behaviour differ: a remote
 branch that moved after the merge, a sibling branch whose name ends the same
@@ -625,6 +625,8 @@ def test_fetch_refspecs_that_map_the_branch_only_onto_its_tracking_ref_are_accep
     git(fleet["checkout"], "config", "--add", "remote.origin.fetch", "^refs/heads/feature")
     git(fleet["checkout"], "config", "--add", "remote.origin.fetch", "refs/heads/feature")
     git(fleet["checkout"], "config", "--add", "remote.origin.fetch", "+refs/heads/featur:refs/heads/victim")
+    git(fleet["checkout"], "config", "--add", "remote.origin.fetch", "refs/heads/feature:")  # FETCH_HEAD only
+    git(fleet["checkout"], "config", "--add", "remote.origin.fetch", "refs/heads/feature*/feature:refs/heads/o*o")  # overlap
 
     assert cleanup_script.fetch_mappings(fleet["checkout"], "refs/heads/feature") == [
         ("+refs/heads/*:refs/remotes/origin/*", "refs/remotes/origin/feature"),
@@ -717,19 +719,28 @@ def test_a_worktree_that_changes_after_the_check_is_not_removed(fleet, monkeypat
 
 
 def test_the_recovery_restores_every_entry_of_the_branch_config(fleet):
+    """Four valued entries and one key written without a value, which git reads as true and is restored as such."""
     git(fleet["checkout"], "worktree", "remove", str(fleet["worktree"]))
     git(fleet["checkout"], "config", "branch.feature.rebase", "true")
     git(fleet["checkout"], "config", "branch.feature.description", "keep me")
-    before = git(fleet["checkout"], "config", "--get-regexp", "^branch\\.feature\\.")
+    config = fleet["checkout"] / ".git" / "config"
+    config.write_text(config.read_text(encoding="utf-8").replace('[branch "feature"]\n', '[branch "feature"]\n\tbare\n', 1),
+                      encoding="utf-8")
+    assert git(fleet["checkout"], "config", "--type=bool", "branch.feature.bare") == "true"
+    valued_before = [line for line in git(fleet["checkout"], "config", "--get-regexp", "^branch\\.feature\\.").split("\n")
+                     if not line.startswith("branch.feature.bare")]
     reject_pushes(fleet)
 
     with pytest.raises(cleanup_script.PartialFailure) as caught:
         run_cleanup(fleet, worktree=None)
 
-    assert "removed branch.feature config (4 entries)" in caught.value.done
+    assert "removed branch.feature config (5 entries)" in caught.value.done
+    assert "config --add branch.feature.bare true` (it was set without a value)" in caught.value.recovery
     git(fleet["checkout"], "branch", "feature", fleet["head"])
-    assert len(run_printed(caught.value.recovery, only="config")) == 4
-    assert git(fleet["checkout"], "config", "--get-regexp", "^branch\\.feature\\.") == before
+    assert len(run_printed(caught.value.recovery, only="config")) == 5
+    after = git(fleet["checkout"], "config", "--get-regexp", "^branch\\.feature\\.").split("\n")
+    assert [line for line in after if not line.startswith("branch.feature.bare")] == valued_before
+    assert git(fleet["checkout"], "config", "--type=bool", "branch.feature.bare") == "true"
 
 
 def test_a_multi_line_description_round_trips_through_the_recovery(fleet):
@@ -854,13 +865,41 @@ def test_a_push_insteadof_rewrite_of_the_push_url_is_refused(fleet):
     fork = fleet["tmp"] / "fork.git"
     subprocess.run(["git", "clone", "-q", "--bare", str(fleet["origin"]), str(fork)], check=True)
     git(fleet["checkout"], "config", "remote.origin.pushurl", str(fleet["origin"]))
-    git(fleet["checkout"], "config", f"url.{fork}.pushInsteadOf", str(fleet["origin"]))
+    # a proper prefix, as git matches it: the base swaps `.../origin` for `.../fork`, so `.git` stays
+    git(fleet["checkout"], "config", f"url.{str(fork)[:-4]}.pushInsteadOf", str(fleet["origin"])[:-4])
 
     with pytest.raises(cleanup_script.Refused, match="pushinsteadof"):
         run_cleanup(fleet, worktree=None)
 
     assert ref(fleet["origin"], "refs/heads/feature") == fleet["head"]
     assert ref(fork, "refs/heads/feature") == fleet["head"]
+
+
+@pytest.mark.parametrize("local_present", [True, False])
+def test_a_read_back_failure_after_an_accepted_delete_still_names_the_push(fleet, monkeypatch, local_present):
+    """A network blip right after the push: the branch is gone from origin, and the recovery must say how to put it back."""
+    git(fleet["checkout"], "worktree", "remove", str(fleet["worktree"]))
+    if not local_present:
+        git(fleet["checkout"], "branch", "-q", "-D", "feature")
+    real = cleanup_script.remote_branch_sha
+    calls: list[str] = []
+
+    def blip_at_the_read_back(checkout, branch):
+        calls.append(branch)
+        if len(calls) == 2:
+            raise RuntimeError("ls-remote origin refs/heads/feature failed: could not read from remote")
+        return real(checkout, branch)
+
+    monkeypatch.setattr(cleanup_script, "remote_branch_sha", blip_at_the_read_back)
+
+    with pytest.raises(cleanup_script.PartialFailure, match="accepted the delete but could not be asked again") as caught:
+        run_cleanup(fleet, worktree=None)
+
+    assert f"deleted remote feature (was {fleet['head'][:10]}; accepted, not confirmed)" in caught.value.done
+    assert f"push origin {fleet['head']}:refs/heads/feature" in caught.value.recovery
+    assert ref(fleet["origin"], "refs/heads/feature") is None
+    run_printed(caught.value.recovery)
+    assert ref(fleet["origin"], "refs/heads/feature") == fleet["head"]
 
 
 def test_a_remote_branch_still_present_after_the_delete_is_a_failure(fleet, monkeypatch):

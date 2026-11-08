@@ -50,8 +50,8 @@ CellStructureMech PR 3068. Rewritten 2026-11-06 for culturebotai-claw#854,
 #855, #856 and #858, for #867-#870 and #872 from the second review round,
 for #873-#875 and #880 from the third, for #893-#895 from the fourth, for
 #920 and #921 from the fifth, and on 2026-11-07 for #931-#936 from the Codex
-review, #950 from CI's git 2.56, and #974-#977 from the review of that round,
-before its reuse on further merged PRs.
+review, #950 from CI's git 2.56, #974-#977 from the review of that round, and
+#1010-#1014 from the review of that one, before its reuse on further merged PRs.
 """
 from __future__ import annotations
 
@@ -184,6 +184,8 @@ def fetch_mappings(checkout: Path, ref: str) -> list[tuple[str, str]]:
         if ":" not in body:
             continue
         src, dst = body.split(":", 1)
+        if not dst:  # `refs/heads/x:` fetches into FETCH_HEAD only and stores nothing
+            continue
         if "*" in src:
             prefix, suffix = src.split("*", 1)
             if ref.startswith(prefix) and ref.endswith(suffix) and len(ref) >= len(prefix) + len(suffix):
@@ -345,7 +347,12 @@ def cleanup(repo: str, number: int, checkout: Path, worktree: Path | None, *, ap
                 # ref. On git 2.56 it still updates what the fetch refspecs map, which the checks above
                 # confined to the tracking ref; its disappearance is read back below.
                 git(checkout, "push", "-q", f"--force-with-lease={local_ref}:{head}", push_url, "--delete", local_ref)
-                still = remote_branch_sha(checkout, branch)
+                try:
+                    still = remote_branch_sha(checkout, branch)
+                except Exception as exc:
+                    # The delete was accepted; the recovery must still name the push that puts the branch back.
+                    done.append(f"deleted remote {branch} (was {head[:10]}; accepted, not confirmed)")
+                    raise RuntimeError(f"origin accepted the delete but could not be asked again: {exc}") from exc
                 if still:
                     raise RuntimeError(f"origin still has {branch} at {still[:10]} after the delete was accepted; "
                                        "the push went elsewhere")
