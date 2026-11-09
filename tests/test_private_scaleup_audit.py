@@ -553,3 +553,22 @@ def test_produce_cli_authenticates_public_bytes_before_constructing_private_clie
     assert calls == ["public-token"]
     assert capsys.readouterr().err.strip() == "source_unverified"
     assert not (tmp_path / "rejected.json").exists()
+
+
+def test_producer_workflow_runtime_is_proven_by_dependency_guard():
+    import yaml
+    from test_workflow_dependency_provisioning import (
+        declared_dependencies,
+        unprovisioned_claw_invocations,
+    )
+    root = Path(__file__).resolve().parents[1]
+    workflow = yaml.safe_load((root / audit.WORKFLOW).read_text())
+    dependencies = declared_dependencies()
+    assert not unprovisioned_claw_invocations(workflow, dependencies)
+    broken = copy.deepcopy(workflow)
+    for step in broken["jobs"]["produce"]["steps"]:
+        if "run" in step:
+            step["run"] = step["run"].replace("uv run --locked --no-dev", "uv run --no-sync")
+    findings = unprovisioned_claw_invocations(broken, dependencies)
+    assert len(findings) == 2
+    assert all(row[0] == "produce" and "linkml" in row[2] for row in findings)

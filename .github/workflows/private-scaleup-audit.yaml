@@ -41,7 +41,7 @@ jobs:
         env:
           GH_PUBLIC_READ_TOKEN: ${{ github.token }}
         run: >-
-          uv run --no-sync python -m kg_microbe_governance.private_scaleup_audit
+          uv run --locked --no-dev python -m kg_microbe_governance.private_scaleup_audit
           preflight --subject-head "$SUBJECT_HEAD"
       - name: Mint read-only token for the one allowed private repository
         id: private-token
@@ -57,7 +57,7 @@ jobs:
           GH_PUBLIC_READ_TOKEN: ${{ github.token }}
           SCALEUP_PRIVATE_READ_TOKEN: ${{ steps.private-token.outputs.token }}
         run: >-
-          uv run --no-sync python -m kg_microbe_governance.private_scaleup_audit
+          uv run --locked --no-dev python -m kg_microbe_governance.private_scaleup_audit
           produce --subject-head "$SUBJECT_HEAD" --output .audit-public/receipt.json
       - name: Publish only the closed public receipt
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
