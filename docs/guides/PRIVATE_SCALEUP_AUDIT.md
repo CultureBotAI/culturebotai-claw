@@ -72,7 +72,12 @@ private response is written to a checkout, log, cache or artifact.
 
 `pending_bootstrap` is only the exact empty main
 `38f8157fc960299f2458f4916dd581ce1b5d0262`, with every governed target and pin
-absent. It records unfinished installation, not release completion. `installed`
+absent. The producer authenticates that exact commit through the Git commit API
+and requires its tree to be the canonical Git empty-tree object. GitHub does not
+serve that object through its tree API; only this authenticated bootstrap is
+handled without a tree request. A missing or failed request for any other object
+remains an error. Commit metadata stays in memory and is never serialized.
+It records unfinished installation, not release completion. `installed`
 requires all 22 applicable artifacts, executable modes and the exact source pin.
 Any other state fails. A candidate cannot change the producer policy or select
 another private repository, source pin or output field.
