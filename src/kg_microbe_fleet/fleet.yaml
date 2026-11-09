@@ -2584,6 +2584,107 @@ mechs:
         status: not_applicable
         reason: AI concepts are not a culture-medium ingredient corpus.
 
+  edgemech:
+    display_name: EdgeMech
+    github: CultureBotAI/EdgeMech
+    environment_variable: EDGEMECH_ROOT
+    package_path: src/edgemech
+    schema_paths:
+    - src/edgemech/schema/edgemech.yaml
+    record_globs:
+    - curation/packets/*.yaml
+    vendored_role: consumer
+    serialization:
+      verified: false
+      reason: >-
+        EdgeMech preserves canonical JSON bundles and immutable external ledger
+        artifacts. Shared YAML record emit options have not been verified;
+        no native scientific corpus serialization is declared.
+    capabilities:
+      id_label_validation:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      curation_history:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      record_review:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      strict_validation:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      schema_sync:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      release_management:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      build_coordination:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      documentation:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      testing:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      refactoring:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      coordination_hooks:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      deep_research:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      edison_key_discovery:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      environment_coverage:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      knowledge_gap_scan:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      vendored_sync:
+        status: enabled
+      unmapped_inventory_input:
+        status: not_applicable
+        reason: External edge accounting is not a culture-medium ingredient corpus.
+      source_catalogue:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      evidence_reference_validation:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      corpus_statistics:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      causal_graph_coverage:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      page_budgets:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      kgx_export:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      source_queue:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      metpo_proposal:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      sssom_export:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      writer_audit:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      site_contract:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+
   # CofactorMech admission main 3cb9d7a6ce527c84277daf6ddfd5cd56decbb4d1 is intentionally empty.
   # Paths are the planned scaffold contract; enabled vendored_sync is the
   # authoritative-consumer obligation, not a deployment claim.

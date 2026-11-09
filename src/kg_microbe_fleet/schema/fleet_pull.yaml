@@ -90,6 +90,9 @@ enums:
         description: CMMMech repository.
       aimech:
         description: AIMech repository.
+      edgemech:
+        description: EdgeMech occurrence accounting and curation infrastructure.
+
       cofactormech:
         description: CofactorMech repository.
 

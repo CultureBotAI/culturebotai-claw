@@ -131,6 +131,20 @@ def test_aimech_policy_uses_native_validation_context():
     }
 
 
+def test_edgemech_admission_blocks_queue_planning_before_any_api_call():
+    class NoAPI:
+        def request(self, *args, **kwargs):
+            pytest.fail("Unapproved EdgeMech admission must not contact GitHub")
+
+        pages = request
+
+    saved = queue.plan(NoAPI(), ["edgemech"])
+    row = saved["repositories"][0]
+    assert row["repository"] == "CultureBotAI/EdgeMech"
+    assert row["status"] == "blocked" and row["desired"] is None
+    assert "#960" in row["errors"][0]
+
+
 def test_blocked_adoption_is_rejected_before_any_api_call(tmp_path, monkeypatch):
     monkeypatch.setattr(queue, "identities", lambda: {"example": "CultureBotAI/example"})
     monkeypatch.setattr(queue, "load_policy", lambda: {

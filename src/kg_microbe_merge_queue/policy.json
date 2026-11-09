@@ -210,6 +210,9 @@
       "vendored-sync"
     ]
   },
+  "edgemech": {
+    "blocked": "EdgeMech fleet admission depends on CLAW #960; merge-queue readiness has not been verified."
+  },
   "cofactormech": {
     ".github/workflows/validate-strict.yaml": [
       "validate-strict"
