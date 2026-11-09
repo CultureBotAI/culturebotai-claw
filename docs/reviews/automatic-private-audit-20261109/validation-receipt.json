@@ -1,5 +1,5 @@
 {
-  "checked_at": "2026-11-09T04:33:53.185112+00:00",
+  "checked_at": "2026-11-09T04:44:54.684227+00:00",
   "raw_full_suite": {
     "head": "904e93928b4d8c50b653e8986f7e1e5648968e09",
     "exit_code": 1,
@@ -33,7 +33,7 @@
   },
   "mypy_source_files": 112,
   "ruff": "all configured source/test directories passed",
-  "mutation_controls": 12,
+  "mutation_controls": 14,
   "combined_1074": {
     "head": "f006a24a4ff4164498db0a222ff81d9b875d1616",
     "passed": 14,
@@ -43,5 +43,23 @@
     "The raw full invocation is not reported green.",
     "No App key, environment, live private workflow or merge was activated.",
     "Hosted checks belong to exact published heads and are reported separately."
-  ]
+  ],
+  "post_retarget_candidate_lane_repair": {
+    "issue": 1085,
+    "previous_reviewed_head": "d95e28890e058e2c325ce69aee1692e82f7a0a08",
+    "main_base_verified_before_push": "e539df04bc92364727c2f22c46fe7ecbac3ce116",
+    "changes": [
+      "Existing structural assertion follows candidate-contracts and the locked command; four mandatory test selections retained.",
+      "Public clone job explicitly depends on successful candidate validation; aggregate and private preflight continue to refuse failed/cancelled/skipped components."
+    ],
+    "complete_candidate_lane_passed": 217,
+    "affected_gate_passed": 407,
+    "affected_gate_log": "/Users/marcin/agent-work/claw/automatic-final-synchronize-tests.log",
+    "restored_after_mutation_passed": 109,
+    "restored_log": "/Users/marcin/agent-work/claw/automatic-restored-final.log",
+    "reference_search_included_ignored_and_hidden": true,
+    "reference_search_log": "/Users/marcin/agent-work/claw/automatic-candidate-step-reference-inventory.log",
+    "mutation_control_count": 14,
+    "hosted_checks": "A new synchronize event is required after this commit; old stacked-base runs are not main-base evidence."
+  }
 }

@@ -22,6 +22,7 @@ permissions:
 jobs:
   fleet-audit:
     name: public-fleet
+    needs: candidate-contracts
     permissions:
       contents: read
       actions: read

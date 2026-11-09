@@ -60,8 +60,8 @@
     {
       "name": "bootstrap-private-refusal",
       "source": ".github/workflows/governance-fleet-audit.yaml",
-      "source_sha256": "c539d40c50b80e247ea6ac69241412c6bfbb2f2f3bdb1c0c3372ac08a0c97070",
-      "mutant_sha256": "7752e2873be6354dada7252a2c1d3689ec3e4f76e05b0ff537f0a73b2aa2d18c",
+      "source_sha256": "c614a395f351e8374cbe15856749373c93bc4defbea2ee5dc42371632cf1bf84",
+      "mutant_sha256": "01d73afee2aa5f33f42f63f4cdb520aad80217254c5f73321ee24a572fba9c0a",
       "test": "tests/test_automatic_fleet_component.py::test_actual_bootstrap_selector_requires_protected_code_for_private[True-False]",
       "mutant_exit": 1,
       "log": "/Users/marcin/agent-work/claw/automatic-mutations/bootstrap-private-refusal.log"
@@ -110,6 +110,24 @@
       "test": "tests/test_automatic_fleet_component.py::test_first_preflight_checks_environment_before_scheduling_private_job",
       "mutant_exit": 1,
       "log": "/Users/marcin/agent-work/claw/automatic-mutations/1084-before-environment-allocation.log"
+    },
+    {
+      "name": "1085-candidate-job-selection",
+      "source": "tests/test_id_label_workflow.py",
+      "source_sha256": "ef0a28d38e1ebb2b4258506a96db32535a00d94650a54a817716a3dc38ebb255",
+      "mutant_sha256": "b5c1d9586b4d17ca0390443854b9615912705fefe12275ee56309a42739d3a7d",
+      "test": "tests/test_id_label_workflow.py::test_candidate_authority_guard_rejects_a_step_moved_into_the_public_job",
+      "mutant_exit": 1,
+      "log": "/Users/marcin/agent-work/claw/automatic-mutations/1085-candidate-job-selection.log"
+    },
+    {
+      "name": "1085-validation-before-clone",
+      "source": ".github/workflows/governance-fleet-audit.yaml",
+      "source_sha256": "c614a395f351e8374cbe15856749373c93bc4defbea2ee5dc42371632cf1bf84",
+      "mutant_sha256": "751863c8146ae9ef9bdd8fb296e434aa5ad27941d0eebd5c1c67050f50a7edac",
+      "test": "tests/test_governance_candidate_consumers.py::test_candidate_roots_are_prepared_after_authority_validation",
+      "mutant_exit": 1,
+      "log": "/Users/marcin/agent-work/claw/automatic-mutations/1085-validation-before-clone.log"
     }
   ]
 }
