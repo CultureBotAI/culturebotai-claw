@@ -25,6 +25,8 @@ def test_process_identity_retains_start_time_and_rejects_other_processes():
     }
     for line in (
         IDENTITY.replace("agy", "bash"),
+        IDENTITY.replace("agy", "node"),
+        IDENTITY.replace("agy", "/opt/codex/bin/codex"),
         IDENTITY.replace("ttys030", "pts/1"),
         IDENTITY.replace("1234", "unknown"),
         IDENTITY.replace("1234", "0"),
@@ -130,3 +132,10 @@ def test_snapshot_js_filters_ttys_and_isolates_unreadable_tabs():
         "window": 7, "tab": 4, "tty": "/dev/ttys004", "screen": "fallback contents"
     }
     assert len(parsed["result"]["warnings"]) == 1
+
+
+def test_known_announcement_cannot_substitute_for_runtime_model_footer():
+    announcement = 'Meet Gemini 4 Argon …\nesc to dismiss\n'
+    assert terminal.composer_reason(EMPTY + announcement) is None
+    assert terminal.composer_reason(EMPTY.replace('? for shortcuts Gemini model\n', '') + announcement) is not None
+    assert terminal.composer_reason(EMPTY + 'Unrecognized announcement\nesc to dismiss\n') is not None

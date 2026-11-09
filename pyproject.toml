@@ -72,10 +72,14 @@ kg-microbe-reviews = "kg_microbe_reviews.__main__:main"
 kg-microbe-skills = "kg_microbe_skills.__main__:main"
 kg-microbe-sources = "kg_microbe_sources.__main__:main"
 kg-microbe-corpus = "kg_microbe_corpus.__main__:main"
+kg-microbe-curation = "kg_microbe_curation.__main__:main"
 kg-microbe-graph = "kg_microbe_graph.__main__:main"
+kg-microbe-evidence = "kg_microbe_evidence.__main__:main"
+kg-microbe-evidence-fetch = "kg_microbe_evidence.fetch:main"
 kg-microbe-pages = "kg_microbe_pages.__main__:main"
 kg-microbe-site = "kg_microbe_site.__main__:main"
 kg-microbe-kgx = "kg_microbe_kgx.__main__:main"
+kg-microbe-links = "kg_microbe_links.__main__:main"
 kg-microbe-source-queue = "kg_microbe_source_queue.__main__:main"
 kg-microbe-sssom = "kg_microbe_sssom.__main__:main"
 kg-microbe-writers = "kg_microbe_writers.__main__:main"
@@ -115,14 +119,16 @@ kg_microbe_embeddings = ["rollout.yaml"]
 kg_microbe_merge_queue = ["policy.json"]
 kg_microbe_write = ["writers.yaml"]
 kg_microbe_research = ["schema/*.yaml"]
+kg_microbe_curation = ["schema/*.json"]
 kg_microbe_progress = ["schema/*.yaml"]
-kg_microbe_workflows = ["schema/*.yaml", "templates/*.yaml", "examples/**/*.yaml", "examples/**/*.md", "examples/README.md"]
+kg_microbe_workflows = ["schema/*.yaml", "templates/*.yaml", "examples/**/*.yaml", "examples/**/*.md", "examples/**/*.json", "examples/README.md"]
 # The catalogue and its canonical templates are read at runtime, so an
 # installed package without them renders nothing while importing fine.
 kg_microbe_skills = ["skills.yaml", "canonical/*.md"]
 kg_microbe_governance = [
     "vendored_artifacts.json",
     "workflow_pins.json",
+    "releases/*.json",
     "artifacts/**/*.py",
     "artifacts/**/*.sh",
     "artifacts/**/*.yaml",
@@ -133,6 +139,8 @@ kg_microbe_config = ["openclaw_config.yaml"]
 kg_microbe_agents = ["definitions/**/*.yaml"]
 kg_microbe_qc = ["templates/*.j2"]
 kg_microbe_discussions = ["templates/*.html"]
+# The Biolink snapshot the KGX exporter maps to (scripts/snapshot_biolink.py).
+kg_microbe_kgx = ["data/*.json"]
 
 [tool.uv]
 package = true
@@ -180,6 +188,12 @@ ignore_missing_imports = true
 no_implicit_optional = true
 warn_unused_configs = true
 disable_error_code = ["import-untyped"]
+
+[[tool.mypy.overrides]]
+# Canonical byte-for-byte Mech payload pinned in vendored_artifacts.json;
+# dynamically patches DupCheckYamlLoader on importlib.import_module("linkml_runtime.loaders.yaml_loader").
+module = ["kg_microbe_governance.artifacts.scripts.record_review"]
+disable_error_code = ["attr-defined"]
 
 [tool.coverage.run]
 source = [

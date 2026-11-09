@@ -1,0 +1,15 @@
+........................................................................ [ 26%]
+...............................................................s........ [ 52%]
+........................................................................ [ 78%]
+..........................................................               [100%]
+=============================== warnings summary ===============================
+tests/test_sssom_contract.py::test_a_well_formed_mapping_reports_nothing
+  /Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/lib/python3.13/site-packages/sssom_schema/datamodel/sssom_schema.py:20: DeprecationWarning: The LinkML dataclass extension patch is deprecated and will be removed in a future release.
+  If you're currently using Python < 3.13, where this patch still applies, you should:
+    • Upgrade your LinkML tooling to version >= 1.9.0 (which no longer needs this patch), OR
+    • Migrate to Pydantic models if you're using LinkML's generated classes at runtime.
+  
+    from linkml_runtime.utils.dataclass_extensions_376 import dataclasses_init_fn_with_kwargs
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+273 passed, 1 skipped, 1 warning in 2.95s

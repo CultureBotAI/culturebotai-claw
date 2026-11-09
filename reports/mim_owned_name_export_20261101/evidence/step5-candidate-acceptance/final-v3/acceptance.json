@@ -1,0 +1,12 @@
+{
+  "status": "FAIL",
+  "error": "B4 transform unavailable; all-native acceptance cannot pass",
+  "classification": "Deterministic author acceptance",
+  "scientific_approval_added": false,
+  "inputs_at_start": {
+    "../step4-mim/output/step5-owned-name-candidate-v2/candidate.sssom.tsv": "2efdd39fd54e5d63199dd2419874e508a51f6c598a64137c4858a9b8a829749a",
+    "../step4-mim/output/step5-owned-name-candidate-v2/suppressed_aliases.tsv": "d2c6942d210c64d3ab3528e7eef61186e9fb326e555ca0a3a4e9c7d631153390",
+    "../step4-mim/output/step5-owned-name-candidate-v2/candidate.sssom.tsv.manifest.json": "7c2783921744b34e614034708fc51d954c3116c6d130ba3dfae1fffb99311788",
+    "../step4-mim/output/step5-owned-name-candidate-v2/.sssom-artifact-journals/write-g328toa4.json": "c7fde3dd022c7a0b39472e85d9f34158590aa8863ac0992cca1d871b1075ffb6"
+  }
+}

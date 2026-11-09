@@ -1,0 +1,9 @@
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import importlib.util,subprocess;from pathlib import Path;from unittest.mock import patch;p=Path("scripts/build_mim_ingredient_sssom.py");s=importlib.util.spec_from_file_location("probe",p);m=importlib.util.module_from_spec(s);s.loader.exec_module(m);p=patch.object(m.subprocess,"run",return_value=subprocess.CompletedProcess([],2,"","validator failed without known marker"));p.start();print({"nonzero_validator_result":m._sssom_validate(Path("unused.tsv"))});p.stop()
+                                                                                                                                                                                                                                       ~~~~~~~~~~~~~~~~~~~~^^^
+  File "<frozen importlib._bootstrap_external>", line 1026, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name/scripts/build_mim_ingredient_sssom.py", line 59, in <module>
+    from kgm_unified_mappings import load_kgm_labels, load_kgm_source_index
+ModuleNotFoundError: No module named 'kgm_unified_mappings'

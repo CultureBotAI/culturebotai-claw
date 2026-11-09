@@ -106,11 +106,19 @@ uv run kg-microbe-governance pin-coupling \
 
 It reports the pin in full or abbreviated to seven or more characters, in either case
 (`pin-reference`), and any committed snapshot of claw's manifest
-(`manifest-snapshot`), outside the pin file and dated `reports/`. A consumer
+(`manifest-snapshot`), outside the pin file and the dated records under
+`reports/`, `reviews/` and `research/`. A consumer
 whose committed pin is not `--old-ref` is reported as `PIN`, since that means
 a mistyped ref or a Mech already moved on. It exits 1 on either and never
-writes. Put each reported file in that Mech's
-re-pin commit. The rollout to `cb83def3` had two: MediaIngredientMech's
+writes. Judge each hit:
+
+- Change, in that Mech's re-pin commit, a copy that the Mech's own checks
+  compare with the pin.
+- Leave unchanged a dated review or research record, provenance or a commit
+  permalink that names the old pin. It records history, and rewriting it would
+  falsify that (#795).
+
+The rollout to `cb83def3` had two couplings: MediaIngredientMech's
 `.github/workflows/qc-evidence.yaml` checks claw out at a `ref:` a test
 requires to equal the pin, and NaturalProductMech's
 `scripts/.vendored_manifest.json` must equal claw's manifest at the pin.
@@ -419,11 +427,138 @@ downstream rollout, exact-main audit, and final-state sequence. Some current
 payload comments retain historical fleet wording; changing those bytes requires
 that separate coordinated release.
 
+## Scoped evidence-validation release (retired)
+
+The evidence-reference-validation canary shipped as a bounded release.
+[claw#693](https://github.com/CultureBotAI/culturebotai-claw/pull/693) let
+MediaIngredientMech alone advance from the fleet baseline
+`a5d562962c75a2ad9efd8160b548df5944315422` to the canary commit
+`16fd7c9484d98b14a53aec55616d26dae70a0af7`, checked by a separate release
+audit while every other Mech kept the baseline. That lane rejected any change to
+the evidence capability or the governance manifest, so the fleet rollout
+([#729](https://github.com/CultureBotAI/culturebotai-claw/issues/729)) retired
+it in [claw#773](https://github.com/CultureBotAI/culturebotai-claw/pull/773).
+
+- The release removed the declaration and `release_audit.py`.
+- The lane's workflow steps stayed for one more PR, because the release PR
+  itself was audited against a base that still had the declaration. The
+  cleanup PR that followed the fleet's re-pin removed them.
+
+Every Mech re-pinned to the rollout release, and the coordinated `fleet-audit`
+above is again the only release gate. Roll a release back forward, as Rollback
+below describes, not with a plain `git revert` (#784). Historical receipts that
+cite the lane keep the revision they validated.
+
+## Scoped seven-goal-cycle release
+
+The `mech-cycle-v2.0.0` release identifies Claw commit
+`c26f3a0906916f9641a5f82b004b5541ae5fbe52`, carrying parent v2.0.0 from
+[claw#866](https://github.com/CultureBotAI/culturebotai-claw/pull/866).
+This is a workflow-contract release; the orchestration package version remains
+0.1.0. Its governance manifest and canonical payload bytes equal the fleet's
+baseline `76c1ebeea3fc7f80bf1abe044688f298f390cfac`.
+
+The strict declaration in
+`src/kg_microbe_governance/releases/mech-cycle-v2-canary.json` permits only
+DUFMech to move from that baseline to that exact release commit. All other
+manifest-defined consumers must retain the baseline. The declaration binds the
+parent, schema and both canonical workflow skills by SHA-256. It does not
+permit an arbitrary descendant commit, another Mech, or a workflow version
+chosen by a consumer. Changing or deleting and reintroducing the declaration
+is refused. Native workflow snapshots and skills are not governed sync targets:
+the DUFMech adoption PR must prepare those and its own stage-1 text separately.
+
+The required `fleet-audit` job selects this lane only when its trusted protected
+base/main contains the declaration. A candidate PR cannot activate its own
+exception. Until activation, the existing unanimous-pin audit still runs.
+After activation, a separate release audit checks every committed Mech main,
+root identity, clean state, immutable pin, payload byte and Git mode against the
+appropriate historical snapshot. The trusted execution revision, release and
+lane introduction must belong to protected first-parent main history; neither
+a downstream pin nor an unmerged candidate supplies executable audit code.
+Candidate CI separately exercises the lane's policy and workflow regressions.
+The ordinary `kg-microbe-governance fleet-audit` command keeps its one-pin
+contract; it will reject the intentionally split canary cohort.
+
+Later protected Claw revisions may update canonical payloads and their matching
+checksums while this lane is active. Current payload checksums are still
+validated, and every other manifest field remains fixed: authority, consumers,
+artifact IDs, source/target paths, modes and applicability. This preserves the
+layout used by the audit's sparse checkouts. It does not advance the canary or
+the fleet: target bytes and pins are checked against the immutable historical
+baseline/release, and workflow-asset digests against the declared release
+commit. Never refresh the release declaration to match current source files.
+
+With all consumer roots freshly fetched into clean audit worktrees, run the
+separate release audit from the merged lane revision:
+
+```bash
+uv run python -m kg_microbe_governance.cycle_release_audit \
+  --trusted-root /path/to/trusted-claw \
+  --target-root <manifest-key>=/path/to/exact-main-worktree \
+  ... \
+  --json-output /path/outside/audited/checkouts/cycle-release-audit.json
+```
+
+Supply every manifest key exactly once. The audit reports DUFMech as `pending`
+at baseline or `adopted` at the release, and the remaining consumers as
+`retained`. Here `adopted` means only that committed governance bytes and pin
+passed; it does not establish supervisor deployment, cycle-boundary migration
+or verified completion of the new issue-triage goal. Those require separate
+native workflow and runtime evidence. The guard performs no deployment, native
+goal dispatch or research call.
+
+Prepare the DUFMech re-pin using `pin-coupling` and dry-run/apply `sync` from the
+published release commit. Its PR depends on the lane PR and must not merge
+before the lane is trusted. Preserve the current active six-goal cycle and its
+evidence; activate the seven-goal candidate only at the verified cycle boundary.
+Do not create the remaining adoption issues or begin the other Mech re-pins
+until DUFMech's first issue-triage goal has verified closure.
+
+Retirement after adoption remains separate, unresolved rollout work. Prepare
+an independently reviewed transition or bridge policy that specifies the exact
+acceptable intermediate cohorts and the gates executed from each trusted base
+before changing the declaration or advancing another consumer. Deleting the
+declaration while DUFMech alone is adopted makes the ordinary one-pin audit fail;
+advancing another consumer while this lane remains active fails its exact-cohort
+check. Declaration deletion alone does not provide a continuously green cutover.
+The #773 precedent explicitly documented its expected red rollout window; do not
+silently assume that a similar window or gate waiver is approved here (#930).
+
+Once that separately reviewed transition has converged the fleet on its approved
+release and the normal exact-main audit passes, remove the obsolete declaration,
+implementation and workflow steps in the order proven by that transition. Keep
+any selector/execution needed by each cleanup PR's trusted base until it is no
+longer required. This scoped canary PR implements no broader rollout bridge and
+authorizes none of those later merges.
+
+Before canary adoption, abandoning this lane needs only a reviewed declaration
+retirement while every consumer remains at baseline. After adoption, do not
+use a plain revert, delete a supervisor ledger, rewrite an active cycle, or
+silently downgrade DUFMech's workflow. Preserve the pinned active contract and
+prepare an explicitly reviewed forward recovery with native migration and
+evidence checks. A successful pin audit is not authority for runtime rollback.
+
 ## Rollback
 
-Rollback means pinning every Mech to the previous reviewed claw commit; do
-not reinstate a Mech authority or use a mutable branch. The canonical bytes
-remain recoverable from every reviewed claw commit.
+Rollback rolls forward:
+
+1. Bring every Mech to the current release.
+2. Merge a reviewed claw commit that restores the previous canonical bytes.
+3. Re-pin every Mech to that commit. `sync` never deletes, so a Mech that the
+   restored manifest drops from an artifact's consumers deletes that file in
+   its re-pin. If the file is a workflow whose job is required, un-require the
+   job with a reviewed merge-queue plan and apply before that re-pin (#794).
+
+Do not reinstate a Mech authority or use a mutable branch.
+
+Re-pinning the fleet to an older claw commit does not work once claw's
+governance manifest has changed, and every governance release changes it.
+`fleet-audit` requires the manifest at the shared pin to equal the one the
+installed package carries. So every claw pull request would then fail,
+including the one restoring the old bytes. `kg-microbe-governance sync`, run
+from the current release, refuses the older ref for the same reason (#789).
+The canonical bytes remain recoverable from every reviewed claw commit.
 
 ## Governed workflow action pins
 

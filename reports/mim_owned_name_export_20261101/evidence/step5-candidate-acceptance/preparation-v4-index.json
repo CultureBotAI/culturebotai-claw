@@ -1,0 +1,14 @@
+{
+  "files": {
+    "verify_candidate_v4.py": {
+      "sha256": "4e425250f8b70544ad1db348f9c8e1517e7b2cf131d1773c9675426397222b25",
+      "bytes": 41260
+    },
+    "README-v4.md": {
+      "sha256": "37e173470c86e3034c8dffd3c1b693a236b50748d0df3d64b9d8b4e628afa4b0",
+      "bytes": 1364
+    }
+  },
+  "syntax_compile": "PASS",
+  "preserved_prior": "preparation-v3-index.json"
+}

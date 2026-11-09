@@ -1,0 +1,18 @@
+{
+  "head": "dc5ac04feb59154fa62fba246fcce4dfd825e498",
+  "files": [
+    {
+      "path": "src/kg_microbe_utils/owned_name_policy.py",
+      "sha256": "18ffd0430d0256b6da6cbb1f3da2327c4cf3418e2b0b2da71ff283ee2f4351ae"
+    },
+    {
+      "path": "src/kg_microbe_utils/sssom_artifacts.py",
+      "sha256": "bd94f9d4930967cad055c18b3c7f042d5b5a8f0db7d863845841649ce5ee98a6"
+    },
+    {
+      "path": "tests/test_mim_sssom_artifacts.py",
+      "sha256": "66dc74b0ea394665eacc84baa2e6c3b8dc3cf4dd3bf5a67eb28ef881450fa655"
+    }
+  ],
+  "scope": "Completion repair only; not final-head approval."
+}

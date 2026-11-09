@@ -108,6 +108,97 @@ def test_legacy_merge_uses_the_live_identifier_without_reviving_rejected_labels(
         assert excluded not in chebi["CHEBI:1"]["synonyms"]
 
 
+def _herring_sperm_indexes(tmp_path, history, *, live_target=True):
+    identifier = "kgmicrobe.ingredient:fish-sperm_dna"
+    _write(
+        tmp_path, "mapped/Deoxyribonucleic_Acid_From_Herring_Sperm.yaml",
+        identifier, "Deoxyribonucleic acid from herring sperm", "REJECTED",
+        curation_history=history,
+        ontology_mapping={"ontology_id": "CHEBI:16991", "ontology_label": "DNA"},
+    )
+    if live_target:
+        _write(
+            tmp_path, "mapped/Fish-sperm_Dna.yaml", identifier, "Fish-Sperm DNA",
+            ontology_mapping={
+                "ontology_id": "CHEBI:16991", "ontology_label": "DNA",
+                "mapping_quality": "NARROW_MATCH",
+            },
+        )
+    indexes = b.load_mim_index(tmp_path)
+    row = b.build_unified_rows({
+        "Deoxyribonucleic acid from herring sperm": {
+            "term_id": "CHEBI:16991", "count": 1, "example_media": [],
+        },
+    }, *indexes, rejections={(identifier, "CHEBI:16991"): identifier})[0]
+    return indexes, row
+
+
+@pytest.mark.parametrize("merge_action", sorted(b.MIM_MERGE_ACTIONS))
+@pytest.mark.parametrize("maintenance_count", [1, 2])
+def test_known_node_maintenance_preserves_the_herring_sperm_legacy_merge(
+    tmp_path, merge_action, maintenance_count,
+):
+    history = [{"action": merge_action, "new_status": "REJECTED"}]
+    history.extend({
+        "action": "REMOVED_STALE_KG_MICROBE_NODE_ID",
+        "previous_status": "REJECTED", "new_status": "REJECTED",
+    } for _ in range(maintenance_count))
+
+    indexes, row = _herring_sperm_indexes(tmp_path, history)
+
+    assert indexes[0]["deoxyribonucleic acid from herring sperm"] is indexes[0]["fish-sperm dna"]
+    assert row["mapping_status"] == "MAPPED"
+    assert row["mim_id"] == "kgmicrobe.ingredient:fish-sperm_dna"
+    assert row["chebi_id"] == row["culturemech_term_id"] == row["kg_microbe_node_id"] == ""
+
+
+@pytest.mark.parametrize("event", [
+    {"action": "UNKNOWN_MAINTENANCE", "previous_status": "REJECTED"},
+    {"action": "REJECTED", "previous_status": "REJECTED"},
+    {"action": "REMOVED_STALE_KG_MICROBE_NODE_ID"},
+    {"action": "REMOVED_STALE_KG_MICROBE_NODE_ID", "previous_status": None},
+    {"action": "REMOVED_STALE_KG_MICROBE_NODE_ID", "previous_status": "MAPPED"},
+    {"action": "REMOVED_STALE_KG_MICROBE_NODE_ID", "previous_status": "UNMAPPED"},
+    {"action": "removed_stale_kg_microbe_node_id", "previous_status": "REJECTED"},
+    {"action": "REMOVED_STALE_KG_MICROBE_NODE_ID", "previous_status": "rejected"},
+])
+@pytest.mark.parametrize("known_maintenance_after", [False, True])
+def test_known_node_maintenance_never_erases_a_rejection_barrier(
+    tmp_path, event, known_maintenance_after,
+):
+    history = [
+        {"action": "MERGED_INTO", "new_status": "REJECTED"},
+        event | {"new_status": "REJECTED"},
+    ]
+    if known_maintenance_after:
+        history.append({
+            "action": "REMOVED_STALE_KG_MICROBE_NODE_ID",
+            "previous_status": "REJECTED", "new_status": "REJECTED",
+        })
+
+    _, row = _herring_sperm_indexes(tmp_path, history)
+
+    assert row["mapping_status"] == "REJECTED"
+    for column in ("mim_id", "chebi_id", "culturemech_term_id", "cas_rn", "kg_microbe_node_id"):
+        assert row[column] == ""
+
+
+@pytest.mark.parametrize("prior_merge,live_target", [(False, True), (True, False)])
+def test_known_node_maintenance_cannot_supply_missing_merge_or_live_target(
+    tmp_path, prior_merge, live_target,
+):
+    history = [{"action": "MERGED_INTO", "new_status": "REJECTED"}] if prior_merge else []
+    history.append({
+        "action": "REMOVED_STALE_KG_MICROBE_NODE_ID",
+        "previous_status": "REJECTED", "new_status": "REJECTED",
+    })
+
+    _, row = _herring_sperm_indexes(tmp_path, history, live_target=live_target)
+
+    assert row["mapping_status"] == "REJECTED"
+    assert row["mim_id"] == row["chebi_id"] == row["culturemech_term_id"] == ""
+
+
 def test_explicit_representative_takes_precedence_over_the_retired_identifier(tmp_path):
     _write(tmp_path, "mapped/A_Retired.yaml", "CHEBI:1", "retired", "REJECTED",
            representative="CHEBI:2")

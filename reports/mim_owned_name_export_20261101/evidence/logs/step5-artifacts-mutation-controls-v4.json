@@ -1,0 +1,17 @@
+{
+  "name": "step5-artifacts-mutation-controls-v4",
+  "argv": [
+    "uv",
+    "run",
+    "--frozen",
+    "python",
+    "../run_step5_artifact_mutations_v4.py"
+  ],
+  "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+  "started_at": "2026-11-01T12:59:13.947233+00:00",
+  "environment_profile": "generation-and-native-qc",
+  "finished_at": "2026-11-01T12:59:22.751048+00:00",
+  "exit_code": 0,
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-artifacts-mutation-controls-v4.log",
+  "log_sha256": "9cfffd1bc20b43000266246d29be71359a18b14b25fa118eb2395f3ccaf0e263"
+}

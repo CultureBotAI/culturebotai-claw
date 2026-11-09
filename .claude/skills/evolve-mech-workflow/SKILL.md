@@ -5,7 +5,7 @@ metadata:
   category: cross-repo
   requires_database: false
   requires_internet: true
-  version: 1.0.0
+  version: 2.0.0
   tags: [fleet, workflow, governance]
 ---
 
@@ -26,8 +26,10 @@ files before declaring a skill, profile, schema, or infrastructure ledger absent
 
 ## Shared contract and local adaptations
 
-Preserve the parent sequence: add records, causal graphs, protein examples,
-record review, grouped review remediation, and infrastructure implementation.
+Parent v2 adds open-issue triage and resolution before add records, causal
+graphs, protein examples, record review, grouped review remediation, and
+infrastructure implementation. Preserve the active parent's stage keys and
+numbering: an in-flight v1 cycle still has its six original goals.
 Every stage is followed by the full commit/PR, independent adversarial review,
 real-issue creation, fixes and renewed review, verified merge, and owned-branch
 cleanup sequence. Only the supervisor dispatches the next /goal after verified
@@ -60,10 +62,19 @@ empty outcomes; agents must create real artifacts and replace all identities and
 hashes. The save_goal_evidence API validates and creates a new manifest without
 overwriting an existing revision; it does not manufacture supporting evidence.
 
-Stage 4 must retain actual review reports, structured findings, corpus coverage,
+The open_issue_triage goal (v2 stage 1) uses the canonical
+triage-and-resolve-issues skill, the supervisor-frozen issue inventory, and the
+parent issue_triage_policy. Keep every critical/high issue resolved or blocked
+with its prerequisite; a blocker holds the goal. Only after urgent work is
+resolved may the primary and secondary spend their shared four-hour wall-clock
+window on one or two largest remaining groups. Preserve stable group IDs and
+explicit carry-forward dispositions. This queue is separate from the current
+cycle's record-review findings and the infrastructure intake.
+
+The record_review goal (v2 stage 5; v1 stage 4) must retain actual review reports, structured findings, corpus coverage,
 reviewer provenance, limitations, input hashes, and disposition accounting.
 Revision and cycle directories come from the parent policy under
-reviews/workflow. Stage 5 groups related findings into deduplicated GitHub
+reviews/workflow. The resolve_review_findings goal (v2 stage 6; v1 stage 5) groups related findings into deduplicated GitHub
 issues, resolves them through native writers, and saves the finding-to-issue
 mapping plus fresh review and validation. Preserve original reports; a new
 assessment creates a linked revision. Neither a terminal summary nor a mutable
@@ -78,12 +89,40 @@ goal, priority, dependencies, status, and real GitHub issue links. Preserve any
 existing ledger and append or reconcile narrowly. Keep the schema-versioned
 tasks mapping in its mech-infra-tasks:start/end marked YAML section; an unlinked
 initial note stays status note, while open/deferred/resolved tasks need real
-issue URLs. Do not invent issues for an empty ledger. Stage 6 freezes a byte copy
+issue URLs. Do not invent issues for an empty ledger. The infrastructure goal
+(v2 stage 7; v1 stage 6) freezes a byte copy
 of the supervisor-frozen infra_scope content/hash/time from status.json, accounts
 for every non-resolved task, saves an implementation plan,
 creates or reuses related issues, implements the plan, validates it, and records
 deferred work explicitly before closure and restart. New arrivals after the
 cutoff remain in the next cycle's intake.
+
+## Durable session state
+
+Use the gitignored `<repo>/.temp/` as the durable work root for review campaigns,
+worktrees, batch state, draft review bundles and handoffs. Use
+`~/agent-work/<repo>/` when a separate clone is needed. Verify `.temp/` is ignored
+before use; provision a missing ignore rule through an authorized repository
+change. Keep maintained helpers and accepted evidence in their native tracked
+directories; a durable scratch root does not replace their provenance contract.
+
+Never store session state or helper scripts in `/tmp/`, `/private/tmp/` or `$TMPDIR`.
+Only disposable caches and pytest temporary fixtures may use system temp roots.
+Use a unique subdirectory for each task and preserve other sessions' state.
+
+Report every auxiliary clone for identity verification and inventory in
+session_repository_roots, and owned campaign/handoff directories in
+session_state_paths. Missing inventory is unknown, not healthy. Report new paths
+to the supervisor/operator; do not edit live configuration or expand authority.
+
+For authorized Git work, push each committed batch branch to `origin` the same
+day, whether or not a PR is opened. Verify the exact pushed head with the remote;
+a local commit or remote-tracking ref alone is not publication proof. Inspect
+the repository's current workflow triggers before claiming a branch push runs
+no CI. A goal delivering commits cannot close while recorded commits exist only
+locally. Publication failure is a retained blocker, never permission to discard
+the branch. This rule grants no Git mutation, merge, cleanup or provider
+authorization beyond the task and the skill's existing boundaries.
 
 ## Prepare and activate a change
 
@@ -100,6 +139,14 @@ validation results, and a migration plan when old artifacts would become invalid
 Do not silently rewrite a running goal or its receipt contract. Activate only
 at the coordinator's verified cycle boundary after the change's closure; a
 coordinator without next-profile support remains blocked on activation.
+
+For v1 to v2 adoption, retain the active goal, old stage numbers, archived
+receipts and immutable evidence paths. A reviewed migration binds the old and
+candidate effective workflow hashes; only verified closure of the old
+infrastructure goal permits the new cycle's seven-goal contract. Keep each
+cycle's parent version explicit. Stage 0 remains not started, not issue triage.
+Release, DUFMech's test adoption, and later fleet rollout are separate phases;
+rendering a skill or preparing a profile does not authorize those mutations.
 
 Use existing authorization and the cross-repository mutation checklist in
 CLAUDE.md. Acquire the owned repository lock, compare captured hashes again,

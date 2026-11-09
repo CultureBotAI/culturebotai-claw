@@ -1,0 +1,34 @@
+{
+  "name": "lower_instead_of_casefold",
+  "argv": [
+    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python3",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "-c",
+    "/dev/null",
+    "--confcutdir",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-helper-implementation/controls/lower_instead_of_casefold",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-helper-implementation/controls/lower_instead_of_casefold/tests/test_mim_owned_name_policy.py",
+    "-k",
+    "test_casefold_without_punctuation_internal_space_or_unicode_normalization"
+  ],
+  "started_at": "2026-11-01T12:39:58.448455+00:00",
+  "finished_at": "2026-11-01T12:39:58.876459+00:00",
+  "exit_code": 1,
+  "expected_failure": true,
+  "control_pass": true,
+  "selection": "test_casefold_without_punctuation_internal_space_or_unicode_normalization",
+  "mutation": {
+    "before": ".casefold()",
+    "after": ".lower()"
+  },
+  "source_sha256": "b20e8fa3402a533aea34b4b8d2c823bf7a3ba55fac40665c306d7593e48f8ce7",
+  "test_sha256": "62c8675b32177dbc609218851ac13d409cf6dfd628fe37118a76a6c2cc7516b6",
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-helper-implementation/controls/lower_instead_of_casefold/pytest.log",
+  "log_sha256": "ab9447ce5c617bf55ff6e2473f397383c55ec509eb1032c89ba81d2ef14df8cf",
+  "fresh_process": true,
+  "fresh_bytecode_prefix": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-helper-implementation/controls/lower_instead_of_casefold/bytecode"
+}

@@ -1,0 +1,55 @@
+--- package_evidence_v3.py
++++ package_evidence_v4.py
+@@ -95,15 +95,21 @@
+                 'Standalone B4 coverage differs or was not archived')
+ 
+ 
+-def check_references(plan, repository):
++def check_references(plan, repository, historical=False):
+     revision = plan['implementation_revision']
+     require(len(revision) == 40 and all(c in '0123456789abcdef' for c in revision), 'Full implementation SHA required')
+-    subprocess.run(['git','merge-base','--is-ancestor',revision,'HEAD'],cwd=repository,check=True)
++    # Author publication requires historical attribution; a portable consumer
++    # needs only current committed bytes and may have no pre-squash objects.
++    if historical:
++        subprocess.run(['git','merge-base','--is-ancestor',revision,'HEAD'],cwd=repository,check=True)
+     for name, expected in plan['maintained_file_references'].items():
+         raw = read(repository/relative(name))
+         require(digest(raw) == expected['sha256'] and len(raw) == expected['bytes'], 'Maintained reference differs: '+name)
+-        committed = subprocess.check_output(['git','show',revision+':'+name],cwd=repository)
+-        require(committed == raw, 'Reference was not committed at the declared implementation revision: '+name)
++        committed = subprocess.check_output(['git','show','HEAD:'+name],cwd=repository)
++        require(committed == raw, 'Current committed reference differs: '+name)
++        if historical:
++            original = subprocess.check_output(['git','show',revision+':'+name],cwd=repository)
++            require(original == raw, 'Reference was not committed at the declared implementation revision: '+name)
+ 
+ 
+ def bound_selection(frozen, selection_bytes, expected_run_root=None):
+@@ -135,7 +141,7 @@
+         require(digest(data) == item['source_sha256'] and len(data) == item['source_bytes'], 'Selected evidence changed: '+name)
+         originals[name] = data
+     validate_bindings(plan, originals)
+-    check_references(plan, RUN/'claw-owned-name')
++    check_references(plan, RUN/'claw-owned-name', historical=True)
+     require(output.parent == HERE and not output.exists(), 'Freeze output must be a fresh run-owned file')
+     result = {'kind':'frozen_step5_claw_evidence','captured_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+               'selection_path':str(selection),'selection_sha256':digest(raw), 'run_root':str(RUN),
+@@ -152,7 +158,7 @@
+     selected = bound_selection(frozen, read(Path(frozen['selection_path'])), RUN)
+     repository=RUN/'claw-owned-name';destination=repository/DESTINATION
+     require(not destination.exists() and not destination.is_symlink(), 'Package destination already exists')
+-    check_references(plan,repository)
++    check_references(plan,repository,historical=True)
+     payloads={};sources={};by_hash={};originals={}
+     for name,item in plan['selected_existing_files'].items():
+         data=read(source(name));sha=digest(data)
+@@ -183,7 +189,7 @@
+     # Preserve an incomplete directory on any race; never overwrite it silently.
+     for name,item in plan['selected_existing_files'].items():
+         require(digest(read(source(name)))==item['source_sha256'], 'Input changed during packaging')
+-    check_references(plan,repository)
++    check_references(plan,repository,historical=True)
+     with (destination/'manifest.json').open('x') as stream:
+         json.dump(manifest,stream,indent=2,sort_keys=True);stream.write('\n')
+     verify(destination,repository,False)

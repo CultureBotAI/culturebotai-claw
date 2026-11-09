@@ -1,0 +1,27 @@
+{
+  "files": {
+    "README.md": "a6baac0648e4de5ba0f86155775aae9e9132925250012fa684d96f3794eb22b7",
+    "checks/step5-builder-703-focused.json": "5e5d54b31d364228c625598e7b894436c6981932e4bb6b063d5587b76629aba9",
+    "checks/step5-builder-703-focused.log": "320a1e3b580c45eb6dc199bab7b5dc71402bc8e09f517b4d4ebf98631cc160a6",
+    "checks/step5-builder-703-mutations.json": "339710642256c425bd0f3f7e961bf37be4e9720bbe8278679f3e3f3c887c4c7a",
+    "checks/step5-builder-703-mutations.log": "0e64918a931bacd18d39165984c5bbb7d45bd1d72b7517f66710b689fd3127c0",
+    "checks/step5-builder-703-ruff.json": "671262fd20cae9867d08e41578cda16ddad31acbe207057fb99c3f0e3f5b4fd1",
+    "checks/step5-builder-703-ruff.log": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+    "mutation-baseline.log": "0682b480b2361ce1c0851b619d8a149048e8b40d174cd244c39ab3db23ff1d28",
+    "mutation-cas-bypass.log": "f061898dfe51f9c6cbdac449398e4b230df5c978ee17066bfbb2836f0bff18e9",
+    "mutation-input-byte-check-bypass.log": "982140c20841be1b886faae4d02080e835d0b7339e4b7916fe2b8ea7d7b6fbae",
+    "mutation-kgm-reread.log": "c6ac813e62b82ae15cab617b45b31c19c2db32b991bd000800cb81d33dc5d17e",
+    "mutation-lexical-stamp-normalization-bypass.log": "28c9ee7004c8b85eb7f1a3a07a05e8ea69840520b7e9727263bb65fcc7dceb60",
+    "mutation-ownership-bypass.log": "2d62c17b71364bdd265c1d2439e487d5053e57758448335f078eda6381aa1e1e",
+    "mutation-path-set-check-bypass.log": "e071a7f0e9d36f5f069f2b293ce199a3e96360adea9d8bb173104a87096589eb",
+    "mutation-rejected-label-bypass.log": "fd5c32ee736f77bd709b296f72526348a1cd091aac6a50b09db6059409f0b184",
+    "mutation-results.json": "0e64918a931bacd18d39165984c5bbb7d45bd1d72b7517f66710b689fd3127c0",
+    "mutation-tsv-only-noop.log": "f7d236961fa296a04c19929bcc13a58d6266227e4b08873055f5dad218f66896",
+    "mutation-validator-returncode-bypass.log": "76f267520469a633292b85d7a3b0ef49f82906520114930d67f9ca5b1091fb74",
+    "mutation_controls.py": "189b96ea539880e236fc986714fd4855c932468126c2b7c7268ab177236e62f5",
+    "source/scripts/build_mim_ingredient_sssom.py": "772b7a70309396f705fd8eb0709088304978e76c6fdf5567c5f75c95d59e40dd",
+    "source/tests/test_mim_owned_name_export.py": "4d8a3eeb9946d7e0f2738a7a3c104d064c6f9ba8a847c6bd574c141d32dc183d",
+    "source/tests/test_mim_sssom_header_dates.py": "abfde63fff697f3869568ccb57e4d311128e48ba6a26832347135c621d1b4b79",
+    "stable-source.json": "092d656f8d03721cb3ab06e1f0f563742b1aab3272aca49bfe9a8affeaea96e3"
+  }
+}

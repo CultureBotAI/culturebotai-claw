@@ -13,7 +13,11 @@ from typing import Any
 from mech_progress_publish import read_remote
 
 from kg_microbe_fleet import load_fleet_manifest
-from kg_microbe_progress import ProgressError, read_json, validate_bundle
+from kg_microbe_progress import (
+    ProgressError,
+    project_bundle_to_manifest,
+    read_json,
+)
 
 MAX_AGE_SECONDS = 15 * 60
 FUTURE_TOLERANCE_SECONDS = 60
@@ -87,6 +91,10 @@ def main(argv: list[str] | None = None, *, now: datetime | None = None) -> int:
         "--manifest", type=Path,
         help="producer's fleet manifest (default: bundle-adjacent fleet.yaml when present, otherwise packaged fleet)",
     )
+    parser.add_argument(
+        "--durability-runtime", type=Path,
+        help="also report saved durability alerts from this explicit local supervisor runtime; never scan or mutate it",
+    )
     args = parser.parse_args(argv)
     try:
         adjacent_manifest = args.bundle.parent / "fleet.yaml"
@@ -110,17 +118,25 @@ def main(argv: list[str] | None = None, *, now: datetime | None = None) -> int:
         history, snapshot = bundle["history"], bundle["snapshot"]
         if not isinstance(history, dict) or not isinstance(snapshot, dict):
             raise ProgressError("bundle must contain history and snapshot objects")
-        validate_bundle(history, snapshot, manifest)
+        snapshot = project_bundle_to_manifest(history, snapshot, manifest)
         warnings = freshness_warnings(snapshot, now or datetime.now(timezone.utc))
         summary = format_summary(snapshot)
+        durability = []
+        if args.durability_runtime is not None:
+            from kg_microbe_progress.durability import read_durability
+            durability = read_durability(args.durability_runtime, manifest, now or datetime.now(timezone.utc))
     except (ValueError, OSError, KeyError, TypeError, subprocess.SubprocessError) as error:
         print(f"Progress unavailable: {error}", file=sys.stderr)
         return 1
 
     print(summary)
+    if durability:
+        from kg_microbe_progress.durability import format_durability
+        for row in durability:
+            print(format_durability(row))
     for warning in warnings:
         print(f"Warning: {warning}. Counts are last verified, not fully current.", file=sys.stderr)
-    return 3 if warnings else 0
+    return 3 if warnings or any(row["alert"] for row in durability) else 0
 
 
 if __name__ == "__main__":

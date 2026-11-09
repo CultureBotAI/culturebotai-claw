@@ -1,0 +1,6 @@
+Not configured locally (12): communitymech, traitmech, proteintraitsmech, 
+antibioticmech, cellstructuremech, habitatmech, naturalproductmech, taxonmech, 
+pathwaymech, dufmech, cmmmech, aimech
+  These are fleet members without a configured path here. Operations against 
+them will still fail closed.
+✓ Configuration is valid

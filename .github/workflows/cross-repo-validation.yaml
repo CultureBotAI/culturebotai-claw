@@ -8,6 +8,8 @@ on:
     branches: [main]
     paths:
       - "scripts/validate_evidence_references.py"
+      - "src/kg_microbe_evidence/**"
+      - "src/kg_microbe_fleet/fleet.yaml"
       - "scripts/inventory_unmapped_ingredients.py"
       - "scripts/generate_kg_microbe_review.py"
       - ".github/workflows/cross-repo-validation.yaml"
@@ -131,8 +133,9 @@ jobs:
         with:
           name: cross-repo-validation-${{ github.run_id }}
           path: |
-            culturebotai-claw/workspace/reports/evidence_reference_validation.tsv
-            culturebotai-claw/workspace/reports/evidence_reference_validation.md
+            MediaIngredientMech/workspace/reports/evidence_reference_validation.tsv
+            MediaIngredientMech/workspace/reports/evidence_reference_validation.md
+            MediaIngredientMech/workspace/reports/evidence_reference_validation.json
             culturebotai-claw/workspace/reports/unmapped_inventory.tsv
             culturebotai-claw/workspace/reports/unmapped_inventory.md
             culturebotai-claw/workspace/reports/unmapped_inventory_coverage.tsv

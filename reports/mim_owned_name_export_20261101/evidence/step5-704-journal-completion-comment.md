@@ -1,0 +1,5 @@
+Further independent re-review verified the journal symlink repair, then reproduced a completion-evidence gap before the first journal capture. A narrow wrapper executes the actual native commit and removes or corrupts its journal just before returning the unchanged native result. The helper accepts missing content (`None`) or stable `{}` bytes and returns complete.
+
+Require an existing completed native journal whose root, changed/created path sets and previous contents match the intended transaction before accepting its first capture. Retain the later byte-identity check after the source callback. Add missing, malformed and incorrectly bound journal regressions without replacing the native writer.
+
+Evidence: `step5-claw-independent/rereview-704-journal-v2/probe_journal_initial_capture.py`, `journal-initial-capture-results.json`; log SHA256 `946b66f97a5d343b57819b9e75ba2114d72b6f025932453af1e116c39ccd738f`. This completion-validation extension is recorded before its fix; no maintained mapping was affected.

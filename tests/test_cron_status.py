@@ -1,0 +1,763 @@
+"""Tests for the scheduled-job status report.
+
+The report exists because "latest run: success" hides the three ways a cron
+job fails quietly: a disabled workflow, runs GitHub dropped or started late,
+and a repository the loop never reached. Each test is driven by an input where
+the two sides of one of those distinctions differ. Everything runs offline:
+`gh` is injected and the clock is fixed.
+"""
+from __future__ import annotations
+
+import base64
+import datetime as dt
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+
+import cron_status as cs  # noqa: E402
+
+NOW = dt.datetime(2026, 11, 5, 5, 28, tzinfo=dt.UTC)
+
+
+def day(text: str) -> dt.date:
+    return dt.date.fromisoformat(text)
+
+
+# ------------------------------------------------------------------ cron --
+@pytest.mark.parametrize("expression,per_day,description", [
+    ("41 6 * * *", 1, "daily 06:41"),
+    ("23 * * * *", 24, "hourly at :23"),
+    ("7,22,37,52 * * * *", 96, "every 15 min"),
+    ("*/20 9-17 * * *", 27, "`*/20 9-17 * * *`"),
+    ("5/15 * * * *", 96, "every 15 min"),
+])
+def test_cron_ticks_per_day_and_description(expression, per_day, description):
+    cron = cs.Cron.parse(expression)
+    assert len(cron.ticks_on(day("2026-11-04"))) == per_day
+    assert cron.describe() == description
+
+
+def test_step_from_a_start_value_runs_to_the_field_maximum():
+    assert cs.Cron.parse("5/15 * * * *").minutes == {5, 20, 35, 50}
+
+
+def test_weekday_restriction_and_sunday_as_seven():
+    weekdays = cs.Cron.parse("0 7 * * 1-5")
+    assert weekdays.runs_on(day("2026-11-02")) and not weekdays.runs_on(day("2026-11-07"))  # Mon / Sat
+    assert cs.Cron.parse("0 0 * * 7").runs_on(day("2026-11-08"))  # Sunday
+    assert cs.Cron.parse("0 0 * * SUN").runs_on(day("2026-11-08"))
+
+
+def test_day_of_month_and_weekday_combine_with_or_when_both_are_restricted():
+    cron = cs.Cron.parse("0 0 1 * 1")
+    assert cron.runs_on(day("2026-11-01"))  # the 1st, a Sunday
+    assert cron.runs_on(day("2026-11-02"))  # a Monday, not the 1st
+    assert not cron.runs_on(day("2026-11-03"))
+    only_dom = cs.Cron.parse("0 0 1 * *")
+    assert not only_dom.runs_on(day("2026-11-02"))
+
+
+@pytest.mark.parametrize("expression", ["61 * * * *", "* * * *", "0 0 * * 8", "*/0 * * * *", "5-1 * * * *",
+                                        "x * * * *"])
+def test_invalid_cron_is_rejected(expression):
+    with pytest.raises(cs.CronError):
+        cs.Cron.parse(expression)
+
+
+def test_last_and_next_tick():
+    cron = cs.Cron.parse("41 6 * * *")
+    started = dt.datetime(2026, 11, 4, 14, 51, tzinfo=dt.UTC)
+    assert cron.last_tick(started) == dt.datetime(2026, 11, 4, 6, 41, tzinfo=dt.UTC)
+    assert cron.next_tick(NOW) == dt.datetime(2026, 11, 5, 6, 41, tzinfo=dt.UTC)
+
+
+# ------------------------------------------------------------- assessing --
+def run(created: str, conclusion: str = "success") -> dict:
+    return {"created_at": created, "status": "completed", "conclusion": conclusion,
+            "html_url": f"https://example.invalid/{created}"}
+
+
+def daily_status(state: str = "active") -> cs.WorkflowStatus:
+    return cs.WorkflowStatus("CultureBotAI/culturebotai-claw", "audit", ".github/workflows/a.yaml", state,
+                             ["41 6 * * *"])
+
+
+def daily_runs(late_hours: float = 8, conclusion: str = "success") -> list[dict]:
+    runs = []
+    for offset in range(1, 7):
+        tick = dt.datetime(2026, 11, 5, 6, 41, tzinfo=dt.UTC) - dt.timedelta(days=offset)
+        runs.append(run((tick + dt.timedelta(hours=late_hours)).isoformat().replace("+00:00", "Z")))
+    runs.sort(key=lambda item: item["created_at"])
+    runs[-1]["conclusion"] = conclusion
+    return runs
+
+
+def test_on_schedule_daily_job_counts_per_day_and_needs_no_attention():
+    status = daily_status()
+    cs.assess(status, daily_runs(), NOW, 7)
+    assert status.runs_per_day == [1, 1, 1, 1, 1, 1, 0]
+    assert status.expected_per_day == [1, 1, 1, 1, 1, 1, 0]  # today's 06:41 has not come yet
+    assert status.expected_due == 6
+    assert status.late_minutes_at_least == 8 * 60
+    assert status.next_tick == "2026-11-05T06:41:00+00:00"
+    assert status.attention == []
+
+
+@pytest.mark.parametrize("late_hours,flagged", [(11.9, False), (12.5, True)])
+def test_lateness_is_flagged_only_beyond_the_grace_period(late_hours, flagged):
+    status = daily_status()
+    cs.assess(status, daily_runs(late_hours), NOW, 7)
+    assert any("late" in flag for flag in status.attention) is flagged
+
+
+def test_latest_failure_is_flagged_but_a_success_is_not():
+    failed, passed = daily_status(), daily_status()
+    cs.assess(failed, daily_runs(conclusion="failure"), NOW, 7)
+    cs.assess(passed, daily_runs(conclusion="success"), NOW, 7)
+    assert "latest run failure" in failed.attention
+    assert passed.attention == []
+
+
+def test_disabled_workflow_is_flagged_even_with_good_history():
+    status = daily_status("disabled_inactivity")
+    cs.assess(status, daily_runs(), NOW, 7)
+    assert any("disabled_inactivity" in flag for flag in status.attention)
+
+
+def test_silence_is_not_health():
+    status = daily_status()
+    cs.assess(status, [], NOW, 7)
+    assert "no scheduled run in the window" in status.attention
+    assert status.latest is None
+
+
+def test_dropped_runs_are_flagged_against_ticks_older_than_the_grace_period():
+    status = cs.WorkflowStatus("r/r", "pages", ".github/workflows/p.yaml", "active", ["7,22,37,52 * * * *"])
+    sparse = [run(f"2026-11-0{d}T0{h}:09:00Z") for d in range(1, 5) for h in (1, 5)]
+    cs.assess(status, sparse, NOW, 7)
+    assert any(flag.startswith("GitHub dropped runs: 8 of") for flag in status.attention)
+    dense = cs.WorkflowStatus("r/r", "pages", ".github/workflows/p.yaml", "active", ["0 */6 * * *"])
+    cs.assess(dense, [run(f"2026-10-{d:02d}T{h:02d}:05:00Z") for d in (30, 31) for h in (0, 6, 12, 18)]
+              + [run(f"2026-11-{d:02d}T{h:02d}:05:00Z") for d in (1, 2, 3, 4) for h in (0, 6, 12, 18)]
+              + [run("2026-11-05T00:05:00Z")], NOW, 7)
+    assert not any("dropped" in flag for flag in dense.attention)
+
+
+# --------------------------------------------------------------- reading --
+def workflow_file(text: str) -> str:
+    return json.dumps({"content": base64.b64encode(text.encode()).decode()})
+
+
+SCHEDULED = "on:\n  schedule:\n    - cron: '41 6 * * *'\n  workflow_dispatch:\njobs: {}\n"
+UNSCHEDULED = "on: [push]\njobs: {}\n"
+
+
+def _created_filter(endpoint: str):
+    from urllib.parse import unquote
+
+    created = unquote(endpoint.split("&created=", 1)[1])
+    if created.startswith(">="):
+        return lambda run: run["created_at"][:10] >= created[2:]
+    return lambda run: run["created_at"][:10] == created
+
+
+def fake_gh(workflows: list[dict], files: dict[str, str], runs: dict[int, list[dict]],
+            failing: set[str] = frozenset(), window_total: int | None = None):
+    """A gh stand-in. `window_total` overrides the window query's total_count, to model the API cap."""
+    def gh(args: list[str]) -> str:
+        endpoint = next(arg for arg in args if arg.startswith("repos/"))
+        if any(part in endpoint for part in failing):
+            raise RuntimeError(f"HTTP 404: {endpoint}")
+        if endpoint.endswith("/actions/workflows"):
+            return "\n".join(json.dumps(workflow) for workflow in workflows)
+        if "/contents/" in endpoint:
+            return files[endpoint.split("/contents/", 1)[1]]
+        workflow_id = int(endpoint.split("/actions/workflows/", 1)[1].split("/", 1)[0])
+        selected = [item for item in runs.get(workflow_id, []) if _created_filter(endpoint)(item)]
+        if args[args.index("--jq") + 1] == ".total_count":
+            if window_total is not None and "%3E%3D" in endpoint:
+                return str(window_total)
+            return str(len(selected))
+        return "\n".join(json.dumps(item) for item in selected)
+    return gh
+
+
+WORKFLOWS = [
+    {"id": 1, "name": "audit", "path": ".github/workflows/audit.yaml", "state": "active"},
+    {"id": 2, "name": "tests", "path": ".github/workflows/tests.yaml", "state": "active"},
+    {"id": 3, "name": "pages-build-deployment", "path": "dynamic/pages/pages-build-deployment", "state": "active"},
+]
+FILES = {".github/workflows/audit.yaml": workflow_file(SCHEDULED),
+         ".github/workflows/tests.yaml": workflow_file(UNSCHEDULED)}
+
+
+def test_only_scheduled_workflows_are_reported():
+    statuses = cs.collect_repository("o/r", fake_gh(WORKFLOWS, FILES, {1: daily_runs()}), NOW, 7)
+    assert [status.name for status in statuses] == ["audit"]
+    assert statuses[0].crons == ["41 6 * * *"]
+
+
+def test_schedule_crons_reads_pyyaml_on_as_true():
+    import yaml
+
+    assert cs.schedule_crons(yaml.safe_load(SCHEDULED)) == ["41 6 * * *"]
+    assert cs.schedule_crons(yaml.safe_load(UNSCHEDULED)) == []
+
+
+def main_output(capsys, gh, *argv) -> tuple[int, str]:
+    status = cs.main(["--no-local", *argv], gh=gh, now=NOW)
+    return status, capsys.readouterr().out
+
+
+def test_complete_report_exits_zero(capsys):
+    status, out = main_output(capsys, fake_gh(WORKFLOWS, FILES, {1: daily_runs()}), "--repo", "o/r")
+    assert status == 0
+    assert "| r | audit | daily 06:41 | active | 1 1 1 1 1 1 0 | 6 / 6 |" in out
+    assert "INCOMPLETE" not in out
+
+
+def test_unreachable_repository_is_named_and_makes_the_report_incomplete(capsys):
+    gh = fake_gh(WORKFLOWS, FILES, {1: daily_runs()}, failing={"o/missing"})
+    status, out = main_output(capsys, gh, "--repo", "o/r", "--repo", "o/missing")
+    assert status == 1
+    assert "INCOMPLETE: o/missing could not be queried" in out
+    assert "| r | audit |" in out
+
+
+def test_unreadable_workflow_file_is_reported_not_skipped(capsys):
+    gh = fake_gh(WORKFLOWS, FILES, {}, failing={"contents/.github/workflows/audit.yaml"})
+    status, out = main_output(capsys, gh, "--repo", "o/r")
+    assert status == 1
+    assert "not assessed: could not read the workflow file" in out
+    assert "INCOMPLETE: o/r .github/workflows/audit.yaml was not assessed" in out  # #826
+
+
+def test_json_output_carries_completeness(capsys):
+    status, out = main_output(capsys, fake_gh(WORKFLOWS, FILES, {1: daily_runs()}), "--repo", "o/r", "--json")
+    data = json.loads(out)
+    assert status == 0 and data["complete"] is True
+    assert data["workflows"][0]["runs_per_day"] == [1, 1, 1, 1, 1, 1, 0]
+
+
+@pytest.mark.parametrize("argv", [["--days", "0"], ["--days", "91"], ["--bogus"]])
+def test_bad_usage_exits_two(argv):
+    assert cs.main(["--no-local", *argv], gh=fake_gh([], {}, {}), now=NOW) == 2
+
+
+# ----------------------------------------------------------------- local --
+def completed(returncode: int = 0, stdout: str = "", stderr: str = "") -> subprocess.CompletedProcess:
+    return subprocess.CompletedProcess([], returncode, stdout, stderr)
+
+
+def test_local_crontab_and_launch_agents(tmp_path):
+    import plistlib
+
+    (tmp_path / "interval.plist").write_bytes(plistlib.dumps({"Label": "me.backup", "StartInterval": 3600}))
+    (tmp_path / "calendar.plist").write_bytes(plistlib.dumps(
+        {"Label": "me.report", "StartCalendarInterval": {"Hour": 6, "Minute": 30}}))
+    (tmp_path / "keepalive.plist").write_bytes(plistlib.dumps({"Label": "me.daemon", "KeepAlive": True}))
+
+    def run_command(command):
+        if command[0] == "crontab":
+            return completed(stdout="# comment\n15 3 * * * /usr/local/bin/sync.sh --quiet\n")
+        if command[-1] == "me.backup":
+            return completed(stdout='{\n\t"LastExitStatus" = 0;\n};\n')
+        return completed(returncode=113, stderr="Could not find service")
+
+    jobs, errors = cs.collect_local(run_command, tmp_path)
+    assert errors == []
+    rows = {(job.source, job.job): (job.schedule, job.status) for job in jobs}
+    assert rows[("crontab", "/usr/local/bin/sync.sh --quiet")] == ("15 3 * * *", "installed")
+    assert rows[("launchd", "me.backup")] == ("every 1 h", "loaded, last exit 0")
+    assert rows[("launchd", "me.report")] == ("Hour=6 Minute=30 (local time)", "not loaded")
+    assert ("launchd", "me.daemon") not in rows  # no calendar or interval trigger
+
+
+def test_no_crontab_is_not_an_error_but_a_crontab_failure_is(tmp_path):
+    jobs, errors = cs.collect_local(lambda command: completed(1, stderr="crontab: no crontab for me"), tmp_path)
+    assert jobs == [] and errors == []
+    _, errors = cs.collect_local(lambda command: completed(1, stderr="crontab: permission denied"), tmp_path)
+    assert errors == ["crontab: crontab: permission denied"]
+
+
+def test_launchd_is_reported_not_checked_rather_than_empty_without_a_directory():
+    calls = []
+
+    def run_command(command):
+        calls.append(command)
+        return completed(1, stderr="crontab: no crontab for me")
+
+    jobs, errors = cs.collect_local(run_command, None)
+    assert jobs == [] and errors == [] and all(call[0] != "launchctl" for call in calls)
+    unchecked = cs.render([], {}, [], [], ["o/r"], 7, NOW, True, launchd_checked=False)
+    checked = cs.render([], {}, [], [], ["o/r"], 7, NOW, True, launchd_checked=True)
+    assert "launchd | not checked" in unchecked and "no LaunchAgent" not in unchecked
+    assert "no LaunchAgent with a calendar or interval trigger" in checked and "not checked" not in checked
+
+
+def test_a_launch_agents_dir_that_does_not_exist_makes_the_report_incomplete(tmp_path):
+    _, errors = cs.collect_local(lambda command: completed(1, stderr="no crontab for me"), tmp_path / "missing")
+    assert errors and "is not a directory" in errors[0]
+
+
+# ------------------------------------------------- review fixes (#821-#827) --
+def test_explicit_step_of_one_expands_to_the_field_maximum():
+    assert cs.Cron.parse("0 5/1 * * *").hours == frozenset(range(5, 24))
+    assert cs.Cron.parse("5/1 * * * *").minutes == frozenset(range(5, 60))
+
+
+@pytest.mark.parametrize("expression", ["0 0 */2 * *", "0 0 * * */2", "0 0 * 1-6 *"])
+def test_a_schedule_that_skips_days_is_not_summarised_as_daily(expression):
+    assert not cs.Cron.parse(expression).describe().startswith("daily")
+
+
+def test_star_prefixed_weekday_combines_with_day_of_month_by_and():
+    cron = cs.Cron.parse("0 0 1 * */2")  # "*/2" is star-prefixed, so AND applies
+    assert cron.runs_on(day("2026-11-01"))  # the 1st, a Sunday
+    assert not cron.runs_on(day("2027-01-01"))  # the 1st, but a Friday
+
+
+def test_a_leap_day_schedule_has_a_next_tick():
+    assert cs.Cron.parse("0 0 29 2 *").next_tick(NOW) == dt.datetime(2028, 2, 29, tzinfo=dt.UTC)
+
+
+def test_lateness_is_a_lower_bound_across_crons():
+    status = cs.WorkflowStatus("o/r", "two", ".github/workflows/t.yaml", "active", ["0 0 * * *", "0 12 * * *"])
+    cs.assess(status, [run("2026-11-05T13:00:00Z")], dt.datetime(2026, 11, 5, 14, tzinfo=dt.UTC), 1)
+    assert status.late_minutes_at_least == 60  # served 00:00 or 12:00; only "at least 60" is known
+    table = cs.render([status], {}, [], [], ["o/r"], 1, NOW, False)
+    assert "Created late by (at least)" in table
+
+
+def test_a_rerun_shows_its_attempt():
+    rerun = dict(run("2026-11-04T14:41:00Z"), run_attempt=2, run_started_at="2026-11-04T16:00:00Z")
+    status = daily_status()
+    cs.assess(status, daily_runs()[:-1] + [rerun], NOW, 7)
+    assert status.latest["run_attempt"] == 2 and status.latest["run_started_at"] == "2026-11-04T16:00:00Z"
+    assert "success (attempt 2)" in cs.render([status], {}, [], [], ["o/r"], 7, NOW, False)
+
+
+def test_more_runs_than_the_search_cap_are_counted_per_day():
+    runs = [dict(run(f"2026-11-0{d}T{h:02d}:{m:02d}:00Z"), id=f"{d}-{h}-{m}")
+            for d in range(1, 5) for h in range(24) for m in (0, 30)]
+    gh = fake_gh(WORKFLOWS, FILES, {1: runs}, window_total=cs.RUN_SEARCH_CAP + 1)
+    fetched = cs.fetch_runs(gh, "o/r", 1, "2026-10-30", NOW.date())
+    assert len(fetched) == len(runs)  # every day queried, nothing lost to the cap
+
+
+def test_a_day_beyond_the_search_cap_makes_the_report_incomplete(capsys, monkeypatch):
+    monkeypatch.setattr(cs, "RUN_SEARCH_CAP", 3)
+    runs = [dict(run(f"2026-11-04T0{h}:00:00Z"), id=h) for h in range(5)]
+    status, out = main_output(capsys, fake_gh(WORKFLOWS, FILES, {1: runs}), "--repo", "o/r")
+    assert status == 1
+    assert "INCOMPLETE: o/r .github/workflows/audit.yaml was not assessed" in out and "more than 3" in out
+
+
+def test_a_schedule_with_a_timezone_is_not_assessed_in_utc(capsys):
+    zoned = "on:\n  schedule:\n    - cron: '0 0 * * *'\n      timezone: America/Los_Angeles\njobs: {}\n"
+    files = {".github/workflows/audit.yaml": workflow_file(zoned), ".github/workflows/tests.yaml": FILES[
+        ".github/workflows/tests.yaml"]}
+    status, out = main_output(capsys, fake_gh(WORKFLOWS, files, {1: daily_runs()}), "--repo", "o/r")
+    assert status == 1
+    assert "schedule timezone America/Los_Angeles is not supported yet" in out
+
+
+def test_a_tab_separated_shortcut_keeps_its_command_and_a_bare_one_is_malformed():
+    jobs, errors = cs.collect_local(lambda command: completed(stdout="@daily\t/bin/true\n@reboot\n"), None)
+    assert [(job.schedule, job.job) for job in jobs] == [("@daily", "/bin/true")]
+    assert errors == ["crontab: shortcut without a command: @reboot"]
+
+
+@pytest.mark.parametrize("seconds,schedule", [(61, "every 1 min 1 s"), (90, "every 1 min 30 s"),
+                                              (120, "every 2 min")])
+def test_launchd_intervals_keep_their_seconds(seconds, schedule):
+    assert cs._launchd_schedule({"StartInterval": seconds}) == schedule
+
+
+def test_the_count_query_is_not_paginated_and_the_listing_is():
+    calls = []
+    inner = fake_gh(WORKFLOWS, FILES, {1: daily_runs()})
+
+    def gh(args):
+        calls.append(args)
+        return inner(args)
+
+    cs.fetch_runs(gh, "o/r", 1, "2026-10-30", NOW.date())
+    counts = [args for args in calls if ".total_count" in args]
+    listings = [args for args in calls if ".total_count" not in args]
+    assert counts and all("--paginate" not in args for args in counts)
+    assert listings and all("--paginate" in args for args in listings)
+    assert all("event=schedule" in next(arg for arg in args if arg.startswith("repos/")) for args in calls)
+
+
+def test_the_per_day_path_includes_today_and_dedupes_by_run_id():
+    runs = [dict(run("2026-11-05T01:00:00Z"), id="today"),
+            dict(run("2026-11-04T09:00:00Z"), id="a"), dict(run("2026-11-04T09:00:00Z"), id="b")]
+    gh = fake_gh(WORKFLOWS, FILES, {1: runs}, window_total=cs.RUN_SEARCH_CAP + 1)
+    fetched = cs.fetch_runs(gh, "o/r", 1, "2026-10-30", NOW.date())
+    assert sorted(item["id"] for item in fetched) == ["a", "b", "today"]
+
+
+def test_a_missing_launchctl_is_reported_not_raised(tmp_path):
+    import plistlib
+
+    (tmp_path / "a.plist").write_bytes(plistlib.dumps({"Label": "me.job", "StartInterval": 3600}))
+
+    def run_command(command):
+        if command[0] == "crontab":
+            return completed(1, stderr="crontab: no crontab for me")
+        raise FileNotFoundError("launchctl")
+
+    jobs, errors = cs.collect_local(run_command, tmp_path)
+    assert jobs[0].status == "unknown" and errors and errors[0].startswith("launchctl:")
+
+
+def test_crontab_assignments_are_skipped_and_shortcuts_keep_their_command(tmp_path):
+    crontab = "PATH=/bin:/usr/bin\nMAILTO=\n@daily /bin/echo one two three four five\n"
+    jobs, errors = cs.collect_local(lambda command: completed(stdout=crontab), None)
+    assert errors == []
+    assert [(job.schedule, job.job) for job in jobs] == [("@daily", "/bin/echo one two three four five")]
+
+
+def test_a_launchctl_failure_is_not_read_as_not_loaded(tmp_path):
+    import plistlib
+
+    (tmp_path / "a.plist").write_bytes(plistlib.dumps({"Label": "me.job", "StartInterval": 3600}))
+
+    def denied(command):
+        if command[0] == "crontab":
+            return completed(1, stderr="crontab: no crontab for me")
+        return completed(1, stderr="Permission denied")
+
+    jobs, errors = cs.collect_local(denied, tmp_path)
+    assert jobs[0].status == "unknown" and errors == ["launchctl list me.job: Permission denied"]
+
+
+def test_a_missing_scheduler_binary_is_reported_not_raised(tmp_path):
+    def missing(command):
+        raise FileNotFoundError(command[0])
+
+    jobs, errors = cs.collect_local(missing, None)
+    assert jobs == [] and errors and errors[0].startswith("crontab:")
+
+
+@pytest.mark.parametrize("plist,schedule", [
+    ({"StartInterval": 30}, "every 30 s"),
+    ({"StartCalendarInterval": {}}, "every minute (local time)"),
+    ({"StartInterval": 3600, "StartCalendarInterval": {"Hour": 6}}, "every 1 h; Hour=6 (local time)"),
+])
+def test_launchd_triggers_are_rendered_in_full(plist, schedule):
+    assert cs._launchd_schedule(plist) == schedule
+
+
+# ------------------------------------------- third review (#831, #832) --
+def _cells(row: str) -> list[str]:
+    import re
+
+    return [cell.strip() for cell in re.split(r"(?<!\\)\|", row)[1:-1]]
+
+
+def test_a_pipe_or_newline_in_a_cell_cannot_add_a_column_or_row():
+    job = cs.LocalJob("crontab", "/bin/echo ok | /usr/bin/tee /tmp/job.log", "0 0 * * *", "installed")
+    broken = cs.WorkflowStatus("o/r", "w", ".github/workflows/w.yaml", "active", [], error="bad | line\nnext")
+    out = cs.render([broken], {}, [job], [], ["o/r"], 7, NOW, True, False)
+    local_row = next(line for line in out.splitlines() if "tee" in line)
+    assert _cells(local_row) == ["crontab", "`/bin/echo ok \\| /usr/bin/tee /tmp/job.log`", "`0 0 * * *`", "installed"]
+    workflow_row = next(line for line in out.splitlines() if "not assessed" in line and line.startswith("|"))
+    assert len(_cells(workflow_row)) == 9
+
+
+@pytest.mark.parametrize("seconds,schedule", [(172860, "every 2 d 0 h 1 min"), (172800, "every 2 d 0 h"),
+                                              (90061, "every 25 h 1 min 1 s")])
+def test_long_launchd_intervals_keep_their_minutes(seconds, schedule):
+    assert cs._launchd_schedule({"StartInterval": seconds}) == schedule
+
+
+def test_a_tick_inside_the_grace_period_is_not_yet_due():
+    status = daily_status()
+    cs.assess(status, daily_runs(), dt.datetime(2026, 11, 5, 10, 0, tzinfo=dt.UTC), 7)
+    assert status.expected_per_day[-1] == 1  # today's 06:41 has passed
+    assert status.expected_due == 6  # but is not due until 12 h after it
+
+
+def test_runs_are_counted_on_the_day_they_were_created():
+    late_start = dict(run("2026-11-03T23:30:00Z"), run_started_at="2026-11-04T00:30:00Z")
+    status = daily_status()
+    cs.assess(status, [late_start], NOW, 7)
+    assert status.runs_per_day == [0, 0, 0, 0, 1, 0, 0]  # Nov 3, not Nov 4
+
+
+def test_an_older_failure_is_flagged_even_when_the_latest_succeeded():
+    runs = daily_runs()
+    runs[0]["conclusion"] = "failure"
+    status = daily_status()
+    cs.assess(status, runs, NOW, 7)
+    assert "1 non-success run(s) in the window" in status.attention
+
+
+# --------------------------------------------------- fourth review (#833) --
+def _rendered_cells(table: str) -> list[list[str]]:
+    import re
+
+    from markdown_it import MarkdownIt
+
+    html = MarkdownIt().enable("table").render(table)
+    rows = re.findall(r"<tr>(.*?)</tr>", html, re.S)
+    return [[re.sub(r"<[^>]+>", "", cell).replace("&quot;", '"').replace("&amp;", "&")
+             .replace("&lt;", "<").replace("&gt;", ">")
+             for cell in re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", row, re.S)] for row in rows]
+
+
+@pytest.mark.parametrize("command", [r"echo \| cat", "echo **hello** | tee out", "printf '`x`' && echo `date`",
+                                     "``fenced``"])
+def test_local_commands_render_literally_through_markdown(command):
+    job = cs.LocalJob("crontab", command, "0 0 * * *", "installed")
+    out = cs.render([], {}, [job], [], ["o/r"], 7, NOW, True)
+    table = "\n".join(line for line in out.splitlines() if line.startswith("| Local") or line.startswith("|---|---|---|---|")
+                      or "installed" in line)
+    cells = _rendered_cells(table)[1]
+    assert cells[1] == command and cells[2] == "0 0 * * *" and cells[3] == "installed"
+
+
+def test_multiline_text_is_joined_with_a_space_and_not_assessed_stays_bold():
+    broken = cs.WorkflowStatus("o/r", "w", ".github/workflows/w.yaml", "active", [], error="first\nsecond")
+    out = cs.render([broken], {}, [], [], ["o/r"], 7, NOW, False)
+    row = next(line for line in out.splitlines() if line.startswith("| r | w |"))
+    assert "**not assessed: first second**" in row
+
+
+# ---------------------------------------------------- fifth review (#834) --
+@pytest.mark.parametrize("bad,reason", [
+    ({"Label": "bad", "StartInterval": "oops"}, "StartInterval is not a positive integer: 'oops'"),
+    (["not", "a", "dict"], "top level is not a dictionary"),
+])
+def test_a_malformed_launch_agent_is_named_and_the_rest_still_reported(tmp_path, bad, reason):
+    import plistlib
+
+    (tmp_path / "bad.plist").write_bytes(plistlib.dumps(bad))
+    (tmp_path / "good.plist").write_bytes(plistlib.dumps({"Label": "me.good", "StartInterval": 3600}))
+
+    def run_command(command):
+        if command[0] == "crontab":
+            return completed(1, stderr="crontab: no crontab for me")
+        return completed(stdout='{\n\t"LastExitStatus" = 0;\n};\n')
+
+    jobs, errors = cs.collect_local(run_command, tmp_path)
+    assert [job.job for job in jobs] == ["me.good"]
+    assert errors == [f"bad.plist: {reason}"]
+
+
+# ---------------------------------------------------- sixth review (#836) --
+def _not_found(command):
+    if command[0] == "crontab":
+        return completed(1, stderr="crontab: no crontab for me")
+    return completed(113, stderr='Could not find service "x" in domain for user gui: 501')
+
+
+def _agents(tmp_path, bad: bytes) -> tuple[list, list[str]]:
+    import plistlib
+
+    (tmp_path / "bad.plist").write_bytes(bad)
+    (tmp_path / "good.plist").write_bytes(plistlib.dumps({"Label": "me.good", "StartInterval": 3600}))
+    return cs.collect_local(_not_found, tmp_path)
+
+
+@pytest.mark.parametrize("bad,reason", [
+    ({"Label": "bad", "StartCalendarInterval": "oops"}, "entry is not a dictionary: 'oops'"),
+    ({"Label": "bad", "StartCalendarInterval": ["oops", 42]}, "entry is not a dictionary: 'oops'"),
+    ({"Label": "bad", "StartCalendarInterval": [{"Hour": 6}, 42]}, "entry is not a dictionary: 42"),
+    ({"Label": "bad", "StartCalendarInterval": {"Hour": "six"}}, "Hour is not an integer in 0-23: 'six'"),
+    ({"Label": "bad", "StartCalendarInterval": {"Hour": True}}, "Hour is not an integer in 0-23: True"),
+    ({"Label": "bad", "StartCalendarInterval": {"Hours": 6}}, "unknown key: 'Hours'"),
+    ({"Label": "bad", "StartCalendarInterval": {"Hour": 24}}, "Hour is not an integer in 0-23: 24"),
+    ({"Label": "bad", "StartCalendarInterval": {"Weekday": 8}}, "Weekday is not an integer in 0-7: 8"),
+    ({"Label": "bad", "StartInterval": "60"}, "StartInterval is not a positive integer: '60'"),
+    ({"Label": "bad", "StartInterval": -1}, "StartInterval is not a positive integer: -1"),
+    ({"Label": "bad", "StartInterval": 0}, "StartInterval is not a positive integer: 0"),
+    ({"Label": "bad", "StartInterval": True}, "StartInterval is not a positive integer: True"),
+    ({"StartInterval": 60}, "Label is not a non-empty string: None"),
+    ({"Label": " ", "StartInterval": 60}, "Label is not a non-empty string: ' '"),
+    ({"Label": 7, "StartInterval": 60}, "Label is not a non-empty string: 7"),
+])
+def test_a_malformed_launchd_field_is_named_never_coerced_or_dropped(tmp_path, bad, reason):
+    import plistlib
+
+    jobs, errors = _agents(tmp_path, plistlib.dumps(bad))
+    assert [job.job for job in jobs] == ["me.good"]
+    assert len(errors) == 1 and errors[0].startswith("bad.plist: ") and errors[0].endswith(reason)
+
+
+@pytest.mark.parametrize("calendar,schedule", [
+    ({"Minute": 59, "Hour": 23, "Day": 31, "Month": 12, "Weekday": 7},
+     "Day=31 Hour=23 Minute=59 Month=12 Weekday=7 (local time)"),
+    ({"Minute": 0, "Hour": 0, "Day": 1, "Month": 1, "Weekday": 0},
+     "Day=1 Hour=0 Minute=0 Month=1 Weekday=0 (local time)"),
+    ([{"Hour": 6}, {"Hour": 18}], "Hour=6; Hour=18 (local time)"),
+])
+def test_launchd_calendar_bounds_are_accepted(calendar, schedule):
+    assert cs._launchd_schedule({"StartCalendarInterval": calendar}) == schedule
+
+
+def test_an_empty_calendar_list_is_no_trigger_rather_than_an_error(tmp_path):
+    import plistlib
+
+    (tmp_path / "idle.plist").write_bytes(plistlib.dumps({"Label": "me.idle", "StartCalendarInterval": []}))
+    assert cs.collect_local(_not_found, tmp_path) == ([], [])
+
+
+def test_a_truncated_xml_plist_is_named_and_the_rest_still_reported(tmp_path):
+    jobs, errors = _agents(tmp_path, b'<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict>')
+    assert [job.job for job in jobs] == ["me.good"]
+    assert len(errors) == 1 and errors[0].startswith("bad.plist: no element found")
+
+
+@pytest.mark.skipif(not hasattr(__import__("os"), "geteuid") or __import__("os").geteuid() == 0,
+                    reason="root reads a mode-0 directory")
+def test_an_unreadable_launch_agents_dir_is_not_read_as_empty(tmp_path):
+    import plistlib
+
+    agents = tmp_path / "LaunchAgents"
+    agents.mkdir()
+    (agents / "good.plist").write_bytes(plistlib.dumps({"Label": "me.good", "StartInterval": 3600}))
+    agents.chmod(0)
+    try:
+        jobs, errors = cs.collect_local(_not_found, agents)
+    finally:
+        agents.chmod(0o700)
+    assert jobs == [] and len(errors) == 1 and errors[0].startswith(f"launchd: cannot list {agents}:")
+
+
+# -------------------------------------------------- seventh review (#837) --
+def _deep_binary_plist(depth: int = 100_000) -> bytes:
+    """A well-framed binary plist of `depth` nested one-element arrays."""
+    header = b"bplist00"
+    body, offsets, position = b"", [], len(header)
+    for index in range(depth):
+        offsets.append(position)
+        item = bytes([0xA1]) + (index + 1).to_bytes(4, "big") if index < depth - 1 else bytes([0xA0])
+        body += item
+        position += len(item)
+    table = b"".join(offset.to_bytes(4, "big") for offset in offsets)
+    trailer = bytes(6) + bytes([4, 4]) + depth.to_bytes(8, "big") + bytes(8) + position.to_bytes(8, "big")
+    return header + body + table + trailer
+
+
+@pytest.mark.parametrize("bad,reason", [
+    (b'<?xml version="1.0" encoding="bogus"?><plist><dict/></plist>', "unknown encoding: bogus"),
+    (_deep_binary_plist(), "maximum recursion depth exceeded"),
+])
+def test_any_plist_parse_failure_is_named_not_raised(tmp_path, bad, reason):
+    jobs, errors = _agents(tmp_path, bad)
+    assert [job.job for job in jobs] == ["me.good"]
+    assert len(errors) == 1 and errors[0].startswith(f"bad.plist: {reason}")
+
+
+def test_an_exception_without_a_message_is_named_by_its_type(tmp_path, monkeypatch):
+    import plistlib
+
+    def broken(data):
+        raise RuntimeError()
+
+    monkeypatch.setattr(cs, "_launchd_schedule", broken)
+    (tmp_path / "a.plist").write_bytes(plistlib.dumps({"Label": "me.job", "StartInterval": 60}))
+    assert cs.collect_local(_not_found, tmp_path) == ([], ["a.plist: RuntimeError"])
+
+
+@pytest.mark.skipif(not hasattr(__import__("os"), "geteuid") or __import__("os").geteuid() == 0,
+                    reason="root searches a mode-0 directory")
+def test_an_unsearchable_parent_of_the_launch_agents_dir_is_named_not_raised(tmp_path):
+    import plistlib
+
+    parent = tmp_path / "blocked"
+    agents = parent / "LaunchAgents"
+    agents.mkdir(parents=True)
+    (agents / "good.plist").write_bytes(plistlib.dumps({"Label": "me.good", "StartInterval": 3600}))
+    parent.chmod(0)
+    try:
+        jobs, errors = cs.collect_local(_not_found, agents)
+    finally:
+        parent.chmod(0o700)
+    assert jobs == [] and len(errors) == 1 and errors[0].startswith(f"launchd: cannot list {agents}:")
+
+
+# --------------------------------------------------- eighth review (#838) --
+def _fake_schedulers(tmp_path, monkeypatch, crontab_octal: str, launchctl_octal: str = "") -> Path:
+    """`crontab` and `launchctl` stand-ins first on PATH, printing the given bytes (as printf octal)."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    for name, payload in (("crontab", crontab_octal), ("launchctl", launchctl_octal)):
+        script = bin_dir / name
+        script.write_text(f"#!/bin/sh\nprintf '{payload}'\n")
+        script.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bin_dir}:{__import__('os').environ['PATH']}")
+    agents = tmp_path / "agents"
+    agents.mkdir()
+    return agents
+
+
+def test_run_local_escapes_bytes_that_are_not_utf8():
+    completed_process = cs.run_local([sys.executable, "-c", "import sys; sys.stdout.buffer.write(b'echo \\xff')"])
+    assert completed_process.stdout == "echo \\xff"
+
+
+def test_undecodable_scheduler_output_is_shown_escaped_through_main(tmp_path, monkeypatch, capsys):
+    import plistlib
+
+    agents = _fake_schedulers(tmp_path, monkeypatch, "0 0 * * * echo \\377\\n", '"LastExitStatus" = \\377;\\n')
+    (agents / "a.plist").write_bytes(plistlib.dumps({"Label": "me.job", "StartInterval": 60}))
+    status = cs.main(["--repo", "o/r", "--json", "--launch-agents-dir", str(agents)],
+                     gh=fake_gh([], {}, {}), now=NOW)
+    data = json.loads(capsys.readouterr().out)
+    assert status == 0 and data["complete"] is True
+    assert [(job["source"], job["job"]) for job in data["local"]] == [("crontab", "echo \\xff"), ("launchd", "me.job")]
+
+
+def test_a_unicode_separator_inside_a_crontab_command_does_not_split_it(tmp_path, monkeypatch, capsys):
+    agents = _fake_schedulers(tmp_path, monkeypatch, "0 0 * * * echo a\\302\\205b\\n")  # U+0085 in UTF-8
+    status = cs.main(["--repo", "o/r", "--json", "--launch-agents-dir", str(agents)],
+                     gh=fake_gh([], {}, {}), now=NOW)
+    data = json.loads(capsys.readouterr().out)
+    assert status == 0
+    assert [(job["schedule"], job["job"]) for job in data["local"]] == [("0 0 * * *", "echo a\u0085b")]
+
+
+@pytest.mark.parametrize("text", ["- not\n- a workflow\n", "just a string\n", ""])
+def test_a_workflow_file_that_is_not_a_mapping_is_not_assessed(capsys, text):
+    files = {**FILES, ".github/workflows/audit.yaml": workflow_file(text)}
+    status, out = main_output(capsys, fake_gh(WORKFLOWS, files, {}), "--repo", "o/r")
+    assert status == 1
+    assert "INCOMPLETE: o/r .github/workflows/audit.yaml was not assessed: could not read the workflow file" in out
+    assert "not a mapping" in out
+
+
+@pytest.mark.parametrize("value,cell", [
+    (cs.Code("echo a b"), "`echo a b`"),
+    (cs.Code("echo a\u0085b"), "`echo a\u0085b`"),
+    ("a\r\nb\rc\nd", "a b c d"),
+])
+def test_cells_join_only_markdown_line_endings(value, cell):
+    assert cs._cell(value) == cell
+
+
+def test_a_unicode_separator_inside_a_gh_json_line_is_part_of_the_string():
+    base = fake_gh(WORKFLOWS[:1], FILES, {1: daily_runs()})
+    named = json.dumps({**WORKFLOWS[0], "name": "a\u2028b"}, ensure_ascii=False)  # raw, as jq writes it
+
+    def gh(args):
+        return named + "\n" if args[-1].startswith(".workflows[]") else base(args)
+
+    assert "\u2028" in named
+    assert [status.name for status in cs.collect_repository("o/r", gh, NOW, 7)] == ["a\u2028b"]
+
+
+def test_a_repository_failure_without_a_message_is_named_by_its_type(capsys):
+    def gh(args):
+        raise RuntimeError("")
+
+    status, out = main_output(capsys, gh, "--repo", "o/r", "--json")
+    assert status == 1 and json.loads(out)["failures"] == {"o/r": "RuntimeError"}

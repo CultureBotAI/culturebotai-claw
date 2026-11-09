@@ -1,0 +1,30 @@
+{
+  "status": "prepared, unexecuted; previous versions preserved",
+  "files": [
+    {
+      "path": "verify_candidate_v3.py",
+      "bytes": 39490,
+      "sha256": "d53310a4b0c3080e989e474d4d0359e74bb757c1a739f617b66e93fea98425e9"
+    },
+    {
+      "path": "README-v3.md",
+      "bytes": 3618,
+      "sha256": "3bb6addacac429b432a33588589c3f047de663e6d705081d4836582d0264bced"
+    },
+    {
+      "path": "preparation-v3-inputs.json",
+      "bytes": 1356,
+      "sha256": "2d565d5b50b71ae6d89de2b995646fd9e50bd33c97889099da3f14d5e6dc3ee4"
+    },
+    {
+      "path": "syntax-check-v3.json",
+      "bytes": 155,
+      "sha256": "f312989af808bc5528e6e52de2aa2bf7c99e895ae89947b190c5470f41a98c24"
+    },
+    {
+      "path": "preparation-v2-index.json",
+      "bytes": 865,
+      "sha256": "0a904473ec2946bd9fd3825740906c391dc52e5b9cdc712a0a9809c1d0d6e6d4"
+    }
+  ]
+}

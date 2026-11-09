@@ -32,6 +32,7 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_utils.ingredient_identity_rejections import rejection_reason  # noqa: E402
 from kg_microbe_fleet import require_mech_roots  # noqa: E402
 
 MIM_ROOT = Path(os.environ.get(
@@ -219,15 +220,24 @@ def main() -> int:
             # Try original name first, then normalized variants
             candidates = normalize_name(name)
             best: dict = {}
+            rejections = []
             tried: list[str] = []
             for cand in candidates:
                 tried.append(cand)
                 hit = cascade_resolve(cand)
                 if hit:
+                    reason = next((why for cas in ((record.get("chemical_properties") or {}).get("cas_rn"), ident)
+                                   if (why := rejection_reason(ontology_id=hit.get("id", ""), name=name, cas=cas))), None)
+                    if reason:
+                        rejections.append({"candidate": hit, "reason": reason})
+                        hit = {}
+                if hit:
                     best = {**hit, "matched_via": cand}
                     break
 
             verdict = "HIGH" if best else "NO_HIT"
+            if not best and rejections:
+                verdict = "REJECTED"
             counts[verdict] = counts.get(verdict, 0) + 1
 
             row = {
@@ -237,6 +247,7 @@ def main() -> int:
                 "candidates_tried": tried,
                 "verdict": verdict,
                 "match": best,
+                "rejections": rejections,
             }
             out_f.write(json.dumps(row) + "\n")
             out_f.flush()

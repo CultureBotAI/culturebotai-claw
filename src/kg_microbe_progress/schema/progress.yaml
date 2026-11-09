@@ -90,6 +90,7 @@ enums:
       unknown: {}
   StageKey:
     permissible_values:
+      open_issue_triage: {}
       add_records: {}
       causal_graphs: {}
       protein_examples: {}
@@ -110,7 +111,7 @@ classes:
         range: integer
         required: true
         minimum_value: 1
-        maximum_value: 6
+        maximum_value: 7
   Association:
     attributes:
       id:
@@ -133,9 +134,12 @@ classes:
         range: integer
         required: true
         minimum_value: 1
-        maximum_value: 6
+        maximum_value: 7
   Closure:
     attributes:
+      parent_version:
+        description: Pinned parent for this cycle. Absence denotes the original v1 six-goal contract.
+        range: string
       id:
         range: SHA256
         required: true
@@ -153,7 +157,7 @@ classes:
         range: integer
         required: true
         minimum_value: 1
-        maximum_value: 6
+        maximum_value: 7
       stage_id:
         range: StageKey
         required: true
@@ -249,6 +253,8 @@ classes:
         inlined_as_list: true
   Current:
     attributes:
+      parent_version:
+        range: string
       run_key:
         range: RunKey
         required: true
@@ -260,7 +266,7 @@ classes:
         range: integer
         required: true
         minimum_value: 1
-        maximum_value: 6
+        maximum_value: 7
       stage_id:
         range: StageKey
         required: true
@@ -275,6 +281,12 @@ classes:
         required: true
   Cursor:
     attributes:
+      parent_version:
+        range: string
+      excluded_pr_associations:
+        description: Well-formed registry records excluded because no retained goal context matches.
+        range: integer
+        minimum_value: 0
       repository_key:
         range: RepositoryKey
         required: true
@@ -289,7 +301,7 @@ classes:
         range: integer
         required: true
         minimum_value: 1
-        maximum_value: 6
+        maximum_value: 7
       stage_id:
         range: StageKey
         required: true
@@ -341,7 +353,7 @@ classes:
         range: integer
         required: true
         minimum_value: 1
-        maximum_value: 6
+        maximum_value: 7
       key:
         range: StageKey
         required: true
@@ -361,6 +373,10 @@ classes:
         required: true
   RepositoryProgress:
     attributes:
+      excluded_pr_associations:
+        description: Sum of excluded registry records across retained run cursors with diagnostics.
+        range: integer
+        minimum_value: 0
       key:
         range: RepositoryKey
         required: true

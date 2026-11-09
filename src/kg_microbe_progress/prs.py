@@ -10,17 +10,20 @@ from __future__ import annotations
 import argparse
 import copy
 import fcntl
+import hashlib
 import json
 import os
 import re
 import stat
 import subprocess
 import tempfile
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
 from kg_microbe_fleet import FleetManifest, load_fleet_manifest
+from kg_microbe_progress import ProgressError, _cycle_version, _stage_keys
 
 REGISTRY_NAME = "pr-associations.jsonl"
 MAX_BYTES = 16 * 1024 * 1024
@@ -32,6 +35,16 @@ RECORD_FIELDS = {"schema_version", *CONTEXT_FIELDS, "pr_number", "reported_at"}
 
 class AssociationError(ValueError):
     """An association cannot safely be used as progress evidence."""
+
+
+class OrphanAssociation(AssociationError):
+    """A valid registry record has no retained supervisor goal context."""
+
+
+@dataclass
+class AssociationCollection:
+    records: list[dict]
+    excluded_counts: dict[tuple[str, str], int]
 
 
 def now() -> str:
@@ -100,14 +113,16 @@ def _context(ledger: dict, record: dict | None = None) -> dict:
     return context
 
 
-def _validate_context(context: dict) -> None:
+def _validate_context(context: dict, *, allow_missing_workflow: bool = False) -> None:
     goal = context.get("goal_identity")
+    workflow = context.get("workflow_sha256")
+    valid_workflow = ((allow_missing_workflow and workflow is None)
+                      or (isinstance(workflow, str) and DIGEST.fullmatch(workflow) is not None))
     if (not isinstance(context.get("run_id"), str) or not context["run_id"]
             or len(context["run_id"]) > 200 or not isinstance(context.get("repository_key"), str)
             or not _positive(context.get("cycle")) or type(context.get("stage")) is not int
-            or context["stage"] not in range(1, 7)
-            or not isinstance(context.get("workflow_sha256"), str)
-            or not DIGEST.fullmatch(context["workflow_sha256"])):
+            or context["stage"] not in range(1, 8)
+            or not valid_workflow):
         raise AssociationError("association workflow identity is incomplete")
     if (not isinstance(goal, dict)
             or set(goal) != {"conversation_id", "started_at", "start_step_index"}
@@ -117,7 +132,116 @@ def _validate_context(context: dict) -> None:
         raise AssociationError("association native goal identity is incomplete")
 
 
-def _validate_record(record: Any, ledger: dict) -> dict:
+def _continuation_contexts(ledger: dict, anchors: list[dict]) -> list[dict]:
+    """Retain PR ownership across verified continuations, without completion credit.
+
+    The coordinator records these links only after unique native acceptance.
+    A link cannot invent a stage: its successor chain must reach the current
+    goal or an actual completed-stage entry in the same workflow context.
+    """
+    entries = ledger.get("same_stage_continuations", [])
+    if not isinstance(entries, list):
+        raise AssociationError("same-stage continuations must be a list")
+    keys = {"schema_version", "run_id", "repository_key", "cycle", "stage",
+            "workflow_sha256", "predecessor", "successor", "evidence"}
+    def encode(value):
+        return json.dumps(value, sort_keys=True, separators=(",", ":"))
+    roots = {encode(context) for context in anchors}
+    edges, incoming, retained = {}, set(), []
+    for entry in entries:
+        if (not isinstance(entry, dict) or set(entry) != keys
+                or type(entry["schema_version"]) is not int or entry["schema_version"] != 1
+                or entry["run_id"] != ledger["run_id"]
+                or entry["repository_key"] != ledger["repository_key"]):
+            raise AssociationError("invalid same-stage continuation binding")
+        before = {key: entry[key] for key in CONTEXT_FIELDS if key != "goal_identity"}
+        before["goal_identity"] = entry["predecessor"]
+        after = {**before, "goal_identity": entry["successor"]}
+        _validate_context(before)
+        _validate_context(after)
+        _validate_cycle_stage(ledger, entry)
+        predecessor, successor = encode(before), encode(after)
+        if (predecessor == successor or predecessor in edges or successor in incoming
+                or predecessor in roots):
+            raise AssociationError("ambiguous same-stage continuation lineage")
+        evidence = entry["evidence"]
+        if (not isinstance(evidence, dict) or set(evidence) != {"path", "sha256"}
+                or not isinstance(evidence["path"], str) or not Path(evidence["path"]).is_absolute()
+                or not isinstance(evidence["sha256"], str) or not DIGEST.fullmatch(evidence["sha256"])):
+            raise AssociationError("invalid continuation evidence pin")
+        try:
+            raw = _read(Path(evidence["path"]))
+        except OSError as error:
+            raise AssociationError("continuation evidence is unavailable") from error
+        if hashlib.sha256(raw).hexdigest() != evidence["sha256"]:
+            raise AssociationError("continuation evidence hash mismatch")
+        proof = _json(raw)
+        binding = {key: value for key, value in entry.items() if key != "evidence"}
+        if (not isinstance(proof, dict) or encode(proof.get("binding")) != encode(binding)
+                or not _timestamp(proof.get("verified_at"))
+                or not isinstance(proof.get("instruction_sha256"), str)
+                or not DIGEST.fullmatch(proof["instruction_sha256"])):
+            raise AssociationError("continuation evidence does not bind the exact lineage")
+        instruction = proof["instruction_sha256"]
+        if (encode(proof.get("native_acceptance")) != encode({
+                **entry["successor"], "submitted_text_sha256": instruction,
+                "matching_declarations": 1})
+                or encode(proof.get("history_acceptance")) != encode({
+                    "conversation_id": entry["successor"]["conversation_id"],
+                    "submitted_text_sha256": instruction, "matching_entries": 1})):
+            raise AssociationError("continuation lacks unique matching native and history acceptance")
+        edges[predecessor] = successor
+        incoming.add(successor)
+        retained.append(before)
+    for predecessor in edges:
+        seen, cursor = set(), predecessor
+        while cursor not in roots:
+            if cursor in seen or cursor not in edges:
+                raise AssociationError("continuation is cyclic or disconnected from a retained goal")
+            seen.add(cursor)
+            cursor = edges[cursor]
+    return retained
+
+
+def _retained_contexts(ledger: dict) -> list[dict]:
+    """Validate the comparison source before calling a registry record orphaned."""
+    current = _context(ledger)
+    contexts = []
+    # Initialization or failed adoption can leave any stage without a goal.
+    # Absence supplies no current context; non-null malformed goals still fail.
+    if current["goal_identity"] is not None:
+        _validate_context(current)
+        _validate_cycle_stage(ledger)
+        contexts.append(current)
+    completed = ledger.get("completed_stages")
+    if not isinstance(completed, list):
+        raise AssociationError("retained goal contexts must be a list")
+    for item in completed:
+        if not isinstance(item, dict):
+            raise AssociationError("retained goal context must be an object")
+        context = _context(ledger, item)
+        # Legacy closures predate workflow pins. Validate their available
+        # identity, but never invent a pin or use them as registry authority.
+        legacy = "workflow_sha256" not in item
+        _validate_context(context, allow_missing_workflow=legacy)
+        _validate_cycle_stage(ledger, item)
+        if not legacy:
+            contexts.append(context)
+    contexts.extend(_continuation_contexts(ledger, contexts))
+    return contexts
+
+
+def _validate_cycle_stage(ledger: dict, record: dict | None = None) -> None:
+    try:
+        version = _cycle_version(ledger, record)
+        source = ledger if record is None else record
+        if source["stage"] > len(_stage_keys({"parent_version": version})):
+            raise ProgressError("stage is outside the pinned cycle")
+    except ProgressError as error:
+        raise AssociationError(str(error)) from error
+
+
+def _validate_record(record: Any, ledger: dict, *, require_retained: bool = True) -> dict:
     if not isinstance(record, dict) or set(record) != RECORD_FIELDS:
         raise AssociationError("association fields differ from schema version 1")
     if type(record["schema_version"]) is not int or record["schema_version"] != 1:
@@ -126,21 +250,22 @@ def _validate_record(record: Any, ledger: dict) -> dict:
         raise AssociationError("association PR number or timestamp is invalid")
     context = {key: record[key] for key in CONTEXT_FIELDS}
     _validate_context(context)
-    contexts = [_context(ledger)]
-    contexts.extend(_context(ledger, item) for item in ledger.get("completed_stages", []))
-    if context not in contexts:
-        raise AssociationError("PR association does not match a retained goal identity")
+    if any(context[key] != ledger.get(key) for key in ("run_id", "repository_key")):
+        raise AssociationError("association run or repository differs from containing ledger")
+    contexts = _retained_contexts(ledger)
+    if require_retained and context not in contexts:
+        raise OrphanAssociation("PR association does not match a retained goal identity")
     return record
 
 
-def _records(raw: bytes, ledger: dict) -> list[dict]:
+def _records(raw: bytes, ledger: dict, *, require_retained: bool = True) -> list[dict]:
     if raw and not raw.endswith(b"\n"):
         raise AssociationError("association registry has an incomplete final record")
     result = []
     for line in raw.splitlines():
         if not line:
             raise AssociationError("association registry contains a blank record")
-        result.append(_validate_record(_json(line), ledger))
+        result.append(_validate_record(_json(line), ledger, require_retained=require_retained))
     return result
 
 
@@ -164,7 +289,65 @@ def _association_key(record: dict) -> tuple:
     return (record["repository_key"], record["run_id"], record["cycle"], record["stage"], record["pr_number"])
 
 
+def _retained_records(raw: bytes, ledger: dict) -> tuple[list[dict], int]:
+    """Ignore well-formed orphans before comparing retained evidence identities."""
+    retained = []
+    excluded = 0
+    seen: dict[tuple, dict] = {}
+    for record in _records(raw, ledger, require_retained=False):
+        try:
+            _validate_record(record, ledger)
+        except OrphanAssociation:
+            excluded += 1
+            continue
+        identity = _association_key(record)
+        prior = seen.get(identity)
+        if prior and any(prior[field] != record[field] for field in CONTEXT_FIELDS):
+            raise AssociationError("conflicting PR association identity")
+        seen[identity] = record
+        retained.append(record)
+    return retained, excluded
+
+
 def gather_associations(runtime_dirs: Iterable[Path], *, fleet: FleetManifest | None = None) -> list[dict]:
+    """Return usable bindings; collectors use collect_associations for diagnostics."""
+    return collect_associations(runtime_dirs, fleet=fleet).records
+
+
+def require_current_pr_associations(session: Path, ledger: dict, numbers: set[int]) -> None:
+    """Corroborate multi-PR membership without granting closure authority.
+
+    The supervisor supplies its own session directory and ledger, never a path
+    from a receipt. Every input row is validated, including unrelated orphans.
+    A current retained binding wins over an orphaned native identity in the
+    same stage, as in collection. Another stage or retained goal never does.
+    """
+    if session.is_symlink() or not session.is_dir():
+        raise AssociationError("association session must be a real directory")
+    current = _context(ledger)
+    _validate_context(current)
+    retained = _retained_contexts(ledger)
+    records = _records(_read(session / REGISTRY_NAME), ledger, require_retained=False)
+    found = set()
+    for record in records:
+        if record["pr_number"] in numbers:
+            context = {key: record[key] for key in CONTEXT_FIELDS}
+            if context != current:
+                if (context in retained or any(context[key] != current[key] for key in
+                                               ("cycle", "stage", "workflow_sha256"))):
+                    raise AssociationError("ordered PR is associated with another retained goal or stage")
+                continue
+            found.add(record["pr_number"])
+    for closed in ledger["completed_stages"]:
+        proof = closed.get("verification") or {}
+        prior = [proof.get("pr_number")] + [item.get("pr_number") for item in proof.get("prs", [])]
+        if numbers.intersection(prior):
+            raise AssociationError("ordered PR already belongs to a verified closure")
+    if found != numbers:
+        raise AssociationError("ordered PR lacks its current goal registry association")
+
+
+def collect_associations(runtime_dirs: Iterable[Path], *, fleet: FleetManifest | None = None) -> AssociationCollection:
     """Read explicit registries and exact version-2 receipt candidate bindings.
 
     A receipt candidate contributes a reported association only. Malformed or
@@ -173,6 +356,7 @@ def gather_associations(runtime_dirs: Iterable[Path], *, fleet: FleetManifest | 
     """
     fleet = fleet or load_fleet_manifest()
     gathered: dict[tuple, dict] = {}
+    excluded: dict[tuple[str, str], int] = {}
     for directory in runtime_dirs:
         runtime = Path(directory).resolve(strict=True)
         for key in fleet.keys:
@@ -182,17 +366,28 @@ def gather_associations(runtime_dirs: Iterable[Path], *, fleet: FleetManifest | 
             if session.is_symlink() or not session.is_dir():
                 raise AssociationError("session directory is not a real directory")
             ledger = _ledger(session, fleet)
-            records = _records(_read(session / REGISTRY_NAME, missing=True), ledger)
+            # A malformed comparison source is not an incomplete candidate.
+            # Validate outside the candidate-tolerance catch, even with no registry.
+            _retained_contexts(ledger)
+            source = (ledger["run_id"], key)
+            if source in excluded:
+                raise AssociationError("duplicate registry source")
+            records, excluded[source] = _retained_records(_read(session / REGISTRY_NAME, missing=True), ledger)
             candidate_raw = _read(session / "completion.json", missing=True)
             if candidate_raw:
                 try:
                     candidate = _json(candidate_raw)
                     if isinstance(candidate, dict) and candidate.get("schema_version") == 2:
-                        record = {key: candidate.get(key) for key in CONTEXT_FIELDS}
-                        record.update(schema_version=1, pr_number=candidate.get("pr", {}).get("number"),
-                                      reported_at=ledger.get("last_observed_at", ledger.get("created_at")))
-                        records.append(_validate_record(record, ledger))
-                except (AssociationError, AttributeError):
+                        from kg_microbe_workflows.closure import multi_pr_members
+                        members = multi_pr_members(candidate) or [candidate.get("pr", {})]
+                        candidates = []
+                        for member in members:
+                            record = {key: candidate.get(key) for key in CONTEXT_FIELDS}
+                            record.update(schema_version=1, pr_number=member.get("number"),
+                                          reported_at=ledger.get("last_observed_at", ledger.get("created_at")))
+                            candidates.append(_validate_record(record, ledger))
+                        records.extend(candidates)
+                except (AssociationError, AttributeError, ValueError):
                     # A working receipt may be incomplete. It is never a
                     # fallback source of weaker, inferred goal associations.
                     pass
@@ -202,7 +397,7 @@ def gather_associations(runtime_dirs: Iterable[Path], *, fleet: FleetManifest | 
                 if prior and any(prior[field] != record[field] for field in CONTEXT_FIELDS):
                     raise AssociationError("conflicting PR association identity")
                 gathered[identity] = copy.deepcopy(record)
-    return sorted(gathered.values(), key=_association_key)
+    return AssociationCollection(sorted(gathered.values(), key=_association_key), excluded)
 
 
 def register_pr(session_dir: Path, number: int, *, fleet: FleetManifest | None = None) -> dict:
@@ -233,7 +428,7 @@ def register_pr(session_dir: Path, number: int, *, fleet: FleetManifest | None =
         _validate_record(record, ledger)
         path = session / REGISTRY_NAME
         raw = _read(path, missing=True)
-        records = _records(raw, ledger)
+        records, _ = _retained_records(raw, ledger)
         for existing in records:
             if _association_key(existing) == _association_key(record):
                 if any(existing[field] != record[field] for field in CONTEXT_FIELDS):
@@ -290,7 +485,7 @@ def fetch_pr_observations(
             raise AssociationError("PR query is outside the canonical fleet")
         stage = association.get("stage", association.get("stage_number"))
         if (not _positive(association.get("cycle")) or type(stage) is not int
-                or stage not in range(1, 7)
+                or stage not in range(1, 8)
                 or ("stage" in association and "stage_number" in association
                     and association["stage"] != association["stage_number"])):
             raise AssociationError("PR query has no explicit goal stage")

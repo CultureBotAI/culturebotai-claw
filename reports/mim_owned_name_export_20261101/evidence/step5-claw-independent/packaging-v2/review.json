@@ -1,0 +1,20 @@
+{
+  "verdict": "CHANGES_REQUIRED",
+  "scope": "Read-only executable/draft-selection review; no real publication",
+  "reviewer": "/root/step4_design_review",
+  "packager_sha256": "5dfe1381dbc435d6196f1529e90d039205f33097bebc4386abc73a326324d907",
+  "finding": {
+    "title": "Frozen execution plan is not cross-bound to archived selected content",
+    "severity": "medium",
+    "observed": "Changing only frozen.plan.package_readme after freeze leaves original selection and all selected source bytes unchanged; publish and portable verify both report PASS for a different README.",
+    "evidence": "frozen-selection-proof.json",
+    "recommended_bound": "Require frozen plan == parsed archived selection plus injected run_root, and package README == selected package_readme. This is internal consistency, not signature/hostile-interpreter attestation."
+  },
+  "positive_controls": "All15 existing synthetic controls pass; actual430 originals/371payloads,13 maintained references,5 command/log pairs and27 JSON links hash-bind correctly. No portable case/NFC archive collision.",
+  "evidence_honesty": "Draft explicitly marks full-suite/safety/final assessment incomplete; actual generation90d is distinguished from README-onlya56; PASS_WITH_LIMITATIONS and BTO1/MICRO73 missing-transform coverage are explicit; no canonical promotion or final-head approval claimed.",
+  "selection_limits": "150 omissions are explicitly listed. Final selection must add completed pending receipts and final source assessment; no draft freeze/publication executed.",
+  "wording_note": "Prefer final prose: builder produced25 events, aggregated into20 sidecar rows; this avoids reading25 as the sidecar row count.",
+  "production_edits": false,
+  "github_mutations": false,
+  "supervisor_context": null
+}

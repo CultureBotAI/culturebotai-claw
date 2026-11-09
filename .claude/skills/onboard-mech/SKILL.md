@@ -41,7 +41,8 @@ the working tree. Before concluding a path or feature is absent, search with
    Declare every current capability catalogue key. Enable only capabilities
    supported by implementation evidence, including all required settings;
    otherwise use `disabled` or `not_applicable` with a reason and the catalogue's
-   applicable path assertions. Recipe names alone do not prove shared-command
+   applicable path assertions. `kgx_export` and `sssom_export` apply to every
+   Mech, so they are `enabled` or `disabled`, never `not_applicable` (#503). Recipe names alone do not prove shared-command
    compatibility. Check required profiles and adapter contracts.
 2. Preserve `record_globs` for read-only corpus inventory, including generated
    records; exclude unrelated fixtures and runtime state. Generated corpora use

@@ -1,0 +1,63 @@
+{
+  "frozen_at": "2026-11-01T12:47:55.422302+00:00",
+  "files": {
+    "artifact-probe-results.json": {
+      "sha256": "df04b1c50b468ac6b7f722066b852c143400df2af3176c84e78efc17d3d07e9a",
+      "bytes": 11975
+    },
+    "journal-callback-result.json": {
+      "sha256": "950efb78173f05dd24ff371a7a81a764be28f5279336ec715d87d620eb879f47",
+      "bytes": 808
+    },
+    "journal-initial-capture-results.json": {
+      "sha256": "946b66f97a5d343b57819b9e75ba2114d72b6f025932453af1e116c39ccd738f",
+      "bytes": 4399
+    },
+    "probe_artifacts.py": {
+      "sha256": "74639e79494ce1fe6edad842a8f0209b8e7ca4a731e3d372be7fbbf2189959a9",
+      "bytes": 3231
+    },
+    "probe_journal_callback.py": {
+      "sha256": "6345dd3511258a4292580193a04f3216d1c286cf9e2904caafa05a91097868ce",
+      "bytes": 1992
+    },
+    "probe_journal_initial_capture.py": {
+      "sha256": "8c26c9d60467f15031aca2eecd89040776c29549efbea0ced8f109f348fb6725",
+      "bytes": 2018
+    },
+    "rereview.md": {
+      "sha256": "fc9962fe63d181956aec2bd5dabc81ea05e05a11bec2c32a581288833eb4adc1",
+      "bytes": 1616
+    },
+    "snapshot/src/kg_microbe_utils/owned_name_policy.py": {
+      "sha256": "18ffd0430d0256b6da6cbb1f3da2327c4cf3418e2b0b2da71ff283ee2f4351ae",
+      "bytes": 7306
+    },
+    "snapshot/src/kg_microbe_utils/sssom_artifacts.py": {
+      "sha256": "971e3cd2e8d65a1ff4a476d8c8c22a1e4209d3ea7bb0f98d184f1c7f92a820b0",
+      "bytes": 11432
+    },
+    "snapshot/tests/test_mim_sssom_artifacts.py": {
+      "sha256": "d82dc63c3efe5363d892137c8fef2af3c8e1c6ddb6f5ec1675465ab10266ad05",
+      "bytes": 14004
+    },
+    "snapshot.json": {
+      "sha256": "62f5e9e913371089d283e240ba437ba5f3049a3c3b510c374b90c2dea43d2de2",
+      "bytes": 601
+    }
+  },
+  "external_logs": {
+    "step5-independent-artifact-replay-704-v2": {
+      "receipt_sha256": "f8bb7f9aedac92bb0f7db8046a0820f7287ce886928a5adfca1de886ceb27c1b",
+      "log_sha256": "df04b1c50b468ac6b7f722066b852c143400df2af3176c84e78efc17d3d07e9a"
+    },
+    "step5-independent-journal-replay-704-v2": {
+      "receipt_sha256": "59abcaf9b36cbe33b0b66af23eaa43de917dfaff9bbb9e935146519c85a0e322",
+      "log_sha256": "950efb78173f05dd24ff371a7a81a764be28f5279336ec715d87d620eb879f47"
+    },
+    "step5-independent-journal-initial-capture-v1": {
+      "receipt_sha256": "9aba9b4bfee4cd0f7aade57fc0aae69077daa4b5e991cc0cd9313fcb6ee5a977",
+      "log_sha256": "946b66f97a5d343b57819b9e75ba2114d72b6f025932453af1e116c39ccd738f"
+    }
+  }
+}

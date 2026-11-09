@@ -5,7 +5,7 @@ metadata:
   category: workflow
   requires_database: false
   requires_internet: true
-  version: 1.0.0
+  version: 2.0.0
 ---
 
 # Evolve the {{ display_name }} workflow
@@ -16,6 +16,32 @@ Native scientific schemas: {{ schema_paths }}.
 ## Authority and preflight
 
 <!-- canonical:begin authority -->
+**Durable session state.**
+Use the gitignored `<repo>/.temp/` as the durable work root for review campaigns,
+worktrees, batch state, draft review bundles and handoffs. Use
+`~/agent-work/<repo>/` when a separate clone is needed. Verify `.temp/` is ignored
+before use; provision a missing ignore rule through an authorized repository
+change. Keep maintained helpers and accepted evidence in their native tracked
+directories; a durable scratch root does not replace their provenance contract.
+
+Never store session state or helper scripts in `/tmp/`, `/private/tmp/` or `$TMPDIR`.
+Only disposable caches and pytest temporary fixtures may use system temp roots.
+Use a unique subdirectory for each task and preserve other sessions' state.
+
+Report every auxiliary clone for identity verification and inventory in
+session_repository_roots, and owned campaign/handoff directories in
+session_state_paths. Missing inventory is unknown, not healthy. Report new paths
+to the supervisor/operator; do not edit live configuration or expand authority.
+
+For authorized Git work, push each committed batch branch to `origin` the same
+day, whether or not a PR is opened. Verify the exact pushed head with the remote;
+a local commit or remote-tracking ref alone is not publication proof. Inspect
+the repository's current workflow triggers before claiming a branch push runs
+no CI. A goal delivering commits cannot close while recorded commits exist only
+locally. Publication failure is a retained blocker, never permission to discard
+the branch. This rule grants no Git mutation, merge, cleanup or provider
+authorization beyond the task and the skill's existing boundaries.
+
 Read the coordinator's active-cycle status and immutable effective-profile pin,
 then workflow/mech-workflow.yaml and its hash-pinned parent snapshots at
 workflow/parent/mech-cycle.yaml and workflow/parent/workflow.yaml. Validate the
@@ -38,6 +64,16 @@ capability stays blocked until its prerequisite is implemented; a domain-based
 inapplicability decision needs evidence and does not remove the stage's closure.
 Preserve the running cycle's pinned contract. A profile edit takes effect only
 at the verified next-cycle activation boundary.
+Parent v2 has seven goals beginning with open_issue_triage. An active v1 cycle
+retains its six goals and old stage numbers until verified boundary migration;
+stage 0 remains not started. Resolve goal semantics by key and active parent
+version, never by assuming a number denotes the same goal in every cycle.
+For open_issue_triage, use the stage's triage-and-resolve-issues skill binding
+and issue_triage_policy. Consume the supervisor-frozen issue_scope, preserve
+stable group IDs and severity reasons, and share one four-hour wall-clock
+window across the Codex primary and agy secondary only after critical/high work
+is resolved. A critical/high prerequisite blocker holds the goal. Keep this
+queue separate from current-cycle review findings and infrastructure intake.
 <!-- canonical:end authority -->
 
 ## Local evolution
@@ -65,12 +101,17 @@ snapshot; consult its status and pinned profile, and never edit that snapshot.
 The candidate activates only after reviewed closure at the cycle boundary. Keep
 older profile versions and evidence interpretable. If no supported activation
 path exists, record the blocker instead of switching an active cycle manually.
+For v1 to v2, the reviewed workflow_parent_migration binds the old and candidate
+effective workflow hashes and its review evidence. Activation follows the old
+infrastructure goal's verified closure; retain the native goal, archived
+receipts and all original evidence paths and history numbers. Record each
+cycle's parent version. Do not re-pin another repository as part of local work.
 <!-- canonical:end adaptation -->
 
 ## Review output and grouped remediation
 
 <!-- canonical:begin reviews -->
-Stage 4 reviews every eligible record in a frozen inventory using the native
+The record_review goal (v2 stage 5; v1 stage 4) reviews every eligible record in a frozen inventory using the native
 record and cohort rubrics. Save actual review output files with stable finding
 IDs, reviewed input hashes, evidence, reviewer identity and independence,
 coverage, limitations, and dispositions. Use the parent-defined revision paths
@@ -89,7 +130,7 @@ closure references. Do not publish an unverified current-stage report as latest
 or write the supervisor's runtime index. Include the tracked index update in
 that subsequent goal's normal commit sequence.
 
-Stage 5 consumes the latest accepted stage-4 outputs. Group related problems by
+The resolve_review_findings goal (v2 stage 6; v1 stage 5) consumes this cycle's exact verified record_review outputs. Group related problems by
 shared cause and repair ownership, search open and closed issues before creating
 new ones, and link each finding to a real issue or an evidenced non-actionable
 disposition. Keep unrelated scientific questions in separate groups. Implement
@@ -106,7 +147,7 @@ means a documented empty result; never fabricate issues or fixes to fill a quota
 ## Evidence preparation and validation
 
 <!-- canonical:begin evidence -->
-Read the packaged stage-4, stage-5 and stage-6 examples under the verified CLAW
+Read the packaged evidence examples under the verified CLAW
 checkout's src/kg_microbe_workflows/examples directory and its README.md. They
 are illustrative empty outcomes, not proof of work. Replace example identities,
 source revisions, outcomes, paths and hashes with actual observations and files.
@@ -114,8 +155,8 @@ A source_revision records the input being reviewed; the closure receipt records
 the final commit containing the output. Never copy an example as a live receipt.
 
 Use `python -m kg_microbe_workflows validate-evidence <evidence.yaml> --root <repo>`
-from the verified CLAW environment. For stage 5, add
-`--previous <verified-stage-4-evidence.yaml>`; carry later-cycle finding history
+from the verified CLAW environment. For resolve_review_findings, add
+`--previous <verified-record-review-evidence.yaml>`; carry later-cycle finding history
 through the parent-defined predecessor references. Add `--required-output <kind>`
 for every output kind required by the active effective stage, including any
 requirements beyond the base contract. The Python helper
@@ -141,7 +182,7 @@ Search for an existing issue before creating one. When issue access is blocked,
 retain a visibly pending-link entry and the blocker; do not claim complete issue
 intake or invent a URL. Preserve closed entries and their resolution links.
 
-For stage 6, read the supervisor-frozen infra_scope content, hash and cutoff
+For infrastructure (v2 stage 7; v1 stage 6), read the supervisor-frozen infra_scope content, hash and cutoff
 time in status.json. Save that exact byte content as the infra_snapshot artifact;
 do not replace it with the notebook as it looks later in the goal. The plan must
 account for every non-resolved task in that frozen snapshot and preserve existing

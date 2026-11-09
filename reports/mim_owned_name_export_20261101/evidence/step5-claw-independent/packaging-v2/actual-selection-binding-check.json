@@ -1,0 +1,24 @@
+{
+  "status": "DRAFT_BINDINGS_PASS_NOT_PUBLICATION_APPROVAL",
+  "selection_sha256": "d3492b205fe781f94318e3a73b7f119f81acb3869ae977f3fedb9be2e4cb9e65",
+  "packager_sha256": "5dfe1381dbc435d6196f1529e90d039205f33097bebc4386abc73a326324d907",
+  "original_identities": 430,
+  "distinct_payloads": 371,
+  "maintained_refs": 13,
+  "command_links": 5,
+  "json_bindings": 27,
+  "explicit_omissions": 150,
+  "all_current_source_and_reference_hashes_pass": true,
+  "portable_case_NFC_archive_collisions": 0,
+  "draft_pending_inputs": [
+    "Explicit final input-list and publication authorization; no real package publication yet",
+    "Completed full-suite-v4 and safety coverage; retain real v3 failure and incomplete prior suites",
+    "Final protection gates and independent final-source/generation assessment",
+    "Complete command classifications and exact final package README after remaining evidence"
+  ],
+  "actual_generation_revision": "90d110e663c10146351b09ae98d387dabdec0b1c",
+  "maintained_source_revision": "a56f3ae4563619a5129ad944878c9205267315d6",
+  "total_source_bytes": 7966247,
+  "final_package_exists": false,
+  "checks_not_run": "No production freeze/publish, final full-suite status or final-head approval inferred."
+}

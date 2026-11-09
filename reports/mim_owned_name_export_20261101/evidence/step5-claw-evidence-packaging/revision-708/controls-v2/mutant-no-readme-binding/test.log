@@ -1,0 +1,40 @@
+{
+  "frozen": "/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/step5-evidence-test-ou45mr3q/packaging/inputs.json",
+  "sha256": "19fa3099a3a8302f64626890762977fffd3e5f0cbcb2ea19f2ec0b4ac1fa4f8e"
+}
+{
+  "status": "PASS",
+  "archive_members": 12,
+  "original_identities": 7,
+  "tracked_checked": false,
+  "scientific_approval_added": false
+}
+{
+  "status": "PASS",
+  "archive_members": 12,
+  "original_identities": 7,
+  "tracked_checked": true,
+  "scientific_approval_added": false
+}
+{
+  "status": "PASS",
+  "archive_members": 12,
+  "original_identities": 7,
+  "tracked_checked": true,
+  "scientific_approval_added": false
+}
+{
+  "status": "PASS",
+  "archive_members": 12,
+  "original_identities": 7,
+  "tracked_checked": false,
+  "scientific_approval_added": false
+}
+Traceback (most recent call last):
+  File "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v5.py", line 118, in <module>
+    check('portable rehashed README substitution refuses',lambda:m.verify(target,repo,False),'Packaged README differs from bound selection')
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v5.py", line 20, in check
+    assert error is None, (name,'did not refuse')
+           ^^^^^^^^^^^^^
+AssertionError: ('portable rehashed README substitution refuses', 'did not refuse')
