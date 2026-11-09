@@ -1,4 +1,4 @@
-import { STAGES, blockerDescription, githubURL, isStale, phaseInfo, relativeTime, selectRepositories, stageLabel, validateSnapshot } from "./model.mjs";
+import { associationLabel, blockerDescription, githubURL, isStale, phaseInfo, relativeTime, selectRepositories, stageLabel, validateSnapshot } from "./model.mjs";
 
 const $ = (id) => document.getElementById(id);
 const formatNumber = new Intl.NumberFormat("en-US");
@@ -70,7 +70,7 @@ function repoDetail(repo) {
   const intro = node("div", "detail-intro");
   let description = "No workflow state has been observed for this Mech. Historical progress is unknown.";
   if (repo.current) {
-    description = `Cycle ${repo.current.cycle}, goal ${repo.current.stage_number} of 6: ${stageLabel(repo.current.stage_number)}. `;
+    description = `Cycle ${repo.current.cycle}, goal ${repo.current.stage_number} of ${repo.stages.length}: ${stageLabel(repo.current.stage_number, repo.current.parent_version)}. `;
     description += blockerDescription(repo.current.blocker_code) ||
       (phaseInfo(repo).kind === "attention" ? "The supervisor reports a condition requiring attention before the sequence can advance. " : "The stage advances only after a verified closure. ");
     description += " ";
@@ -87,7 +87,7 @@ function repoDetail(repo) {
     const list = node("ol", "history-list");
     [...repo.closures].sort((a, b) => Date.parse(b.verified_at) - Date.parse(a.verified_at)).forEach((closure) => {
       const item = node("li");
-      item.append(node("p", "history-title", `Cycle ${closure.cycle} · ${closure.stage_number}. ${stageLabel(closure.stage_number)}`));
+      item.append(node("p", "history-title", `Cycle ${closure.cycle} · ${closure.stage_number}. ${stageLabel(closure.stage_number, closure.parent_version)}`));
       const meta = node("p", "history-meta", `${closure.outcome === "no_changes" ? "Verified no changes" : "Merged and closed"} · ${exactTime(closure.verified_at)}`);
       if (closure.pr_url) meta.append(link(`PR #${closure.pr_number} ↗`, closure.pr_url, repo.github_url));
       item.append(meta);
@@ -105,7 +105,7 @@ function repoDetail(repo) {
       const item = node("li");
       const description = node("div");
       description.append(link(`PR #${pr.number} ↗`, pr.url, repo.github_url));
-      description.append(node("small", "", pr.associations.map((association) => `Cycle ${association.cycle} · ${stageLabel(association.stage_number)}`).join("; ")));
+      description.append(node("small", "", pr.associations.map((association) => `Cycle ${association.cycle} · ${associationLabel(repo, association)}`).join("; ")));
       const status = node("span", `pr-state ${pr.state}`, pr.state === "closed" ? "Closed, unmerged" : pr.state);
       status.title = `Verified ${exactTime(pr.observed_at)}`;
       item.append(description, status);
@@ -144,13 +144,13 @@ function repositoryCard(repo) {
   const cycle = node("span", "cycle-cell");
   const heading = node("span", "cycle-heading");
   heading.append(node("span", "", repo.current ? `Cycle ${String(repo.current.cycle).padStart(2, "0")}` : "Cycle unknown"));
-  heading.append(node("span", "stage-name", repo.current ? `${repo.current.stage_number} / 6 · ${stageLabel(repo.current.stage_number)}` : "Awaiting an observation"));
+  heading.append(node("span", "stage-name", repo.current ? `${repo.current.stage_number} / ${repo.stages.length} · ${stageLabel(repo.current.stage_number, repo.current.parent_version)}` : "Awaiting an observation"));
   cycle.append(heading);
   const track = node("span", "stage-track");
   const description = [];
   repo.stages.forEach((stage, index) => {
     const segment = node("span", `stage-segment ${stage.state}`);
-    const text = `${index + 1}. ${STAGES[index].label}: ${stage.state}`;
+    const text = `${index + 1}. ${stageLabel(stage.number, repo.current?.parent_version)}: ${stage.state}`;
     segment.title = text;
     segment.setAttribute("aria-hidden", "true");
     track.append(segment);
@@ -160,7 +160,7 @@ function repositoryCard(repo) {
   track.setAttribute("aria-label", description.join(". "));
   cycle.append(track);
   const completed = repo.stages.filter((stage) => stage.state === "completed").length;
-  cycle.append(node("span", "cycle-caption", repo.current ? `${completed} of 6 closures verified in this cycle` : "History not observed"));
+  cycle.append(node("span", "cycle-caption", repo.current ? `${completed} of ${repo.stages.length} closures verified in this cycle` : "History not observed"));
   summary.append(cycle);
   const observed = repo.history_coverage !== "unobserved";
   summary.append(counter(repo.counters.completed_cycles, "cycles", observed), counter(repo.counters.completed_goals, "goals", observed), counter(repo.counters.merged_prs, "PRs merged", observed));
