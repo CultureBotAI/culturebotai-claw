@@ -404,3 +404,27 @@ mechs:
     tracking:
     - https://github.com/CultureBotAI/AIMech/pull/1
     - https://github.com/CultureBotAI/culturebotai-claw/issues/426
+  edgemech:
+    revision: da9595f6e39854cb702de674f9c8913b3bb0e377
+    native: no_pipeline_in_audited_source
+    evidence:
+    - README.md
+    - src/edgemech/packets.py
+    - conf/routing.yaml
+    sets:
+      candidate-packet-text:
+        modality: text
+        representation: inherited_candidate_packet
+        entity_type: bounded_curation_packet
+        state: conditional
+        notes: Added at EdgeMech admission on 2026-11-07. A future packet search view would
+          require a versioned input recipe, pinned encoder and real vectors. No embedding
+          pipeline or corpus projection exists at this revision. Exact source occurrences,
+          native assertions and inherited review remain separate identities; similarity
+          cannot grant scientific approval or establish independent evidence.
+    actions:
+    - Keep embedding execution disabled until a separately reviewed packet-search use case,
+      real vectors and the common projection canary are available. Do not project the full
+      graph merely because EdgeMech is admitted to the fleet.
+    tracking:
+    - https://github.com/CultureBotAI/culturebotai-claw/issues/957

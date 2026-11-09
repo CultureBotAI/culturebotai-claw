@@ -209,5 +209,8 @@
     ".github/workflows/vendored-sync.yaml": [
       "vendored-sync"
     ]
+  },
+  "edgemech": {
+    "blocked": "EdgeMech fleet admission depends on CLAW #960; merge-queue readiness has not been verified."
   }
 }
