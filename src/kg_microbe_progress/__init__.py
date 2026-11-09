@@ -587,6 +587,56 @@ def validate_bundle(history: dict[str, Any], snapshot: dict[str, Any],
         raise ProgressError("snapshot differs from its history")
 
 
+def project_bundle_to_manifest(
+    history: dict[str, Any], snapshot: dict[str, Any],
+    manifest: FleetManifest | None = None,
+) -> dict[str, Any]:
+    """Validate a bundle against ``manifest``, projecting across append-only fleet expansion.
+
+    When ``snapshot["repositories"]`` covers a non-empty strict prefix of the
+    current manifest keys and none of the newly admitted suffix Mechs have
+    entries in ``history``, the bundle is first validated strictly against the
+    prefix manifest and then projected to ``manifest`` with zero-counter
+    ``unobserved`` rows for the newly admitted Mechs. Any reordering, dropped
+    historical Mech, shrunk manifest, or historical evidence for a missing
+    snapshot row still fails closed through ``validate_bundle``.
+    """
+    fleet = manifest or load_fleet_manifest()
+    repositories = snapshot.get("repositories") if isinstance(snapshot, dict) else None
+    snapshot_keys = (
+        [row.get("key") for row in repositories]
+        if isinstance(repositories, list)
+        and all(isinstance(row, dict) and isinstance(row.get("key"), str) for row in repositories)
+        else []
+    )
+    if (
+        0 < len(snapshot_keys) < len(fleet.keys)
+        and snapshot_keys == list(fleet.keys[:len(snapshot_keys)])
+        and isinstance(history, dict)
+    ):
+        added_keys = set(fleet.keys[len(snapshot_keys):])
+        has_added_history = any(
+            isinstance(item, dict) and item.get("repository_key") in added_keys
+            for field in ("closures", "pr_events", "associations", "cursors")
+            for item in (history.get(field) if isinstance(history.get(field), list) else [])
+        )
+        if not has_added_history:
+            prefix_manifest = FleetManifest(
+                {key: fleet.mechs[key] for key in snapshot_keys},
+                fleet.capability_catalogue,
+                fleet.vendored_governance,
+                fleet.source,
+            )
+            validate_bundle(history, snapshot, prefix_manifest)
+            projected = snapshot_from_history(
+                history, generated_at=snapshot["generated_at"], manifest=fleet,
+            )
+            validate_bundle(history, projected, fleet)
+            return projected
+    validate_bundle(history, snapshot, fleet)
+    return snapshot
+
+
 def validate_extension(previous: dict[str, Any], new: dict[str, Any],
                        manifest: FleetManifest | None = None) -> None:
     """Reject history replacement, deletion, rewriting and cursor rollback."""
