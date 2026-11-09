@@ -1,0 +1,22 @@
+{
+  "name": "mutant-no-publish-binding",
+  "argv": [
+    "/opt/homebrew/Caskroom/miniforge/base/bin/python",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v5.py",
+    "--module",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-708/controls-v2/mutant-no-publish-binding/packager.py",
+    "--results",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-708/controls-v2/mutant-no-publish-binding/results.json"
+  ],
+  "started_at": "2026-11-01T13:16:35.023023+00:00",
+  "finished_at": "2026-11-01T13:16:35.280314+00:00",
+  "exit_code": 1,
+  "expected_pass": false,
+  "expected_assertion_failure": true,
+  "module_sha256": "6c4a09a7a2f0b84de77c18e9ede4b347efb396fae3e6235204dc0eaaf45702a3",
+  "log_sha256": "137e6563ec57a44b24104d3acd46ed2d1fad859e9115df84886a24665d8c04a4",
+  "mutation": [
+    "selected = bound_selection(frozen, read(Path(frozen['selection_path'])), RUN)",
+    "selected = json.loads(read(Path(frozen['selection_path'])))"
+  ]
+}

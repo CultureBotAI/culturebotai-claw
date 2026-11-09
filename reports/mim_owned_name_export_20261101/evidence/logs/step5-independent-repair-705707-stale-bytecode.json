@@ -1,0 +1,15 @@
+{
+  "name": "step5-independent-repair-705707-stale-bytecode",
+  "argv": [
+    "python",
+    "-B",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-705-707-v1/stale-bytecode/probe.py"
+  ],
+  "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+  "started_at": "2026-11-01T13:03:52.012652+00:00",
+  "environment_profile": "generation-and-native-qc",
+  "finished_at": "2026-11-01T13:03:52.216519+00:00",
+  "exit_code": 0,
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-independent-repair-705707-stale-bytecode.log",
+  "log_sha256": "0e2a3108eb53d64ddba44fbc5484bfb602f123d67829934abfb5133617a09337"
+}

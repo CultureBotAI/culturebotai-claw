@@ -1,0 +1,27 @@
+{
+  "name": "step5-claw-full-tests-v3",
+  "argv": [
+    "uv",
+    "run",
+    "--frozen",
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "--cov=src",
+    "--cov=cli.main",
+    "--cov=plugins.repository_settings",
+    "--cov=plugins.lock_manager",
+    "--cov=plugins.git_integration",
+    "--cov=plugins.just_runner",
+    "--cov-report=term-missing",
+    "--cov-fail-under=70"
+  ],
+  "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+  "started_at": "2026-11-01T13:04:59.742848+00:00",
+  "environment_profile": "claw-ci-no-sibling-roots",
+  "finished_at": "2026-11-01T13:06:23.445842+00:00",
+  "exit_code": 2,
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-claw-full-tests-v3.log",
+  "log_sha256": "009fcf029caccfc71458adb27294a7ac1240f4b2f17e3bdb43a499dbbe177aec"
+}

@@ -24,9 +24,14 @@ def main() -> None:
     parser.add_argument("--claw-root", type=Path, required=True)
     args = parser.parse_args()
     root = args.claw_root.resolve()
+    terminal_path = root / "scripts/mech_session_terminal.py"
+    if not terminal_path.is_file():
+        raise SystemExit(f"Missing terminal boundary script: {terminal_path}")
     spec = importlib.util.spec_from_file_location(
-        "terminal_boundary_probe", root / "scripts/mech_session_terminal.py"
+        "terminal_boundary_probe", terminal_path
     )
+    if spec is None or spec.loader is None:
+        raise SystemExit(f"Cannot load terminal boundary script: {terminal_path}")
     terminal = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(terminal)
     panes = []

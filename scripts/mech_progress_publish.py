@@ -27,7 +27,7 @@ from kg_microbe_progress import (
     validate_history,
 )
 from kg_microbe_progress import read_json as read_progress_json
-from kg_microbe_progress.prs import fetch_pr_observations, gather_associations
+from kg_microbe_progress.prs import collect_associations, fetch_pr_observations
 
 REPOSITORY = "CultureBotAI/culturebotai-claw"
 BRANCH = "mech-progress-data"
@@ -199,9 +199,12 @@ def collect_once(runtime_dirs: list[Path], state_dir: Path, *, apply=False, init
         local = read_json(local_path) if local_path.exists() else None
         head, remote = read_remote(api) if apply else (None, None)
         prior = newest_history(local["history"] if local else None, remote["history"] if remote else None)
-        associations = gather_associations(runtime_dirs)
-        observations = fetch_pr_observations(refresh_associations(associations, prior))
-        history, snapshot = collect_progress(runtime_dirs, prior, verified_pr_observations=observations)
+        associations = collect_associations(runtime_dirs)
+        observations = fetch_pr_observations(refresh_associations(associations.records, prior))
+        history, snapshot = collect_progress(
+            runtime_dirs, prior, verified_pr_observations=observations,
+            excluded_association_counts=associations.excluded_counts,
+        )
         bundle = {"history": history, "snapshot": snapshot}
         # A failed remote write never discards newly observed durable history.
         atomic_json(local_path, bundle)

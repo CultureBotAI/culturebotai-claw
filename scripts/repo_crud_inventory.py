@@ -19,6 +19,7 @@ import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlsplit
 
 CACHE_NAMES = {"__pycache__", ".pytest_cache", ".ruff_cache"}
@@ -72,12 +73,29 @@ class Git:
 
     def run(self, *args: str, allowed: tuple[int, ...] = (0,)) -> bytes:
         env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
-        env.update(GIT_OPTIONAL_LOCKS="0", GIT_TERMINAL_PROMPT="0", GIT_NO_LAZY_FETCH="1", LC_ALL="C")
+        env.update(
+            GIT_OPTIONAL_LOCKS="0",
+            GIT_TERMINAL_PROMPT="0",
+            GIT_NO_LAZY_FETCH="1",
+            GIT_CONFIG_NOSYSTEM="1",
+            GIT_CONFIG_GLOBAL=os.devnull,
+            LC_ALL="C",
+        )
         # Trace2 reads global/system config before command-line -c settings.
         # Environment overrides disable all three destinations without hiding
         # legitimate repository configuration. Legacy GIT_TRACE* was stripped.
         env.update(GIT_TRACE2="0", GIT_TRACE2_EVENT="0", GIT_TRACE2_PERF="0")
-        command = ["git", "--no-optional-locks", "-c", "core.fsmonitor=false", "-C", str(self.root), *args]
+        command = [
+            "git",
+            "--no-optional-locks",
+            "-c",
+            "core.fsmonitor=false",
+            "-c",
+            f"core.excludesFile={os.devnull}",
+            "-C",
+            str(self.root),
+            *args,
+        ]
         proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
         # Drain both streams with a shared hard cap; never emit Git's stderr,
         # which can contain configured URLs, credentials, or untrusted text.
@@ -186,9 +204,10 @@ def cache_leaf_allowed(cache: str, relative: str, kind: str) -> bool:
 
 
 def scan_tree(root: Path, tracked: set[str], ignored: set[str], untracked: set[str],
-              *, max_entries: int, max_seconds: float) -> tuple[list[dict], list[str]]:
+              *, max_entries: int, max_seconds: float) -> tuple[list[dict[str, Any]], list[str]]:
     """Use directory descriptors so a replaced directory cannot redirect scans."""
-    entries, errors = [], []
+    entries: list[dict[str, Any]] = []
+    errors: list[str] = []
     deadline = time.monotonic() + max_seconds
     root_device = root.stat().st_dev
     tracked_dirs = {str(parent) for path in tracked for parent in Path(path).parents}
@@ -257,11 +276,11 @@ def scan_tree(root: Path, tracked: set[str], ignored: set[str], untracked: set[s
             os.close(root_fd)
     except (OSError, InventoryError) as exc:
         errors.append(str(exc))
-    entries.sort(key=lambda row: row["path"])
+    entries.sort(key=lambda row: str(row["path"]))
     return entries, errors
 
 
-def cache_candidates(entries: list[dict], *, complete: bool, operations: list[str]) -> list[dict]:
+def cache_candidates(entries: list[dict[str, Any]], *, complete: bool, operations: list[str]) -> list[dict[str, Any]]:
     if not complete or operations:
         for row in entries:
             if Path(row["path"]).name in CACHE_NAMES:
@@ -296,15 +315,16 @@ def cache_candidates(entries: list[dict], *, complete: bool, operations: list[st
     return candidates
 
 
-def git_metadata(git: Git, git_dir: Path) -> dict:
-    branches = []
+def git_metadata(git: Git, git_dir: Path) -> dict[str, Any]:
+    branches: list[dict[str, str]] = []
     raw = git.run("for-each-ref", "--format=%(refname)%00%(objectname)%00%(upstream)%00", "refs/heads", "refs/remotes")
     for line in raw.splitlines():
         fields = line.split(b"\0")
         if len(fields) != 4 or fields[-1]:
             raise InventoryError("Git branch inventory is malformed")
         branches.append(dict(zip(("ref", "oid", "upstream"), map(os.fsdecode, fields[:3]))))
-    worktrees, current = [], {}
+    worktrees: list[dict[str, Any]] = []
+    current: dict[str, Any] = {}
     raw = git.run("worktree", "list", "--porcelain", "-z")
     if raw and not raw.endswith(b"\0\0"):
         raise InventoryError("Git worktree inventory is incomplete")
@@ -341,8 +361,8 @@ def git_metadata(git: Git, git_dir: Path) -> dict:
 
 
 def inventory(repo: Path, expected_origin: str, *, max_entries: int = 50_000,
-              max_seconds: float = 30, git_max_bytes: int = 16_000_000) -> dict:
-    report = {
+              max_seconds: float = 30, git_max_bytes: int = 16_000_000) -> dict[str, Any]:
+    report: dict[str, Any] = {
         "schema_version": 1, "mode": "read_only", "apply_supported": False,
         "generated_at": datetime.now(timezone.utc).isoformat(), "complete": False,
         "scope": "candidate scan outside retained protected subtrees; Git pathname metadata",
@@ -401,15 +421,129 @@ def inventory(repo: Path, expected_origin: str, *, max_entries: int = 50_000,
     return report
 
 
+def inventory_fleet(
+    claw_checkout: Path | None = None,
+    *,
+    claw_root: Path | None = None,
+    include_claw: bool = True,
+    max_entries: int = 50_000,
+    max_seconds: float = 30,
+    git_max_bytes: int = 16_000_000,
+) -> dict:
+    """Run read-only metadata inventory across claw and all configured manifest Mechs."""
+    import sys
+
+    repo_root = Path(__file__).resolve().parents[1]
+    if str(repo_root / "src") not in sys.path:
+        sys.path.insert(0, str(repo_root / "src"))
+    from kg_microbe_fleet import load_fleet_manifest
+    from kg_microbe_fleet.roots import MechRootError, resolve_mech_root
+    from kg_microbe_fleet.roots import claw_root as default_claw_root
+
+    base_claw = (claw_root or claw_checkout or default_claw_root()).resolve()
+    manifest = load_fleet_manifest()
+    repositories: dict[str, dict] = {}
+    unconfigured: list[dict] = []
+
+    if include_claw:
+        claw_origin = manifest.vendored_governance.canonical_repository
+        repositories["claw"] = inventory(
+            base_claw,
+            claw_origin,
+            max_entries=max_entries,
+            max_seconds=max_seconds,
+            git_max_bytes=git_max_bytes,
+        )
+
+    for key, mech in manifest.mechs.items():
+        try:
+            mech_root = resolve_mech_root(key, claw_root=base_claw, manifest=manifest)
+        except MechRootError as exc:
+            unconfigured.append(
+                {
+                    "key": key,
+                    "display_name": mech.display_name,
+                    "expected_origin": mech.github,
+                    "error": str(exc),
+                }
+            )
+            continue
+        repositories[key] = inventory(
+            mech_root,
+            mech.github,
+            max_entries=max_entries,
+            max_seconds=max_seconds,
+            git_max_bytes=git_max_bytes,
+        )
+
+    complete = bool(repositories) and not unconfigured and all(
+        rep.get("complete", False) for rep in repositories.values()
+    )
+    total_candidates = sum(len(rep.get("candidates", [])) for rep in repositories.values())
+    total_candidate_bytes = sum(
+        sum(c.get("bytes", 0) for c in rep.get("candidates", []))
+        for rep in repositories.values()
+    )
+    return {
+        "schema_version": 1,
+        "mode": "read_only_fleet",
+        "apply_supported": False,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "claw_root": str(base_claw),
+        "manifest_mech_count": len(manifest.mechs),
+        "configured_count": len(repositories),
+        "unconfigured": unconfigured,
+        "complete": complete,
+        "total_review_candidates": total_candidates,
+        "total_review_candidate_bytes": total_candidate_bytes,
+        "repositories": repositories,
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--repo", required=True, type=Path)
-    parser.add_argument("--expected-origin", required=True, metavar="OWNER/REPO")
+    parser.add_argument("--repo", type=Path, help="Single repository root to inventory")
+    parser.add_argument("--expected-origin", metavar="OWNER/REPO", help="Expected GitHub owner/repo for --repo")
+    parser.add_argument("--all-fleet", action="store_true", help="Inventory claw and all configured manifest Mechs")
+    parser.add_argument("--claw-root", type=Path, help="Explicit claw root when using --all-fleet")
+    parser.add_argument("--no-claw", action="store_true", help="Exclude claw itself from --all-fleet")
     parser.add_argument("--json", action="store_true", help="write the full JSON report to stdout")
     parser.add_argument("--max-entries", type=int, default=50_000)
     parser.add_argument("--max-seconds", type=float, default=30)
     parser.add_argument("--git-max-bytes", type=int, default=16_000_000)
     args = parser.parse_args(argv)
+    if args.all_fleet:
+        if args.repo is not None or args.expected_origin is not None:
+            parser.error("--all-fleet cannot be combined with --repo or --expected-origin")
+        fleet_report = inventory_fleet(
+            args.claw_root,
+            include_claw=not args.no_claw,
+            max_entries=args.max_entries,
+            max_seconds=args.max_seconds,
+            git_max_bytes=args.git_max_bytes,
+        )
+        if args.json:
+            print(json.dumps(fleet_report, indent=2, ensure_ascii=True))
+        else:
+            print(
+                f"Read-only fleet inventory: complete={fleet_report['complete']}, "
+                f"configured={fleet_report['configured_count']}, "
+                f"unconfigured={len(fleet_report['unconfigured'])}, "
+                f"review_candidates={fleet_report['total_review_candidates']} "
+                f"({fleet_report['total_review_candidate_bytes']} bytes)"
+            )
+            for key, rep in fleet_report["repositories"].items():
+                print(
+                    f"  {key:<22} complete={rep['complete']} "
+                    f"entries={len(rep['entries'])} candidates={len(rep['candidates'])}"
+                )
+            for item in fleet_report["unconfigured"]:
+                print(f"  {item['key']:<22} unconfigured: {item['error']}")
+            print("No apply support. Candidates and metadata fingerprints do not authorize deletion.")
+        return 0 if fleet_report["complete"] else 1
+
+    if args.repo is None or args.expected_origin is None:
+        parser.error("--repo and --expected-origin are required unless --all-fleet is passed")
     report = inventory(args.repo, args.expected_origin, max_entries=args.max_entries, max_seconds=args.max_seconds, git_max_bytes=args.git_max_bytes)
     if args.json:
         print(json.dumps(report, indent=2, ensure_ascii=True))

@@ -1,0 +1,12 @@
+{
+  "changed": [],
+  "created": [
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/706-stale-bytecode/controls/import-provenance/artifacts/candidate.tsv",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/706-stale-bytecode/controls/import-provenance/artifacts/candidate.tsv.manifest.json",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/706-stale-bytecode/controls/import-provenance/artifacts/suppressed_aliases.tsv"
+  ],
+  "previous": {},
+  "root": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/706-stale-bytecode/controls/import-provenance/artifacts",
+  "status": "complete",
+  "version": 1
+}

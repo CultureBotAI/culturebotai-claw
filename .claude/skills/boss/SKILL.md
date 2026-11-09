@@ -70,7 +70,10 @@ session observability, or manual worktree lifecycle is required.
 ## Mode B — External tmux Agents
 
 For long-running or observable tasks. Each agent runs in its own tmux session
-with its own worktree under the portable `FLEET_WORKTREE_ROOT`.
+with its own worktree under the durable `FLEET_WORKTREE_ROOT`.
+Verify the orchestration repository ignores `.temp/` before creating state.
+For an authorized separate clone, use `~/agent-work/<repo>/`. Never use
+`/tmp/`, `/private/tmp/` or `$TMPDIR` for campaigns, worktrees or handoffs.
 
 ### Resolve fleet and set up (once per orchestration run)
 
@@ -84,7 +87,7 @@ esac
 test -n "$TARGET_KEY" || { echo "TARGET_KEY is required" >&2; exit 2; }
 ORCHESTRATION_ROOT="$(git rev-parse --show-toplevel)"
 test -f "$ORCHESTRATION_ROOT/plugins/lock_manager.py"
-FLEET_WORKTREE_ROOT="${FLEET_WORKTREE_ROOT:-${TMPDIR:-/tmp}/culturebotai-worktrees}"
+FLEET_WORKTREE_ROOT="$ORCHESTRATION_ROOT/.temp/worktrees"
 mkdir -p "$FLEET_WORKTREE_ROOT"
 TARGET_ROWS="$(uv run python -m kg_microbe_fleet targets \
   --capability coordination_hooks)"
@@ -245,12 +248,7 @@ requires; a missing `mechs` server is a setup error there, not permission to sta
 one over ssh. The inventory commands below do not start a tmux server or GUI app.
 
 ```bash
-# 1. Choose a task identity, then inventory before creating its worktree
-TASK_DIR="$(mktemp -d "$FLEET_WORKTREE_ROOT/${SLUG}.XXXXXX")"
-WORKTREE="$TASK_DIR/worktree"
-TASK_ID="$(printf '%s' "${TASK_DIR##*.}" | LC_ALL=C tr '[:upper:]' '[:lower:]')"
-BRANCH="feat/$SLUG-$TASK_ID"
-SESSION="$SLUG-$TASK_ID"
+# 1. Inventory the existing server before creating a task directory or worktree
 if SESSION_NAMES="$(tmux list-sessions -F '#S' 2>&1)"; then
   printf '%s\n' "$SESSION_NAMES"
 else
@@ -260,12 +258,18 @@ else
     *) printf 'Cannot inventory tmux sessions: %s\n' "$SESSION_NAMES" >&2; exit 1 ;;
   esac
 fi
-if printf '%s\n' "$SESSION_NAMES" | grep -Fxq -- "$SESSION"; then
-  printf 'Refusing existing tmux session: %s\n' "$SESSION" >&2
-  exit 2
-fi
 if printf '%s\n' "$SESSION_NAMES" | grep -Fxq -- mechs; then
   tmux list-windows -t '=mechs' -F '#I #W'
+fi
+TASK_DIR="$(mktemp -d "$FLEET_WORKTREE_ROOT/${SLUG}.XXXXXX")"
+WORKTREE="$TASK_DIR/worktree"
+TASK_ID="$(printf '%s' "${TASK_DIR##*.}" | LC_ALL=C tr '[:upper:]' '[:lower:]')"
+BRANCH="feat/$SLUG-$TASK_ID"
+SESSION="$SLUG-$TASK_ID"
+if printf '%s\n' "$SESSION_NAMES" | grep -Fxq -- "$SESSION"; then
+  rmdir "$TASK_DIR" 2>/dev/null || true
+  printf 'Refusing existing tmux session: %s\n' "$SESSION" >&2
+  exit 2
 fi
 run_locked_command "fetch-main-$SLUG" 300 \
   git -C "$REPO" fetch origin \

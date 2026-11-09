@@ -90,6 +90,25 @@ class CanonicalSkill:
     reason: str
 
 
+def _is_pycache_only_dir(path: Path) -> bool:
+    """True when a skill directory holds only gitignored __pycache__ bytecode leftovers."""
+    if not path.is_dir() or (path / "SKILL.md").is_file():
+        return False
+    descendants = list(path.rglob("*"))
+    if not any(d.name == "__pycache__" for d in descendants):
+        return False
+    files = [d for d in descendants if d.is_file()]
+    return all("__pycache__" in f.parts or f.suffix in (".pyc", ".pyo") for f in files)
+
+
+def _present_skill_names(skills_dir: Path) -> set[str]:
+    return {
+        p.name
+        for p in skills_dir.iterdir()
+        if p.is_dir() and not _is_pycache_only_dir(p)
+    }
+
+
 def load_catalogue(
     path: Path | None = None, skills_dir: Path | None = None
 ) -> dict[str, SkillEntry]:
@@ -135,7 +154,7 @@ def load_catalogue(
     if skills_dir is None:
         skills_dir = Path(__file__).resolve().parents[2] / ".claude" / "skills"
     if skills_dir.is_dir():
-        present = {p.name for p in skills_dir.iterdir() if p.is_dir()}
+        present = _present_skill_names(skills_dir)
         missing = sorted(present - set(entries))
         if missing:
             raise CatalogueError(

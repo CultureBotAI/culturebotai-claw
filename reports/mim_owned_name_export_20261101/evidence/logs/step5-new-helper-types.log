@@ -1,0 +1,2 @@
+src/kg_microbe_utils/sssom_artifacts.py:245: error: Item "None" of "bytes | None" has no attribute "decode"  [union-attr]
+Found 1 error in 1 file (checked 2 source files)

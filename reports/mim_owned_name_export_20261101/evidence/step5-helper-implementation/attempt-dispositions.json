@@ -1,0 +1,12 @@
+{
+  "step5-helper-ruff-v1": {
+    "outcome": "Infrastructure/tool-resolution failure before lint; no code result",
+    "reason": "Non-offline uvx attempted package-index access and DNS failed",
+    "resolution": "Same pinned Ruff 0.16.3 resolved from existing cache with --offline; check PASS",
+    "failed_attempt_preserved": true
+  },
+  "all_mutants": {
+    "outcome": "Expected assertion failures; positive isolated baseline passed",
+    "author_source_changed": false
+  }
+}

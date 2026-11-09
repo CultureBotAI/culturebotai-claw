@@ -66,6 +66,7 @@ MIM_ROOT = Path(
 
 sys.path.insert(0, str(REPO_ROOT / "src"))
 from kg_microbe_fleet import require_mech_roots  # noqa: E402
+from kg_microbe_utils.sssom_artifacts import POLICY_MARKER  # noqa: E402
 
 CLAW_ROOT = REPO_ROOT
 MIM_ROOT = MIM_ROOT
@@ -578,7 +579,10 @@ def _validate(path: Path) -> list[str]:
         return ["sssom CLI not on PATH"]
     combined = (proc.stdout or "") + "\n" + (proc.stderr or "")
     markers = ("is not well-formed", "is not a valid URI or CURIE", "must be supplied")
-    return [ln.strip() for ln in combined.splitlines() if any(m in ln for m in markers)]
+    errors = [ln.strip() for ln in combined.splitlines() if any(m in ln for m in markers)]
+    if proc.returncode:
+        errors.insert(0, f"sssom validate exited {proc.returncode}: {combined.strip()[:1000]}")
+    return errors
 
 
 def main():
@@ -614,6 +618,20 @@ def main():
     if not WORKING_COPY.exists():
         print(f"Working copy missing: {WORKING_COPY}", file=sys.stderr)
         print("Run `just build-sssom` first.", file=sys.stderr)
+        sys.exit(2)
+
+    # New owned-name candidates are a bound three-file artifact set (#701).
+    # This legacy publisher only copies TSV bytes. Refuse before even its
+    # same-hash no-op: a missing/stale sidecar is not a successful promotion.
+    # The marker lives in SSSOM metadata, so deleting the manifest cannot
+    # silently downgrade a policy candidate to the legacy publication path.
+    if POLICY_MARKER in WORKING_COPY.read_text(encoding="utf-8"):
+        print(
+            "Refusing TSV-only promotion of an owned-name policy candidate. "
+            "Use a reviewed MIM guarded promotion that preserves its suppression "
+            "sidecar and bound manifest; publish_sssom.py does not support this artifact set.",
+            file=sys.stderr,
+        )
         sys.exit(2)
 
     # Count rows the same way the diff does -- a line count and a csv parse

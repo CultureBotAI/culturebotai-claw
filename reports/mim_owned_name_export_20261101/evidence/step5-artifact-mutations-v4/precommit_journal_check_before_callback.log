@@ -1,0 +1,42 @@
+F..                                                                      [100%]
+=================================== FAILURES ===================================
+_ test_last_callback_cannot_redirect_or_change_the_recovery_journal[precommit] _
+
+setup = (PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8554/test_last_callback_c...ppression-sidecar-required"\nsubject_id\tother\nMIM:Subject\tkept\n', <function setup.<locals>.publish at 0x109a0ade0>)
+tmp_path = PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8554/test_last_callback_cannot_redi0')
+phase = 'precommit'
+
+    @pytest.mark.parametrize("phase", ["precommit", "postwrite", "journal_bytes"])
+    def test_last_callback_cannot_redirect_or_change_the_recovery_journal(setup, tmp_path, phase):
+        output, paths, _, _, publish = setup
+        outside = tmp_path / "elsewhere"
+        outside.mkdir()
+        journal_dir = output.parent / ".sssom-artifact-journals"
+        boundary = 5 if phase == "precommit" else 6
+        calls = 0
+    
+        def callback():
+            nonlocal calls
+            calls += 1
+            if calls == boundary:
+                if phase == "journal_bytes":
+                    journal = next(journal_dir.glob("write-*.json"))
+                    journal.write_bytes(b"{}\n")
+                else:
+                    if journal_dir.exists():
+                        journal_dir.rename(output.parent / "original-journals")
+                    journal_dir.symlink_to(outside, target_is_directory=True)
+    
+        with pytest.raises((ValueError, transaction.ValidationFailed), match="Symlink|journal changed"):
+            publish(input_check=callback)
+        assert calls == boundary
+>       assert not list(outside.iterdir())
+E       AssertionError: assert not [PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8554/test_last_callback_cannot_redi0/elsewhere/write-36j3ziky.json')]
+E        +  where [PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8554/test_last_callback_cannot_redi0/elsewhere/write-36j3ziky.json')] = list(<map object at 0x103c3d8a0>)
+E        +    where <map object at 0x103c3d8a0> = iterdir()
+E        +      where iterdir = PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8554/test_last_callback_cannot_redi0/elsewhere').iterdir
+
+tests/test_mim_sssom_artifacts.py:331: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_mim_sssom_artifacts.py::test_last_callback_cannot_redirect_or_change_the_recovery_journal[precommit]
+1 failed, 2 passed in 0.07s

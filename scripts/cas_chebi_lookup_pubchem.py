@@ -47,6 +47,7 @@ MIM_ROOT = Path(
 )
 
 sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_utils.ingredient_identity_rejections import rejection_reason  # noqa: E402
 from kg_microbe_fleet import require_mech_roots  # noqa: E402
 WORKSPACE = REPO_ROOT / "workspace"
 QUEUE_TSV = WORKSPACE / "reports/culturebotht_curation_queue.tsv"
@@ -101,7 +102,12 @@ def _save_pubchem_cache(cache: dict) -> None:
 def pubchem_cas_to_chebi(cas: str, cache: dict) -> str | None:
     """Resolve a CAS-RN through PubChem to a CHEBI id, if possible."""
     if cas in cache:
-        return cache[cas]
+        candidate = cache[cas]
+        reason = rejection_reason(ontology_id=candidate or "", cas=cas)
+        if reason:
+            print(f"[REJECTED] {cas} → {candidate}: {reason}")
+            return None
+        return candidate
     # Step 1: CAS → CIDs
     cid_url = (
         f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/xref/RegistryID/"
@@ -137,10 +143,14 @@ def pubchem_cas_to_chebi(cas: str, cache: dict) -> str | None:
             if m:
                 chebi = f"CHEBI:{m.group(1)}"
                 cache[cas] = chebi
+                reason = rejection_reason(ontology_id=chebi, cas=cas)
+                if reason:
+                    print(f"[REJECTED] {cas} → {chebi}: {reason}")
+                    continue
                 return chebi
     except Exception:
         pass
-    cache[cas] = None
+    cache.setdefault(cas, None)
     return None
 
 
@@ -148,6 +158,9 @@ def _create_yaml(path: Path, name: str, chebi: str, label: str, cas: str,
                  panels: list[str], source: str) -> tuple[bool, str]:
     if path.exists():
         return False, "yaml exists"
+    reason = rejection_reason(ontology_id=chebi, cas=cas, name=name)
+    if reason:
+        return False, f"rejected: {reason}"
     notes = (
         f"Imported from CultureBotHT. CAS-RN→CHEBI mapping resolved via "
         f"{source}. "
@@ -254,6 +267,11 @@ def main() -> None:
             if chebi:
                 source = "PubChem CID→synonym CHEBI"
         if not chebi:
+            no_match += 1
+            continue
+        reason = rejection_reason(ontology_id=chebi, cas=cas, name=name)
+        if reason:
+            print(f"[REJECTED] {name} ({cas}) → {chebi}: {reason}")
             no_match += 1
             continue
         # Check if CHEBI already in MIM

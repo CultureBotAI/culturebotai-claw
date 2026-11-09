@@ -18,7 +18,8 @@ FIXTURE = r'''
 set -euo pipefail
 SLUG=review
 FLEET_WORKTREE_ROOT=/unused/fixture
-mktemp() { printf '%s\n' /unused/fixture/review.ABC12Z; }
+mktemp() { printf 'mktemp\n' >> "$EVENTS"; printf '%s\n' /unused/fixture/review.ABC12Z; }
+rmdir() { printf 'rmdir %s\n' "$*" >> "$EVENTS"; }
 tmux() {
   printf '%s\n' "$*" >> "$EVENTS"
   case "$1" in
@@ -60,18 +61,24 @@ class DispatchContractTests(unittest.TestCase):
         result, events = self.run_fixture()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("RESULT:review-abc12z|feat/review-abc12z", result.stdout)
-        self.assertEqual(events, ["list-sessions -F #S", "list-windows -t =mechs -F #I #W"])
+        self.assertEqual(
+            events,
+            ["list-sessions -F #S", "list-windows -t =mechs -F #I #W", "mktemp"],
+        )
 
     def test_exact_existing_task_session_refused(self):
         result, events = self.run_fixture("review-abc12z")
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertIn("Refusing existing tmux session", result.stderr)
-        self.assertEqual(events, ["list-sessions -F #S"])
+        self.assertEqual(
+            events,
+            ["list-sessions -F #S", "mktemp", "rmdir /unused/fixture/review.ABC12Z"],
+        )
 
     def test_session_prefix_is_not_an_exact_collision(self):
         result, events = self.run_fixture("review-abc12z-other")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(events, ["list-sessions -F #S"])
+        self.assertEqual(events, ["list-sessions -F #S", "mktemp"])
 
     def test_expected_no_server_errors_are_empty_inventory(self):
         for text in ("no server running on /tmp/tmux-501/default",
@@ -80,7 +87,7 @@ class DispatchContractTests(unittest.TestCase):
                 result, events = self.run_fixture(text, exit_code=1)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn("RESULT:review-abc12z", result.stdout)
-                self.assertEqual(events, ["list-sessions -F #S"])
+                self.assertEqual(events, ["list-sessions -F #S", "mktemp"])
 
     def test_other_inventory_errors_stop_dispatch(self):
         result, events = self.run_fixture("error connecting to /tmp/tmux-501/default (Permission denied)", 1)
@@ -90,9 +97,10 @@ class DispatchContractTests(unittest.TestCase):
         self.assertEqual(events, ["list-sessions -F #S"])
 
     def test_existing_host_window_inventory_failure_stops_dispatch(self):
-        result, _ = self.run_fixture(windows_exit=3)
+        result, events = self.run_fixture(windows_exit=3)
         self.assertEqual(result.returncode, 3, result.stderr)
         self.assertNotIn("RESULT:", result.stdout)
+        self.assertEqual(events, ["list-sessions -F #S", "list-windows -t =mechs -F #I #W"])
 
 
 if __name__ == "__main__":

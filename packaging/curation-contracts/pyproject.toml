@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=81,<82"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kg-microbe-curation-contracts"
+version = "0.1.0"
+description = "Byte-preserved CLAW identity, native assertion and curation contracts"
+requires-python = ">=3.11"
+readme = "README.md"
+dependencies = ["jsonschema>=4,<5"]
+
+[project.optional-dependencies]
+reviews = ["PyYAML>=6,<7", "linkml>=1.10,<1.11", "linkml-runtime>=1.10,<1.11"]
+
+[tool.setuptools]
+include-package-data = false
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["kg_microbe_curation", "kg_microbe_reviews", "kg_microbe_governance",
+           "kg_microbe_governance.artifacts", "kg_microbe_governance.artifacts.scripts"]
+namespaces = false
+
+[tool.setuptools.package-data]
+kg_microbe_curation = ["schema/*.json", "distribution-provenance.json"]
+kg_microbe_governance = ["artifacts/schema/record_review.yaml"]

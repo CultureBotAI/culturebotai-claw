@@ -1,0 +1,162 @@
+[
+  {
+    "subject_id": "MIM:Bacto-tryptone",
+    "token_key": "tryptone",
+    "published_in_step4_raw_candidate": false,
+    "published_in_current_unfiltered_counterfactual": false,
+    "prior_formatter_dedicated_label_exclusion": true,
+    "classification": "candidate encounter already excluded as a dedicated label"
+  },
+  {
+    "subject_id": "MIM:Bacto_Brain_Heart_Infusion",
+    "token_key": "brain heart infusion",
+    "published_in_step4_raw_candidate": false,
+    "published_in_current_unfiltered_counterfactual": false,
+    "prior_formatter_dedicated_label_exclusion": true,
+    "classification": "candidate encounter already excluded as a dedicated label"
+  },
+  {
+    "subject_id": "MIM:Bacto_Peptone",
+    "token_key": "peptone",
+    "published_in_step4_raw_candidate": false,
+    "published_in_current_unfiltered_counterfactual": false,
+    "prior_formatter_dedicated_label_exclusion": true,
+    "classification": "candidate encounter already excluded as a dedicated label"
+  },
+  {
+    "subject_id": "MIM:Beta-lactose",
+    "token_key": "lactose",
+    "published_in_step4_raw_candidate": true,
+    "published_in_current_unfiltered_counterfactual": true,
+    "prior_formatter_dedicated_label_exclusion": false,
+    "classification": "previously published token removed"
+  },
+  {
+    "subject_id": "MIM:Brain_Heart_Infusion_Broth",
+    "token_key": "brain heart infusion",
+    "published_in_step4_raw_candidate": false,
+    "published_in_current_unfiltered_counterfactual": false,
+    "prior_formatter_dedicated_label_exclusion": true,
+    "classification": "candidate encounter already excluded as a dedicated label"
+  },
+  {
+    "subject_id": "MIM:Cr1_Soil",
+    "token_key": "soil",
+    "published_in_step4_raw_candidate": false,
+    "published_in_current_unfiltered_counterfactual": false,
+    "prior_formatter_dedicated_label_exclusion": true,
+    "classification": "candidate encounter already excluded as a dedicated label"
+  },
+  {
+    "subject_id": "MIM:D-mannitol",
+    "token_key": "mannitol",
+    "published_in_step4_raw_candidate": true,
+    "published_in_current_unfiltered_counterfactual": true,
+    "prior_formatter_dedicated_label_exclusion": false,
+    "classification": "previously published token removed"
+  },
+  {
+    "subject_id": "MIM:Geomycin",
+    "token_key": "oxytetracycline",
+    "published_in_step4_raw_candidate": false,
+    "published_in_current_unfiltered_counterfactual": false,
+    "prior_formatter_dedicated_label_exclusion": true,
+    "classification": "candidate encounter already excluded as a dedicated label"
+  },
+  {
+    "subject_id": "MIM:Glebomycin",
+    "token_key": "bluensomycin",
+    "published_in_step4_raw_candidate": false,
+    "published_in_current_unfiltered_counterfactual": false,
+    "prior_formatter_dedicated_label_exclusion": true,
+    "classification": "candidate encounter already excluded as a dedicated label"
+  },
+  {
+    "subject_id": "MIM:L-asparagine",
+    "token_key": "asparagine",
+    "published_in_step4_raw_candidate": true,
+    "published_in_current_unfiltered_counterfactual": true,
+    "prior_formatter_dedicated_label_exclusion": false,
+    "classification": "previously published token removed"
+  },
+  {
+    "subject_id": "MIM:L-cysteine",
+    "token_key": "cysteine",
+    "published_in_step4_raw_candidate": true,
+    "published_in_current_unfiltered_counterfactual": true,
+    "prior_formatter_dedicated_label_exclusion": false,
+    "classification": "previously published token removed"
+  },
+  {
+    "subject_id": "MIM:L-glutamic_Acid",
+    "token_key": "glutamic acid",
+    "published_in_step4_raw_candidate": true,
+    "published_in_current_unfiltered_counterfactual": true,
+    "prior_formatter_dedicated_label_exclusion": false,
+    "classification": "previously published token removed"
+  },
+  {
+    "subject_id": "MIM:L-proline",
+    "token_key": "proline",
+    "published_in_step4_raw_candidate": true,
+    "published_in_current_unfiltered_counterfactual": true,
+    "prior_formatter_dedicated_label_exclusion": false,
+    "classification": "previously published token removed"
+  },
+  {
+    "subject_id": "MIM:L-tryptophan",
+    "token_key": "tryptophan",
+    "published_in_step4_raw_candidate": true,
+    "published_in_current_unfiltered_counterfactual": true,
+    "prior_formatter_dedicated_label_exclusion": false,
+    "classification": "previously published token removed"
+  },
+  {
+    "subject_id": "MIM:Liver_Extract_Concentrate",
+    "token_key": "liver extract",
+    "published_in_step4_raw_candidate": false,
+    "published_in_current_unfiltered_counterfactual": false,
+    "prior_formatter_dedicated_label_exclusion": true,
+    "classification": "candidate encounter already excluded as a dedicated label"
+  },
+  {
+    "subject_id": "MIM:Liver_Extract_Infusion",
+    "token_key": "liver extract",
+    "published_in_step4_raw_candidate": false,
+    "published_in_current_unfiltered_counterfactual": false,
+    "prior_formatter_dedicated_label_exclusion": true,
+    "classification": "candidate encounter already excluded as a dedicated label"
+  },
+  {
+    "subject_id": "MIM:Trisodium_Citrate",
+    "token_key": "sodium citrate",
+    "published_in_step4_raw_candidate": false,
+    "published_in_current_unfiltered_counterfactual": false,
+    "prior_formatter_dedicated_label_exclusion": true,
+    "classification": "candidate encounter already excluded as a dedicated label"
+  },
+  {
+    "subject_id": "MIM:Trisodium_Citrate_X_H2O",
+    "token_key": "trisodium citrate",
+    "published_in_step4_raw_candidate": false,
+    "published_in_current_unfiltered_counterfactual": false,
+    "prior_formatter_dedicated_label_exclusion": true,
+    "classification": "candidate encounter already excluded as a dedicated label"
+  },
+  {
+    "subject_id": "MIM:Trypticase",
+    "token_key": "trypticase peptone",
+    "published_in_step4_raw_candidate": false,
+    "published_in_current_unfiltered_counterfactual": false,
+    "prior_formatter_dedicated_label_exclusion": true,
+    "classification": "candidate encounter already excluded as a dedicated label"
+  },
+  {
+    "subject_id": "MIM:Tryptone_Peptone",
+    "token_key": "tryptone",
+    "published_in_step4_raw_candidate": false,
+    "published_in_current_unfiltered_counterfactual": false,
+    "prior_formatter_dedicated_label_exclusion": true,
+    "classification": "candidate encounter already excluded as a dedicated label"
+  }
+]

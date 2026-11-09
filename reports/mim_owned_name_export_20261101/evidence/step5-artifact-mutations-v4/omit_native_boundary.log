@@ -1,0 +1,38 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+___ test_real_native_precommit_checker_refuses_a_source_change_after_staging ___
+
+setup = (PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8546/test_real_native_pre...ppression-sidecar-required"\nsubject_id\tother\nMIM:Subject\tkept\n', <function setup.<locals>.publish at 0x10793ef20>)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x107bfbce0>
+
+    def test_real_native_precommit_checker_refuses_a_source_change_after_staging(setup, monkeypatch):
+        output, _, source, _, publish = setup
+        original = transaction.ValidatedWriteTransaction.commit
+    
+        def commit(self, **kwargs):
+            source.write_bytes(b"changed after staging\n")
+            return original(self, **kwargs)
+    
+        monkeypatch.setattr(transaction.ValidatedWriteTransaction, "commit", commit)
+        with pytest.raises(transaction.ValidationFailed):
+>           publish()
+
+tests/test_mim_sssom_artifacts.py:178: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_mim_sssom_artifacts.py:58: in publish
+    return artifacts.publish_candidate_artifacts(
+src/kg_microbe_utils/sssom_artifacts.py:256: in publish_candidate_artifacts
+    input_check()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def check():
+>       assert source.read_bytes() == b"preferred_term: Owned\n"
+E       AssertionError: assert b'changed after staging\n' == b'preferred_term: Owned\n'
+E         
+E         At index 0 diff: b'c' != b'p'
+E         Use -v to get more diff
+
+tests/test_mim_sssom_artifacts.py:55: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_mim_sssom_artifacts.py::test_real_native_precommit_checker_refuses_a_source_change_after_staging
+1 failed in 0.07s

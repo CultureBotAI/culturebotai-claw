@@ -1,0 +1,121 @@
+{
+  "files": {
+    "21-controls.json": {
+      "sha256": "e45b311b521e91d1f91b4d0377217c54bc90744e1aacf87abfd7629b925fcf30",
+      "bytes": 2921
+    },
+    "fixture/candidate/acceptance.json": {
+      "sha256": "569872f3593a5bdda6905e504375f9d531ddd101aa179e474129c67f215c6252",
+      "bytes": 105
+    },
+    "fixture/candidate/candidate.tsv": {
+      "sha256": "5c73bea3195e0b0aa2c83ae3c2881f3f62ed186963a3a204d278e37ff701c69c",
+      "bytes": 80
+    },
+    "fixture/candidate/candidate.tsv.manifest.json": {
+      "sha256": "bec3b411c0e2fc28262fca62b4d8091fa69d339731ec6bde134204af77b4cc6e",
+      "bytes": 595
+    },
+    "fixture/candidate/journal.json": {
+      "sha256": "9602863744dfa71df70d1575aeb9135d64bc96f13e72aa5eca6b2b89bf0922c7",
+      "bytes": 779
+    },
+    "fixture/candidate/suppressed_aliases.tsv": {
+      "sha256": "6b9c835e90cedb6bb177297b5427788b512f3f6b8aa34fc38d5d2d61178cefcf",
+      "bytes": 17
+    },
+    "fixture/check.json": {
+      "sha256": "44e10b8271b0bf8431ddd8ae9018d503e721bff8253869b9d0eced65ba224379",
+      "bytes": 327
+    },
+    "fixture/check.log": {
+      "sha256": "ef1b64e2963e07c3c6d0af931fd26fc9c3123cd9b82fb6129eca0fdafadfdccf",
+      "bytes": 26
+    },
+    "fixture/claw-owned-name/reports/mim_owned_name_export_20261101/README.md": {
+      "sha256": "e10526891fdbc7b3a05c4ee8f27472248e2432d70574cc407a885784eb0a70d4",
+      "bytes": 61
+    },
+    "fixture/claw-owned-name/reports/mim_owned_name_export_20261101/evidence/candidate/acceptance.json": {
+      "sha256": "569872f3593a5bdda6905e504375f9d531ddd101aa179e474129c67f215c6252",
+      "bytes": 105
+    },
+    "fixture/claw-owned-name/reports/mim_owned_name_export_20261101/evidence/candidate/candidate.tsv": {
+      "sha256": "5c73bea3195e0b0aa2c83ae3c2881f3f62ed186963a3a204d278e37ff701c69c",
+      "bytes": 80
+    },
+    "fixture/claw-owned-name/reports/mim_owned_name_export_20261101/evidence/candidate/candidate.tsv.manifest.json": {
+      "sha256": "bec3b411c0e2fc28262fca62b4d8091fa69d339731ec6bde134204af77b4cc6e",
+      "bytes": 595
+    },
+    "fixture/claw-owned-name/reports/mim_owned_name_export_20261101/evidence/candidate/journal.json": {
+      "sha256": "9602863744dfa71df70d1575aeb9135d64bc96f13e72aa5eca6b2b89bf0922c7",
+      "bytes": 779
+    },
+    "fixture/claw-owned-name/reports/mim_owned_name_export_20261101/evidence/candidate/suppressed_aliases.tsv": {
+      "sha256": "6b9c835e90cedb6bb177297b5427788b512f3f6b8aa34fc38d5d2d61178cefcf",
+      "bytes": 17
+    },
+    "fixture/claw-owned-name/reports/mim_owned_name_export_20261101/evidence/check.json": {
+      "sha256": "44e10b8271b0bf8431ddd8ae9018d503e721bff8253869b9d0eced65ba224379",
+      "bytes": 327
+    },
+    "fixture/claw-owned-name/reports/mim_owned_name_export_20261101/evidence/check.log": {
+      "sha256": "ef1b64e2963e07c3c6d0af931fd26fc9c3123cd9b82fb6129eca0fdafadfdccf",
+      "bytes": 26
+    },
+    "fixture/claw-owned-name/reports/mim_owned_name_export_20261101/final-inputs.json": {
+      "sha256": "08704913a34e3b8e3319855087d55398b3d7253619dc76b39f3e7e613c3c7e1d",
+      "bytes": 3324
+    },
+    "fixture/claw-owned-name/reports/mim_owned_name_export_20261101/manifest.json": {
+      "sha256": "7f835f797c42735d1a7db26f16386f35284d5366530755b8defdf25e555ea5c3",
+      "bytes": 4486
+    },
+    "fixture/claw-owned-name/reports/mim_owned_name_export_20261101/selection.final.json": {
+      "sha256": "ec4cf34b175b2878fa9836291167ceb6763885a106050d46893f88cf91301194",
+      "bytes": 2202
+    },
+    "fixture/claw-owned-name/reports/mim_owned_name_export_20261101/verify.py": {
+      "sha256": "74ade999a59f91d61e83d1b41de9d6b00dbae2fd58a9b28f285724359b18c821",
+      "bytes": 14702
+    },
+    "fixture/claw-owned-name/source.py": {
+      "sha256": "585c93666fcb046b7b264d3fa73202aa2a38254ae82a4b3ba19e873c2d5a9886",
+      "bytes": 10
+    },
+    "fixture/packaging/draft.json": {
+      "sha256": "888cdf36537b2997264058cc39f8e4ae189dfccaef8ab643e0994bb0919dbcbc",
+      "bytes": 2202
+    },
+    "fixture/packaging/inputs.json": {
+      "sha256": "08704913a34e3b8e3319855087d55398b3d7253619dc76b39f3e7e613c3c7e1d",
+      "bytes": 3324
+    },
+    "fixture/packaging/selection.json": {
+      "sha256": "ec4cf34b175b2878fa9836291167ceb6763885a106050d46893f88cf91301194",
+      "bytes": 2202
+    },
+    "package_evidence_v3.py": {
+      "sha256": "74ade999a59f91d61e83d1b41de9d6b00dbae2fd58a9b28f285724359b18c821",
+      "bytes": 14702
+    },
+    "probe_repaired_binding.py": {
+      "sha256": "cb5ea28f95878fb98d407098c91a52698b3af08e6ea7025d6bcdae5a71a7422b",
+      "bytes": 8758
+    },
+    "repair-proof.json": {
+      "sha256": "dc251cf820ace71cca52b0e58a34d91b83de03a37e14b17a1971c48b9baafbee",
+      "bytes": 765
+    },
+    "review.json": {
+      "sha256": "8e040bae49c9de3add97801b655a8794bc79512d217285a06eb8ee2520e35180",
+      "bytes": 3548
+    },
+    "test_packager_v5.py": {
+      "sha256": "bbe219fb38b06899a4c080b42b1eaeecc3fbe861f3e5b819a88b30e5f463f23a",
+      "bytes": 9962
+    }
+  },
+  "omissions": "Synthetic fixture Git internals; reproduce from the preserved probe source."
+}

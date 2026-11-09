@@ -34,6 +34,7 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_utils.ingredient_identity_rejections import rejection_reason  # noqa: E402
 from kg_microbe_fleet import require_mech_roots  # noqa: E402
 
 MIM_ROOT = Path(os.environ.get(
@@ -188,12 +189,19 @@ def main() -> int:
 
             # Strategy 1: any-ontology exact on each name variant
             best: dict = {}
+            rejections = []
             tried: list[str] = []
             verdict = "NO_HIT"
             for v in normalize_v2(name):
                 tried.append(v)
                 hit = ols_any_ontology(v)
                 time.sleep(RATE_DELAY)
+                if hit:
+                    reason = next((why for cas in ((record.get("chemical_properties") or {}).get("cas_rn"), ident)
+                                   if (why := rejection_reason(ontology_id=hit.get("id", ""), name=name, cas=cas))), None)
+                    if reason:
+                        rejections.append({"candidate": hit, "reason": reason})
+                        hit = {}
                 if hit:
                     best = {**hit, "matched_via": v, "strategy": "any-onto-exact"}
                     verdict = "HIGH"
@@ -204,9 +212,17 @@ def main() -> int:
                 hit = ols_stem_match(name)
                 time.sleep(RATE_DELAY)
                 if hit:
+                    reason = next((why for cas in ((record.get("chemical_properties") or {}).get("cas_rn"), ident)
+                                   if (why := rejection_reason(ontology_id=hit.get("id", ""), name=name, cas=cas))), None)
+                    if reason:
+                        rejections.append({"candidate": hit, "reason": reason})
+                        hit = {}
+                if hit:
                     best = {**hit, "matched_via": name, "strategy": "stem-match"}
                     verdict = "STEM_MATCH"
 
+            if not best and rejections:
+                verdict = "REJECTED"
             counts[verdict] = counts.get(verdict, 0) + 1
             row = {
                 "yaml_path": str(path.relative_to(MIM_ROOT)),
@@ -215,6 +231,7 @@ def main() -> int:
                 "candidates_tried": tried,
                 "verdict": verdict,
                 "match": best,
+                "rejections": rejections,
             }
             out_f.write(json.dumps(row) + "\n")
             out_f.flush()

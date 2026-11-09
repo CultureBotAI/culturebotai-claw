@@ -1,0 +1,7 @@
+{
+  "at": "2026-11-01T12:47:53.612210+00:00",
+  "reason": "Stop the owned pre-repair full-suite run because source changed for independently confirmed #704 fixes. Rerun after code freeze; do not attribute this mixed-snapshot run to the final head.",
+  "runner_pid": 88551,
+  "signaled_pytest_pid": 88562,
+  "signal": "SIGINT"
+}

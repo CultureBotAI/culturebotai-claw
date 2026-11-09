@@ -1,0 +1,7 @@
+{
+  "at": "2026-11-01T13:06:22.806698+00:00",
+  "reason": "Full suite emitted a real failure near 11%; interrupt to obtain failure traceback before any edits and avoid wasting the remainder. Incomplete run is not a passing check.",
+  "runner_pid": 5353,
+  "signaled_pytest_pid": 5357,
+  "signal": "SIGINT"
+}

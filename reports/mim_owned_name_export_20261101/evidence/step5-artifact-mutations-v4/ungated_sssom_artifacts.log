@@ -1,0 +1,20 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+__________ test_ci_actually_type_checks_both_artifact_policy_helpers ___________
+
+    def test_ci_actually_type_checks_both_artifact_policy_helpers():
+        workflow = yaml.safe_load((ROOT / ".github/workflows/tests.yaml").read_text())
+        runs = [shlex.split(step["run"]) for job in workflow["jobs"].values()
+                for step in job["steps"] if step.get("name") == "Type-check safety-critical modules"]
+        assert len(runs) == 1 and "mypy" in runs[0]
+>       assert {"src/kg_microbe_utils/owned_name_policy.py",
+                "src/kg_microbe_utils/sssom_artifacts.py"} <= set(runs[0])
+E       AssertionError: assert {'src/kg_micr...artifacts.py'} <= {'--extra', '...nner.py', ...}
+E         
+E         Extra items in the left set:
+E         'src/kg_microbe_utils/sssom_artifacts.py'
+
+tests/test_mim_sssom_artifacts.py:365: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_mim_sssom_artifacts.py::test_ci_actually_type_checks_both_artifact_policy_helpers
+1 failed in 0.06s

@@ -109,6 +109,15 @@ def foreground(pid, tty):
 def composer_reason(screen):
     """Accept only an empty, familiar composer; busy checks live in supervisor."""
     lines = [line.rstrip() for line in screen.replace("\r", "").splitlines()]
+    # This documented startup announcement needs no response. Accept its one
+    # known two-line shape without broadening generic prompt/menu recognition
+    # and without sending Escape (or any other input) to dismiss it.
+    announcement_lines = set()
+    for i in range(len(lines) - 1, 0, -1):
+        if (lines[i].strip(" │┃").lower() == "esc to dismiss"
+                and re.fullmatch(r"Meet Gemini 4 Argon[^?\n]{0,300}", lines[i - 1].strip(" │┃"))):
+            announcement_lines.update((i - 1, i))
+    lines = [line for index, line in enumerate(lines) if index not in announcement_lines]
     while lines and not lines[-1].strip():
         lines.pop()
     if not lines:

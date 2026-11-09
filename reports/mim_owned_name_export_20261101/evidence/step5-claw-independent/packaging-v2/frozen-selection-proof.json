@@ -1,0 +1,9 @@
+{
+  "packager_sha256": "5dfe1381dbc435d6196f1529e90d039205f33097bebc4386abc73a326324d907",
+  "mutated_input": "Only frozen.plan.package_readme changed; original final selection and all selected input artifacts unchanged.",
+  "result": "publish and portable verify both report PASS",
+  "selected_readme": "Synthetic packager check only. No actual candidate approval.\n",
+  "published_readme": "UNREVIEWED CONTENT INSERTED AFTER FREEZE\n",
+  "published_content_differs_from_bound_selection": true,
+  "scope": "isolated synthetic Git repository; no production edits"
+}

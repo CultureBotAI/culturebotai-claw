@@ -1,0 +1,44 @@
+...FF                                                                    [100%]
+=================================== FAILURES ===================================
+_ test_external_validator_returncode_is_authoritative[2-arbitrary validator failure-True] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1091cbac0>
+tmp_path = PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8507/test_external_validator_return3')
+returncode = 2, stderr = 'arbitrary validator failure', fails = True
+
+    @pytest.mark.parametrize(("returncode", "stderr", "fails"), [
+        (0, "", False), (0, "informational warning", False),
+        (0, "is not well-formed", True), (2, "arbitrary validator failure", True), (1, "", True),
+    ])
+    def test_external_validator_returncode_is_authoritative(monkeypatch, tmp_path, returncode, stderr, fails):
+        monkeypatch.setattr(builder.subprocess, "run", lambda *a, **kw: subprocess.CompletedProcess(a, returncode, "", stderr))
+>       assert bool(builder._sssom_validate(tmp_path / "candidate.tsv")) is fails
+E       AssertionError: assert False is True
+E        +  where False = bool([])
+E        +    where [] = <function _sssom_validate at 0x108f24e00>((PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8507/test_external_validator_return3') / 'candidate.tsv'))
+E        +      where <function _sssom_validate at 0x108f24e00> = builder._sssom_validate
+
+tests/test_mim_owned_name_export.py:282: AssertionError
+_________ test_external_validator_returncode_is_authoritative[1--True] _________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1091cbce0>
+tmp_path = PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8507/test_external_validator_return4')
+returncode = 1, stderr = '', fails = True
+
+    @pytest.mark.parametrize(("returncode", "stderr", "fails"), [
+        (0, "", False), (0, "informational warning", False),
+        (0, "is not well-formed", True), (2, "arbitrary validator failure", True), (1, "", True),
+    ])
+    def test_external_validator_returncode_is_authoritative(monkeypatch, tmp_path, returncode, stderr, fails):
+        monkeypatch.setattr(builder.subprocess, "run", lambda *a, **kw: subprocess.CompletedProcess(a, returncode, "", stderr))
+>       assert bool(builder._sssom_validate(tmp_path / "candidate.tsv")) is fails
+E       AssertionError: assert False is True
+E        +  where False = bool([])
+E        +    where [] = <function _sssom_validate at 0x108f24e00>((PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8507/test_external_validator_return4') / 'candidate.tsv'))
+E        +      where <function _sssom_validate at 0x108f24e00> = builder._sssom_validate
+
+tests/test_mim_owned_name_export.py:282: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_mim_owned_name_export.py::test_external_validator_returncode_is_authoritative[2-arbitrary validator failure-True]
+FAILED tests/test_mim_owned_name_export.py::test_external_validator_returncode_is_authoritative[1--True]
+2 failed, 3 passed, 32 deselected in 0.07s

@@ -1,0 +1,17 @@
+{
+  "name": "step5-helper-ruff-v1",
+  "argv": [
+    "uvx",
+    "ruff@0.16.3",
+    "check",
+    "src/kg_microbe_utils/owned_name_policy.py",
+    "tests/test_mim_owned_name_policy.py"
+  ],
+  "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+  "started_at": "2026-11-01T12:39:16.688770+00:00",
+  "environment_profile": "generation-and-native-qc",
+  "finished_at": "2026-11-01T12:39:20.071187+00:00",
+  "exit_code": 2,
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-helper-ruff-v1.log",
+  "log_sha256": "ab960078234ac3697fb507c8fdadea23ac7e81c44106a364eadf43bd5b0a42b6"
+}

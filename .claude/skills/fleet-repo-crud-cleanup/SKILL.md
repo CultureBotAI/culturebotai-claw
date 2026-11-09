@@ -94,6 +94,14 @@ python3 scripts/repo_crud_inventory.py \
   --json > "$AUDIT_DIR/$TARGET_KEY.json"
 ```
 
+When sweeping all configured manifest Mechs (and optionally `claw` itself) in a
+single read-only pass, you may also run the fleet-wide wrapper:
+
+```bash
+python3 scripts/repo_crud_inventory.py --all-fleet --json > "$AUDIT_DIR/fleet_crud.json"
+python3 scripts/repo_crud_inventory.py --all-fleet --no-claw
+```
+
 Inspect the command exit status and each report's completeness and errors.
 Timeouts, unreadable paths, traversal bounds, failed Git queries, and sparse
 checkouts remain explicit limitations. Never convert a failed inventory into an

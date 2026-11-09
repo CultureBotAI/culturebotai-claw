@@ -1,0 +1,57 @@
+{
+  "verdict": "PASS_WITH_LIMITATIONS",
+  "issue": "https://github.com/CultureBotAI/culturebotai-claw/issues/708",
+  "reviewer": "/root/step4_design_review",
+  "scope": "Independent re-review of stable v3 packaging executable and original v2 failure; isolated real-Git fixtures only. Final selection/package/committed head/body remain separate.",
+  "source_sha256": "74ade999a59f91d61e83d1b41de9d6b00dbae2fd58a9b28f285724359b18c821",
+  "finding_disposition": "Resolved. Full frozen-plan JSON semantics must equal the hash-bound selection plus the explicit run_root; published README must equal selected content.",
+  "original_reproduction": "Refuses the changed frozen.plan.package_readme before creating destination.",
+  "portable_rehash_controls": "Changed plan README, added supervisor field and changed README-only payload are refused despite updated outer archive hashes. Equivalent JSON serialization is allowed and restored original package verifies.",
+  "normal_publication": "PASS",
+  "existing_fixture_controls": "21 passed independently",
+  "old_v2_evidence_index_unchanged": true,
+  "remaining_findings": [],
+  "limitations": [
+    "No real package published by this review.",
+    "No final full-suite or final-head/PR-body result inferred.",
+    "Integrity binding is internal consistency; external exact-head review still binds selected evidence to the actual work."
+  ],
+  "production_edits": false,
+  "github_mutations": false,
+  "paid_providers": false,
+  "supervisor_context": null,
+  "logs": {
+    "step5-independent-packager708-replay": {
+      "name": "step5-independent-packager708-replay",
+      "argv": [
+        "python",
+        "-B",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/packaging-v3/probe_repaired_binding.py"
+      ],
+      "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+      "started_at": "2026-11-01T13:17:25.646235+00:00",
+      "environment_profile": "claw-ci-no-sibling-roots",
+      "finished_at": "2026-11-01T13:17:25.870661+00:00",
+      "exit_code": 0,
+      "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-independent-packager708-replay.log",
+      "log_sha256": "c6aec04e579e4b43a8fb38422edcb21a987e38a4bbcb864c07cd9a75dce55137"
+    },
+    "step5-independent-packager708-21controls": {
+      "name": "step5-independent-packager708-21controls",
+      "argv": [
+        "python",
+        "-B",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/packaging-v3/test_packager_v5.py",
+        "--results",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/packaging-v3/21-controls.json"
+      ],
+      "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+      "started_at": "2026-11-01T13:17:25.646237+00:00",
+      "environment_profile": "claw-ci-no-sibling-roots",
+      "finished_at": "2026-11-01T13:17:25.939962+00:00",
+      "exit_code": 0,
+      "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-independent-packager708-21controls.log",
+      "log_sha256": "bab3c9136769a9258e1f49ed0f158970a35b41fbc6cc996f131f91d43403aaf9"
+    }
+  }
+}

@@ -1,0 +1,45 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+______ test_frozen_kgm_consumption_survives_transient_source_replacement _______
+
+cli = {'canonical': PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8568/test_fr...57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8568/test_frozen_kgm_consumption_su0/mim/data/ingredients/mapped'), ...}
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x107c048a0>
+
+    def test_frozen_kgm_consumption_survives_transient_source_replacement(cli, monkeypatch):
+        original_bytes = cli["kgm"].read_bytes()
+        source_loader = builder.load_kgm_source_index
+        label_loader = builder.load_kgm_labels
+        observed = []
+    
+        def sources(path):
+            observed.append(path)
+            cli["kgm"].write_bytes(gzip.compress(gzip.decompress(original_bytes).replace(b"Owned", b"Injected"), mtime=0))
+            return source_loader(path)
+    
+        def labels(path):
+            observed.append(path)
+            result = label_loader(path)
+            cli["kgm"].write_bytes(original_bytes)
+            return result
+    
+        monkeypatch.setattr(builder, "load_kgm_source_index", sources)
+        monkeypatch.setattr(builder, "load_kgm_labels", labels)
+        output, _, _ = cli["run"]()
+>       assert observed[0] == observed[1] and observed[0] != cli["kgm"]
+E       AssertionError: assert (PosixPath('/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/mim-owned-name-n521d4wb/input-15.gz') == PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8568/test_frozen_kgm_consumption_su0/kgm.tsv.gz'))
+
+tests/test_mim_owned_name_export.py:307: AssertionError
+----------------------------- Captured stderr call -----------------------------
+Scanning 2 MIM ingredient YAMLs...
+Fetching rdfs:labels for 1 CHEBI ids from OAK...
+  resolved 1 / 1
+Replayed 1 validation_method stamps (prior sources: published.tsv=1; 1 unique)
+Published 1 diagnostic rows to /private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8568/test_frozen_kgm_consumption_su0/artifacts/candidate.tsv (complete)
+  (skipped 1 MIM records without a supported ontology_id prefix: CHEBI:, FOODON:, UBERON:, ENVO:, NCIT:, MICRO:, mesh:, BTO:, kgmicrobe.compound:, kgmicrobe.ingredient:, cas:)
+Predicate breakdown:
+  skos:exactMatch          1
+Object-prefix breakdown:
+  CHEBI:     1
+=========================== short test summary info ============================
+FAILED tests/test_mim_owned_name_export.py::test_frozen_kgm_consumption_survives_transient_source_replacement
+1 failed, 54 deselected in 0.13s
