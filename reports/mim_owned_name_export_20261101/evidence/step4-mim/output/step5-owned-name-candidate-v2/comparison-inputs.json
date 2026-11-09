@@ -1,0 +1,27 @@
+{
+  "/Users/marcin/Documents/VIMSS/ontology/Mechs/CultureMech/output/ingredients_list.tsv": {
+    "sha256": "9ccbdb69c261c7901d42209271311f4e6b9e3885886dd15e8ca1e5404d2c1f48",
+    "bytes": 263074,
+    "role": "comparison input only; not consumed by raw SSSOM builder"
+  },
+  "/Users/marcin/Documents/VIMSS/ontology/Mechs/CultureMech/output/ingredient_occurrences.tsv": {
+    "sha256": "e04bc9c22ee753e8456cd6aa7a972b7e6d3c2f114427c87aad44c09e38be236a",
+    "bytes": 172291153,
+    "role": "comparison input only; not consumed by raw SSSOM builder"
+  },
+  "/Users/marcin/Documents/VIMSS/ontology/Mechs/CultureMech/output/mapped_ingredients.yaml": {
+    "sha256": "456691b997fe3495994bf15db11e864e78bd5d89e87e5167398543729460e7b7",
+    "bytes": 132964697,
+    "role": "comparison input only; not consumed by raw SSSOM builder"
+  },
+  "/Users/marcin/Documents/VIMSS/ontology/Mechs/CultureMech/output/unmapped_ingredients.yaml": {
+    "sha256": "f584f5c2b66d4b55d6c7afa4a2b638138faa9275984df48bde8d437a193f10c3",
+    "bytes": 2624729,
+    "role": "comparison input only; not consumed by raw SSSOM builder"
+  },
+  "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe/data/transformed/mediadive/nodes.tsv": {
+    "sha256": "091f399834f46260f59002e617e76ee292742a4bf2ebb31ca1b4790a798a2e6c",
+    "bytes": 3089399,
+    "role": "comparison input only; not consumed by raw SSSOM builder"
+  }
+}

@@ -133,7 +133,7 @@ def test_cross_mech_sync_fails_closed_and_uses_owned_locks():
     assert 'timeout=task_limit + 300' in text
     assert 'finally:' in text
     assert 'manager.release_lock(resource)' in text
-    assert 'mktemp -d "${TMPDIR:-/tmp}/cross-mech-${TARGET_KEY}.XXXXXX"' in text
+    assert 'mktemp -d "$DURABLE_ROOT/cross-mech-${TARGET_KEY}.XXXXXX"' in text
     assert 'gh pr create -R "$TARGET_GITHUB"' in text
     assert 'gh pr merge "$PR_NUMBER" -R "$TARGET_GITHUB"' in text
     assert '--match-head-commit "$local_head"' in text
@@ -288,9 +288,14 @@ def test_fleet_pr_review_uses_only_declared_repository_identities():
 # call. The claim is still checkable -- the script it names must itself read
 # the manifest -- so this is a redirection, not an exemption.
 RESOLVES_THROUGH_A_SCRIPT = {
+    "cron-status": "scripts/cron_status.py",
     "fleet-branch-status": "scripts/fleet_branch_status.py",
     "fleet-issue-status": "scripts/fleet_issue_status.py",
+    "fleet-maintenance-cycle": "scripts/fleet_maintenance_cycle.py",
     "fleet-pull": "scripts/fleet_pull.py",
+    "fleet-stale-content-audit": "scripts/fleet_stale_content_audit.py",
+    "fleet-test-and-ci-status": "scripts/fleet_test_ci_status.py",
+    "fleet-worktree-and-temp-hygiene": "scripts/fleet_git_and_temp_hygiene.py",
     "metpo-aggregate": "scripts/fleet_metpo_aggregate.py",
     "fleet-pr-status": "scripts/fleet_pr_status.py",
     "github-pages-status": "scripts/fleet_pages_status.py",

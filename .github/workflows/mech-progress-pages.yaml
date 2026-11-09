@@ -1,0 +1,68 @@
+name: Mech progress Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - site/progress/**
+      - src/kg_microbe_progress/**
+      - src/kg_microbe_fleet/**
+      - scripts/mech_progress_publish.py
+      - scripts/build_mech_progress_site.py
+      - .github/workflows/mech-progress-pages.yaml
+      - pyproject.toml
+      - uv.lock
+  repository_dispatch:
+    types: [mech_progress_updated]
+  workflow_dispatch:
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+
+permissions:
+  contents: read
+
+# Never execute code from the data branch. Dispatch uses default-branch code;
+# only the two fixed JSON blobs at a pinned data commit are downloaded.
+concurrency:
+  group: mech-progress-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: '0.12.5'
+          python-version: '3.13'
+          enable-cache: true
+      - run: uv sync --locked
+      - name: Validate public history and build static site
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: uv run python scripts/build_mech_progress_site.py --output _site
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4

@@ -1,0 +1,160 @@
+[
+  {
+    "name": "baseline",
+    "argv": [
+      "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_mim_owned_name_export.py"
+    ],
+    "exit_code": 0,
+    "expected_outcome": true,
+    "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-builder-implementation-revision-703/mutation-baseline.log",
+    "sha256": "0682b480b2361ce1c0851b619d8a149048e8b40d174cd244c39ab3db23ff1d28"
+  },
+  {
+    "name": "ownership-bypass",
+    "argv": [
+      "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_mim_owned_name_export.py",
+      "-k",
+      "all_alias_inputs or late_cas"
+    ],
+    "exit_code": 1,
+    "expected_outcome": true,
+    "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-builder-implementation-revision-703/mutation-ownership-bypass.log",
+    "sha256": "2d62c17b71364bdd265c1d2439e487d5053e57758448335f078eda6381aa1e1e"
+  },
+  {
+    "name": "cas-bypass",
+    "argv": [
+      "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_mim_owned_name_export.py",
+      "-k",
+      "late_cas"
+    ],
+    "exit_code": 1,
+    "expected_outcome": true,
+    "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-builder-implementation-revision-703/mutation-cas-bypass.log",
+    "sha256": "f061898dfe51f9c6cbdac449398e4b230df5c978ee17066bfbb2836f0bff18e9"
+  },
+  {
+    "name": "input-byte-check-bypass",
+    "argv": [
+      "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_mim_owned_name_export.py",
+      "-k",
+      "input_drift or code_input_drift"
+    ],
+    "exit_code": 1,
+    "expected_outcome": true,
+    "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-builder-implementation-revision-703/mutation-input-byte-check-bypass.log",
+    "sha256": "982140c20841be1b886faae4d02080e835d0b7339e4b7916fe2b8ea7d7b6fbae"
+  },
+  {
+    "name": "path-set-check-bypass",
+    "argv": [
+      "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_mim_owned_name_export.py",
+      "-k",
+      "input_drift and added"
+    ],
+    "exit_code": 1,
+    "expected_outcome": true,
+    "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-builder-implementation-revision-703/mutation-path-set-check-bypass.log",
+    "sha256": "e071a7f0e9d36f5f069f2b293ce199a3e96360adea9d8bb173104a87096589eb"
+  },
+  {
+    "name": "validator-returncode-bypass",
+    "argv": [
+      "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_mim_owned_name_export.py",
+      "-k",
+      "returncode_is_authoritative"
+    ],
+    "exit_code": 1,
+    "expected_outcome": true,
+    "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-builder-implementation-revision-703/mutation-validator-returncode-bypass.log",
+    "sha256": "76f267520469a633292b85d7a3b0ef49f82906520114930d67f9ca5b1091fb74"
+  },
+  {
+    "name": "tsv-only-noop",
+    "argv": [
+      "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_mim_owned_name_export.py",
+      "-k",
+      "sidecar_refresh"
+    ],
+    "exit_code": 1,
+    "expected_outcome": true,
+    "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-builder-implementation-revision-703/mutation-tsv-only-noop.log",
+    "sha256": "f7d236961fa296a04c19929bcc13a58d6266227e4b08873055f5dad218f66896"
+  },
+  {
+    "name": "rejected-label-bypass",
+    "argv": [
+      "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_mim_owned_name_export.py",
+      "-k",
+      "source_bound_rejection"
+    ],
+    "exit_code": 1,
+    "expected_outcome": true,
+    "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-builder-implementation-revision-703/mutation-rejected-label-bypass.log",
+    "sha256": "fd5c32ee736f77bd709b296f72526348a1cd091aac6a50b09db6059409f0b184"
+  },
+  {
+    "name": "kgm-reread",
+    "argv": [
+      "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_mim_owned_name_export.py",
+      "-k",
+      "frozen_kgm_consumption"
+    ],
+    "exit_code": 1,
+    "expected_outcome": true,
+    "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-builder-implementation-revision-703/mutation-kgm-reread.log",
+    "sha256": "c6ac813e62b82ae15cab617b45b31c19c2db32b991bd000800cb81d33dc5d17e"
+  },
+  {
+    "name": "lexical-stamp-normalization-bypass",
+    "argv": [
+      "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_mim_owned_name_export.py",
+      "-k",
+      "lexical_prior_stamp_alias"
+    ],
+    "exit_code": 1,
+    "expected_outcome": true,
+    "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-builder-implementation-revision-703/mutation-lexical-stamp-normalization-bypass.log",
+    "sha256": "28c9ee7004c8b85eb7f1a3a07a05e8ea69840520b7e9727263bb65fcc7dceb60"
+  }
+]

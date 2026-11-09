@@ -1,0 +1,17 @@
+{
+  "name": "step5-builder-integration-v3",
+  "argv": [
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "tests/test_mim_owned_name_export.py"
+  ],
+  "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+  "started_at": "2026-11-01T12:42:03.003593+00:00",
+  "environment_profile": "generation-and-native-qc",
+  "finished_at": "2026-11-01T12:42:04.104420+00:00",
+  "exit_code": 0,
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-builder-integration-v3.log",
+  "log_sha256": "8e7a89924bb15485704096f234e21ee43a347d3cb35696d153b7f46e7ddd3271"
+}

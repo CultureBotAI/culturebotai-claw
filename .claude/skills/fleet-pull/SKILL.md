@@ -1,25 +1,29 @@
 ---
 name: fleet-pull
-description: "Preview or pull remote updates across the manifest-defined Mech checkouts. Fast-forward each clean current branch from its existing origin upstream; report dirty, detached, diverged, locked, or unconfigured repositories. Use to update local Mech clones, rather than propagate a shared code change."
+description: "Preview or pull remote updates across claw and the manifest-defined Mech checkouts. Fast-forward each clean current branch from its existing origin upstream; report dirty, detached, diverged, locked, or unconfigured repositories. Use to update local fleet clones, rather than propagate a shared code change."
 metadata:
   category: cross-repo
   requires_database: false
   requires_internet: true
-  version: 1.0.1
+  version: 1.0.2
   tags: [git, pull, fleet, cross-repo]
 ---
 
 # Fleet pull
 
-Run from the CLAW checkout. `scripts/fleet_pull.py` resolves the fleet through
-`src/kg_microbe_fleet/fleet.yaml` and validates configured roots and GitHub origins
-through `RepositorySettings`. It loads CLAW's `.env` when present; exported
-variables take precedence. Missing roots stay visible in the report.
+Run from the CLAW checkout. `scripts/fleet_pull.py` pulls the explicit `claw`
+control-plane checkout plus the Mech fleet from `src/kg_microbe_fleet/fleet.yaml`
+(and the companion `site` checkout for `CultureBotAI/CultureBotAI.github.io` when
+`CULTUREBOTAI_SITE_ROOT` or a verified sibling `CultureBotAI.github.io` checkout
+is present, or when `--mech site` is passed), then validates configured roots
+and GitHub origins through `RepositorySettings`. It loads CLAW's `.env` when
+present; exported variables take precedence. Missing Mech roots stay visible in
+the report.
 
 ```bash
 just fleet-pull                         # offline preview
 just fleet-pull --apply                 # fetch and fast-forward eligible repos
-just fleet-pull --mech traitmech --apply # select one; repeat --mech for several
+just fleet-pull --mech claw --apply     # select one; repeat --mech for several
 just fleet-pull --json                  # machine-readable preview
 ```
 
@@ -54,18 +58,20 @@ remain after a completed rebase; it is preserved and does not by itself block
 a pull. Other operation markers and checkout safeguards still apply.
 
 The current branch can be a feature branch. The command does not switch to main
-or change upstream configuration. CLAW and kg-microbe are outside this Mech-only
-scope. Do not add either implicitly.
+or change upstream configuration. kg-microbe is outside this fleet scope. Do not
+add it implicitly.
 
 ## Interpret results
 
-- `updated`: fast-forwarded to the reported fetched commit.
-- `would_update`: cached upstream is ahead; preview only.
+- `updated`: fast-forwarded to the reported fetched commit; includes `commits`
+  (`sha` and `subject`) and extracted `prs` (`#NNN`) brought in by the merge.
+- `would_update`: cached upstream is ahead; preview only, with incoming `commits`
+  and `prs`.
 - `up_to_date`, `ahead`: no local update needed relative to the compared ref.
 - `skipped_*`: dirty/untracked/submodule changes, detached HEAD, missing or
   non-origin/symbolic tracking, diverged history, an operation marker, or an unavailable
   lock. Preserve the checkout and report the reason.
-- `not_configured`, `error`: coverage is incomplete; report the affected Mech.
+- `not_configured`, `error`: coverage is incomplete; report the affected repository.
 
 Error results retain the branch, upstream, initial HEAD and fetched target when
 those were observed. After a failed fetch or merge, `after: null` means the final
@@ -73,15 +79,20 @@ HEAD was not verified; do not interpret it as proof that the checkout was unchan
 
 Exit `0` means all selected repositories were assessed successfully. Exit `1`
 means at least one was skipped or failed. Exit `2` means invalid invocation or
-configuration. JSON includes the full selected denominator and one result per
-repository; do not omit skipped repositories from the final summary.
+configuration. JSON (`FleetPullReport` in `src/kg_microbe_fleet/schema/fleet_pull.yaml`)
+includes the full selected denominator and one result per repository; do not omit
+skipped repositories from the final summary.
 
-Always finish with a table listing every selected repository, its branch,
-result, and commit change or reason. Put successfully updated repositories
-first, then all repositories that were not updated at the end (including
-already-current, ahead, skipped, and failed checkouts). Include totals for
-updated and not updated. The command's default output uses this order; when
-using JSON, arrange the final response table the same way.
+Always provide the full report table output listing every selected repository with
+columns `| Repository | Branch | Result | Merged Commits | Merged PRs | Details |`.
+For `updated` (and `would_update`) rows, `Merged Commits` must give the count of
+merged commits and `Merged PRs` must list the merged pull request numbers (`#NNN`,
+or `—` when a direct commit has no PR reference). Put successfully updated
+repositories first, then all repositories that were not updated at the end
+(including already-current, ahead, skipped, and failed checkouts), followed by the
+totals for updated and not updated. The command's default output renders this exact
+table; when using `--json`, render the final response table with the same columns
+and row order.
 
 ## Boundaries
 

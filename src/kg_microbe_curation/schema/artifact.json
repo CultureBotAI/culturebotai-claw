@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://w3id.org/culturebotai/claw/curation/v1/artifact.schema.json",
+  "title": "Immutable external curation generation",
+  "type": "object", "additionalProperties": false,
+  "required": ["contract", "identity_contract", "generation", "parent_manifest_sha256", "source", "layout", "tables", "counters", "assurance"],
+  "properties": {
+    "contract": {"const": "kg-microbe-curation-artifact/v1"},
+    "identity_contract": {"const": "kg-microbe-curation/v1"},
+    "generation": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}(?![\\s\\S])"},
+    "parent_manifest_sha256": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+    "source": {
+      "type": "object", "additionalProperties": false,
+      "required": ["input_manifest_sha256", "source_manifest_sha256", "edge_member", "edge_member_sha256", "sqlite_sha256", "ledger_revision", "selected_rows", "source_rows", "complete_export"],
+      "properties": {
+        "input_manifest_sha256": {"$ref": "#/$defs/sha256"},
+        "source_manifest_sha256": {"$ref": "#/$defs/sha256"},
+        "edge_member": {"$ref": "#/$defs/nonblank"},
+        "edge_member_sha256": {"$ref": "#/$defs/sha256"},
+        "sqlite_sha256": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+        "ledger_revision": {"$ref": "#/$defs/sha256"},
+        "selected_rows": {"type": "integer", "minimum": 0},
+        "source_rows": {"type": "integer", "minimum": 0},
+        "complete_export": {"type": "boolean"}
+      }
+    },
+    "layout": {
+      "type": "object", "additionalProperties": false,
+      "required": ["partitioning", "buckets", "row_group_size"],
+      "properties": {
+        "partitioning": {"const": "sha256-first-key-modulo/v1"},
+        "buckets": {"type": "integer", "minimum": 1, "maximum": 4096},
+        "row_group_size": {"type": "integer", "minimum": 1, "maximum": 10000000}
+      }
+    },
+    "tables": {
+      "type": "object", "additionalProperties": false,
+      "required": ["occurrences", "current_decisions", "bundles", "metadata", "coverage_counts", "observations", "claims", "reviews", "evidence", "memberships", "history"],
+      "properties": {
+        "occurrences": {"$ref": "#/$defs/table"}, "current_decisions": {"$ref": "#/$defs/table"},
+        "bundles": {"$ref": "#/$defs/table"}, "metadata": {"$ref": "#/$defs/table"},
+        "coverage_counts": {"$ref": "#/$defs/table"}, "observations": {"$ref": "#/$defs/table"},
+        "claims": {"$ref": "#/$defs/table"}, "reviews": {"$ref": "#/$defs/table"},
+        "evidence": {"$ref": "#/$defs/table"}, "memberships": {"$ref": "#/$defs/table"},
+        "history": {"$ref": "#/$defs/table"}
+      }
+    },
+    "counters": {
+      "type": "object", "additionalProperties": false,
+      "required": ["lifecycle", "review_state", "conflict_state", "disposition"],
+      "properties": {
+        "lifecycle": {"type": "object", "propertyNames": {"enum": ["active", "superseded", "retracted"]}, "additionalProperties": {"type": "integer", "minimum": 0}},
+        "review_state": {"type": "object", "propertyNames": {"enum": ["unprocessed", "in_review", "reviewed", "deferred"]}, "additionalProperties": {"type": "integer", "minimum": 0}},
+        "conflict_state": {"type": "object", "propertyNames": {"enum": ["not_assessed", "none_reported", "unresolved", "resolved"]}, "additionalProperties": {"type": "integer", "minimum": 0}},
+        "disposition": {"type": "object", "propertyNames": {"enum": ["withheld", "retain", "amend", "exclude"]}, "additionalProperties": {"type": "integer", "minimum": 0}}
+      }
+    },
+    "assurance": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source_verification", "scientific_review"],
+      "properties": {
+        "source_verification": {"$ref": "#/$defs/nonblank"},
+        "scientific_review": {"const": false}
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}(?![\\s\\S])"},
+    "nonblank": {"type": "string", "pattern": "\\S", "maxLength": 4096},
+    "table": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema", "rows", "logical_sha256", "partitions"],
+      "properties": {
+        "schema": {"$ref": "#/$defs/nonblank"},
+        "rows": {"type": "integer", "minimum": 0},
+        "logical_sha256": {"$ref": "#/$defs/sha256"},
+        "partitions": {"type": "array", "maxItems": 100000, "items": {"$ref": "#/$defs/partition"}}
+      }
+    },
+    "partition": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "sha256", "bytes", "rows"],
+      "properties": {
+        "path": {"$ref": "#/$defs/nonblank"}, "sha256": {"$ref": "#/$defs/sha256"},
+        "bytes": {"type": "integer", "minimum": 1}, "rows": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

@@ -20,6 +20,7 @@ from urllib.parse import quote
 import yaml
 
 from kg_microbe_fleet import UniqueKeySafeLoader, load_fleet_manifest
+from kg_microbe_governance import load_governance_manifest
 
 RULESET_NAME = "CLAW merge queue"
 CLAW = "CultureBotAI/culturebotai-claw"
@@ -34,6 +35,12 @@ QUEUE_PARAMETERS = {
     "min_entries_to_merge_wait_minutes": 5,
 }
 RULESET_FIELDS = ("name", "target", "enforcement", "bypass_actors", "conditions", "rules")
+# A claw checkout at a step output is accepted only when the whole workflow is
+# a claw-governed artifact, byte for byte (#793). The reviewed workflow derives
+# that ref from the consumer's committed pin, and the consumer's vendored-sync
+# check holds its bytes to the canon. A hand-written lookalike still needs a
+# literal commit SHA, because nothing here interprets the step that sets it.
+PIN_DERIVED_REF = re.compile(r"\$\{\{\s*steps\.[A-Za-z0-9_-]+\.outputs\.ref\s*\}\}")
 
 
 class QueueError(ValueError):
@@ -83,6 +90,11 @@ def load_policy(path: Path | None = None) -> dict:
     for key, workflows in policy.items():
         if not isinstance(workflows, dict) or not workflows:
             raise QueueError(f"{key}: empty workflow policy")
+        if "blocked" in workflows:
+            reason = workflows["blocked"]
+            if set(workflows) != {"blocked"} or not isinstance(reason, str) or not reason.strip():
+                raise QueueError(f"{key}: blocked policy must contain only a non-empty reason")
+            continue
         names = []
         for workflow, contexts in workflows.items():
             if not workflow.startswith(".github/workflows/") or ".." in workflow.split("/"):
@@ -98,6 +110,8 @@ def load_policy(path: Path | None = None) -> dict:
 
 
 def desired_ruleset(workflows: dict) -> dict:
+    if "blocked" in workflows:
+        raise QueueError(f"Queue adoption blocked: {workflows['blocked']}")
     contexts = sorted(name for names in workflows.values() for name in names)
     return {
         "name": RULESET_NAME, "target": "branch", "enforcement": "active",
@@ -144,6 +158,12 @@ def canonical_ruleset(ruleset: dict) -> dict:
                 params.pop("required_reviewers")
     result["rules"] = sorted(result["rules"] or [], key=lambda rule: rule["type"])
     return result
+
+
+def governed_workflow_digests() -> frozenset[str]:
+    """sha256 of every claw-governed workflow artifact in the installed manifest."""
+    return frozenset(artifact.sha256 for artifact in load_governance_manifest().artifacts
+                     if artifact.target.startswith(".github/workflows/"))
 
 
 def workflow_errors(text: str, contexts: list[str] | None = None) -> list[str]:
@@ -259,7 +279,12 @@ def workflow_errors(text: str, contexts: list[str] | None = None) -> list[str]:
                 "&& github.sha || 'main' }}"
             )
             auxiliary = isinstance(ref, str) and re.fullmatch(r"[0-9a-f]{40}", ref)
-            if not trusted_audit_base and not auxiliary:
+            pin_derived = (
+                options.get("repository") == CLAW
+                and isinstance(ref, str) and PIN_DERIVED_REF.fullmatch(ref) is not None
+                and hashlib.sha256(text.encode("utf-8")).hexdigest() in governed_workflow_digests()
+            )
+            if not trusted_audit_base and not auxiliary and not pin_derived:
                 errors.append(f"{label}: auxiliary checkout needs an immutable full commit SHA")
             if not isinstance(path, str) or not re.fullmatch(r"[A-Za-z0-9_./-]+", path) or path.startswith("/") or any(
                 part in (".", "..", "") for part in path.split("/")
@@ -405,8 +430,9 @@ def plan(api: GitHub, keys: list[str] | None = None) -> dict:
     rows = []
     for key in selected:
         repo = repos[key]
-        row: dict = {"key": key, "repository": repo, "desired": desired_ruleset(policy[key])}
+        row: dict = {"key": key, "repository": repo, "desired": None}
         try:
+            row["desired"] = desired_ruleset(policy[key])
             state = snapshot(api, repo, policy[key])
             errors = readiness_errors(state, repo, policy[key])
             row.update(before=state, fingerprint=fingerprint(state), errors=errors)

@@ -81,6 +81,11 @@ enums:
       HabitatMech:
       NaturalProductMech:
       TaxonMech:
+      PathwayMech:
+      DUFMech:
+      CMMMech:
+      AIMech:
+      EdgeMech:
 
   ProviderEnum:
     description: >-

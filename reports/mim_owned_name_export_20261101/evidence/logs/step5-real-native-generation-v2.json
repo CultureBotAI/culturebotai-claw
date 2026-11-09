@@ -1,0 +1,21 @@
+{
+  "name": "step5-real-native-generation-v2",
+  "argv": [
+    "uv",
+    "run",
+    "--frozen",
+    "python",
+    "../generate_candidate_step5_v2.py",
+    "step4-mim",
+    "claw-owned-name",
+    "step5-owned-name-candidate-v2",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/mappings/ingredient_mappings.sssom.tsv"
+  ],
+  "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+  "started_at": "2026-11-01T13:05:14.141128+00:00",
+  "environment_profile": "generation-and-native-qc",
+  "finished_at": "2026-11-01T13:06:41.431956+00:00",
+  "exit_code": 0,
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-real-native-generation-v2.log",
+  "log_sha256": "d2bba7f78d39aa1ca0cb478bb893fbddb30d0a9bf392a156c819383b4d3342d2"
+}

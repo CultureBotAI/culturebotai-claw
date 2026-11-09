@@ -1,0 +1,37 @@
+I001 [*] Import block is un-sorted or un-formatted
+  --> scripts/build_mim_ingredient_sssom.py:45:1
+   |
+43 |   """
+44 |
+45 | / from __future__ import annotations
+46 | |
+47 | | import argparse
+48 | | import builtins
+49 | | import importlib.util
+50 | | import hashlib
+51 | | import json
+52 | | import os
+53 | | import re
+54 | | import subprocess
+55 | | import sys
+56 | | import tempfile
+57 | | from datetime import date
+58 | | from pathlib import Path
+59 | | from types import ModuleType
+60 | |
+61 | | import yaml
+   | |___________^
+62 |
+63 |   REPO_ROOT = Path(__file__).resolve().parent.parent
+   |
+help: Organize imports
+   |
+48 | import builtins
+49 + import hashlib
+50 | import importlib.util
+   - import hashlib
+51 | import json
+   |
+
+Found 1 error.
+[*] 1 fixable with the `--fix` option.

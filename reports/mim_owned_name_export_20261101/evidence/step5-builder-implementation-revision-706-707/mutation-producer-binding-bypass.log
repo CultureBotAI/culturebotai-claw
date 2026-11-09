@@ -1,0 +1,116 @@
+.FFFFF                                                                   [100%]
+=================================== FAILURES ===================================
+_ test_import_snapshot_drift_and_foreign_cached_module_refuse[before-main-Producer source bytes changed] _
+
+tmp_path = PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8570/test_import_snapshot_drift_and0')
+mode = 'before-main', message = 'Producer source bytes changed'
+
+    @pytest.mark.parametrize(("mode", "message"), [
+        ("before-main", "Producer source bytes changed"),
+        ("during-import-bytes", "Producer source bytes changed"),
+        ("during-import-pathset", "Producer path set changed"),
+        ("during-import-remove", "Producer path set changed"),
+        ("wrong-origin", "Imported producer origin differs"),
+    ])
+    def test_import_snapshot_drift_and_foreign_cached_module_refuse(tmp_path, mode, message):
+        result = isolated_producer_probe(tmp_path, mode)
+>       assert result["status"] == "refused", result
+E       AssertionError: {'actual_policy_hash': 'cb1994953fd3eb3bf9450515fe01a1a7e54ed29c59c847156853d02aef0481fc', 'bound_policy_hash': '18ffd0430d0256b6da6cbb1f3da2327c4cf3418e2b0b2da71ff283ee2f4351ae', 'other_cells': ['', ''], 'output_exists': True, ...}
+E       assert 'published' == 'refused'
+E         
+E         - refused
+E         + published
+
+tests/test_mim_owned_name_export.py:516: AssertionError
+_ test_import_snapshot_drift_and_foreign_cached_module_refuse[during-import-bytes-Producer source bytes changed] _
+
+tmp_path = PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8570/test_import_snapshot_drift_and1')
+mode = 'during-import-bytes', message = 'Producer source bytes changed'
+
+    @pytest.mark.parametrize(("mode", "message"), [
+        ("before-main", "Producer source bytes changed"),
+        ("during-import-bytes", "Producer source bytes changed"),
+        ("during-import-pathset", "Producer path set changed"),
+        ("during-import-remove", "Producer path set changed"),
+        ("wrong-origin", "Imported producer origin differs"),
+    ])
+    def test_import_snapshot_drift_and_foreign_cached_module_refuse(tmp_path, mode, message):
+        result = isolated_producer_probe(tmp_path, mode)
+>       assert result["status"] == "refused", result
+E       AssertionError: {'actual_policy_hash': '5aa302730d8d02bd4e200ba8eaeeeff2397c77166c2f8d3808d30242b77d6f1a', 'bound_policy_hash': '18ffd0430d0256b6da6cbb1f3da2327c4cf3418e2b0b2da71ff283ee2f4351ae', 'other_cells': ['', ''], 'output_exists': True, ...}
+E       assert 'published' == 'refused'
+E         
+E         - refused
+E         + published
+
+tests/test_mim_owned_name_export.py:516: AssertionError
+_ test_import_snapshot_drift_and_foreign_cached_module_refuse[during-import-pathset-Producer path set changed] _
+
+tmp_path = PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8570/test_import_snapshot_drift_and2')
+mode = 'during-import-pathset', message = 'Producer path set changed'
+
+    @pytest.mark.parametrize(("mode", "message"), [
+        ("before-main", "Producer source bytes changed"),
+        ("during-import-bytes", "Producer source bytes changed"),
+        ("during-import-pathset", "Producer path set changed"),
+        ("during-import-remove", "Producer path set changed"),
+        ("wrong-origin", "Imported producer origin differs"),
+    ])
+    def test_import_snapshot_drift_and_foreign_cached_module_refuse(tmp_path, mode, message):
+        result = isolated_producer_probe(tmp_path, mode)
+>       assert result["status"] == "refused", result
+E       AssertionError: {'actual_policy_hash': '18ffd0430d0256b6da6cbb1f3da2327c4cf3418e2b0b2da71ff283ee2f4351ae', 'bound_policy_hash': '18ffd0430d0256b6da6cbb1f3da2327c4cf3418e2b0b2da71ff283ee2f4351ae', 'other_cells': ['', ''], 'output_exists': True, ...}
+E       assert 'published' == 'refused'
+E         
+E         - refused
+E         + published
+
+tests/test_mim_owned_name_export.py:516: AssertionError
+_ test_import_snapshot_drift_and_foreign_cached_module_refuse[during-import-remove-Producer path set changed] _
+
+tmp_path = PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8570/test_import_snapshot_drift_and3')
+mode = 'during-import-remove', message = 'Producer path set changed'
+
+    @pytest.mark.parametrize(("mode", "message"), [
+        ("before-main", "Producer source bytes changed"),
+        ("during-import-bytes", "Producer source bytes changed"),
+        ("during-import-pathset", "Producer path set changed"),
+        ("during-import-remove", "Producer path set changed"),
+        ("wrong-origin", "Imported producer origin differs"),
+    ])
+    def test_import_snapshot_drift_and_foreign_cached_module_refuse(tmp_path, mode, message):
+        result = isolated_producer_probe(tmp_path, mode)
+        assert result["status"] == "refused", result
+>       assert message in result["error"]
+E       assert 'Producer path set changed' in "[Errno 2] No such file or directory: '/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8570/test_import_snapshot_drift_and3/producer/src/kg_microbe_utils/owned_name_policy.py'"
+
+tests/test_mim_owned_name_export.py:517: AssertionError
+_ test_import_snapshot_drift_and_foreign_cached_module_refuse[wrong-origin-Imported producer origin differs] _
+
+tmp_path = PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8570/test_import_snapshot_drift_and4')
+mode = 'wrong-origin', message = 'Imported producer origin differs'
+
+    @pytest.mark.parametrize(("mode", "message"), [
+        ("before-main", "Producer source bytes changed"),
+        ("during-import-bytes", "Producer source bytes changed"),
+        ("during-import-pathset", "Producer path set changed"),
+        ("during-import-remove", "Producer path set changed"),
+        ("wrong-origin", "Imported producer origin differs"),
+    ])
+    def test_import_snapshot_drift_and_foreign_cached_module_refuse(tmp_path, mode, message):
+        result = isolated_producer_probe(tmp_path, mode)
+>       assert result["status"] == "refused", result
+E       AssertionError: {'actual_policy_hash': '18ffd0430d0256b6da6cbb1f3da2327c4cf3418e2b0b2da71ff283ee2f4351ae', 'bound_policy_hash': '18ffd0430d0256b6da6cbb1f3da2327c4cf3418e2b0b2da71ff283ee2f4351ae', 'other_cells': ['', ''], 'output_exists': True, ...}
+E       assert 'published' == 'refused'
+E         
+E         - refused
+E         + published
+
+tests/test_mim_owned_name_export.py:516: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_mim_owned_name_export.py::test_import_snapshot_drift_and_foreign_cached_module_refuse[before-main-Producer source bytes changed]
+FAILED tests/test_mim_owned_name_export.py::test_import_snapshot_drift_and_foreign_cached_module_refuse[during-import-bytes-Producer source bytes changed]
+FAILED tests/test_mim_owned_name_export.py::test_import_snapshot_drift_and_foreign_cached_module_refuse[during-import-pathset-Producer path set changed]
+FAILED tests/test_mim_owned_name_export.py::test_import_snapshot_drift_and_foreign_cached_module_refuse[during-import-remove-Producer path set changed]
+FAILED tests/test_mim_owned_name_export.py::test_import_snapshot_drift_and_foreign_cached_module_refuse[wrong-origin-Imported producer origin differs]
+5 failed, 1 passed, 49 deselected in 1.46s

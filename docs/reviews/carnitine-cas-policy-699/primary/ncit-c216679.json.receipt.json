@@ -1,0 +1,11 @@
+{
+  "started_at": "2026-11-01T05:29:20.030939+00:00",
+  "finished_at": "2026-11-01T05:29:20.899801+00:00",
+  "url": "https://api-evsrest.nci.nih.gov/api/v1/concept/ncit/C216679?include=full",
+  "final_url": "https://api-evsrest.nci.nih.gov/api/v1/concept/ncit/C216679?include=full",
+  "status": 200,
+  "bytes": 1391,
+  "sha256": "3c2bbdefd80f43e183e5710bc34afcd24d4af9769cbbd966b8387b90d72a7db0",
+  "source_receipt_sha256": "5c12fe4712916567f39e36c736c555a19746fe55bfef393ce6f4209d6617ac2b",
+  "capture_note": "Projection of retained original receipt; transport headers omitted."
+}

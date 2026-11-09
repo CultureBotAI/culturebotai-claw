@@ -1,0 +1,11 @@
+{
+  "archive_sha256": "d0772873d7d6419573adeb0969b8842579fedeaaad529d71309ac57cd28a6193",
+  "at": "2026-11-01T13:46:38.005462+00:00",
+  "decompressed_sha256": "7932dc43623e93b148017ec45c72ca6e4cfa953c1e8f6f4de07fecfe2df24d22",
+  "historical_published_head": "1f5ad6779cdb3f39f39ba6f9f26d31840b7e7077",
+  "metadata_files_verified": 5,
+  "old_original_identities_preserved": 572,
+  "old_portable_members_verified": 466,
+  "production_changes": false,
+  "status": "PASS"
+}

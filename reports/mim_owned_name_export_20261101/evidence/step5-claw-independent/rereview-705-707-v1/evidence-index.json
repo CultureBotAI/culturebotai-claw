@@ -1,0 +1,401 @@
+{
+  "scope": "immutable independent repair review",
+  "files": {
+    "after-import/builder-boundary-results.json": {
+      "sha256": "4f43e6209c41f16b306cddfde4f53096cb3c6ae842d9ca7a6fbaf78cb3e4a556",
+      "bytes": 1406
+    },
+    "after-import/controls/import-provenance/mim/data/ingredients/mapped/Owned.yaml": {
+      "sha256": "e7d8064795ad65cee2ff29db98271c9c9441792917d8ffc30c32756272599bfc",
+      "bytes": 140
+    },
+    "after-import/controls/import-provenance/mim/data/ingredients/mapped/Subject.yaml": {
+      "sha256": "37c18ebe6ffa74c1c9b666e810b94a636531de6020f8798833f853c187d716f2",
+      "bytes": 281
+    },
+    "after-import/controls/rejected-cas/CAS_owner.yaml": {
+      "sha256": "a65a8ba3a83bff6cfa3438e101a7f04b461ebf717c1a4ab1dd75c3096a343a3f",
+      "bytes": 146
+    },
+    "after-import/controls/rejected-cas/Subject.yaml": {
+      "sha256": "608a86f874676bc949da9770da2061b1f5860794e27043aa40d62ad562d2911e",
+      "bytes": 364
+    },
+    "after-import/probe.py": {
+      "sha256": "fb2d5e4af88ac12ed4150c38796e95d3353e4d2e53ee9c19f333ca2d729f3fbe",
+      "bytes": 4119
+    },
+    "after-import/producer-fixture/plugins/lock_manager.py": {
+      "sha256": "e36effe07ea8f925c61f31044b178c6b639027ff6060ee2f91d6d26612b85b93",
+      "bytes": 26065
+    },
+    "after-import/producer-fixture/scripts/build_mim_ingredient_sssom.py": {
+      "sha256": "38d59f42953305f6fc51e4fc24dfc59ee1919bfb961595b67a8afe9f8a46a1bc",
+      "bytes": 73598
+    },
+    "after-import/producer-fixture/scripts/kgm_unified_mappings.py": {
+      "sha256": "bdcec27470bf7d9ce52ec969fa6cddd35eec966ac7bd9f30def86fa91c36db24",
+      "bytes": 6812
+    },
+    "after-import/producer-fixture/src/kg_microbe_fleet/__init__.py": {
+      "sha256": "8280395a8c3542f3c7c2d1b59ab0cf5790680b6d2124679477fce8073b70a589",
+      "bytes": 41015
+    },
+    "after-import/producer-fixture/src/kg_microbe_fleet/__main__.py": {
+      "sha256": "ec38bef19c73e716a1e56bb85216c8941f5bbdd4c044a3da5ec1bf81a3bcbc35",
+      "bytes": 11943
+    },
+    "after-import/producer-fixture/src/kg_microbe_fleet/roots.py": {
+      "sha256": "21039ea705b99323913d0705c04ac24417246feb5972d4c8e26077fb00f72d3b",
+      "bytes": 15183
+    },
+    "after-import/producer-fixture/src/kg_microbe_utils/__init__.py": {
+      "sha256": "55592e20cc266eefac40a71502f6f53c0d3672da01474409307487421bb1da82",
+      "bytes": 76
+    },
+    "after-import/producer-fixture/src/kg_microbe_utils/ingredient_identity_rejections.py": {
+      "sha256": "d901b53f2d203deb9184de0597b7a34e6b1dd4543e027bfd2f82ca1a213aea28",
+      "bytes": 1895
+    },
+    "after-import/producer-fixture/src/kg_microbe_utils/owned_name_policy.py": {
+      "sha256": "02fbd2306351e8ae688d359580e3364ff8b02798a168162f337ba01daffefed6",
+      "bytes": 7468
+    },
+    "after-import/producer-fixture/src/kg_microbe_utils/sssom_artifacts.py": {
+      "sha256": "44fb030a7884d76cef9fddf0a79f1d81bd2d49432d3c764ea4ac3e508115594b",
+      "bytes": 12906
+    },
+    "after-import/producer-fixture/src/kg_microbe_write/__init__.py": {
+      "sha256": "70a953d943bb8bf0c289811c180a6da9be117ce52bb2994a5bdbe9e9d671167c",
+      "bytes": 1070
+    },
+    "after-import/producer-fixture/src/kg_microbe_write/registry.py": {
+      "sha256": "737ae8a7f8047b4355c6e38e370859be068ff9ddbca154f244d1c4b743ea0c7a",
+      "bytes": 9631
+    },
+    "after-import/producer-fixture/src/kg_microbe_write/serialize.py": {
+      "sha256": "c5f52036c5b0d6ab78099aadc2c11beac2fb9997920aef453b97658483df17ec",
+      "bytes": 2198
+    },
+    "after-import/producer-fixture/src/kg_microbe_write/transaction.py": {
+      "sha256": "aa5b5bd082b14ae094f6decd5dbe3d75343a7436dc95d6b1fcbfb65c56e6f17e",
+      "bytes": 12891
+    },
+    "ci-gate-result.json": {
+      "sha256": "8adc3f3f04196c6cc3ec00c7e4325b54ae0b836386f1e4bff9f53ab5f099815c",
+      "bytes": 2495
+    },
+    "prior-ci-fixture/.github/workflows/tests.yaml": {
+      "sha256": "87682322bd999a400b74adf688c774442c33485edd5544d212a96bb9801b2e37",
+      "bytes": 7225
+    },
+    "repair.diff": {
+      "sha256": "834c86a54f310d9c4db50040dba8dc7b24c71359824e5fe7d21ff2168ff8bfbb",
+      "bytes": 30585
+    },
+    "review.json": {
+      "sha256": "ffea4ea56e15a456e82bc15e3e136316b21f6c3fc3ae1ad6f55bb9468b3c1d94",
+      "bytes": 7355
+    },
+    "same-origin/builder-boundary-results.json": {
+      "sha256": "5cc25a703c606d0bb3029acebac4c2419edb118d8143d131e7d432e830eea2d9",
+      "bytes": 1588
+    },
+    "same-origin/controls/import-provenance/artifacts/.sssom-artifact-journals/write-sgqpmohs.json": {
+      "sha256": "168e1f91d76bea90878c654620ba47bf844b49afea811d2ef3ac7b8a2d043754",
+      "bytes": 975
+    },
+    "same-origin/controls/import-provenance/artifacts/candidate.tsv": {
+      "sha256": "d7a0cac9502939f4e5dc2941d31e527c65943f3b31ddf4157dd1d0d943178852",
+      "bytes": 2439
+    },
+    "same-origin/controls/import-provenance/artifacts/candidate.tsv.manifest.json": {
+      "sha256": "82c723fd73eba35ed29fb83a439aabb3f8f5b60d773b3251130f414b406c6800",
+      "bytes": 12811
+    },
+    "same-origin/controls/import-provenance/artifacts/suppressed_aliases.tsv": {
+      "sha256": "675720ff302b6e852dee454dd9f937a6c6fdcb595998254183c30326ee6ce22a",
+      "bytes": 98
+    },
+    "same-origin/controls/import-provenance/mim/data/ingredients/mapped/Owned.yaml": {
+      "sha256": "e7d8064795ad65cee2ff29db98271c9c9441792917d8ffc30c32756272599bfc",
+      "bytes": 140
+    },
+    "same-origin/controls/import-provenance/mim/data/ingredients/mapped/Subject.yaml": {
+      "sha256": "37c18ebe6ffa74c1c9b666e810b94a636531de6020f8798833f853c187d716f2",
+      "bytes": 281
+    },
+    "same-origin/controls/import-provenance/workspace/locks/.lock-hierarchy.guard": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "same-origin/controls/import-provenance/workspace/locks/.mediaingredientmech.lock.guard": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "same-origin/controls/rejected-cas/CAS_owner.yaml": {
+      "sha256": "a65a8ba3a83bff6cfa3438e101a7f04b461ebf717c1a4ab1dd75c3096a343a3f",
+      "bytes": 146
+    },
+    "same-origin/controls/rejected-cas/Subject.yaml": {
+      "sha256": "608a86f874676bc949da9770da2061b1f5860794e27043aa40d62ad562d2911e",
+      "bytes": 364
+    },
+    "same-origin/probe.py": {
+      "sha256": "7214298583b20d5d2ff2433472add80a24caa8eb1a48ae27f6299d363f952fc5",
+      "bytes": 4190
+    },
+    "same-origin/producer-fixture/plugins/lock_manager.py": {
+      "sha256": "e36effe07ea8f925c61f31044b178c6b639027ff6060ee2f91d6d26612b85b93",
+      "bytes": 26065
+    },
+    "same-origin/producer-fixture/scripts/build_mim_ingredient_sssom.py": {
+      "sha256": "38d59f42953305f6fc51e4fc24dfc59ee1919bfb961595b67a8afe9f8a46a1bc",
+      "bytes": 73598
+    },
+    "same-origin/producer-fixture/scripts/kgm_unified_mappings.py": {
+      "sha256": "bdcec27470bf7d9ce52ec969fa6cddd35eec966ac7bd9f30def86fa91c36db24",
+      "bytes": 6812
+    },
+    "same-origin/producer-fixture/src/kg_microbe_fleet/__init__.py": {
+      "sha256": "8280395a8c3542f3c7c2d1b59ab0cf5790680b6d2124679477fce8073b70a589",
+      "bytes": 41015
+    },
+    "same-origin/producer-fixture/src/kg_microbe_fleet/__main__.py": {
+      "sha256": "ec38bef19c73e716a1e56bb85216c8941f5bbdd4c044a3da5ec1bf81a3bcbc35",
+      "bytes": 11943
+    },
+    "same-origin/producer-fixture/src/kg_microbe_fleet/roots.py": {
+      "sha256": "21039ea705b99323913d0705c04ac24417246feb5972d4c8e26077fb00f72d3b",
+      "bytes": 15183
+    },
+    "same-origin/producer-fixture/src/kg_microbe_utils/__init__.py": {
+      "sha256": "55592e20cc266eefac40a71502f6f53c0d3672da01474409307487421bb1da82",
+      "bytes": 76
+    },
+    "same-origin/producer-fixture/src/kg_microbe_utils/ingredient_identity_rejections.py": {
+      "sha256": "d901b53f2d203deb9184de0597b7a34e6b1dd4543e027bfd2f82ca1a213aea28",
+      "bytes": 1895
+    },
+    "same-origin/producer-fixture/src/kg_microbe_utils/owned_name_policy.py": {
+      "sha256": "d6893a9cb720dd9aefeb185df6500297025377905cd2687022e39d147bca513f",
+      "bytes": 7471
+    },
+    "same-origin/producer-fixture/src/kg_microbe_utils/sssom_artifacts.py": {
+      "sha256": "44fb030a7884d76cef9fddf0a79f1d81bd2d49432d3c764ea4ac3e508115594b",
+      "bytes": 12906
+    },
+    "same-origin/producer-fixture/src/kg_microbe_write/__init__.py": {
+      "sha256": "70a953d943bb8bf0c289811c180a6da9be117ce52bb2994a5bdbe9e9d671167c",
+      "bytes": 1070
+    },
+    "same-origin/producer-fixture/src/kg_microbe_write/registry.py": {
+      "sha256": "737ae8a7f8047b4355c6e38e370859be068ff9ddbca154f244d1c4b743ea0c7a",
+      "bytes": 9631
+    },
+    "same-origin/producer-fixture/src/kg_microbe_write/serialize.py": {
+      "sha256": "c5f52036c5b0d6ab78099aadc2c11beac2fb9997920aef453b97658483df17ec",
+      "bytes": 2198
+    },
+    "same-origin/producer-fixture/src/kg_microbe_write/transaction.py": {
+      "sha256": "aa5b5bd082b14ae094f6decd5dbe3d75343a7436dc95d6b1fcbfb65c56e6f17e",
+      "bytes": 12891
+    },
+    "source/.github/workflows/tests.yaml": {
+      "sha256": "8e74899c1cb01d61a8c239811865a5d3432cbdba09a71c5a0b453f272f8da8c5",
+      "bytes": 7327
+    },
+    "source/AGENTS.md": {
+      "sha256": "15d179d128f3f30c3e3b724af8251756a53f92e3a7e5f7d4f01646d21a519120",
+      "bytes": 32167
+    },
+    "source/docs/guides/MIM_OWNED_NAME_EXPORT.md": {
+      "sha256": "96effe0c0cb0f8817db6943ae9f0e20b4f00cd688f3d9c2f24ec7c3fa2adaba4",
+      "bytes": 3499
+    },
+    "source/plugins/lock_manager.py": {
+      "sha256": "e36effe07ea8f925c61f31044b178c6b639027ff6060ee2f91d6d26612b85b93",
+      "bytes": 26065
+    },
+    "source/scripts/build_mim_ingredient_sssom.py": {
+      "sha256": "38d59f42953305f6fc51e4fc24dfc59ee1919bfb961595b67a8afe9f8a46a1bc",
+      "bytes": 73598
+    },
+    "source/scripts/kgm_unified_mappings.py": {
+      "sha256": "bdcec27470bf7d9ce52ec969fa6cddd35eec966ac7bd9f30def86fa91c36db24",
+      "bytes": 6812
+    },
+    "source/src/kg_microbe_fleet/__init__.py": {
+      "sha256": "8280395a8c3542f3c7c2d1b59ab0cf5790680b6d2124679477fce8073b70a589",
+      "bytes": 41015
+    },
+    "source/src/kg_microbe_fleet/__main__.py": {
+      "sha256": "ec38bef19c73e716a1e56bb85216c8941f5bbdd4c044a3da5ec1bf81a3bcbc35",
+      "bytes": 11943
+    },
+    "source/src/kg_microbe_fleet/roots.py": {
+      "sha256": "21039ea705b99323913d0705c04ac24417246feb5972d4c8e26077fb00f72d3b",
+      "bytes": 15183
+    },
+    "source/src/kg_microbe_utils/__init__.py": {
+      "sha256": "55592e20cc266eefac40a71502f6f53c0d3672da01474409307487421bb1da82",
+      "bytes": 76
+    },
+    "source/src/kg_microbe_utils/ingredient_identity_rejections.py": {
+      "sha256": "d901b53f2d203deb9184de0597b7a34e6b1dd4543e027bfd2f82ca1a213aea28",
+      "bytes": 1895
+    },
+    "source/src/kg_microbe_utils/owned_name_policy.py": {
+      "sha256": "18ffd0430d0256b6da6cbb1f3da2327c4cf3418e2b0b2da71ff283ee2f4351ae",
+      "bytes": 7306
+    },
+    "source/src/kg_microbe_utils/sssom_artifacts.py": {
+      "sha256": "44fb030a7884d76cef9fddf0a79f1d81bd2d49432d3c764ea4ac3e508115594b",
+      "bytes": 12906
+    },
+    "source/src/kg_microbe_write/__init__.py": {
+      "sha256": "70a953d943bb8bf0c289811c180a6da9be117ce52bb2994a5bdbe9e9d671167c",
+      "bytes": 1070
+    },
+    "source/src/kg_microbe_write/registry.py": {
+      "sha256": "737ae8a7f8047b4355c6e38e370859be068ff9ddbca154f244d1c4b743ea0c7a",
+      "bytes": 9631
+    },
+    "source/src/kg_microbe_write/serialize.py": {
+      "sha256": "c5f52036c5b0d6ab78099aadc2c11beac2fb9997920aef453b97658483df17ec",
+      "bytes": 2198
+    },
+    "source/src/kg_microbe_write/transaction.py": {
+      "sha256": "aa5b5bd082b14ae094f6decd5dbe3d75343a7436dc95d6b1fcbfb65c56e6f17e",
+      "bytes": 12891
+    },
+    "source/tests/test_mim_owned_name_export.py": {
+      "sha256": "bb26c9f0c6b9b2517bcd1ff91519ac5a11c31a5c130aa59ef484ab51002f1f20",
+      "bytes": 26024
+    },
+    "source/tests/test_mim_sssom_artifacts.py": {
+      "sha256": "492f711c435f8e83324dc37f2b0f91036d98f5530ea98827293d105fb1bef650",
+      "bytes": 15709
+    },
+    "source/tests/test_mim_sssom_header_dates.py": {
+      "sha256": "771d31940c0dc38d57ec9aec0fd12698eb88186756394f8db83ae9edd27d6fc2",
+      "bytes": 8227
+    },
+    "source-index.json": {
+      "sha256": "673c9f9c4285fa52f0253dec8cc245c2d8aed3a03fbfc2618ac9e63b24943aa9",
+      "bytes": 2930
+    },
+    "stale-bytecode/builder-boundary-results.json": {
+      "sha256": "4af8648047ae07fdba36e8938c005f3972c5ab2f27d5b0095a56383dfaaaa067",
+      "bytes": 1590
+    },
+    "stale-bytecode/controls/import-provenance/artifacts/.sssom-artifact-journals/write-6e3kjm3v.json": {
+      "sha256": "87d9b0487ce41fd1066d7f24909acc5197243c2d87a43e6e9e646ddb4a7707c4",
+      "bytes": 987
+    },
+    "stale-bytecode/controls/import-provenance/artifacts/candidate.tsv": {
+      "sha256": "d7a0cac9502939f4e5dc2941d31e527c65943f3b31ddf4157dd1d0d943178852",
+      "bytes": 2439
+    },
+    "stale-bytecode/controls/import-provenance/artifacts/candidate.tsv.manifest.json": {
+      "sha256": "efd7f31945b78f73ce775c8f3eb93e9dd5a94dd88dea5ea80411dda285b752fa",
+      "bytes": 12931
+    },
+    "stale-bytecode/controls/import-provenance/artifacts/suppressed_aliases.tsv": {
+      "sha256": "675720ff302b6e852dee454dd9f937a6c6fdcb595998254183c30326ee6ce22a",
+      "bytes": 98
+    },
+    "stale-bytecode/controls/import-provenance/mim/data/ingredients/mapped/Owned.yaml": {
+      "sha256": "e7d8064795ad65cee2ff29db98271c9c9441792917d8ffc30c32756272599bfc",
+      "bytes": 140
+    },
+    "stale-bytecode/controls/import-provenance/mim/data/ingredients/mapped/Subject.yaml": {
+      "sha256": "37c18ebe6ffa74c1c9b666e810b94a636531de6020f8798833f853c187d716f2",
+      "bytes": 281
+    },
+    "stale-bytecode/controls/import-provenance/workspace/locks/.lock-hierarchy.guard": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "stale-bytecode/controls/import-provenance/workspace/locks/.mediaingredientmech.lock.guard": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "stale-bytecode/controls/rejected-cas/CAS_owner.yaml": {
+      "sha256": "a65a8ba3a83bff6cfa3438e101a7f04b461ebf717c1a4ab1dd75c3096a343a3f",
+      "bytes": 146
+    },
+    "stale-bytecode/controls/rejected-cas/Subject.yaml": {
+      "sha256": "608a86f874676bc949da9770da2061b1f5860794e27043aa40d62ad562d2911e",
+      "bytes": 364
+    },
+    "stale-bytecode/probe.py": {
+      "sha256": "d2d7767f6b784cde5b4d79010455dc437779a84c9173df5313323bb91bb505e8",
+      "bytes": 4426
+    },
+    "stale-bytecode/producer-fixture/plugins/lock_manager.py": {
+      "sha256": "e36effe07ea8f925c61f31044b178c6b639027ff6060ee2f91d6d26612b85b93",
+      "bytes": 26065
+    },
+    "stale-bytecode/producer-fixture/scripts/build_mim_ingredient_sssom.py": {
+      "sha256": "38d59f42953305f6fc51e4fc24dfc59ee1919bfb961595b67a8afe9f8a46a1bc",
+      "bytes": 73598
+    },
+    "stale-bytecode/producer-fixture/scripts/kgm_unified_mappings.py": {
+      "sha256": "bdcec27470bf7d9ce52ec969fa6cddd35eec966ac7bd9f30def86fa91c36db24",
+      "bytes": 6812
+    },
+    "stale-bytecode/producer-fixture/src/kg_microbe_fleet/__init__.py": {
+      "sha256": "8280395a8c3542f3c7c2d1b59ab0cf5790680b6d2124679477fce8073b70a589",
+      "bytes": 41015
+    },
+    "stale-bytecode/producer-fixture/src/kg_microbe_fleet/__main__.py": {
+      "sha256": "ec38bef19c73e716a1e56bb85216c8941f5bbdd4c044a3da5ec1bf81a3bcbc35",
+      "bytes": 11943
+    },
+    "stale-bytecode/producer-fixture/src/kg_microbe_fleet/roots.py": {
+      "sha256": "21039ea705b99323913d0705c04ac24417246feb5972d4c8e26077fb00f72d3b",
+      "bytes": 15183
+    },
+    "stale-bytecode/producer-fixture/src/kg_microbe_utils/__init__.py": {
+      "sha256": "55592e20cc266eefac40a71502f6f53c0d3672da01474409307487421bb1da82",
+      "bytes": 76
+    },
+    "stale-bytecode/producer-fixture/src/kg_microbe_utils/__pycache__/owned_name_policy.cpython-313.pyc": {
+      "sha256": "20e30eaedaa860c7b691fa0a88e4c217b5ce6820bbb688bf5449d4eb8cefbbfe",
+      "bytes": 11104
+    },
+    "stale-bytecode/producer-fixture/src/kg_microbe_utils/ingredient_identity_rejections.py": {
+      "sha256": "d901b53f2d203deb9184de0597b7a34e6b1dd4543e027bfd2f82ca1a213aea28",
+      "bytes": 1895
+    },
+    "stale-bytecode/producer-fixture/src/kg_microbe_utils/owned_name_policy.py": {
+      "sha256": "6abdb359d5e00b660a72ac138624dbe0a039a252a4474d0d5c94a1867b69b74b",
+      "bytes": 7306
+    },
+    "stale-bytecode/producer-fixture/src/kg_microbe_utils/sssom_artifacts.py": {
+      "sha256": "44fb030a7884d76cef9fddf0a79f1d81bd2d49432d3c764ea4ac3e508115594b",
+      "bytes": 12906
+    },
+    "stale-bytecode/producer-fixture/src/kg_microbe_write/__init__.py": {
+      "sha256": "70a953d943bb8bf0c289811c180a6da9be117ce52bb2994a5bdbe9e9d671167c",
+      "bytes": 1070
+    },
+    "stale-bytecode/producer-fixture/src/kg_microbe_write/registry.py": {
+      "sha256": "737ae8a7f8047b4355c6e38e370859be068ff9ddbca154f244d1c4b743ea0c7a",
+      "bytes": 9631
+    },
+    "stale-bytecode/producer-fixture/src/kg_microbe_write/serialize.py": {
+      "sha256": "c5f52036c5b0d6ab78099aadc2c11beac2fb9997920aef453b97658483df17ec",
+      "bytes": 2198
+    },
+    "stale-bytecode/producer-fixture/src/kg_microbe_write/transaction.py": {
+      "sha256": "aa5b5bd082b14ae094f6decd5dbe3d75343a7436dc95d6b1fcbfb65c56e6f17e",
+      "bytes": 12891
+    },
+    "verify_ci_gate.py": {
+      "sha256": "a239ec9a814d7b1aedeb4d95ade414a74e294a974883b97526066b91c8ab79d7",
+      "bytes": 2044
+    }
+  }
+}

@@ -44,6 +44,7 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_utils.ingredient_identity_rejections import rejection_reason  # noqa: E402
 from kg_microbe_fleet import require_mech_roots  # noqa: E402
 
 MIM_ROOT = Path(os.environ.get(
@@ -233,6 +234,12 @@ def upgrade_yaml(path: Path, ontology_id: str, ontology_label: str,
     record = load_yaml(path)
     if not record:
         return "no-change"
+    reason = next((why for cas in ((record.get("chemical_properties") or {}).get("cas_rn"),
+                                  record.get("identifier"))
+                   if (why := rejection_reason(ontology_id=ontology_id,
+                              name=record.get("preferred_term"), cas=cas))), None)
+    if reason:
+        return f"rejected: {reason}"
     prev_ident = record.get("identifier")
     if prev_ident == ontology_id:
         return "no-change"
@@ -345,6 +352,18 @@ def main() -> int:
                 if confidence == "NO_HIT_FOODON":
                     confidence = "NO_HIT"
 
+        target_id = result.get("id") or result.get("foodon_id", "")
+        target_yaml = find_mim_yaml_by_name(name, name_idx)
+        owner = load_yaml(target_yaml) if target_yaml else {}
+        owner = owner or {}
+        reason = next((why for owner_name in (name, owner.get("preferred_term"))
+                       for cas in ((owner.get("chemical_properties") or {}).get("cas_rn"), owner.get("identifier"))
+                       if (why := rejection_reason(ontology_id=target_id, name=owner_name, cas=cas))), None)
+        if reason:
+            counts["REJECTED"] = counts.get("REJECTED", 0) + 1
+            rows.append((name, target_id, result.get("label", ""), "REJECTED", match, reason))
+            print(f"[REJECTED] {name} → {target_id}: {reason}")
+            continue
         counts[confidence] = counts.get(confidence, 0) + 1
 
         # No usable result?
@@ -363,7 +382,7 @@ def main() -> int:
         elif args.apply and eligible_for_apply and not (
                 args.high_only and confidence != "HIGH"):
             res = upgrade_yaml(target_yaml, target_id, target_label, match)
-            action = "UPGRADED" if res == "upgraded" else "NO_CHANGE"
+            action = "UPGRADED" if res == "upgraded" else ("NO_CHANGE" if res == "no-change" else res)
             if res == "upgraded":
                 counts["UPGRADED"] = counts.get("UPGRADED", 0) + 1
         elif eligible_for_apply:

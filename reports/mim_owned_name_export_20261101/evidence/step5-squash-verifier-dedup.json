@@ -1,0 +1,44 @@
+{
+  "at": "2026-11-01T13:42:13.318577+00:00",
+  "queries": {
+    "repo:CultureBotAI/culturebotai-claw is:issue \"squash\" \"evidence\"": {
+      "total_count": 5,
+      "items": [
+        {
+          "number": 687,
+          "title": "Quote-against-source evidence validation gates CI in one Mech only; make it a fleet capability",
+          "state": "closed",
+          "url": "https://github.com/CultureBotAI/culturebotai-claw/issues/687"
+        },
+        {
+          "number": 550,
+          "title": "Deploy deterministic merge admission and squash-tree verification across the fleet",
+          "state": "closed",
+          "url": "https://github.com/CultureBotAI/culturebotai-claw/issues/550"
+        },
+        {
+          "number": 580,
+          "title": "Complete CMMMech governance adoption and 13-member fleet convergence",
+          "state": "closed",
+          "url": "https://github.com/CultureBotAI/culturebotai-claw/issues/580"
+        },
+        {
+          "number": 132,
+          "title": "[tracker] Mech general-functionality standardization program",
+          "state": "open",
+          "url": "https://github.com/CultureBotAI/culturebotai-claw/issues/132"
+        },
+        {
+          "number": 562,
+          "title": "Add a Mech HTML design skill grounded in the fleet\u2019s data-display and interaction patterns",
+          "state": "closed",
+          "url": "https://github.com/CultureBotAI/culturebotai-claw/issues/562"
+        }
+      ]
+    },
+    "repo:CultureBotAI/culturebotai-claw is:issue \"ancestry\" \"verifier\"": {
+      "total_count": 0,
+      "items": []
+    }
+  }
+}

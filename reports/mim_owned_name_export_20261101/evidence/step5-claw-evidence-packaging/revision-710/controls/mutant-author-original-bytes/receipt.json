@@ -1,0 +1,24 @@
+{
+  "name": "mutant-author-original-bytes",
+  "scenario": "historical",
+  "expected": "assertion",
+  "argv": [
+    "/opt/homebrew/Caskroom/miniforge/base/bin/python",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v6.py",
+    "--module",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-710/controls/mutant-author-original-bytes/packager.py",
+    "--scenario",
+    "historical",
+    "--results",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-710/controls/mutant-author-original-bytes/results.json"
+  ],
+  "started_at": "2026-11-01T13:44:53.937790+00:00",
+  "finished_at": "2026-11-01T13:44:54.513321+00:00",
+  "exit_code": 1,
+  "log_sha256": "d25eaa5e7455f3a6b168571304fdec868d27fbf3813017e46e60033f27492a0e",
+  "module_sha256": "2fcfe4ea3f56b6cb6392d5ad8e60de0fa26bd023dd5b6df6d9d861793a826b92",
+  "mutation": [
+    "original = subprocess.check_output(['git','show',revision+':'+name],cwd=repository)",
+    "original = raw"
+  ]
+}

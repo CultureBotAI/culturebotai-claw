@@ -1,0 +1,58 @@
+{
+  "scripts/build_mim_ingredient_sssom.py": {
+    "sha256": "ed1cb00cc8705ca5b3c7cd71d2aa84a2e053f71a627e3c961048364a0179aab0",
+    "bytes": 69296
+  },
+  "scripts/kgm_unified_mappings.py": {
+    "sha256": "bdcec27470bf7d9ce52ec969fa6cddd35eec966ac7bd9f30def86fa91c36db24",
+    "bytes": 6812
+  },
+  "plugins/lock_manager.py": {
+    "sha256": "e36effe07ea8f925c61f31044b178c6b639027ff6060ee2f91d6d26612b85b93",
+    "bytes": 26065
+  },
+  "src/kg_microbe_utils/owned_name_policy.py": {
+    "sha256": "18ffd0430d0256b6da6cbb1f3da2327c4cf3418e2b0b2da71ff283ee2f4351ae",
+    "bytes": 7306
+  },
+  "src/kg_microbe_utils/__init__.py": {
+    "sha256": "55592e20cc266eefac40a71502f6f53c0d3672da01474409307487421bb1da82",
+    "bytes": 76
+  },
+  "src/kg_microbe_utils/ingredient_identity_rejections.py": {
+    "sha256": "d901b53f2d203deb9184de0597b7a34e6b1dd4543e027bfd2f82ca1a213aea28",
+    "bytes": 1895
+  },
+  "src/kg_microbe_utils/sssom_artifacts.py": {
+    "sha256": "44fb030a7884d76cef9fddf0a79f1d81bd2d49432d3c764ea4ac3e508115594b",
+    "bytes": 12906
+  },
+  "src/kg_microbe_write/serialize.py": {
+    "sha256": "c5f52036c5b0d6ab78099aadc2c11beac2fb9997920aef453b97658483df17ec",
+    "bytes": 2198
+  },
+  "src/kg_microbe_write/registry.py": {
+    "sha256": "737ae8a7f8047b4355c6e38e370859be068ff9ddbca154f244d1c4b743ea0c7a",
+    "bytes": 9631
+  },
+  "src/kg_microbe_write/transaction.py": {
+    "sha256": "aa5b5bd082b14ae094f6decd5dbe3d75343a7436dc95d6b1fcbfb65c56e6f17e",
+    "bytes": 12891
+  },
+  "src/kg_microbe_write/__init__.py": {
+    "sha256": "70a953d943bb8bf0c289811c180a6da9be117ce52bb2994a5bdbe9e9d671167c",
+    "bytes": 1070
+  },
+  "src/kg_microbe_fleet/__init__.py": {
+    "sha256": "8280395a8c3542f3c7c2d1b59ab0cf5790680b6d2124679477fce8073b70a589",
+    "bytes": 41015
+  },
+  "src/kg_microbe_fleet/__main__.py": {
+    "sha256": "ec38bef19c73e716a1e56bb85216c8941f5bbdd4c044a3da5ec1bf81a3bcbc35",
+    "bytes": 11943
+  },
+  "src/kg_microbe_fleet/roots.py": {
+    "sha256": "21039ea705b99323913d0705c04ac24417246feb5972d4c8e26077fb00f72d3b",
+    "bytes": 15183
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "artifact_module_sha256": "971e3cd2e8d65a1ff4a476d8c8c22a1e4209d3ea7bb0f98d184f1c7f92a820b0",
+  "input_check_calls": 5,
+  "journal_path_is_symlink": true,
+  "returned": {
+    "exception": "1 staged change(s) failed validation and nothing was written:\n  /Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-journal-v2/journal-callback-control/out/suppressed_aliases.tsv: Symlink artifact/input path refused: /Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-journal-v2/journal-callback-control/out/.sssom-artifact-journals",
+    "type": "ValidationFailed"
+  },
+  "outside_journals": [],
+  "intended_artifacts_published": false
+}

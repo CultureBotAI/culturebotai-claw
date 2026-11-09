@@ -1,0 +1,6 @@
+{
+  "supplied_path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-703-704-v1/lexical-recheck/alias/../candidate.tsv",
+  "exception": "Parent traversal in artifact/input path refused: /Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-703-704-v1/lexical-recheck/alias/../candidate.tsv",
+  "normalized_candidate_absent": true,
+  "resolved_candidate_absent": true
+}

@@ -186,5 +186,31 @@
     ".github/workflows/label-correspondence.yaml": [
       "label-correspondence"
     ]
+  },
+  "dufmech": {
+    ".github/workflows/validate.yaml": [
+      "qc"
+    ]
+  },
+  "cmmmech": {
+    ".github/workflows/validate-strict.yaml": [
+      "validate-strict"
+    ]
+  },
+  "aimech": {
+    ".github/workflows/validate-strict.yaml": [
+      "validate-strict"
+    ]
+  },
+  "pathwaymech": {
+    ".github/workflows/main.yaml": [
+      "qc"
+    ],
+    ".github/workflows/vendored-sync.yaml": [
+      "vendored-sync"
+    ]
+  },
+  "edgemech": {
+    "blocked": "EdgeMech fleet admission depends on CLAW #960; merge-queue readiness has not been verified."
   }
 }

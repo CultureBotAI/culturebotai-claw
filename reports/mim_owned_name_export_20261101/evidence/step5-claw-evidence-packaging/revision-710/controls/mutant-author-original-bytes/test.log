@@ -1,0 +1,38 @@
+fatal: Not a valid commit name 54357e497de22a54bf7994e8806cd902596fe0ab
+{
+  "frozen": "/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/step5-evidence-test-j5n9q79b/packaging/inputs.json",
+  "sha256": "96d9051c34ef5e1ebbb467d2de2b49e1c022988fa4fc15a675e5e63de48eb83a"
+}
+{
+  "status": "PASS",
+  "archive_members": 12,
+  "original_identities": 7,
+  "tracked_checked": false,
+  "scientific_approval_added": false
+}
+{
+  "status": "PASS",
+  "archive_members": 12,
+  "original_identities": 7,
+  "tracked_checked": true,
+  "scientific_approval_added": false
+}
+{
+  "status": "PASS",
+  "archive_members": 12,
+  "original_identities": 7,
+  "tracked_checked": true,
+  "scientific_approval_added": false
+}
+{
+  "status": "PASS",
+  "archive_members": 12,
+  "original_identities": 7,
+  "tracked_checked": true,
+  "scientific_approval_added": false
+}
+Traceback (most recent call last):
+  File "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v6.py", line 165, in <module>
+    else:raise AssertionError('author historical source did not refuse missing original file')
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: author historical source did not refuse missing original file

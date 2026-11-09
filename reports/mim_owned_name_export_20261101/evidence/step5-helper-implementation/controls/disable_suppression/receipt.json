@@ -1,0 +1,34 @@
+{
+  "name": "disable_suppression",
+  "argv": [
+    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python3",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "-c",
+    "/dev/null",
+    "--confcutdir",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-helper-implementation/controls/disable_suppression",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-helper-implementation/controls/disable_suppression/tests/test_mim_owned_name_policy.py",
+    "-k",
+    "test_real_generic_and_form_examples_suppress_without_chemical_inference"
+  ],
+  "started_at": "2026-11-01T12:39:55.785844+00:00",
+  "finished_at": "2026-11-01T12:39:56.464962+00:00",
+  "exit_code": 1,
+  "expected_failure": true,
+  "control_pass": true,
+  "selection": "test_real_generic_and_form_examples_suppress_without_chemical_inference",
+  "mutation": {
+    "before": "if not holders or subject in holders:",
+    "after": "if True:"
+  },
+  "source_sha256": "290a29d95de6522f22114d77be44ac5a8e096381877b28c0cb3633058e35806b",
+  "test_sha256": "62c8675b32177dbc609218851ac13d409cf6dfd628fe37118a76a6c2cc7516b6",
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-helper-implementation/controls/disable_suppression/pytest.log",
+  "log_sha256": "46352b0ef0fd07b8ae344d34467b931affe3e34e0b0cb917b2ea030a29f5f2a4",
+  "fresh_process": true,
+  "fresh_bytecode_prefix": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-helper-implementation/controls/disable_suppression/bytecode"
+}

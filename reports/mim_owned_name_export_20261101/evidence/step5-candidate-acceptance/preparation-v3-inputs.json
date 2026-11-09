@@ -1,0 +1,27 @@
+{
+  "scope": "Source-interface preparation only, no candidate acceptance",
+  "created_at": "2026-11-01T13:06:04.850263+00:00",
+  "inspected_producer_head": "90d110e663c10146351b09ae98d387dabdec0b1c",
+  "inputs": [
+    {
+      "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name/scripts/build_mim_ingredient_sssom.py",
+      "bytes": 73598,
+      "sha256": "38d59f42953305f6fc51e4fc24dfc59ee1919bfb961595b67a8afe9f8a46a1bc"
+    },
+    {
+      "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/generate_candidate_step5_v2.py",
+      "bytes": 6993,
+      "sha256": "060f915ab0234c42661882e56ec21f86033d21bad818a8a5e07e4f5ee42e70e0"
+    },
+    {
+      "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-candidate-acceptance/verify_candidate_v2.py",
+      "bytes": 33689,
+      "sha256": "5f15bc3e890391b69f15343a266239c77579c9002b09d3088be0a7d6d9bb413c"
+    },
+    {
+      "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-candidate-acceptance/preparation-v2-index.json",
+      "bytes": 865,
+      "sha256": "0a904473ec2946bd9fd3825740906c391dc52e5b9cdc712a0a9809c1d0d6e6d4"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+.F                                                                       [100%]
+=================================== FAILURES ===================================
+_ test_captured_source_wins_over_same_origin_cache_and_stale_bytecode[stale-pyc] _
+
+tmp_path = PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8575/test_captured_source_wins_over1')
+mode = 'stale-pyc'
+
+    @pytest.mark.parametrize("mode", ["same-origin-preloaded", "stale-pyc"])
+    def test_captured_source_wins_over_same_origin_cache_and_stale_bytecode(tmp_path, mode):
+        result = isolated_producer_probe(tmp_path, mode)
+        assert result["status"] == "published", result
+        assert result["bound_policy_hash"] == result["actual_policy_hash"]
+>       assert "Owned" in result["other_cells"]
+E       AssertionError: assert 'Owned' in ['', '']
+
+tests/test_mim_owned_name_export.py:526: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_mim_owned_name_export.py::test_captured_source_wins_over_same_origin_cache_and_stale_bytecode[stale-pyc]
+1 failed, 1 passed, 53 deselected in 0.55s

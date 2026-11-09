@@ -1,0 +1,37 @@
+I001 [*] Import block is un-sorted or un-formatted
+  --> scripts/build_mim_ingredient_sssom.py:72:1
+   |
+71 |   sys.path.insert(0, str(REPO_ROOT / "src"))
+72 | / from kg_microbe_fleet import require_mech_roots  # noqa: E402
+73 | | from kg_microbe_utils.owned_name_policy import (  # noqa: E402
+74 | |     AliasCandidate, Suppression, build_owner_index, filter_owned_aliases,
+75 | |     render_suppressed_aliases,
+76 | | )
+77 | | from kg_microbe_utils.sssom_artifacts import (  # noqa: E402
+78 | |     POLICY_MARKER, artifact_paths, capture_beforeimages, publish_candidate_artifacts,
+79 | | )
+   | |_^
+80 |
+81 |   OWNED_NAME_EVIDENCE = (
+   |
+help: Organize imports
+   |
+73 | from kg_microbe_utils.owned_name_policy import (  # noqa: E402
+   -     AliasCandidate, Suppression, build_owner_index, filter_owned_aliases,
+74 +     AliasCandidate,
+75 +     Suppression,
+76 +     build_owner_index,
+77 +     filter_owned_aliases,
+78 |     render_suppressed_aliases,
+79 | )
+80 | from kg_microbe_utils.sssom_artifacts import (  # noqa: E402
+   -     POLICY_MARKER, artifact_paths, capture_beforeimages, publish_candidate_artifacts,
+81 +     POLICY_MARKER,
+82 +     artifact_paths,
+83 +     capture_beforeimages,
+84 +     publish_candidate_artifacts,
+85 | )
+   |
+
+Found 1 error.
+[*] 1 fixable with the `--fix` option.

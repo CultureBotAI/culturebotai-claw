@@ -1,0 +1,9 @@
+{
+  "at": "2026-11-01T13:15:39.580471+00:00",
+  "issue": "https://github.com/CultureBotAI/culturebotai-claw/issues/708",
+  "before_path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/package_evidence_v2.py",
+  "before_sha256": "5dfe1381dbc435d6196f1529e90d039205f33097bebc4386abc73a326324d907",
+  "after_path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/package_evidence_v3.py",
+  "after_sha256": "74ade999a59f91d61e83d1b41de9d6b00dbae2fd58a9b28f285724359b18c821",
+  "production_modified": false
+}

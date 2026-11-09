@@ -23,7 +23,10 @@ like neither: it deliberately declines the project's dependencies. The fleet
 already uses it, in the vendored pr-shepherd workflow, so the flag is excluded
 rather than assumed absent.
 
-Per-script import graphs are deliberately not modelled. `scripts/` imports
+The two governed queue controllers are narrow exceptions: every AST import,
+including function-local imports, is checked against the standard library before
+either canonical or consumer spelling is exempted. Dynamic loaders invalidate
+the exemption. Other per-script import graphs are deliberately not modelled. `scripts/` imports
 `kg_microbe_fleet`, which imports whatever it needs today; pinning a subset per
 script would recreate the hand list one level down. Two spellings are also
 outside the model because nothing here uses them: `uv pip install <name>`,
@@ -37,8 +40,10 @@ matched as claw code here.
 
 from __future__ import annotations
 
+import ast
 import re
 import shlex
+import sys
 import tomllib
 from pathlib import Path
 
@@ -59,6 +64,59 @@ _UV_RUN = re.compile(r"^uv\s+run\b(?![^\n]*--no-(?:project|sync)\b)")
 _CLAW_CODE = re.compile(
     r"scripts/\w+\.py|-m\s+kg_microbe_\w+|\bkg-microbe-[a-z-]+\b|\bopenclaw-cli\b"
 )
+
+
+_STANDALONE_SOURCES = {
+    spelling: Path("src/kg_microbe_governance/artifacts/scripts") / name
+    for name in ("auto_merge_ready_prs.py", "verify_merge_integrity.py")
+    for spelling in (f"scripts/{name}", f"src/kg_microbe_governance/artifacts/scripts/{name}")
+}
+# These stdlib facilities can import arbitrary code without an Import AST node.
+# Fail closed on their presence rather than attempting dynamic dependency analysis.
+_DYNAMIC_MODULES = {"builtins", "importlib", "runpy", "pkgutil"}
+_DYNAMIC_NAMES = {"__import__", "__builtins__", "eval", "exec", "compile", "getattr", "globals", "locals"}
+_DYNAMIC_ATTRIBUTES = {"__import__", "eval", "exec", "import_module", "exec_module", "load_module"}
+
+
+def _audited_stdlib_source(path: Path) -> bool:
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError, UnicodeError):
+        return False
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            roots = {alias.name.split(".", 1)[0] for alias in node.names}
+        elif isinstance(node, ast.ImportFrom):
+            if node.level or not node.module:
+                return False
+            roots = {node.module.split(".", 1)[0]}
+        else:
+            roots = set()
+        if not roots <= sys.stdlib_module_names or roots & _DYNAMIC_MODULES:
+            return False
+        if isinstance(node, ast.Name) and node.id in _DYNAMIC_NAMES:
+            return False
+        if isinstance(node, ast.Attribute) and node.attr in _DYNAMIC_ATTRIBUTES:
+            return False
+    return True
+
+
+def _requires_project(line: str) -> bool:
+    """Remove only exact, source-audited standalone references from the scan.
+
+    Assignments count too: workflows select a consumer or canonical path before
+    invoking "$script". An unrelated script in that same shell command still
+    requires project provisioning; this is never a whole-command exemption.
+    """
+    remaining = []
+    for token in shlex.split(line):
+        assignment = re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=(.*)", token)
+        value = assignment.group(1) if assignment else token
+        source = _STANDALONE_SOURCES.get(value)
+        if source is not None and _audited_stdlib_source(ROOT / source):
+            continue
+        remaining.append(token)
+    return bool(_CLAW_CODE.search(shlex.join(remaining)))
 
 
 def _canonical(name: str) -> str:
@@ -148,7 +206,7 @@ def unprovisioned_claw_invocations(
                             path_interpreter |= dependencies
                         else:
                             path_interpreter.add(_canonical(argument))
-                if _CLAW_CODE.search(line):
+                if _requires_project(line):
                     available = dependencies if through_uv else path_interpreter
                     missing = sorted(dependencies - available)
                     if missing:
@@ -293,3 +351,37 @@ def test_assignment_command_substitution_enters_uv_project_environment():
         {"run": 'matrix="$(uv run python -m kg_microbe_fleet matrix)"'},
     ]}}}
     assert unprovisioned_claw_invocations(workflow, {"pyyaml", "python-dotenv"}) == []
+
+
+@pytest.mark.parametrize("script", ["auto_merge_ready_prs.py", "verify_merge_integrity.py"])
+@pytest.mark.parametrize("prefix", ["scripts/", "src/kg_microbe_governance/artifacts/scripts/"])
+def test_audited_queue_standalone_needs_no_project_dependencies(script, prefix):
+    command = f"uv run --no-project python {prefix}{script} --help"
+    workflow = {"jobs": {"queue": {"steps": [{"run": command}]}}}
+    assert unprovisioned_claw_invocations(workflow, {"pyyaml", "python-dotenv"}) == []
+
+
+@pytest.mark.parametrize("source", [
+    "def later():\n    import third_party\n",
+    "def later():\n    from . import sibling\n",
+    "def later():\n    return __import__('third_party')\n",
+    "import importlib as loader\ndef later():\n    return loader.import_module('third_party')\n",
+    "from builtins import exec as execute\ndef later():\n    execute('import third_party')\n",
+    "def later():\n    eval(\"__import__('third_party')\")\n",
+])
+def test_standalone_assignment_is_exempt_only_while_whole_source_is_stdlib(tmp_path, monkeypatch, source):
+    path = tmp_path / "src/kg_microbe_governance/artifacts/scripts/auto_merge_ready_prs.py"
+    path.parent.mkdir(parents=True)
+    path.write_text("import json\n" + source)
+    monkeypatch.setattr(sys.modules[__name__], "ROOT", tmp_path)
+    workflow = {"jobs": {"queue": {"steps": [{"run": "script=scripts/auto_merge_ready_prs.py"}]}}}
+    assert unprovisioned_claw_invocations(workflow, {"pyyaml"})
+    path.write_text("import json\ndef later():\n    import pathlib\n")
+    assert unprovisioned_claw_invocations(workflow, {"pyyaml"}) == []
+
+
+def test_queue_standalone_does_not_exempt_other_claw_code_in_same_command():
+    workflow = {"jobs": {"queue": {"steps": [{
+        "run": "script=scripts/auto_merge_ready_prs.py python scripts/other.py",
+    }]}}}
+    assert unprovisioned_claw_invocations(workflow, {"pyyaml"})

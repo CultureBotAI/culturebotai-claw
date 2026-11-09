@@ -1,0 +1,59 @@
+{
+  "reviewer": "/root/step4_design_review",
+  "role": "independent adversarial reviewer; no production authorship",
+  "scope": "Exact committed code head only; full ten-file diff, maintained CI/test discovery, native publisher boundaries, ownership semantics, snapshot/stamp paths and actual diagnostic output. No final packaged-head or PR-body approval.",
+  "head": "e78e220d153e41d4340ad0f8abfbd83d96d01b57",
+  "base": "6a7172585eb68da7f4fe01aee75a82458ddd470c",
+  "tree": "6a11b998d157edf4e24aff472001455bd781fa26",
+  "verdict": "CHANGES_REQUIRED",
+  "findings": [
+    {
+      "issue": "https://github.com/CultureBotAI/culturebotai-claw/issues/706",
+      "severity": "medium",
+      "title": "Producer manifest may bind changed disk code rather than already imported code",
+      "reproduction": "probe_builder_boundaries.py / imported_code_provenance",
+      "evidence": "builder-boundary-results.json",
+      "observed": "Native publication succeeds using imported original policy while manifest hashes changed on-disk policy with different behavior.",
+      "boundary": "Source drift between module import and first producer snapshot."
+    },
+    {
+      "issue": "https://github.com/CultureBotAI/culturebotai-claw/issues/707",
+      "severity": "low",
+      "title": "Rejected CAS alias receives a false ownership-suppression provenance event",
+      "reproduction": "probe_builder_boundaries.py / cas_rejection_provenance",
+      "evidence": "builder-boundary-results.json",
+      "observed": "CAS marked REJECTED_LABEL is omitted from other but emits SUPPRESS with mim.cas/policy evidence because ownership precedes rejection eligibility."
+    }
+  ],
+  "other_root_finding": "Parent reported #705 for maintained type/CI checks; not independently reproduced in this exact-head round.",
+  "candidate_assessment": {
+    "candidate_rows": 2974,
+    "prior_rows": 2974,
+    "row_key_changes": 0,
+    "removed_alias_pairs": 7,
+    "sidecar_encounter_pairs": 20,
+    "already_dropped_object_label_pairs": 13,
+    "classification": "No additional code finding: frozen helper interface explicitly leaves existing empty/drop/dedup/cap behavior to downstream _pipe. These 13 unchanged-row encounters must not be described as 13 additional published removals.",
+    "separate_label_resolution_example": "Seawater changes ENVO:00002149 object_label sea water to ocean water and adds sea water to other; diagnostic only, not authorized canonical promotion.",
+    "evidence": [
+      "actual-candidate-sidecar-comparison.json",
+      "sidecar-label-drop-proof.json"
+    ]
+  },
+  "verification": {
+    "exact_ten_git_objects_and_saved_sources": "PASS",
+    "actual_code_boundary_probes": "Both defects reproduced in fresh isolated fixtures, using actual policy/snapshot/native lock/transaction; free/offline labels and explicit no-validate documented.",
+    "prior_helper_review": "rereview-704-completion-v3 evidence is preserved and remains applicable to unchanged artifact helper bd94f9d4; scope limitations remain.",
+    "ci_discovery": "All new tests are in maintained test_*.py paths; setuptools includes kg_microbe_*; tests.yaml runs full maintained pytest and existing lint/type checks.",
+    "production_changes_by_reviewer": false,
+    "github_mutations_by_reviewer": false,
+    "paid_provider_use": false
+  },
+  "required_followup": [
+    "Independently rerun the two red controls after repairs.",
+    "Review repair deltas and exact new committed code head.",
+    "Review fresh full diagnostic output and native validators.",
+    "Review portable evidence package and final exact PR head/body separately; current review does not authorize merge."
+  ],
+  "supervisor_context": null
+}

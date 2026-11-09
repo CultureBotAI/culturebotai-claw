@@ -1,0 +1,21 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_ test_lazy_policy_and_native_lock_use_the_same_source_snapshot[lazy-public-contamination] _
+
+tmp_path = PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8576/test_lazy_policy_and_native_lo0')
+mode = 'lazy-public-contamination'
+
+    @pytest.mark.parametrize("mode", ["lazy-public-contamination", "native-lock"])
+    def test_lazy_policy_and_native_lock_use_the_same_source_snapshot(tmp_path, mode):
+        result = isolated_producer_probe(tmp_path, mode)
+>       assert result["status"] == "published", result
+E       AssertionError: {'error': 'Unexpected suppression sidecar columns', 'exception': 'ValueError', 'output_exists': False, 'status': 'refused'}
+E       assert 'refused' == 'published'
+E         
+E         - published
+E         + refused
+
+tests/test_mim_owned_name_export.py:533: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_mim_owned_name_export.py::test_lazy_policy_and_native_lock_use_the_same_source_snapshot[lazy-public-contamination]
+1 failed, 54 deselected in 0.29s

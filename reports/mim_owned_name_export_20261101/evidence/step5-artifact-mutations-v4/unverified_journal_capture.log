@@ -1,0 +1,228 @@
+FFFFFFF                                                                  [100%]
+=================================== FAILURES ===================================
+_ test_missing_or_incorrect_native_completion_journal_never_reports_success[missing] _
+
+setup = (PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8555/test_missing_or_inco...ppression-sidecar-required"\nsubject_id\tother\nMIM:Subject\tkept\n', <function setup.<locals>.publish at 0x1095eef20>)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10993fe10>
+corruption = 'missing'
+
+    @pytest.mark.parametrize("corruption", ["missing", "malformed", "root", "status", "changed", "created", "previous"])
+    def test_missing_or_incorrect_native_completion_journal_never_reports_success(setup, monkeypatch, corruption):
+        _, _, _, sssom, publish = setup
+        publish()
+        original = transaction.ValidatedWriteTransaction.commit
+    
+        def commit(self, **kwargs):
+            result = original(self, **kwargs)
+            if corruption == "missing":
+                result.journal_path.unlink()
+            elif corruption == "malformed":
+                result.journal_path.write_bytes(b"{}\n")
+            else:
+                data = json.loads(result.journal_path.read_bytes())
+                data[corruption] = {"root": "/wrong-root", "status": "in_progress", "changed": [],
+                                    "created": ["invented"], "previous": {}}[corruption]
+                result.journal_path.write_text(json.dumps(data, indent=2, sort_keys=True))
+            return result
+    
+        monkeypatch.setattr(transaction.ValidatedWriteTransaction, "commit", commit)
+>       with pytest.raises(ValueError, match="Missing or invalid completed recovery journal"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_mim_sssom_artifacts.py:356: Failed
+_ test_missing_or_incorrect_native_completion_journal_never_reports_success[malformed] _
+
+setup = (PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8555/test_missing_or_inco...ppression-sidecar-required"\nsubject_id\tother\nMIM:Subject\tkept\n', <function setup.<locals>.publish at 0x10962e7a0>)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1098ca570>
+corruption = 'malformed'
+
+    @pytest.mark.parametrize("corruption", ["missing", "malformed", "root", "status", "changed", "created", "previous"])
+    def test_missing_or_incorrect_native_completion_journal_never_reports_success(setup, monkeypatch, corruption):
+        _, _, _, sssom, publish = setup
+        publish()
+        original = transaction.ValidatedWriteTransaction.commit
+    
+        def commit(self, **kwargs):
+            result = original(self, **kwargs)
+            if corruption == "missing":
+                result.journal_path.unlink()
+            elif corruption == "malformed":
+                result.journal_path.write_bytes(b"{}\n")
+            else:
+                data = json.loads(result.journal_path.read_bytes())
+                data[corruption] = {"root": "/wrong-root", "status": "in_progress", "changed": [],
+                                    "created": ["invented"], "previous": {}}[corruption]
+                result.journal_path.write_text(json.dumps(data, indent=2, sort_keys=True))
+            return result
+    
+        monkeypatch.setattr(transaction.ValidatedWriteTransaction, "commit", commit)
+>       with pytest.raises(ValueError, match="Missing or invalid completed recovery journal"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_mim_sssom_artifacts.py:356: Failed
+_ test_missing_or_incorrect_native_completion_journal_never_reports_success[root] _
+
+setup = (PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8555/test_missing_or_inco...ppression-sidecar-required"\nsubject_id\tother\nMIM:Subject\tkept\n', <function setup.<locals>.publish at 0x1095ed6c0>)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1098a6360>
+corruption = 'root'
+
+    @pytest.mark.parametrize("corruption", ["missing", "malformed", "root", "status", "changed", "created", "previous"])
+    def test_missing_or_incorrect_native_completion_journal_never_reports_success(setup, monkeypatch, corruption):
+        _, _, _, sssom, publish = setup
+        publish()
+        original = transaction.ValidatedWriteTransaction.commit
+    
+        def commit(self, **kwargs):
+            result = original(self, **kwargs)
+            if corruption == "missing":
+                result.journal_path.unlink()
+            elif corruption == "malformed":
+                result.journal_path.write_bytes(b"{}\n")
+            else:
+                data = json.loads(result.journal_path.read_bytes())
+                data[corruption] = {"root": "/wrong-root", "status": "in_progress", "changed": [],
+                                    "created": ["invented"], "previous": {}}[corruption]
+                result.journal_path.write_text(json.dumps(data, indent=2, sort_keys=True))
+            return result
+    
+        monkeypatch.setattr(transaction.ValidatedWriteTransaction, "commit", commit)
+>       with pytest.raises(ValueError, match="Missing or invalid completed recovery journal"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_mim_sssom_artifacts.py:356: Failed
+_ test_missing_or_incorrect_native_completion_journal_never_reports_success[status] _
+
+setup = (PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8555/test_missing_or_inco...ppression-sidecar-required"\nsubject_id\tother\nMIM:Subject\tkept\n', <function setup.<locals>.publish at 0x10962d300>)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1098a6580>
+corruption = 'status'
+
+    @pytest.mark.parametrize("corruption", ["missing", "malformed", "root", "status", "changed", "created", "previous"])
+    def test_missing_or_incorrect_native_completion_journal_never_reports_success(setup, monkeypatch, corruption):
+        _, _, _, sssom, publish = setup
+        publish()
+        original = transaction.ValidatedWriteTransaction.commit
+    
+        def commit(self, **kwargs):
+            result = original(self, **kwargs)
+            if corruption == "missing":
+                result.journal_path.unlink()
+            elif corruption == "malformed":
+                result.journal_path.write_bytes(b"{}\n")
+            else:
+                data = json.loads(result.journal_path.read_bytes())
+                data[corruption] = {"root": "/wrong-root", "status": "in_progress", "changed": [],
+                                    "created": ["invented"], "previous": {}}[corruption]
+                result.journal_path.write_text(json.dumps(data, indent=2, sort_keys=True))
+            return result
+    
+        monkeypatch.setattr(transaction.ValidatedWriteTransaction, "commit", commit)
+>       with pytest.raises(ValueError, match="Missing or invalid completed recovery journal"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_mim_sssom_artifacts.py:356: Failed
+_ test_missing_or_incorrect_native_completion_journal_never_reports_success[changed] _
+
+setup = (PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8555/test_missing_or_inco...ppression-sidecar-required"\nsubject_id\tother\nMIM:Subject\tkept\n', <function setup.<locals>.publish at 0x1095efb00>)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10965ee50>
+corruption = 'changed'
+
+    @pytest.mark.parametrize("corruption", ["missing", "malformed", "root", "status", "changed", "created", "previous"])
+    def test_missing_or_incorrect_native_completion_journal_never_reports_success(setup, monkeypatch, corruption):
+        _, _, _, sssom, publish = setup
+        publish()
+        original = transaction.ValidatedWriteTransaction.commit
+    
+        def commit(self, **kwargs):
+            result = original(self, **kwargs)
+            if corruption == "missing":
+                result.journal_path.unlink()
+            elif corruption == "malformed":
+                result.journal_path.write_bytes(b"{}\n")
+            else:
+                data = json.loads(result.journal_path.read_bytes())
+                data[corruption] = {"root": "/wrong-root", "status": "in_progress", "changed": [],
+                                    "created": ["invented"], "previous": {}}[corruption]
+                result.journal_path.write_text(json.dumps(data, indent=2, sort_keys=True))
+            return result
+    
+        monkeypatch.setattr(transaction.ValidatedWriteTransaction, "commit", commit)
+>       with pytest.raises(ValueError, match="Missing or invalid completed recovery journal"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_mim_sssom_artifacts.py:356: Failed
+_ test_missing_or_incorrect_native_completion_journal_never_reports_success[created] _
+
+setup = (PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8555/test_missing_or_inco...ppression-sidecar-required"\nsubject_id\tother\nMIM:Subject\tkept\n', <function setup.<locals>.publish at 0x10962c7c0>)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10965f350>
+corruption = 'created'
+
+    @pytest.mark.parametrize("corruption", ["missing", "malformed", "root", "status", "changed", "created", "previous"])
+    def test_missing_or_incorrect_native_completion_journal_never_reports_success(setup, monkeypatch, corruption):
+        _, _, _, sssom, publish = setup
+        publish()
+        original = transaction.ValidatedWriteTransaction.commit
+    
+        def commit(self, **kwargs):
+            result = original(self, **kwargs)
+            if corruption == "missing":
+                result.journal_path.unlink()
+            elif corruption == "malformed":
+                result.journal_path.write_bytes(b"{}\n")
+            else:
+                data = json.loads(result.journal_path.read_bytes())
+                data[corruption] = {"root": "/wrong-root", "status": "in_progress", "changed": [],
+                                    "created": ["invented"], "previous": {}}[corruption]
+                result.journal_path.write_text(json.dumps(data, indent=2, sort_keys=True))
+            return result
+    
+        monkeypatch.setattr(transaction.ValidatedWriteTransaction, "commit", commit)
+>       with pytest.raises(ValueError, match="Missing or invalid completed recovery journal"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_mim_sssom_artifacts.py:356: Failed
+_ test_missing_or_incorrect_native_completion_journal_never_reports_success[previous] _
+
+setup = (PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8555/test_missing_or_inco...ppression-sidecar-required"\nsubject_id\tother\nMIM:Subject\tkept\n', <function setup.<locals>.publish at 0x1095efba0>)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109636990>
+corruption = 'previous'
+
+    @pytest.mark.parametrize("corruption", ["missing", "malformed", "root", "status", "changed", "created", "previous"])
+    def test_missing_or_incorrect_native_completion_journal_never_reports_success(setup, monkeypatch, corruption):
+        _, _, _, sssom, publish = setup
+        publish()
+        original = transaction.ValidatedWriteTransaction.commit
+    
+        def commit(self, **kwargs):
+            result = original(self, **kwargs)
+            if corruption == "missing":
+                result.journal_path.unlink()
+            elif corruption == "malformed":
+                result.journal_path.write_bytes(b"{}\n")
+            else:
+                data = json.loads(result.journal_path.read_bytes())
+                data[corruption] = {"root": "/wrong-root", "status": "in_progress", "changed": [],
+                                    "created": ["invented"], "previous": {}}[corruption]
+                result.journal_path.write_text(json.dumps(data, indent=2, sort_keys=True))
+            return result
+    
+        monkeypatch.setattr(transaction.ValidatedWriteTransaction, "commit", commit)
+>       with pytest.raises(ValueError, match="Missing or invalid completed recovery journal"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_mim_sssom_artifacts.py:356: Failed
+=========================== short test summary info ============================
+FAILED tests/test_mim_sssom_artifacts.py::test_missing_or_incorrect_native_completion_journal_never_reports_success[missing]
+FAILED tests/test_mim_sssom_artifacts.py::test_missing_or_incorrect_native_completion_journal_never_reports_success[malformed]
+FAILED tests/test_mim_sssom_artifacts.py::test_missing_or_incorrect_native_completion_journal_never_reports_success[root]
+FAILED tests/test_mim_sssom_artifacts.py::test_missing_or_incorrect_native_completion_journal_never_reports_success[status]
+FAILED tests/test_mim_sssom_artifacts.py::test_missing_or_incorrect_native_completion_journal_never_reports_success[changed]
+FAILED tests/test_mim_sssom_artifacts.py::test_missing_or_incorrect_native_completion_journal_never_reports_success[created]
+FAILED tests/test_mim_sssom_artifacts.py::test_missing_or_incorrect_native_completion_journal_never_reports_success[previous]
+7 failed in 0.16s
