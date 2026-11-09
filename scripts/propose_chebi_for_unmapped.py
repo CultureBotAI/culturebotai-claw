@@ -21,6 +21,7 @@ from __future__ import annotations
 import csv
 import json
 import re
+import sys
 import time
 import urllib.parse
 import urllib.request
@@ -29,6 +30,8 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_utils.ingredient_identity_rejections import rejection_reason  # noqa: E402
 WORKSPACE = REPO_ROOT / "workspace"
 QUEUE_TSV = WORKSPACE / "reports/mim_curation_queue.tsv"
 CACHE_PATH = WORKSPACE / "cache/chebi_search_cache.json"
@@ -44,7 +47,7 @@ COLS = [
     "candidate_1_chebi", "candidate_1_label", "candidate_1_score",
     "candidate_2_chebi", "candidate_2_label", "candidate_2_score",
     "candidate_3_chebi", "candidate_3_label", "candidate_3_score",
-    "confidence", "best_label_match",
+    "confidence", "best_label_match", "rejections",
 ]
 
 
@@ -130,10 +133,20 @@ def process_one(row: dict, cache: dict) -> dict:
         return {"source_id": source_id, "preferred_term": "", "confidence": "NONE"}
 
     candidates = search_ols(term, cache)
+    accepted, rejections = [], []
+    for candidate in candidates:
+        reason = next((why for cas in (row.get("CAS"), row.get("cas_rn"), source_id)
+                       if (why := rejection_reason(ontology_id=candidate.get("chebi", ""), name=term, cas=cas))), None)
+        if reason:
+            rejections.append({"candidate": candidate, "reason": reason})
+        else:
+            accepted.append(candidate)
+    candidates = accepted
     confidence, best = classify_candidates(term, candidates)
 
     out = {"source_id": source_id, "preferred_term": term,
-           "confidence": confidence, "best_label_match": best}
+           "confidence": confidence, "best_label_match": best,
+           "rejections": json.dumps(rejections, sort_keys=True)}
     for i in range(3):
         if i < len(candidates) and not candidates[i].get("error"):
             c = candidates[i]

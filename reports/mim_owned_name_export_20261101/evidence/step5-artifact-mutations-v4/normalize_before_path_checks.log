@@ -1,0 +1,80 @@
+FFFF                                                                     [100%]
+=================================== FAILURES ===================================
+_ test_symlink_parent_traversal_is_refused_before_lexical_normalization[output] _
+
+tmp_path = PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8551/test_symlink_parent_traversal_0')
+kind = 'output'
+
+    @pytest.mark.parametrize("kind", ["output", "sidecar", "manifest", "source"])
+    def test_symlink_parent_traversal_is_refused_before_lexical_normalization(tmp_path, kind):
+        real = tmp_path / "real"
+        (real / "sub").mkdir(parents=True)
+        alias = tmp_path / "alias"
+        alias.symlink_to(real / "sub", target_is_directory=True)
+        supplied = alias / ".." / "candidate.tsv"
+        output = tmp_path / "ordinary.tsv"
+>       with pytest.raises(ValueError, match="Parent traversal"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_mim_sssom_artifacts.py:293: Failed
+_ test_symlink_parent_traversal_is_refused_before_lexical_normalization[sidecar] _
+
+tmp_path = PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8551/test_symlink_parent_traversal_1')
+kind = 'sidecar'
+
+    @pytest.mark.parametrize("kind", ["output", "sidecar", "manifest", "source"])
+    def test_symlink_parent_traversal_is_refused_before_lexical_normalization(tmp_path, kind):
+        real = tmp_path / "real"
+        (real / "sub").mkdir(parents=True)
+        alias = tmp_path / "alias"
+        alias.symlink_to(real / "sub", target_is_directory=True)
+        supplied = alias / ".." / "candidate.tsv"
+        output = tmp_path / "ordinary.tsv"
+>       with pytest.raises(ValueError, match="Parent traversal"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_mim_sssom_artifacts.py:293: Failed
+_ test_symlink_parent_traversal_is_refused_before_lexical_normalization[manifest] _
+
+tmp_path = PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8551/test_symlink_parent_traversal_2')
+kind = 'manifest'
+
+    @pytest.mark.parametrize("kind", ["output", "sidecar", "manifest", "source"])
+    def test_symlink_parent_traversal_is_refused_before_lexical_normalization(tmp_path, kind):
+        real = tmp_path / "real"
+        (real / "sub").mkdir(parents=True)
+        alias = tmp_path / "alias"
+        alias.symlink_to(real / "sub", target_is_directory=True)
+        supplied = alias / ".." / "candidate.tsv"
+        output = tmp_path / "ordinary.tsv"
+>       with pytest.raises(ValueError, match="Parent traversal"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_mim_sssom_artifacts.py:293: Failed
+_ test_symlink_parent_traversal_is_refused_before_lexical_normalization[source] _
+
+tmp_path = PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8551/test_symlink_parent_traversal_3')
+kind = 'source'
+
+    @pytest.mark.parametrize("kind", ["output", "sidecar", "manifest", "source"])
+    def test_symlink_parent_traversal_is_refused_before_lexical_normalization(tmp_path, kind):
+        real = tmp_path / "real"
+        (real / "sub").mkdir(parents=True)
+        alias = tmp_path / "alias"
+        alias.symlink_to(real / "sub", target_is_directory=True)
+        supplied = alias / ".." / "candidate.tsv"
+        output = tmp_path / "ordinary.tsv"
+>       with pytest.raises(ValueError, match="Parent traversal"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_mim_sssom_artifacts.py:293: Failed
+=========================== short test summary info ============================
+FAILED tests/test_mim_sssom_artifacts.py::test_symlink_parent_traversal_is_refused_before_lexical_normalization[output]
+FAILED tests/test_mim_sssom_artifacts.py::test_symlink_parent_traversal_is_refused_before_lexical_normalization[sidecar]
+FAILED tests/test_mim_sssom_artifacts.py::test_symlink_parent_traversal_is_refused_before_lexical_normalization[manifest]
+FAILED tests/test_mim_sssom_artifacts.py::test_symlink_parent_traversal_is_refused_before_lexical_normalization[source]
+4 failed in 0.06s

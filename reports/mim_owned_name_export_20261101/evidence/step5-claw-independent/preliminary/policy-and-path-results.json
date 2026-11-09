@@ -1,0 +1,38 @@
+{
+  "native_validator_sha256": "89821559f9cbf999675b163396140c4b035cac7bf3ae23dd709f8b76e149de77",
+  "native_owner_snapshots": 100,
+  "native_rule_k_comparisons": 700,
+  "native_empty_baseline_all_filtered_rows_pass": true,
+  "lexical_alias": {
+    "supplied_output": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/preliminary/policy-and-path-controls/lexical/alias/../candidate.tsv",
+    "filesystem_resolved_output": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/preliminary/policy-and-path-controls/lexical/real/candidate.tsv",
+    "normalized_by_artifact_paths": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/preliminary/policy-and-path-controls/lexical/candidate.tsv",
+    "result": {
+      "status": "complete",
+      "applied": true,
+      "changed": [],
+      "created": [
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/preliminary/policy-and-path-controls/lexical/candidate.tsv",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/preliminary/policy-and-path-controls/lexical/candidate.tsv.manifest.json",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/preliminary/policy-and-path-controls/lexical/suppressed_aliases.tsv"
+      ],
+      "unchanged": [],
+      "journal": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/preliminary/policy-and-path-controls/lexical/.sssom-artifact-journals/write-riypfrpj.json",
+      "artifacts": [
+        {
+          "role": "sssom",
+          "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/preliminary/policy-and-path-controls/lexical/candidate.tsv",
+          "sha256": "446a924fe0802ce877b3489867ee3409e179bfebf5445029ddc1ae12a9da151d"
+        },
+        {
+          "role": "suppressed_aliases",
+          "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/preliminary/policy-and-path-controls/lexical/suppressed_aliases.tsv",
+          "sha256": "675720ff302b6e852dee454dd9f937a6c6fdcb595998254183c30326ee6ce22a"
+        }
+      ],
+      "manifest_sha256": "bc47a96c9d6f35f1a028ddbe68fcd9f17fee8c6ec9709509e7c89c08ec75a86a"
+    },
+    "normalized_output_written": true,
+    "actual_symlink_dotdot_destination_written": false
+  }
+}

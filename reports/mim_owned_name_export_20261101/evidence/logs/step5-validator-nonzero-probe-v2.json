@@ -1,0 +1,18 @@
+{
+  "name": "step5-validator-nonzero-probe-v2",
+  "argv": [
+    "uv",
+    "run",
+    "--frozen",
+    "python",
+    "-c",
+    "import importlib.util,subprocess,sys;from pathlib import Path;from unittest.mock import patch;sys.path.insert(0,str(Path(\"scripts\").resolve()));p=Path(\"scripts/build_mim_ingredient_sssom.py\");s=importlib.util.spec_from_file_location(\"probe\",p);m=importlib.util.module_from_spec(s);sys.modules[s.name]=m;s.loader.exec_module(m);p=patch.object(m.subprocess,\"run\",return_value=subprocess.CompletedProcess([],2,\"\",\"validator failed without known marker\"));p.start();print({\"nonzero_validator_result\":m._sssom_validate(Path(\"unused.tsv\"))});p.stop()"
+  ],
+  "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+  "started_at": "2026-11-01T12:39:56.478515+00:00",
+  "environment_profile": "generation-and-native-qc",
+  "finished_at": "2026-11-01T12:39:56.643570+00:00",
+  "exit_code": 0,
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-validator-nonzero-probe-v2.log",
+  "log_sha256": "f4e5f06443417660147ca8f87676107ea5527ac726711259f2df10fb18b35e39"
+}

@@ -1,0 +1,38 @@
+{
+  "loader": "_load_ols_labels",
+  "args": [
+    [
+      "ENVO:00001998",
+      "ENVO:00002005",
+      "ENVO:00002010",
+      "ENVO:00002044",
+      "ENVO:00002149",
+      "ENVO:00002263",
+      "ENVO:00002984",
+      "ENVO:00003031",
+      "ENVO:00003870",
+      "ENVO:00005749",
+      "ENVO:01000173",
+      "ENVO:06105101"
+    ]
+  ],
+  "kwargs": {
+    "ontology": "envo",
+    "iri_prefix": "http://purl.obolibrary.org/obo/ENVO_"
+  },
+  "labels": {
+    "ENVO:00001998": "soil",
+    "ENVO:00002005": "air",
+    "ENVO:00002010": "saline water",
+    "ENVO:00002044": "sludge",
+    "ENVO:00002149": "ocean water",
+    "ENVO:00002263": "garden soil",
+    "ENVO:00002984": "petroleum",
+    "ENVO:00003031": "animal manure",
+    "ENVO:00003870": "rice straw",
+    "ENVO:00005749": "farm soil",
+    "ENVO:01000173": "anoxic water",
+    "ENVO:06105101": "plastic"
+  },
+  "accessed_at": "2026-11-01T13:06:34.159070+00:00"
+}

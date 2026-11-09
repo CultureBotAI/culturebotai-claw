@@ -1,0 +1,4 @@
+interface:
+  display_name: "Mech monitoring controls"
+  short_description: "Start, stop, and check local Mech monitoring"
+  default_prompt: "Use $mech-monitor-control to check the local monitors and perform the lifecycle action I request."

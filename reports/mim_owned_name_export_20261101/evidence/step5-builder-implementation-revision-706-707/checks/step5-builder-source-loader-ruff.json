@@ -1,0 +1,19 @@
+{
+  "name": "step5-builder-source-loader-ruff",
+  "argv": [
+    "uvx",
+    "--offline",
+    "ruff@0.16.3",
+    "check",
+    "scripts/build_mim_ingredient_sssom.py",
+    "tests/test_mim_owned_name_export.py",
+    "tests/test_mim_sssom_header_dates.py"
+  ],
+  "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+  "started_at": "2026-11-01T13:00:44.837380+00:00",
+  "environment_profile": "generation-and-native-qc",
+  "finished_at": "2026-11-01T13:00:44.860150+00:00",
+  "exit_code": 1,
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-builder-source-loader-ruff.log",
+  "log_sha256": "04f02071fbad5ff6cc4eed41f6becc46542bf289f622905a7179ec06861e4d5f"
+}

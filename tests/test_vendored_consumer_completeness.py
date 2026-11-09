@@ -10,7 +10,10 @@ The trap is sharper than "declare before vendoring". Admitting a consumer can
 stop applying to "all" before a Mech with no research provider could join -- and
 that rescoping advances claw's canonical ref, which invalidates every existing
 consumer's pin. So admitting a Mech is a fleet-wide re-pin, not a
-single-repository adoption, and the audit requires all pins to be identical.
+single-repository adoption under the default coordinated policy. The separately
+versioned #960 infrastructure admission preserves the historical cohort pins
+and recognizes one exact empty bootstrap commit, with no installed-artifact
+claim. It is not a general exception for new or incomplete consumers.
 
 This asks the cheap half offline: does each consumer's `origin/main` track every
 artifact the manifest says applies to it? Read from git rather than the working
@@ -43,6 +46,12 @@ import pytest
 
 from kg_microbe_fleet import load_fleet_manifest
 from kg_microbe_fleet.roots import MechRootError, resolve_mech_root
+from kg_microbe_governance.artifacts.scripts.check_vendored_sync import parse_manifest
+from kg_microbe_governance.infrastructure_admission import (
+    ADMITTED,
+    bootstrap_pending,
+    validate_packaged_transition,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = json.loads(
@@ -62,47 +71,7 @@ class IncompleteConsumer:
 # Consumers known to be mid-adoption, with the exact gaps and reason. A new
 # missing path fails rather than inheriting the waiver. When the repository
 # finishes vendoring, this test says so and the entry comes out.
-INCOMPLETE_CONSUMERS: dict[str, IncompleteConsumer] = {
-    # Entries leave this list because the test below fails when a repository
-    # becomes complete. CellStructureMech left it when
-    # CultureBotAI/CellStructureMech#53 merged; CultureMech, MediaIngredientMech
-    # and ProteinTraitsMech left it when they vendored
-    # scripts/deep_research_contract.py (#270); and AntibioticMech left it when
-    # CultureBotAI/AntibioticMech#177 vendored all 13 artifacts that apply to it
-    # and pinned 0a3252d4, the claw commit that declares it (#279 step 2 of 3);
-    # HabitatMech left it when CultureBotAI/HabitatMech#255 vendored all 13
-    # artifacts that apply to it and pinned 69c3abb7, the commit of #360 that
-    # declares it.
-    "pathwaymech": IncompleteConsumer(
-        # Measured with git ls-tree against PathwayMech origin/main c9971e5f on
-        # admission: 12 of the 14 artifacts that apply to it are absent. Two
-        # more are tracked but are not the canonical files -- its own
-        # prompts/backlog-loop-goal.md and scripts/deep_research_contract.py
-        # (a wrapper around its own report-heading checker; no test imports
-        # it, and its QC gate calls the checker directly) -- which this
-        # presence check cannot see and fleet-audit's byte comparison will;
-        # vendoring must replace or rename them.
-        expected_missing=frozenset({
-            ".github/workflows/pr-shepherd.yml",
-            "scripts/chem_formula.py",
-            "scripts/check_vendored_sync.py",
-            "scripts/check_vendored_sync.sh",
-            "scripts/validate_id_label_correspondence.py",
-            "src/pathwaymech/schema/history.yaml",
-            "src/pathwaymech/schema/mech_shared.yaml",
-            "tests/test_curation_timestamp_schema.py",
-            "tests/test_id_label_empty_adapter.py",
-            "tests/test_id_label_plausibility.py",
-            "tests/test_id_label_unknown_prefix.py",
-            "tests/test_skill_frontmatter.py",
-        }),
-        reason=(
-            "Admitted before vendoring: PathwayMech gained its LinkML schema and CI "
-            "in PathwayMech PRs 189 and 190 and has not yet vendored the governed "
-            "artifacts or pinned a claw commit (#510)."
-        ),
-    ),
-}
+INCOMPLETE_CONSUMERS: dict[str, IncompleteConsumer] = {}
 
 
 def _applicable(consumer: str) -> list[str]:
@@ -188,20 +157,11 @@ CONSUMERS = sorted(MANIFEST["consumers"])
 
 
 def test_the_manifest_declares_the_consumers_the_fleet_expects():
-    """Offline, so it runs everywhere. Names the set rather than counting it."""
-    assert CONSUMERS == [
-        "antibioticmech",
-        "cellstructuremech",
-        "communitymech",
-        "culturemech",
-        "habitatmech",
-        "mediaingredientmech",
-        "naturalproductmech",
-        "pathwaymech",
-        "proteintraitsmech",
-        "taxonmech",
-        "traitmech",
-    ]
+    """The canonical fleet defines the expected consumer identities, not a fixed count."""
+    assert CONSUMERS == sorted(
+        key for key, mech in load_fleet_manifest().mechs.items()
+        if mech.vendored_role == "consumer"
+    )
 
 
 def bad_scopes(manifest: dict) -> list[str]:
@@ -258,6 +218,15 @@ def test_the_scope_rule_catches_what_it_is_for(scope, expected):
 @pytest.mark.parametrize("consumer", CONSUMERS)
 def test_a_declared_consumer_carries_every_artifact_that_applies_to_it(consumer):
     missing = _missing(consumer)
+    if consumer == ADMITTED.key and missing:
+        policy = validate_packaged_transition(ROOT)
+        root = resolve_mech_root(consumer, claw_root=ROOT)
+        manifest = parse_manifest(json.dumps(MANIFEST).encode())
+        if bootstrap_pending(root, ADMITTED, manifest, policy, committed_only=True):
+            assert set(missing) == set(_applicable(consumer))
+            # Exact inspected bootstrap, zero installed/payload-verified files.
+            # This is an admission result, not an installed-consumer success.
+            return
     if consumer in INCOMPLETE_CONSUMERS:
         _assert_exact_admission_gap(consumer, missing)
         pytest.skip(f"{consumer} is a known-incomplete consumer")

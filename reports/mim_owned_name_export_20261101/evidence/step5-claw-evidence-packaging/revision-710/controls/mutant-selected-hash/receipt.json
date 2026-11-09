@@ -1,0 +1,24 @@
+{
+  "name": "mutant-selected-hash",
+  "scenario": "manifest",
+  "expected": "assertion",
+  "argv": [
+    "/opt/homebrew/Caskroom/miniforge/base/bin/python",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v6.py",
+    "--module",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-710/controls/mutant-selected-hash/packager.py",
+    "--scenario",
+    "manifest",
+    "--results",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-710/controls/mutant-selected-hash/results.json"
+  ],
+  "started_at": "2026-11-01T13:44:52.184859+00:00",
+  "finished_at": "2026-11-01T13:44:52.775539+00:00",
+  "exit_code": 1,
+  "log_sha256": "f646015cd687259ca2c6d4caf4e0361da6085a053b664c371f5979e5258397fa",
+  "module_sha256": "b5a3914b4726f41f3fa81e25fa8dd9edb453da1bba31f750645d79a51f614e31",
+  "mutation": [
+    "require(digest(raw) == expected['sha256'] and len(raw) == expected['bytes'],",
+    "require(True,"
+  ]
+}

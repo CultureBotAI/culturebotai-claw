@@ -1,0 +1,15 @@
+{
+  "name": "step5-independent-706-stale-bytecode",
+  "argv": [
+    "python",
+    "-B",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/706-stale-bytecode/probe_stale_bytecode.py"
+  ],
+  "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+  "started_at": "2026-11-01T12:57:33.417558+00:00",
+  "environment_profile": "generation-and-native-qc",
+  "finished_at": "2026-11-01T12:57:33.571634+00:00",
+  "exit_code": 0,
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-independent-706-stale-bytecode.log",
+  "log_sha256": "3498b76a283c20303441dfeb3d2e7b1e0e01d61d4c56b3ef11a84facba2727d0"
+}

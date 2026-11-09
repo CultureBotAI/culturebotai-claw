@@ -1,0 +1,19 @@
+{
+  "frozen": "/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/step5-evidence-test-6xbn6uf5/packaging/inputs.json",
+  "sha256": "e5dbf2f4df6630b397f3c9505ccba6b16d21cb0c174f4ee9241545403c26513b"
+}
+{
+  "status": "PASS",
+  "archive_members": 12,
+  "original_identities": 7,
+  "tracked_checked": false,
+  "scientific_approval_added": false
+}
+Traceback (most recent call last):
+  File "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v5.py", line 81, in <module>
+    check('frozen plan README substitution refuses before publication',lambda:m.publish(frozen),'Frozen plan differs from bound selection')
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v5.py", line 20, in check
+    assert error is None, (name,'did not refuse')
+           ^^^^^^^^^^^^^
+AssertionError: ('frozen plan README substitution refuses before publication', 'did not refuse')

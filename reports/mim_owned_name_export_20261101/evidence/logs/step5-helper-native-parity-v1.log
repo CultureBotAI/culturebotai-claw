@@ -1,0 +1,14 @@
+{
+  "classification": "Synthetic native-validator parity, not live generation or independent scientific approval",
+  "native_validator_path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/scripts/validate_sssom_invariants.py",
+  "native_validator_sha256": "89821559f9cbf999675b163396140c4b035cac7bf3ae23dd709f8b76e149de77",
+  "helper_sha256": "18ffd0430d0256b6da6cbb1f3da2327c4cf3418e2b0b2da71ff283ee2f4351ae",
+  "owner_index_equal": true,
+  "row_token_trials": 240,
+  "native_rule_k_before": 192,
+  "native_rule_k_after": 0,
+  "unique_suppressed_pairs": 165,
+  "sidecar_sha256": "43d9d9516864988465f22264b738719ccc0d870629298b2fea22d0dd0a239bba",
+  "no_outside_mapped_directory_owner": true,
+  "empty_native_baseline": true
+}

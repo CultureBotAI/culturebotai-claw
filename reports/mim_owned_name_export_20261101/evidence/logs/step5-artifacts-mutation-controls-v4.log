@@ -1,0 +1,15 @@
+positive 0 48 passed in 0.31s
+tsv_only_noop 1 4 failed in 0.10s
+omit_native_boundary 1 1 failed in 0.07s
+legacy_policy_bypass 1 2 failed in 0.09s
+nonzero_validator_accepted 1 2 failed, 2 passed in 0.07s
+input_output_overlap 1 1 failed, 2 passed in 0.06s
+still_published_suppression 1 1 failed, 5 passed in 0.07s
+absent_portable_collision 1 2 failed in 0.08s
+normalize_before_path_checks 1 4 failed in 0.06s
+callback_after_precommit_guards 1 2 failed, 1 passed in 0.08s
+callback_after_final_guards 1 1 failed, 2 passed in 0.07s
+precommit_journal_check_before_callback 1 1 failed, 2 passed in 0.07s
+unverified_journal_capture 1 7 failed in 0.16s
+ungated_owned_name_policy 1 1 failed in 0.06s
+ungated_sssom_artifacts 1 1 failed in 0.06s

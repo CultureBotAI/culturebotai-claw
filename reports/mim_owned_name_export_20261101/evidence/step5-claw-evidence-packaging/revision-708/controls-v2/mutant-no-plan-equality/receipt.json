@@ -1,0 +1,22 @@
+{
+  "name": "mutant-no-plan-equality",
+  "argv": [
+    "/opt/homebrew/Caskroom/miniforge/base/bin/python",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v5.py",
+    "--module",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-708/controls-v2/mutant-no-plan-equality/packager.py",
+    "--results",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-708/controls-v2/mutant-no-plan-equality/results.json"
+  ],
+  "started_at": "2026-11-01T13:16:34.751780+00:00",
+  "finished_at": "2026-11-01T13:16:35.022664+00:00",
+  "exit_code": 1,
+  "expected_pass": false,
+  "expected_assertion_failure": true,
+  "module_sha256": "c4b650f6f5538243baaa56c495778979e8290c1434e9e4793e730ae1d4c80e34",
+  "log_sha256": "b42e83b0e4d6e2932eb42a5627911ca54323521e8ad2c72aeba954c8fee44250",
+  "mutation": [
+    "require(json.dumps(frozen['plan'], sort_keys=True) == json.dumps(expected, sort_keys=True),",
+    "require(True,"
+  ]
+}

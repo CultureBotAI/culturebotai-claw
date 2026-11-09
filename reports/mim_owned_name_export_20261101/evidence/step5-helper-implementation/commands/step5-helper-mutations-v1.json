@@ -1,0 +1,17 @@
+{
+  "name": "step5-helper-mutations-v1",
+  "argv": [
+    "uv",
+    "run",
+    "--frozen",
+    "python",
+    "../step5-helper-implementation/run_mutations.py"
+  ],
+  "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+  "started_at": "2026-11-01T12:39:55.242533+00:00",
+  "environment_profile": "generation-and-native-qc",
+  "finished_at": "2026-11-01T12:39:58.882574+00:00",
+  "exit_code": 0,
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-helper-mutations-v1.log",
+  "log_sha256": "6b12bd5cf05ad14eece7f6ad03323429cbec1bf22d7f77bdf8f17a542fd7881f"
+}

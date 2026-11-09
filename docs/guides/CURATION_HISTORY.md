@@ -15,10 +15,9 @@ not: **which model, using which tool, changed what, why, and under which issue?*
 This follows the same shape as `kg_microbe_kgscan`: claw owns one
 implementation and each Mech exposes thin repository-specific recipes.
 
-The schema is **vendored** into a Mech; the scaffolder is **not**. PathwayMech,
-admitted before vendoring, has no copy yet (see [Fleet adoption](#fleet-adoption)).
-A Mech validates its local schema copy so its correctness gate is self-contained
-and pinned rather than dependent on another repository's current branch:
+The schema is **vendored** into every Mech; the scaffolder is **not**. A Mech
+validates its local schema copy so its correctness gate is self-contained and
+pinned rather than dependent on another repository's current branch:
 
 ```bash
 kg-microbe-history validate history \
@@ -32,16 +31,14 @@ source-tree fallback. Pass `--schema` only when deliberately validating a
 Mech's governed copy or another compatible `HistoryRecord` schema.
 
 To change the shared schema, update the canonical artifact and manifest in claw,
-merge a reviewed claw commit, and coordinate that immutable pin across all eight
-Mechs. See [Vendored governance](VENDORED_GOVERNANCE.md) for synchronization,
+merge a reviewed claw commit, and coordinate that immutable pin across every
+Mech. See [Vendored governance](VENDORED_GOVERNANCE.md) for synchronization,
 audit, and rollback.
 
 ## Fleet adoption
 
-Every Mech vendors the governed schema except PathwayMech, which was admitted
-before vendoring it (#510). Of the Mechs below that have the schema, all but
-AntibioticMech also carry the repository-local workflow that makes it usable;
-AntibioticMech has the schema alone.
+Every Mech vendors the governed schema. Most also carry the repository-local
+recipes and a validity check that make it usable; the table says which do not.
 
 | Repo | Governed schema | Recipes | Validity checked in |
 |---|:--:|:--:|---|
@@ -52,8 +49,10 @@ AntibioticMech has the schema alone.
 | ProteinTraitsMech | yes | yes | `history-and-vendored.yaml`, combined with the vendored-sync guard |
 | CellStructureMech | yes | yes | the qc runner, `scripts/run_qc.py` |
 | HabitatMech | yes | yes | the qc runner, `scripts/run_qc.py` |
+| TaxonMech | yes | yes | the qc runner, `scripts/run_qc.py` |
+| NaturalProductMech | yes | `new-history` only | nothing yet |
 | AntibioticMech | yes | no | nothing yet — CultureBotAI/AntibioticMech#205 |
-| PathwayMech | no | no | nothing yet — the schema arrives with #510; recipes and a check, #515 |
+| PathwayMech | yes | no | nothing yet — #515 |
 
 Where validity is checked differs on purpose. A repository whose qc runner is
 the single authoritative gate puts it there; one that already separates

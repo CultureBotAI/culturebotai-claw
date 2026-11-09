@@ -1,227 +1,94 @@
 #!/usr/bin/env python3
-"""Verify that every literature snippet attached to a MIM evidence
-claim appears verbatim in the cached PubMed abstract for the cited
-PMID/DOI.
+"""Compatibility entry point for the shared, offline evidence quote gate.
 
-This is the anti-hallucination gate: a curator (human or AI) must
-back any literature snippet with a real reference, and the snippet
-text must be a substring of the actual abstract.
-
-Run via the `evidence-reference-validation` skill or directly:
-
-    python3 scripts/validate_evidence_references.py
-    python3 scripts/validate_evidence_references.py --strict
-    python3 scripts/validate_evidence_references.py --auto-repair --apply
-
-Verdict vocabulary (matches the Phase 1 plan):
-
-  OK                       — snippet found in cached abstract
-  MISSING_CACHE            — abstract not in references_cache (run fetcher)
-  MISSING_REFERENCE        — snippet present but no PMID/DOI
-  SNIPPET_NOT_IN_ABSTRACT  — snippet text not found in abstract (FAIL)
-  NO_EVIDENCE              — evidence item has neither pmid/doi nor snippet
-                             (allowed; informational only)
+The default Mech is mediaingredientmech. CLI flags and report formats come from
+kg_microbe_evidence; reports belong to the exact validated Mech checkout.
+load_cache and normalize remain available to apply_evidence_proposals.py.
+No import-time root resolution, source fetching or repair is performed.
 """
 from __future__ import annotations
 
-import argparse
-import csv
-import os
 import re
 import sys
-import unicodedata
-from dataclasses import dataclass
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Iterable
 
-import yaml
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path[:0] = [str(REPO_ROOT / "src"), str(REPO_ROOT)]
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+from kg_microbe_evidence import (  # noqa: E402
+    CAPABILITY,
+    CachedSource,
+    EvidenceConfig,
+    EvidenceError,
+    EvidenceValidator,
+    normalize as normalize,
+)
 
-sys.path.insert(0, str(REPO_ROOT / "src"))
-from kg_microbe_fleet import require_mech_roots  # noqa: E402
-
-MIM_ROOT = Path(os.environ.get(
-    "MEDIAINGREDIENTMECH_ROOT",
-    REPO_ROOT.parent / "MediaIngredientMech",
-))
-CACHE_DIR = MIM_ROOT / "references_cache"
-INGREDIENTS = MIM_ROOT / "data" / "ingredients"
-
-OUT_DIR = REPO_ROOT / "workspace" / "reports"
-OUT_TSV = OUT_DIR / "evidence_reference_validation.tsv"
-OUT_MD = OUT_DIR / "evidence_reference_validation.md"
-
-PMID_RE = re.compile(r"^[0-9]+$")
-WS_RE = re.compile(r"\s+")
-
-
-@dataclass
-class Verdict:
-    yaml_path: str
-    container: str   # ontology_mapping | role_assignments[i] | cellular_role_assignments[i]
-    pmid: str
-    doi: str
-    snippet: str
-    verdict: str
-    detail: str = ""
+# Explicit bindings retained for the old downstream adapter. None means resolve
+# through RepositorySettings when called; it never means a guessed sibling.
+MIM_ROOT: Path | None = None
+CACHE_DIR: Path | None = None
+INGREDIENTS: Path | None = None
+OUT_DIR: Path | None = None
+OUT_TSV: Path | None = None
+OUT_MD: Path | None = None
 
 
-def normalize(s: str) -> str:
-    """NFKC + collapse whitespace + lower for substring matching."""
-    if not s:
-        return ""
-    s = unicodedata.normalize("NFKC", s)
-    s = WS_RE.sub(" ", s).strip().lower()
-    return s
+def _cache_validator() -> EvidenceValidator:
+    if CACHE_DIR is not None:
+        # An intentional import-API override, used by existing adapters/tests.
+        # Keep the cache's final component unresolved so symlinks stay visible
+        # to the shared parser's rejection rules.
+        cache = Path(CACHE_DIR).expanduser().absolute()
+        return EvidenceValidator(cache.parent, EvidenceConfig(cache.name))
+
+    from kg_microbe_fleet import load_fleet_manifest
+    from kg_microbe_fleet.roots import claw_root
+    from plugins.repository_settings import (
+        RepositorySettings,
+        RepositoryTarget,
+        merged_repository_environment,
+    )
+
+    manifest = load_fleet_manifest()
+    mech = manifest.mechs["mediaingredientmech"]
+    capability = mech.capability(CAPABILITY)
+    if capability is None or not capability.is_enabled:
+        raise EvidenceError("mediaingredientmech evidence validation is not enabled")
+    config = EvidenceConfig.from_settings(capability.settings)
+    if MIM_ROOT is not None:
+        target = RepositoryTarget(mech.key, Path(MIM_ROOT).expanduser().resolve(), mech.github)
+    else:
+        dotenv = claw_root() / ".env"
+        environment = merged_repository_environment(dotenv if dotenv.exists() else None)
+        target = RepositorySettings.from_environment(environ=environment, manifest=manifest).get_target(mech.key)
+    target.open()
+    return EvidenceValidator(target.path, config)
 
 
 def load_cache(pmid: str) -> str | None:
-    p = CACHE_DIR / f"PMID_{pmid}.md"
-    if not p.exists():
+    """Return the identified abstract body, never metadata or curator notes.
+
+    Missing, malformed, wrongly identified and symlinked cache files return
+    None, preserving the import API's refusal to accept that candidate. Root
+    configuration errors still raise instead of silently selecting a checkout.
+    """
+    if not isinstance(pmid, str) or re.fullmatch(r"[0-9]+", pmid) is None:
         return None
-    return p.read_text()
+    source = _cache_validator()._source(pmid)
+    return source.body if isinstance(source, CachedSource) else None
 
 
-def check_evidence(ev: dict, yaml_path: str, container: str) -> Verdict | None:
-    pmid = (ev.get("pmid") or "").strip()
-    doi = (ev.get("doi") or "").strip()
-    snippet = (ev.get("snippet") or ev.get("excerpt") or "").strip()
+def main(argv: Sequence[str] | None = None) -> int:
+    from kg_microbe_evidence.__main__ import main as shared_main
 
-    if not snippet and not pmid and not doi:
-        # Plain MappingEvidence with no literature claim — out of scope
-        return None
-
-    if snippet and not (pmid or doi):
-        return Verdict(yaml_path, container, pmid, doi, snippet,
-                       "MISSING_REFERENCE",
-                       "snippet provided but no pmid/doi")
-
-    if (pmid or doi) and not snippet:
-        return Verdict(yaml_path, container, pmid, doi, "",
-                       "NO_EVIDENCE",
-                       "reference cited without supporting snippet")
-
-    if pmid and not PMID_RE.match(pmid):
-        return Verdict(yaml_path, container, pmid, doi, snippet,
-                       "MISSING_REFERENCE",
-                       f"malformed pmid: {pmid!r}")
-
-    if pmid:
-        cache_text = load_cache(pmid)
-        if cache_text is None:
-            return Verdict(yaml_path, container, pmid, doi, snippet,
-                           "MISSING_CACHE",
-                           f"PMID:{pmid} not yet fetched")
-        if normalize(snippet) in normalize(cache_text):
-            return Verdict(yaml_path, container, pmid, doi, snippet,
-                           "OK", "")
-        return Verdict(yaml_path, container, pmid, doi, snippet,
-                       "SNIPPET_NOT_IN_ABSTRACT",
-                       "snippet text does not appear in abstract")
-
-    # DOI-only: no cache layer yet (DOIs are supplementary; PMIDs are
-    # primary). Treat as MISSING_CACHE.
-    return Verdict(yaml_path, container, pmid, doi, snippet,
-                   "MISSING_CACHE",
-                   f"DOI:{doi} cache not implemented (PMID preferred)")
-
-
-def walk_yamls() -> Iterable[Verdict]:
-    if not INGREDIENTS.is_dir():
-        return
-    for path in sorted(INGREDIENTS.rglob("*.yaml")):
-        try:
-            with open(path) as f:
-                y = yaml.safe_load(f) or {}
-        except Exception:
-            continue
-        rel = str(path.relative_to(MIM_ROOT))
-
-        om = y.get("ontology_mapping") or {}
-        for i, ev in enumerate(om.get("evidence") or []):
-            v = check_evidence(ev, rel, f"ontology_mapping.evidence[{i}]")
-            if v:
-                yield v
-
-        for j, ra in enumerate(y.get("role_assignments") or []):
-            for i, ev in enumerate(ra.get("evidence") or []):
-                v = check_evidence(ev, rel,
-                                   f"role_assignments[{j}].evidence[{i}]")
-                if v:
-                    yield v
-
-        for j, ra in enumerate(y.get("cellular_role_assignments") or []):
-            for i, ev in enumerate(ra.get("evidence") or []):
-                v = check_evidence(ev, rel,
-                                   f"cellular_role_assignments[{j}].evidence[{i}]")
-                if v:
-                    yield v
-
-
-def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--strict", action="store_true",
-                    help=("exit 2 if any MISSING_CACHE present (default: "
-                          "only SNIPPET_NOT_IN_ABSTRACT triggers exit 2)"))
-    args = ap.parse_args()
-    # Verify the checkout before doing work; module-level roots stay
-    # plain paths so importing this file never needs one (#176).
-    require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-
-    verdicts = list(walk_yamls())
-    bucket: dict[str, int] = {}
-    for v in verdicts:
-        bucket[v.verdict] = bucket.get(v.verdict, 0) + 1
-
-    with open(OUT_TSV, "w", newline="") as f:
-        w = csv.writer(f, delimiter="\t")
-        w.writerow(["yaml_path", "container", "verdict", "pmid", "doi",
-                    "snippet", "detail"])
-        for v in verdicts:
-            w.writerow([v.yaml_path, v.container, v.verdict, v.pmid,
-                        v.doi, v.snippet[:200], v.detail])
-
-    md: list[str] = []
-    md.append("# Evidence reference validation\n")
-    md.append(f"Total evidence items checked: **{len(verdicts)}**\n")
-    md.append("\n## Verdicts\n")
-    md.append("| Verdict | Count |\n|---|---:|")
-    for k in ("OK", "NO_EVIDENCE", "MISSING_CACHE", "MISSING_REFERENCE",
-              "SNIPPET_NOT_IN_ABSTRACT"):
-        md.append(f"| `{k}` | {bucket.get(k, 0)} |")
-    if bucket.get("SNIPPET_NOT_IN_ABSTRACT", 0) > 0:
-        md.append("\n## ⚠️ SNIPPET_NOT_IN_ABSTRACT (likely hallucinated)\n")
-        md.append("| YAML | Container | PMID | Snippet (truncated) |")
-        md.append("|---|---|---|---|")
-        for v in verdicts:
-            if v.verdict == "SNIPPET_NOT_IN_ABSTRACT":
-                md.append(
-                    f"| `{v.yaml_path}` | `{v.container}` | "
-                    f"`{v.pmid}` | {v.snippet[:80]}… |")
-    if bucket.get("MISSING_CACHE", 0) > 0:
-        md.append(
-            f"\n## MISSING_CACHE: {bucket['MISSING_CACHE']} entries\n")
-        md.append(
-            "Run `python3 scripts/fetch_pubmed_abstracts.py` to populate "
-            "the cache, then rerun.\n")
-
-    with open(OUT_MD, "w") as f:
-        f.write("\n".join(md))
-
-    print(f"Checked {len(verdicts)} evidence items")
-    for k, n in sorted(bucket.items()):
-        print(f"  {k:30s} {n}")
-    print(f"\nWrote {OUT_TSV.relative_to(REPO_ROOT)}")
-    print(f"Wrote {OUT_MD.relative_to(REPO_ROOT)}")
-
-    if bucket.get("SNIPPET_NOT_IN_ABSTRACT", 0) > 0:
-        return 2
-    if args.strict and bucket.get("MISSING_CACHE", 0) > 0:
-        return 2
-    return 0
+    arguments = ["--mech", "mediaingredientmech"]
+    if MIM_ROOT is not None:
+        arguments.extend(["--root", str(MIM_ROOT)])
+    arguments.extend(sys.argv[1:] if argv is None else argv)
+    return shared_main(arguments)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

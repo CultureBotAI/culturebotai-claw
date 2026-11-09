@@ -1,0 +1,771 @@
+{
+  "status": "PASS_WITH_LIMITATIONS",
+  "limitations": [
+    {
+      "rule": "B4",
+      "kind": "missing ontology transforms",
+      "prefixes": [
+        "BTO",
+        "MICRO"
+      ],
+      "affected_row_count": 74
+    }
+  ],
+  "b4_coverage": {
+    "contract": "Unmodified native warn-and-skip for missing transforms; no synthetic transforms",
+    "full_prefix_coverage": false,
+    "in_use_prefixes": [
+      "BTO",
+      "CHEBI",
+      "ENVO",
+      "FOODON",
+      "MICRO",
+      "UBERON"
+    ],
+    "available_transform_sha256": {
+      "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe/data/transformed/ontologies/chebi_nodes.tsv": "02024ca0a29cafaac16b43a06a786edd0368a8a646b75ab1002b6239c1219f60",
+      "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe/data/transformed/ontologies/envo_nodes.tsv": "8eb6bf7473bee2bfd87c0c781be35564b1bdebac29f05f631841ce561b5d1806",
+      "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe/data/transformed/ontologies/foodon_nodes.tsv": "5e423c14f9d263aac38ba33699363a968d35496e11483a720ef22c9b12dd4c56",
+      "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe/data/transformed/ontologies/uberon_nodes.tsv": "320908b15386832a32ac8016c33358ab2f5cc37756af515c3da45a17a2c6dd14"
+    },
+    "missing_transforms": [
+      {
+        "prefix": "BTO",
+        "expected_path": "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe/data/transformed/ontologies/bto_nodes.tsv",
+        "affected_rows": [
+          {
+            "subject_id": "MIM:Cell_Lysate",
+            "object_id": "BTO:0004304",
+            "object_label": "cell lysate"
+          }
+        ],
+        "affected_row_count": 1
+      },
+      {
+        "prefix": "MICRO",
+        "expected_path": "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe/data/transformed/ontologies/micro_nodes.tsv",
+        "affected_rows": [
+          {
+            "subject_id": "MIM:Algal_Trace_Elements_Solution",
+            "object_id": "MICRO:0000455",
+            "object_label": "trace elements solution"
+          },
+          {
+            "subject_id": "MIM:Artificial_seawater",
+            "object_id": "MICRO:0001715",
+            "object_label": "artificial seawater"
+          },
+          {
+            "subject_id": "MIM:Bacto-tryptone",
+            "object_id": "MICRO:0000182",
+            "object_label": "tryptone"
+          },
+          {
+            "subject_id": "MIM:Bacto_Brain_Heart_Infusion",
+            "object_id": "MICRO:0000193",
+            "object_label": "brain heart infusion"
+          },
+          {
+            "subject_id": "MIM:Bacto_Peptone",
+            "object_id": "MICRO:0000178",
+            "object_label": "peptone"
+          },
+          {
+            "subject_id": "MIM:Bacto_Tryptic_Soy_Agar",
+            "object_id": "MICRO:0000114",
+            "object_label": "tryptic soy agar"
+          },
+          {
+            "subject_id": "MIM:Bacto_Tryptic_Soy_Broth",
+            "object_id": "MICRO:0000113",
+            "object_label": "tryptic soy broth"
+          },
+          {
+            "subject_id": "MIM:Bg-11_Medium",
+            "object_id": "MICRO:0001348",
+            "object_label": "BG 11 medium"
+          },
+          {
+            "subject_id": "MIM:Biotin_Vitamin_Solution",
+            "object_id": "MICRO:0000460",
+            "object_label": "vitamin solution"
+          },
+          {
+            "subject_id": "MIM:Bovine_Albumin",
+            "object_id": "MICRO:0000307",
+            "object_label": "bovine albumin"
+          },
+          {
+            "subject_id": "MIM:Bovine_Calf_Serum",
+            "object_id": "MICRO:0001709",
+            "object_label": "calf serum"
+          },
+          {
+            "subject_id": "MIM:Brain_Heart_Infusion",
+            "object_id": "MICRO:0000193",
+            "object_label": "brain heart infusion"
+          },
+          {
+            "subject_id": "MIM:Brain_Heart_Infusion_Broth",
+            "object_id": "MICRO:0000193",
+            "object_label": "brain heart infusion"
+          },
+          {
+            "subject_id": "MIM:Brainheart_infusion_agar",
+            "object_id": "MICRO:0000566",
+            "object_label": "brain heart infusion agar"
+          },
+          {
+            "subject_id": "MIM:Brucella_Agar",
+            "object_id": "MICRO:0000595",
+            "object_label": "Brucella agar"
+          },
+          {
+            "subject_id": "MIM:Casein_hydrolysate",
+            "object_id": "MICRO:0001366",
+            "object_label": "casein hydrolysate"
+          },
+          {
+            "subject_id": "MIM:Casitone",
+            "object_id": "MICRO:0000606",
+            "object_label": "casitone"
+          },
+          {
+            "subject_id": "MIM:Chocolate_agar",
+            "object_id": "MICRO:0000591",
+            "object_label": "chocolate agar"
+          },
+          {
+            "subject_id": "MIM:Clarified_rumen_fluid",
+            "object_id": "MICRO:0000520",
+            "object_label": "clarified rumen fluid"
+          },
+          {
+            "subject_id": "MIM:Columbia_Agar_Base",
+            "object_id": "MICRO:0000536",
+            "object_label": "Columbia Agar Base"
+          },
+          {
+            "subject_id": "MIM:Defibrinated_horse_blood",
+            "object_id": "MICRO:0001572",
+            "object_label": "defibrinated horse blood"
+          },
+          {
+            "subject_id": "MIM:Defibrinated_sheep_blood",
+            "object_id": "MICRO:0001570",
+            "object_label": "defibrinated sheep blood"
+          },
+          {
+            "subject_id": "MIM:Digested_Serum",
+            "object_id": "MICRO:0001362",
+            "object_label": "digested serum"
+          },
+          {
+            "subject_id": "MIM:Dried_Bovine_Hemoglobin_BD_212392",
+            "object_id": "MICRO:0001599",
+            "object_label": "dried bovine hemoglobin"
+          },
+          {
+            "subject_id": "MIM:Eugon_agar_BD-Difco",
+            "object_id": "MICRO:0001358",
+            "object_label": "Eugon agar"
+          },
+          {
+            "subject_id": "MIM:Fildes_Enrichment",
+            "object_id": "MICRO:0001597",
+            "object_label": "fildes enrichment"
+          },
+          {
+            "subject_id": "MIM:Filtered_Seawater",
+            "object_id": "MICRO:0001773",
+            "object_label": "filtered seawater"
+          },
+          {
+            "subject_id": "MIM:Fish_peptone",
+            "object_id": "MICRO:0000462",
+            "object_label": "fish peptone"
+          },
+          {
+            "subject_id": "MIM:Heart_Infusion_Agar_BD_211065",
+            "object_id": "MICRO:0000567",
+            "object_label": "heart infusion agar"
+          },
+          {
+            "subject_id": "MIM:Hemin_solution_see_below",
+            "object_id": "MICRO:0001598",
+            "object_label": "hemin solution"
+          },
+          {
+            "subject_id": "MIM:Horse_Serum",
+            "object_id": "MICRO:0001235",
+            "object_label": "horse serum"
+          },
+          {
+            "subject_id": "MIM:Horse_blood",
+            "object_id": "MICRO:0001234",
+            "object_label": "horse blood"
+          },
+          {
+            "subject_id": "MIM:Kao_And_Michayluk_Vitamin_Solution",
+            "object_id": "MICRO:0000460",
+            "object_label": "vitamin solution"
+          },
+          {
+            "subject_id": "MIM:Lactalbumin_Hydrolysate",
+            "object_id": "MICRO:0001365",
+            "object_label": "lactalbumin hydrolysate"
+          },
+          {
+            "subject_id": "MIM:Liver_Digest",
+            "object_id": "MICRO:0001668",
+            "object_label": "liver digest"
+          },
+          {
+            "subject_id": "MIM:Liver_Extract",
+            "object_id": "MICRO:0001363",
+            "object_label": "liver extract"
+          },
+          {
+            "subject_id": "MIM:Liver_Extract_Concentrate",
+            "object_id": "MICRO:0001363",
+            "object_label": "liver extract"
+          },
+          {
+            "subject_id": "MIM:Liver_Extract_Infusion",
+            "object_id": "MICRO:0001363",
+            "object_label": "liver extract"
+          },
+          {
+            "subject_id": "MIM:MH_agar",
+            "object_id": "MICRO:0001328",
+            "object_label": "MH agar"
+          },
+          {
+            "subject_id": "MIM:MRS_agar_Oxoid",
+            "object_id": "MICRO:0000554",
+            "object_label": "MRS agar"
+          },
+          {
+            "subject_id": "MIM:Meat_peptone",
+            "object_id": "MICRO:0000176",
+            "object_label": "meat peptone"
+          },
+          {
+            "subject_id": "MIM:Metals_44_see_below",
+            "object_id": "MICRO:0000456",
+            "object_label": "trace metals 44"
+          },
+          {
+            "subject_id": "MIM:Na-caseinate",
+            "object_id": "MICRO:0001611",
+            "object_label": "sodium caseinate"
+          },
+          {
+            "subject_id": "MIM:Nutrient_Broth_No_2",
+            "object_id": "MICRO:0000082",
+            "object_label": "nutrient broth"
+          },
+          {
+            "subject_id": "MIM:Ox-bile",
+            "object_id": "MICRO:0000610",
+            "object_label": "ox bile"
+          },
+          {
+            "subject_id": "MIM:PPLO_medium",
+            "object_id": "MICRO:0000094",
+            "object_label": "PPLO medium"
+          },
+          {
+            "subject_id": "MIM:Pancreatic_Digest_of_Gelatin_Hardy_C6540",
+            "object_id": "MICRO:0000466",
+            "object_label": "pancreatic digest of gelatin"
+          },
+          {
+            "subject_id": "MIM:Peptone",
+            "object_id": "MICRO:0000178",
+            "object_label": "peptone"
+          },
+          {
+            "subject_id": "MIM:Porcine_Serum",
+            "object_id": "MICRO:0001238",
+            "object_label": "porcine serum"
+          },
+          {
+            "subject_id": "MIM:Proteose_Peptone",
+            "object_id": "MICRO:0000180",
+            "object_label": "proteose peptone"
+          },
+          {
+            "subject_id": "MIM:Proteose_Peptone_No_2",
+            "object_id": "MICRO:0002393",
+            "object_label": "Proteose Peptone No. 2"
+          },
+          {
+            "subject_id": "MIM:R2A_agar",
+            "object_id": "MICRO:0000543",
+            "object_label": "R2A agar"
+          },
+          {
+            "subject_id": "MIM:Rabbit_Blood",
+            "object_id": "MICRO:0001229",
+            "object_label": "rabbit blood"
+          },
+          {
+            "subject_id": "MIM:Rabbit_Serum",
+            "object_id": "MICRO:0002392",
+            "object_label": "rabbit serum"
+          },
+          {
+            "subject_id": "MIM:Sheep_blood",
+            "object_id": "MICRO:0001230",
+            "object_label": "sheep blood"
+          },
+          {
+            "subject_id": "MIM:Skim_milk_powder",
+            "object_id": "MICRO:0001241",
+            "object_label": "skim milk powder"
+          },
+          {
+            "subject_id": "MIM:Sludge_fluid",
+            "object_id": "MICRO:0000521",
+            "object_label": "sludge fluid"
+          },
+          {
+            "subject_id": "MIM:Soil_Extract",
+            "object_id": "MICRO:0000457",
+            "object_label": "soil extract"
+          },
+          {
+            "subject_id": "MIM:Thiamine_Vitamin_Solution",
+            "object_id": "MICRO:0000460",
+            "object_label": "vitamin solution"
+          },
+          {
+            "subject_id": "MIM:Trace_Metal_Mix_A5",
+            "object_id": "MICRO:0001349",
+            "object_label": "trace metal mix A5"
+          },
+          {
+            "subject_id": "MIM:Trypsin_Sigma-Aldrich",
+            "object_id": "MICRO:0000673",
+            "object_label": "trypsin assay"
+          },
+          {
+            "subject_id": "MIM:Trypticase",
+            "object_id": "MICRO:0000175",
+            "object_label": "Trypticase peptone"
+          },
+          {
+            "subject_id": "MIM:Trypticase_Peptone",
+            "object_id": "MICRO:0000175",
+            "object_label": "Trypticase peptone"
+          },
+          {
+            "subject_id": "MIM:Tryptone",
+            "object_id": "MICRO:0000182",
+            "object_label": "tryptone"
+          },
+          {
+            "subject_id": "MIM:Tryptone_Peptone",
+            "object_id": "MICRO:0000182",
+            "object_label": "tryptone"
+          },
+          {
+            "subject_id": "MIM:Tryptose",
+            "object_id": "MICRO:0000183",
+            "object_label": "tryptose"
+          },
+          {
+            "subject_id": "MIM:V-8_Juice",
+            "object_id": "MICRO:0002250",
+            "object_label": "V-8 juice"
+          },
+          {
+            "subject_id": "MIM:Vitamin_Solution",
+            "object_id": "MICRO:0000460",
+            "object_label": "vitamin solution"
+          },
+          {
+            "subject_id": "MIM:Vitamin_Solution_See_Medium_No_403",
+            "object_id": "MICRO:0000460",
+            "object_label": "vitamin solution"
+          },
+          {
+            "subject_id": "MIM:Vitamin_Solution_Thermophilic_Formulation",
+            "object_id": "MICRO:0000460",
+            "object_label": "vitamin solution"
+          },
+          {
+            "subject_id": "MIM:Washed_agar",
+            "object_id": "MICRO:0001723",
+            "object_label": "washed agar"
+          },
+          {
+            "subject_id": "MIM:Wc_Trace_Elements_Solution",
+            "object_id": "MICRO:0000455",
+            "object_label": "trace elements solution"
+          },
+          {
+            "subject_id": "MIM:Yeastolate_BD_2_autoclaved",
+            "object_id": "MICRO:0000522",
+            "object_label": "Yeastolate"
+          }
+        ],
+        "affected_row_count": 73
+      }
+    ],
+    "captured_label_comparison": "Separate observed-input supplement; not replacement ontology transforms"
+  },
+  "classification": "Deterministic author acceptance; not independent scientific review",
+  "canonical_promotion": false,
+  "scientific_approval_added": false,
+  "revisions": {
+    "claw": "90d110e663c10146351b09ae98d387dabdec0b1c",
+    "kg_microbe": "d6baf5b90003a2032747559d94c00f86a7a4c615",
+    "mim": "be7170deb00a7c5490f8ade82facf86d45a852a4"
+  },
+  "artifacts": {
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/output/step5-owned-name-candidate-v2/candidate.sssom.tsv": "2efdd39fd54e5d63199dd2419874e508a51f6c598a64137c4858a9b8a829749a",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/output/step5-owned-name-candidate-v2/suppressed_aliases.tsv": "d2c6942d210c64d3ab3528e7eef61186e9fb326e555ca0a3a4e9c7d631153390",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/output/step5-owned-name-candidate-v2/candidate.sssom.tsv.manifest.json": "7c2783921744b34e614034708fc51d954c3116c6d130ba3dfae1fffb99311788"
+  },
+  "generation_receipt_sha256": "f78ea990e83ecb278e4b69e5e90dfedd654d2b266885245b5a4fb142da6f685a",
+  "journal": {
+    "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/output/step5-owned-name-candidate-v2/.sssom-artifact-journals/write-g328toa4.json",
+    "sha256": "c7fde3dd022c7a0b39472e85d9f34158590aa8863ac0992cca1d871b1075ffb6"
+  },
+  "native_validator_sha256": "89821559f9cbf999675b163396140c4b035cac7bf3ae23dd709f8b76e149de77",
+  "native_invariants_exit_code": 0,
+  "rule_k_baseline": "empty in memory; canonical baseline untouched",
+  "schema_validation": {
+    "argv": [
+      "sssom",
+      "validate",
+      "-V",
+      "JsonSchema",
+      "-V",
+      "PrefixMapCompleteness",
+      "-V",
+      "StrictCurieFormat",
+      "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/output/step5-owned-name-candidate-v2/candidate.sssom.tsv"
+    ],
+    "exit_code": 0
+  },
+  "rows": 2974,
+  "suppression_events": 25,
+  "unique_suppressed_pairs": 20,
+  "previously_published_pairs_removed": 7,
+  "policy_encounter_classes": {
+    "candidate encounter already excluded as a dedicated label": 13,
+    "previously published token removed": 7
+  },
+  "observed_label_resolution_changes": {
+    "ENVO:00001998": {
+      "before_returned": null,
+      "after_returned": "soil"
+    },
+    "ENVO:00002005": {
+      "before_returned": null,
+      "after_returned": "air"
+    },
+    "ENVO:00002010": {
+      "before_returned": null,
+      "after_returned": "saline water"
+    },
+    "ENVO:00002044": {
+      "before_returned": null,
+      "after_returned": "sludge"
+    },
+    "ENVO:00002149": {
+      "before_returned": null,
+      "after_returned": "ocean water"
+    },
+    "ENVO:00002263": {
+      "before_returned": null,
+      "after_returned": "garden soil"
+    },
+    "ENVO:00002984": {
+      "before_returned": null,
+      "after_returned": "petroleum"
+    },
+    "ENVO:00003031": {
+      "before_returned": null,
+      "after_returned": "animal manure"
+    },
+    "ENVO:00003870": {
+      "before_returned": null,
+      "after_returned": "rice straw"
+    },
+    "ENVO:00005749": {
+      "before_returned": null,
+      "after_returned": "farm soil"
+    },
+    "ENVO:01000173": {
+      "before_returned": null,
+      "after_returned": "anoxic water"
+    },
+    "ENVO:06105101": {
+      "before_returned": null,
+      "after_returned": "plastic"
+    },
+    "FOODON:00001059": {
+      "before_returned": null,
+      "after_returned": "apple juice"
+    },
+    "FOODON:00001282": {
+      "before_returned": null,
+      "after_returned": "beef (ground)"
+    },
+    "FOODON:00003412": {
+      "before_returned": null,
+      "after_returned": "sugar beet"
+    },
+    "FOODON:00004062": {
+      "before_returned": null,
+      "after_returned": "Vino de Mesa"
+    },
+    "FOODON:00004410": {
+      "before_returned": null,
+      "after_returned": "beef heart"
+    },
+    "FOODON:00005198": {
+      "before_returned": null,
+      "after_returned": "agave"
+    },
+    "FOODON:02020891": {
+      "before_returned": null,
+      "after_returned": "cow milk"
+    },
+    "FOODON:02020911": {
+      "before_returned": null,
+      "after_returned": "beef brain"
+    },
+    "FOODON:03000441": {
+      "before_returned": null,
+      "after_returned": "liver powder supplement"
+    },
+    "FOODON:03301056": {
+      "before_returned": null,
+      "after_returned": "malt extract"
+    },
+    "FOODON:03301312": {
+      "before_returned": null,
+      "after_returned": "oat flour"
+    },
+    "FOODON:03301328": {
+      "before_returned": null,
+      "after_returned": "mineral water"
+    },
+    "FOODON:03301454": {
+      "before_returned": null,
+      "after_returned": "tomato juice"
+    },
+    "FOODON:03301484": {
+      "before_returned": null,
+      "after_returned": "skim milk food product"
+    },
+    "FOODON:03301670": {
+      "before_returned": null,
+      "after_returned": "sake"
+    },
+    "FOODON:03301826": {
+      "before_returned": null,
+      "after_returned": "olive oil"
+    },
+    "FOODON:03302088": {
+      "before_returned": null,
+      "after_returned": "beef extract"
+    },
+    "FOODON:03302142": {
+      "before_returned": null,
+      "after_returned": "soybean flour"
+    },
+    "FOODON:03302378": {
+      "before_returned": null,
+      "after_returned": "potato flour"
+    },
+    "FOODON:03305103": {
+      "before_returned": null,
+      "after_returned": "meat (cooked)"
+    },
+    "FOODON:03306272": {
+      "before_returned": null,
+      "after_returned": "oat flakes"
+    },
+    "FOODON:03307110": {
+      "before_returned": null,
+      "after_returned": "rolled oats"
+    },
+    "FOODON:03310257": {
+      "before_returned": null,
+      "after_returned": "cornmeal"
+    },
+    "FOODON:03310367": {
+      "before_returned": null,
+      "after_returned": "cellulose powder"
+    },
+    "FOODON:03311582": {
+      "before_returned": null,
+      "after_returned": "rye bran"
+    },
+    "FOODON:03315081": {
+      "before_returned": null,
+      "after_returned": "tea food product"
+    },
+    "FOODON:03315306": {
+      "before_returned": null,
+      "after_returned": "protein hydrolyzates"
+    },
+    "FOODON:03315424": {
+      "before_returned": null,
+      "after_returned": "meat extract"
+    },
+    "FOODON:03315426": {
+      "before_returned": null,
+      "after_returned": "yeast extract"
+    },
+    "FOODON:03315719": {
+      "before_returned": null,
+      "after_returned": "mammalian milk protein (hydrolyzed)"
+    },
+    "FOODON:03315720": {
+      "before_returned": null,
+      "after_returned": "vegetable protein, hydrolyzed"
+    },
+    "FOODON:03315772": {
+      "before_returned": null,
+      "after_returned": "chicken egg yolk food product"
+    },
+    "FOODON:03411345": {
+      "before_returned": null,
+      "after_returned": "yeast"
+    },
+    "FOODON:03412975": {
+      "before_returned": null,
+      "after_returned": "gum arabic"
+    },
+    "FOODON:03413044": {
+      "before_returned": null,
+      "after_returned": "calcium lactate"
+    },
+    "FOODON:03413045": {
+      "before_returned": null,
+      "after_returned": "calcium malate"
+    },
+    "FOODON:03413132": {
+      "before_returned": null,
+      "after_returned": "locust bean gum"
+    },
+    "FOODON:03413240": {
+      "before_returned": null,
+      "after_returned": "sodium adipate"
+    },
+    "FOODON:03413299": {
+      "before_returned": null,
+      "after_returned": "tara gum"
+    },
+    "FOODON:03413797": {
+      "before_returned": null,
+      "after_returned": "baker's yeast"
+    },
+    "FOODON:03420180": {
+      "before_returned": null,
+      "after_returned": "casein"
+    },
+    "FOODON:03530244": {
+      "before_returned": null,
+      "after_returned": "sodium tripolyphosphate"
+    },
+    "UBERON:0000178": {
+      "before_returned": null,
+      "after_returned": "blood"
+    },
+    "UBERON:0001913": {
+      "before_returned": null,
+      "after_returned": "milk"
+    },
+    "UBERON:0001977": {
+      "before_returned": null,
+      "after_returned": "blood serum"
+    },
+    "UBERON:0010228": {
+      "before_returned": null,
+      "after_returned": "ruminal fluid"
+    }
+  },
+  "mapped_source_records": 2680,
+  "all_individual_yaml_records": 2955,
+  "source_yaml_bytes_unchanged": true,
+  "canonical_and_baseline_unchanged": true,
+  "exact_native_candidate_and_sidecar_replay": true,
+  "stamp_replay": {
+    "replayed": 2904,
+    "carried": 0,
+    "reset": 0,
+    "absent": 70
+  },
+  "trusted_entry_source_sha256": "38d59f42953305f6fc51e4fc24dfc59ee1919bfb961595b67a8afe9f8a46a1bc",
+  "producer_import_snapshot": {
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name/plugins/lock_manager.py": "e36effe07ea8f925c61f31044b178c6b639027ff6060ee2f91d6d26612b85b93",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name/scripts/build_mim_ingredient_sssom.py": "38d59f42953305f6fc51e4fc24dfc59ee1919bfb961595b67a8afe9f8a46a1bc",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name/scripts/kgm_unified_mappings.py": "bdcec27470bf7d9ce52ec969fa6cddd35eec966ac7bd9f30def86fa91c36db24",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name/src/kg_microbe_fleet/__init__.py": "8280395a8c3542f3c7c2d1b59ab0cf5790680b6d2124679477fce8073b70a589",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name/src/kg_microbe_fleet/__main__.py": "ec38bef19c73e716a1e56bb85216c8941f5bbdd4c044a3da5ec1bf81a3bcbc35",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name/src/kg_microbe_fleet/roots.py": "21039ea705b99323913d0705c04ac24417246feb5972d4c8e26077fb00f72d3b",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name/src/kg_microbe_utils/__init__.py": "55592e20cc266eefac40a71502f6f53c0d3672da01474409307487421bb1da82",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name/src/kg_microbe_utils/ingredient_identity_rejections.py": "d901b53f2d203deb9184de0597b7a34e6b1dd4543e027bfd2f82ca1a213aea28",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name/src/kg_microbe_utils/owned_name_policy.py": "18ffd0430d0256b6da6cbb1f3da2327c4cf3418e2b0b2da71ff283ee2f4351ae",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name/src/kg_microbe_utils/sssom_artifacts.py": "44fb030a7884d76cef9fddf0a79f1d81bd2d49432d3c764ea4ac3e508115594b",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name/src/kg_microbe_write/__init__.py": "70a953d943bb8bf0c289811c180a6da9be117ce52bb2994a5bdbe9e9d671167c",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name/src/kg_microbe_write/registry.py": "737ae8a7f8047b4355c6e38e370859be068ff9ddbca154f244d1c4b743ea0c7a",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name/src/kg_microbe_write/serialize.py": "c5f52036c5b0d6ab78099aadc2c11beac2fb9997920aef453b97658483df17ec",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name/src/kg_microbe_write/transaction.py": "aa5b5bd082b14ae094f6decd5dbe3d75343a7436dc95d6b1fcbfb65c56e6f17e"
+  },
+  "producer_binding_scope": "source entrypoint plus captured local dependency graph; trusted caller/interpreter, not cryptographic runtime attestation",
+  "counterfactual": {
+    "policy_calls": 5220,
+    "unique_encountered_pairs": 20,
+    "same_policy_encounters_as_real_replay": true,
+    "private_and_entry_aliases_restored": true
+  },
+  "newest_row_mapping_date": "2026-11-01",
+  "b4_input_sha256": {
+    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe/data/transformed/ontologies/chebi_nodes.tsv": "02024ca0a29cafaac16b43a06a786edd0368a8a646b75ab1002b6239c1219f60",
+    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe/data/transformed/ontologies/envo_nodes.tsv": "8eb6bf7473bee2bfd87c0c781be35564b1bdebac29f05f631841ce561b5d1806",
+    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe/data/transformed/ontologies/foodon_nodes.tsv": "5e423c14f9d263aac38ba33699363a968d35496e11483a720ef22c9b12dd4c56",
+    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe/data/transformed/ontologies/uberon_nodes.tsv": "320908b15386832a32ac8016c33358ab2f5cc37756af515c3da45a17a2c6dd14"
+  },
+  "changed_row_classes": {
+    "owned-name suppression": 7,
+    "observed canonical-label resolution from stored-label fallback": 4,
+    "stored target label exposed by observed canonical-label resolution": 1
+  },
+  "changed_rows": 11,
+  "candidate_columns": [
+    "subject_id",
+    "subject_label",
+    "predicate_id",
+    "object_id",
+    "object_label",
+    "object_source",
+    "mapping_justification",
+    "source",
+    "mapping_date",
+    "confidence",
+    "comment",
+    "other",
+    "validation_method"
+  ],
+  "sidecar_columns": [
+    "subject_id",
+    "token_key",
+    "token",
+    "owner_subject_ids",
+    "disposition",
+    "input_surfaces",
+    "source_refs",
+    "evidence_refs"
+  ],
+  "timestamp": "2026-11-01T13:09:54.002888+00:00",
+  "verifier_sha256": "4e425250f8b70544ad1db348f9c8e1517e7b2cf131d1773c9675426397222b25"
+}

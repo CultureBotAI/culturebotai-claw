@@ -1,0 +1,4 @@
+interface:
+  display_name: "Mech HTML Design"
+  short_description: "Audit and improve Mech data browsers and navigation"
+  default_prompt: "Use $mech-html-design to compare the selected Mech sites and fix applicable display, navigation, and interaction gaps."

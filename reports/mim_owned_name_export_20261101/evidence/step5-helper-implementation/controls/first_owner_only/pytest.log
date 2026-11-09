@@ -1,0 +1,21 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+__ test_tombstone_credits_all_live_identifier_holders_and_keeps_current_owner __
+
+    def test_tombstone_credits_all_live_identifier_holders_and_keeps_current_owner():
+        owners = build_owner_index({
+            "MIM:Z": record("Z", status="AMBIGUOUS"),
+            "MIM:A": record("A"),
+            "MIM:Dead": record("Old name", status=" rejected "),
+        })
+>       assert owners["old name"] == frozenset({"MIM:A", "MIM:Z"})
+E       AssertionError: assert frozenset({'MIM:A'}) == frozenset({'MIM:A', 'MIM:Z'})
+E         
+E         Extra items in the right set:
+E         'MIM:Z'
+E         Use -v to get more diff
+
+tests/test_mim_owned_name_policy.py:82: AssertionError
+=========================== short test summary info ============================
+FAILED ../../../../../../../../../../../../dev::test_tombstone_credits_all_live_identifier_holders_and_keeps_current_owner
+1 failed, 47 deselected in 0.03s

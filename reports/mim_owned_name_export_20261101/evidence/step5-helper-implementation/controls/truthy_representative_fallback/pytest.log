@@ -1,0 +1,46 @@
+FF...                                                                    [100%]
+=================================== FAILURES ===================================
+_ test_explicit_empty_or_unresolved_representative_never_uses_old_identifier[None] _
+
+target = None
+
+    @pytest.mark.parametrize("target", [None, "", "  ", "CHEBI:missing", "chebi:1"])
+    def test_explicit_empty_or_unresolved_representative_never_uses_old_identifier(target):
+        owners = build_owner_index({
+            "MIM:Old": record("Old"),
+            "MIM:Tomb": record("Merged name", status="REJECTED", representative=target),
+        })
+>       assert owners["merged name"] == frozenset({"MIM:Tomb"})
+E       AssertionError: assert frozenset({'MIM:Old'}) == frozenset({'MIM:Tomb'})
+E         
+E         Extra items in the left set:
+E         'MIM:Old'
+E         Extra items in the right set:
+E         'MIM:Tomb'
+E         Use -v to get more diff
+
+tests/test_mim_owned_name_policy.py:108: AssertionError
+_ test_explicit_empty_or_unresolved_representative_never_uses_old_identifier[] _
+
+target = ''
+
+    @pytest.mark.parametrize("target", [None, "", "  ", "CHEBI:missing", "chebi:1"])
+    def test_explicit_empty_or_unresolved_representative_never_uses_old_identifier(target):
+        owners = build_owner_index({
+            "MIM:Old": record("Old"),
+            "MIM:Tomb": record("Merged name", status="REJECTED", representative=target),
+        })
+>       assert owners["merged name"] == frozenset({"MIM:Tomb"})
+E       AssertionError: assert frozenset({'MIM:Old'}) == frozenset({'MIM:Tomb'})
+E         
+E         Extra items in the left set:
+E         'MIM:Old'
+E         Extra items in the right set:
+E         'MIM:Tomb'
+E         Use -v to get more diff
+
+tests/test_mim_owned_name_policy.py:108: AssertionError
+=========================== short test summary info ============================
+FAILED ../../../../../../../../../../../../dev::test_explicit_empty_or_unresolved_representative_never_uses_old_identifier[None]
+FAILED ../../../../../../../../../../../../dev::test_explicit_empty_or_unresolved_representative_never_uses_old_identifier[]
+2 failed, 3 passed, 43 deselected in 0.08s

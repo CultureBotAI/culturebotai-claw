@@ -38,6 +38,11 @@ skills:
   complex-ingredient-resolver:
     scope: domain
     reason: Multi-ontology cascade for heuristic-complex MIM ingredients.
+  cron-status:
+    scope: fleet
+    reason: >-
+      Reports whether scheduled jobs ran and on time: claw's scheduled workflows,
+      or with --fleet every manifest-resolved Mech's, plus local schedulers.
   cross-mech-sync:
     scope: fleet
     reason: Propagates a vendored artifact across manifest-declared consumers.
@@ -48,12 +53,15 @@ skills:
       kg-microbe, which is not a Mech at all. It does not resolve the fleet
       from the manifest, which is what `fleet` means here and what the skill's
       own `fleet` tag asserts.
+  evolve-mech-workflow:
+    scope: fleet
+    reason: Maintains the shared goal-cycle contract and prepares repository-specific profile and skill adaptations from the manifest.
   evidence-curation:
     scope: domain
     reason: Proposes PMID evidence for MIM ingredient claims.
   evidence-reference-validation:
-    scope: domain
-    reason: Anti-hallucination gate over MIM literature evidence.
+    scope: fleet
+    reason: Validates quoted evidence for manifest-enabled Mechs using explicit native evidence profiles and retained sources.
   feba-integration:
     scope: domain
     reason: FEBA functional-enrichment import into MIM.
@@ -67,12 +75,47 @@ skills:
     reason: >-
       One row per repository of open issues and open PRs across claw and the
       manifest-defined Mechs, reading membership from the manifest.
+  fleet-issue-review:
+    scope: fleet
+    reason: Reviews the complete manifest-defined Mech backlog with thematic prioritization and dependency-aware parallel planning.
+  fleet-maintenance-cycle:
+    scope: fleet
+    reason: >-
+      Runs the recurring fast and full maintenance tiers across claw and the
+      manifest-defined Mechs, resolving membership from the manifest through
+      its component scripts.
+  fleet-repo-crud-cleanup:
+    scope: fleet
+    reason: Inventories local clutter across manifest-resolved Mechs and explicit new targets, then guides evidence-backed cleanup within the user-authorized scope.
+  fleet-stale-content-audit:
+    scope: fleet
+    reason: >-
+      Audits repository weight, .git bloat, legacy root test_*.py diagnostics,
+      unreferenced scripts, ungoverned YAML writers, and unapplied patch
+      backlogs across claw and the manifest-defined Mechs.
+  fleet-test-and-ci-status:
+    scope: fleet
+    reason: >-
+      Audits test suite counts, coverage floors, mypy/ruff parity, workflow
+      triggers, and CI telemetry across claw and the manifest-defined Mechs.
+  fleet-worktree-and-temp-hygiene:
+    scope: fleet
+    reason: >-
+      Audits /tmp, /private/tmp, $TMPDIR, claw/workspace/, worktrees, local
+      branches, stashes, and lock leases across claw and the manifest-defined
+      Mechs.
   fleet-pr-review:
     scope: fleet
     reason: Reviews open PRs across the manifest-defined control plane.
   fleet-pr-status:
     scope: fleet
     reason: Answers "what is open" across claw and the manifest-defined Mechs.
+  mech-progress-status:
+    scope: fleet
+    reason: Summarizes verified goals, full cycles, and distinct PR rounds from the manifest-defined fleet tracker.
+  mech-monitor-control:
+    scope: claw
+    reason: Controls explicitly configured local approval and goal-monitor processes while preserving their session bindings and progress.
   onboard-mech:
     scope: fleet
     reason: Registers a verified Mech with complete capability decisions and coordinated governance.
@@ -100,12 +143,36 @@ skills:
   kg-microbe-sync:
     scope: claw
     reason: Snapshots kg-microbe files into claw's own workspace.
+  lbnl-literature-and-db-access:
+    scope: fleet
+    reason: >-
+      Combines CBORG MCP servers (valency, tavily, context7), anonymous public
+      literature APIs, local Zotero PDFs, and LBNL-licensed databases and TDM
+      APIs for evidence-backed curation across manifest-resolved Mechs.
   map-ingredients:
     scope: domain
     reason: Runs the unified ingredient-mapping pipeline over MIM.
   mapping-taxonomy:
     scope: domain
     reason: Documents the MIM to kg-microbe mapping cases.
+  mech-html-design:
+    scope: fleet
+    reason: >-
+      Resolves current Mech sites from the published fleet manifest, compares
+      applicable data-display, navigation and interaction patterns, and guides
+      source-level changes with rendered behavior checks.
+  mech-html-review:
+    scope: fleet
+    reason: >-
+      Reviews manifest-resolved or explicitly named Mech websites against the
+      current DisMech UI and published X-Mech Website features matrix, with
+      separate evidence-backed verdicts and timestamped local reports.
+  mechcheck:
+    scope: fleet
+    reason: >-
+      Audits a manifest-resolved or explicitly named Mech against refreshed
+      DisMech features and the published X-Mech capability matrix, preserving
+      declaration, implementation, and source-freshness differences.
   publish-sssom:
     scope: domain
     reason: Builds and promotes MIM's canonical SSSOM product.
@@ -127,6 +194,11 @@ skills:
   team-review-sssom:
     scope: domain
     reason: Parallel agent review of MIM's SSSOM product.
+  triage-and-resolve-issues:
+    scope: claw
+    reason: >-
+      Executes authorized stage-1 issue resolution for the Claw queue; Mech
+      adapters render the same managed policy from the canonical template.
   unify-skills:
     scope: fleet
     reason: >-
@@ -145,6 +217,23 @@ skills:
 # Mechs those are -- from the manifest, so the set cannot drift the way a list
 # written here would the moment a Mech gained or lost the capability.
 canonical:
+  triage-and-resolve-issues:
+    capability: testing
+    reason: >-
+      Supplies the seven-goal cycle's stage-1 policy without changing the
+      read-only review-open-issues skill. Testing is the same explicit stand-in
+      for workflow participation used by evolve-mech-workflow; rendering an
+      adapter does not install it or activate a new cycle.
+  evolve-mech-workflow:
+    capability: testing
+    reason: >-
+      Every manifest Mech participates in the recurring goal cycle and needs its
+      own adapter for native skills, applicability and local schema evolution.
+      The shared regions preserve parent closure, review-versioning and
+      infrastructure-intake invariants; local knowledge remains outside them.
+      Testing is an explicit stand-in capability until workflow participation
+      has its own declaration, as with the other universal templates (#316).
+
   manage-identifiers:
     capability: testing
     reason: >-
@@ -328,23 +417,36 @@ canonical:
       globs, its schema, the variable naming its checkout -- comes from the
       manifest, which is exactly what a rendered adapter is for.
   review-yaml-category:
-    capability: testing
+    capability: record_review
     reason: >-
       The record reviewer handles exactly one YAML target. ProteinTraitsMech's
       older sample reviewer exposed the next shared verb: resolve a category or
       cohort, judge its member boundary, and decide which apparent duplicates
-      should be lumped or split before a curator edits anything. Every
-      testing-capable Mech has YAML record categories that need that read-only
-      cohort pass, and the testing capability is the same stand-in used by
-      review-yaml-record until the manifest grows an exact record-review
-      capability (#316).
+      should be lumped or split before a curator edits anything.
+
+      Structured record_review is independent of curation_history. Each Mech
+      declares its native rubric and owner paths in a local review profile;
+      common schema/saver adoption does not enable scientific record mutation.
   review-yaml-record:
-    capability: testing
+    capability: record_review
     reason: >-
-      ProteinTraitsMech had the only explicit record-review skill, and that
-      one samples records by axis and category rather than taking one named
-      target. Every testing-capable Mech curates YAML records and should have a
-      read-only skill for inspecting one record before a curation edit. The
-      testing capability is a stand-in until the manifest grows an exact
-      record-review capability (#316), matching the way fetch-source and
-      manage-identifiers select all current Mechs.
+      Every enabled consumer persists read-only observations through the
+      CLAW-owned schema and saver, preserving domain rules in a native profile.
+      Eligibility no longer borrows curation_history: PathwayMech and CMMMech
+      can review records without adopting the generic scientific write contract.
+  scalability-and-health:
+    capability: page_budgets
+    reason: >-
+      Generalizes ProteinTraitsMech's scalability-check across the Mechs that
+      declare page_budgets, combining kg-microbe-health report (Git and
+      working-tree weight) with kg-microbe-pages audit and kg-microbe-site
+      check (Pages deploy and browser shard budgets) while leaving repository
+      build recipes and shard constants outside the managed regions.
+  stats-report:
+    capability: corpus_statistics
+    reason: >-
+      Seven Mechs carry a stats-report skill and share the same core rule:
+      never quote hardcoded snapshot counts from prose, always compute live
+      counts at run time through kg-microbe-corpus report and pair them with
+      native validation and commit provenance, while keeping repository-specific
+      recipes and domain strata outside the managed regions.

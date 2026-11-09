@@ -1,0 +1,30 @@
+..F                                                                      [100%]
+=================================== FAILURES ===================================
+__ test_callback_output_drift_never_returns_complete_or_unchanged[postwrite] ___
+
+setup = (PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8553/test_callback_output...ppression-sidecar-required"\nsubject_id\tother\nMIM:Subject\tkept\n', <function setup.<locals>.publish at 0x106d03060>)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x106ff6470>
+phase = 'postwrite'
+
+    @pytest.mark.parametrize("phase", ["noop", "precommit", "postwrite"])
+    def test_callback_output_drift_never_returns_complete_or_unchanged(setup, monkeypatch, phase):
+        output, paths, _, sssom, publish = setup
+        if phase == "noop":
+            publish()
+        boundary = {"noop": 1, "precommit": 5, "postwrite": 6}[phase]
+        calls = 0
+    
+        def callback():
+            nonlocal calls
+            calls += 1
+            if calls == boundary:
+                paths[1].write_bytes(b"concurrent sidecar edit\n")
+    
+>       with pytest.raises((ValueError, transaction.ValidationFailed), match="beforeimage|mismatch"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE any of (<class 'ValueError'>, <class 'kg_microbe_write.transaction.ValidationFailed'>)
+
+tests/test_mim_sssom_artifacts.py:275: Failed
+=========================== short test summary info ============================
+FAILED tests/test_mim_sssom_artifacts.py::test_callback_output_drift_never_returns_complete_or_unchanged[postwrite]
+1 failed, 2 passed in 0.07s
