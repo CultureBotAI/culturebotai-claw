@@ -42,3 +42,5 @@ Other maintained references:
 Operational scratch reports belong under the gitignored `workspace/reports/`,
 not in the documentation tree. Versioned goal-review evidence follows the
 repository paths defined by the workflow contract.
+
+- [CofactorMech pending admission](guides/COFACTORMECH_ADMISSION.md): bootstrap provenance, capability gaps and the coordinated release hold.

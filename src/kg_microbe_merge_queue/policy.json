@@ -209,5 +209,10 @@
     ".github/workflows/vendored-sync.yaml": [
       "vendored-sync"
     ]
+  },
+  "cofactormech": {
+    ".github/workflows/validate-strict.yaml": [
+      "validate-strict"
+    ]
   }
 }

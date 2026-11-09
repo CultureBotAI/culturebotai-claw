@@ -2583,3 +2583,104 @@ mechs:
       unmapped_inventory_input:
         status: not_applicable
         reason: AI concepts are not a culture-medium ingredient corpus.
+
+  # CofactorMech admission main 3cb9d7a6ce527c84277daf6ddfd5cd56decbb4d1 is intentionally empty.
+  # Paths are the planned scaffold contract; enabled vendored_sync is the
+  # authoritative-consumer obligation, not a deployment claim.
+  cofactormech:
+    display_name: CofactorMech
+    github: CultureBotAI/CofactorMech
+    environment_variable: COFACTORMECH_ROOT
+    package_path: src/cofactormech
+    schema_paths:
+    - src/cofactormech/schema/cofactormech.yaml
+    record_globs:
+    - data/cofactors/*.yaml
+    vendored_role: consumer
+    serialization:
+      verified: false
+      reason: The empty admission main has no cofactor corpus. Measure native record round trips after the seed PR is merged before enabling shared serialization.
+    capabilities:
+      id_label_validation:
+        status: disabled
+        reason: Shared ontology correspondence requires a reviewed cofactor adapter after scaffold adoption.
+      curation_history:
+        status: disabled
+        reason: Native history authoring and the shared curation skill contract await scaffold adoption.
+      record_review:
+        status: disabled
+        reason: Structured record review adapters await scaffold adoption.
+      strict_validation:
+        status: disabled
+        reason: Native strict validation and the shared validation recipe adapters await scaffold adoption.
+      schema_sync:
+        status: disabled
+        reason: The planned cofactor schema is not yet present on the inspected main; generation adapters are unverified.
+      release_management:
+        status: disabled
+        reason: Release recipes are not yet present on the inspected empty main.
+      build_coordination:
+        status: disabled
+        reason: Build recipes are not yet present on the inspected empty main.
+      documentation:
+        status: disabled
+        reason: Documentation recipes are not yet present on the inspected empty main.
+      testing:
+        status: disabled
+        reason: Test recipes are not yet present on the inspected empty main.
+      refactoring:
+        status: disabled
+        reason: Development adapters are not yet present on the inspected empty main.
+      coordination_hooks:
+        status: disabled
+        reason: Local coordination hooks have not been adopted or verified.
+      deep_research:
+        status: disabled
+        reason: No shared research-provider adapter has been adopted.
+      edison_key_discovery:
+        status: not_applicable
+        reason: Cofactor bootstrap does not use an Edison provider integration.
+      environment_coverage:
+        status: not_applicable
+        reason: Cofactors are not a microbial environment inventory.
+      knowledge_gap_scan:
+        status: disabled
+        reason: No shared knowledge-gap scanner adapter has been adopted.
+      vendored_sync:
+        status: enabled
+      unmapped_inventory_input:
+        status: not_applicable
+        reason: Cofactor records are not a culture-medium ingredient inventory.
+      source_catalogue:
+        status: disabled
+        reason: The source catalogue contract awaits scaffold and seed adoption.
+      evidence_reference_validation:
+        status: disabled
+        reason: Domain source and quote-validation adapters require separate validation after seed curation.
+      corpus_statistics:
+        status: disabled
+        reason: No records exist on the inspected empty main; populated census fields remain to be measured.
+      causal_graph_coverage:
+        status: disabled
+        reason: Cofactor membership and requirement links do not themselves establish causal graphs.
+      page_budgets:
+        status: disabled
+        reason: No generated site is deployed or measured for the new repository.
+      kgx_export:
+        status: disabled
+        reason: No reviewed KGX export adapter has been adopted.
+      source_queue:
+        status: disabled
+        reason: The shared source-queue contract has not been adopted.
+      metpo_proposal:
+        status: not_applicable
+        reason: Cofactor identity curation does not itself propose microbial phenotype ontology terms.
+      sssom_export:
+        status: disabled
+        reason: No reviewed SSSOM export adapter has been adopted.
+      writer_audit:
+        status: disabled
+        reason: The native writing path and shared writer audit remain to be verified after scaffold adoption.
+      site_contract:
+        status: disabled
+        reason: No built site has been verified against the shared HTML contract.

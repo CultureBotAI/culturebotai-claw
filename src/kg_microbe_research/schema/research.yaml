@@ -85,6 +85,7 @@ enums:
       DUFMech:
       CMMMech:
       AIMech:
+      CofactorMech:
 
   ProviderEnum:
     description: >-

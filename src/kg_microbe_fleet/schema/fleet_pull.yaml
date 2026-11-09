@@ -90,6 +90,8 @@ enums:
         description: CMMMech repository.
       aimech:
         description: AIMech repository.
+      cofactormech:
+        description: CofactorMech repository.
 
   FleetPullStatusEnum:
     description: Per-repository status returned by fleet_pull.py.

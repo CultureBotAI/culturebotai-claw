@@ -102,6 +102,13 @@ repositories:
     task_runner: just
     description: "AI concepts from pinned AIO ontology releases and evidence-backed curation"
 
+  cofactormech:
+    path: ${COFACTORMECH_ROOT}
+    type: python
+    package_manager: uv
+    task_runner: just
+    description: "Evidence-backed cofactors, suppliers, pathways and enzyme requirements"
+
 agents:
   discovery_paths:
     - kg_microbe_agents/definitions

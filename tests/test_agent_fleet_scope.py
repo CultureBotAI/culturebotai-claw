@@ -65,7 +65,9 @@ def test_general_agents_use_validated_manifest_capability_scopes():
             "repository_scope"
         )
         # Native validation alone does not establish the fleet recipe adapter.
-        excluded = {"aimech", "cmmmech"} if capability in {"strict_validation", "schema_sync"} else set()
+        excluded = {"cofactormech"}
+        if capability in {"strict_validation", "schema_sync"}:
+            excluded |= {"aimech", "cmmmech"}
         assert set(manifest.with_capability(capability)) == set(manifest.keys) - excluded
         assert all(
             capability in mech.capabilities for mech in manifest.mechs.values()

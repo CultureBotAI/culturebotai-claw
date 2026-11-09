@@ -51,6 +51,7 @@ manifest when no source checkout is present:
 - DUFMech (`DUFMECH_ROOT`)
 - CMMMech (`CMMMECH_ROOT`)
 - AIMech (`AIMECH_ROOT`)
+- CofactorMech (`COFACTORMECH_ROOT`) — admission pending; see the admission guide
 
 You do not need every Mech cloned. `openclaw-cli config validate` reports an
 unset root as "not configured locally" rather than a failure; pass

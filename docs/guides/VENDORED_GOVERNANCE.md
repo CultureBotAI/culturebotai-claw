@@ -626,3 +626,11 @@ closing the obsolete PR. A successful vendored-sync run from before the
 workflow became governed does not validate merging that old PR against today's
 main branch. Require checks on the current candidate containing the canonical
 copy and the Mech-owned update.
+
+### CofactorMech pending admission
+
+See [CofactorMech admission](COFACTORMECH_ADMISSION.md) for the empty-main
+inspection, exact artifact ledger, branch-published bootstrap provenance and
+active cycle-v2 release hold. This registration must not merge while the
+active lane freezes the consumer cohort. It does not mutate existing consumers
+or claim a completed fleet release.

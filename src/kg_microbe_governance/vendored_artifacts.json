@@ -58,6 +58,10 @@
     "aimech": {
       "github": "CultureBotAI/AIMech",
       "package_path": "src/aimech"
+    },
+    "cofactormech": {
+      "github": "CultureBotAI/CofactorMech",
+      "package_path": "src/cofactormech"
     }
   },
   "artifacts": [

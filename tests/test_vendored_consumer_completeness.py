@@ -62,7 +62,40 @@ class IncompleteConsumer:
 # Consumers known to be mid-adoption, with the exact gaps and reason. A new
 # missing path fails rather than inheriting the waiver. When the repository
 # finishes vendoring, this test says so and the entry comes out.
-INCOMPLETE_CONSUMERS: dict[str, IncompleteConsumer] = {}
+INCOMPLETE_CONSUMERS: dict[str, IncompleteConsumer] = {
+    "cofactormech": IncompleteConsumer(
+        expected_missing=frozenset({
+            '.github/workflows/merge-queue-admission.yaml',
+            '.github/workflows/pr-shepherd.yml',
+            '.github/workflows/verify-merge-integrity.yaml',
+            'docs/record-reviews.md',
+            'prompts/backlog-loop-goal.md',
+            'schema/record_review.yaml',
+            'scripts/auto_merge_ready_prs.py',
+            'scripts/check_vendored_sync.py',
+            'scripts/check_vendored_sync.sh',
+            'scripts/chem_formula.py',
+            'scripts/deep_research_contract.py',
+            'scripts/record_review.py',
+            'scripts/validate_id_label_correspondence.py',
+            'scripts/verify_merge_integrity.py',
+            'src/cofactormech/schema/history.yaml',
+            'src/cofactormech/schema/mech_shared.yaml',
+            'tests/test_curation_timestamp_schema.py',
+            'tests/test_id_label_empty_adapter.py',
+            'tests/test_id_label_plausibility.py',
+            'tests/test_id_label_unknown_prefix.py',
+            'tests/test_record_review_contract.py',
+            'tests/test_skill_frontmatter.py',
+        }),
+        reason=(
+            "Admission inspected empty main 3cb9d7a6ce527c84277daf6ddfd5cd56decbb4d1; "
+            "the separately reviewed scaffold adopts these exact governed artifacts. "
+            "Remove this ledger only after that scaffold reaches main. "
+            "Admission does not complete the coordinated governance release."
+        ),
+    ),
+}
 
 
 def _applicable(consumer: str) -> list[str]:
@@ -154,6 +187,7 @@ def test_the_manifest_declares_the_consumers_the_fleet_expects():
         "antibioticmech",
         "cellstructuremech",
         "cmmmech",
+        "cofactormech",
         "communitymech",
         "culturemech",
         "dufmech",
