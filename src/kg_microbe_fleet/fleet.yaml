@@ -2806,6 +2806,16 @@ mechs:
       writer_audit:
         status: disabled
         reason: Initial integration scaffold; this fleet capability has not been verified.
+      taxon_links:
+        status: disabled
+        reason: >-
+          Measured 2026-11-09 against EdgeMech main e1856f61f9: curation/packets/
+          does not exist yet and src/edgemech/schema/edgemech.yaml declares no
+          taxon or organism slot. Enable, with the slots, once a packet carries
+          an NCBITaxon CURIE.
+        reason_claims:
+          present: ["src/edgemech/schema/edgemech.yaml"]
+          absent: ["curation/packets"]
       site_contract:
         status: disabled
         reason: Initial integration scaffold; this fleet capability has not been verified.
