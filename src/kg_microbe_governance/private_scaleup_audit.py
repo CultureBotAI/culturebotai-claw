@@ -37,6 +37,7 @@ CONTROL_ID = 1193181994
 PRIVATE_ID = 1450887724
 WORKFLOW = ".github/workflows/private-scaleup-audit.yaml"
 ENVIRONMENT = "scaleup-private-audit"
+EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 MAX_RECEIPT = 32_768
 MAX_RESPONSE = 8_388_608
 MAX_BLOB = 4_194_304
@@ -241,7 +242,7 @@ def producer_context(public: GitHubRead, environ: Mapping[str, str], subject_hea
 
 
 class PrivateSnapshot:
-    def __init__(self, private: GitHubRead):
+    def __init__(self, private: GitHubRead, bootstrap_main_ref: str):
         self.api = private
         scope = private.get("/installation/repositories?per_page=100")
         require(scope.get("total_count") == 1 and isinstance(scope.get("repositories"), list)
@@ -252,7 +253,17 @@ class PrivateSnapshot:
                 and repo.get("private") is True and repo.get("default_branch") == "main",
                 "private_identity_mismatch")
         self.head = self.main()
+        commit = private.get(f"/repos/{PRIVATE}/git/commits/{self.head}")
+        require(commit.get("sha") == self.head and isinstance(commit.get("tree"), dict)
+                and is_sha(commit["tree"].get("sha")), "private_snapshot_invalid")
+        self.root_tree = commit["tree"]["sha"]
         self.trees: dict[str, dict] = {}
+        if self.head == bootstrap_main_ref:
+            # GitHub returns 404 for the canonical empty Git tree. Authenticate
+            # the exact bootstrap commit's tree instead; never reinterpret a
+            # failed tree request or an unknown object as an empty installation.
+            require(self.root_tree == EMPTY_TREE, "private_snapshot_invalid")
+            self.trees[self.root_tree] = {}
 
     def main(self) -> str:
         ref = self.api.get(f"/repos/{PRIVATE}/git/ref/heads/main")
@@ -263,7 +274,7 @@ class PrivateSnapshot:
     def tree(self, ref: str) -> dict:
         if ref not in self.trees:
             tree = self.api.get(f"/repos/{PRIVATE}/git/trees/{ref}")
-            require(tree.get("truncated") is False and is_sha(tree.get("sha"))
+            require(tree.get("truncated") is False and tree.get("sha") == ref
                     and isinstance(tree.get("tree"), list), "private_snapshot_invalid")
             entries = tree["tree"]
             require(all(isinstance(row, dict) and isinstance(row.get("path"), str)
@@ -274,7 +285,7 @@ class PrivateSnapshot:
 
     def read(self, path: str) -> tuple[str, bytes] | None:
         parts = path.split("/")
-        tree_ref = self.head
+        tree_ref = self.root_tree
         for part in parts[:-1]:
             row = self.tree(tree_ref).get(part)
             if row is None:
@@ -301,7 +312,7 @@ class PrivateSnapshot:
 def inspect(policy: dict, private: GitHubRead, payloads: Mapping[str, bytes], producer: dict,
             now: datetime) -> dict:
     require(now.tzinfo is not None and now.utcoffset() == timedelta(0), "invalid_arguments")
-    snapshot = PrivateSnapshot(private)
+    snapshot = PrivateSnapshot(private, policy["bootstrap_main_ref"])
     rows = []
     for artifact in policy["artifacts"]:
         actual = snapshot.read(artifact["target"])

@@ -80,6 +80,8 @@ class PrivateAPI:
             directories["/".join(parts[:-1])][parts[-1]] = {
                 "path": parts[-1], "sha": sha, "size": len(content), "type": "blob", "mode": mode}
         ids = {path: hashlib.sha1(("tree:" + path).encode()).hexdigest() for path in directories}
+        if not self.entries:
+            ids[""] = audit.EMPTY_TREE
         for path in directories:
             if path:
                 parent, _, name = path.rpartition("/")
@@ -87,6 +89,8 @@ class PrivateAPI:
         self.trees = {ids[path]: {"sha": ids[path], "truncated": False, "tree": list(rows.values())}
                       for path, rows in directories.items()}
         self.trees[self.head] = self.trees[ids[""]]
+        self.root_sha = ids[""]
+        self.commit = {"sha": self.head, "tree": {"sha": self.root_sha}, "message": SECRET}
         self.secret_tree = ids.get("data")
 
     def get(self, path):
@@ -99,8 +103,16 @@ class PrivateAPI:
             self.ref_reads += 1
             return {"ref": "refs/heads/main", "object": {
                 "type": "commit", "sha": self.head if self.ref_reads == 1 else self.next_head}}
+        if "/git/commits/" in path:
+            assert path.endswith("/" + self.head)
+            return copy.deepcopy(self.commit)
         if "/git/trees/" in path:
-            return copy.deepcopy(self.trees[path.rsplit("/", 1)[-1]])
+            ref = path.rsplit("/", 1)[-1]
+            if self.root_sha == audit.EMPTY_TREE and ref in {self.head, audit.EMPTY_TREE}:
+                # The actual API does not serve an empty-tree JSON at either
+                # the authenticated empty commit or canonical tree SHA (#1079).
+                raise audit.AuditError("transport_refused")
+            return copy.deepcopy(self.trees[ref])
         if "/git/blobs/" in path:
             return copy.deepcopy(self.blobs[path.rsplit("/", 1)[-1]])
         raise AssertionError("Unexpected fixed API request")
@@ -160,7 +172,10 @@ def test_installed_private_audit_reads_no_records_and_serializes_only_closed_sta
 
 
 def test_exact_empty_tip_is_pending_bootstrap_not_installed(source):
-    value, _ = receipt(source, installed=False, empty=True)
+    value, private = receipt(source, installed=False, empty=True)
+    assert any("/git/commits/" in path for path in private.calls)
+    assert not any("/git/trees/" in path for path in private.calls)
+    assert SECRET not in json.dumps(value)
     assert value["state"] == "pending_bootstrap"
     assert not any(row["present"] for row in value["artifacts"])
     assert not any(value["pin"].values())
@@ -186,8 +201,8 @@ def test_private_changes_never_become_success_or_leak_content(source, change):
         content, mode = private.entries[path]
         private.add(path, content, "100755" if mode == "100644" else "100644")
     elif change == "partial":
-        private.head = policy["bootstrap_main_ref"]
-        private.next_head = private.head
+        # A partially installed new commit cannot reuse the immutable empty
+        # bootstrap SHA; wrong bootstrap tree metadata is tested separately.
         private.entries = {path: private.entries[path]}
     else:
         private.add(policy["pin_path"], b"d" * 40 if change == "unknown_pin" else SECRET.encode())
@@ -572,3 +587,39 @@ def test_producer_workflow_runtime_is_proven_by_dependency_guard():
     findings = unprovisioned_claw_invocations(broken, dependencies)
     assert len(findings) == 2
     assert all(row[0] == "produce" and "linkml" in row[2] for row in findings)
+
+
+@pytest.mark.parametrize("change", ["wrong_commit", "unknown_tree", "missing_tree"])
+def test_bootstrap_requires_authenticated_exact_commit_and_canonical_empty_tree(source, change):
+    policy, payloads = source
+    private = PrivateAPI(policy, payloads, installed=False, empty=True)
+    if change == "wrong_commit":
+        private.commit["sha"] = "f" * 40
+    elif change == "unknown_tree":
+        private.commit["tree"]["sha"] = "d" * 40
+    else:
+        private.commit.pop("tree")
+    with pytest.raises(audit.AuditError, match="private_snapshot_invalid"):
+        audit.inspect(policy, private, payloads, CONTEXT, NOW)
+
+
+def test_nonempty_tree_api_failure_never_becomes_a_bootstrap_receipt(source):
+    policy, payloads = source
+    private = PrivateAPI(policy, payloads)
+    original = private.get
+    def tree_unavailable(path):
+        if "/git/trees/" in path:
+            raise audit.AuditError("transport_refused")
+        return original(path)
+    private.get = tree_unavailable
+    with pytest.raises(audit.AuditError, match="transport_refused"):
+        audit.inspect(policy, private, payloads, CONTEXT, NOW)
+
+
+def test_new_empty_commit_does_not_get_the_exact_bootstrap_exception(source):
+    policy, payloads = source
+    private = PrivateAPI(policy, payloads, installed=False, empty=True)
+    private.head = private.next_head = "f" * 40
+    private.commit["sha"] = private.head
+    with pytest.raises(audit.AuditError, match="transport_refused"):
+        audit.inspect(policy, private, payloads, CONTEXT, NOW)

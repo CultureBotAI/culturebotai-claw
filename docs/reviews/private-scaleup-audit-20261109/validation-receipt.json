@@ -23,5 +23,13 @@
     "positive_and_negative_group": "tests/test_skill_references.py:83passed",
     "positive_selector": "test_the_claw_root_is_found_from_the_working_directory",
     "negative_selector": "test_no_checkout_is_a_refusal_not_an_empty_pass"
+  },
+  "empty_tree_followup": {
+    "issue": "https://github.com/CultureBotAI/culturebotai-claw/issues/1079",
+    "tests": "96 passed, including installed wheel, all private audit and provisioning tests",
+    "mutations": "five red/restored green; original producer rejects actual-shaped empty tree while installed control passes",
+    "privacy": "only exact authenticated bootstrap commit plus canonical empty tree; no arbitrary404 fallback; commit metadata never serialized",
+    "ruff": "passed",
+    "mypy": "all108 safety-module files passed"
   }
 }
