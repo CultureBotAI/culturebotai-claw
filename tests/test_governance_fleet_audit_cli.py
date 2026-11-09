@@ -1,4 +1,4 @@
-"""CLI contracts for the five-Mech governance pin audit."""
+"""CLI contracts for the manifest-complete governance pin audit."""
 
 from pathlib import Path
 
@@ -74,6 +74,8 @@ def test_fleet_audit_cli_parses_repeated_roots_and_reports_success(
             "cmmmech=/tmp/cmm",
             "--target-root",
             "aimech=/tmp/ai",
+            "--target-root",
+            "cofactormech=/fixture/cofactor",
         ]
     ) == 0
 
@@ -93,6 +95,7 @@ def test_fleet_audit_cli_parses_repeated_roots_and_reports_success(
             "dufmech": Path("/tmp/duf"),
             "cmmmech": Path("/tmp/cmm"),
             "aimech": Path("/tmp/ai"),
+            "cofactormech": Path("/fixture/cofactor"),
         },
         "ref": REF,
     }
