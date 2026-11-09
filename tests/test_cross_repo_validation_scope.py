@@ -199,6 +199,16 @@ def test_the_workflow_uploads_the_coverage_sidecar():
     assert "unmapped_inventory_coverage.tsv" in upload["with"]["path"]
 
 
+def test_evidence_reports_are_uploaded_from_the_active_mech():
+    """The shared CLI writes inside its validated Mech, not the Claw runner."""
+    steps = _steps()
+    checkout = next(step for step in steps if step.get("with", {}).get("repository") == "CultureBotAI/MediaIngredientMech")
+    upload = next(step for step in steps if step.get("uses", "").startswith("actions/upload-artifact"))
+    paths = upload["with"]["path"].splitlines()
+    for suffix in ("json", "md", "tsv"):
+        assert f"{checkout['with']['path']}/workspace/reports/evidence_reference_validation.{suffix}" in paths
+
+
 # --------------------------------------------------------------------------
 # #164: the fail-closed path must still produce its diagnostics
 # --------------------------------------------------------------------------

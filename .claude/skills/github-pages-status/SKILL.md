@@ -21,7 +21,11 @@ The organization is *also* listed, and any Mech-named repository publishing a
 site without being a manifest member is reported under Coverage rather than
 quietly folded in — that gap is a finding, not a detail. Discovery is from
 GitHub rather than local clones, so a newly created or uncloned Mech cannot
-disappear from an "all Mechs" answer.
+disappear from an "all Mechs" answer. The checker also inspects the companion
+X-Mech Suite site (`CultureBotAI/CultureBotAI.github.io`, published at
+`https://culturebotai.github.io/mechs/`) and reports its deployment and live
+status under `Suite site (X-Mech overview)` (`suite_site` in `--json`) without counting it
+as an unmanifested Mech.
 
 ## Interpret the result
 
@@ -51,11 +55,12 @@ Treat these as separate evidence:
   change set cannot be narrowed — the report says so and the commit count is an
   **upper bound**. Quote it that way rather than as a stale-page count.
 
-Exit `0` means every discovered Mech has Pages enabled, its newest deployment
-attempt succeeded or is still running, the served content matches main, the
-site is reachable, and fleet discovery was not truncated. Exit `1` means
-the printed findings need attention or coverage is incomplete. Exit `2` means
-fleet discovery or command usage failed.
+Exit `0` means every discovered Mech (and the companion X-Mech Suite site when
+present in the org listing) has Pages enabled, its newest deployment attempt
+succeeded or is still running, the served content matches main, the site is
+reachable, and fleet discovery was not truncated. Exit `1` means the printed
+findings need attention or coverage is incomplete. Exit `2` means fleet
+discovery or command usage failed.
 
 Report the table and Coverage section together. Never quote the current count
 without the discovered-repository denominator or suppress a nonzero exit.
@@ -69,18 +74,24 @@ narrowed.
 
 ```bash
 uv run python scripts/fleet_pages_status.py --json
+uv run python scripts/fleet_pages_status.py --with-local-audits
 uv run python scripts/fleet_pages_status.py --org CultureBotAI
 uv run python scripts/fleet_pages_status.py --repo-limit 500
 uv run python scripts/fleet_pages_status.py --deployment-limit 50
 uv run python scripts/fleet_pages_status.py --no-live-check
 ```
 
-Use `--json` for downstream processing. `--no-live-check` is appropriate only
-when HTTP reachability is explicitly out of scope; freshness still uses remote
-GitHub deployment and branch data. `GH_TOKEN` or `GITHUB_TOKEN` is used when
-present, but public CultureBotAI repositories can normally be checked without a
-token. If GitHub rate-limits an unauthenticated run, report the incomplete check
-and rerun with a read-only token; do not infer health from local clones.
+Use `--json` for downstream processing. Pass `--with-local-audits` to also run
+the offline `page_budgets` (`kg-microbe-pages audit`) and `site_contract`
+(`kg-microbe-site check`) checks against each locally configured Mech's built
+site directory (`Local Pages Budgets & Site Contract Audits`). `--no-live-check`
+is appropriate only when HTTP reachability is explicitly out of scope; freshness
+still uses remote GitHub deployment and branch data. `GH_TOKEN` or
+`GITHUB_TOKEN` is used when present; when neither is set, `GitHubClient`
+automatically uses authenticated `gh api` (without extracting tokens) before
+falling back to unauthenticated urllib requests so full 5,000 req/hr rate limits
+apply when `gh` is logged in. If GitHub rate-limits an unauthenticated run,
+report the incomplete check; do not infer health from local clones.
 
 ## Boundaries
 
@@ -88,3 +99,8 @@ This skill is read-only. A stale, failed, or unreachable result authorizes
 diagnosis only—not a workflow dispatch, rebuild, configuration edit, or deploy.
 If remediation is requested later, inspect the failing repository's Pages
 workflow and obtain any authorization required for cross-repository changes.
+When Mech Pages sites or corpora advance and a companion X-Mech Suite refresh is
+requested, check `CultureBotAI.github.io/scripts/fleet/check_updates.py` (see
+`CultureBotAI.github.io/.claude/skills/check-xmech-updates/SKILL.md` and
+`CultureBotAI.github.io/.claude/skills/update-xmech-page/SKILL.md` in
+`$CULTUREBOTAI_SITE_ROOT`).

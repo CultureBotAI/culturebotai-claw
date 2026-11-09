@@ -1,0 +1,14 @@
+{
+  "timestamp": "2026-11-01T12:44:42.661864+00:00",
+  "author_role": "implementation author",
+  "issue": "https://github.com/CultureBotAI/culturebotai-claw/issues/703",
+  "owned_files": {
+    "scripts/build_mim_ingredient_sssom.py": "772b7a70309396f705fd8eb0709088304978e76c6fdf5567c5f75c95d59e40dd",
+    "tests/test_mim_owned_name_export.py": "4d8a3eeb9946d7e0f2738a7a3c104d064c6f9ba8a847c6bd574c141d32dc183d",
+    "tests/test_mim_sssom_header_dates.py": "abfde63fff697f3869568ccb57e4d311128e48ba6a26832347135c621d1b4b79"
+  },
+  "prior_evidence_index_sha256": "64a31630b392f66a361a162a82a6feb9517bce03c687634b10ebab8a065ecd37",
+  "root_artifacts_sha256": "9053a55006b10396edb9d470555ddd989cdac5816572ae1952570119ca63a664",
+  "change": "Validate lexical input paths with shared checked_path before normalization; refuse explicit prior-stamp paths with parent traversal or symlink components. No other builder behavior changed.",
+  "tests": "273 focused passed, one existing skip; pinned Ruff passed; final nine builder mutations detected."
+}

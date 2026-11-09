@@ -1,0 +1,67 @@
+{
+  "reviewer": "/root/step4_design_review",
+  "verdict": "PASS_WITH_LIMITATIONS",
+  "issue": "https://github.com/CultureBotAI/culturebotai-claw/issues/710",
+  "scope": "Independent v4 packaging repair code/probe review; no replacement package or new final head attestation",
+  "source_sha256": "1377772d93374ce6a31de85fab0ba9fe5697f63430db1e075431360e35018422",
+  "resolved_finding": "Separate author-time historical implementation ancestry/content verification from portable current working-byte and HEAD Git-blob verification. Portable consumer needs no pre-squash commit objects.",
+  "independent_evidence": {
+    "actual_blocked_integration": "fda8972b1820964d2d839d44165fb948b2917762",
+    "old_v3_actual_squash": "RED",
+    "old_v3_real_shallow_consumer": "RED",
+    "v4_actual_squash_refs": "PASS",
+    "v4_depth_one_consumer_without_a56_object": "PASS",
+    "working_bytes_refusal": "PASS",
+    "current_git_blob_refusal": "PASS",
+    "selected_hash_refusal": "PASS",
+    "author_missing_history_refusal": "PASS",
+    "retained_controls_and_additional_historical_refusals": 23
+  },
+  "author_evidence_observed": "13 fresh-process receipts/log hashes verified: 2 old-code failures,6 repaired scenarios,5 guard-removal mutants failing assertions/refusal. Independent original-failure replay and negative controls are separate.",
+  "prior_blocked_queue_evidence_unchanged": true,
+  "remaining_findings": [],
+  "limitations": [
+    "Tests use disposable copies of actual integration evidence with only verifier/version bindings updated; production package untouched.",
+    "Original queue attempt remains a historical BLOCKED review and was not retroactively approved.",
+    "New replacement package, exact committed head/live body and subsequent actual queue integration still need independent review.",
+    "Content integrity is not cryptographic execution attestation or scientific approval."
+  ],
+  "references": {
+    "old-probe-index": {
+      "path": "step5-claw-independent/queue709/fda8972/index.json",
+      "sha256": "c2a43278a40d58cbc57bd92ae48a7f25ed36b2bbef881934a8f8151aa4e04fc6"
+    },
+    "retained-control-test": {
+      "path": "step5-claw-evidence-packaging/test_packager_v6.py",
+      "sha256": "96020ddec66007c600e96616d672205504082050e453554e6ed7d17b27ccb102"
+    },
+    "v4-source": {
+      "path": "step5-claw-evidence-packaging/package_evidence_v4.py",
+      "sha256": "1377772d93374ce6a31de85fab0ba9fe5697f63430db1e075431360e35018422"
+    },
+    "author-control-results": {
+      "path": "step5-claw-evidence-packaging/revision-710/control-results.json",
+      "sha256": "0f62f736486bd1d83f5057158c5596882199ef9494b197b6b07eff383d112a00"
+    },
+    "step5-independent-710-v4-actual-shallow-receipt": {
+      "path": "logs/step5-independent-710-v4-actual-shallow.json",
+      "sha256": "b97dc00b45e665df7c06be8416dfde25762de29a3325c43e720b0fcf8d7c3b97"
+    },
+    "step5-independent-710-v4-actual-shallow-log": {
+      "path": "logs/step5-independent-710-v4-actual-shallow.log",
+      "sha256": "408e352ca8855f9ce97315a8fea2c4e7baf50a9fe88ccc1655413414737d6e70"
+    },
+    "step5-independent-710-v4-retained-controls-receipt": {
+      "path": "logs/step5-independent-710-v4-retained-controls.json",
+      "sha256": "4bdcce38553f7b7c4c453d8672b7f9f515b5bc65ce78c69775328f8e4121c759"
+    },
+    "step5-independent-710-v4-retained-controls-log": {
+      "path": "logs/step5-independent-710-v4-retained-controls.log",
+      "sha256": "9687538d01f7a401829babf1f3bcde9fcbfb25f0ffa87c5996b76210100f8567"
+    }
+  },
+  "production_edits": false,
+  "github_mutations": false,
+  "paid_providers": false,
+  "supervisor_binding": null
+}

@@ -1,0 +1,60 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_ test_native_precommit_rejects_input_drift_with_prior_artifacts_preserved[added-owner] _
+
+cli = {'canonical': PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8564/test_na...57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8564/test_native_precommit_rejects_0/mim/data/ingredients/mapped'), ...}
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10b26c8a0>
+kind = 'added-owner'
+
+    @pytest.mark.parametrize("kind", ["record", "added-owner", "removed-owner", "kgm", "canonical", "residual-created"])
+    def test_native_precommit_rejects_input_drift_with_prior_artifacts_preserved(cli, monkeypatch, kind):
+        paths = cli["run"]()
+        before = [p.read_bytes() for p in paths]
+        native = sssom_artifacts.ValidatedWriteTransaction
+    
+        class Drift(native):
+            def commit(self, **kwargs):
+                if kind == "record":
+                    path = cli["records"] / "Subject.yaml"
+                    path.write_bytes(path.read_bytes() + b"# drift\n")
+                elif kind == "added-owner":
+                    write_record(cli["records"], "New owner", ontology_mapping={})
+                elif kind == "removed-owner":
+                    (cli["records"] / "Owned.yaml").unlink()
+                elif kind == "residual-created":
+                    cli["residual"].write_text('{"decisions": []}')
+                else:
+                    path = cli[kind]
+                    path.write_bytes(path.read_bytes() + b"drift")
+                return super().commit(**kwargs)
+    
+        monkeypatch.setattr(sssom_artifacts, "ValidatedWriteTransaction", Drift)
+>       with pytest.raises(Exception, match="changed during generation"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'Exception'>
+
+tests/test_mim_owned_name_export.py:238: Failed
+----------------------------- Captured stderr call -----------------------------
+Scanning 2 MIM ingredient YAMLs...
+Fetching rdfs:labels for 1 CHEBI ids from OAK...
+  resolved 1 / 1
+Replayed 1 validation_method stamps (prior sources: published.tsv=1; 1 unique)
+Published 1 diagnostic rows to /private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8564/test_native_precommit_rejects_0/artifacts/candidate.tsv (complete)
+  (skipped 1 MIM records without a supported ontology_id prefix: CHEBI:, FOODON:, UBERON:, ENVO:, NCIT:, MICRO:, mesh:, BTO:, kgmicrobe.compound:, kgmicrobe.ingredient:, cas:)
+Predicate breakdown:
+  skos:exactMatch          1
+Object-prefix breakdown:
+  CHEBI:     1
+Scanning 2 MIM ingredient YAMLs...
+Fetching rdfs:labels for 1 CHEBI ids from OAK...
+  resolved 1 / 1
+Replayed 1 validation_method stamps (prior sources: candidate.tsv=1, published.tsv=1; 1 unique)
+Published 1 diagnostic rows to /private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8564/test_native_precommit_rejects_0/artifacts/candidate.tsv (complete)
+  (skipped 1 MIM records without a supported ontology_id prefix: CHEBI:, FOODON:, UBERON:, ENVO:, NCIT:, MICRO:, mesh:, BTO:, kgmicrobe.compound:, kgmicrobe.ingredient:, cas:)
+Predicate breakdown:
+  skos:exactMatch          1
+Object-prefix breakdown:
+  CHEBI:     1
+=========================== short test summary info ============================
+FAILED tests/test_mim_owned_name_export.py::test_native_precommit_rejects_input_drift_with_prior_artifacts_preserved[added-owner]
+1 failed, 54 deselected in 0.20s

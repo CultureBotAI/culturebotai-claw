@@ -10,7 +10,8 @@ annotated with all available identifiers from MIM:
   - CAS-RN
   - KG-Microbe node ID
   - mapping status
-  - occurrence count in CultureMech
+  - occurrence count in CultureMech: media ingredients, solution-record
+    composition, and the composition of inline stocks (see scan_culturemech)
   - source ontology term ID (as used in CultureMech media files)
 
 Usage:
@@ -20,7 +21,9 @@ Usage:
 import argparse
 import csv
 import os
+import re
 import sys
+import unicodedata
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -52,15 +55,24 @@ STRUCTURED_MIM_SYNONYM_MARKERS = (
     'synonym source:',
 )
 REJECTIONS_PATH = Path('mappings/unified_mapping_rejections.tsv')
+REJECTION_ID = re.compile(r'[A-Za-z][A-Za-z0-9.]*:[A-Za-z0-9][A-Za-z0-9._~-]*\Z')
 
 
-def load_mapping_rejections(mim_root: Path, name_index: dict) -> dict:
+def load_mapping_rejections(
+    mim_root: Path,
+    name_index: dict,
+    *,
+    label_index: Optional[dict] = None,
+    live: Optional[tuple] = None,
+) -> dict:
     """Read reviewed source-ID rejections; never infer them from prefix alone.
 
     The ledger preserves the rejected source ID and its curation reason outside
     the published identity columns. Older MIM checkouts may lack the ledger.
     A present but malformed or stale ledger must fail rather than silently
-    republish the rejected ID.
+    republish the rejected ID. See docs/guides/UNIFIED_MAPPING_REJECTIONS.md:
+    nonempty mim_id rows retain identity-wide scope; explicitly empty mim_id
+    rows hold only the exact source-label/ID pair without asserting a replacement.
     """
     path = mim_root / REJECTIONS_PATH
     if not path.exists():
@@ -72,18 +84,22 @@ def load_mapping_rejections(mim_root: Path, name_index: dict) -> dict:
         if reader.fieldnames != columns:
             raise ValueError(f'{path}: expected columns {columns}')
         for line, row in enumerate(reader, 2):
-            if None in row or any(not (row.get(c) or '').strip() for c in columns):
+            if (None in row or any(row.get(c) is None for c in columns)
+                    or any(not row[c].strip() for c in columns if c != 'mim_id')):
                 raise ValueError(f'{path}:{line}: incomplete rejection')
             row = {k: v.strip() for k, v in row.items()}
-            key = (row['mim_id'], row['rejected_id'])
-            if key in rejections or ':' not in row['rejected_id']:
+            source_hold = not row['mim_id']
+            key = (('source_label', _label_key(row['ingredient_name']), row['rejected_id'])
+                   if source_hold else (row['mim_id'], row['rejected_id']))
+            if key in rejections or not REJECTION_ID.fullmatch(row['rejected_id']):
                 raise ValueError(f'{path}:{line}: duplicate or invalid rejection')
-            mim = name_index.get(_normalize(row['ingredient_name']))
-            if (not mim or mim['mim_id'] != row['mim_id']
-                    or mim['mapping_status'] not in ('MAPPED', 'REJECTED')
-                    or row['rejected_id'] == row['mim_id']):
-                raise ValueError(f'{path}:{line}: rejection disagrees with MIM identity')
-            if row['rejected_id'] in (mim['chebi_id'], mim['kg_microbe_node_id']):
+            mim = _anchor_record(row['ingredient_name'], name_index, label_index, live)
+            if not source_hold:
+                if (not mim or mim['mim_id'] != row['mim_id']
+                        or mim['mapping_status'] not in ('MAPPED', 'REJECTED')
+                        or row['rejected_id'] == row['mim_id']):
+                    raise ValueError(f'{path}:{line}: rejection disagrees with MIM identity')
+            if mim and row['rejected_id'] in (mim['mim_id'], mim['chebi_id'], mim['kg_microbe_node_id']):
                 raise ValueError(f'{path}:{line}: MIM still publishes the rejected ID')
             rejections[key] = row['mim_id']
     return rejections
@@ -129,6 +145,12 @@ def _mim_merge_target(data: dict) -> str:
         if event.get('action') in MIM_MERGE_ACTIONS:
             return (data.get('identifier') or '').strip()
         if event.get('new_status') == 'REJECTED':
+            # This reviewed source cleanup preserves a tombstone's status and
+            # merge evidence (MIM#882, claw#711). Unknown events, incomplete
+            # transitions and explicit rejection still stop the legacy scan.
+            if (event.get('action') == 'REMOVED_STALE_KG_MICROBE_NODE_ID'
+                    and event.get('previous_status') == 'REJECTED'):
+                continue
             return ''
     return ''
 
@@ -159,6 +181,18 @@ def _mim_record_files(ingredients_dir: Path) -> list:
     return files
 
 
+class MIMNameIndex(dict):
+    """Name lookup plus every source row and its validated resolved record.
+
+    Lookup collisions must not discard an exact-label owner or the evidence
+    distinguishing a merged tombstone from an identity-free rejection.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.source_records: list[tuple[dict, dict]] = []
+
+
 def load_mim_index(mim_root: Path) -> tuple[dict, dict, dict]:
     """
     Load only direct mapped/unmapped records. Retired labels resolve through
@@ -172,7 +206,7 @@ def load_mim_index(mim_root: Path) -> tuple[dict, dict, dict]:
             the same ingredient under a CHEBI ID.
     """
     ingredients_dir = mim_root / 'data' / 'ingredients'
-    name_index: Dict[str, dict] = {}
+    name_index = MIMNameIndex()
     chebi_index: Dict[str, dict] = {}
     ontology_index: Dict[str, dict] = {}
     live_by_id: dict[str, tuple[dict, set[str]]] = {}
@@ -299,6 +333,12 @@ def load_mim_index(mim_root: Path) -> tuple[dict, dict, dict]:
         if canonical and '_retired_source_ids' in canonical[0]:
             record['_retired_source_ids'] = canonical[0]['_retired_source_ids']
 
+    # A live record's refused labels travel with it, so a tombstone's label-index
+    # row cannot hand the survivor a name the survivor itself rejects.
+    for _, record, rejected_names in name_records:
+        if record.get('mapping_status') == 'MAPPED' and rejected_names:
+            record.setdefault('_rejected_names', set()).update(rejected_names)
+
     # Active names come first, followed by aliases of resolved tombstones.
     # Explicit nonidentities must survive competing synonyms, and a retired
     # alias cannot undo a REJECTED_LABEL decision on its representative.
@@ -328,6 +368,7 @@ def load_mim_index(mim_root: Path) -> tuple[dict, dict, dict]:
             )
         ]
 
+    name_index.source_records = [(data, record) for data, record, _ in name_records]
     print(f"  {count} MIM records → {len(name_index)} name entries, "
           f"{len(chebi_index)} CHEBI, {len(ontology_index)} ontology IDs\n")
     return name_index, chebi_index, ontology_index
@@ -343,28 +384,157 @@ def _normalize(s: str) -> str:
 # Step 2: Scan CultureMech for all ingredient occurrences
 # ---------------------------------------------------------------------------
 
+# CultureMech's record contract, as its own occurrence table reads it
+# (CultureMech scripts/record_kinds.py and scripts/ingredient_occurrences.py,
+# CultureMech#605). A record whose upstream term.id is a solution id is shaped as
+# a SolutionRecipe and keeps its components in `composition`; any other record
+# is a MediaRecipe and keeps them in `ingredients`. Reading the field a record's
+# shape does not own is wrong both ways: a MediaDive solution record carries its
+# real components in `composition` and only a "See source for composition"
+# placeholder in `ingredients`.
+SOLUTION_TERM_PREFIXES = ('mediadive.solution:', 'MediaIngredientMech:')
+
+
+def _solution_term_id(record: dict) -> str:
+    """The upstream solution id that makes ``record`` SolutionRecipe-shaped, else ''."""
+    term = record.get('term')
+    term_id = term.get('id') if isinstance(term, dict) else None
+    if isinstance(term_id, str) and term_id.startswith(SOLUTION_TERM_PREFIXES):
+        return term_id
+    return ''
+
+
+def _references_scanned_record(solution: dict, scanned_records, solution_records) -> bool:
+    """Whether a nested solution names a record that this scan counts on its own.
+
+    The rule of CultureMech#605's scanner: a ``culturemech_term`` naming a
+    scanned record, then a ``term.id`` that a scanned solution record carries.
+    A ``culturemech_term`` naming no scanned record falls back to the
+    ``term.id``, so a stale local link cannot count a stock's components a
+    second time. CultureMech's KGX export checks the same two links in the same
+    order, but takes any ``CultureMech:`` id as given (#610).
+    """
+    local = solution.get('culturemech_term')
+    if isinstance(local, dict) and str(local.get('id', '')) in scanned_records:
+        return True
+    term = solution.get('term')
+    term_id = term.get('id') if isinstance(term, dict) else None
+    return isinstance(term_id, str) and term_id in solution_records
+
+
+def _component_errors(record: dict, field: str) -> list:
+    """Where ``record``'s components are not lists of mappings, as ``path problem``.
+
+    Checks the root ``field`` and every ``solutions[]`` and nested
+    ``composition`` below it, references included. CultureMech's scanner and
+    schema refuse such a record, so counting around it would publish numbers
+    CultureMech never produces (#607). A nested ``composition`` may be null:
+    CultureMech's schema allows that on a stock named only by reference, and
+    whether a stock is one is known only once every file is read (#614).
+    """
+    def collection(value, path: str) -> list:
+        if not isinstance(value, list):
+            got = 'missing or null' if value is None else type(value).__name__
+            return [f'{path} must be a list (got {got})']
+        return [f'{path}/{index} must be a mapping'
+                for index, item in enumerate(value) if not isinstance(item, dict)]
+
+    errors = collection(record.get(field), field)
+
+    def walk(owner: dict, prefix: str) -> None:
+        solutions = owner.get('solutions')
+        if solutions is None:
+            return
+        errors.extend(collection(solutions, f'{prefix}solutions'))
+        if not isinstance(solutions, list):
+            return
+        for index, solution in enumerate(solutions):
+            if not isinstance(solution, dict):
+                continue
+            path = f'{prefix}solutions/{index}'
+            if solution.get('composition') is not None:
+                errors.extend(collection(solution['composition'], f'{path}/composition'))
+            walk(solution, f'{path}/')
+
+    walk(record, '')
+    return errors
+
+
+def _inline_solution_compositions(owner: dict, is_reference, prefix: str = '') -> list:
+    """``(path, composition)`` for every stock written inline in ``owner``'s ``solutions[]``.
+
+    Since CultureMech#577 a recipe's inline stocks hold components that exist
+    nowhere else, so they are occurrences of that recipe. The walk stops at a
+    reference to a scanned record, together with everything below it: that
+    record's components are counted once where it is scanned, and expanding
+    the reference would count them again for every medium that uses it
+    (CultureMech#312).
+    """
+    found = []
+    solutions = owner.get('solutions')
+    if not isinstance(solutions, list):
+        return found
+    for index, solution in enumerate(solutions):
+        if not isinstance(solution, dict) or is_reference(solution):
+            continue
+        path = f'{prefix}solutions/{index}'
+        if 'composition' in solution:
+            found.append((f'{path}/composition', solution.get('composition')))
+        found.extend(_inline_solution_compositions(solution, is_reference, f'{path}/'))
+    return found
+
+
 def scan_culturemech(culturemech_root: Path) -> dict:
     """
-    Returns: name → {'count': N, 'term_id': str, 'media': [list]}
+    Returns: name → {'count': N, 'term_id': str, 'example_media': [list]}
+
+    Counts the components CultureMech's own occurrence table counts, so the two
+    cannot disagree about what a recipe contains (#604):
+
+    - each record's root ``composition`` if it is SolutionRecipe-shaped, else
+      its root ``ingredients`` -- one field, never both;
+    - the ``composition`` of every stock written inline in ``solutions[]``, at
+      any depth;
+    - except a nested solution that references a record in the same scan, and
+      everything below it, because that record counts its own components.
+
+    Inline stocks are counted after every file has been read, so whether a
+    nested solution is a reference does not depend on which file sorts first.
+
+    Raises ``ValueError``, naming the problems found (at most 25 in the message),
+    instead of counting around a record CultureMech's scanner would refuse: a
+    file that is unreadable, empty or not a mapping; a missing or repeated
+    ``id``; components that are not lists of mappings; an inline stock whose
+    ``composition`` is null; or no records at all (#607). Skipping such a record
+    would also change other records' counts, because a reference to it would no
+    longer be recognised. A stock named only by reference may leave its
+    ``composition`` null, as CultureMech's schema allows (#614). CultureMech's
+    schema validation is not otherwise repeated.
+
+    Root components are counted before inline stocks, each in file order. A
+    medium's components, root or inline, outrank a solution record's when a
+    name's ``term_id`` and example media are chosen, and within a rank the first
+    one met wins (#609). Counting roots first keeps the identity each name had
+    when only root components were read. Ranking media first matters because
+    almost every solution-record component carries MediaDive's raw
+    ``mediadive.compound:`` id where media carry their curated grounding: by
+    file order alone, DNA would trade CHEBI:16991 for mediadive.compound:958.
     """
     normalized_yaml = culturemech_root / 'data' / 'normalized_yaml'
     occurrences: Dict[str, dict] = {}
+    errors: list = []
+    record_sources: Dict[str, str] = {}
+    solution_records: set = set()
+    pending = []
+    medium_rank, solution_rank = 0, 1
+    term_ranks: Dict[str, int] = {}
+    examples: Dict[str, tuple] = {}
 
-    print("Scanning CultureMech ingredient occurrences...")
-    file_count = 0
-    for yaml_file in sorted(normalized_yaml.rglob('*.yaml')):
-        try:
-            data = yaml.safe_load(yaml_file.read_text())
-        except Exception:
-            continue
-        if not data or not isinstance(data, dict):
-            continue
-
-        media_id = data.get('id', yaml_file.stem)
-        file_count += 1
-
-        for ing in data.get('ingredients', []) or []:
-            name = ing.get('preferred_term', '').strip()
+    def count(media_id, components: list, rank: int) -> int:
+        counted = 0
+        for ing in components:
+            name = ing.get('preferred_term')
+            name = name.strip() if isinstance(name, str) else ''
             if not name:
                 continue
 
@@ -377,16 +547,93 @@ def scan_culturemech(culturemech_root: Path) -> dict:
                     'term_id': term_id,
                     'example_media': [],
                 }
+                term_ranks[name] = rank
+                examples[name] = ([], [])
 
             entry = occurrences[name]
             entry['count'] += 1
-            # Prefer entries that have a term_id
-            if term_id and not entry['term_id']:
+            counted += 1
+            # Prefer entries that have a term_id, and a medium's to a solution record's
+            if term_id and (not entry['term_id'] or rank < term_ranks[name]):
                 entry['term_id'] = term_id
-            if len(entry['example_media']) < 3:
-                entry['example_media'].append(media_id)
+                term_ranks[name] = rank
+            listed = examples[name][rank]
+            if len(listed) < 3:
+                listed.append(media_id)
+        return counted
 
-    print(f"  {file_count} media files → {len(occurrences)} unique ingredient names\n")
+    print("Scanning CultureMech ingredient occurrences...")
+    file_count = root_count = 0
+    for yaml_file in sorted(normalized_yaml.rglob('*.yaml')):
+        source = yaml_file.relative_to(normalized_yaml).as_posix()
+        try:
+            data = yaml.safe_load(yaml_file.read_text(encoding='utf-8'))
+        except (OSError, ValueError, yaml.YAMLError) as exc:
+            errors.append(f'{source}: unreadable ({type(exc).__name__})')
+            continue
+        if not isinstance(data, dict):
+            got = 'nothing' if data is None else type(data).__name__
+            errors.append(f'{source}: the root must be a mapping (got {got})')
+            continue
+        media_id = data.get('id')
+        if not isinstance(media_id, str) or not media_id.strip():
+            errors.append(f'{source}: no id')
+            continue
+        record_id = media_id.strip()
+        if record_id in record_sources:
+            errors.append(f'{source}: id {record_id} is also used by {record_sources[record_id]}')
+            continue
+        record_sources[record_id] = source
+
+        solution_id = _solution_term_id(data)
+        field = 'composition' if solution_id else 'ingredients'
+        problems = _component_errors(data, field)
+        if problems:
+            errors.extend(f'{source}: {problem}' for problem in problems)
+            continue
+        file_count += 1
+        rank = solution_rank if solution_id else medium_rank
+        root_count += count(media_id, data[field], rank)
+        if solution_id:
+            solution_records.add(solution_id)
+        if data.get('solutions'):
+            # Only the stocks are needed later; the rest of the record can go.
+            pending.append((media_id, source, {'solutions': data['solutions']}, rank))
+
+    def refuse_if_any() -> None:
+        if errors:
+            shown = '\n  '.join(errors[:25])
+            more = f'\n  ... and {len(errors) - 25} more' if len(errors) > 25 else ''
+            raise ValueError(f'{len(errors)} problem(s) under {normalized_yaml}, so nothing '
+                             f'was counted:\n  {shown}{more}')
+
+    if not file_count and not errors:
+        errors.append('no CultureMech records')
+    refuse_if_any()
+
+    def is_reference(solution: dict) -> bool:
+        return _references_scanned_record(solution, record_sources, solution_records)
+
+    inline = []
+    for media_id, source, owner, rank in pending:
+        for path, components in _inline_solution_compositions(owner, is_reference):
+            if components is None:
+                # Walked, so not a reference: CultureMech refuses a null here (#614).
+                errors.append(f'{source}: {path} must be a list (got missing or null)')
+            else:
+                inline.append((media_id, components, rank))
+    refuse_if_any()
+
+    inline_count = 0
+    for media_id, components, rank in inline:
+        inline_count += count(media_id, components, rank)
+
+    for name, entry in occurrences.items():
+        medium_examples, solution_examples = examples[name]
+        entry['example_media'] = (medium_examples + solution_examples)[:3]
+
+    print(f"  {file_count} records → {root_count} root and {inline_count} inline-stock "
+          f"occurrences, {len(occurrences)} unique ingredient names\n")
     return occurrences
 
 
@@ -394,23 +641,163 @@ def scan_culturemech(culturemech_root: Path) -> dict:
 # Step 3: Join and resolve
 # ---------------------------------------------------------------------------
 
+# MIM label-index verdicts under which this builder lets the label's first row
+# outrank a recipe's own term.id. `agree:same_substance` is deliberately left
+# out although LABEL_INDEX_CONTRACT.md calls either pick right: it compares
+# element totals, so it cannot tell stereoisomers apart -- `Histidine` would go
+# to L-histidine over the recipe's correct stereo-unspecified CHEBI:27570.
+# Under that verdict the recipe's term.id decides, as it always did.
+TRUSTED_LABEL_AMBIGUITIES = frozenset({'unique', 'resolved:owned'})
+LABEL_INDEX_COLUMNS = frozenset(
+    {'label', 'identifier', 'preferred_term', 'mapping_status', 'ambiguity'})
+
+
+def _label_key(s: str) -> str:
+    """The label index's exact key: NFC, trimmed, case-folded."""
+    return unicodedata.normalize('NFC', s).strip().casefold()
+
+
+def load_mim_label_index(mim_root: Path) -> dict:
+    """First row per label of MIM's published docs/data/label_index.csv.
+
+    The contract is "take the first row for a label"; rows for one label are
+    contiguous and ordered most-significant first. A MIM checkout without the
+    file yields an empty index (``main`` says so); a file without the columns
+    this builder reads is an error, not a silent fallback.
+    """
+    path = mim_root / 'docs' / 'data' / 'label_index.csv'
+    first: dict = {}
+    if not path.is_file():
+        return first
+    with path.open(newline='', encoding='utf-8') as fh:
+        reader = csv.DictReader(fh)
+        missing = LABEL_INDEX_COLUMNS - set(reader.fieldnames or ())
+        if missing:
+            raise ValueError(f'{path}: missing label-index column(s) {sorted(missing)}')
+        for row in reader:
+            first.setdefault(_label_key(row['label']), row)
+    return first
+
+
+def live_records(*indexes: dict) -> tuple[dict, dict, dict, dict]:
+    """MIM records the label index can name, without losing source owners.
+
+    - live MAPPED records by identifier;
+    - live MAPPED records by (identifier, preferred_term) -- `identifier` is not
+      a unique record key, so a label-index answer is matched to the record it
+      names, not to whichever record holding that identifier loaded first;
+    - explicit nonidentity records by their ``UNMAPPED_NNNN`` identifier.
+    - rejected source rows by (CSV identifier, preferred_term), retaining the
+      loader's validated survivor or identity-free refusal. Reused identifiers
+      alone never establish that a rejected row was merged.
+
+    The loader's complete catalogue precedes the lossy lookup dictionaries.
+    Plain dictionaries still support live-record lookups, but cannot establish
+    a rejected source row's merge disposition.
+    """
+    by_id: dict = {}
+    by_id_term: dict = {}
+    nonidentity: dict = {}
+    retired_by_owner: dict = {}
+    for index in indexes:
+        sources = index.source_records if isinstance(index, MIMNameIndex) else []
+        for data, record in sources:
+            if data.get('mapping_status') != 'REJECTED':
+                continue
+            # Exporters may name either the original ID or its survivor. Both
+            # must resolve through this source row's recorded disposition.
+            for identifier in ((data.get('identifier') or '').strip(), record.get('mim_id')):
+                if identifier:
+                    retired_by_owner.setdefault(
+                        (identifier, data['preferred_term'].strip()), record)
+        records = [record for _, record in sources] if sources else index.values()
+        for record in records:
+            mim_id = record.get('mim_id') or ''
+            if record.get('mapping_status') == 'MAPPED' and mim_id:
+                by_id.setdefault(mim_id, record)
+                by_id_term.setdefault((mim_id, record.get('preferred_term')), record)
+            elif mim_id.startswith('UNMAPPED') and _is_mim_nonidentity(record):
+                nonidentity.setdefault(mim_id, record)
+    return by_id, by_id_term, nonidentity, retired_by_owner
+
+
+def label_ruling(
+    name: str,
+    named: Optional[dict],
+    label_index: Optional[dict],
+    live: Optional[tuple],
+) -> Optional[dict]:
+    """MIM's published ruling on the exact label ``name``, or None to defer.
+
+    Only a first row whose verdict is in ``TRUSTED_LABEL_AMBIGUITIES`` rules:
+
+    - an ``UNMAPPED_NNNN`` row is MIM explicitly leaving the label without an
+      identity, so the nonidentity record is returned;
+    - a MAPPED row returns its exact owner from the complete loaded catalogue,
+      else the record the name index found for that identifier, else the first
+      live holder;
+    - a REJECTED row follows only that source row's validated merge disposition.
+      A non-merge rejection remains an identity-free refusal. A tombstone row
+      is not followed when its survivor rejects the label (REJECTED_LABEL);
+    - an undecided curation status (PENDING_REVIEW, IN_PROGRESS, NEEDS_EXPERT,
+      AMBIGUOUS) never rules.
+    """
+    answer = (label_index or {}).get(_label_key(name))
+    if not answer or answer.get('ambiguity') not in TRUSTED_LABEL_AMBIGUITIES or not live:
+        return None
+    by_id, by_id_term, nonidentity, retired_by_owner = live
+    identifier = answer.get('identifier') or ''
+    status = answer.get('mapping_status') or ''
+    if status == 'REJECTED':
+        record = retired_by_owner.get((identifier, answer.get('preferred_term')))
+        if record is not None and not _is_mim_nonidentity(record) \
+                and _normalize(answer.get('label') or '') in record.get('_rejected_names', ()):
+            return None
+        return record
+    if identifier.startswith('UNMAPPED'):
+        return nonidentity.get(identifier)
+    if status != 'MAPPED':
+        return None
+    record = by_id_term.get((identifier, answer.get('preferred_term')))
+    if record is None and named and named.get('mapping_status') == 'MAPPED' \
+            and named.get('mim_id') == identifier:
+        record = named
+    if record is None:
+        record = by_id.get(identifier)
+    return record
+
+
 def resolve_mim_record(
     name: str,
     term_id: str,
     name_index: dict,
     chebi_index: dict,
     ontology_index: dict,
+    *,
+    label_index: Optional[dict] = None,
+    live: Optional[tuple] = None,
 ) -> Optional[dict]:
     """
     Find best MIM record for this ingredient name + optional term_id.
 
     Priority:
-      0. Explicit MIM nonidentity/refusal → no identity
-      1. CultureMech CHEBI term.id → direct CHEBI index lookup
-      2. Any CultureMech term.id (FOODON/ENVO) → ontology index lookup
-      3. Name/synonym → name index lookup
+      1. MIM's published ruling on this exact label (``label_ruling``): a
+         live record, or MIM's explicit nonidentity for the label
+      2. A nonidentity record the loose name index lands on → no identity
+      3. CultureMech CHEBI term.id → direct CHEBI index lookup
+      4. Any CultureMech term.id (FOODON/ENVO) → ontology index lookup
+      5. Name/synonym → name index lookup
+
+    Step 1 is MIM's own ruling on the label. Without it a recipe's stale
+    ``term.id`` outranked it: ``K2HPO4 x 3 H2O`` and ``Na2HPO4 x 7 H2O`` were
+    published on their anhydrous CHEBI terms although MIM resolves both to
+    hydrate records (MIM #808) -- the same defect CultureMech retired for KGX by
+    resolving through the label index (CultureMech #260).
     """
     named = name_index.get(_normalize(name))
+    ruled = label_ruling(name, named, label_index, live)
+    if ruled is not None:
+        return ruled
     if named and _is_mim_nonidentity(named):
         return named
     if term_id in (named or {}).get('_retired_source_ids', ()):
@@ -490,12 +877,29 @@ def _published_ids(term_id: str, mim: dict | None) -> tuple[str, str]:
     return chebi_id, cm_term_id
 
 
+def _anchor_record(
+    name: str,
+    name_index: dict,
+    label_index: Optional[dict],
+    live: Optional[tuple],
+) -> Optional[dict]:
+    """The record a name resolves to before any source term.id is consulted.
+
+    The rejection ledger is keyed on this record, so ledger validation and the
+    builder agree on it: MIM's trusted ruling on the exact label (an identity
+    or an explicit nonidentity), else the name index's own match.
+    """
+    named = name_index.get(_normalize(name))
+    return label_ruling(name, named, label_index, live) or named
+
+
 def build_unified_rows(
     occurrences: dict,
     name_index: dict,
     chebi_index: dict,
     ontology_index: dict,
     rejections: dict | None = None,
+    label_index: dict | None = None,
 ) -> list:
     """
     Join CultureMech occurrences with MIM records.
@@ -508,18 +912,30 @@ def build_unified_rows(
     """
     rows = []
     matched = unmatched = 0
+    live = live_records(name_index, chebi_index, ontology_index)
 
     for name, info in occurrences.items():
         term_id = info['term_id']
-        named_mim = name_index.get(_normalize(name))
-        if term_id in (named_mim or {}).get('_retired_source_ids', ()):
+        if ('source_label', _label_key(name), term_id) in (rejections or {}):
+            # Hold this exact pair before source-ID lookup can lend a different
+            # record's identity/metadata, or raw publication can reassert the ID.
+            # Independent name ownership still follows the ordinary resolver.
             term_id = ''
-        expected_id = (rejections or {}).get(((named_mim or {}).get('mim_id'), term_id))
+        named_mim = name_index.get(_normalize(name))
+        anchor = _anchor_record(name, name_index, label_index, live)
+        if term_id in (named_mim or {}).get('_retired_source_ids', ()) or term_id in (
+            anchor or {}
+        ).get('_retired_source_ids', ()):
+            term_id = ''
+        expected_id = (rejections or {}).get(((anchor or {}).get('mim_id'), term_id))
         if expected_id:
             # Do not let a rejected source ID select another MIM record before
             # the curated name can resolve (e.g. a real detergent record).
             term_id = ''
-        mim = resolve_mim_record(name, term_id, name_index, chebi_index, ontology_index)
+        mim = resolve_mim_record(
+            name, term_id, name_index, chebi_index, ontology_index,
+            label_index=label_index, live=live,
+        )
         if expected_id and (not mim or mim['mim_id'] != expected_id):
             raise ValueError(f'{name}: rejected source ID has no matching curated identity')
 
@@ -680,13 +1096,22 @@ def main():
 
     # Load MIM index
     name_index, chebi_index, ontology_index = load_mim_index(args.mim)
-    rejections = load_mapping_rejections(args.mim, name_index)
+    label_index = load_mim_label_index(args.mim)
+    if label_index:
+        print(f"  {len(label_index)} MIM label-index labels (trusted verdicts outrank recipe term.ids)")
+    else:
+        print("  WARNING: no MIM docs/data/label_index.csv; recipe term.ids outrank MIM's label rulings")
+    live = live_records(name_index, chebi_index, ontology_index)
+    rejections = load_mapping_rejections(
+        args.mim, name_index, label_index=label_index, live=live)
 
     # Scan CultureMech
     occurrences = scan_culturemech(args.culturemech)
 
     # Join
-    rows = build_unified_rows(occurrences, name_index, chebi_index, ontology_index, rejections)
+    rows = build_unified_rows(
+        occurrences, name_index, chebi_index, ontology_index, rejections, label_index,
+    )
 
     # Print coverage report
     print_coverage_report(rows)

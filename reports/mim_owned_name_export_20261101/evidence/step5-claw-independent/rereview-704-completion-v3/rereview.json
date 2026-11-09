@@ -1,0 +1,44 @@
+{
+  "completed_at": "2026-11-01T12:49:50.163190+00:00",
+  "reviewer": "/root/step4_design_review",
+  "scope": "Bounded preliminary publication-helper and #703/#704 repair re-review; whole builder integration, real generation and final-head review remain separate.",
+  "artifact_module_sha256": "bd94f9d4930967cad055c18b3c7f042d5b5a8f0db7d863845841649ce5ee98a6",
+  "verdict": "pass_with_limitations",
+  "remaining_in_scope_findings": [],
+  "negative_replays": [
+    "Absent case-equivalent and NFC/NFD-equivalent output destinations refuse before writes.",
+    "No-op and postwrite destination changes during final source checking refuse success.",
+    "Journal-directory redirect during final native precommit callback refuses before artifact/outside-journal writes.",
+    "Missing and invalid completed native journals before initial capture refuse success."
+  ],
+  "positive_cases": [
+    "first_create",
+    "replace_existing_tsv",
+    "sidecar_only_refresh",
+    "missing_manifest_refresh",
+    "true_all_artifact_noop"
+  ],
+  "independent_artifact_regressions_passed": 47,
+  "prior_evidence": [
+    {
+      "directory": "preliminary",
+      "evidence_index_sha256": "627e5f4685efe75a340397cf9dea3c0286204b191f1eef9eb435891e22ee70b4",
+      "all_bound_files_preserved": true
+    },
+    {
+      "directory": "rereview-703-704-v1",
+      "evidence_index_sha256": "8ba94568d03a11c6319623efcc4d552d56d238dd2d204ca52435ed03a4823bfd",
+      "all_bound_files_preserved": true
+    },
+    {
+      "directory": "rereview-704-journal-v2",
+      "evidence_index_sha256": "33cb70a127172fbd5a16973ec2d712f75619e226b84bed1f4c0ea3f02ff2092e",
+      "all_bound_files_preserved": true
+    }
+  ],
+  "limits": [
+    "This is exact helper repair content, not a final commit or complete builder attestation.",
+    "Native working-copy journals record write completion; a failed helper postcheck remains a failed publication even when its journal records completed renames.",
+    "No scientific approval, production generation, source mutation or GitHub mutation performed by this reviewer."
+  ]
+}

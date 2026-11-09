@@ -1,0 +1,6 @@
+{"name": "baseline", "exit_code": 0, "expected_failure": false, "control_pass": true}
+{"name": "disable_suppression", "exit_code": 1, "expected_failure": true, "control_pass": true}
+{"name": "truthy_representative_fallback", "exit_code": 1, "expected_failure": true, "control_pass": true}
+{"name": "first_owner_only", "exit_code": 1, "expected_failure": true, "control_pass": true}
+{"name": "discard_later_sources", "exit_code": 1, "expected_failure": true, "control_pass": true}
+{"name": "lower_instead_of_casefold", "exit_code": 1, "expected_failure": true, "control_pass": true}

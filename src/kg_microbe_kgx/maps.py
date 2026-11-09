@@ -159,11 +159,17 @@ def predicates(version: str = BIOLINK_VERSION) -> frozenset[str]:
 def parse_pairs(values: Iterable[object] | None, what: str) -> dict[str, str]:
     """``["KEY=biolink:Term", ...]`` from a manifest string_list."""
     pairs: dict[str, str] = {}
+    normalized_seen: set[str] = set()
     for item in values or ():
         key, sep, target = str(item).partition("=")
         if not sep or not key.strip() or not target.strip():
             raise ValueError(f"{what} entry {item!r} is not KEY=biolink:Term")
-        pairs[key.strip()] = target.strip()
+        clean_key = key.strip()
+        norm_key = _phrase(clean_key) if what == "predicate_map" else clean_key
+        if clean_key in pairs or norm_key in normalized_seen:
+            raise ValueError(f"{what} has duplicate key {clean_key!r}")
+        normalized_seen.add(norm_key)
+        pairs[clean_key] = target.strip()
     return pairs
 
 

@@ -1,0 +1,57 @@
+fatal: path 'source.py' exists on disk, but not in '541382bd5ab65cecfd25329038306367aa0f7d51'
+{
+  "frozen": "/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/step5-evidence-test-_7ql_r1v/packaging/inputs.json",
+  "sha256": "e81f585a86253794746a8c34071867f768c7013c61802aa7af748435eef45b29"
+}
+{
+  "status": "PASS",
+  "archive_members": 12,
+  "original_identities": 7,
+  "tracked_checked": false,
+  "scientific_approval_added": false
+}
+{
+  "status": "PASS",
+  "archive_members": 12,
+  "original_identities": 7,
+  "tracked_checked": true,
+  "scientific_approval_added": false
+}
+{
+  "status": "PASS",
+  "archive_members": 12,
+  "original_identities": 7,
+  "tracked_checked": true,
+  "scientific_approval_added": false
+}
+{
+  "status": "PASS",
+  "archive_members": 12,
+  "original_identities": 7,
+  "tracked_checked": true,
+  "scientific_approval_added": false
+}
+Traceback (most recent call last):
+  File "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v6.py", line 145, in <module>
+    check('shallow consumer without implementation object verifies',lambda:m.verify(consumer_package,consumer,True))
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v6.py", line 16, in check
+    try:action()
+        ~~~~~~^^
+  File "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v6.py", line 145, in <lambda>
+    check('shallow consumer without implementation object verifies',lambda:m.verify(consumer_package,consumer,True))
+                                                                           ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-710/controls/old-v3-shallow-without-ancestry/packager.py", line 220, in verify
+    check_references(plan,repository)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-710/controls/old-v3-shallow-without-ancestry/packager.py", line 105, in check_references
+    committed = subprocess.check_output(['git','show',revision+':'+name],cwd=repository)
+  File "/opt/homebrew/Caskroom/miniforge/base/lib/python3.14/subprocess.py", line 473, in check_output
+    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+           ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+               **kwargs).stdout
+               ^^^^^^^^^
+  File "/opt/homebrew/Caskroom/miniforge/base/lib/python3.14/subprocess.py", line 578, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['git', 'show', '541382bd5ab65cecfd25329038306367aa0f7d51:source.py']' returned non-zero exit status 128.

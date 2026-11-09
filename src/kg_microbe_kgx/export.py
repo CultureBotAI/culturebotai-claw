@@ -183,6 +183,8 @@ def _evidence(raw: Mapping[str, Any], field_name: str | None) -> tuple[list[str]
 def export(root: Path, globs: Sequence[str], settings: ExportSettings,
            *, sample: int | None = None) -> tuple[list[list[str]], list[list[str]], ExportStats]:
     """Read the corpus and return KGX node rows, edge rows and statistics."""
+    if sample is not None and (isinstance(sample, bool) or sample < 1):
+        raise ExportError(f"{settings.mech}: sample must be a positive integer (got {sample!r})")
     stats = ExportStats()
     nodes: dict[str, list[str]] = {}
     edges: list[list[str]] = []

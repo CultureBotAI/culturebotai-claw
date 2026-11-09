@@ -1,0 +1,304 @@
+[
+  {
+    "name": "baseline",
+    "argv": [
+      "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_mim_owned_name_export.py"
+    ],
+    "exit_code": 0,
+    "expected_outcome": true,
+    "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-builder-implementation-revision-706-707/mutation-baseline.log",
+    "sha256": "bf91f8264be5955b1b75237f95d72a5af0c659cae1735547347b9d30a72f0c43"
+  },
+  {
+    "name": "original-706707-red",
+    "argv": [
+      "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_mim_owned_name_export.py",
+      "-k",
+      "import_snapshot_drift or rejected_cas_precedes or captured_source_wins"
+    ],
+    "exit_code": 1,
+    "expected_outcome": true,
+    "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-builder-implementation-revision-706-707/mutation-original-706707-red.log",
+    "sha256": "d1f7480ee7d6a4d6a4297828c03388d806ee9285c389e1a641d092e242b693a6"
+  },
+  {
+    "name": "ownership-bypass",
+    "argv": [
+      "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_mim_owned_name_export.py",
+      "-k",
+      "all_alias_inputs or late_cas"
+    ],
+    "exit_code": 1,
+    "expected_outcome": true,
+    "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-builder-implementation-revision-706-707/mutation-ownership-bypass.log",
+    "sha256": "5447f5b7a6d181a58745bfcf037b5c1c5f25b08aaf9e975a76a0b0f5a83d9dbe"
+  },
+  {
+    "name": "cas-bypass",
+    "argv": [
+      "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_mim_owned_name_export.py",
+      "-k",
+      "late_cas"
+    ],
+    "exit_code": 1,
+    "expected_outcome": true,
+    "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-builder-implementation-revision-706-707/mutation-cas-bypass.log",
+    "sha256": "6fb0d078f3bfd7b0dd81972317b5a24f59ed21c95af054aaf4537db6cc6548a8"
+  },
+  {
+    "name": "input-byte-check-bypass",
+    "argv": [
+      "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_mim_owned_name_export.py",
+      "-k",
+      "input_drift or code_input_drift"
+    ],
+    "exit_code": 1,
+    "expected_outcome": true,
+    "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-builder-implementation-revision-706-707/mutation-input-byte-check-bypass.log",
+    "sha256": "59cf7f07bb5e9a32f4805463a7bd86489a127bc293b62dc389f8edba1be53b49"
+  },
+  {
+    "name": "path-set-check-bypass",
+    "argv": [
+      "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_mim_owned_name_export.py",
+      "-k",
+      "input_drift and added"
+    ],
+    "exit_code": 1,
+    "expected_outcome": true,
+    "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-builder-implementation-revision-706-707/mutation-path-set-check-bypass.log",
+    "sha256": "547a8baeba6e84c8e7747157e32b8f820902e77aee829189bc2391b7e2dcc726"
+  },
+  {
+    "name": "validator-returncode-bypass",
+    "argv": [
+      "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_mim_owned_name_export.py",
+      "-k",
+      "returncode_is_authoritative"
+    ],
+    "exit_code": 1,
+    "expected_outcome": true,
+    "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-builder-implementation-revision-706-707/mutation-validator-returncode-bypass.log",
+    "sha256": "996904c3d3041a852e284d2f8b1af59b6362b38a488567e668ba155e2530d12c"
+  },
+  {
+    "name": "tsv-only-noop",
+    "argv": [
+      "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_mim_owned_name_export.py",
+      "-k",
+      "sidecar_refresh"
+    ],
+    "exit_code": 1,
+    "expected_outcome": true,
+    "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-builder-implementation-revision-706-707/mutation-tsv-only-noop.log",
+    "sha256": "b8e1f58d2da79762732c6a12377f7f31de3b314b5c5dd68d1be705d7f7358bc0"
+  },
+  {
+    "name": "rejected-label-bypass",
+    "argv": [
+      "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_mim_owned_name_export.py",
+      "-k",
+      "source_bound_rejection"
+    ],
+    "exit_code": 1,
+    "expected_outcome": true,
+    "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-builder-implementation-revision-706-707/mutation-rejected-label-bypass.log",
+    "sha256": "3f0ec18b9880713bcf8867ab9c96868a447952ed7d4905236b0643caddd7989b"
+  },
+  {
+    "name": "kgm-reread",
+    "argv": [
+      "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_mim_owned_name_export.py",
+      "-k",
+      "frozen_kgm_consumption"
+    ],
+    "exit_code": 1,
+    "expected_outcome": true,
+    "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-builder-implementation-revision-706-707/mutation-kgm-reread.log",
+    "sha256": "6d55ae4a8f497597571f57a9d0392ea7e9ad9aa4e056a927c60085e00afffd6e"
+  },
+  {
+    "name": "lexical-stamp-normalization-bypass",
+    "argv": [
+      "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_mim_owned_name_export.py",
+      "-k",
+      "lexical_prior_stamp_alias"
+    ],
+    "exit_code": 1,
+    "expected_outcome": true,
+    "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-builder-implementation-revision-706-707/mutation-lexical-stamp-normalization-bypass.log",
+    "sha256": "f37c36bf2b5bba959bde2e0afe59bb70e756ef93a96f34afd709ce6e142ef718"
+  },
+  {
+    "name": "producer-binding-bypass",
+    "argv": [
+      "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_mim_owned_name_export.py",
+      "-k",
+      "import_snapshot"
+    ],
+    "exit_code": 1,
+    "expected_outcome": true,
+    "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-builder-implementation-revision-706-707/mutation-producer-binding-bypass.log",
+    "sha256": "f43f0869c9ed5609afcf9a739b623ba3c32e65e3d07139fdb02a24fb74defe74"
+  },
+  {
+    "name": "late-import-snapshot-rebind",
+    "argv": [
+      "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_mim_owned_name_export.py",
+      "-k",
+      "import_snapshot and during"
+    ],
+    "exit_code": 1,
+    "expected_outcome": true,
+    "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-builder-implementation-revision-706-707/mutation-late-import-snapshot-rebind.log",
+    "sha256": "51a6e04724883b834fcd7ba931e41030a85e33c539e5d29d5afca1b6109bb424"
+  },
+  {
+    "name": "import-origin-bypass",
+    "argv": [
+      "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_mim_owned_name_export.py",
+      "-k",
+      "import_snapshot and wrong"
+    ],
+    "exit_code": 1,
+    "expected_outcome": true,
+    "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-builder-implementation-revision-706-707/mutation-import-origin-bypass.log",
+    "sha256": "c6f744c53b884a02ccc9737b48854c85bb0b455766085e07c945eef83bdbad5a"
+  },
+  {
+    "name": "rejected-cas-order",
+    "argv": [
+      "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_mim_owned_name_export.py",
+      "-k",
+      "rejected_cas_precedes"
+    ],
+    "exit_code": 1,
+    "expected_outcome": true,
+    "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-builder-implementation-revision-706-707/mutation-rejected-cas-order.log",
+    "sha256": "a3aa1d074f65304ffa49f829bdafe9431f5bfd661e8a1ac47789b7f1d3b7b14f"
+  },
+  {
+    "name": "public-cache-reuse",
+    "argv": [
+      "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_mim_owned_name_export.py",
+      "-k",
+      "captured_source_wins"
+    ],
+    "exit_code": 1,
+    "expected_outcome": true,
+    "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-builder-implementation-revision-706-707/mutation-public-cache-reuse.log",
+    "sha256": "edb02ee00a987e4ea52d9f71890b6087f4507d072c85e2e210cd479d22fa2418"
+  },
+  {
+    "name": "stale-bytecode-loader",
+    "argv": [
+      "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_mim_owned_name_export.py",
+      "-k",
+      "captured_source_wins and stale"
+    ],
+    "exit_code": 1,
+    "expected_outcome": true,
+    "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-builder-implementation-revision-706-707/mutation-stale-bytecode-loader.log",
+    "sha256": "98f779699fa05995d1f7f1e32ac7426ead497c848dca0f6d441625343a311ab3"
+  },
+  {
+    "name": "lazy-policy-cache-escape",
+    "argv": [
+      "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_mim_owned_name_export.py",
+      "-k",
+      "lazy_policy and contamination"
+    ],
+    "exit_code": 1,
+    "expected_outcome": true,
+    "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-builder-implementation-revision-706-707/mutation-lazy-policy-cache-escape.log",
+    "sha256": "bfa86cebb43e0c3955144fddef8ae5afe787be117d8949ed78f43be7c3a2e665"
+  },
+  {
+    "name": "native-lock-cache-escape",
+    "argv": [
+      "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_mim_owned_name_export.py",
+      "-k",
+      "lazy_policy and native"
+    ],
+    "exit_code": 1,
+    "expected_outcome": true,
+    "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-builder-implementation-revision-706-707/mutation-native-lock-cache-escape.log",
+    "sha256": "189cb92b581ebeec9e403b7b3823b43771e25303f4f949510681cdf74d15d356"
+  }
+]

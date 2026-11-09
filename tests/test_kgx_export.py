@@ -284,6 +284,28 @@ def test_without_a_declared_graph_shape_there_is_nothing_to_export():
         ExportSettings.from_manifest("m", Declaration())
 
 
+@pytest.mark.parametrize("bad_sample", [0, -1, False])
+def test_non_positive_sample_is_refused(tmp_path, bad_sample):
+    root = tmp_path / "repo"
+    (root / "data").mkdir(parents=True)
+    (root / "data" / "r.yaml").write_text(yaml.safe_dump(_graph_record([_edge()])))
+    with pytest.raises(ExportError, match="sample must be a positive integer"):
+        write_export(root, GLOBS, _settings(), tmp_path / "out", sample=bad_sample)
+
+
+def test_duplicate_map_keys_are_refused():
+    with pytest.raises(ValueError, match="duplicate key"):
+        maps.parse_pairs(
+            ["CHEMICAL=biolink:ChemicalEntity", "CHEMICAL=biolink:MolecularEntity"],
+            "category_map",
+        )
+    with pytest.raises(ValueError, match="duplicate key"):
+        maps.parse_pairs(
+            ["part_of=biolink:part_of", "part of=biolink:has_part"],
+            "predicate_map",
+        )
+
+
 # --------------------------------------------------------------------------
 # The maps themselves
 # --------------------------------------------------------------------------

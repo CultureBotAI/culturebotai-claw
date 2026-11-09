@@ -306,7 +306,9 @@ def check_page(
     return _check_facts(read_page(html), page, allowed_hosts)
 
 
-def _exists_case_exactly(root: Path, relative: PurePosixPath) -> Path | None:
+def _exists_case_exactly(
+    root: Path, relative: PurePosixPath, listings: dict[Path, set[str] | None]
+) -> Path | None:
     """Resolve `relative` under `root`, matching each name exactly.
 
     `Path.is_file()` asks the filesystem, and on macOS the filesystem says yes to
@@ -319,11 +321,13 @@ def _exists_case_exactly(root: Path, relative: PurePosixPath) -> Path | None:
     current = root
     # PurePosixPath has already dropped "." and empty components.
     for part in relative.parts:
-        try:
-            names = {entry.name for entry in current.iterdir()}
-        except (NotADirectoryError, PermissionError, FileNotFoundError):
-            return None
-        if part not in names:
+        if current not in listings:
+            try:
+                listings[current] = {entry.name for entry in current.iterdir()}
+            except (NotADirectoryError, PermissionError, FileNotFoundError):
+                listings[current] = None
+        names = listings[current]
+        if names is None or part not in names:
             return None
         current = current / part
     return current
@@ -376,7 +380,11 @@ _OUTSIDE = _Outside()
 
 
 def _resolves(
-    root: Path, page: Path, facts: PageFacts, reference: str
+    root: Path,
+    page: Path,
+    facts: PageFacts,
+    reference: str,
+    listings: dict[Path, set[str] | None],
 ) -> bool | _Outside:
     # A leading "/" is site-absolute, not filesystem-absolute. Resolving it
     # against the filesystem would look outside the site and, on a machine that
@@ -395,13 +403,13 @@ def _resolves(
         # answer yes to something that 404s (#238).
         return _OUTSIDE
 
-    found = _exists_case_exactly(root.resolve(), relative)
+    found = _exists_case_exactly(root.resolve(), relative, listings)
     if found is None:
         return False
     if found.is_file():
         return True
     # A directory reference is served as its index.
-    return _exists_case_exactly(found, PurePosixPath("index.html")) is not None
+    return _exists_case_exactly(found, PurePosixPath("index.html"), listings) is not None
 
 
 def check_site(
@@ -423,11 +431,17 @@ def check_site(
     `../../../app/discussions/`. Conflating the two made those references
     unresolvable inside the site and silently resolved against the checkout
     instead (#238).
+
+    Check a finished build whose files remain stable during this call. Directory
+    listings are reused across its links and pages, then discarded; a subsequent
+    call reads fresh listings from disk. Exact-case resolution must not enumerate
+    a large site's directories again for every record link.
     """
     root = Path(root)
     published = Path(published_root) if published_root is not None else root
     found = sorted(pages) if pages is not None else sorted(root.rglob("*.html"))
     findings: list[Finding] = []
+    listings: dict[Path, set[str] | None] = {}
 
     for path in found:
         name = path.relative_to(root).as_posix()
@@ -450,7 +464,7 @@ def check_site(
                     )
                 )
                 continue
-            verdict = _resolves(published, path, facts, target)
+            verdict = _resolves(published, path, facts, target, listings)
             if verdict is _OUTSIDE:
                 findings.append(
                     Finding(

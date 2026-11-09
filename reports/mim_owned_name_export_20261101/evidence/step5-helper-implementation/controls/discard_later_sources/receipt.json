@@ -1,0 +1,34 @@
+{
+  "name": "discard_later_sources",
+  "argv": [
+    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python3",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "-c",
+    "/dev/null",
+    "--confcutdir",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-helper-implementation/controls/discard_later_sources",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-helper-implementation/controls/discard_later_sources/tests/test_mim_owned_name_policy.py",
+    "-k",
+    "test_repeated_pair_aggregates_every_origin_and_owner_in_one_deterministic_row"
+  ],
+  "started_at": "2026-11-01T12:39:58.014685+00:00",
+  "finished_at": "2026-11-01T12:39:58.447884+00:00",
+  "exit_code": 1,
+  "expected_failure": true,
+  "control_pass": true,
+  "selection": "test_repeated_pair_aggregates_every_origin_and_owner_in_one_deterministic_row",
+  "mutation": {
+    "before": "group[\"source_refs\"].update(source_refs)",
+    "after": "group[\"source_refs\"].update(source_refs if not group[\"source_refs\"] else ())"
+  },
+  "source_sha256": "c54331aeeb082199db921a7a00fc2bb1ad62bc595aba9125e54b611b9e78009c",
+  "test_sha256": "62c8675b32177dbc609218851ac13d409cf6dfd628fe37118a76a6c2cc7516b6",
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-helper-implementation/controls/discard_later_sources/pytest.log",
+  "log_sha256": "d91fd0c3d560dba8d595f2e67899c9526cf072da3de1de14276ef7214701597a",
+  "fresh_process": true,
+  "fresh_bytecode_prefix": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-helper-implementation/controls/discard_later_sources/bytecode"
+}

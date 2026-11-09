@@ -1,0 +1,406 @@
+[
+  {
+    "subject_id": "MIM:Bacto-tryptone",
+    "token_key": "tryptone",
+    "credited_owner_inputs": [
+      {
+        "subject_id": "MIM:Tryptone",
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Tryptone.yaml",
+        "sha256": "2d4142f88d854838da86fa3f81a34d5d40c302627cf127adc0b50006e5b21356"
+      }
+    ],
+    "source_inputs": [
+      {
+        "reference": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Bacto-tryptone.yaml#ontology_mapping.ontology_label",
+        "sha256": "cab30ffd901d05f125c7da64298ea68c43578c92cd8acc962a84b9318a628dda",
+        "selector": "ontology_mapping.ontology_label",
+        "resolved_source_field": "ontology_mapping.ontology_label"
+      }
+    ]
+  },
+  {
+    "subject_id": "MIM:Bacto_Brain_Heart_Infusion",
+    "token_key": "brain heart infusion",
+    "credited_owner_inputs": [
+      {
+        "subject_id": "MIM:Brain_Heart_Infusion",
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Brain_Heart_Infusion.yaml",
+        "sha256": "77230cb3783ad3fbeb96695e96958441f8d0c9ac6f5a9595ac1816a72b7d86d8"
+      }
+    ],
+    "source_inputs": [
+      {
+        "reference": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Bacto_Brain_Heart_Infusion.yaml#ontology_mapping.ontology_label",
+        "sha256": "022df020b7f4660ac46d19baf0847df3ba868608398e97b2f027bb73be58b2f5",
+        "selector": "ontology_mapping.ontology_label",
+        "resolved_source_field": "ontology_mapping.ontology_label"
+      }
+    ]
+  },
+  {
+    "subject_id": "MIM:Bacto_Peptone",
+    "token_key": "peptone",
+    "credited_owner_inputs": [
+      {
+        "subject_id": "MIM:Peptone",
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Peptone.yaml",
+        "sha256": "e00551197758fb417846becc5c14e931f614bc00887609b8749d734ad2f8d4aa"
+      }
+    ],
+    "source_inputs": [
+      {
+        "reference": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Bacto_Peptone.yaml#ontology_mapping.ontology_label",
+        "sha256": "864e86820c578ff82b2b32e075c6fb428e704907f78a250c2733b06a70d8e655",
+        "selector": "ontology_mapping.ontology_label",
+        "resolved_source_field": "ontology_mapping.ontology_label"
+      },
+      {
+        "reference": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Bacto_Peptone.yaml#synonyms[28]",
+        "sha256": "864e86820c578ff82b2b32e075c6fb428e704907f78a250c2733b06a70d8e655",
+        "selector": "synonyms[28]",
+        "resolved_source_field": "synonyms[28]"
+      },
+      {
+        "reference": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Bacto_Peptone.yaml#synonyms[29]",
+        "sha256": "864e86820c578ff82b2b32e075c6fb428e704907f78a250c2733b06a70d8e655",
+        "selector": "synonyms[29]",
+        "resolved_source_field": "synonyms[29]"
+      }
+    ]
+  },
+  {
+    "subject_id": "MIM:Beta-lactose",
+    "token_key": "lactose",
+    "credited_owner_inputs": [
+      {
+        "subject_id": "MIM:Lactose",
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Lactose.yaml",
+        "sha256": "03c3f8147a4b0529118abe4afca35b7ac28fd3a815c2cc5cf465cf3b6fce4dec"
+      }
+    ],
+    "source_inputs": [
+      {
+        "reference": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Beta-lactose.yaml#synonyms[0]",
+        "sha256": "f1c39640418e71ea7999184bcb97d44bb238c7eef405a5ff7c80864e7a7bad86",
+        "selector": "synonyms[0]",
+        "resolved_source_field": "synonyms[0]"
+      }
+    ]
+  },
+  {
+    "subject_id": "MIM:Brain_Heart_Infusion_Broth",
+    "token_key": "brain heart infusion",
+    "credited_owner_inputs": [
+      {
+        "subject_id": "MIM:Brain_Heart_Infusion",
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Brain_Heart_Infusion.yaml",
+        "sha256": "77230cb3783ad3fbeb96695e96958441f8d0c9ac6f5a9595ac1816a72b7d86d8"
+      }
+    ],
+    "source_inputs": [
+      {
+        "reference": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Brain_Heart_Infusion_Broth.yaml#ontology_mapping.ontology_label",
+        "sha256": "8c742451138c16e6d483be385ee3c4ab97fd1ce47890f2dd04fd76a0f1d8f85a",
+        "selector": "ontology_mapping.ontology_label",
+        "resolved_source_field": "ontology_mapping.ontology_label"
+      }
+    ]
+  },
+  {
+    "subject_id": "MIM:Cr1_Soil",
+    "token_key": "soil",
+    "credited_owner_inputs": [
+      {
+        "subject_id": "MIM:Soil",
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Soil.yaml",
+        "sha256": "bdf0ed420d352f6c31f25317929c929d8d3a77223014a2dd0d6a0c4779707ee6"
+      }
+    ],
+    "source_inputs": [
+      {
+        "reference": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Cr1_Soil.yaml#ontology_mapping.ontology_label",
+        "sha256": "806cb0bcb6ac7d866b7d8b664dc4fa2942920d5096f3fc1b22f6932b36a92e47",
+        "selector": "ontology_mapping.ontology_label",
+        "resolved_source_field": "ontology_mapping.ontology_label"
+      }
+    ]
+  },
+  {
+    "subject_id": "MIM:D-mannitol",
+    "token_key": "mannitol",
+    "credited_owner_inputs": [
+      {
+        "subject_id": "MIM:Mannitol",
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Mannitol.yaml",
+        "sha256": "ecc07b7b800770b32335c03b1d6aea5031adda31c592b9f4d4046bbca07277f5"
+      }
+    ],
+    "source_inputs": [
+      {
+        "reference": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/D-mannitol.yaml#synonyms[10]",
+        "sha256": "0a04714750dac2e0bec56ab4ee0ba62d29cb4e41cd90fa3f1cacecdcc31c48d9",
+        "selector": "synonyms[10]",
+        "resolved_source_field": "synonyms[10]"
+      }
+    ]
+  },
+  {
+    "subject_id": "MIM:Geomycin",
+    "token_key": "oxytetracycline",
+    "credited_owner_inputs": [
+      {
+        "subject_id": "MIM:Oxytetracycline",
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Oxytetracycline.yaml",
+        "sha256": "4afb7d012861b670058cec15634f6dd146b4abb78c4f2cdd910de21d57d32d34"
+      }
+    ],
+    "source_inputs": [
+      {
+        "reference": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Geomycin.yaml#ontology_mapping.ontology_label",
+        "sha256": "fa269060e6ebc77f8c8bdf474dbae2432967d180e859387780789a8268d19bda",
+        "selector": "ontology_mapping.ontology_label",
+        "resolved_source_field": "ontology_mapping.ontology_label"
+      }
+    ]
+  },
+  {
+    "subject_id": "MIM:Glebomycin",
+    "token_key": "bluensomycin",
+    "credited_owner_inputs": [
+      {
+        "subject_id": "MIM:Bluensomycin",
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Bluensomycin.yaml",
+        "sha256": "1f46279fd2a89f00445da6eff7b79bbb8a686917030697c2cb99725b9855657d"
+      }
+    ],
+    "source_inputs": [
+      {
+        "reference": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Glebomycin.yaml#ontology_mapping.ontology_label",
+        "sha256": "f14ec57e02fe9731bb5318f0491635540564ec1e7d376d9509eb03ac4eeea1ed",
+        "selector": "ontology_mapping.ontology_label",
+        "resolved_source_field": "ontology_mapping.ontology_label"
+      }
+    ]
+  },
+  {
+    "subject_id": "MIM:L-asparagine",
+    "token_key": "asparagine",
+    "credited_owner_inputs": [
+      {
+        "subject_id": "MIM:Asparagine",
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Asparagine.yaml",
+        "sha256": "230bf341a7759b1f6b6b29460d49f47ca56bccf375bc43768fbda08cf9103f79"
+      }
+    ],
+    "source_inputs": [
+      {
+        "reference": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/L-asparagine.yaml#synonyms[14]",
+        "sha256": "c936ac6337e4d867601ba73d3378e7370518a218e34fc41cbf0bdc506d375b7c",
+        "selector": "synonyms[14]",
+        "resolved_source_field": "synonyms[14]"
+      }
+    ]
+  },
+  {
+    "subject_id": "MIM:L-cysteine",
+    "token_key": "cysteine",
+    "credited_owner_inputs": [
+      {
+        "subject_id": "MIM:Cysteine",
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Cysteine.yaml",
+        "sha256": "91eebbb9397c2f88e483ebe2a97c96546138be9d09e72cab5b667154443055ed"
+      }
+    ],
+    "source_inputs": [
+      {
+        "reference": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/L-cysteine.yaml#synonyms[19]",
+        "sha256": "8c24e38f13a5574684dda7aae35813c6f417016f5ce47089070ccb607aed6e79",
+        "selector": "synonyms[19]",
+        "resolved_source_field": "synonyms[19]"
+      }
+    ]
+  },
+  {
+    "subject_id": "MIM:L-glutamic_Acid",
+    "token_key": "glutamic acid",
+    "credited_owner_inputs": [
+      {
+        "subject_id": "MIM:Glutamic_Acid",
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Glutamic_Acid.yaml",
+        "sha256": "6659214935592ce3ea2d7e3391ccdb615679b32eca645fe6cb3dd685b2f61320"
+      }
+    ],
+    "source_inputs": [
+      {
+        "reference": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/L-glutamic_Acid.yaml#synonyms[12]",
+        "sha256": "1abbfb5fd04f94d5f684108d4304267a5d8c972a9d9a629d60ba755198c6edbb",
+        "selector": "synonyms[12]",
+        "resolved_source_field": "synonyms[12]"
+      }
+    ]
+  },
+  {
+    "subject_id": "MIM:L-proline",
+    "token_key": "proline",
+    "credited_owner_inputs": [
+      {
+        "subject_id": "MIM:Proline",
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Proline.yaml",
+        "sha256": "3e61bdcb6aaa68b6f0d188489811526edd438ec7ccab6574a601effa9dd62df2"
+      }
+    ],
+    "source_inputs": [
+      {
+        "reference": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/L-proline.yaml#synonyms[14]",
+        "sha256": "5dd10c136db722ba99235189330fb4c539abad17d4a52927f533dd5b1cf440d8",
+        "selector": "synonyms[14]",
+        "resolved_source_field": "synonyms[14]"
+      }
+    ]
+  },
+  {
+    "subject_id": "MIM:L-tryptophan",
+    "token_key": "tryptophan",
+    "credited_owner_inputs": [
+      {
+        "subject_id": "MIM:Tryptophan",
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Tryptophan.yaml",
+        "sha256": "33eb945268c2de48a4141c357266d845d83c9d2eb82c121584bb1e65f5b8c543"
+      }
+    ],
+    "source_inputs": [
+      {
+        "reference": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/L-tryptophan.yaml#synonyms[8]",
+        "sha256": "9e95fed47a3744d5ca9420212a63488f02af4050687ee078f892f2a1b17c25e0",
+        "selector": "synonyms[8]",
+        "resolved_source_field": "synonyms[8]"
+      }
+    ]
+  },
+  {
+    "subject_id": "MIM:Liver_Extract_Concentrate",
+    "token_key": "liver extract",
+    "credited_owner_inputs": [
+      {
+        "subject_id": "MIM:Liver_Extract",
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Liver_Extract.yaml",
+        "sha256": "55ee994c1efbbf9ab375e9d673b4f46119d3ed7d8392d48519723de35b903e19"
+      }
+    ],
+    "source_inputs": [
+      {
+        "reference": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Liver_Extract_Concentrate.yaml#ontology_mapping.ontology_label",
+        "sha256": "e0caf606f7a4a437843e740b0c982af74d654c21ae0a635a5d9da1d021987597",
+        "selector": "ontology_mapping.ontology_label",
+        "resolved_source_field": "ontology_mapping.ontology_label"
+      }
+    ]
+  },
+  {
+    "subject_id": "MIM:Liver_Extract_Infusion",
+    "token_key": "liver extract",
+    "credited_owner_inputs": [
+      {
+        "subject_id": "MIM:Liver_Extract",
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Liver_Extract.yaml",
+        "sha256": "55ee994c1efbbf9ab375e9d673b4f46119d3ed7d8392d48519723de35b903e19"
+      }
+    ],
+    "source_inputs": [
+      {
+        "reference": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Liver_Extract_Infusion.yaml#ontology_mapping.ontology_label",
+        "sha256": "b9282556e77cf35f541d0da1d2099a62ee35cbaf115bddec21a1e2c7d7ddefac",
+        "selector": "ontology_mapping.ontology_label",
+        "resolved_source_field": "ontology_mapping.ontology_label"
+      }
+    ]
+  },
+  {
+    "subject_id": "MIM:Trisodium_Citrate",
+    "token_key": "sodium citrate",
+    "credited_owner_inputs": [
+      {
+        "subject_id": "MIM:Na3-citrate_X_2_H2o",
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Na3-citrate_X_2_H2o.yaml",
+        "sha256": "3c1499ff6499f36840a5e3789a881515ef77b9db4781a38d4b2065b4838f8d10"
+      }
+    ],
+    "source_inputs": [
+      {
+        "reference": "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe/mappings/kgmicrobe_unified_entity_mappings.sssom.tsv.gz#object_id=CHEBI:53258",
+        "sha256": "59464e08017cc907a1240a4378d2462efc9e2c1b9d6c3cf0b08b4344ef695ae8",
+        "selector": "object_id=CHEBI:53258",
+        "resolved_source_field": "object_id=CHEBI:53258"
+      },
+      {
+        "reference": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Trisodium_Citrate.yaml#ontology_mapping.ontology_label",
+        "sha256": "18e92ef91df77a9dccc34e47371223f06bde14a937573765f4c0c67ce49e71b9",
+        "selector": "ontology_mapping.ontology_label",
+        "resolved_source_field": "ontology_mapping.ontology_label"
+      },
+      {
+        "reference": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Trisodium_Citrate.yaml#synonyms[9]",
+        "sha256": "18e92ef91df77a9dccc34e47371223f06bde14a937573765f4c0c67ce49e71b9",
+        "selector": "synonyms[9]",
+        "resolved_source_field": "synonyms[9]"
+      }
+    ]
+  },
+  {
+    "subject_id": "MIM:Trisodium_Citrate_X_H2O",
+    "token_key": "trisodium citrate",
+    "credited_owner_inputs": [
+      {
+        "subject_id": "MIM:Trisodium_Citrate",
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Trisodium_Citrate.yaml",
+        "sha256": "18e92ef91df77a9dccc34e47371223f06bde14a937573765f4c0c67ce49e71b9"
+      }
+    ],
+    "source_inputs": [
+      {
+        "reference": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Trisodium_Citrate_X_H2O.yaml#ontology_mapping.ontology_label",
+        "sha256": "47480b3cdddc63a9b7685533ad4c5f20884a34655ec6b76d880ec2178bddbd8d",
+        "selector": "ontology_mapping.ontology_label",
+        "resolved_source_field": "ontology_mapping.ontology_label"
+      }
+    ]
+  },
+  {
+    "subject_id": "MIM:Trypticase",
+    "token_key": "trypticase peptone",
+    "credited_owner_inputs": [
+      {
+        "subject_id": "MIM:Trypticase_Peptone",
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Trypticase_Peptone.yaml",
+        "sha256": "88e513d4f6e6fa153ae508047b9a654922dad2bab84d4624cca2a17ade2b742c"
+      }
+    ],
+    "source_inputs": [
+      {
+        "reference": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Trypticase.yaml#ontology_mapping.ontology_label",
+        "sha256": "ced9ce2808f4e36f73e5a5aa7b2626efa2a85efd67ca1d39b4e15a61d4c454ef",
+        "selector": "ontology_mapping.ontology_label",
+        "resolved_source_field": "ontology_mapping.ontology_label"
+      }
+    ]
+  },
+  {
+    "subject_id": "MIM:Tryptone_Peptone",
+    "token_key": "tryptone",
+    "credited_owner_inputs": [
+      {
+        "subject_id": "MIM:Tryptone",
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Tryptone.yaml",
+        "sha256": "2d4142f88d854838da86fa3f81a34d5d40c302627cf127adc0b50006e5b21356"
+      }
+    ],
+    "source_inputs": [
+      {
+        "reference": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Tryptone_Peptone.yaml#ontology_mapping.ontology_label",
+        "sha256": "d9feb1586ea8908bcf25248a1b9390909a71b72d9def8eedc39d3a0617b9e585",
+        "selector": "ontology_mapping.ontology_label",
+        "resolved_source_field": "ontology_mapping.ontology_label"
+      }
+    ]
+  }
+]

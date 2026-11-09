@@ -12,6 +12,7 @@ from collections import defaultdict
 import argparse
 from typing import Dict, List, Set
 import sys
+import re
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 # Module level stays plain paths so importing this file never requires a
@@ -20,6 +21,7 @@ CULTUREMECH_ROOT_PATH = Path(
     os.environ.get("CULTUREMECH_ROOT", REPO_ROOT.parent / "CultureMech")
 )
 sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_utils.ingredient_identity_rejections import rejection_reason  # noqa: E402
 from kg_microbe_fleet import require_mech_roots  # noqa: E402
 
 
@@ -30,6 +32,7 @@ class OntologyEnrichmentApplicator:
         self.culturemech_root = culturemech_root
         self.enrichment_file = enrichment_file
         self.enrichments = {}
+        self.rejections = []
         self.stats = {
             'media_scanned': 0,
             'media_updated': 0,
@@ -48,9 +51,11 @@ class OntologyEnrichmentApplicator:
         print(f"Loaded {len(self.enrichments)} enrichments")
 
         # Count successful enrichments
-        successful = sum(1 for e in self.enrichments.values() if e.get('chebi_id'))
-        print(f"  {successful} with ChEBI IDs")
-        print(f"  {len(self.enrichments) - successful} without ChEBI IDs")
+        successful = sum(1 for name, e in self.enrichments.items()
+                         if e.get('chebi_id') and not rejection_reason(
+                             ontology_id=e['chebi_id'], name=name, cas=e.get('cas_rn')))
+        print(f"  {successful} admissible ChEBI IDs")
+        print(f"  {len(self.enrichments) - successful} without an admissible ChEBI ID")
 
     def get_chebi_label(self, chebi_id: str) -> str:
         """
@@ -95,6 +100,19 @@ class OntologyEnrichmentApplicator:
                         chebi_id = enrichment.get('chebi_id')
 
                         if chebi_id:
+                            # FEBA source notes use the same explicit CAS annotation as the producer.
+                            source_cas = re.findall(r"CAS:\s*([0-9]{2,7}-[0-9]{2}-[0-9])",
+                                                    ingredient.get("notes", ""))
+                            reason = next((why for cas in (*source_cas, enrichment.get("cas_rn"),
+                                          ingredient.get("cas_rn"), ingredient.get("identifier"),
+                                          (ingredient.get("chemical_properties") or {}).get("cas_rn"))
+                                           if (why := rejection_reason(ontology_id=chebi_id,
+                                                name=preferred_term, cas=cas))), None)
+                            if reason:
+                                self.rejections.append({"path": str(yaml_file), "name": preferred_term,
+                                                        "chebi_id": chebi_id, "reason": reason})
+                                print(f"[REJECTED] {preferred_term} → {chebi_id}: {reason}")
+                                continue
                             # Check if ingredient already has ontology ID
                             term = ingredient.get('term', {})
                             existing_id = term.get('id', '')

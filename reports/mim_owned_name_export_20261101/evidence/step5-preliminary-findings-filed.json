@@ -1,0 +1,34 @@
+[
+  {
+    "kind": "alias",
+    "url": "https://github.com/CultureBotAI/culturebotai-claw/issues/703",
+    "created_at": "2026-11-01T12:43:08.867883+00:00",
+    "argv": [
+      "gh",
+      "issue",
+      "create",
+      "-R",
+      "CultureBotAI/culturebotai-claw",
+      "--title",
+      "Refuse absent case/Unicode-equivalent artifact destinations before writing",
+      "--body-file",
+      "output/approved-plan-20261101T031134Z/step5-review-alias-issue.md"
+    ]
+  },
+  {
+    "kind": "race",
+    "url": "https://github.com/CultureBotAI/culturebotai-claw/issues/704",
+    "created_at": "2026-11-01T12:43:09.676289+00:00",
+    "argv": [
+      "gh",
+      "issue",
+      "create",
+      "-R",
+      "CultureBotAI/culturebotai-claw",
+      "--title",
+      "Recheck artifact bytes after source callbacks before reporting success",
+      "--body-file",
+      "output/approved-plan-20261101T031134Z/step5-review-race-issue.md"
+    ]
+  }
+]

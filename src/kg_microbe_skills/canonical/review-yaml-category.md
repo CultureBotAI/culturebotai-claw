@@ -6,7 +6,7 @@ metadata:
   category: review
   requires_database: false
   requires_internet: true
-  version: 1.0.0
+  version: 2.0.0
 ---
 
 # Review one {{ display_name }} YAML record category
@@ -18,13 +18,39 @@ metadata:
 ## The Contract
 
 <!-- canonical:begin the-contract -->
+**Durable session state.**
+Use the gitignored `<repo>/.temp/` as the durable work root for review campaigns,
+worktrees, batch state, draft review bundles and handoffs. Use
+`~/agent-work/<repo>/` when a separate clone is needed. Verify `.temp/` is ignored
+before use; provision a missing ignore rule through an authorized repository
+change. Keep maintained helpers and accepted evidence in their native tracked
+directories; a durable scratch root does not replace their provenance contract.
+
+Never store session state or helper scripts in `/tmp/`, `/private/tmp/` or `$TMPDIR`.
+Only disposable caches and pytest temporary fixtures may use system temp roots.
+Use a unique subdirectory for each task and preserve other sessions' state.
+
+Report every auxiliary clone for identity verification and inventory in
+session_repository_roots, and owned campaign/handoff directories in
+session_state_paths. Missing inventory is unknown, not healthy. Report new paths
+to the supervisor/operator; do not edit live configuration or expand authority.
+
+For authorized Git work, push each committed batch branch to `origin` the same
+day, whether or not a PR is opened. Verify the exact pushed head with the remote;
+a local commit or remote-tracking ref alone is not publication proof. Inspect
+the repository's current workflow triggers before claiming a branch push runs
+no CI. A goal delivering commits cannot close while recorded commits exist only
+locally. Publication failure is a retained blocker, never permission to discard
+the branch. This rule grants no Git mutation, merge, cleanup or provider
+authorization beyond the task and the skill's existing boundaries.
+
 Produce a read-only judgement of a coherent record category: which records
 belong together, which are synonyms or aliases that should be lumped, which
 mix unrelated concepts and should be split, which patterns are well supported,
 and which future curation changes would make the category sound.
 
 Reviewing a category is not curation. A review request authorizes reads,
-validation commands, Markdown reports under the review-report path named below,
+validation commands, structured YAML/Markdown review bundles described below,
 and a concise final summary; it does not authorize editing records,
 regenerating products, spending provider credits, contacting anyone, or
 creating or mutating GitHub issues, pull requests, comments, labels, or
@@ -43,23 +69,22 @@ lump them before reviewing so duplicates are judged together.
 ## Scope
 
 <!-- canonical:begin scope -->
-Review only YAML records from this repository's curated record corpus. If a
-record is generated from a maintained table, overlay, or source transform,
-report the maintained upstream input that owns any future fix. Do not patch
-generated artifacts, generated pages, cache files, reports, or cross-repository
-outputs to make a reviewed category look correct, except for new review
-reports this skill writes.
+Review records from this repository's declared corpus, including an exact frozen
+snapshot row when the local profile uses that surface. Read
+`docs/record-review-profile.md` for the active native review entrypoints, local
+rubrics, validators, and maintained input ownership. A curation skill is not a
+prerequisite for reviewing a record.
 
-Use the write boundaries, generated-output warnings, and curation ownership
-rules from `.claude/skills/curate-yaml-record/SKILL.md` to decide where future
-fixes would belong. For this skill, report those paths; do not make the
-changes.
+For a generated record, identify the maintained table, overlay, source transform
+or seeder that owns a future fix. Do not patch records, generated artifacts,
+pages, caches, or cross-repository outputs. Only the new review bundle is written.
 
-Use `.claude/skills/review-yaml-record/SKILL.md` for the per-record review
-rubric and `.claude/skills/curate-yaml-record/references/review-checklist.md`
-for repository-specific field expectations. The category review adds a boundary
-layer: membership, lumping, splitting, and systemic patterns across the member
-records.
+Preserve local claim types, priority rules, scoring definitions, and scientific
+status/history gates. The shared shape standardizes observations; it does not
+replace the Mech's field-by-field rubric or authorize status promotion.
+
+Use the local record-review rubric for individual members. Add explicit cohort
+membership, lump/split/retain/defer decisions and systemic findings.
 <!-- canonical:end scope -->
 
 ## Evidence Rules
@@ -140,10 +165,8 @@ search, call the miss provisional.
 
 <!-- canonical:begin workflow -->
 1. Read the local guidance that names exact validators and write boundaries:
-   `CLAUDE.md`, `justfile`,
-   `.claude/skills/review-yaml-record/SKILL.md`,
-   `.claude/skills/curate-yaml-record/SKILL.md`, and
-   `.claude/skills/curate-yaml-record/references/review-checklist.md`.
+   `CLAUDE.md`, `justfile`, `docs/record-review-profile.md`, its local rubrics,
+   and `docs/record-reviews.md` for the shared output contract.
 2. Resolve the requested category into one or more bounded cohorts under the
    curated record globs named above. Record the selection rule for each cohort,
    then enumerate its candidate members from the filesystem. Do not write a
@@ -188,82 +211,38 @@ search, call the miss provisional.
 ## Output
 
 <!-- canonical:begin output -->
-After resolving at least one coherent target category and completing a review,
-write one timestamped Markdown report per reviewed cohort before the final
-response:
+Save one immutable structured review bundle per reviewed cohort
+using the CLAW-governed contract in `docs/record-reviews.md` and
+`schema/record_review.yaml`. Preserve the local rubric identified by
+`docs/record-review-profile.md`.
 
-- Name each report
-  `reports/yaml_category_review/<YYYYMMDDTHHMMSSZ>-<category-slug>.md`. Use
-  `date -u +%Y%m%dT%H%M%SZ` for the UTC timestamp. Preserve the category slug
-  when it is already filename-safe; otherwise slugify it to lower-case ASCII
-  words joined with `-`.
-- Create `reports/yaml_category_review/` if it does not exist.
-- Do not overwrite or append to a prior review. If a filename already exists,
-  regenerate the timestamp.
-- Keep this section order so review reports are easy to diff across the fleet:
+- Capture actual UTC start/finish, reviewer identity and independence, exact
+  target IDs/locators, Git base, input hashes, and generated-input owners.
+- Retain every check and its real result, domain assessments, inspected evidence,
+  normalized findings, native rules/severity rationale, proposed actions with
+  acceptance checks, and explicit limitations. Do not equate a deterministic
+  check with scientific review.
+- Use `kind: category`; enumerate reviewed members, population and selection,
+  and record explicit lump/split/retain/defer decisions with evidence. Sampled
+  coverage must retain its method and uninspected remainder.
+- Invoke `uv run python scripts/record_review.py inspect --targets <targets.yaml>`
+  before assessment, then `validate <completed-review.yaml>` and
+  `save --content <completed-review.yaml>` with the same script. Recheck changed
+  inputs instead of silently refreshing their hashes.
+- The saver writes
+  `reviews/structured/<YYYYMMDDTHHMMSSZ>-<slug>/review.yaml` plus `review.md`.
+  YAML is authoritative; do not hand-edit the rendered Markdown or overwrite an
+  earlier bundle. Run `uv run python scripts/record_review.py check` afterward.
+- If required checks are unavailable after the target is resolved, save an honest
+  partial/blocked observation. If the shared saver itself cannot run, report
+  that persistence is blocked; session-only prose is not a saved review.
+- Retain stable issue keys and exact `previous_occurrences` when reassessing a
+  finding. A later clean report does not close earlier unresolved findings.
+- Do not append curation/history events or promote native scientific status.
+  Those require a separately authorized curation change and native gates.
 
-```markdown
-# YAML Category Review: <category label>
-
-- Repository:
-- Category:
-- Selection Rule:
-- Started UTC:
-- Finished UTC:
-- Verdict:
-
-## Target Category
-## Selection and Membership
-## Validation
-## Lump and Split Review
-## Identity and Grounding
-## Evidence Patterns
-## Completeness Patterns
-## Findings
-## Recommended Edits
-## Follow-up Checks
-## Additional Notes
-```
-
-Use tables, bullets, or prose inside those headings as the category demands.
-Put repo-specific diagnostics, edge cases, and low-signal observations under
-**Additional Notes** instead of inventing new top-level sections.
-
-The report must cover:
-
-- **Verdict**: pass, pass with minor issues, or needs curation.
-- **Target Category**: the resolved cohort label, source request, selection
-  rule, member count, and whether coverage was full, split into subcohorts, or
-  sampled.
-- **Selection and Membership**: every included record path and every excluded
-  near miss that explains the boundary.
-- **Validation**: each command run and its result, including unavailable checks.
-- **Lump and Split Review**: synonyms, duplicate identities, over-split
-  variants, over-broad groups, singleton smells, and legitimate siblings that
-  should remain separate.
-- **Identity and Grounding**: whether the members agree on class, identifier
-  policy, label shape, source identity, ontology grounding, and internal
-  references.
-- **Evidence Patterns**: supported category-level patterns, unsupported or
-  over-scoped source usage, and citation or snippet mismatches that recur.
-- **Completeness Patterns**: consequential gaps, empty optional slots correctly
-  left empty, and bounded searches that found nothing.
-- **Findings**: blocker, major, and minor findings, each with evidence,
-  affected paths, and a maintained owner path for any fix.
-- **Recommended Edits**: concrete future curation actions, ordered by severity,
-  with the maintained path that owns each fix.
-- **Follow-up Checks**: the narrowest validators or manual checks that would
-  prove each recommended edit.
-
-Use `None found` or `Not checked: <reason>` when a section has no findings or a
-check cannot run; do not delete required headings. If only a sample was read,
-the verdict must say `sampled` and must not claim full-category coverage.
-
-Do not append a curation event, promote a review status, or write a history
-entry from this read-only review. Those belong to a later curation change.
-If the request needs disambiguation before a coherent category is resolved, ask
-for it without creating a report.
-
-In the final response, link every report path and summarize only each verdict,
-finding counts by severity, and any skipped validators or unresolved blockers.
+Do not create a report for an unresolved ambiguous target. In the final response,
+link both saved files and summarize scope, verdict, findings by severity, and
+unavailable checks. Existing ad hoc Markdown is historical, not the output format
+for new reviews.
 <!-- canonical:end output -->

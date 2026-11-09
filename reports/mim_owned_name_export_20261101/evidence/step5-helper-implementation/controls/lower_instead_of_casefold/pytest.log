@@ -1,0 +1,18 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+__ test_casefold_without_punctuation_internal_space_or_unicode_normalization ___
+
+    def test_casefold_without_punctuation_internal_space_or_unicode_normalization():
+        owners = build_owner_index({
+            "MIM:Street": record(" Straße "),
+            "MIM:Spaces": record("Parent  name"),
+            "MIM:Stereo": record("(S)-malate"),
+            "MIM:Accent": record("é"),
+        })
+>       assert "strasse" in owners and "straße" not in owners
+E       AssertionError: assert ('strasse' in {'(s)-malate': frozenset({'MIM:Stereo'}), 'parent  name': frozenset({'MIM:Spaces'}), 'straße': frozenset({'MIM:Street'}), 'é': frozenset({'MIM:Accent'})})
+
+tests/test_mim_owned_name_policy.py:62: AssertionError
+=========================== short test summary info ============================
+FAILED ../../../../../../../../../../../../dev::test_casefold_without_punctuation_internal_space_or_unicode_normalization
+1 failed, 47 deselected in 0.02s
