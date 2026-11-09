@@ -35,6 +35,8 @@ jobs:
           python-version: "3.13"
       - name: Install test dependencies
         run: python -m pip install --upgrade pip pytest oaklib
+      - name: Smoke-test real OAK import
+        run: python -c "from oaklib import get_adapter; assert callable(get_adapter)"
       - name: Run canonical ID-label behavioral tests
         working-directory: src/kg_microbe_governance/artifacts
         run: |

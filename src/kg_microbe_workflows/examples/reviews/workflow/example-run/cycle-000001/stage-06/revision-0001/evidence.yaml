@@ -1,0 +1,25 @@
+schema_version: 1.0.0
+repository_key: examplemech
+github_repository: example/Mech
+run_id: example-run
+cycle: 1
+stage: 6
+revision: 1
+outcome: no_findings
+summary: Illustrative empty outcome; this is not a completed live goal.
+source_revision: f3c7684bedeecf4af707b1b3b9c484e6f1a4fba6
+artifacts:
+- path: reviews/workflow/example-run/cycle-000001/stage-06/revision-0001/infra_snapshot.md
+  sha256: 98c19e3397082a7438ef9dd02036f3563506b0998be1842e1105a437b0e1517c
+  kind: infra_snapshot
+- path: reviews/workflow/example-run/cycle-000001/stage-06/revision-0001/implementation_plan.md
+  sha256: 89fd696eed15320d16a9e1d9d223d6c3b132d2b600c435ceda7f98e5d37603f0
+  kind: implementation_plan
+- path: reviews/workflow/example-run/cycle-000001/stage-06/revision-0001/validation.md
+  sha256: 89fd696eed15320d16a9e1d9d223d6c3b132d2b600c435ceda7f98e5d37603f0
+  kind: validation
+findings: []
+groups: []
+carry_forward_ids: []
+infra_tasks: []
+scope_frozen_at: '2026-10-20T00:00:00Z'

@@ -1,0 +1,5 @@
+Independent review of #701 at `e78e220d153e41d4340ad0f8abfbd83d96d01b57` found that late CAS token handling applies ownership filtering before REJECTED_LABEL exclusion. When a CAS display token is already rejected in its subject YAML and also owned elsewhere, the output correctly omits it but the sidecar incorrectly records SUPPRESS, attributing a source rejection to the export policy.
+
+Filter source-rejected CAS display tokens before the ownership policy on every late CAS/registry path. Add regressions for symmetric, direct-registry and B1-registry paths, retaining the positive case where a genuinely eligible owned CAS token is suppressed and attributed.
+
+Independent reproduction and log are the same exact-head builder boundary evidence as the producer finding: `step5-claw-independent/code-e78e220/builder-boundary-results.json`, log SHA256 `2effda2ecb67559e78c323148fe507ecdcea4cbc01d5a11859d677844508d875`. This is incorrect suppression provenance, not a leaked rejected output token or a scientific merge decision.

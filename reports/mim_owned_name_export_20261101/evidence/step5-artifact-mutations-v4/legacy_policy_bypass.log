@@ -1,0 +1,89 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_ test_legacy_publisher_refuses_policy_candidate_even_without_manifest[False] __
+
+setup = (PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8547/test_legacy_publishe...ppression-sidecar-required"\nsubject_id\tother\nMIM:Subject\tkept\n', <function setup.<locals>.publish at 0x10b5f6de0>)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10b90be10>
+same_tsv = False
+
+    @pytest.mark.parametrize("same_tsv", [False, True])
+    def test_legacy_publisher_refuses_policy_candidate_even_without_manifest(setup, monkeypatch, same_tsv):
+        output, _, _, sssom, publish = setup
+        publish()
+        spec = importlib.util.spec_from_file_location("policy_publish_test", ROOT / "scripts/publish_sssom.py")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        canonical = output.parent / "canonical.tsv"
+        canonical.write_bytes(sssom if same_tsv else b"old canonical bytes\n")
+        original = canonical.read_bytes()
+        output.with_suffix(output.suffix + ".manifest.json").unlink()
+        monkeypatch.setattr(module, "WORKING_COPY", output)
+        monkeypatch.setattr(module, "PUBLISHED", canonical)
+        monkeypatch.setattr(module, "require_mech_roots", lambda *args, **kwargs: None)
+        monkeypatch.setattr(sys, "argv", ["publish_sssom.py", "--apply"])
+        with pytest.raises(SystemExit) as error:
+>           module.main()
+
+tests/test_mim_sssom_artifacts.py:221: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/publish_sssom.py:655: in main
+    diff = diff_rows(prev_parsed, new_parsed)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+prev = [], new = [{'other': 'kept', 'subject_id': 'MIM:Subject'}]
+
+    def diff_rows(prev: list[dict[str, str]], new: list[dict[str, str]]) -> SssomDiff:
+        """Compare two SSSOM row sets on `(subject_id, object_id)`.
+    
+        A row present on one side only is not automatically an add or a removal:
+        if the same object appears on the other side under a subject that is only
+        *spelled* differently, the record did not leave the mapping set, its
+        subject was rewritten. Those pair up as `respelled` and are neutral for the
+        truncation guard -- but they are reported, because 82 of them at once means
+        every downstream consumer holding the old subject needs an alias row.
+        """
+        prev_by_key = {(r["subject_id"], r["object_id"]): r for r in prev}
+>       new_by_key = {(r["subject_id"], r["object_id"]): r for r in new}
+                                        ^^^^^^^^^^^^^^
+E       KeyError: 'object_id'
+
+scripts/publish_sssom.py:352: KeyError
+----------------------------- Captured stdout call -----------------------------
+Working copy: /private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8547/test_legacy_publisher_refuses_0/artifacts/candidate.sssom.tsv (1 rows, sha256=446a924fe080)
+Published:    /private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8547/test_legacy_publisher_refuses_0/artifacts/canonical.tsv (0 rows, sha256=c00162bcbc7c)
+Delta:        +1 rows
+__ test_legacy_publisher_refuses_policy_candidate_even_without_manifest[True] __
+
+setup = (PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8547/test_legacy_publishe...ppression-sidecar-required"\nsubject_id\tother\nMIM:Subject\tkept\n', <function setup.<locals>.publish at 0x10b764220>)
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10b936570>
+same_tsv = True
+
+    @pytest.mark.parametrize("same_tsv", [False, True])
+    def test_legacy_publisher_refuses_policy_candidate_even_without_manifest(setup, monkeypatch, same_tsv):
+        output, _, _, sssom, publish = setup
+        publish()
+        spec = importlib.util.spec_from_file_location("policy_publish_test", ROOT / "scripts/publish_sssom.py")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        canonical = output.parent / "canonical.tsv"
+        canonical.write_bytes(sssom if same_tsv else b"old canonical bytes\n")
+        original = canonical.read_bytes()
+        output.with_suffix(output.suffix + ".manifest.json").unlink()
+        monkeypatch.setattr(module, "WORKING_COPY", output)
+        monkeypatch.setattr(module, "PUBLISHED", canonical)
+        monkeypatch.setattr(module, "require_mech_roots", lambda *args, **kwargs: None)
+        monkeypatch.setattr(sys, "argv", ["publish_sssom.py", "--apply"])
+>       with pytest.raises(SystemExit) as error:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'SystemExit'>
+
+tests/test_mim_sssom_artifacts.py:220: Failed
+----------------------------- Captured stdout call -----------------------------
+Published file already up to date (sha256=446a924fe080). Nothing to do.
+=========================== short test summary info ============================
+FAILED tests/test_mim_sssom_artifacts.py::test_legacy_publisher_refuses_policy_candidate_even_without_manifest[False]
+FAILED tests/test_mim_sssom_artifacts.py::test_legacy_publisher_refuses_policy_candidate_even_without_manifest[True]
+2 failed in 0.09s

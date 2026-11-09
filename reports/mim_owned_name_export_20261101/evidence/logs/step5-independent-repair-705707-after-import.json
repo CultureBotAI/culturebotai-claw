@@ -1,0 +1,15 @@
+{
+  "name": "step5-independent-repair-705707-after-import",
+  "argv": [
+    "python",
+    "-B",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-705-707-v1/after-import/probe.py"
+  ],
+  "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+  "started_at": "2026-11-01T13:03:52.013011+00:00",
+  "environment_profile": "generation-and-native-qc",
+  "finished_at": "2026-11-01T13:03:52.083272+00:00",
+  "exit_code": 0,
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-independent-repair-705707-after-import.log",
+  "log_sha256": "4f43e6209c41f16b306cddfde4f53096cb3c6ae842d9ca7a6fbaf78cb3e4a556"
+}

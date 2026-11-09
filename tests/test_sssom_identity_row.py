@@ -30,12 +30,15 @@ sys.modules[_SPEC.name] = builder
 _SPEC.loader.exec_module(builder)
 
 
-def write_record(tmp_path, stem, identifier, ontology_id, quality, label="Thing"):
+def write_record(tmp_path, stem, identifier, ontology_id, quality, label="Thing",
+                 ingredient_type=None):
     path = tmp_path / f"{stem}.yaml"
+    type_line = f"ingredient_type: {ingredient_type}\n" if ingredient_type else ""
     path.write_text(
         f"identifier: {identifier}\n"
         f"preferred_term: {label}\n"
         f"mapping_status: MAPPED\n"
+        f"{type_line}"
         f"ontology_mapping:\n"
         f"  ontology_id: {ontology_id}\n"
         f"  ontology_label: {label}\n"
@@ -202,15 +205,167 @@ def test_a_row_with_no_prior_stamp_is_absent_not_reset():
     assert (stamp, outcome) == (None, "absent")
 
 
-def test_narrow_match_to_a_different_parent_stays_narrow(tmp_path):
+def test_narrow_match_to_a_different_parent_stays_asymmetric(tmp_path):
     """NARROW_MATCH identity rows were already exactMatch and must stay so,
-    while the asymmetric parent row keeps its narrowMatch."""
+    while the parent row stays asymmetric.
+
+    The parent predicate is skos:broadMatch since MediaIngredientMech#390: a
+    record graded NARROW_MATCH is narrower, so its ontology parent is the
+    BROADER concept, and `A skos:broadMatch B` asserts exactly that. It emitted
+    skos:narrowMatch before, which under SKOS says the parent is narrower.
+    """
     rows = rows_for(tmp_path, stem="Thing", identifier="kgmicrobe.ingredient:thing",
                     ontology_id="CHEBI:17634", quality="NARROW_MATCH")
 
     assert next(r for r in rows
-                if r["object_id"] == "CHEBI:17634")["predicate_id"] == "skos:narrowMatch"
+                if r["object_id"] == "CHEBI:17634")["predicate_id"] == "skos:broadMatch"
     assert identity_row(rows, "kgmicrobe.ingredient:thing")["predicate_id"] == "skos:exactMatch"
+
+
+@pytest.mark.parametrize(
+    ("stem", "identifier", "ontology_id", "ingredient_type"),
+    [
+        ("MES_Buffer", "kgmicrobe.ingredient:mes_buffer", "CHEBI:39010",
+         "STOCK_SOLUTION"),
+        ("Amylopectin_From_Maize", "kgmicrobe.ingredient:amylopectin_from_maize",
+         "CHEBI:28057", "SINGLE_INGREDIENT"),
+        ("Casamino_Acids_Vitamin_Assay",
+         "kgmicrobe.ingredient:casamino_acids_vitamin_assay", "mesh:C017721",
+         "UNDEFINED_MIXTURE"),
+        ("PBS", "kgmicrobe.ingredient:pbs", "NCIT:C178908", "STOCK_SOLUTION"),
+        # Synthetic reverse-direction control: either explicit local identity
+        # satisfies B1, regardless of the namespace inferred from the parent.
+        ("Thing", "kgmicrobe.compound:thing", "FOODON:00001234",
+         "SINGLE_INGREDIENT"),
+        ("Buffer_(pH7)", "kgmicrobe.ingredient:buffer_~28ph7~29", "CHEBI:39010",
+         "STOCK_SOLUTION"),
+    ],
+)
+def test_b1_preserves_curated_namespace_when_parent_prefix_differs(
+    tmp_path, stem, identifier, ontology_id, ingredient_type,
+):
+    """#679: backfill must not invent a second namespace for an existing ID.
+
+    The real source-qualified amylopectin record deliberately keeps its local
+    ingredient identity despite SINGLE_INGREDIENT classification. Neither that
+    coarse type nor the ontology parent's prefix may replace curated identity.
+    """
+    rows = rows_for(tmp_path, stem=stem, identifier=identifier,
+                    ontology_id=ontology_id, quality="NARROW_MATCH",
+                    ingredient_type=ingredient_type)
+
+    assert len(rows) == 2
+    assert {(r["object_id"], r["predicate_id"]) for r in rows} == {
+        (ontology_id, "skos:broadMatch"),
+        (identifier, "skos:exactMatch"),
+    }
+    assert {r["subject_id"] for r in rows} == {builder._mim_curie(f"{stem}.yaml")}
+
+
+@pytest.mark.parametrize(
+    ("identifier", "ontology_id"),
+    [
+        ("kgmicrobe.compound:thing", "CHEBI:17634"),
+        ("kgmicrobe.ingredient:thing", "FOODON:00001234"),
+    ],
+)
+def test_b1_does_not_duplicate_a_matching_namespace(tmp_path, identifier, ontology_id):
+    rows = rows_for(tmp_path, stem="Thing", identifier=identifier,
+                    ontology_id=ontology_id, quality="NARROW_MATCH")
+
+    assert len(rows) == 2
+    assert [r["object_id"] for r in rows].count(identifier) == 1
+    assert identity_row(rows, identifier)["predicate_id"] == "skos:exactMatch"
+
+
+def test_b1_still_synthesizes_a_registry_row_for_a_cas_primary(tmp_path):
+    """A CAS identity does not satisfy the local-registry obligation."""
+    rows = rows_for(tmp_path, stem="Thing", identifier="cas:1234-56-7",
+                    ontology_id="CHEBI:17634", quality="NARROW_MATCH")
+
+    assert len(rows) == 3
+    assert {(r["object_id"], r["predicate_id"]) for r in rows} == {
+        ("CHEBI:17634", "skos:broadMatch"),
+        ("cas:1234-56-7", "skos:exactMatch"),
+        ("kgmicrobe.compound:thing", "skos:exactMatch"),
+    }
+
+
+def test_b1_requires_the_subject_slug_even_with_another_local_identity(tmp_path):
+    """#684: retain B1's subject slug in the curated identity's namespace."""
+    rows = rows_for(tmp_path, stem="Thing", identifier="kgmicrobe.ingredient:other",
+                    ontology_id="CHEBI:17634", quality="NARROW_MATCH")
+
+    assert len(rows) == 3
+    assert {(r["object_id"], r["predicate_id"]) for r in rows} == {
+        ("CHEBI:17634", "skos:broadMatch"),
+        ("kgmicrobe.ingredient:other", "skos:exactMatch"),
+        ("kgmicrobe.ingredient:thing", "skos:exactMatch"),
+    }
+
+
+def test_b1_stock_alias_retains_the_curated_namespace_with_a_different_slug(tmp_path):
+    """#684: the real Sodium_Nitrate_070_M_Stock identity predates its filename.
+
+    Preserve that curated identity and add the filename-based B1 handle in the
+    same namespace; the broader sodium nitrate compound does not type the stock.
+    """
+    identifier = "kgmicrobe.ingredient:sodium_nitrate_~28070_m_stock~29"
+    rows = rows_for(
+        tmp_path, stem="Sodium_Nitrate_070_M_Stock", identifier=identifier,
+        ontology_id="CHEBI:63005", quality="NARROW_MATCH",
+        ingredient_type="STOCK_SOLUTION", label="Sodium nitrate (0.70 M stock)",
+    )
+
+    assert len(rows) == 3
+    assert {(r["object_id"], r["predicate_id"]) for r in rows} == {
+        ("CHEBI:63005", "skos:broadMatch"),
+        (identifier, "skos:exactMatch"),
+        ("kgmicrobe.ingredient:sodium_nitrate_070_m_stock", "skos:exactMatch"),
+    }
+    alias = identity_row(rows, "kgmicrobe.ingredient:sodium_nitrate_070_m_stock")
+    assert alias["object_source"] == "kgm:ingredient"
+
+
+@pytest.mark.parametrize(
+    ("identifier", "ontology_id", "expected_alias"),
+    [
+        ("kgmicrobe.ingredient:MES_Buffer", "CHEBI:39010",
+         "kgmicrobe.ingredient:mes_buffer"),
+        ("kgmicrobe.compound:MES_Buffer", "FOODON:00001234",
+         "kgmicrobe.compound:mes_buffer"),
+        ("kgmicrobe.compound:another_slug", "FOODON:00001234",
+         "kgmicrobe.compound:mes_buffer"),
+    ],
+)
+def test_b1_canonical_alias_keeps_namespace_for_mixed_case_or_other_slug(
+    tmp_path, identifier, ontology_id, expected_alias,
+):
+    """#685: preserve original spelling without a B5 namespace collision.
+
+    B1 requires the lowercase subject slug, so merely skipping the backfill
+    case-insensitively would not satisfy it for a mixed-case primary identity.
+    """
+    rows = rows_for(tmp_path, stem="MES_Buffer", identifier=identifier,
+                    ontology_id=ontology_id, quality="NARROW_MATCH")
+
+    assert len(rows) == 3
+    assert {(r["object_id"], r["predicate_id"]) for r in rows} == {
+        (ontology_id, "skos:broadMatch"),
+        (identifier, "skos:exactMatch"),
+        (expected_alias, "skos:exactMatch"),
+    }
+
+
+def test_b1_does_not_add_a_registry_row_for_a_close_match_parent(tmp_path):
+    rows = rows_for(tmp_path, stem="Thing", identifier="kgmicrobe.ingredient:thing",
+                    ontology_id="CHEBI:17634", quality="CLOSE_MATCH")
+
+    assert len(rows) == 2
+    assert {(r["object_id"], r["predicate_id"]) for r in rows} == {
+        ("CHEBI:17634", "skos:closeMatch"),
+        ("kgmicrobe.ingredient:thing", "skos:exactMatch"),
+    }
 
 
 def test_identity_row_drops_a_stale_symmetric_comment(tmp_path, monkeypatch):
@@ -378,3 +533,20 @@ def test_the_outcome_counts_sum_to_the_rows_considered():
     outcomes = builder.apply_replayed_stamps(rows, prior)
 
     assert sum(outcomes.values()) == 2, "the pre-stamped row is skipped, not counted"
+
+
+def test_the_header_declares_skos_predicate_semantics():
+    """kg-microbe reads the direction of every asymmetric row from this one
+    header line and treats its absence as the legacy inverted convention
+    (kg-microbe#822). Emitting broadMatch rows under a header without it would
+    invert every parent edge downstream, so the two ship together or not at all.
+
+    Top-level means `# key: value` with exactly one space after the `#` -- SSSOM
+    headers are nested YAML, and a nested key of this name is not the declaration.
+    """
+    header = builder.HEADER_TEMPLATE if hasattr(builder, "HEADER_TEMPLATE") else None
+    source = Path(builder.__file__).read_text(encoding="utf-8")
+    text = header if isinstance(header, str) else source
+    assert "\n# predicate_semantics: skos\n" in text
+    assert 'predicate = "skos:broadMatch"' in source
+    assert 'predicate = "skos:narrowMatch"' not in source

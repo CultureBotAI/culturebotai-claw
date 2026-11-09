@@ -1,0 +1,34 @@
+{
+  "name": "truthy_representative_fallback",
+  "argv": [
+    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python3",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "-c",
+    "/dev/null",
+    "--confcutdir",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-helper-implementation/controls/truthy_representative_fallback",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-helper-implementation/controls/truthy_representative_fallback/tests/test_mim_owned_name_policy.py",
+    "-k",
+    "test_explicit_empty_or_unresolved_representative_never_uses_old_identifier"
+  ],
+  "started_at": "2026-11-01T12:39:56.467268+00:00",
+  "finished_at": "2026-11-01T12:39:57.467130+00:00",
+  "exit_code": 1,
+  "expected_failure": true,
+  "control_pass": true,
+  "selection": "test_explicit_empty_or_unresolved_representative_never_uses_old_identifier",
+  "mutation": {
+    "before": "target = data.get(\"representative\") if \"representative\" in data else data.get(\"identifier\")",
+    "after": "target = data.get(\"representative\") or data.get(\"identifier\")"
+  },
+  "source_sha256": "f7b7af98e5cd695614880da0c0819405d4e6f22ce116d37c47fa6149eb845807",
+  "test_sha256": "62c8675b32177dbc609218851ac13d409cf6dfd628fe37118a76a6c2cc7516b6",
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-helper-implementation/controls/truthy_representative_fallback/pytest.log",
+  "log_sha256": "f2718e54ab987ebffe60f2f2ad200837dae6453108abcab29e0d9f69ccba4ce4",
+  "fresh_process": true,
+  "fresh_bytecode_prefix": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-helper-implementation/controls/truthy_representative_fallback/bytecode"
+}

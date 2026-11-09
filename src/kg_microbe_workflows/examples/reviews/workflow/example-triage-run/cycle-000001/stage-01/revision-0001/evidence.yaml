@@ -1,0 +1,44 @@
+schema_version: 2.0.0
+parent_version: 2.0.0
+stage_key: open_issue_triage
+repository_key: traitmech
+github_repository: CultureBotAI/TraitMech
+run_id: example-triage-run
+cycle: 1
+stage: 1
+revision: 1
+outcome: no_findings
+summary: Illustrative empty outcome, not a live completed goal.
+source_revision: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+scope_frozen_at: '2026-11-06T10:00:00Z'
+artifacts:
+- path: reviews/workflow/example-triage-run/cycle-000001/stage-01/revision-0001/issue_inventory.json
+  sha256: 5b822cc53c550b49996c32315ae5a2ab5c9acc897608d95229175ef1e05d8a4d
+  kind: issue_inventory
+- path: reviews/workflow/example-triage-run/cycle-000001/stage-01/revision-0001/issue_groups.json
+  sha256: 4ea5e45828cc630698c2b6dd78dec2319daead3354f31c205ee1912a8652faf2
+  kind: issue_groups
+- path: reviews/workflow/example-triage-run/cycle-000001/stage-01/revision-0001/group_plans.json
+  sha256: b64c0e49d0efd3c2fcaaa3ee263b0ec157ae142658b437686885d95bc90e3f09
+  kind: group_plans
+- path: reviews/workflow/example-triage-run/cycle-000001/stage-01/revision-0001/dispositions.json
+  sha256: 10825bbad6beb4ffd80d07f8aa6d6b21a0024905da069d2cada279b2065cbec3
+  kind: dispositions
+- path: reviews/workflow/example-triage-run/cycle-000001/stage-01/revision-0001/validation.json
+  sha256: c9fcef0283be5b402687c51a1e75159a3191524b559457c2e35c0f2ec9bc62e7
+  kind: validation
+findings: []
+groups: []
+carry_forward_ids: []
+infra_tasks: []
+issue_triage:
+  inventory: []
+  groups: []
+  group_plans: []
+  dispositions: []
+  carry_forward_group_ids: []
+  budget:
+    limit_seconds: 14400
+    selected_group_ids: []
+    work_intervals: []
+    unused_reason: Illustrative empty frozen inventory; no live triage occurred.

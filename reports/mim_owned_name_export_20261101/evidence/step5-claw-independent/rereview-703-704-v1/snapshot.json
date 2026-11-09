@@ -1,0 +1,26 @@
+[
+  {
+    "path": "src/kg_microbe_utils/owned_name_policy.py",
+    "sha256": "18ffd0430d0256b6da6cbb1f3da2327c4cf3418e2b0b2da71ff283ee2f4351ae"
+  },
+  {
+    "path": "src/kg_microbe_utils/sssom_artifacts.py",
+    "sha256": "9053a55006b10396edb9d470555ddd989cdac5816572ae1952570119ca63a664"
+  },
+  {
+    "path": "scripts/publish_sssom.py",
+    "sha256": "daf0eeed1c98a305b5d7fe538941df8e276e37d12e78c3776c6c5204d8db9bd5"
+  },
+  {
+    "path": "scripts/build_mim_ingredient_sssom.py",
+    "sha256": "772b7a70309396f705fd8eb0709088304978e76c6fdf5567c5f75c95d59e40dd"
+  },
+  {
+    "path": "tests/test_mim_sssom_artifacts.py",
+    "sha256": "58f62e6b391a125fee1da3b1f8e3ffd012bdbb133c48db1272d23cb4e08c63cb"
+  },
+  {
+    "path": "tests/test_mim_owned_name_export.py",
+    "sha256": "4d8a3eeb9946d7e0f2738a7a3c104d064c6f9ba8a847c6bd574c141d32dc183d"
+  }
+]

@@ -1,0 +1,12 @@
+{
+  "changed": [],
+  "created": [
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/output/step5-owned-name-candidate-v2/candidate.sssom.tsv",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/output/step5-owned-name-candidate-v2/candidate.sssom.tsv.manifest.json",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/output/step5-owned-name-candidate-v2/suppressed_aliases.tsv"
+  ],
+  "previous": {},
+  "root": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/output/step5-owned-name-candidate-v2",
+  "status": "complete",
+  "version": 1
+}

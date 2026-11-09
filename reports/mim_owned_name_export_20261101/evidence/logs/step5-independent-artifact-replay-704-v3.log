@@ -1,0 +1,193 @@
+[
+  {
+    "case": "positive",
+    "output": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/positive/out/candidate.sssom.tsv",
+    "sidecar": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/positive/out/suppressed_aliases.tsv",
+    "outputs_initially_absent": true,
+    "return": {
+      "status": "complete",
+      "applied": true,
+      "changed": [],
+      "created": [
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/positive/out/candidate.sssom.tsv",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/positive/out/candidate.sssom.tsv.manifest.json",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/positive/out/suppressed_aliases.tsv"
+      ],
+      "unchanged": [],
+      "journal": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/positive/out/.sssom-artifact-journals/write-_l8k0ums.json",
+      "artifacts": [
+        {
+          "role": "sssom",
+          "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/positive/out/candidate.sssom.tsv",
+          "sha256": "446a924fe0802ce877b3489867ee3409e179bfebf5445029ddc1ae12a9da151d"
+        },
+        {
+          "role": "suppressed_aliases",
+          "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/positive/out/suppressed_aliases.tsv",
+          "sha256": "675720ff302b6e852dee454dd9f937a6c6fdcb595998254183c30326ee6ce22a"
+        }
+      ],
+      "manifest_sha256": "b2c345034fa01e9486e54b224b3a0dbb6c14bb9ee8d54a11cbe51975758e9891"
+    },
+    "files": [
+      {
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/positive/out/candidate.sssom.tsv",
+        "exists": true,
+        "sha256": "446a924fe0802ce877b3489867ee3409e179bfebf5445029ddc1ae12a9da151d"
+      },
+      {
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/positive/out/suppressed_aliases.tsv",
+        "exists": true,
+        "sha256": "675720ff302b6e852dee454dd9f937a6c6fdcb595998254183c30326ee6ce22a"
+      },
+      {
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/positive/out/candidate.sssom.tsv.manifest.json",
+        "exists": true,
+        "sha256": "b2c345034fa01e9486e54b224b3a0dbb6c14bb9ee8d54a11cbe51975758e9891"
+      }
+    ],
+    "output_equals_intended": true,
+    "sidecar_equals_intended": true,
+    "samefile": false,
+    "journals": [
+      {
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/positive/out/.sssom-artifact-journals/write-_l8k0ums.json",
+        "status": "complete"
+      }
+    ]
+  },
+  {
+    "case": "case_alias",
+    "output": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/case_alias/out/candidate.sssom.tsv",
+    "sidecar": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/case_alias/out/CANDIDATE.SSSOM.TSV",
+    "outputs_initially_absent": true,
+    "exception": {
+      "type": "ValueError",
+      "message": "Case/Unicode-equivalent artifact destinations are aliases"
+    },
+    "files": [
+      {
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/case_alias/out/candidate.sssom.tsv",
+        "exists": false,
+        "sha256": null
+      },
+      {
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/case_alias/out/CANDIDATE.SSSOM.TSV",
+        "exists": false,
+        "sha256": null
+      },
+      {
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/case_alias/out/candidate.sssom.tsv.manifest.json",
+        "exists": false,
+        "sha256": null
+      }
+    ],
+    "output_equals_intended": false,
+    "sidecar_equals_intended": false,
+    "samefile": false,
+    "journals": []
+  },
+  {
+    "case": "unicode_alias",
+    "output": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/unicode_alias/out/caf\u00e9.sssom.tsv",
+    "sidecar": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/unicode_alias/out/cafe\u0301.sssom.tsv",
+    "outputs_initially_absent": true,
+    "exception": {
+      "type": "ValueError",
+      "message": "Case/Unicode-equivalent artifact destinations are aliases"
+    },
+    "files": [
+      {
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/unicode_alias/out/caf\u00e9.sssom.tsv",
+        "exists": false,
+        "sha256": null
+      },
+      {
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/unicode_alias/out/cafe\u0301.sssom.tsv",
+        "exists": false,
+        "sha256": null
+      },
+      {
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/unicode_alias/out/caf\u00e9.sssom.tsv.manifest.json",
+        "exists": false,
+        "sha256": null
+      }
+    ],
+    "output_equals_intended": false,
+    "sidecar_equals_intended": false,
+    "samefile": false,
+    "journals": []
+  },
+  {
+    "case": "no_op_callback_drift",
+    "output": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/no_op_callback_drift/out/candidate.sssom.tsv",
+    "sidecar": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/no_op_callback_drift/out/suppressed_aliases.tsv",
+    "outputs_initially_absent": true,
+    "exception": {
+      "type": "ValueError",
+      "message": "Artifact beforeimage changed: /Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/no_op_callback_drift/out/suppressed_aliases.tsv"
+    },
+    "files": [
+      {
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/no_op_callback_drift/out/candidate.sssom.tsv",
+        "exists": true,
+        "sha256": "446a924fe0802ce877b3489867ee3409e179bfebf5445029ddc1ae12a9da151d"
+      },
+      {
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/no_op_callback_drift/out/suppressed_aliases.tsv",
+        "exists": true,
+        "sha256": "01c08dac3d40cc4d2fb6d412934e773af6edf259993c5bc65acddad657cd8d1a"
+      },
+      {
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/no_op_callback_drift/out/candidate.sssom.tsv.manifest.json",
+        "exists": true,
+        "sha256": "0640206b56bc453424f53ed1c02cc8c62a57086db11b1ce496b4a8b0e78e75a9"
+      }
+    ],
+    "output_equals_intended": true,
+    "sidecar_equals_intended": false,
+    "samefile": false,
+    "journals": [
+      {
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/no_op_callback_drift/out/.sssom-artifact-journals/write-skclc914.json",
+        "status": "complete"
+      }
+    ]
+  },
+  {
+    "case": "complete_callback_drift",
+    "output": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/complete_callback_drift/out/candidate.sssom.tsv",
+    "sidecar": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/complete_callback_drift/out/suppressed_aliases.tsv",
+    "outputs_initially_absent": true,
+    "exception": {
+      "type": "ValueError",
+      "message": "Artifact publication mismatch: /Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/complete_callback_drift/out/suppressed_aliases.tsv; journal=/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/complete_callback_drift/out/.sssom-artifact-journals/write-0do66okt.json"
+    },
+    "files": [
+      {
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/complete_callback_drift/out/candidate.sssom.tsv",
+        "exists": true,
+        "sha256": "446a924fe0802ce877b3489867ee3409e179bfebf5445029ddc1ae12a9da151d"
+      },
+      {
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/complete_callback_drift/out/suppressed_aliases.tsv",
+        "exists": true,
+        "sha256": "01c08dac3d40cc4d2fb6d412934e773af6edf259993c5bc65acddad657cd8d1a"
+      },
+      {
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/complete_callback_drift/out/candidate.sssom.tsv.manifest.json",
+        "exists": true,
+        "sha256": "9c49ab1177d4ec425a7e0713f67ffe3298bf62c5453fa5c331bd098fc9a61a9a"
+      }
+    ],
+    "output_equals_intended": true,
+    "sidecar_equals_intended": false,
+    "samefile": false,
+    "journals": [
+      {
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/controls/complete_callback_drift/out/.sssom-artifact-journals/write-0do66okt.json",
+        "status": "complete"
+      }
+    ]
+  }
+]

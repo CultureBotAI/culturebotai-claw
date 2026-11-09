@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import kg_microbe_governance.fleet_audit as fleet_audit
+from kg_microbe_fleet import load_fleet_manifest
 from kg_microbe_governance.__main__ import main
 from kg_microbe_governance.fleet_audit import (
     FleetAuditResult,
@@ -41,50 +42,16 @@ def test_fleet_audit_cli_parses_repeated_roots_and_reports_success(
         return _successful_result(roots, expected_ref)
 
     monkeypatch.setattr(fleet_audit, "audit_fleet_pins", fake_audit)
-    assert main(
-        [
-            "fleet-audit",
-            "--ref",
-            REF,
-            "--target-root",
-            "culturemech=/tmp/culture",
-            "--target-root",
-            "mediaingredientmech=/tmp/media",
-            "--target-root",
-            "communitymech=/tmp/community",
-            "--target-root",
-            "traitmech=/tmp/trait",
-            "--target-root",
-            "proteintraitsmech=/tmp/protein",
-            "--target-root",
-            "cellstructuremech=/tmp/cellstructure",
-            "--target-root",
-            "antibioticmech=/tmp/antibiotic",
-            "--target-root",
-            "habitatmech=/tmp/habitat",
-            "--target-root",
-            "naturalproductmech=/tmp/npm",
-            "--target-root",
-            "taxonmech=/tmp/taxon",
-        ]
-    ) == 0
-
-    assert captured == {
-        "roots": {
-            "culturemech": Path("/tmp/culture"),
-            "mediaingredientmech": Path("/tmp/media"),
-            "communitymech": Path("/tmp/community"),
-            "traitmech": Path("/tmp/trait"),
-            "proteintraitsmech": Path("/tmp/protein"),
-            "cellstructuremech": Path("/tmp/cellstructure"),
-            "antibioticmech": Path("/tmp/antibiotic"),
-            "habitatmech": Path("/tmp/habitat"),
-            "naturalproductmech": Path("/tmp/npm"),
-            "taxonmech": Path("/tmp/taxon"),
-        },
-        "ref": REF,
+    roots = {
+        key: Path("/tmp") / key for key, mech in load_fleet_manifest().mechs.items()
+        if mech.vendored_role == "consumer"
     }
-    assert "OK: all 10 Mechs match" in capsys.readouterr().out
+    arguments = ["fleet-audit", "--ref", REF]
+    for key, root in roots.items():
+        arguments.extend(["--target-root", f"{key}={root}"])
+    assert main(arguments) == 0
+    assert captured == {"roots": roots, "ref": REF}
+    assert f"OK: all {len(captured['roots'])} Mechs match" in capsys.readouterr().out
 
 
 def test_fleet_audit_cli_rejects_malformed_or_duplicate_root_values(capsys) -> None:

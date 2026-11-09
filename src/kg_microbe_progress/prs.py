@@ -1,0 +1,472 @@
+#!/usr/bin/env python3
+"""Bind explicitly reported PRs to goals and refresh GitHub facts read-only.
+
+The private JSONL registry is informational. Neither registering a PR nor
+observing a merge authorizes the supervisor to complete a goal. Public callers
+must project observations through kg_microbe_progress, never publish this file.
+"""
+from __future__ import annotations
+
+import argparse
+import copy
+import fcntl
+import json
+import os
+import re
+import stat
+import subprocess
+import tempfile
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Callable, Iterable
+
+from kg_microbe_fleet import FleetManifest, load_fleet_manifest
+from kg_microbe_progress import ProgressError, _cycle_version, _stage_keys
+
+REGISTRY_NAME = "pr-associations.jsonl"
+MAX_BYTES = 16 * 1024 * 1024
+DIGEST = re.compile(r"[0-9a-f]{64}\Z")
+SHA = re.compile(r"[0-9a-f]{40}\Z")
+CONTEXT_FIELDS = ("run_id", "repository_key", "cycle", "stage", "goal_identity", "workflow_sha256")
+RECORD_FIELDS = {"schema_version", *CONTEXT_FIELDS, "pr_number", "reported_at"}
+
+
+class AssociationError(ValueError):
+    """An association cannot safely be used as progress evidence."""
+
+
+class OrphanAssociation(AssociationError):
+    """A valid registry record has no retained supervisor goal context."""
+
+
+@dataclass
+class AssociationCollection:
+    records: list[dict]
+    excluded_counts: dict[tuple[str, str], int]
+
+
+def now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _object(pairs: list[tuple[str, Any]]) -> dict:
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise AssociationError("duplicate JSON key")
+        result[key] = value
+    return result
+
+
+def _json(raw: bytes | str) -> Any:
+    try:
+        return json.loads(raw, object_pairs_hook=_object,
+                          parse_constant=lambda _: (_ for _ in ()).throw(AssociationError("non-finite JSON")))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise AssociationError("invalid JSON") from error
+
+
+def _read(path: Path, *, missing: bool = False) -> bytes:
+    flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        with os.fdopen(os.open(path, flags), "rb") as stream:
+            info = os.fstat(stream.fileno())
+            if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_BYTES:
+                raise AssociationError("input must be a bounded regular file")
+            raw = stream.read(MAX_BYTES + 1)
+            if len(raw) > MAX_BYTES:
+                raise AssociationError("input exceeds size limit")
+            return raw
+    except FileNotFoundError:
+        if missing:
+            return b""
+        raise
+    except OSError as error:
+        raise AssociationError("input cannot be read safely") from error
+
+
+def _timestamp(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).tzinfo is not None
+    except ValueError:
+        return False
+
+
+def _positive(value: Any) -> bool:
+    return type(value) is int and value > 0
+
+
+def _context(ledger: dict, record: dict | None = None) -> dict:
+    source = record if record is not None else ledger
+    context = {
+        "run_id": ledger.get("run_id"),
+        "repository_key": ledger.get("repository_key"),
+        "cycle": source.get("cycle"),
+        "stage": source.get("stage"),
+        "goal_identity": source.get("goal_identity") if record is not None else ledger.get("adopted_goal"),
+        "workflow_sha256": source.get("workflow_sha256") if record is not None else ledger.get("workflow", {}).get("sha256"),
+    }
+    return context
+
+
+def _validate_context(context: dict, *, allow_missing_workflow: bool = False) -> None:
+    goal = context.get("goal_identity")
+    workflow = context.get("workflow_sha256")
+    valid_workflow = ((allow_missing_workflow and workflow is None)
+                      or (isinstance(workflow, str) and DIGEST.fullmatch(workflow) is not None))
+    if (not isinstance(context.get("run_id"), str) or not context["run_id"]
+            or len(context["run_id"]) > 200 or not isinstance(context.get("repository_key"), str)
+            or not _positive(context.get("cycle")) or type(context.get("stage")) is not int
+            or context["stage"] not in range(1, 8)
+            or not valid_workflow):
+        raise AssociationError("association workflow identity is incomplete")
+    if (not isinstance(goal, dict)
+            or set(goal) != {"conversation_id", "started_at", "start_step_index"}
+            or not isinstance(goal["conversation_id"], str) or not goal["conversation_id"]
+            or len(goal["conversation_id"]) > 200 or not _timestamp(goal["started_at"])
+            or type(goal["start_step_index"]) is not int or goal["start_step_index"] < 0):
+        raise AssociationError("association native goal identity is incomplete")
+
+
+def _retained_contexts(ledger: dict) -> list[dict]:
+    """Validate the comparison source before calling a registry record orphaned."""
+    current = _context(ledger)
+    contexts = []
+    # Initialization or failed adoption can leave any stage without a goal.
+    # Absence supplies no current context; non-null malformed goals still fail.
+    if current["goal_identity"] is not None:
+        _validate_context(current)
+        _validate_cycle_stage(ledger)
+        contexts.append(current)
+    completed = ledger.get("completed_stages")
+    if not isinstance(completed, list):
+        raise AssociationError("retained goal contexts must be a list")
+    for item in completed:
+        if not isinstance(item, dict):
+            raise AssociationError("retained goal context must be an object")
+        context = _context(ledger, item)
+        # Legacy closures predate workflow pins. Validate their available
+        # identity, but never invent a pin or use them as registry authority.
+        legacy = "workflow_sha256" not in item
+        _validate_context(context, allow_missing_workflow=legacy)
+        _validate_cycle_stage(ledger, item)
+        if not legacy:
+            contexts.append(context)
+    return contexts
+
+
+def _validate_cycle_stage(ledger: dict, record: dict | None = None) -> None:
+    try:
+        version = _cycle_version(ledger, record)
+        source = ledger if record is None else record
+        if source["stage"] > len(_stage_keys({"parent_version": version})):
+            raise ProgressError("stage is outside the pinned cycle")
+    except ProgressError as error:
+        raise AssociationError(str(error)) from error
+
+
+def _validate_record(record: Any, ledger: dict, *, require_retained: bool = True) -> dict:
+    if not isinstance(record, dict) or set(record) != RECORD_FIELDS:
+        raise AssociationError("association fields differ from schema version 1")
+    if type(record["schema_version"]) is not int or record["schema_version"] != 1:
+        raise AssociationError("unsupported association schema")
+    if not _positive(record["pr_number"]) or not _timestamp(record["reported_at"]):
+        raise AssociationError("association PR number or timestamp is invalid")
+    context = {key: record[key] for key in CONTEXT_FIELDS}
+    _validate_context(context)
+    if any(context[key] != ledger.get(key) for key in ("run_id", "repository_key")):
+        raise AssociationError("association run or repository differs from containing ledger")
+    contexts = _retained_contexts(ledger)
+    if require_retained and context not in contexts:
+        raise OrphanAssociation("PR association does not match a retained goal identity")
+    return record
+
+
+def _records(raw: bytes, ledger: dict, *, require_retained: bool = True) -> list[dict]:
+    if raw and not raw.endswith(b"\n"):
+        raise AssociationError("association registry has an incomplete final record")
+    result = []
+    for line in raw.splitlines():
+        if not line:
+            raise AssociationError("association registry contains a blank record")
+        result.append(_validate_record(_json(line), ledger, require_retained=require_retained))
+    return result
+
+
+def _ledger(session: Path, fleet: FleetManifest) -> dict:
+    ledger = _json(_read(session / "ledger.json"))
+    if not isinstance(ledger, dict) or ledger.get("schema_version") != 2:
+        raise AssociationError("PR tracking requires a version 2 supervisor ledger")
+    key = ledger.get("repository_key")
+    if key != session.name or key not in fleet.keys:
+        raise AssociationError("session repository is not the canonical fleet member")
+    config = _json(_read(session.parent / "config.json"))
+    if not isinstance(config, dict) or config.get("run_id") != ledger.get("run_id"):
+        raise AssociationError("ledger and runtime run identities differ")
+    targets = [item for item in config.get("targets", []) if item.get("repository_key") == key]
+    if len(targets) != 1 or targets[0].get("github_repository", "").casefold() != fleet.get(key).github.casefold():
+        raise AssociationError("runtime target and canonical GitHub repository differ")
+    return ledger
+
+
+def _association_key(record: dict) -> tuple:
+    return (record["repository_key"], record["run_id"], record["cycle"], record["stage"], record["pr_number"])
+
+
+def _retained_records(raw: bytes, ledger: dict) -> tuple[list[dict], int]:
+    """Ignore well-formed orphans before comparing retained evidence identities."""
+    retained = []
+    excluded = 0
+    seen: dict[tuple, dict] = {}
+    for record in _records(raw, ledger, require_retained=False):
+        try:
+            _validate_record(record, ledger)
+        except OrphanAssociation:
+            excluded += 1
+            continue
+        identity = _association_key(record)
+        prior = seen.get(identity)
+        if prior and any(prior[field] != record[field] for field in CONTEXT_FIELDS):
+            raise AssociationError("conflicting PR association identity")
+        seen[identity] = record
+        retained.append(record)
+    return retained, excluded
+
+
+def gather_associations(runtime_dirs: Iterable[Path], *, fleet: FleetManifest | None = None) -> list[dict]:
+    """Return usable bindings; collectors use collect_associations for diagnostics."""
+    return collect_associations(runtime_dirs, fleet=fleet).records
+
+
+def require_current_pr_associations(session: Path, ledger: dict, numbers: set[int]) -> None:
+    """Corroborate multi-PR membership without granting closure authority.
+
+    The supervisor supplies its own session directory and ledger, never a path
+    from a receipt. Every input row is validated, including unrelated orphans.
+    A current retained binding wins over an orphaned native identity in the
+    same stage, as in collection. Another stage or retained goal never does.
+    """
+    if session.is_symlink() or not session.is_dir():
+        raise AssociationError("association session must be a real directory")
+    current = _context(ledger)
+    _validate_context(current)
+    retained = _retained_contexts(ledger)
+    records = _records(_read(session / REGISTRY_NAME), ledger, require_retained=False)
+    found = set()
+    for record in records:
+        if record["pr_number"] in numbers:
+            context = {key: record[key] for key in CONTEXT_FIELDS}
+            if context != current:
+                if (context in retained or any(context[key] != current[key] for key in
+                                               ("cycle", "stage", "workflow_sha256"))):
+                    raise AssociationError("ordered PR is associated with another retained goal or stage")
+                continue
+            found.add(record["pr_number"])
+    for closed in ledger["completed_stages"]:
+        proof = closed.get("verification") or {}
+        prior = [proof.get("pr_number")] + [item.get("pr_number") for item in proof.get("prs", [])]
+        if numbers.intersection(prior):
+            raise AssociationError("ordered PR already belongs to a verified closure")
+    if found != numbers:
+        raise AssociationError("ordered PR lacks its current goal registry association")
+
+
+def collect_associations(runtime_dirs: Iterable[Path], *, fleet: FleetManifest | None = None) -> AssociationCollection:
+    """Read explicit registries and exact version-2 receipt candidate bindings.
+
+    A receipt candidate contributes a reported association only. Malformed or
+    legacy candidates contribute nothing; accepted completion authority belongs
+    solely to the supervisor's completed_stages ledger.
+    """
+    fleet = fleet or load_fleet_manifest()
+    gathered: dict[tuple, dict] = {}
+    excluded: dict[tuple[str, str], int] = {}
+    for directory in runtime_dirs:
+        runtime = Path(directory).resolve(strict=True)
+        for key in fleet.keys:
+            session = runtime / key
+            if not session.exists():
+                continue
+            if session.is_symlink() or not session.is_dir():
+                raise AssociationError("session directory is not a real directory")
+            ledger = _ledger(session, fleet)
+            # A malformed comparison source is not an incomplete candidate.
+            # Validate outside the candidate-tolerance catch, even with no registry.
+            _retained_contexts(ledger)
+            source = (ledger["run_id"], key)
+            if source in excluded:
+                raise AssociationError("duplicate registry source")
+            records, excluded[source] = _retained_records(_read(session / REGISTRY_NAME, missing=True), ledger)
+            candidate_raw = _read(session / "completion.json", missing=True)
+            if candidate_raw:
+                try:
+                    candidate = _json(candidate_raw)
+                    if isinstance(candidate, dict) and candidate.get("schema_version") == 2:
+                        from kg_microbe_workflows.closure import multi_pr_members
+                        members = multi_pr_members(candidate) or [candidate.get("pr", {})]
+                        candidates = []
+                        for member in members:
+                            record = {key: candidate.get(key) for key in CONTEXT_FIELDS}
+                            record.update(schema_version=1, pr_number=member.get("number"),
+                                          reported_at=ledger.get("last_observed_at", ledger.get("created_at")))
+                            candidates.append(_validate_record(record, ledger))
+                        records.extend(candidates)
+                except (AssociationError, AttributeError, ValueError):
+                    # A working receipt may be incomplete. It is never a
+                    # fallback source of weaker, inferred goal associations.
+                    pass
+            for record in records:
+                identity = _association_key(record)
+                prior = gathered.get(identity)
+                if prior and any(prior[field] != record[field] for field in CONTEXT_FIELDS):
+                    raise AssociationError("conflicting PR association identity")
+                gathered[identity] = copy.deepcopy(record)
+    return AssociationCollection(sorted(gathered.values(), key=_association_key), excluded)
+
+
+def register_pr(session_dir: Path, number: int, *, fleet: FleetManifest | None = None) -> dict:
+    """Atomically add a PR binding for the exact current supervised goal."""
+    if not _positive(number):
+        raise AssociationError("PR number must be a positive integer")
+    fleet = fleet or load_fleet_manifest()
+    session = Path(session_dir)
+    if session.is_symlink():
+        raise AssociationError("session directory must not be a symlink")
+    session = session.resolve(strict=True)
+    if not session.is_dir():
+        raise AssociationError("session directory is not a directory")
+    lock_path = session / ".pr-associations.lock"
+    flags = os.O_RDWR | os.O_CREAT | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0)
+    with os.fdopen(os.open(lock_path, flags, 0o600), "r+") as lock:
+        if not stat.S_ISREG(os.fstat(lock.fileno()).st_mode):
+            raise AssociationError("association lock is not a regular file")
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        ledger = _ledger(session, fleet)
+        status = _json(_read(session / "status.json"))
+        context = _context(ledger)
+        if not isinstance(status, dict) or any(status.get(key) != value for key, value in context.items()):
+            raise AssociationError("current status and ledger disagree; retry after the supervisor sweep")
+        if ledger.get("awaiting_goal") is True:
+            raise AssociationError("next goal has not yet been adopted")
+        record = {**context, "schema_version": 1, "pr_number": number, "reported_at": now()}
+        _validate_record(record, ledger)
+        path = session / REGISTRY_NAME
+        raw = _read(path, missing=True)
+        records, _ = _retained_records(raw, ledger)
+        for existing in records:
+            if _association_key(existing) == _association_key(record):
+                if any(existing[field] != record[field] for field in CONTEXT_FIELDS):
+                    raise AssociationError("PR identity is already bound to another native goal")
+                return existing
+        # The supervisor writes whole ledgers atomically. A racing stage
+        # transition must not turn a registration into the next goal's PR.
+        latest = _ledger(session, fleet)
+        _validate_record(record, latest)
+        payload = raw + json.dumps(record, sort_keys=True, separators=(",", ":")).encode() + b"\n"
+        if len(payload) > MAX_BYTES:
+            raise AssociationError("association registry exceeds size limit")
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(dir=session, prefix=".pr-associations-", delete=False) as stream:
+                temporary = Path(stream.name)
+                stream.write(payload)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, path)
+            descriptor = os.open(session, os.O_RDONLY)
+            try:
+                os.fsync(descriptor)
+            finally:
+                os.close(descriptor)
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
+        return record
+
+
+def _gh(args: list[str]) -> Any:
+    return subprocess.run(args, capture_output=True, text=True, timeout=60, check=False)
+
+
+def fetch_pr_observations(
+    associations: Iterable[dict], *, gh: Callable[[list[str]], Any] = _gh,
+    fleet: FleetManifest | None = None,
+) -> list[dict]:
+    """Refresh GitHub facts for explicit private or retained public bindings.
+
+    Public bindings may use run_key in place of private run_id. They must come
+    from the previously validated published progress snapshot. GitHub failures
+    raise so the publisher preserves its prior successful snapshot.
+    """
+    fleet = fleet or load_fleet_manifest()
+    cache: dict[tuple, dict] = {}
+    results = []
+    observed_at = now()
+    for association in associations:
+        key = association.get("repository_key")
+        number = association.get("pr_number", association.get("number"))
+        if key not in fleet.keys or not _positive(number):
+            raise AssociationError("PR query is outside the canonical fleet")
+        stage = association.get("stage", association.get("stage_number"))
+        if (not _positive(association.get("cycle")) or type(stage) is not int
+                or stage not in range(1, 8)
+                or ("stage" in association and "stage_number" in association
+                    and association["stage"] != association["stage_number"])):
+            raise AssociationError("PR query has no explicit goal stage")
+        run_field = "run_id" if "run_id" in association else "run_key"
+        run = association.get(run_field)
+        if not isinstance(run, str) or not run or len(run) > 200:
+            raise AssociationError("PR query has no run identity")
+        github = fleet.get(key).github
+        identity = (key, number)
+        if identity not in cache:
+            response = gh(["gh", "api", f"repos/{github}/pulls/{number}"])
+            if response.returncode:
+                raise AssociationError(f"GitHub PR query failed for {github}#{number}")
+            live = _json(response.stdout)
+            if (not isinstance(live, dict) or type(live.get("number")) is not int or live["number"] != number
+                    or live.get("base", {}).get("repo", {}).get("full_name", "").casefold() != github.casefold()
+                    or live.get("html_url", "").casefold() != f"https://github.com/{github}/pull/{number}".casefold()
+                    or not isinstance(live.get("head", {}).get("sha"), str)
+                    or not SHA.fullmatch(live["head"]["sha"])
+                    or type(live.get("merged")) is not bool or live.get("state") not in {"open", "closed"}):
+                raise AssociationError("GitHub PR identity or state does not match the association")
+            facts = {"number": number, "state": "merged" if live["merged"] else live["state"],
+                     "head_sha": live["head"]["sha"], "observed_at": observed_at}
+            if live["merged"]:
+                if (live["state"] != "closed" or not _timestamp(live.get("merged_at"))
+                        or not isinstance(live.get("merge_commit_sha"), str)
+                        or not SHA.fullmatch(live["merge_commit_sha"])):
+                    raise AssociationError("GitHub merged PR evidence is incomplete")
+                facts.update(merged_at=live["merged_at"], merge_commit_sha=live["merge_commit_sha"])
+            elif live.get("merged_at") is not None:
+                raise AssociationError("GitHub unmerged PR has a merge timestamp")
+            cache[identity] = facts
+        results.append({
+            "repository_key": key, run_field: run, "cycle": association["cycle"], "stage": stage,
+            "association_authority": "agent_reported", **cache[identity],
+        })
+    return results
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    commands = parser.add_subparsers(dest="command", required=True)
+    register = commands.add_parser("register", help="Record every PR for the exact active goal")
+    register.add_argument("--session-dir", required=True, type=Path)
+    register.add_argument("--number", required=True, type=int)
+    args = parser.parse_args(argv)
+    try:
+        record = register_pr(args.session_dir, args.number)
+    except (AssociationError, OSError, ValueError) as error:
+        parser.exit(1, f"PR association was not registered: {error}\n")
+    print(json.dumps({"registered": True, "number": record["pr_number"],
+                      "repository_key": record["repository_key"], "cycle": record["cycle"], "stage": record["stage"]}))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -20,6 +20,7 @@ MIM_ROOT_PATH = Path(
     os.environ.get("MEDIAINGREDIENTMECH_ROOT", REPO_ROOT.parent / "MediaIngredientMech")
 )
 sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_utils.ingredient_identity_rejections import rejection_reason  # noqa: E402
 from kg_microbe_fleet import require_mech_roots  # noqa: E402
 
 
@@ -30,6 +31,7 @@ class MIMEnrichmentUpdater:
         self.mim_root = mim_root
         self.enrichment_file = enrichment_file
         self.enrichments = {}
+        self.rejections = []
         self.stats = {
             'enrichments_loaded': 0,
             'ingredients_found_in_mim': 0,
@@ -50,10 +52,12 @@ class MIMEnrichmentUpdater:
         self.stats['enrichments_loaded'] = len(self.enrichments)
 
         # Count successful enrichments
-        successful = sum(1 for e in self.enrichments.values() if e.get('chebi_id'))
+        successful = sum(1 for name, e in self.enrichments.items()
+                         if e.get('chebi_id') and not rejection_reason(
+                             ontology_id=e['chebi_id'], name=name, cas=e.get('cas_rn')))
         print(f"Loaded {len(self.enrichments)} enrichment entries")
-        print(f"  {successful} with ChEBI IDs")
-        print(f"  {len(self.enrichments) - successful} without ChEBI IDs")
+        print(f"  {successful} admissible ChEBI IDs")
+        print(f"  {len(self.enrichments) - successful} without an admissible ChEBI ID")
 
     def normalize_name(self, name: str) -> str:
         """Normalize ingredient name for matching."""
@@ -121,6 +125,15 @@ class MIMEnrichmentUpdater:
 
         if not ingredient_data:
             return False
+
+        for owner_cas in (cas_rn, (ingredient_data.get("chemical_properties") or {}).get("cas_rn"),
+                          ingredient_data.get("identifier")):
+            reason = rejection_reason(ontology_id=chebi_id,
+                                      name=ingredient_data.get("preferred_term"), cas=owner_cas)
+            if reason:
+                self.rejections.append({"path": str(ingredient_file), "chebi_id": chebi_id, "reason": reason})
+                print(f"[REJECTED] {ingredient_file.name} → {chebi_id}: {reason}")
+                return False
 
         # Check if already has this ChEBI ID as identifier
         existing_identifier = ingredient_data.get('identifier', '')
@@ -193,6 +206,12 @@ class MIMEnrichmentUpdater:
             if not chebi_id:
                 continue
 
+            reason = rejection_reason(ontology_id=chebi_id, name=ingredient_name, cas=cas_rn)
+            if reason:
+                self.rejections.append({"name": ingredient_name, "chebi_id": chebi_id, "reason": reason})
+                print(f"[REJECTED] {ingredient_name} → {chebi_id}: {reason}")
+                continue
+
             # Find ingredient file
             ingredient_file = self.find_ingredient_file(ingredient_name)
 
@@ -204,6 +223,7 @@ class MIMEnrichmentUpdater:
             self.stats['ingredients_found_in_mim'] += 1
 
             # Update ingredient file
+            rejected_before = len(self.rejections)
             updated = self.update_ingredient_file(ingredient_file, chebi_id, cas_rn, dry_run)
 
             if updated:
@@ -214,7 +234,7 @@ class MIMEnrichmentUpdater:
                     print(f"  [DRY RUN] {ingredient_name} → {chebi_id} ({ingredient_file.name})")
                 else:
                     print(f"  [UPDATE] {ingredient_name} → {chebi_id} ({ingredient_file.name})")
-            else:
+            elif len(self.rejections) == rejected_before:
                 self.stats['ingredients_already_mapped'] += 1
                 print(f"  [SKIP] {ingredient_name} - already has {chebi_id}")
 

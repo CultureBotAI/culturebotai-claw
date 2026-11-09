@@ -1,0 +1,23 @@
+F.....                                                                   [100%]
+=================================== FAILURES ===================================
+______________ test_invalid_sidecar_never_publishes_a_tsv[rows0] _______________
+
+setup = (PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8549/test_invalid_sidecar...ppression-sidecar-required"\nsubject_id\tother\nMIM:Subject\tkept\n', <function setup.<locals>.publish at 0x1097d6d40>)
+rows = [['MIM:Subject', 'kept', 'kept', '["MIM:Owner"]', 'SUPPRESS', '["yaml"]', ...]]
+
+    @pytest.mark.parametrize("rows", [
+        [suppression("kept")], [suppression(), suppression()],
+        [suppression(owner_subject_ids='["MIM:Subject"]')],
+        [suppression(evidence_refs="[]")], [suppression(disposition="DROP")],
+        [suppression(subject_id="MIM:NotEmitted")],
+    ])
+    def test_invalid_sidecar_never_publishes_a_tsv(setup, rows):
+        output, _, _, _, publish = setup
+>       with pytest.raises(ValueError):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_mim_sssom_artifacts.py:150: Failed
+=========================== short test summary info ============================
+FAILED tests/test_mim_sssom_artifacts.py::test_invalid_sidecar_never_publishes_a_tsv[rows0]
+1 failed, 5 passed in 0.07s

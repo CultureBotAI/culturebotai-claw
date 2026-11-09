@@ -20,6 +20,7 @@ from kg_microbe_governance.workflow_pins import (
     check_workflow_pins,
     load_pin_contract,
     render_workflow,
+    workflow_entries,
 )
 from scripts import update_governed_workflow_pins as updater
 
@@ -29,7 +30,9 @@ WORKFLOW = Path("src/kg_microbe_governance/artifacts/workflows/pr-shepherd.yml")
 
 @pytest.fixture
 def checkout(tmp_path: Path) -> Path:
-    for path in (CONTRACT_PATH, MANIFEST_PATH, WORKFLOW):
+    paths = {CONTRACT_PATH, MANIFEST_PATH}
+    paths.update(Path(entry["source"]) for entry in workflow_entries(ROOT))
+    for path in paths:
         (tmp_path / path).parent.mkdir(parents=True, exist_ok=True)
         (tmp_path / path).write_bytes((ROOT / path).read_bytes())
     return tmp_path
@@ -108,13 +111,13 @@ def test_updater_previews_then_updates_contract_payload_and_digest(checkout, mon
     args = ["--action", "astral-sh/setup-uv@v10.2.0", "--uv-version", "0.12.6"]
     assert updater.main(args, root=checkout) == 0
     assert snapshot(checkout) == before
-    assert "Preview: 3 canonical files" in capsys.readouterr().out
+    expected = {CONTRACT_PATH, MANIFEST_PATH}
+    expected.update(Path(entry["source"]) for entry in workflow_entries(checkout))
+    assert f"Preview: {len(expected)} local governed files" in capsys.readouterr().out
     assert updater.main([*args, "--apply"], root=checkout) == 0
     check_workflow_pins(checkout)
     after = snapshot(checkout)
-    assert {path for path in before if before[path] != after[path]} == {
-        CONTRACT_PATH, MANIFEST_PATH, WORKFLOW,
-    }
+    assert {path for path in before if before[path] != after[path]} == expected
     text = after[WORKFLOW].decode()
     assert f"astral-sh/setup-uv@{'b' * 40} # v10.2.0" in text
     assert 'version: "0.12.6"' in text
@@ -424,3 +427,169 @@ def test_read_only_check_never_writes_even_when_drift_exists(checkout, monkeypat
     monkeypatch.setattr(updater, "apply_plan", forbidden)
     assert updater.main(["--check"], root=checkout) == (0 if valid else 1)
     assert snapshot(checkout) == before
+
+
+def add_local_copies(checkout):
+    copies = {}
+    for entry in workflow_entries(checkout):
+        target = Path(entry["target"])
+        (checkout / target).parent.mkdir(parents=True, exist_ok=True)
+        (checkout / target).write_bytes((checkout / entry["source"]).read_bytes())
+        copies[target] = Path(entry["source"])
+    return copies
+
+
+def test_pin_update_preserves_existing_claw_copies_in_same_transaction(checkout):
+    copies = add_local_copies(checkout)
+    contract = load_pin_contract(checkout / CONTRACT_PATH)
+    contract["uv_version"] = "0.12.6"
+    before = snapshot(checkout)
+    plan = updater.update_plan(checkout, contract)
+    assert snapshot(checkout) == before
+    assert set(copies) <= plan.keys()
+    updater.apply_plan(checkout, plan)
+    for target, source in copies.items():
+        assert (checkout / target).read_bytes() == (checkout / source).read_bytes()
+        assert 'version: "0.12.6"' in (checkout / target).read_text()
+
+
+def test_pin_update_refuses_existing_divergent_claw_copy(checkout):
+    copies = add_local_copies(checkout)
+    target = next(iter(copies))
+    (checkout / target).write_text((checkout / target).read_text() + "# independent edit\n")
+    before = snapshot(checkout)
+    contract = load_pin_contract(checkout / CONTRACT_PATH)
+    contract["uv_version"] = "0.12.6"
+    with pytest.raises(GovernanceError, match="copy.*differs|differs.*copy"):
+        updater.update_plan(checkout, contract)
+    assert snapshot(checkout) == before
+
+
+def test_copy_is_required_in_candidate_before_any_replacement(checkout, monkeypatch):
+    copies = add_local_copies(checkout)
+    contract = load_pin_contract(checkout / CONTRACT_PATH)
+    contract["uv_version"] = "0.12.6"
+    plan = updater.update_plan(checkout, contract)
+    for target in copies:
+        plan.pop(target, None)
+    before = snapshot(checkout)
+
+    def forbidden(*args):
+        pytest.fail("incomplete local-copy plan reached replacement")
+
+    monkeypatch.setattr(updater.os, "replace", forbidden)
+    with pytest.raises(GovernanceError, match="copy.*differs|differs.*copy"):
+        updater.apply_plan(checkout, plan)
+    assert snapshot(checkout) == before
+
+
+def test_local_copy_update_failure_rolls_back_canonical_and_copies(checkout, monkeypatch):
+    copies = add_local_copies(checkout)
+    contract = load_pin_contract(checkout / CONTRACT_PATH)
+    contract["uv_version"] = "0.12.6"
+    plan = updater.update_plan(checkout, contract)
+    before = snapshot(checkout)
+    original = updater.os.replace
+    attempted = []
+
+    def fail_after_copy_replaced(source, target):
+        original(source, target)
+        if Path(target).relative_to(checkout) in copies and not attempted:
+            attempted.append(target)
+            raise OSError("copy replacement failed after syscall")
+
+    monkeypatch.setattr(updater.os, "replace", fail_after_copy_replaced)
+    with pytest.raises(OSError, match="copy replacement"):
+        updater.apply_plan(checkout, plan)
+    assert attempted
+    assert snapshot(checkout) == before
+
+
+def test_absent_claw_workflow_copy_is_not_created(checkout):
+    targets = {Path(entry["target"]) for entry in workflow_entries(checkout)}
+    contract = load_pin_contract(checkout / CONTRACT_PATH)
+    contract["uv_version"] = "0.12.6"
+    plan = updater.update_plan(checkout, contract)
+    assert not targets.intersection(plan)
+    updater.apply_plan(checkout, plan)
+    assert all(not (checkout / target).exists() for target in targets)
+
+
+def test_copy_changed_after_plan_refuses_apply_before_replacement(checkout, monkeypatch):
+    copies = add_local_copies(checkout)
+    contract = load_pin_contract(checkout / CONTRACT_PATH)
+    contract["uv_version"] = "0.12.6"
+    plan = updater.update_plan(checkout, contract)
+    target = next(iter(copies))
+    (checkout / target).write_text((checkout / target).read_text() + "# concurrent local edit\n")
+    before = snapshot(checkout)
+
+    def forbidden(*args):
+        pytest.fail("concurrently edited copy reached replacement")
+
+    monkeypatch.setattr(updater.os, "replace", forbidden)
+    with pytest.raises(GovernanceError, match="copy differs"):
+        updater.apply_plan(checkout, plan)
+    assert snapshot(checkout) == before
+
+
+def test_read_only_check_rejects_copy_drift_without_writes(checkout, monkeypatch):
+    copies = add_local_copies(checkout)
+    target = next(iter(copies))
+    (checkout / target).write_text((checkout / target).read_text() + "# local drift\n")
+    before = snapshot(checkout)
+
+    def forbidden(*args):
+        pytest.fail("read-only copy check attempted replacement")
+
+    monkeypatch.setattr(updater.os, "replace", forbidden)
+    assert updater.main(["--check"], root=checkout) == 1
+    assert snapshot(checkout) == before
+
+
+def test_tampered_copy_payload_fails_candidate_validation(checkout, monkeypatch):
+    copies = add_local_copies(checkout)
+    contract = load_pin_contract(checkout / CONTRACT_PATH)
+    contract["uv_version"] = "0.12.6"
+    plan = updater.update_plan(checkout, contract)
+    plan[next(iter(copies))] += "# payload must match canonical source\n"
+    before = snapshot(checkout)
+
+    def forbidden(*args):
+        pytest.fail("tampered local copy reached replacement")
+
+    monkeypatch.setattr(updater.os, "replace", forbidden)
+    with pytest.raises(GovernanceError, match="copy differs"):
+        updater.apply_plan(checkout, plan)
+    assert snapshot(checkout) == before
+
+
+def test_final_verification_failure_restores_canonical_and_every_copy(checkout, monkeypatch):
+    add_local_copies(checkout)
+    contract = load_pin_contract(checkout / CONTRACT_PATH)
+    contract["uv_version"] = "0.12.6"
+    plan = updater.update_plan(checkout, contract)
+    before = snapshot(checkout)
+    check = updater.check_workflow_pins
+
+    def fail_after_updates(root):
+        if root == checkout:
+            raise GovernanceError("post-update integrity failed")
+        check(root)
+
+    monkeypatch.setattr(updater, "check_workflow_pins", fail_after_updates)
+    with pytest.raises(GovernanceError, match="post-update integrity"):
+        updater.apply_plan(checkout, plan)
+    assert snapshot(checkout) == before
+
+
+def test_existing_symlink_copy_is_never_overwritten(checkout):
+    entry = workflow_entries(checkout)[0]
+    target = checkout / entry["target"]
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.symlink_to(checkout / entry["source"])
+    contract = load_pin_contract(checkout / CONTRACT_PATH)
+    contract["uv_version"] = "0.12.6"
+    with pytest.raises(GovernanceError, match="symlink"):
+        updater.update_plan(checkout, contract)
+    assert target.is_symlink()

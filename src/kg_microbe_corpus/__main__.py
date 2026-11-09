@@ -4,13 +4,12 @@ from __future__ import annotations
 
 import argparse
 import sys
-from pathlib import Path
 
 from kg_microbe_corpus.statistics import CorpusError, collect
 from kg_microbe_fleet import load_fleet_manifest
-from kg_microbe_fleet.roots import MechRootError, resolve_mech_root
+from kg_microbe_fleet.roots import MechRootError, claw_root, resolve_mech_root
 
-CLAW_ROOT = Path(__file__).resolve().parents[2]
+CLAW_ROOT = claw_root()
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -61,10 +60,10 @@ def main(argv: list[str] | None = None) -> int:
     # machine-independent while a slow run still explains itself (#233).
     print(report.parser_note(), file=sys.stderr)
     print(report.to_json(), end="")
-    # An unreadable record is a finding, not a footnote: it is excluded from
-    # every count above, so a report that stayed silent about it would
-    # understate the corpus without saying so.
-    return 1 if report.unreadable else 0
+    # An unreadable or empty record is a finding, not a footnote: it is
+    # excluded from every count above, so a report that stayed silent about it
+    # would understate the corpus without saying so.
+    return 1 if report.unreadable or report.empty else 0
 
 
 if __name__ == "__main__":  # pragma: no cover - console entry point

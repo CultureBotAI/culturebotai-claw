@@ -1,0 +1,387 @@
+{
+  "excluded_event_rows": [
+    {
+      "event": {
+        "subject_id": "MIM:Bacto-tryptone",
+        "token_key": "tryptone",
+        "token": "tryptone",
+        "owner_subject_ids": "[\"MIM:Tryptone\"]",
+        "disposition": "SUPPRESS",
+        "input_surfaces": "[\"mim.ontology_label\"]",
+        "source_refs": "[\"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Bacto-tryptone.yaml#ontology_mapping.ontology_label\"]",
+        "evidence_refs": "[\"https://github.com/CultureBotAI/MediaIngredientMech/issues/669#issuecomment-6558035777\",\"https://github.com/CultureBotAI/culturebotai-claw/issues/701\"]"
+      },
+      "rows": [
+        {
+          "key": [
+            "MIM:Bacto-tryptone",
+            "skos:exactMatch",
+            "MICRO:0000182"
+          ],
+          "old_object_label": "tryptone",
+          "new_object_label": "tryptone",
+          "old_subject_label": "Bacto-tryptone",
+          "new_subject_label": "Bacto-tryptone",
+          "old_other": "Bacto Tryptone",
+          "new_other": "Bacto Tryptone",
+          "changed_fields": {}
+        }
+      ]
+    },
+    {
+      "event": {
+        "subject_id": "MIM:Bacto_Brain_Heart_Infusion",
+        "token_key": "brain heart infusion",
+        "token": "brain heart infusion",
+        "owner_subject_ids": "[\"MIM:Brain_Heart_Infusion\"]",
+        "disposition": "SUPPRESS",
+        "input_surfaces": "[\"mim.ontology_label\"]",
+        "source_refs": "[\"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Bacto_Brain_Heart_Infusion.yaml#ontology_mapping.ontology_label\"]",
+        "evidence_refs": "[\"https://github.com/CultureBotAI/MediaIngredientMech/issues/669#issuecomment-6558035777\",\"https://github.com/CultureBotAI/culturebotai-claw/issues/701\"]"
+      },
+      "rows": [
+        {
+          "key": [
+            "MIM:Bacto_Brain_Heart_Infusion",
+            "skos:exactMatch",
+            "MICRO:0000193"
+          ],
+          "old_object_label": "brain heart infusion",
+          "new_object_label": "brain heart infusion",
+          "old_subject_label": "Bacto brain heart infusion",
+          "new_subject_label": "Bacto brain heart infusion",
+          "old_other": "",
+          "new_other": "",
+          "changed_fields": {}
+        }
+      ]
+    },
+    {
+      "event": {
+        "subject_id": "MIM:Bacto_Peptone",
+        "token_key": "peptone",
+        "token": "Peptone",
+        "owner_subject_ids": "[\"MIM:Peptone\"]",
+        "disposition": "SUPPRESS",
+        "input_surfaces": "[\"mim.ontology_label\",\"mim.synonym\"]",
+        "source_refs": "[\"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Bacto_Peptone.yaml#ontology_mapping.ontology_label\",\"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Bacto_Peptone.yaml#synonyms[28]\",\"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Bacto_Peptone.yaml#synonyms[29]\"]",
+        "evidence_refs": "[\"https://github.com/CultureBotAI/MediaIngredientMech/issues/669#issuecomment-6558035777\",\"https://github.com/CultureBotAI/culturebotai-claw/issues/701\"]"
+      },
+      "rows": [
+        {
+          "key": [
+            "MIM:Bacto_Peptone",
+            "skos:exactMatch",
+            "MICRO:0000178"
+          ],
+          "old_object_label": "peptone",
+          "new_object_label": "peptone",
+          "old_subject_label": "Bacto peptone",
+          "new_subject_label": "Bacto peptone",
+          "old_other": "Bacto peptone (BD-Difco)|Bacto Peptone (Difco)|Bacto-Peptone (BD)|Peptone, Bacto (BD 211677)|Peptone (Oxoid)|Peptone (BD--Difco)|Peptone (BD Bacto)|Peptone (BD-Difco)|Peptone (BBL 11910)|Oxoid peptone|Bacto peptone (BD--Difco)|Peptone from meat|Peptone (meat)|Peptone from meat (pepsin-digested)|Bacteriological peptone|Neopeptone|Neopeptone (BD-Difco)|Neopeptone (Difco Laboratories, Detroit, Ml)|Gelatin peptone|Universal peptone|Universal peptone (Merck)|Peptone mixture|Fish peptone (Fluka)",
+          "new_other": "Bacto peptone (BD-Difco)|Bacto Peptone (Difco)|Bacto-Peptone (BD)|Peptone, Bacto (BD 211677)|Peptone (Oxoid)|Peptone (BD--Difco)|Peptone (BD Bacto)|Peptone (BD-Difco)|Peptone (BBL 11910)|Oxoid peptone|Bacto peptone (BD--Difco)|Peptone from meat|Peptone (meat)|Peptone from meat (pepsin-digested)|Bacteriological peptone|Neopeptone|Neopeptone (BD-Difco)|Neopeptone (Difco Laboratories, Detroit, Ml)|Gelatin peptone|Universal peptone|Universal peptone (Merck)|Peptone mixture|Fish peptone (Fluka)",
+          "changed_fields": {}
+        }
+      ]
+    },
+    {
+      "event": {
+        "subject_id": "MIM:Brain_Heart_Infusion_Broth",
+        "token_key": "brain heart infusion",
+        "token": "brain heart infusion",
+        "owner_subject_ids": "[\"MIM:Brain_Heart_Infusion\"]",
+        "disposition": "SUPPRESS",
+        "input_surfaces": "[\"mim.ontology_label\"]",
+        "source_refs": "[\"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Brain_Heart_Infusion_Broth.yaml#ontology_mapping.ontology_label\"]",
+        "evidence_refs": "[\"https://github.com/CultureBotAI/MediaIngredientMech/issues/669#issuecomment-6558035777\",\"https://github.com/CultureBotAI/culturebotai-claw/issues/701\"]"
+      },
+      "rows": [
+        {
+          "key": [
+            "MIM:Brain_Heart_Infusion_Broth",
+            "skos:exactMatch",
+            "MICRO:0000193"
+          ],
+          "old_object_label": "brain heart infusion",
+          "new_object_label": "brain heart infusion",
+          "old_subject_label": "Brain heart infusion broth",
+          "new_subject_label": "Brain heart infusion broth",
+          "old_other": "",
+          "new_other": "",
+          "changed_fields": {}
+        }
+      ]
+    },
+    {
+      "event": {
+        "subject_id": "MIM:Cr1_Soil",
+        "token_key": "soil",
+        "token": "soil",
+        "owner_subject_ids": "[\"MIM:Soil\"]",
+        "disposition": "SUPPRESS",
+        "input_surfaces": "[\"mim.ontology_label\"]",
+        "source_refs": "[\"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Cr1_Soil.yaml#ontology_mapping.ontology_label\"]",
+        "evidence_refs": "[\"https://github.com/CultureBotAI/MediaIngredientMech/issues/669#issuecomment-6558035777\",\"https://github.com/CultureBotAI/culturebotai-claw/issues/701\"]"
+      },
+      "rows": [
+        {
+          "key": [
+            "MIM:Cr1_Soil",
+            "skos:exactMatch",
+            "ENVO:00001998"
+          ],
+          "old_object_label": "soil",
+          "new_object_label": "soil",
+          "old_subject_label": "CR1 Soil",
+          "new_subject_label": "CR1 Soil",
+          "old_other": "",
+          "new_other": "",
+          "changed_fields": {}
+        }
+      ]
+    },
+    {
+      "event": {
+        "subject_id": "MIM:Geomycin",
+        "token_key": "oxytetracycline",
+        "token": "Oxytetracycline",
+        "owner_subject_ids": "[\"MIM:Oxytetracycline\"]",
+        "disposition": "SUPPRESS",
+        "input_surfaces": "[\"mim.ontology_label\"]",
+        "source_refs": "[\"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Geomycin.yaml#ontology_mapping.ontology_label\"]",
+        "evidence_refs": "[\"https://github.com/CultureBotAI/MediaIngredientMech/issues/669#issuecomment-6558035777\",\"https://github.com/CultureBotAI/culturebotai-claw/issues/701\"]"
+      },
+      "rows": [
+        {
+          "key": [
+            "MIM:Geomycin",
+            "skos:exactMatch",
+            "mesh:D010118"
+          ],
+          "old_object_label": "Oxytetracycline",
+          "new_object_label": "Oxytetracycline",
+          "old_subject_label": "Geomycin",
+          "new_subject_label": "Geomycin",
+          "old_other": "",
+          "new_other": "",
+          "changed_fields": {}
+        }
+      ]
+    },
+    {
+      "event": {
+        "subject_id": "MIM:Glebomycin",
+        "token_key": "bluensomycin",
+        "token": "Bluensomycin",
+        "owner_subject_ids": "[\"MIM:Bluensomycin\"]",
+        "disposition": "SUPPRESS",
+        "input_surfaces": "[\"mim.ontology_label\"]",
+        "source_refs": "[\"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Glebomycin.yaml#ontology_mapping.ontology_label\"]",
+        "evidence_refs": "[\"https://github.com/CultureBotAI/MediaIngredientMech/issues/669#issuecomment-6558035777\",\"https://github.com/CultureBotAI/culturebotai-claw/issues/701\"]"
+      },
+      "rows": [
+        {
+          "key": [
+            "MIM:Glebomycin",
+            "skos:exactMatch",
+            "NCIT:C90636"
+          ],
+          "old_object_label": "Bluensomycin",
+          "new_object_label": "Bluensomycin",
+          "old_subject_label": "Glebomycin",
+          "new_subject_label": "Glebomycin",
+          "old_other": "",
+          "new_other": "",
+          "changed_fields": {}
+        }
+      ]
+    },
+    {
+      "event": {
+        "subject_id": "MIM:Liver_Extract_Concentrate",
+        "token_key": "liver extract",
+        "token": "liver extract",
+        "owner_subject_ids": "[\"MIM:Liver_Extract\"]",
+        "disposition": "SUPPRESS",
+        "input_surfaces": "[\"mim.ontology_label\"]",
+        "source_refs": "[\"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Liver_Extract_Concentrate.yaml#ontology_mapping.ontology_label\"]",
+        "evidence_refs": "[\"https://github.com/CultureBotAI/MediaIngredientMech/issues/669#issuecomment-6558035777\",\"https://github.com/CultureBotAI/culturebotai-claw/issues/701\"]"
+      },
+      "rows": [
+        {
+          "key": [
+            "MIM:Liver_Extract_Concentrate",
+            "skos:exactMatch",
+            "MICRO:0001363"
+          ],
+          "old_object_label": "liver extract",
+          "new_object_label": "liver extract",
+          "old_subject_label": "Liver extract concentrate",
+          "new_subject_label": "Liver extract concentrate",
+          "old_other": "",
+          "new_other": "",
+          "changed_fields": {}
+        }
+      ]
+    },
+    {
+      "event": {
+        "subject_id": "MIM:Liver_Extract_Infusion",
+        "token_key": "liver extract",
+        "token": "liver extract",
+        "owner_subject_ids": "[\"MIM:Liver_Extract\"]",
+        "disposition": "SUPPRESS",
+        "input_surfaces": "[\"mim.ontology_label\"]",
+        "source_refs": "[\"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Liver_Extract_Infusion.yaml#ontology_mapping.ontology_label\"]",
+        "evidence_refs": "[\"https://github.com/CultureBotAI/MediaIngredientMech/issues/669#issuecomment-6558035777\",\"https://github.com/CultureBotAI/culturebotai-claw/issues/701\"]"
+      },
+      "rows": [
+        {
+          "key": [
+            "MIM:Liver_Extract_Infusion",
+            "skos:exactMatch",
+            "MICRO:0001363"
+          ],
+          "old_object_label": "liver extract",
+          "new_object_label": "liver extract",
+          "old_subject_label": "Liver extract infusion",
+          "new_subject_label": "Liver extract infusion",
+          "old_other": "",
+          "new_other": "",
+          "changed_fields": {}
+        }
+      ]
+    },
+    {
+      "event": {
+        "subject_id": "MIM:Trisodium_Citrate",
+        "token_key": "sodium citrate",
+        "token": "Sodium citrate",
+        "owner_subject_ids": "[\"MIM:Na3-citrate_X_2_H2o\"]",
+        "disposition": "SUPPRESS",
+        "input_surfaces": "[\"kgmicrobe.canonical_name\",\"kgmicrobe.synonym\",\"mim.ontology_label\",\"mim.synonym\"]",
+        "source_refs": "[\"/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe/mappings/kgmicrobe_unified_entity_mappings.sssom.tsv.gz#object_id=CHEBI:53258\",\"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Trisodium_Citrate.yaml#ontology_mapping.ontology_label\",\"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Trisodium_Citrate.yaml#synonyms[9]\"]",
+        "evidence_refs": "[\"https://github.com/CultureBotAI/MediaIngredientMech/issues/669#issuecomment-6558035777\",\"https://github.com/CultureBotAI/culturebotai-claw/issues/701\"]"
+      },
+      "rows": [
+        {
+          "key": [
+            "MIM:Trisodium_Citrate",
+            "skos:exactMatch",
+            "CHEBI:53258"
+          ],
+          "old_object_label": "sodium citrate",
+          "new_object_label": "sodium citrate",
+          "old_subject_label": "Trisodium citrate",
+          "new_subject_label": "Trisodium citrate",
+          "old_other": "Tri-sodium citrate|citric acid trisodium salt|trisodium 2-hydroxypropane-1,2,3-tricarboxylate|Na3-citrate|CAS:68-04-2",
+          "new_other": "Tri-sodium citrate|citric acid trisodium salt|trisodium 2-hydroxypropane-1,2,3-tricarboxylate|Na3-citrate|CAS:68-04-2",
+          "changed_fields": {}
+        }
+      ]
+    },
+    {
+      "event": {
+        "subject_id": "MIM:Trisodium_Citrate_X_H2O",
+        "token_key": "trisodium citrate",
+        "token": "trisodium citrate",
+        "owner_subject_ids": "[\"MIM:Trisodium_Citrate\"]",
+        "disposition": "SUPPRESS",
+        "input_surfaces": "[\"mim.ontology_label\"]",
+        "source_refs": "[\"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Trisodium_Citrate_X_H2O.yaml#ontology_mapping.ontology_label\"]",
+        "evidence_refs": "[\"https://github.com/CultureBotAI/MediaIngredientMech/issues/669#issuecomment-6558035777\",\"https://github.com/CultureBotAI/culturebotai-claw/issues/701\"]"
+      },
+      "rows": [
+        {
+          "key": [
+            "MIM:Trisodium_Citrate_X_H2O",
+            "skos:exactMatch",
+            "mesh:C514290"
+          ],
+          "old_object_label": "trisodium citrate",
+          "new_object_label": "trisodium citrate",
+          "old_subject_label": "Trisodium citrate x H2O",
+          "new_subject_label": "Trisodium citrate x H2O",
+          "old_other": "",
+          "new_other": "",
+          "changed_fields": {}
+        }
+      ]
+    },
+    {
+      "event": {
+        "subject_id": "MIM:Trypticase",
+        "token_key": "trypticase peptone",
+        "token": "Trypticase peptone",
+        "owner_subject_ids": "[\"MIM:Trypticase_Peptone\"]",
+        "disposition": "SUPPRESS",
+        "input_surfaces": "[\"mim.ontology_label\"]",
+        "source_refs": "[\"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Trypticase.yaml#ontology_mapping.ontology_label\"]",
+        "evidence_refs": "[\"https://github.com/CultureBotAI/MediaIngredientMech/issues/669#issuecomment-6558035777\",\"https://github.com/CultureBotAI/culturebotai-claw/issues/701\"]"
+      },
+      "rows": [
+        {
+          "key": [
+            "MIM:Trypticase",
+            "skos:exactMatch",
+            "MICRO:0000175"
+          ],
+          "old_object_label": "Trypticase peptone",
+          "new_object_label": "Trypticase peptone",
+          "old_subject_label": "Trypticase",
+          "new_subject_label": "Trypticase",
+          "old_other": "",
+          "new_other": "",
+          "changed_fields": {}
+        }
+      ]
+    },
+    {
+      "event": {
+        "subject_id": "MIM:Tryptone_Peptone",
+        "token_key": "tryptone",
+        "token": "tryptone",
+        "owner_subject_ids": "[\"MIM:Tryptone\"]",
+        "disposition": "SUPPRESS",
+        "input_surfaces": "[\"mim.ontology_label\"]",
+        "source_refs": "[\"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/data/ingredients/mapped/Tryptone_Peptone.yaml#ontology_mapping.ontology_label\"]",
+        "evidence_refs": "[\"https://github.com/CultureBotAI/MediaIngredientMech/issues/669#issuecomment-6558035777\",\"https://github.com/CultureBotAI/culturebotai-claw/issues/701\"]"
+      },
+      "rows": [
+        {
+          "key": [
+            "MIM:Tryptone_Peptone",
+            "skos:exactMatch",
+            "MICRO:0000182"
+          ],
+          "old_object_label": "tryptone",
+          "new_object_label": "tryptone",
+          "old_subject_label": "Tryptone peptone",
+          "new_subject_label": "Tryptone peptone",
+          "old_other": "",
+          "new_other": "",
+          "changed_fields": {}
+        }
+      ]
+    }
+  ],
+  "seawater": [
+    {
+      "key": [
+        "MIM:Seawater",
+        "skos:exactMatch",
+        "ENVO:00002149"
+      ],
+      "changed_fields": {
+        "object_label": [
+          "sea water",
+          "ocean water"
+        ],
+        "other": [
+          "Seawater (30 ppt)|Seawater(non-sterilized)",
+          "sea water|Seawater (30 ppt)|Seawater(non-sterilized)"
+        ]
+      }
+    }
+  ]
+}

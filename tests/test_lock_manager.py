@@ -783,3 +783,92 @@ def test_relative_workspace_fails_closed_outside_checkout(
     explicit_status = tmp_path / "explicit-status"
     assert LockManager({"locks_dir": explicit_locks}).locks_dir == explicit_locks
     assert StatusManager({"status_dir": explicit_status}).status_dir == explicit_status
+
+
+# --- check_lock_setup mirrors the constructor and a first acquisition (#754, #764)
+
+PERMISSION_STATES = {"unwritable-parent", "unwritable-locks", "guard-unwritable"}
+
+
+@pytest.mark.parametrize("state", [
+    "fresh", "existing-locks", "locks-symlink", "locks-file", "under-a-file", "unwritable-parent",
+    "unwritable-locks", "guard-symlink", "guard-dir", "guard-unwritable", "resource-lock-dir",
+    "resource-guard-dir", "configured-under-dangling-symlink", "global-lock-dir",
+])
+def test_check_lock_setup_refuses_exactly_what_a_real_lock_refuses(tmp_path, monkeypatch, state):
+    """The dry-run check and a real first acquisition of the same resource agree."""
+    from plugins.lock_manager import LockManager, check_lock_setup
+    if state in PERMISSION_STATES and os.geteuid() == 0:
+        pytest.skip("root ignores file permissions")
+    workspace = tmp_path / "workspace"
+    locks = workspace / "locks"
+    config = None
+    restrict = None
+    if state in {"existing-locks", "guard-symlink", "guard-dir", "guard-unwritable",
+                 "resource-lock-dir", "resource-guard-dir", "unwritable-locks", "global-lock-dir"}:
+        locks.mkdir(parents=True)
+    if state == "locks-symlink":
+        workspace.mkdir()
+        locks.symlink_to(tmp_path, target_is_directory=True)
+    elif state == "locks-file":
+        workspace.mkdir()
+        locks.write_text("not a directory")
+        # Executable, so only the directory check -- not the access check -- refuses it.
+        locks.chmod(0o755)
+    elif state == "under-a-file":
+        (tmp_path / "file").write_text("x")
+        workspace = tmp_path / "file" / "workspace"
+    elif state == "unwritable-parent":
+        workspace.mkdir()
+        restrict = workspace
+    elif state == "unwritable-locks":
+        restrict = locks
+    elif state == "guard-symlink":
+        (tmp_path / "elsewhere").write_text("")
+        (locks / ".lock-hierarchy.guard").symlink_to(tmp_path / "elsewhere")
+    elif state == "guard-dir":
+        (locks / ".lock-hierarchy.guard").mkdir()
+    elif state == "guard-unwritable":
+        guard = locks / ".lock-hierarchy.guard"
+        guard.write_text("")
+        restrict = guard
+    elif state == "resource-lock-dir":
+        (locks / "probe.lock").mkdir()
+    elif state == "resource-guard-dir":
+        (locks / ".probe.lock.guard").mkdir()
+    elif state == "global-lock-dir":
+        (locks / "global.lock").mkdir()  # every resource acquisition consults it (#771)
+    elif state == "configured-under-dangling-symlink":
+        (tmp_path / "dangling").symlink_to(tmp_path / "missing", target_is_directory=True)
+        config = {"locks_dir": str(tmp_path / "dangling" / "locks")}
+    monkeypatch.setenv("OPENCLAW_WORKSPACE", str(workspace))
+    if restrict is not None:
+        restrict.chmod(0o400 if restrict.is_file() else 0o555)
+    try:
+        before = sorted(str(p) for p in tmp_path.rglob("*"))
+        try:
+            check_lock_setup(config, resource="probe")
+            checked = True
+        except (OSError, ValueError):
+            checked = False
+        assert sorted(str(p) for p in tmp_path.rglob("*")) == before  # created nothing
+        try:
+            with LockManager(config).lock("probe", "probe"):
+                pass
+            acquired = True
+        except (OSError, ValueError, RuntimeError):
+            acquired = False
+    finally:
+        if restrict is not None:
+            restrict.chmod(0o644 if restrict.is_file() else 0o755)
+    assert checked == acquired
+    # The per-resource guard is used only to release or reclaim, so it cannot
+    # block an acquisition; the check must not refuse what the lock accepts.
+    assert checked == (state in {"fresh", "existing-locks", "resource-guard-dir"})
+
+
+def test_check_lock_setup_rejects_an_invalid_resource_name(tmp_path, monkeypatch):
+    from plugins.lock_manager import check_lock_setup
+    monkeypatch.setenv("OPENCLAW_WORKSPACE", str(tmp_path / "workspace"))
+    with pytest.raises(ValueError):
+        check_lock_setup(resource="../escape")

@@ -1,0 +1,22 @@
+{
+  "name": "step5-independent-artifact-regressions-704-v3",
+  "argv": [
+    "python",
+    "-B",
+    "-m",
+    "pytest",
+    "-q",
+    "-o",
+    "addopts=",
+    "-p",
+    "no:cacheprovider",
+    "tests/test_mim_sssom_artifacts.py"
+  ],
+  "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+  "started_at": "2026-11-01T12:49:27.442454+00:00",
+  "environment_profile": "generation-and-native-qc",
+  "finished_at": "2026-11-01T12:49:28.025417+00:00",
+  "exit_code": 0,
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-independent-artifact-regressions-704-v3.log",
+  "log_sha256": "3146e9e7282a3a27cbdc34098b64d33091c133a6616efc3dc4f6d531334ce127"
+}

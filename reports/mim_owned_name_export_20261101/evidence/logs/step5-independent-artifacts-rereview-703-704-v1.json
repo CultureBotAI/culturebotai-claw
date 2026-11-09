@@ -1,0 +1,15 @@
+{
+  "name": "step5-independent-artifacts-rereview-703-704-v1",
+  "argv": [
+    "python",
+    "-B",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-703-704-v1/probe_artifacts.py"
+  ],
+  "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+  "started_at": "2026-11-01T12:45:10.043536+00:00",
+  "environment_profile": "generation-and-native-qc",
+  "finished_at": "2026-11-01T12:45:10.121621+00:00",
+  "exit_code": 0,
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-independent-artifacts-rereview-703-704-v1.log",
+  "log_sha256": "0888e295aaec20aa8108b119bab96fdfc9373df4131ab6c1983062c4b0683c32"
+}

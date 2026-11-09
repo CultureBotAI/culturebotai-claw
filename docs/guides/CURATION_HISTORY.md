@@ -15,7 +15,7 @@ not: **which model, using which tool, changed what, why, and under which issue?*
 This follows the same shape as `kg_microbe_kgscan`: claw owns one
 implementation and each Mech exposes thin repository-specific recipes.
 
-The schema is **vendored** into every Mech; the scaffolder is **not**. Each Mech
+The schema is **vendored** into every Mech; the scaffolder is **not**. A Mech
 validates its local schema copy so its correctness gate is self-contained and
 pinned rather than dependent on another repository's current branch:
 
@@ -31,15 +31,14 @@ source-tree fallback. Pass `--schema` only when deliberately validating a
 Mech's governed copy or another compatible `HistoryRecord` schema.
 
 To change the shared schema, update the canonical artifact and manifest in claw,
-merge a reviewed claw commit, and coordinate that immutable pin across all eight
-Mechs. See [Vendored governance](VENDORED_GOVERNANCE.md) for synchronization,
+merge a reviewed claw commit, and coordinate that immutable pin across every
+Mech. See [Vendored governance](VENDORED_GOVERNANCE.md) for synchronization,
 audit, and rollback.
 
 ## Fleet adoption
 
-Every Mech vendors the governed schema. Seven of the eight also carry the
-repository-local workflow that makes it usable; AntibioticMech is the exception
-and has the schema alone.
+Every Mech vendors the governed schema. Most also carry the repository-local
+recipes and a validity check that make it usable; the table says which do not.
 
 | Repo | Governed schema | Recipes | Validity checked in |
 |---|:--:|:--:|---|
@@ -50,7 +49,10 @@ and has the schema alone.
 | ProteinTraitsMech | yes | yes | `history-and-vendored.yaml`, combined with the vendored-sync guard |
 | CellStructureMech | yes | yes | the qc runner, `scripts/run_qc.py` |
 | HabitatMech | yes | yes | the qc runner, `scripts/run_qc.py` |
+| TaxonMech | yes | yes | the qc runner, `scripts/run_qc.py` |
+| NaturalProductMech | yes | `new-history` only | nothing yet |
 | AntibioticMech | yes | no | nothing yet — CultureBotAI/AntibioticMech#205 |
+| PathwayMech | yes | no | nothing yet — #515 |
 
 Where validity is checked differs on purpose. A repository whose qc runner is
 the single authoritative gate puts it there; one that already separates

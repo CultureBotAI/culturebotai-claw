@@ -1,0 +1,9 @@
+{
+  "frozen": "/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/step5-evidence-test-tha7cu_1/packaging/inputs.json",
+  "sha256": "9fcdd2aa3e23f13e26516ec049ea478c1f13260b3ae6a0e3e0fa2bbb663769c8"
+}
+Traceback (most recent call last):
+  File "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v5.py", line 82, in <module>
+    assert not (repo/m.DESTINATION).exists()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

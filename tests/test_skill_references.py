@@ -56,6 +56,8 @@ def _skill(tmp_path: Path, name: str, body: str, frontmatter: str = "") -> Path:
         "owner/repository",  # a shape, not a name
         "data/ingredients/unmapped/UNMAPPED_NNNN.yaml",
         "workspace/shards/sssom_review/shard_N.tsv",
+        "organism/dataset/component",
+        "organism/dataset/gene",
         "{package_path}/schema/history.yaml",
         "scripts/aggregate_*",  # a glob
         "--require-sources",
@@ -65,6 +67,23 @@ def _skill(tmp_path: Path, name: str, body: str, frontmatter: str = "") -> Path:
 def test_things_that_are_not_repository_paths_are_not_references(tmp_path, token):
     path = _skill(tmp_path, "s", f"See `{token}` for details.\n")
     assert [r.text for r in extract_references(path) if r.kind == "path"] == []
+
+
+@pytest.mark.parametrize(
+    "token",
+    [
+        "organism/dataset/component",
+        "organism/dataset/gene",
+    ],
+)
+def test_imodulondb_source_keys_in_shell_fences_are_not_references(tmp_path, token):
+    path = _skill(
+        tmp_path,
+        "s",
+        f"```bash\nkg-microbe-sources imodulondb get {token}\n```\n",
+    )
+
+    assert extract_references(path) == []
 
 
 def test_a_repository_path_is_a_reference(tmp_path):
@@ -108,6 +127,23 @@ def test_a_workspace_path_is_an_output_not_a_missing_file(tmp_path):
     """Skills name the artifacts they write. workspace/ is gitignored runtime
     state, so asserting it exists would fail on every clean checkout."""
     _skill(tmp_path, "s", "Writes `workspace/reports/thing.tsv`.\n")
+
+    findings = check(tmp_path)
+
+    assert [f.verdict for f in findings] == ["output"]
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "reports/yaml_record_review",
+        "reports/yaml_record_review/20260101T000000Z-record.md",
+        "reports/yaml_category_review",
+        "reports/yaml_category_review/20260101T000000Z-category.md",
+    ],
+)
+def test_yaml_review_report_paths_are_outputs(tmp_path, path):
+    _skill(tmp_path, "s", f"Writes `{path}`.\n")
 
     findings = check(tmp_path)
 
@@ -164,6 +200,37 @@ def test_a_repeated_prefix_is_a_layout_not_a_typo(tmp_path):
     _skill(tmp_path, "s", "Read `CommunityMech/CommunityMech/reports/x.csv`.\n")
 
     assert check(tmp_path, {"CommunityMech": root})[0].verdict == "ok"
+
+
+def test_a_bare_repeated_prefix_is_judged_not_assumed(tmp_path):
+    """In a sibling layout `CultureMech/CultureMech` names a directory that
+    does not exist, so it is missing; an earlier fix that called any bare
+    repeated prefix "ok" hid exactly this (#845)."""
+    mech = _repository(tmp_path / "CultureMech", {"README.md": "x"})
+    _skill(tmp_path, "s", "Compare `CultureMech/CultureMech`.\n")
+
+    assert check(tmp_path, {"CultureMech": mech})[0].verdict == "missing"
+
+
+@pytest.mark.parametrize("text", [".git/objects/pack", "OtherMech/.git/objects/pack"])
+def test_git_internal_state_is_output_not_missing(tmp_path, text):
+    """Git never tracks `.git`, so no checkout can contain `.git/objects/pack`;
+    with a downstream checkout resolvable it used to be called missing (#839)."""
+    other = _repository(tmp_path / "OtherMech", {"README.md": "x"})
+    _skill(tmp_path, "s", f"Measure `{text}`.\n")
+
+    finding = check(tmp_path, {"OtherMech": other})[0]
+
+    assert (finding.verdict, finding.detail) == ("output", "git's own state under .git/, which git never tracks")
+
+
+@pytest.mark.parametrize("text", [".github/gone.yaml", ".gitignore.d/gone", "OtherMech/.github/gone.yaml"])
+def test_a_path_that_only_starts_with_dot_git_is_still_judged(tmp_path, text):
+    """The exemption is the `.git` path segment, not the `.git` prefix (#839)."""
+    other = _repository(tmp_path / "OtherMech", {"README.md": "x"})
+    _skill(tmp_path, "s", f"Read `{text}`.\n")
+
+    assert check(tmp_path, {"OtherMech": other})[0].verdict == "missing"
 
 
 def test_an_unknown_repository_prefix_is_unverifiable_not_missing(tmp_path):

@@ -11,10 +11,14 @@ import tarfile
 import zipfile
 from pathlib import Path
 
+from test_record_review import review as review  # noqa: F401
+
+from kg_microbe_fleet import load_fleet_manifest
+
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path) -> None:
+def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path, review) -> None:
     """Installed CLIs must start without a source checkout or override."""
 
     uv = shutil.which("uv")
@@ -52,6 +56,7 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path) -> None
     with tarfile.open(source_archives[0], "r:gz") as source_archive:
         source_names = {name.split("/", 1)[1] for name in source_archive.getnames() if "/" in name}
     assert "src/kg_microbe_fleet/fleet.yaml" in source_names
+    assert "src/kg_microbe_embeddings/rollout.yaml" in source_names
     assert "src/kg_microbe_merge_queue/__init__.py" in source_names
     assert "src/kg_microbe_merge_queue/__main__.py" in source_names
     assert "src/kg_microbe_merge_queue/policy.json" in source_names
@@ -61,12 +66,22 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path) -> None
         )
     )
     assert "src/kg_microbe_governance/vendored_artifacts.json" in source_names
+    assert "src/kg_microbe_governance/releases/mech-cycle-v2-canary.json" in source_names
+    admitted_snapshot = "kg_microbe_governance/releases/edgemech-infrastructure-source-manifest.json"
+    assert "src/" + admitted_snapshot in source_names
     for artifact in governance_document["artifacts"]:
         assert artifact["source"] in source_names
     assert "src/kg_microbe_config/openclaw_config.yaml" in source_names
     assert "src/kg_microbe_research/__init__.py" in source_names
     assert "src/kg_microbe_research/__main__.py" in source_names
     assert "src/kg_microbe_research/schema/research.yaml" in source_names
+    assert "src/kg_microbe_reviews/__main__.py" in source_names
+    assert "src/kg_microbe_curation/schema/bundle.json" in source_names
+    assert "src/kg_microbe_governance/artifacts/schema/record_review.yaml" in source_names
+    assert "src/kg_microbe_governance/artifacts/docs/record-reviews.md" in source_names
+    assert (
+        "src/kg_microbe_governance/artifacts/tests/test_record_review_contract.py" in source_names
+    )
     assert not any(name.startswith("agents/") for name in source_names)
     assert not any(name.startswith("conf/") for name in source_names)
     assert not any(name.startswith("build/") for name in source_names)
@@ -102,19 +117,36 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path) -> None
     with zipfile.ZipFile(wheels[0]) as wheel:
         names = set(wheel.namelist())
         assert "kg_microbe_fleet/fleet.yaml" in names
+        assert (
+            wheel.read("kg_microbe_embeddings/rollout.yaml")
+            == (REPOSITORY_ROOT / "src/kg_microbe_embeddings/rollout.yaml").read_bytes()
+        )
         assert "kg_microbe_merge_queue/__init__.py" in names
         assert "kg_microbe_merge_queue/__main__.py" in names
         assert "kg_microbe_merge_queue/policy.json" in names
-        assert wheel.read("kg_microbe_merge_queue/policy.json") == (
-            REPOSITORY_ROOT / "src/kg_microbe_merge_queue/policy.json"
-        ).read_bytes()
+        assert (
+            wheel.read("kg_microbe_merge_queue/policy.json")
+            == (REPOSITORY_ROOT / "src/kg_microbe_merge_queue/policy.json").read_bytes()
+        )
         assert "kg_microbe_governance/vendored_artifacts.json" in names
+        assert wheel.read(admitted_snapshot) == (REPOSITORY_ROOT / "src" / admitted_snapshot).read_bytes()
+        assert "kg_microbe_evidence/__init__.py" in names
+        assert "kg_microbe_evidence/__main__.py" in names
+        assert "kg_microbe_evidence/fetch.py" in names
         for artifact in governance_document["artifacts"]:
             assert artifact["source"].removeprefix("src/") in names
         assert "kg_microbe_config/openclaw_config.yaml" in names
         assert "kg_microbe_research/__init__.py" in names
         assert "kg_microbe_research/__main__.py" in names
         assert "kg_microbe_research/schema/research.yaml" in names
+        assert "kg_microbe_reviews/__main__.py" in names
+        assert "kg_microbe_curation/schema/bundle.json" in names
+        assert (
+            wheel.read("kg_microbe_governance/artifacts/schema/record_review.yaml")
+            == (
+                REPOSITORY_ROOT / "src/kg_microbe_governance/artifacts/schema/record_review.yaml"
+            ).read_bytes()
+        )
         assert "kg_microbe_agents/definitions/dev_workflow/validation_agent.yaml" in names
         assert "conf/fleet.yaml" not in names
         assert "openclaw_config.yaml" not in names
@@ -127,10 +159,14 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path) -> None
         )
         entry_points = wheel.read(entry_points_path).decode("utf-8")
         assert "kg-microbe-fleet = kg_microbe_fleet.__main__:main" in entry_points
+        assert "kg-microbe-evidence = kg_microbe_evidence.__main__:main" in entry_points
+        assert "kg-microbe-embeddings = kg_microbe_embeddings.__main__:main" in entry_points
         assert "kg-microbe-merge-queue = kg_microbe_merge_queue.__main__:main" in entry_points
         assert "kg-microbe-governance = kg_microbe_governance.__main__:main" in entry_points
         assert "kg-microbe-history = kg_microbe_history.__main__:main" in entry_points
         assert "kg-microbe-research = kg_microbe_research.__main__:main" in entry_points
+        assert "kg-microbe-reviews = kg_microbe_reviews.__main__:main" in entry_points
+        assert "kg-microbe-curation = kg_microbe_curation.__main__:main" in entry_points
         wheel.extractall(unpacked)
 
     smoke_environment = os.environ.copy()
@@ -146,9 +182,11 @@ from contextlib import redirect_stdout
 from datetime import datetime, timedelta, timezone
 from importlib.metadata import distribution
 from io import StringIO
+import hashlib
 import json
 import os
 from pathlib import Path
+import subprocess
 import sys
 
 import cli as cli_package
@@ -162,6 +200,12 @@ import kg_microbe_merge_queue
 import kg_microbe_merge_queue.__main__
 import kg_microbe_research
 import kg_microbe_research.__main__
+import kg_microbe_reviews
+import kg_microbe_reviews.__main__
+import kg_microbe_reviews.aggregate
+import kg_microbe_curation
+import kg_microbe_curation.__main__
+from kg_microbe_curation.contract import validate_bundle, unprocessed_decision
 import plugins
 from click.testing import CliRunner
 from cli.main import cli
@@ -197,25 +241,25 @@ runtime_modules = (
     kg_microbe_merge_queue.__main__,
     kg_microbe_research,
     kg_microbe_research.__main__,
+    kg_microbe_reviews,
+    kg_microbe_reviews.__main__,
+    kg_microbe_reviews.aggregate,
+    kg_microbe_curation,
+    kg_microbe_curation.__main__,
     plugins,
 )
 for module in runtime_modules:
     module_path = Path(module.__file__).resolve()
     assert module_path.is_relative_to(unpacked), (module.__name__, module_path)
 module_path = Path(kg_microbe_fleet.__file__).resolve()
+occurrence = "urn:kg-microbe:occurrence:v1:" + "a" * 64
+validate_bundle({
+    "contract": "kg-microbe-curation/v1", "input_sha256": "b" * 64,
+    "occurrence_ids": [occurrence], "decisions": [unprocessed_decision(occurrence)],
+    "observations": [], "claims": [], "reviews": [],
+})
 manifest = load_fleet_manifest()
-assert manifest.keys == (
-    "culturemech",
-    "mediaingredientmech",
-    "communitymech",
-    "traitmech",
-    "proteintraitsmech",
-    "antibioticmech",
-    "cellstructuremech",
-    "habitatmech",
-    "naturalproductmech",
-    "taxonmech",
-)
+assert manifest.keys == tuple(json.loads(sys.argv[4]))
 assert default_manifest_path() == module_path.parent / "fleet.yaml"
 # Importing an editable package or merely declaring package-data can hide a
 # missing policy. Exercise the default loader using only the unpacked wheel.
@@ -245,9 +289,45 @@ with redirect_stdout(queue_help):
     else:
         raise AssertionError("queue CLI help did not exit through its parser")
 assert "{plan,check,apply}" in queue_help.getvalue()
+review_entry = next(
+    entry for entry in distribution("kg-microbe-orchestration").entry_points
+    if entry.group == "console_scripts" and entry.name == "kg-microbe-reviews"
+)
+assert review_entry.load() is kg_microbe_reviews.__main__.main
+assert kg_microbe_reviews.SCHEMA_PATH.resolve() == (
+    unpacked / "kg_microbe_governance/artifacts/schema/record_review.yaml"
+)
+assert review_entry.load()(["validate", sys.argv[3]]) == 0
+assert review_entry.load()(["render", "--content", sys.argv[3]]) == 0
 assert default_config_path().is_relative_to(unpacked)
 governance = load_governance_manifest(fleet_manifest=manifest)
-assert len(governance.artifacts) == 16
+assert len(governance.artifacts) == 26
+# Exercise admitted sync through installed resources, with only immutable
+# fixture DATA supplied from outside the unpacked wheel. No repository imports
+# or network calls can satisfy this installed-package proof.
+admitted_path = unpacked / "kg_microbe_governance/releases/edgemech-infrastructure-source-manifest.json"
+admitted_raw = admitted_path.read_bytes()
+admitted_document = json.loads(admitted_raw)
+admitted_payloads = {"src/kg_microbe_governance/vendored_artifacts.json": admitted_raw}
+for artifact in admitted_document["artifacts"]:
+    payload = (unpacked / artifact["source"].removeprefix("src/")).read_bytes()
+    if hashlib.sha256(payload).hexdigest() != artifact["sha256"]:
+        payload = (Path(sys.argv[5]) / Path(artifact["source"]).name).read_bytes()
+    assert hashlib.sha256(payload).hexdigest() == artifact["sha256"]
+    admitted_payloads[artifact["source"]] = payload
+kg_microbe_governance.fetch_url = lambda url: admitted_payloads[url.split("/", 6)[-1]]
+edge_root = Path(sys.argv[2]).parent / "wheel-edge-consumer"
+subprocess.run(["git", "init", "-q", str(edge_root)], check=True)
+subprocess.run(["git", "-C", str(edge_root), "remote", "add", "origin",
+                "https://github.com/CultureBotAI/EdgeMech"], check=True)
+assert len(kg_microbe_governance.plan_sync("edgemech", edge_root,
+           "7e672227fb246a8359ad57b6d3975ce5ed329007")) == 20
+assert not (edge_root / "scripts").exists()
+for name in ("kg_microbe_governance.infrastructure_admission", "kg_microbe_governance.cycle_release_audit"):
+    assert Path(sys.modules[name].__file__).resolve().is_relative_to(unpacked)
+from kg_microbe_evidence import EvidenceConfig, EvidenceValidator
+assert Path(sys.modules["kg_microbe_evidence"].__file__).resolve().is_relative_to(unpacked)
+assert EvidenceValidator(unpacked, EvidenceConfig("references_cache")).check_item({"pmid": "1"}).verdict == "NO_QUOTE"
 assert load_pin_contract()["uv_version"]
 assert governance_main(["list", "--repository", "proteintraitsmech", "--json"]) == 0
 history_schema = Path(_default_schema_path()).resolve()
@@ -339,6 +419,8 @@ assert ran.exit_code == 0, ran.output
 validated = runner.invoke(cli, ["config", "validate"])
 assert validated.exit_code == 0, validated.output
 """
+    review_input = tmp_path / "synthetic-wheel-review.json"
+    review_input.write_text(json.dumps(review), encoding="utf-8")
     smoked = subprocess.run(
         [
             sys.executable,
@@ -346,6 +428,11 @@ assert validated.exit_code == 0, validated.output
             smoke_code,
             str(unpacked),
             str(tmp_path / "wheel-history"),
+            str(review_input),
+            json.dumps(load_fleet_manifest(
+                REPOSITORY_ROOT / "src/kg_microbe_fleet/fleet.yaml"
+            ).keys),
+            str(REPOSITORY_ROOT / "tests/fixtures/edgemech-admitted-source"),
         ],
         cwd=tmp_path,
         env=smoke_environment,

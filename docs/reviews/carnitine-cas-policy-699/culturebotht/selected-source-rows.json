@@ -1,0 +1,48 @@
+{
+  "repository": "https://github.com/CultureBotAI/CultureBotHT.git",
+  "checkout_revision": "1f27c43b1d5c7d15c08b45fc675d91b6ee938371",
+  "raw_file": "data/raw/google_sheets/compounds_to_cas.csv",
+  "raw_sha256": "76b70a1836b25de431c4f5cc27c72bb6b06a223ce33911e93b7681d4fcdb28f9",
+  "raw_revision_scope": "Raw CSV is ignored, not a Git blob at this revision; revision identifies checkout context only.",
+  "overlay_path": "data/curated/compound_cas_corrections.tsv",
+  "overlay_sha256": "10147dabecb0da6c50ca35445faafc514719a7cd3e25bf7b7bebe3c4b8685b27",
+  "selected_rows": [
+    {
+      "csv_line": 96,
+      "row": {
+        "Compound": "Carnitine Hydrochloride",
+        "CAS": "461-05-2",
+        "Company": "Sigma",
+        "CatalogNumber": "C9500",
+        "FW": "197.66",
+        "Synonyms": "",
+        "Notes": "",
+        "Hans80Anti": "",
+        "Hans80metals": "no",
+        "FEBA_carbon": "yes",
+        "FEBA_nitrogen": "yes",
+        "FEBA_stress": "",
+        "All_star": ""
+      }
+    },
+    {
+      "csv_line": 787,
+      "row": {
+        "Compound": "Carnitine (Dl) Hydrochloride",
+        "CAS": "461-06-3",
+        "Company": "",
+        "CatalogNumber": "",
+        "FW": "",
+        "Synonyms": "",
+        "Notes": "",
+        "Hans80Anti": "",
+        "Hans80metals": "",
+        "FEBA_carbon": "",
+        "FEBA_nitrogen": "",
+        "FEBA_stress": "",
+        "All_star": ""
+      }
+    }
+  ],
+  "other_overlay_entries": "Preserved as source evidence, not applied by this change."
+}
