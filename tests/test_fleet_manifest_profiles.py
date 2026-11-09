@@ -221,12 +221,13 @@ def test_cmmmech_admission_preserves_records_and_defers_unverified_adapters() ->
     assert "does not enable curation" in history.reason
     assert "append-only" in history.reason
     assert mech.supports("record_review")
-    assert set(history.reason_claims.absent) == {
-        ".claude/skills/curate-yaml-record/SKILL.md",
-        ".claude/skills/curate-yaml-record/references/review-checklist.md",
-    }
+    # The curate-yaml-record skill landed after admission (CMMMech#513), so
+    # its files are now claimed present; enabling curation awaits review (#785).
+    assert not history.reason_claims.absent
     assert set(history.reason_claims.present) == {
         "justfile", "src/cmmmech/history.py", "history",
+        ".claude/skills/curate-yaml-record/SKILL.md",
+        ".claude/skills/curate-yaml-record/references/review-checklist.md",
     }
 
 
