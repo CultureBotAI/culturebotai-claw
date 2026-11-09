@@ -99,6 +99,8 @@ EXPECTED_CAPABILITIES = {
     # language, alt text, heading order and references that resolve -- and
     # which third-party host each of them has deliberately taken on.
     "site_contract",
+    # Where each Mech names taxa, for kg-microbe-links taxa (#881 plan, Phase 1).
+    "taxon_links",
     # Whose term mappings are checked against the shared SSSOM contract. It
     # applies to every Mech (#503), so the rest are disabled, pending adoption.
     "sssom_export",
