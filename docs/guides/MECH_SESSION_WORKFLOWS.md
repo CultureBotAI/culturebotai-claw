@@ -224,7 +224,25 @@ working directory/origin, native conversation and initial goal identity, one
 matching Terminal tab, empty composer, idle native execution, and absence of
 queued/background work. Drafts, menus and unfamiliar screens remain untouched.
 The final send rechecks process identity and the exact captured screen.
-A send is acknowledged only through matching native history or a new goal marker.
+A successful Terminal API return is an attempted transport, not proof that the
+agent submitted the whole instruction. The reservation remains `uncertain`
+until the native reader proves one exact full user input after the reserved
+step and time, in the same workspace, conversation and goal context. Hash-only
+input evidence is bounded to the latest 200 user steps; a reservation older
+than that window remains held for operator assessment. Missing, partial,
+different or duplicate inputs never authorize a retry or an automatic Enter. Matching pending, queued or unknown-status inputs also defeat uniqueness. Only the observed plain-text input shape, or one SYSTEM goal declaration followed by its plain-text suffix, is supported; extra file or unknown scopes fail closed even when their displayed text has the same hash.
+Workspace-history markers alone are not acceptance authority.
+
+A `start_goal` additionally requires actual native SYSTEM `/goal` metadata and
+a matching new goal identity. Literal `/goal` text or a marker in a checkpoint
+cannot substitute for that declaration. Previously accepted action records are
+preserved; they do not independently authorize adoption of another goal.
+
+For an existing unsent draft, preserve the screen, action and native-input
+evidence and prepare a separately reviewed recovery proposal. Do not clear or
+submit it under an ordinary sweep, rewrite its action state, or resend a goal.
+A valid ordinary closure receipt may still close an already completed goal once
+all readiness and closure gates pass; delivery evidence is not closure proof.
 
 A replacement agy process or conversation blocks the old binding. Stop,
 inspect its current goal and any already delivered instructions/PRs, preserve
@@ -404,6 +422,56 @@ then increments `cycle`, validates and pins the committed next-cycle profile,
 and returns to stage 1. Actions, progress, receipts, archives, and reports carry
 the cycle identity, so older evidence cannot complete a later cycle. Legacy
 four-stage configurations remain supported until explicitly migrated.
+
+## Previously resolved findings in later remediation goals
+
+A completed single-PR `resolve_review_findings` receipt may identify an issue
+whose same finding scope was already resolved in an earlier verified cycle.
+Keep the current PR as the current goal's sole PR; a prior cycle's PR is not
+an ordered same-goal member. Use the issue's top-level `fix_commit_sha` for
+the actual fixing commit in the earlier PR, with this exact descriptor:
+
+```json
+{
+  "number": 23,
+  "disposition": "addressed",
+  "fix_commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "historical_resolution": {
+    "github_repository": "CultureBotAI/ExampleMech",
+    "pr_number": 42,
+    "base": "main",
+    "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "merge_commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+    "receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  }
+}
+```
+
+These values are illustrative placeholders, not evidence. There is no nested
+`fix_commit_sha`, alternative fixing PR, or automatic fallback when the
+current PR lacks a claimed commit. The descriptor must bind exactly one earlier
+verified remediation closure by canonical receipt digest, PR head and merge.
+The retained manifest bytes must match its recorded snapshot. Its resolved
+group and stable finding IDs, issue and summaries must match the current
+cycle's frozen review and the current resolution group; a reopened or different
+finding cannot inherit historical credit.
+
+The verifier freshly checks the prior merged repository/base/head/merge,
+complete bounded commit inventory, actual issue closure, and that the merge
+is an ancestor of the current reviewed head, PR base and checkout. The issue's
+fix must be in that historical PR. This proves declared provenance and
+retention of the reviewed finding scope; commit membership alone is not a new
+scientific review. Current-goal review, final-head artifacts, checks, merge,
+cleanup, publication and native-goal gates still apply. Successful verification
+retains `historical_issue_resolutions` in the new closure proof without rewriting
+old records. Existing ordinary receipts and previously retained historical
+proofs stay unchanged. This additive path is deliberately not combined with
+ordered multi-PR receipts.
+
+Incorrect existing receipts require a separately reviewed exact correction
+record and user approval before any runtime replacement. Preparing or testing
+this compatibility code grants no authority to edit a receipt, reset a repair
+budget, replay a goal, or deploy it. See claw issue #1031.
 
 ## Ordered multi-PR closure receipts
 

@@ -36,10 +36,23 @@ from .artifacts.scripts.check_vendored_sync import (
     raw_url,
 )
 from .fleet_audit import (
+    RepositoryAuditResult,
     _commit_at,
     _head_blob,
     _preflight_repository,
     _run_git_bytes,
+)
+from .infrastructure_admission import (
+    ADMISSION_PATH,
+    ADMITTED,
+    ADMITTED_MANIFEST_PATH,
+    HISTORICAL_MANIFEST_PATH,
+    admission_anchor,
+    bind_source_snapshot,
+    bootstrap_pending,
+    parse_admission,
+    validate_current_layout,
+    validate_transition,
 )
 
 RELEASE_ID = "mech-cycle-v2-dufmech"
@@ -210,18 +223,45 @@ def audit_release(trusted_root: Path, roots: Mapping[str, Path]) -> dict[str, An
     if (base_raw != candidate_raw or base_payloads != candidate_payloads
             or _sha(candidate_raw) != policy["manifest_sha256"]):
         raise GovernanceError("Cycle release must preserve exact baseline governance bytes and authority")
-    # Current trusted code may publish future payload revisions without changing
-    # this immutable release. Validate their checksums but retain the exact
-    # authority/layout used for sparse checkout and the frozen target cohort.
-    current, _, _ = _snapshot(trusted, head)
-    if _authority_layout(current) != _authority_layout(candidate):
-        raise GovernanceError("Current trusted governance authority/layout differs from the active cycle release")
+    # Current payloads checksum-validate independently; their publication does
+    # not replace the immutable historical or admitted downstream data pins.
+    current, _, current_raw = _snapshot(trusted, head)
+    admission: dict[str, Any] | None = None
+    admission_report = None
+    admission_entry = _head_blob(trusted, head, ADMISSION_PATH)
+    if admission_entry is None:
+        if _run_git(trusted, ("log", "-1", "--format=%H", head, "--", ADMISSION_PATH)):
+            raise GovernanceError("Infrastructure admission declaration was deleted")
+        if _authority_layout(current) != _authority_layout(candidate):
+            raise GovernanceError("Current trusted governance authority/layout differs from the active cycle release")
+    else:
+        admission_content = _blob(trusted, head, ADMISSION_PATH)
+        admission = parse_admission(admission_content)
+        admitted_at = admission_anchor(trusted, head, admission_content)
+        if (admitted_at not in protected_history or admitted_at == lane_ref
+                or not _ancestor(trusted, lane_ref, admitted_at)):
+            raise GovernanceError("Infrastructure admission is outside protected post-cutoff history")
+        if _blob(trusted, head, HISTORICAL_MANIFEST_PATH) != candidate_raw:
+            raise GovernanceError("Packaged historical governance snapshot differs from its frozen release")
+        admitted_raw = _blob(trusted, head, ADMITTED_MANIFEST_PATH)
+        admitted = validate_transition(admission, content, candidate_raw, admitted_raw,
+                                      _blob(trusted, head, FLEET_PATH))
+        validate_current_layout(admitted, current_raw)
+        admission_report = {
+            "admission_id": admission["admission_id"], "authority": admission["authority"],
+            "activation": "protected_first_parent_introduction", "anchor": admitted_at,
+            "declaration_sha256": _sha(admission_content), "source_ref": admission["source_ref"],
+            "source_manifest_sha256": admission["source_manifest_sha256"],
+            "bootstrap_main_ref": admission["bootstrap_main_ref"],
+            "historical_cohort_policy_retained": True, "scientific_capabilities_enabled": False,
+        }
     _validate_release_assets(trusted, candidate_ref, policy)
-    if set(roots) != set(candidate.consumers):
+    cohort = current.consumers if admission else candidate.consumers
+    if set(roots) != set(cohort):
         raise GovernanceError(
             "Release audit requires every exact fleet root "
-            f"(missing={sorted(set(candidate.consumers) - set(roots))}, "
-            f"unknown={sorted(set(roots) - set(candidate.consumers))})"
+            f"(missing={sorted(set(cohort) - set(roots))}, "
+            f"unknown={sorted(set(roots) - set(cohort))})"
         )
 
     preflight = []
@@ -237,11 +277,31 @@ def audit_release(trusted_root: Path, roots: Mapping[str, Path]) -> dict[str, An
                 issues=tuple(issue for issue in result.issues if issue.code != "unexpected_pin"),
             )
         preflight.append(result)
+    pending_infrastructure = False
+    if admission:
+        pending_infrastructure = bootstrap_pending(roots[ADMITTED.key], ADMITTED, current, admission)
+        if pending_infrastructure:
+            root = roots[ADMITTED.key].resolve()
+            preflight.append(RepositoryAuditResult(
+                ADMITTED.key, ADMITTED.github, root, admission["bootstrap_main_ref"],
+                admission["bootstrap_main_ref"], None, 0, 0, (),
+            ))
+        else:
+            preflight.append(_preflight_repository(
+                ADMITTED, roots[ADMITTED.key], admission["source_ref"], current.pin_path,
+                len(current.artifacts_for(ADMITTED)),
+            ))
     resolved = [result.root for result in preflight]
     if len(set(resolved)) != len(resolved) or trusted in resolved:
         raise GovernanceError("Every consumer and trusted Claw root must be distinct")
 
     historical = {baseline_ref: (baseline, base_payloads), candidate_ref: (candidate, candidate_payloads)}
+    if admission:
+        # This one reviewed data pin is declared by protected policy, so squash
+        # merging its source branch cannot select arbitrary executable code.
+        historical[admission["source_ref"]] = bind_source_snapshot(
+            trusted, admission["source_ref"], admitted_raw, candidate_payloads,
+        )
     canonical = {
         raw_url(ref, path): payload
         for ref, (_, payloads) in historical.items() for path, payload in payloads.items()
@@ -265,7 +325,13 @@ def audit_release(trusted_root: Path, roots: Mapping[str, Path]) -> dict[str, An
             "adopted" if result.key == CANARY and result.pin == candidate_ref
             else "pending" if result.key == CANARY else "retained"
         )
-        if clean:
+        is_infrastructure = bool(admission and result.key == ADMITTED.key)
+        if is_infrastructure:
+            assert admission is not None
+            row["allowed_refs"] = [admission["source_ref"]]
+            row["state"] = "pending_infrastructure_bootstrap" if pending_infrastructure else "installed_infrastructure"
+            row["installation_verified"] = False
+        if clean and not (is_infrastructure and pending_infrastructure):
             assert result.pin is not None and result.head is not None
             manifest, payloads = historical[result.pin]
             consumer = manifest.consumers[result.key]
@@ -289,6 +355,8 @@ def audit_release(trusted_root: Path, roots: Mapping[str, Path]) -> dict[str, An
                     row["issues"].append({"code": "applicability", "message": "Checked artifact count differs from historical manifest"})
             except GovernanceError as exc:
                 row["issues"].append({"code": "working_artifact", "message": str(exc)})
+            if is_infrastructure:
+                row["installation_verified"] = not row["issues"]
         if row["issues"] or not clean:
             row["state"] = "invalid"
         rows.append(row)
@@ -301,7 +369,7 @@ def audit_release(trusted_root: Path, roots: Mapping[str, Path]) -> dict[str, An
         if (_commit_at(root, "HEAD") != observed
                 or _commit_at(root, "refs/remotes/origin/main") != remote):
             raise GovernanceError("A worktree HEAD or origin/main changed during the release audit")
-    return {
+    result_document = {
         "version": 1, "ok": clean and not any(row["issues"] for row in rows),
         "release_id": RELEASE_ID,
         "trusted_head": head, "trusted_origin_main": origin_main,
@@ -311,9 +379,13 @@ def audit_release(trusted_root: Path, roots: Mapping[str, Path]) -> dict[str, An
         "baseline_manifest_sha256": _sha(base_raw),
         "candidate_manifest_sha256": _sha(candidate_raw),
         "counts": {state: sum(row["state"] == state for row in rows)
-                   for state in ("pending", "adopted", "retained", "invalid")},
+                   for state in (("pending", "adopted", "retained", "invalid")
+                                 + (("pending_infrastructure_bootstrap", "installed_infrastructure") if admission else ()))},
         "repositories": rows,
     }
+    if admission_report is not None:
+        result_document["infrastructure_admission"] = admission_report
+    return result_document
 
 
 def main(argv: Sequence[str] | None = None) -> int:

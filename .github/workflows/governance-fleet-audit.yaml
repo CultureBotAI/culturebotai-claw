@@ -1,8 +1,9 @@
 name: authoritative governance fleet audit
 
 # Audit the public Mech mains with code from trusted claw base/main. Downstream
-# pins are treated only as data: all must agree and resolve inside trusted claw
-# history before any audit runs. Public Git/GitHub reads and deterministic local
+# pins are treated only as data. Historical cohort refs retain their exact
+# release rules; infrastructure data requires a protected explicit admission.
+# Public Git/GitHub reads and deterministic local
 # checks never invoke a model, research provider, credentialed service, or paid API.
 
 on:
@@ -51,6 +52,31 @@ jobs:
 
       - name: Install trusted governance package
         run: uv sync --project fleet/trusted-claw --locked
+
+      - name: Prepare protected infrastructure data snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          trusted="$GITHUB_WORKSPACE/fleet/trusted-claw"
+          selector="$trusted/src/kg_microbe_governance/infrastructure_admission.py"
+          # Historical trusted checkouts have no admission and need no new code.
+          # Candidate policy and downstream pins cannot select this fetch target.
+          if [ ! -f "$selector" ]; then
+            exit 0
+          fi
+          source_ref="$(uv run --project "$trusted" python -m kg_microbe_governance.infrastructure_admission \
+            --trusted-root "$trusted")"
+          # A protected selector with no active declaration emits no data ref.
+          if [ -z "$source_ref" ]; then
+            exit 0
+          fi
+          if ! [[ "$source_ref" =~ ^[0-9a-f]{40}$ ]]; then
+            printf '%s\n' 'Refusing invalid infrastructure data ref' >&2
+            exit 2
+          fi
+          # Fetch only immutable DATA objects, leaving refs, HEAD and FETCH_HEAD alone.
+          git -C "$trusted" -c core.hooksPath=/dev/null fetch \
+            --no-tags --no-prune --no-write-fetch-head origin "$source_ref"
 
       - name: Export manifest-defined governance consumers
         shell: bash
@@ -246,6 +272,7 @@ jobs:
             control/tests/test_fleet_manifest.py \
             control/tests/test_kg_microbe_governance.py \
             control/tests/test_governance_cycle_release_audit.py \
+            control/tests/test_governance_infrastructure_admission.py \
             control/tests/test_governance_cycle_release_workflow.py \
             control/tests/test_id_label_workflow.py \
             control/tests/test_authoritative_governance_layout.py

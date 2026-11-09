@@ -154,7 +154,8 @@ def test_noncanary_next_goal_is_not_held_by_boundary_guard(cycle_setup, monkeypa
     receipt = write_goal_evidence(fixture, fixture.ledger)
     ledger = instance.advance(fixture.target, fixture.ledger, receipt, {'status': 'merged'}, 'native_completed')
     result = instance.dispatch(fixture.target, ledger, supervisor.decide(ledger, fixture.observation))
-    assert result['state'] == 'sent'
+    assert result['state'] == 'uncertain'  # Transport succeeded; native acceptance is still unproven.
+    assert 'action' not in supervisor.decide(ledger, fixture.observation)
     assert [event[0] for event in events] == ['goal']
     assert 'port_pressure_boundary' not in ledger
 

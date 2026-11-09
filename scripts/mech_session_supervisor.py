@@ -120,7 +120,13 @@ def terminal_busy_reason(screen: str) -> str | None:
     while lines and not lines[-1].strip():
         lines.pop()
     footer = "\n".join(lines[-32:])
-    if re.search(r"esc to interrupt|Compacting conversation|\b(?:messages?|tasks?) queued\b|\bqueued (?:messages?|tasks?)\b|"
+    # Queue wording and counts also occur in completed thoughts/replies.
+    # Counts must occupy a complete status line or a middle-dot footer field.
+    queue_count = re.search(
+        r"(?:^|·)\s*(?:[1-9]\d* (?:messages?|tasks?) queued|"
+        r"queued (?:messages?|tasks?):\s*[1-9]\d*)\s*(?=$|·)", footer, re.I | re.M,
+    )
+    if queue_count or re.search(r"esc to interrupt|Compacting conversation|"
                  r"alt\+m to send immediately|Press up to edit queued messages|"
                  r"\b[1-9]\d* (?:background )?task\(s\)|\b[1-9]\d* background tasks?\b|"
                  r"\bbackground tasks?:\s*[1-9]\d*|^\s*● .* running\s*$", footer, re.I | re.M):
@@ -222,6 +228,73 @@ def load_effective(config: dict, target: dict, *, next_cycle: bool = False, prof
 
     return load_effective_workflow(source("parent", PARENT_PATH), Path(profile),
                                   target["repository_key"], schema_path=source("schema", SCHEMA_PATH))
+
+
+
+def native_delivery_proof(action: dict, target: dict, observation: dict) -> dict | None:
+    """A transport return or marker substring is never delivery acceptance.
+
+    Match one full user input in this exact native workspace/conversation after
+    the reserved step/time. Truncation, duplicates and bounded-out observations
+    hold the reservation; they never authorize retry. Historical accepted actions
+    remain intact and cannot by themselves adopt a later native goal.
+    """
+    native = observation.get("native") or {}
+    if (observation.get("error") or native.get("error")
+            or native.get("conversation_id") != target["native_session_id"]
+            or action.get("native_session_id") != target["native_session_id"]
+            or native.get("root") != target["root"]
+            or native.get("workspace_identity", {}).get("verified") is not True):
+        return None
+    message = action.get("message")
+    boundary = action.get("native_step_index")
+    reserved = action.get("reserved_epoch_ms")
+    if (not isinstance(message, str) or not message
+            or type(boundary) is not int or boundary < 0
+            or type(reserved) is not int or reserved < 0):
+        return None
+    expected_hash = hashlib.sha256(message.encode("utf-8")).hexdigest()
+    if action.get("message_sha256", expected_hash) != expected_hash:
+        return None
+    evidence = native.get("user_input_evidence") or {}
+    if evidence.get("schema_version") != 1 or not isinstance(evidence.get("inputs"), list):
+        return None
+    inputs = evidence["inputs"]
+    # If the reservation predates the bounded window, an earlier duplicate may
+    # have fallen out. Absence or uniqueness cannot then be established.
+    if evidence.get("truncated") and (not inputs or inputs[0].get("step_index", -1) > boundary):
+        return None
+    matches = []
+    for entry in inputs:
+        index = entry.get("step_index")
+        if (type(index) is not int or index <= boundary
+                or entry.get("text_sha256") != expected_hash
+                or entry.get("text_length") != len(message)):
+            continue
+        try:
+            created = datetime.fromisoformat(entry["created_at"].replace("Z", "+00:00"))
+            if created.tzinfo is None or created.timestamp() * 1000 < reserved:
+                return None
+        except (KeyError, TypeError, ValueError, AttributeError):
+            return None
+        matches.append(entry)
+    if len(matches) != 1:
+        return None
+    proof = matches[0]
+    if proof.get("status_number") != 3 or proof.get("supported_input_shape") is not True:
+        return None
+    if action.get("kind") == "start_goal":
+        identity = observation.get("goal_identity") or {}
+        if (proof.get("native_goal_declaration") is not True
+                or identity.get("conversation_id") != target["native_session_id"]
+                or identity.get("start_step_index") != proof["step_index"]
+                or identity.get("started_at") != proof["created_at"]):
+            return None
+    elif observation.get("goal_identity") != action.get("goal_identity"):
+        return None
+    return {"native_step_index": proof["step_index"], "text_sha256": expected_hash,
+            "created_at": proof["created_at"],
+            "native_goal_declaration": proof.get("native_goal_declaration") is True}
 
 
 def scoped(action: dict, ledger: dict) -> bool:
@@ -777,6 +850,137 @@ def previous_evidence(ledger: dict, stage: int) -> dict | None:
     return eligible[-1] if eligible else None
 
 
+HISTORICAL_RESOLUTION_FIELDS = {
+    "github_repository", "pr_number", "base", "head_sha", "merge_commit_sha", "receipt_sha256",
+}
+
+
+def historical_resolution_record(issue: dict, receipt: dict, ledger: dict, target: dict) -> dict:
+    """Select one earlier, verified remediation closure; never another goal's PR member."""
+    historical = issue.get("historical_resolution")
+    if (not isinstance(historical, dict) or set(historical) != HISTORICAL_RESOLUTION_FIELDS
+            or ledger.get("schema_version") != 2 or receipt.get("schema_version") != 2
+            or workflow_stage_key(ledger) != "resolve_review_findings"
+            or receipt.get("status") != "completed" or "prs" in receipt
+            or type(historical.get("pr_number")) is not int or historical["pr_number"] <= 0
+            or historical["pr_number"] == (receipt.get("pr") or {}).get("number")
+            or historical.get("github_repository") != target["github_repository"]
+            or historical.get("base") != target["default_branch"]
+            or any(not SHA.fullmatch(str(historical.get(key, ""))) for key in ("head_sha", "merge_commit_sha"))
+            or not DIGEST.fullmatch(str(historical.get("receipt_sha256", "")))):
+        raise SupervisorError("historical resolution requires a completed single-PR remediation receipt and exact prior identity")
+    records = [record for record in ledger.get("completed_stages", [])
+               if record.get("receipt_sha256") == historical["receipt_sha256"]]
+    if len(records) != 1:
+        raise SupervisorError("historical resolution must bind one prior verified closure")
+    record = records[0]
+    verified = record.get("verification") or {}
+    if (type(record.get("cycle")) is not int or not 1 <= record["cycle"] < ledger["cycle"]
+            or record_stage_key(ledger, record) != "resolve_review_findings"
+            or record.get("completion_authority") not in {"native_completed", "verified_receipt_override"}
+            or verified.get("status") != "merged" or not verified.get("merged_at")
+            or any(verified.get(key) != historical[key] for key in ("pr_number", "head_sha", "merge_commit_sha"))):
+        raise SupervisorError("historical resolution differs from its earlier verified remediation closure")
+    closure_time(verified["merged_at"], "historical merge")
+    return record
+
+
+def historical_finding_scope(issue: dict, receipt: dict, ledger: dict, target: dict,
+                             evidence: dict, previous_data: dict | None) -> dict:
+    """Require the same already-resolved finding group in retained bytes and this cycle's review."""
+    record = historical_resolution_record(issue, receipt, ledger, target)
+    descriptor = record.get("goal_evidence") or {}
+    root = Path(target["root"])
+    path = (root / descriptor.get("path", "")).resolve()
+    if not path.is_relative_to(root.resolve()) or not path.is_file():
+        raise SupervisorError("historical finding evidence must be a retained repository file")
+    # Read once, hash and parse those bytes; a ledger snapshot alone is not evidence.
+    flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0)
+    with os.fdopen(os.open(path, flags), "rb") as stream:
+        if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+            raise SupervisorError("historical finding evidence must be a regular file")
+        raw = stream.read()
+    from kg_microbe_workflows import load_document
+    retained = load_document(raw)
+    if (hashlib.sha256(raw).hexdigest() != descriptor.get("sha256")
+            or retained != record.get("goal_evidence_snapshot")
+            or retained.get("repository_key") != ledger["repository_key"]
+            or retained.get("github_repository") != target["github_repository"]
+            or retained.get("run_id") != ledger["run_id"]
+            or retained.get("cycle") != record["cycle"] or retained.get("stage") != record["stage"]):
+        raise SupervisorError("historical finding snapshot differs from its pinned evidence or closure context")
+    url = f"https://github.com/{target['github_repository']}/issues/{issue['number']}"
+    current = [item for item in evidence.get("groups", []) if item.get("issue_url") == url]
+    if len(current) != 1 or current[0].get("status") != "resolved":
+        raise SupervisorError("historical issue must identify exactly one current resolved group")
+    identities = set(current[0].get("finding_ids", []))
+    old = [item for item in retained.get("groups", []) if item.get("issue_url") == url
+           and item.get("status") == "resolved" and set(item.get("finding_ids", [])) == identities]
+    before = {item["finding_id"]: item for item in retained.get("findings", [])}
+    frozen = {item["finding_id"]: item for item in (previous_data or {}).get("findings", [])}
+    after = {item["finding_id"]: item for item in evidence.get("findings", [])}
+    if (len(old) != 1 or not identities or any(
+            key not in before or key not in frozen or key not in after
+            or any(row.get("status") != "resolved" or row.get("issue_url") != url
+                   for row in (before[key], frozen[key], after[key]))
+            or before[key].get("summary") != frozen[key].get("summary")
+            or frozen[key].get("summary") != after[key].get("summary") for key in identities)):
+        raise SupervisorError("historical resolution must carry the same already-resolved finding scope")
+    return record
+
+
+def verify_historical_issue_resolutions(receipt: dict, ledger: dict, target: dict,
+                                        evidence: dict | None, current_live: dict, runner) -> list[dict]:
+    """Fresh read-only identity, membership and ancestry checks after current-PR gates."""
+    historical_issues = [issue for issue in receipt["issues"] if "historical_resolution" in issue]
+    if not historical_issues:
+        return []
+    if not evidence:
+        raise SupervisorError("historical resolutions require verified finding evidence")
+    previous = previous_evidence(ledger, ledger["stage"])
+    proofs = []
+    github, root = target["github_repository"], target["root"]
+    for issue in historical_issues:
+        record = historical_finding_scope(issue, receipt, ledger, target, evidence,
+                                           previous.get("goal_evidence_snapshot") if previous else None)
+        historical = issue["historical_resolution"]
+        prior = json.loads(runner(["gh", "api", f"repos/{github}/pulls/{historical['pr_number']}"]).stdout)
+        if (prior.get("merged") is not True or not prior.get("merged_at")
+                or prior.get("base", {}).get("ref") != historical["base"]
+                or prior.get("base", {}).get("repo", {}).get("full_name") != github
+                or (prior.get("head", {}).get("repo") or {}).get("full_name") != github
+                or prior.get("head", {}).get("sha") != historical["head_sha"]
+                or prior.get("merge_commit_sha") != historical["merge_commit_sha"]
+                or closure_time(prior["merged_at"], "historical merge") !=
+                closure_time(record["verification"]["merged_at"], "retained historical merge")
+                or closure_time(prior["merged_at"], "historical merge") >=
+                closure_time(current_live["merged_at"], "current merge")):
+            raise SupervisorError("historical PR differs from the pinned verified merge")
+        commits = bounded_api_pages(f"repos/{github}/pulls/{historical['pr_number']}/commits",
+                                    lambda args: runner(args).stdout, label="historical PR commits")
+        shas = {item.get("sha") for item in commits}
+        count = prior.get("commits")
+        if (type(count) is not int or not 1 <= count <= 250 or len(commits) != count
+                or len(shas) != count or historical["head_sha"] not in shas
+                or any(not isinstance(sha, str) or not SHA.fullmatch(sha) for sha in shas)
+                or issue["fix_commit_sha"] not in shas):
+            raise SupervisorError("historical issue fix is not in a complete pinned PR commit inventory")
+        live_issue = json.loads(runner(["gh", "api", f"repos/{github}/issues/{issue['number']}"]).stdout)
+        if (live_issue.get("state") != "closed" or "pull_request" in live_issue
+                or live_issue.get("number") != issue["number"]
+                or live_issue.get("html_url") != f"https://github.com/{github}/issues/{issue['number']}"):
+            raise SupervisorError("historical issue is not actually closed in the expected repository")
+        base = current_live.get("base", {}).get("sha", "")
+        if not isinstance(base, str) or not SHA.fullmatch(base):
+            raise SupervisorError("current PR base commit unavailable for historical ancestry")
+        for descendant in (receipt["pr"]["head_sha"], base, "HEAD"):
+            if runner(["git", "-C", root, "merge-base", "--is-ancestor", historical["merge_commit_sha"],
+                       descendant], check=False).returncode:
+                raise SupervisorError("historical merge is absent from current reviewed head/base/default checkout")
+        proofs.append({**historical, "number": issue["number"], "fix_commit_sha": issue["fix_commit_sha"]})
+    return proofs
+
+
 def goal_output_data(receipt: dict, ledger: dict, target: dict) -> dict | None:
     if ledger.get("schema_version") != 2 or ledger["stage"] == 0:
         return None
@@ -845,6 +1049,9 @@ def goal_output_data(receipt: dict, ledger: dict, target: dict) -> dict | None:
             match = re.fullmatch(r"https://github\.com/" + re.escape(target["github_repository"]) + r"/issues/([1-9]\d*)", url, re.I)
             if not match or int(match[1]) not in {issue["number"] for issue in receipt.get("issues", [])}:
                 raise SupervisorError("resolved review/infra groups require matching independently verified closure issues")
+    for issue in receipt.get("issues", []):
+        if "historical_resolution" in issue:
+            historical_finding_scope(issue, receipt, ledger, target, data, previous_data)
     return data
 
 
@@ -968,6 +1175,11 @@ def validate_receipt(receipt: dict, ledger: dict, target: dict, runtime: Path) -
                     or issue.get("disposition") != "addressed"
                     or not SHA.fullmatch(str(issue.get("fix_commit_sha", "")))):
                 errors.append("each issue needs unique number and addressed fix commit")
+            if "historical_resolution" in issue:
+                try:
+                    historical_resolution_record(issue, receipt, ledger, target)
+                except SupervisorError as error:
+                    errors.append(str(error))
             if isinstance(number, int):
                 numbers.add(number)
     if status == "no_changes":
@@ -1247,7 +1459,11 @@ def verify_remote_receipt(receipt: dict, ledger: dict, target: dict, runner=comm
     if "prs" in receipt:
         proof = verify_ordered_prs(receipt, ledger, target, runtime, evidence, runner)
     else:
-        proof, _, commits = verify_pr_member(receipt["pr"], receipt["issues"], target, runner)
+        current_issues = [item for item in receipt["issues"] if "historical_resolution" not in item]
+        proof, live, commits = verify_pr_member(receipt["pr"], current_issues, target, runner)
+        historical = verify_historical_issue_resolutions(receipt, ledger, target, evidence, live, runner)
+        if historical:
+            proof["historical_issue_resolutions"] = historical
         proof["commit_publication"] = verify_receipt_publication(
             receipt, target, {item["sha"] for item in commits}, runner)
     return {**proof, **({"issue_triage": triage_verification} if triage_verification is not None else {})}
@@ -1809,39 +2025,27 @@ class Supervisor:
     def reconcile(self, target: dict, ledger: dict, observation: dict) -> None:
         """Receipt reconciliation never infers completion from message delivery."""
         native_id = observation.get("goal_identity")
-        native_goal = (observation.get("native") or {}).get("current_goal") or {}
         if not ledger["adopted_goal"] and native_id:
             if native_id != target["initial_goal_identity"]:
                 observation.update(error="native goal differs from the assessed initial goal; reassessment required", ready=False)
                 return
             ledger["adopted_goal"] = native_id
-        history_path = Path(self.config.get("history_path", Path.home() / ".gemini/antigravity-cli/history.jsonl"))
         pending = [a for a in ledger["actions"].values() if scoped(a, ledger) and a["state"] in BLOCKING_RECEIPTS]
-        if pending and history_path.is_file():
-            with history_path.open() as stream:
-                for line in stream:
-                    try:
-                        row = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
-                    if row.get("workspace") != target["root"]:
-                        continue
-                    for action in pending:
-                        if (action["marker"] in str(row.get("display", ""))
-                                and row.get("timestamp", 0) >= action["reserved_epoch_ms"]
-                                and row.get("conversationId") == target["native_session_id"]
-                                and action["native_session_id"] == target["native_session_id"]):
-                            action.update(state="accepted", accepted_at=now(), acceptance="native_workspace_history_marker")
-                            if action["kind"] == "policy_update":
-                                ledger["policy_notification_required"] = False
-        if ledger.get("awaiting_goal") and native_id and native_id != ledger["adopted_goal"]:
-            for action in pending:
-                if (action["kind"] == "start_goal" and scoped(action, ledger)
-                        and action["marker"] in native_goal.get("goal_text", "")):
-                    action.update(state="accepted", accepted_at=now(), acceptance="native_goal_marker")
-                    action["accepted_goal_identity"] = native_id
-                    ledger.update(adopted_goal=native_id, awaiting_goal=False)
-                    break
+        for action in pending:
+            adopting = ledger.get("awaiting_goal") and action.get("kind") == "start_goal"
+            if action["state"] == "accepted" and not adopting:
+                continue  # historical acceptance timestamps are immutable
+            proof = native_delivery_proof(action, target, observation)
+            if proof is None:
+                continue
+            if action["state"] != "accepted":
+                action.update(state="accepted", accepted_at=now(), acceptance="native_exact_user_input")
+            action.update(delivery_proof=proof, delivery_verified_at=now())
+            if action["kind"] == "policy_update":
+                ledger["policy_notification_required"] = False
+            if adopting and native_id and native_id != ledger["adopted_goal"]:
+                action["accepted_goal_identity"] = native_id
+                ledger.update(adopted_goal=native_id, awaiting_goal=False)
 
     def baseline(self, target: dict, ledger: dict) -> None:
         if "baseline_head" not in ledger:
@@ -2011,6 +2215,7 @@ class Supervisor:
                       "marker": "MECH-WORKFLOW-" + identifier, "state": "reserved", "reserved_at": now(),
                       "reserved_epoch_ms": int(time.time() * 1000), "native_session_id": target["native_session_id"],
                       "goal_identity": ledger["adopted_goal"], "message": message,
+                      "message_sha256": hashlib.sha256(message.encode("utf-8")).hexdigest(),
                       "native_step_index": ((observation.get("native") or {}).get("last_step") or {}).get("index"),
                       "instruction_sha256": hashlib.sha256(prompt.read_bytes()).hexdigest()}
             ledger["actions"][identifier] = action
@@ -2021,7 +2226,11 @@ class Supervisor:
                 else:
                     result = self.notifier.jxa(SEND_JS, {**observation["tab"], "pid": target["pid"],
                         "identity": target["process_identity"], "cwd": target["root"], "message": message})
-                    action.update(state="sent" if result == "sent" else "not-sent", outcome=result, updated_at=now())
+                    # Terminal returning proves only that the transport was
+                    # invoked: it may leave a partial unsent composer. Keep a
+                    # blocking uncertain reservation until native exact-input
+                    # reconciliation, never retry or append Enter automatically.
+                    action.update(state="uncertain" if result == "sent" else "not-sent", outcome=result, updated_at=now())
             except Exception as error:
                 action.update(state="uncertain", error=str(error)[:500], updated_at=now())
             self.save(target, ledger)
