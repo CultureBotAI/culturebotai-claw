@@ -512,3 +512,18 @@ def test_private_mint_waits_until_final_verifier_has_finished_setup(source, stat
                 sleep=lambda n: None,
                 monotonic=lambda: next(tick),
             )
+
+
+def test_public_expected_app_id_must_match_the_protected_producer(source):
+    public, _, _ = packaged(source)
+    with pytest.raises(manual.AuditError):
+        auto.verify_producer(
+            public,
+            source[0],
+            binding(public),
+            run_id=101,
+            attempt=2,
+            app_id=APP_ID + 1,
+            now=NOW + timedelta(seconds=2),
+            clock=lambda: NOW + timedelta(seconds=2),
+        )

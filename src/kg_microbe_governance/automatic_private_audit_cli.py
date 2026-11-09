@@ -182,6 +182,9 @@ def main(argv=None) -> int:
             binding_sha = manual.digest(auto.canonical(binding))
             if args.command == "producer-preflight":
                 if obligation["required"]:
+                    # Refuse before scheduling the environment-bound job. GitHub
+                    # can create a missing referenced environment automatically.
+                    manual.environment_is_protected(public)
                     auto.wait_components(public, binding)
                     auto.wait_verifier_ready(public, binding)
                 if args.require_protected_environment:

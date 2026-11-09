@@ -151,6 +151,24 @@ def test_real_download_boundary_refuses_malformed_success(
         component.authenticate_report(public, tmp_path, bound)
 
 
+def assert_public_clone_remotes(calls):
+    remotes = [args[-2] for args in calls if args and args[0] == "clone"]
+    assert remotes == ["https://github.com/CultureBotAI/PublicMech.git"]
+
+
+def test_remote_assertion_rejects_private_url_with_ordinary_destination():
+    with pytest.raises(AssertionError):
+        assert_public_clone_remotes(
+            [
+                (
+                    "clone",
+                    "https://github.com/CultureBotAI/ScaleupMech.git",
+                    "/ordinary/publicmech",
+                )
+            ]
+        )
+
+
 def test_public_clone_never_includes_private_identity(
     public_report, monkeypatch, tmp_path
 ):
@@ -163,9 +181,9 @@ def test_public_clone_never_includes_private_identity(
         "private": False,
         "default_branch": "main",
     }
-    roots = component.clone_public(public, tmp_path / "clones", values)
+    roots = component.clone_public(public, tmp_path / "ScaleupMech" / "clones", values)
     assert set(roots) == {"publicmech"}
-    assert not any("ScaleupMech" in str(args) for args in calls)
+    assert_public_clone_remotes(calls)
 
 
 @pytest.mark.parametrize("required", [False, True])
@@ -326,3 +344,86 @@ def test_private_producer_has_no_candidate_execution_cache_or_broad_token():
     upload = steps[-1]
     assert upload["with"]["path"] == ".temp/automatic-private/receipt.json"
     assert upload["with"]["overwrite"] is False
+
+
+@pytest.mark.parametrize(
+    "required,kind",
+    [
+        (True, "missing"),
+        (True, "unrestricted"),
+        (True, "protected"),
+        (False, "missing"),
+    ],
+)
+def test_first_preflight_checks_environment_before_scheduling_private_job(
+    monkeypatch, tmp_path, required, kind
+):
+    source = fixtures.source.__wrapped__()
+    public = MetadataAPI(source)
+    bound = binding(public)
+    if kind == "unrestricted":
+        public.environment = {"deployment_branch_policy": None}
+    original = public.get
+
+    def get(path):
+        if kind == "missing" and "/environments/" in path:
+            raise manual.AuditError("environment_unprotected")
+        return original(path)
+
+    public.get = get
+    output = tmp_path / "workflow-output"
+    monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+    monkeypatch.setattr(manual, "GitHubRead", lambda token: public)
+    monkeypatch.setattr(
+        cli, "protected_runtime", lambda *a: bound["protected_main_sha"]
+    )
+    monkeypatch.setattr(cli, "own_producer_run", lambda *a: None)
+    monkeypatch.setattr(
+        cli, "event_parent", lambda: (bound["run_id"], bound["run_attempt"])
+    )
+    monkeypatch.setattr(auto, "private_obligation", lambda *a: {"required": required})
+    waits = []
+    monkeypatch.setattr(auto, "wait_components", lambda *a: waits.append("components"))
+    monkeypatch.setattr(
+        auto, "wait_verifier_ready", lambda *a: waits.append("verifier")
+    )
+    code = cli.main(["producer-preflight", "--trusted-root", str(tmp_path)])
+    if required and kind != "protected":
+        assert code == 2 and not output.exists() and waits == []
+    else:
+        assert (
+            code == 0
+            and f"required_private={str(required).lower()}\n" in output.read_text()
+        )
+        assert waits == (["components", "verifier"] if required else [])
+        if not required:
+            assert not any("/environments/" in path for path in public.calls)
+
+
+def test_parent_jobs_use_only_the_permissions_and_candidate_tests_they_need():
+    workflow = yaml.safe_load(WORKFLOW.read_text())
+    assert workflow["permissions"] == {"contents": "read"}
+    jobs = workflow["jobs"]
+    assert jobs["candidate-contracts"].get("permissions", workflow["permissions"]) == {
+        "contents": "read"
+    }
+    for key in ("fleet-audit", "verified-fleet"):
+        assert jobs[key]["permissions"] == {"contents": "read", "actions": "read"}
+    name = "Validate candidate authority contract"
+    assert not any(step.get("name") == name for step in jobs["fleet-audit"]["steps"])
+    step = next(
+        step
+        for step in jobs["candidate-contracts"]["steps"]
+        if step.get("name") == name
+    )
+    for filename in (
+        "test_fleet_manifest.py",
+        "test_kg_microbe_governance.py",
+        "test_governance_cycle_release_audit.py",
+        "test_governance_infrastructure_admission.py",
+        "test_governance_cycle_release_workflow.py",
+        "test_id_label_workflow.py",
+        "test_authoritative_governance_layout.py",
+        "test_governance_consumer_admission.py",
+    ):
+        assert "control/tests/" + filename in step["run"]

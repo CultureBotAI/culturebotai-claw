@@ -60,8 +60,8 @@
     {
       "name": "bootstrap-private-refusal",
       "source": ".github/workflows/governance-fleet-audit.yaml",
-      "source_sha256": "1f6326501f489b554223c0914da37bd400ff4baabfb7211574166e636e3ab972",
-      "mutant_sha256": "de9a9054370dc45e6a19ee899eddedff1f52688d4fd291f0e715e62d9321a1e0",
+      "source_sha256": "c539d40c50b80e247ea6ac69241412c6bfbb2f2f3bdb1c0c3372ac08a0c97070",
+      "mutant_sha256": "7752e2873be6354dada7252a2c1d3689ec3e4f76e05b0ff537f0a73b2aa2d18c",
       "test": "tests/test_automatic_fleet_component.py::test_actual_bootstrap_selector_requires_protected_code_for_private[True-False]",
       "mutant_exit": 1,
       "log": "/Users/marcin/agent-work/claw/automatic-mutations/bootstrap-private-refusal.log"
@@ -83,6 +83,33 @@
       "test": "tests/test_automatic_private_audit.py::test_private_mint_waits_until_final_verifier_has_finished_setup[setup]",
       "mutant_exit": 1,
       "log": "/Users/marcin/agent-work/claw/automatic-mutations/verifier-setup-freshness.log"
+    },
+    {
+      "name": "1083-destination-is-not-remote",
+      "source": "tests/test_automatic_fleet_component.py",
+      "source_sha256": "418296cb5acd4e1d5d67a97eafc53a29180b4448803a646b170c69c866401dd3",
+      "mutant_sha256": "6f66f203c3b6c7ec03edb526c4e4dedf7c982569ba8683da92ab640d217da9d3",
+      "test": "tests/test_automatic_fleet_component.py::test_public_clone_never_includes_private_identity",
+      "mutant_exit": 1,
+      "log": "/Users/marcin/agent-work/claw/automatic-mutations/1083-destination-is-not-remote.log"
+    },
+    {
+      "name": "1083-private-remote-contrast",
+      "source": "tests/test_automatic_fleet_component.py",
+      "source_sha256": "418296cb5acd4e1d5d67a97eafc53a29180b4448803a646b170c69c866401dd3",
+      "mutant_sha256": "437920645062acbf2404298d1d53e8d57e6617247be7e6ec0e486e3dd0b8a816",
+      "test": "tests/test_automatic_fleet_component.py::test_remote_assertion_rejects_private_url_with_ordinary_destination",
+      "mutant_exit": 1,
+      "log": "/Users/marcin/agent-work/claw/automatic-mutations/1083-private-remote-contrast.log"
+    },
+    {
+      "name": "1084-before-environment-allocation",
+      "source": "src/kg_microbe_governance/automatic_private_audit_cli.py",
+      "source_sha256": "bc39651997b0d3bcf58cb41fbaeee6f1a4200f908a521b3350dea9c57592fa7e",
+      "mutant_sha256": "3b5b124161eb3bec4f71f21e1b0e64856d9c5741c4e1cb478b45a0ed92386d2b",
+      "test": "tests/test_automatic_fleet_component.py::test_first_preflight_checks_environment_before_scheduling_private_job",
+      "mutant_exit": 1,
+      "log": "/Users/marcin/agent-work/claw/automatic-mutations/1084-before-environment-allocation.log"
     }
   ]
 }

@@ -53,7 +53,9 @@ def test_exactly_one_audit_lane_runs_and_release_uses_trusted_code():
     assert "done < fleet/governance-consumers.tsv" in release["run"]
     assert "continue-on-error" not in release
     assert "|| true" not in release["run"]
-    candidate = next(s for s in entries if s["name"] == "Validate candidate authority contract")
+    workflow = yaml.load(WORKFLOW.read_text(), Loader=yaml.BaseLoader)
+    candidate = next(s for s in workflow["jobs"]["candidate-contracts"]["steps"]
+                     if s.get("name") == "Validate candidate authority contract")
     assert "control/tests/test_governance_cycle_release_audit.py" in candidate["run"]
     assert "control/tests/test_governance_infrastructure_admission.py" in candidate["run"]
     assert "control/tests/test_governance_cycle_release_workflow.py" in candidate["run"]
