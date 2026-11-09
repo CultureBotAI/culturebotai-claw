@@ -1,0 +1,13 @@
+{
+  "canonical_files": 17,
+  "distribution_version": "0.1.0+g1b5391d083ba85ac94e5279c3cba25ac4fde243c",
+  "format": "kg-microbe-curation-installation-check/v1",
+  "imported_modules_verified": 13,
+  "native_only_environment": false,
+  "provenance_sha256": "21102b3bade024a2fe3c18595ef34685c51397d20c549a9a369d20449ff7284f",
+  "review_runtime_origin_verified": true,
+  "schemas_loaded_and_empty_envelopes_rejected": true,
+  "scientific_approvals_created": 0,
+  "source_commit": "1b5391d083ba85ac94e5279c3cba25ac4fde243c",
+  "verifier_sha256": "ddee8c1fc27109ff8279376f972a6e1f248857d10fdba98eab90c301c86b8b37"
+}

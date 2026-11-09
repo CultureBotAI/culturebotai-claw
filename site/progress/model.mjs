@@ -7,6 +7,25 @@ export const STAGES = Object.freeze([
   { key: "resolve_review_findings", label: "Resolve findings" },
   { key: "infrastructure", label: "Infrastructure" },
 ]);
+const V2_STAGES = Object.freeze([{ key: "open_issue_triage", label: "Open-issue triage" }, ...STAGES]);
+
+export function stagesForVersion(version = "1.0.0") {
+  if (typeof version === "string" && /^1\.\d+\.\d+$/.test(version)) return STAGES;
+  if (version === "2.0.0") return V2_STAGES;
+  throw new Error("Unsupported cycle parent version.");
+}
+
+function cycleVersion(repo, association) {
+  const closure = repo.closures.find((item) => item.run_key === association.run_key && item.cycle === association.cycle);
+  if (closure) return closure.parent_version ?? "1.0.0";
+  if (repo.current?.run_key === association.run_key && repo.current.cycle === association.cycle) return repo.current.parent_version ?? "1.0.0";
+  return null;
+}
+
+export function associationLabel(repo, association) {
+  const version = cycleVersion(repo, association);
+  return version === null ? `Goal ${association.stage_number}` : stageLabel(association.stage_number, version);
+}
 
 export const STALE_AFTER_MS = 15 * 60 * 1000;
 const COUNT_KEYS = ["completed_cycles", "completed_goals", "unique_prs", "merged_prs", "no_change_goals", "open_prs", "closed_prs"];
@@ -52,13 +71,16 @@ function verifiedCounts(repo) {
     demand(!goals.has(goal) && !closures.has(closure.id));
     closures.add(closure.id);
     goals.add(goal);
-    if (!cycles.has(cycle)) cycles.set(cycle, new Set());
-    cycles.get(cycle).add(closure.stage_number);
+    const version = closure.parent_version ?? "1.0.0";
+    if (!cycles.has(cycle)) cycles.set(cycle, { version, stages: new Set() });
+    demand(cycles.get(cycle).version === version);
+    if (repo.current?.run_key === closure.run_key && repo.current.cycle === closure.cycle) demand((repo.current.parent_version ?? "1.0.0") === version);
+    cycles.get(cycle).stages.add(closure.stage_number);
   }
   const numbers = new Set(repo.pull_requests.map((pr) => pr.number));
   demand(numbers.size === repo.pull_requests.length);
   return {
-    completed_cycles: [...cycles.values()].filter((stages) => stages.size === 6).length,
+    completed_cycles: [...cycles.values()].filter(({ version, stages }) => stages.size === stagesForVersion(version).length).length,
     completed_goals: repo.closures.length,
     unique_prs: repo.pull_requests.length,
     merged_prs: repo.pull_requests.filter((pr) => pr.state === "merged").length,
@@ -83,19 +105,21 @@ export function validateSnapshot(snapshot) {
     demand(typeof repo.name === "string" && repo.name.length > 0 && repo.name.length < 150 && githubURL(repo.github_url));
     demand(counts(repo.counters) && ["partial", "unobserved"].includes(repo.history_coverage));
     demand(repo.last_observed_at == null || validTime(repo.last_observed_at));
+    const currentStages = stagesForVersion(repo.current?.parent_version);
     demand(repo.current == null || (
       typeof repo.current === "object" && Number.isSafeInteger(repo.current.cycle) && repo.current.cycle > 0 &&
-      Number.isSafeInteger(repo.current.stage_number) && repo.current.stage_number >= 1 && repo.current.stage_number <= 6 &&
-      STAGES[repo.current.stage_number - 1].key === repo.current.stage_id &&
+      Number.isSafeInteger(repo.current.stage_number) && repo.current.stage_number >= 1 && repo.current.stage_number <= currentStages.length &&
+      currentStages[repo.current.stage_number - 1].key === repo.current.stage_id &&
       typeof repo.current.phase === "string" && validTime(repo.current.observed_at)
     ));
-    demand(Array.isArray(repo.stages) && repo.stages.length === 6);
-    repo.stages.forEach((stage, index) => demand(stage.number === index + 1 && stage.key === STAGES[index].key && ["completed", "current", "pending", "unverified"].includes(stage.state)));
+    demand(Array.isArray(repo.stages) && repo.stages.length === currentStages.length);
+    repo.stages.forEach((stage, index) => demand(stage.number === index + 1 && stage.key === currentStages[index].key && ["completed", "current", "pending", "unverified"].includes(stage.state)));
     demand(Array.isArray(repo.closures) && Array.isArray(repo.pull_requests));
     for (const closure of repo.closures) {
+      const closureStages = stagesForVersion(closure.parent_version);
       demand(typeof closure.id === "string" && Number.isSafeInteger(closure.cycle) && closure.cycle > 0 &&
-        Number.isSafeInteger(closure.stage_number) && closure.stage_number >= 1 && closure.stage_number <= 6 &&
-        STAGES[closure.stage_number - 1].key === closure.stage_id &&
+        Number.isSafeInteger(closure.stage_number) && closure.stage_number >= 1 && closure.stage_number <= closureStages.length &&
+        closureStages[closure.stage_number - 1].key === closure.stage_id &&
         ["merged", "no_changes"].includes(closure.outcome) && validTime(closure.verified_at));
       demand(!closure.pr_url || githubURL(closure.pr_url, repo.github_url));
     }
@@ -104,8 +128,9 @@ export function validateSnapshot(snapshot) {
         githubURL(pr.url, repo.github_url) && new URL(pr.url).pathname.endsWith(`/pull/${pr.number}`) &&
         ["open", "closed", "merged"].includes(pr.state) && validTime(pr.observed_at) && Array.isArray(pr.associations));
       for (const association of pr.associations) {
+        const version = cycleVersion(repo, association);
         demand(Number.isSafeInteger(association.cycle) && association.cycle > 0 &&
-          Number.isSafeInteger(association.stage_number) && association.stage_number >= 1 && association.stage_number <= 6);
+          Number.isSafeInteger(association.stage_number) && association.stage_number >= 1 && association.stage_number <= (version === null ? 7 : stagesForVersion(version).length));
       }
     }
     const expected = verifiedCounts(repo);
@@ -115,8 +140,8 @@ export function validateSnapshot(snapshot) {
   return snapshot;
 }
 
-export function stageLabel(number) {
-  return STAGES[number - 1]?.label ?? "Unknown stage";
+export function stageLabel(number, version = "1.0.0") {
+  return stagesForVersion(version)[number - 1]?.label ?? "Unknown stage";
 }
 
 export function isStale(value, now = Date.now()) {

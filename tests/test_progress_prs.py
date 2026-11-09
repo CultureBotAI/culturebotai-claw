@@ -134,7 +134,7 @@ def test_valid_records_unchanged_beside_orphan_and_no_orphan_github_query(sessio
 
 @pytest.mark.parametrize("field,value", [
     ("schema_version", True), ("pr_number", True), ("pr_number", 0),
-    ("reported_at", "not-a-date"), ("stage", 7), ("cycle", "2"),
+    ("reported_at", "not-a-date"), ("stage", 8), ("cycle", "2"),
     ("workflow_sha256", "bad"), ("goal_identity", {**GOAL, "start_step_index": True}),
     ("summary", "private text"),
 ])

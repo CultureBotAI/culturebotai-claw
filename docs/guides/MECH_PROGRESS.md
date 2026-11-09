@@ -2,18 +2,26 @@
 
 [The Mech progress dashboard](https://culturebotai.github.io/culturebotai-claw/)
 shows the manifest-defined fleet's current goal, verified goal closures, complete
-six-goal cycles, and distinct pull requests. Its data contract is
+versioned goal cycles, and distinct pull requests. Its data contract is
 [`progress.yaml`](../../src/kg_microbe_progress/schema/progress.yaml), a packaged
 LinkML schema. The sequence itself remains governed by
 [the workflow contract](MECH_WORKFLOW_CONTRACT.md).
 
 ## What the counts mean
 
-A **goal** is one stage of one cycle in one supervised run. The six stages are
-add records, causal graphs, protein examples, record review, resolve review
-findings, and infrastructure. A **completed cycle** requires verified closures
-for all six stages of that same run and cycle. The current stage number never
-stands in for missing completion evidence.
+A **goal** is one stage of one cycle in one supervised run. Parent v2 adds open
+issue triage before add records, causal graphs, protein examples, record review,
+resolve review findings, and infrastructure. A **completed cycle** requires
+verified closures for all stages of that run and cycle: six for pinned v1 cycles,
+seven for v2. Six v2 closures do not constitute a complete cycle. The current
+stage number never stands in for missing completion evidence.
+
+Each new v2 cursor and closure carries its cycle's `parent_version`. Historical
+public records without that field retain v1 stage meanings and remain unchanged.
+The collector reads the supervisor's per-cycle version history rather than
+applying the current cycle's stage numbers to earlier evidence. A version change
+inside an observed cycle is rejected. This PR changes accounting compatibility;
+it does not migrate live runs, re-pin Mechs, or publish progress data.
 
 A **PR round** is a distinct `(repository, PR number)`, not a commit. Several PRs
 can belong to one goal, and one PR associated with multiple goals still counts
@@ -60,6 +68,14 @@ on stderr about a snapshot or Mech observation older than 15 minutes, missing
 observations, or timestamps more than one minute in the future. Retain those
 warnings when quoting a stale summary. Exit 1 means data could not be verified
 and prints no counts; exit 2 means invalid arguments.
+
+The optional `--durability-runtime PATH` appends saved local per-Mech alerts
+for unpublished commits and owned temporary files approaching cleanup. Supply
+the actual verified supervisor runtime; the command reads it without scanning
+or changing sessions. Missing or stale observations remain unknown and exit 3.
+The public bundle schema and counters are unchanged. See
+[session-state durability](SESSION_STATE_DURABILITY.md) for ownership inventory,
+read-only boundaries and publication requirements.
 
 ## Register every PR in the coding session
 
@@ -179,6 +195,12 @@ therefore does not establish compatibility; pin consumers to the reviewed code.
 This release chooses a coordinated consumer upgrade rather than introducing a
 history migration or downgrade mechanism.
 
+The cycle-v2 `parent_version` fields and seventh stage have the same upgrade
+boundary. New readers accept unchanged v1 history, but six-stage readers cannot
+read v2 bundles or correctly count them. Upgrade consumers before the first v2
+cycle is collected. Keep old closures and receipt hashes unchanged; do not
+renumber them or strip their cycle version to make an old reader accept them.
+
 Before the updated publisher first writes a bundle to the production state
 directory or publishes one, upgrade **every consumer** to the merged main commit
 or a pinned release containing the change. This includes the Pages workflow,
@@ -238,7 +260,9 @@ This is an operator procedure, not an automatic deployment command. First merge
 the reviewed change and complete the consumer upgrades above. Choose the exact
 reviewed main commit, not a moving branch name. Use a separate review checkout
 to obtain its archive; never switch the checkout used by running monitors.
-Preserve the state directory and every configured `--runtime` argument. The
+Preserve the state directory and every configured `--runtime` argument.
+Keep the release archive and assessed dry-run bundle under the review
+checkout's gitignored `.temp/` durable root; verify its ignore rule first. The
 example below has one runtime; repeat that argument when the existing deployment
 has more.
 
@@ -257,7 +281,9 @@ git -C "$REVIEW_CHECKOUT" merge-base --is-ancestor "$REVIEWED_COMMIT" origin/mai
 test ! -e "$RELEASE"
 mkdir -p "$STATE/releases"
 mkdir "$RELEASE"
-ARCHIVE="$(mktemp "${TMPDIR:-/tmp}/mech-progress-release.XXXXXX")"
+DURABLE_ROOT="$REVIEW_CHECKOUT/.temp"
+mkdir -p "$DURABLE_ROOT"
+ARCHIVE="$(mktemp "$DURABLE_ROOT/mech-progress-release.XXXXXX")"
 git -C "$REVIEW_CHECKOUT" archive --format=tar --output="$ARCHIVE" "$REVIEWED_COMMIT"
 tar -xf "$ARCHIVE" -C "$RELEASE"
 printf '%s\n' "$REVIEWED_COMMIT" > "$RELEASE/REVISION"
@@ -265,7 +291,7 @@ shasum -a 256 "$ARCHIVE" > "$RELEASE/archive.sha256"
 UV_PROJECT_ENVIRONMENT="$RELEASE/.venv" uv sync --project "$RELEASE" --locked
 PYTHON="$RELEASE/.venv/bin/python"
 
-DRY_STATE="$(mktemp -d "${TMPDIR:-/tmp}/mech-progress-dry-run.XXXXXX")"
+DRY_STATE="$(mktemp -d "$DURABLE_ROOT/mech-progress-dry-run.XXXXXX")"
 cp -p "$STATE/bundle.json" "$DRY_STATE/bundle.json"
 cp "$RELEASE/src/kg_microbe_fleet/fleet.yaml" "$DRY_STATE/fleet.yaml"
 env PYTHONPATH="$RELEASE/src:$RELEASE" "$PYTHON" \
@@ -320,7 +346,7 @@ uv run --extra dev python -m pytest -q \
   tests/test_progress_model.py tests/test_progress_prs.py \
   tests/test_progress_publish.py tests/test_progress_site.py
 uv run --extra dev mypy src/kg_microbe_progress
-uv run python scripts/build_mech_progress_site.py --output /tmp/mech-progress-site
+uv run python scripts/build_mech_progress_site.py --output .temp/mech-progress-site
 ```
 
 The build requires an initialized data branch and read access through `gh`.
@@ -328,3 +354,11 @@ Test fixtures cover duplicate collection, multiple PRs per goal, restart history
 incomplete cycle coverage, invalid receipt evidence, private-field rejection,
 GitHub state changes, and publication failures. Browser checks cover the actual
 built desktop/mobile site, controls, disclosures, and failed data loads.
+
+An accepted [ordered multi-PR closure](MECH_SESSION_WORKFLOWS.md#ordered-multi-pr-closure-receipts)
+contributes every independently verified member PR to the existing PR event and
+association history. The goal closure remains one event naming the final
+integration PR, so public schemas and single-PR history are unchanged. Member
+identity and order must match the hash-bound archived receipt; an incomplete or
+mismatched stored proof fails collection. A working multi-PR receipt may report
+its member associations but never grants completion authority.

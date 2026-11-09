@@ -17,6 +17,32 @@ tags: [scalability, health, pages, budgets, git, audit]
 ## Two axes that fail differently
 
 <!-- canonical:begin two-axes -->
+**Durable session state.**
+Use the gitignored `<repo>/.temp/` as the durable work root for review campaigns,
+worktrees, batch state, draft review bundles and handoffs. Use
+`~/agent-work/<repo>/` when a separate clone is needed. Verify `.temp/` is ignored
+before use; provision a missing ignore rule through an authorized repository
+change. Keep maintained helpers and accepted evidence in their native tracked
+directories; a durable scratch root does not replace their provenance contract.
+
+Never store session state or helper scripts in `/tmp/`, `/private/tmp/` or `$TMPDIR`.
+Only disposable caches and pytest temporary fixtures may use system temp roots.
+Use a unique subdirectory for each task and preserve other sessions' state.
+
+Report every auxiliary clone for identity verification and inventory in
+session_repository_roots, and owned campaign/handoff directories in
+session_state_paths. Missing inventory is unknown, not healthy. Report new paths
+to the supervisor/operator; do not edit live configuration or expand authority.
+
+For authorized Git work, push each committed batch branch to `origin` the same
+day, whether or not a PR is opened. Verify the exact pushed head with the remote;
+a local commit or remote-tracking ref alone is not publication proof. Inspect
+the repository's current workflow triggers before claiming a branch push runs
+no CI. A goal delivering commits cannot close while recorded commits exist only
+locally. Publication failure is a retained blocker, never permission to discard
+the branch. This rule grants no Git mutation, merge, cleanup or provider
+authorization beyond the task and the skill's existing boundaries.
+
 Run this check after large ingestions, before releases, or when git operations or
 the web browser start feeling slow. Two independent axes fail in different ways:
 

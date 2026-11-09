@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
-const { validateSnapshot, githubURL, isStale, phaseInfo, relativeTime, selectRepositories, STAGES } = await import(pathToFileURL(process.argv[2]).href);
+const { validateSnapshot, githubURL, isStale, phaseInfo, relativeTime, selectRepositories, STAGES, stagesForVersion, stageLabel, associationLabel } = await import(pathToFileURL(process.argv[2]).href);
 const now = Date.parse("2026-10-20T12:00:00Z");
 const timestamp = "2026-10-20T11:59:00Z";
 const counters = { completed_cycles: 0, completed_goals: 0, unique_prs: 0, merged_prs: 0, open_prs: 0, closed_prs: 0, no_change_goals: 0 };
@@ -26,6 +26,39 @@ if (process.argv[3]) {
 }
 
 validateSnapshot(snapshot);
+const seven = structuredClone(snapshot);
+const sevenRepo = seven.repositories[0];
+sevenRepo.current = { ...sevenRepo.current, stage_number: 7, stage_id: "infrastructure", parent_version: "2.0.0" };
+sevenRepo.stages = stagesForVersion("2.0.0").map((stage, index) => ({ number: index + 1, key: stage.key, state: index < 6 ? "completed" : "current" }));
+sevenRepo.closures = stagesForVersion("2.0.0").slice(0, 6).map((stage, index) => ({
+  id: `v2-goal-${index}`, run_key: sevenRepo.current.run_key, cycle: 1, stage_number: index + 1,
+  stage_id: stage.key, parent_version: "2.0.0", outcome: "no_changes", verified_at: timestamp,
+}));
+sevenRepo.counters = { ...counters, completed_goals: 6, no_change_goals: 6 };
+seven.totals = { ...sevenRepo.counters };
+validateSnapshot(seven);
+const premature = structuredClone(seven);
+premature.repositories[0].counters.completed_cycles = premature.totals.completed_cycles = 1;
+assert.throws(() => validateSnapshot(premature));
+sevenRepo.closures.push({ ...sevenRepo.closures[0], id: "v2-goal-7", stage_number: 7, stage_id: "infrastructure" });
+sevenRepo.current = { ...sevenRepo.current, cycle: 2, stage_number: 1, stage_id: "open_issue_triage" };
+sevenRepo.counters = { ...counters, completed_goals: 7, no_change_goals: 7, completed_cycles: 1 };
+seven.totals = { ...sevenRepo.counters };
+validateSnapshot(seven);
+const mixed = structuredClone(seven);
+delete mixed.repositories[0].closures[0].parent_version;
+mixed.repositories[0].closures[0].stage_id = "add_records";
+assert.throws(() => validateSnapshot(mixed));
+const unknown = structuredClone(seven);
+unknown.repositories[0].current.parent_version = "3.0.0";
+assert.throws(() => validateSnapshot(unknown));
+assert.equal(stageLabel(6), "Infrastructure");
+assert.equal(stageLabel(6, "2.0.0"), "Resolve findings");
+assert.equal(stageLabel(7, "2.0.0"), "Infrastructure");
+assert.equal(associationLabel(sevenRepo, { run_key: sevenRepo.current.run_key, cycle: 1, stage_number: 1 }), "Open-issue triage");
+assert.equal(associationLabel(sevenRepo, { run_key: "unknown-run", cycle: 1, stage_number: 1 }), "Goal 1");
+const legacyAssociationRepo = { ...sevenRepo, closures: [{ ...sevenRepo.closures[0], parent_version: "1.0.0", stage_id: "add_records" }] };
+assert.equal(associationLabel(legacyAssociationRepo, { run_key: sevenRepo.current.run_key, cycle: 1, stage_number: 1 }), "Add records");
 const offsetSnapshot = structuredClone(snapshot);
 offsetSnapshot.generated_at = "2026-10-20T04:59:00-07:00";
 offsetSnapshot.repositories[0].last_observed_at = "2026-10-20T13:59:00+02:00";
