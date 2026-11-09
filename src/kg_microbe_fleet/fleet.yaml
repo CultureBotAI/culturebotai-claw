@@ -1243,7 +1243,8 @@ mechs:
           Records carry the shared Discussion section, so the scan applies. The
           condition this declaration set, enabling once the first tranche of
           records lands (CellStructureMech#12), is met; the scan matrix follows
-          this declaration, so the switch awaits review (#848).
+          this declaration, so the switch awaits review (CellStructureMech#1642,
+          CellStructureMech#404).
       # An authoritative consumer must sync; the loader rejects anything else.
       # CellStructureMech#48 vendors the artifact set and pin that this
       # declaration obliges; until it lands, the fleet audit reports the gap.
@@ -1427,8 +1428,8 @@ mechs:
       environment_coverage:
         status: disabled
         reason: >-
-          HabitatMech is itself an environment vocabulary: 3,213 habitat
-          records grounded in ENVO, UBERON, FOODON and BTO. Environment
+          HabitatMech is itself an environment vocabulary: habitat records
+          grounded in ENVO, UBERON, FOODON and BTO. Environment
           coverage compares culture media, ingredients and communities against
           ENVO and has no loader for HabitatRecord, so it cannot yet read this
           corpus as either an input or the reference set. Adopting it applies
@@ -1980,14 +1981,15 @@ mechs:
       curation_history:
         status: disabled
         reason: >-
-          Pathway records carry a curation_history of CurationEvent under the
-          governed src/pathwaymech/schema/history.yaml, the justfile's
-          new-history recipe appends events, and history/ holds record
-          directories that CI validates through pathwaymech-run-qc. That meets
-          the condition this declaration set for enabling (#515); the switch
-          awaits review (#848).
+          Pathway records carry an inline curation_history of CurationEvent, a
+          class of PathwayMech's own src/pathwaymech/schema/pathwaymech.yaml;
+          the governed src/pathwaymech/schema/history.yaml is vendored, the
+          justfile's new-history recipe scaffolds history/ records, and CI
+          validates history/ through pathwaymech-run-qc. That meets the
+          condition this declaration set for enabling (#515), where the switch
+          awaits review.
         reason_claims:
-          present: ["history", "src/pathwaymech/schema/history.yaml", "justfile"]
+          present: ["history", "src/pathwaymech/schema/history.yaml", "src/pathwaymech/schema/pathwaymech.yaml", "justfile"]
       # Closed-mode LinkML validation (pathwaymech-validate-strict) runs in
       # `just validate` and in the "Build and test" workflow on every pull
       # request (PathwayMech #190).
@@ -2329,7 +2331,7 @@ mechs:
           .claude/skills/curate-yaml-record/references/review-checklist.md now exist,
           added with CMMMech's canonical skill adapters (CMMMech#513), so the
           write contract's files are present; enabling generic curation awaits
-          review (#785). Read-only structured review has its own record_review
+          review (#1059). Read-only structured review has its own record_review
           capability and does not enable curation.
         reason_claims:
           present:
@@ -2482,10 +2484,10 @@ mechs:
       curation_history:
         status: disabled
         reason: >-
-          The native new-history recipe in justfile predates the shared curation
-          write contract. .claude/skills/curate-yaml-record/SKILL.md and
+          The native new-history recipe in justfile does not establish the shared
+          curation write contract. .claude/skills/curate-yaml-record/SKILL.md and
           .claude/skills/curate-yaml-record/references/review-checklist.md now
-          exist (AIMech#428); enabling generic curation awaits review (#785).
+          exist (AIMech#428); enabling generic curation awaits review (#1059).
           Structured record review is separately enabled.
         reason_claims:
           present:
