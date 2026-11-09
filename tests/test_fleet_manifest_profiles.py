@@ -17,6 +17,11 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = REPOSITORY_ROOT / "src" / "kg_microbe_fleet" / "fleet.yaml"
 
 EXPECTED_PROFILES = {
+    "assaymech": (
+        "src/assaymech",
+        ("src/assaymech/schema/assaymech.yaml",),
+        ("data/assays/*.yaml",),
+    ),
     "aimech": (
         "src/aimech",
         ("src/aimech/schema/aimech.yaml",),

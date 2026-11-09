@@ -42,3 +42,5 @@ Other maintained references:
 Operational scratch reports belong under the gitignored `workspace/reports/`,
 not in the documentation tree. Versioned goal-review evidence follows the
 repository paths defined by the workflow contract.
+
+- [AssayMech pending admission](guides/ASSAYMECH_ADMISSION.md): bootstrap provenance, conservative capability declarations and release dependencies.

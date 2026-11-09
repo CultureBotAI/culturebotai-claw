@@ -428,3 +428,20 @@ mechs:
       graph merely because EdgeMech is admitted to the fleet.
     tracking:
     - https://github.com/CultureBotAI/culturebotai-claw/issues/957
+
+  assaymech:
+    revision: a85aea616168160ec7e5dc08e71f15b361455924
+    native: no_pipeline_in_audited_source
+    evidence:
+    - https://github.com/CultureBotAI/AssayMech/tree/a85aea616168160ec7e5dc08e71f15b361455924 (empty initial tree)
+    sets:
+      record-text:
+        modality: text
+        representation: whole_record
+        entity_type: assay
+        state: planned
+        notes: Blocked pending scaffold and evidence-backed seed adoption. No records, encoder, vectors or projection exist on the inspected empty main.
+    actions:
+    - Measure the curated assay corpus before designing a versioned text adapter; preserve source and cross-corpus evidence distinctions.
+    tracking:
+    - https://github.com/CultureBotAI/culturebotai-claw/issues/426

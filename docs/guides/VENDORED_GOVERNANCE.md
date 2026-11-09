@@ -626,3 +626,10 @@ closing the obsolete PR. A successful vendored-sync run from before the
 workflow became governed does not validate merging that old PR against today's
 main branch. Require checks on the current candidate containing the canonical
 copy and the Mech-owned update.
+
+### AssayMech pending admission
+
+See [AssayMech admission](ASSAYMECH_ADMISSION.md) for its exact empty-main
+inspection, 22-artifact obligation and published bootstrap procedure. It needs
+its own separately reviewed declaration; existing Edge or Cofactor policy is
+not authority for Assay. Candidate validation is not protected deployment.
