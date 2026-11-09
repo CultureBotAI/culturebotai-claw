@@ -633,3 +633,9 @@ See [ScaleupMech admission](SCALEUPMECH_ADMISSION.md) for its exact empty-main
 inspection, 22-artifact obligation and published bootstrap procedure. It needs
 its own separately reviewed declaration; existing Edge or Cofactor policy is
 not authority for Assay. Candidate validation is not protected deployment.
+
+The separately sealed ScaleupMech proposal preserves the historical DUF/Edge
+permissions and adds only its independently bound source. Private audit access
+remains an explicit protected-infrastructure dependency; no admission declaration
+permits private checkout data or credentials in an untrusted candidate job.
+See [ScaleupMech admission](SCALEUPMECH_ADMISSION.md).

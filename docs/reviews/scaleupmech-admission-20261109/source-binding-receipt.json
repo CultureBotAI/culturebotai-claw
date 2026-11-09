@@ -1,0 +1,17 @@
+{
+  "checked_at": "2026-11-09T03:37:44.521071+00:00",
+  "protected_base": "ee3ae4112834d79c1923a270cb454b87666f62e2",
+  "reviewed_shared_implementation": "3cb87b411bc4ebc6c91a45bc48848361e713ebe2",
+  "preserved_declarations_and_snapshots": {
+    "mech-cycle-v2-canary.json": "89a362436eb3df0f3b4bfdb9feeaf9a258b2476291e565a744568b41f9445697",
+    "mech-cycle-v2-governance-manifest.json": "368edbac106cb49c0a4159a87c07eeba4a5ed79c343ff042c0ddbc1b6b990ebb",
+    "edgemech-infrastructure-admission-v1.json": "1d65bcbe0b6697c20cff09af817f2e864e564e8f62303ed76c30383072fc705f",
+    "edgemech-infrastructure-source-manifest.json": "bfd4b703f46ce748487253d6fe093e79fe00ba7a9a88293f5cc6df176f11b519"
+  },
+  "scaleup_source_ref": "88e719d5480d0008d6ce082510dcd066775f232b",
+  "scaleup_source_manifest_sha256": "c0f521cce8fb2b618e3702c5b2cd06170017fac04f1ff448c97b317c7e6d208b",
+  "bootstrap_main_ref": "38f8157fc960299f2458f4916dd581ce1b5d0262",
+  "applicable_artifacts": 22,
+  "native_contract_exclusions": [],
+  "protected_activation": "not_performed; proposal only"
+}

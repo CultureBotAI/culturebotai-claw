@@ -252,6 +252,21 @@ def test_the_scope_rule_catches_what_it_is_for(scope, expected):
 @pytest.mark.parametrize("consumer", CONSUMERS)
 def test_a_declared_consumer_carries_every_artifact_that_applies_to_it(consumer):
     missing = _missing(consumer)
+    from kg_microbe_governance.consumer_admission import SPECS, compose
+    from kg_microbe_governance.consumer_admission import (
+        bootstrap_pending as native_bootstrap_pending,
+    )
+    if consumer in {spec.consumer.key for spec in SPECS} and missing:
+        _, _, additions = compose(lambda p: (ROOT / p).read_bytes(),
+                                  (ROOT / "src/kg_microbe_fleet/fleet.yaml").read_bytes(),
+                                  json.dumps(MANIFEST).encode())
+        if consumer in additions:
+            root = resolve_mech_root(consumer, claw_root=ROOT)
+            if native_bootstrap_pending(root, additions[consumer], committed_only=True):
+                _assert_exact_admission_gap(consumer, missing)
+                return
+            # An unrelated new empty tip cannot inherit the temporary ledger.
+            assert not missing, "Declared native bootstrap expired without complete artifacts"
     if consumer == ADMITTED.key and missing:
         policy = validate_packaged_transition(ROOT)
         root = resolve_mech_root(consumer, claw_root=ROOT)

@@ -1,0 +1,51 @@
+[
+  {
+    "mutation": "explicit-root",
+    "test": "tests/test_scaleupmech_admission.py::test_scaleup_identity_is_consistent_across_runtime_surfaces",
+    "red_exit": 1,
+    "restored_exit": 0,
+    "assertion_failure": true
+  },
+  {
+    "mutation": "report-enum",
+    "test": "tests/test_fleet_pull.py::test_fleet_pull_schema_repository_keys_match_manifest",
+    "red_exit": 1,
+    "restored_exit": 0,
+    "assertion_failure": true
+  },
+  {
+    "mutation": "domain-case",
+    "test": "tests/test_review_domain_fit.py::test_domain_cases_cover_the_actual_manifest",
+    "red_exit": 1,
+    "restored_exit": 0,
+    "assertion_failure": true
+  },
+  {
+    "mutation": "capability-eligibility",
+    "test": "tests/test_skill_catalogue.py::test_review_eligibility_is_independent_of_scientific_curation",
+    "red_exit": 1,
+    "restored_exit": 0,
+    "assertion_failure": true
+  },
+  {
+    "mutation": "fleet-count",
+    "test": "tests/test_fleet_count_prose.py::test_the_fleet_size_the_prose_describes_is_the_manifest_size",
+    "red_exit": 1,
+    "restored_exit": 0,
+    "assertion_failure": true
+  },
+  {
+    "mutation": "complete-cli-roots",
+    "test": "tests/test_governance_fleet_audit_cli.py::test_fleet_audit_cli_parses_repeated_roots_and_reports_success",
+    "red_exit": 1,
+    "restored_exit": 0,
+    "assertion_failure": true
+  },
+  {
+    "mutation": "native-contract-scope",
+    "test": "tests/test_vendored_consumer_completeness.py::test_admission_gaps_name_known_consumers_and_applicable_artifacts",
+    "red_exit": 1,
+    "restored_exit": 0,
+    "assertion_failure": true
+  }
+]

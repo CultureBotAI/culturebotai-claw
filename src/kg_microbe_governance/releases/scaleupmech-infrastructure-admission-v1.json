@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "admission_id": "scaleupmech-post-cutoff-infrastructure-v1",
+  "authority": "infrastructure_only",
+  "consumer": {
+    "key": "scaleupmech",
+    "github": "CultureBotAI/ScaleupMech",
+    "package_path": "src/scaleupmech"
+  },
+  "source_ref": "88e719d5480d0008d6ce082510dcd066775f232b",
+  "source_manifest_sha256": "c0f521cce8fb2b618e3702c5b2cd06170017fac04f1ff448c97b317c7e6d208b",
+  "bootstrap_main_ref": "38f8157fc960299f2458f4916dd581ce1b5d0262",
+  "fleet_entry_sha256": "dfe4bcdf6b7f3835f945628bbabf2e32934f1b08a73336f113f6acdd66149006",
+  "historical_declaration_sha256": "89a362436eb3df0f3b4bfdb9feeaf9a258b2476291e565a744568b41f9445697",
+  "historical_manifest_sha256": "368edbac106cb49c0a4159a87c07eeba4a5ed79c343ff042c0ddbc1b6b990ebb",
+  "edge_declaration_sha256": "1d65bcbe0b6697c20cff09af817f2e864e564e8f62303ed76c30383072fc705f",
+  "required_artifacts": [
+    "backlog_loop_contract",
+    "chemical_formula_helper",
+    "curation_history_schema",
+    "curation_timestamp_contract",
+    "deep_research_contract",
+    "id_label_empty_adapter_contract",
+    "id_label_plausibility_contract",
+    "id_label_unknown_prefix_contract",
+    "id_label_validator",
+    "merge_integrity_verifier",
+    "merge_integrity_workflow",
+    "merge_queue_admission_controller",
+    "merge_queue_admission_workflow",
+    "pr_shepherd_workflow",
+    "record_review_contract",
+    "record_review_guide",
+    "record_review_helper",
+    "record_review_schema",
+    "shared_mech_schema",
+    "skill_frontmatter_contract",
+    "vendored_checker",
+    "vendored_checker_launcher"
+  ]
+}

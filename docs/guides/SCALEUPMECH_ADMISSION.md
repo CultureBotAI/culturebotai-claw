@@ -57,3 +57,22 @@ complements [Project PISCES](https://projectpisces.org/) by linking to PISCES
 flowsheets where verified. It must never copy flowsheet, unit-operation or TEA
 content. Cite original evidence and preserve scale, strain, operating context,
 units and uncertainty; a single-scale observation does not establish transfer.
+
+## Separately sealed infrastructure proposal
+
+The independent declaration binds bootstrap
+`88e719d5480d0008d6ce082510dcd066775f232b`, exact source bytes and all 22 native
+obligations. Its shared mechanism is the independently reviewed Cofactor/Assay
+implementation with one explicit Scaleup descriptor. This branch includes only
+Scaleup's declaration and registration; the other descriptors remain dormant.
+Each declaration requires immutable protected first-parent introduction, exact
+identity/ref pairing and source authentication. Candidate declarations cannot
+activate against an older protected base. Earlier consumer permissions and all
+four DUF/Edge declaration/source files remain unchanged. Tests compose three
+independent native source snapshots and reject every crossed newcomer pin.
+
+This additive authority does not solve private CI access. The separate dormant
+private-audit prerequisite is reviewable plumbing, not automatic fleet-gate
+integration. Until protected activation, safe App/environment configuration and
+a reviewed gate cutover exist, public hosted completeness cannot honestly pass
+for this private consumer. Missing access is never recorded as success.
