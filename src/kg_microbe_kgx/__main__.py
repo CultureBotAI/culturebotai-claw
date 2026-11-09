@@ -35,7 +35,8 @@ def main(argv: list[str] | None = None) -> int:
     capability = manifest.mechs[args.mech].capabilities.get("kgx_export")
     if capability is None or not capability.is_enabled:
         reason = getattr(capability, "reason", "") or "not declared in the manifest"
-        print(f"{args.mech} exports no KGX: {reason}")
+        status = getattr(capability, "status", "undeclared")
+        print(f"{args.mech}: kgx_export is {status}, so there is nothing to check: {reason}")
         return 0
 
     nodes, edges = args.nodes, args.edges
