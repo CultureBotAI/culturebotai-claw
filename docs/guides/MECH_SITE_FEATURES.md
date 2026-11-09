@@ -127,7 +127,7 @@ the network and a wrong path fails silently on every record page.
 ## Licences
 
 Read the licence files rather than assuming the intended fleet policy, which is
-unresolved (claw #394). Every Mech except AIMech carries `LICENSE` (scope),
+unresolved (claw #394). Every publishing Mech except AIMech carries `LICENSE` (scope),
 `LICENSE-DATA` (CC BY 4.0) and `LICENSE-CODE` (BSD-3-Clause). The footers do not
 all say so: on 2026-10-25 CommunityMech labelled its data BSD-3-Clause, CultureMech
 named only the code licence, and the footers of HabitatMech, MediaIngredientMech,

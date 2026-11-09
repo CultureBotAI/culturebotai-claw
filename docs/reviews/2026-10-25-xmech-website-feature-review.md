@@ -1,6 +1,8 @@
 # X-Mech Website Features: Fresh Review And Catalogue (2026-10-25)
 
-This is a dated review of what readers can do on every manifest Mech's website,
+This is a dated review of what readers can do on every publishing manifest Mech's website
+(the 14 corpus Mechs in `fleet.yaml` on 2026-10-25; `edgemech` was admitted later as an
+infrastructure repository with `site_contract: not_applicable`),
 measured against the published X-Mech Suite **Website features** catalogue, plus
 the features it does not yet catalogue. It records observations, not fixes: the
 unification PRs it led to are listed at the end with their state when written.
