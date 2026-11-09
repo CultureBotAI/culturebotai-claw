@@ -2210,22 +2210,48 @@ class Supervisor:
             if not prompt.is_file():
                 return {"state": "not-sent", "reason": "workflow instruction file missing"}
             identifier = decision["action_id"]
-            message = message_for(target, ledger, decision, self.directory(target))
+            from kg_microbe_workflows.instructions import (
+                InstructionError,
+                prepare_instruction,
+                verify_instruction,
+            )
+
+            instruction = message_for(target, ledger, decision, self.directory(target))
+            instruction_hash = hashlib.sha256(prompt.read_bytes()).hexdigest()
+            context = {"action_id": identifier, "kind": decision["action"],
+                       "run_id": ledger["run_id"], "repository_key": target["repository_key"],
+                       "cycle": ledger.get("cycle", 1), "stage": ledger["stage"],
+                       "stage_key": workflow_stage_key(ledger),
+                       "native_session_id": target["native_session_id"],
+                       "reservation_goal_identity": copy.deepcopy(ledger["adopted_goal"]),
+                       "instruction_sha256": instruction_hash,
+                       "workflow_sha256": ledger.get("workflow", {}).get("sha256")}
+            try:
+                delivery = prepare_instruction(self.directory(target), context, instruction)
+            except (InstructionError, OSError) as error:
+                # Definite preparation failure precedes reservation and input.
+                return {"state": "not-sent", "reason": "instruction preparation refused: " + str(error)}
             action = {"id": identifier, "kind": decision["action"], "stage": ledger["stage"], "cycle": ledger.get("cycle", 1),
                       "marker": "MECH-WORKFLOW-" + identifier, "state": "reserved", "reserved_at": now(),
                       "reserved_epoch_ms": int(time.time() * 1000), "native_session_id": target["native_session_id"],
-                      "goal_identity": ledger["adopted_goal"], "message": message,
-                      "message_sha256": hashlib.sha256(message.encode("utf-8")).hexdigest(),
+                      "goal_identity": ledger["adopted_goal"], **delivery,
                       "native_step_index": ((observation.get("native") or {}).get("last_step") or {}).get("index"),
-                      "instruction_sha256": hashlib.sha256(prompt.read_bytes()).hexdigest()}
+                      "instruction_sha256": instruction_hash}
             ledger["actions"][identifier] = action
             self.save(target, ledger)  # durable intent before any terminal input
             try:
                 if self.stopping():
                     action.update(state="not-sent", outcome="stop-requested", updated_at=now())
                 else:
+                    try:
+                        verify_instruction(self.directory(target), action["instruction_artifact"])
+                    except (InstructionError, OSError) as error:
+                        action.update(state="not-sent", outcome="instruction-artifact-rejected",
+                                      error=str(error), updated_at=now())
+                        self.save(target, ledger)
+                        return action
                     result = self.notifier.jxa(SEND_JS, {**observation["tab"], "pid": target["pid"],
-                        "identity": target["process_identity"], "cwd": target["root"], "message": message})
+                        "identity": target["process_identity"], "cwd": target["root"], "message": action["message"]})
                     # Terminal returning proves only that the transport was
                     # invoked: it may leave a partial unsent composer. Keep a
                     # blocking uncertain reservation until native exact-input
