@@ -24,6 +24,9 @@ Other maintained references:
   domain-specific work; what a new Mech adopts, and in what order
 - [`guides/VENDORED_GOVERNANCE.md`](guides/VENDORED_GOVERNANCE.md) — canonical
   shared-artifact manifest, synchronization, rollout, and rollback.
+- [`guides/EVIDENCE_REFERENCE_VALIDATION.md`](guides/EVIDENCE_REFERENCE_VALIDATION.md) —
+  offline quote validation, explicit native evidence scope, graph coverage, the known-findings
+  ledger, cache fetching, and the fleet rollout.
 - [`guides/CURATION_HISTORY.md`](guides/CURATION_HISTORY.md) — append-only
   curation-history schema, CLI, vendoring, and enforcement model.
 - [`guides/RECORD_REVIEWS.md`](guides/RECORD_REVIEWS.md) — shared structured

@@ -58,6 +58,10 @@
     "aimech": {
       "github": "CultureBotAI/AIMech",
       "package_path": "src/aimech"
+    },
+    "edgemech": {
+      "github": "CultureBotAI/EdgeMech",
+      "package_path": "src/edgemech"
     }
   },
   "artifacts": [
@@ -124,7 +128,7 @@
       "id": "skill_frontmatter_contract",
       "source": "src/kg_microbe_governance/artifacts/tests/test_skill_frontmatter.py",
       "target": "tests/test_skill_frontmatter.py",
-      "consumers": "all",
+      "consumers": ["culturemech", "mediaingredientmech", "communitymech", "traitmech", "proteintraitsmech", "cellstructuremech", "antibioticmech", "habitatmech", "naturalproductmech", "taxonmech", "pathwaymech", "dufmech", "cmmmech", "aimech"],
       "sha256": "a1252211fbdec1a4a36f8138b9a60617d69e9fa6c5c3f589d15846a783d77569",
       "mode": "0644"
     },
@@ -132,7 +136,7 @@
       "id": "curation_timestamp_contract",
       "source": "src/kg_microbe_governance/artifacts/tests/test_curation_timestamp_schema.py",
       "target": "tests/test_curation_timestamp_schema.py",
-      "consumers": "all",
+      "consumers": ["culturemech", "mediaingredientmech", "communitymech", "traitmech", "proteintraitsmech", "cellstructuremech", "antibioticmech", "habitatmech", "naturalproductmech", "taxonmech", "pathwaymech", "dufmech", "cmmmech", "aimech"],
       "sha256": "4714184d0ebf50d1d777c02390b214a3491531310811e3be600c730ed175b92f",
       "mode": "0644"
     },
@@ -165,7 +169,7 @@
       "source": "src/kg_microbe_governance/artifacts/prompts/backlog-loop-goal.md",
       "target": "prompts/backlog-loop-goal.md",
       "consumers": "all",
-      "sha256": "0babff88b826007cba9f6e1d83f761cc3a951e19d0c37da072a9c39a8781ff88",
+      "sha256": "0b75a1976f71ad8595ec9d1f293afcddafed4287ae0e67fc8bb348a6467df610",
       "mode": "0644"
     },
     {
@@ -253,15 +257,39 @@
       "source": "src/kg_microbe_governance/artifacts/docs/record-reviews.md",
       "target": "docs/record-reviews.md",
       "consumers": "all",
-      "sha256": "452a19ab688276747b7c4308523a14d4d99c1c39ef6909ae8a90b85b7a9b3e9b",
+      "sha256": "eaedec5783b40925a3f0e159dfd1202c315a12e98c8859526378ceea5c547822",
       "mode": "0644"
     },
     {
       "id": "record_review_contract",
       "source": "src/kg_microbe_governance/artifacts/tests/test_record_review_contract.py",
       "target": "tests/test_record_review_contract.py",
-      "consumers": "all",
+      "consumers": ["culturemech", "mediaingredientmech", "communitymech", "traitmech", "proteintraitsmech", "cellstructuremech", "antibioticmech", "habitatmech", "naturalproductmech", "taxonmech", "pathwaymech", "dufmech", "cmmmech", "aimech"],
       "sha256": "7be08e684dcd235ddeae8f3c6a5d45b0ee74a60d1c1818cc81467e38901e5d56",
+      "mode": "0644"
+    },
+    {
+      "id": "evidence_validator_runner",
+      "source": "src/kg_microbe_governance/artifacts/scripts/run_shared_evidence_validator.py",
+      "target": "scripts/run_shared_evidence_validator.py",
+      "consumers": [
+        "mediaingredientmech",
+        "cellstructuremech",
+        "habitatmech"
+      ],
+      "sha256": "a2b2674a6dbea52a6ae256c9e445ff06118bc7565d9054a1587cbf2ddb3cba38",
+      "mode": "0644"
+    },
+    {
+      "id": "evidence_validation_workflow",
+      "source": "src/kg_microbe_governance/artifacts/workflows/qc-evidence.yaml",
+      "target": ".github/workflows/qc-evidence.yaml",
+      "consumers": [
+        "mediaingredientmech",
+        "cellstructuremech",
+        "habitatmech"
+      ],
+      "sha256": "288ef1795582105763952c4104d1455c1fef273a65528949f1e558d39c7306f3",
       "mode": "0644"
     }
   ]

@@ -1,0 +1,108 @@
+{
+  "classification": "Deterministic author acceptance, not independent review or scientific approval",
+  "status": "PASS_WITH_LIMITATIONS",
+  "native_reject_count": 0,
+  "files": [
+    {
+      "source_path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-candidate-acceptance/verify_candidate_v4.py",
+      "sha256": "4e425250f8b70544ad1db348f9c8e1517e7b2cf131d1773c9675426397222b25",
+      "bytes": 41260
+    },
+    {
+      "source_path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-candidate-acceptance/README-v4.md",
+      "sha256": "37e173470c86e3034c8dffd3c1b693a236b50748d0df3d64b9d8b4e628afa4b0",
+      "bytes": 1364
+    },
+    {
+      "source_path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-candidate-acceptance/preparation-v4-index.json",
+      "sha256": "ca482e98dedc4bce09f7f7e8057d96fefbe234e0f468e8fc00f443418ad9fc7b",
+      "bytes": 375
+    },
+    {
+      "source_path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-candidate-acceptance/COMPLETED-v4.md",
+      "sha256": "0b7be32168d7fce9cc08c4dfd4c361059579ea20ceb1d307b9153580eb88d518",
+      "bytes": 2721
+    },
+    {
+      "source_path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-candidate-acceptance/final-v4/acceptance.json",
+      "sha256": "90f2ff64589b3d813a24c7536315660b94a18aad574c869b269ba0482e154c36",
+      "bytes": 28115
+    },
+    {
+      "source_path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-candidate-acceptance/final-v4/b4-coverage.json",
+      "sha256": "b95e2b8d3ef19c0d13db73f40247f1734e19cd2e03bc94d31ee82441e35c5bb2",
+      "bytes": 13061
+    },
+    {
+      "source_path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-candidate-acceptance/final-v4/maintained-mim-before.json",
+      "sha256": "41721fecc83904ff2d0a41b4e6d13eccf10c72d60c4f774121ed5f084c6721dc",
+      "bytes": 686453
+    },
+    {
+      "source_path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-candidate-acceptance/final-v4/native-invariants.log",
+      "sha256": "c27b6030b75cc2171835ca828e8864bc20f637c82de7356d152c5ca858241329",
+      "bytes": 667
+    },
+    {
+      "source_path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-candidate-acceptance/final-v4/native-rejects.tsv",
+      "sha256": "42d8c6eea820f77e09912dd5202ff99d579fab9badc87af72959e9a22a2a9b84",
+      "bytes": 2339
+    },
+    {
+      "source_path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-candidate-acceptance/final-v4/policy-encounter-classification.json",
+      "sha256": "86e8fcf3d13edc032a260a5e258a46093e1c0b384d06dda2bfb52c9d24d20390",
+      "bytes": 6385
+    },
+    {
+      "source_path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-candidate-acceptance/final-v4/sssom-schema.log",
+      "sha256": "1e701ed637c6a83ffd63e57ca331f7e0f651a7982cd24414ebd1edbe455ae15d",
+      "bytes": 312
+    },
+    {
+      "source_path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-candidate-acceptance/final-v4/step4-candidate-delta.json",
+      "sha256": "3524ac8751a95640c19e67d9b7d07a3882bccb36e27a39200f3b3dd6b014acd3",
+      "bytes": 19322
+    },
+    {
+      "source_path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-candidate-acceptance/final-v4/suppression-proofs.json",
+      "sha256": "9a587135a05dc63c0978014fbe4abfe221fa71c1d04a6b0951cba16985a8e1a3",
+      "bytes": 19196
+    },
+    {
+      "source_path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-candidate-acceptance-v4.log",
+      "sha256": "90f2ff64589b3d813a24c7536315660b94a18aad574c869b269ba0482e154c36",
+      "bytes": 28115
+    },
+    {
+      "source_path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-candidate-acceptance-v4.json",
+      "sha256": "19a0c21120d6517145ba1c990cbadd38e126b94b4c37c1938f2b84b24229d229",
+      "bytes": 1414
+    },
+    {
+      "source_path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-candidate-acceptance/verify_candidate_v3.py",
+      "sha256": "d53310a4b0c3080e989e474d4d0359e74bb757c1a739f617b66e93fea98425e9",
+      "bytes": 39490
+    },
+    {
+      "source_path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-candidate-acceptance/preparation-v3-index.json",
+      "sha256": "9ec0f3bb97332eaa9b8346311a5cc8c02e0f215c350cd16c88718a8a7bb2ffd1",
+      "bytes": 864
+    },
+    {
+      "source_path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-candidate-acceptance/final-v3/acceptance.json",
+      "sha256": "2d47e8fdf4b8feb9c0ffd1213df0eedb6226faa0a937085aa86e4b76bbc228dd",
+      "bytes": 839
+    },
+    {
+      "source_path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-candidate-acceptance-v3.log",
+      "sha256": "be98e98ea9225776a14a7a4c3ca3f8fc1765687c25b0a32daba53776c41dada8",
+      "bytes": 1218
+    },
+    {
+      "source_path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-candidate-acceptance-v3.json",
+      "sha256": "a39b161e1ecba45132d7c0d17e5bfec5d49d39627d796fb64301ac9399042afd",
+      "bytes": 1414
+    }
+  ],
+  "native_reject_count_parser": "SSSOM leading metadata skipped, then TSV header consumed"
+}

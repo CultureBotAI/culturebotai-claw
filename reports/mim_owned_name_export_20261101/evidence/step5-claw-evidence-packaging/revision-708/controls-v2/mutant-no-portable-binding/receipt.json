@@ -1,0 +1,22 @@
+{
+  "name": "mutant-no-portable-binding",
+  "argv": [
+    "/opt/homebrew/Caskroom/miniforge/base/bin/python",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v5.py",
+    "--module",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-708/controls-v2/mutant-no-portable-binding/packager.py",
+    "--results",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-708/controls-v2/mutant-no-portable-binding/results.json"
+  ],
+  "started_at": "2026-11-01T13:16:35.280705+00:00",
+  "finished_at": "2026-11-01T13:16:35.669857+00:00",
+  "exit_code": 1,
+  "expected_pass": false,
+  "expected_assertion_failure": true,
+  "module_sha256": "7d8c0f874dde933e3bd5532fc40ea21b0bb28e2f036e0d4b0f1646f8fa140eaa",
+  "log_sha256": "80c0c8a6242b5fc2742d3f5d92875b4cb7c45366cea61ee2aa3ee14ded2cc276",
+  "mutation": [
+    "selected = bound_selection(frozen, read(package/'selection.final.json'))",
+    "selected = json.loads(read(package/'selection.final.json'))"
+  ]
+}

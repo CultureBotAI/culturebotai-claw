@@ -13,14 +13,13 @@ provider credits or mutate curated data without explicit authorization.
 ## 1. Reconcile before choosing
 
 - Read `CLAUDE.md`, inspect Git status, and preserve unrelated work.
-- Query the remote repository for all open issues and pull requests with an
-  explicit high limit. Print totals before ranking; list commands truncate.
-- Read the full issue body, state reason, and comments for anything cited or
-  selected. A title is a hypothesis, not a finding. Reproduce its premise on
+- Query all remote issues and PRs with explicit limits; print totals before
+  ranking and verify pagination completeness.
+- Read full bodies, state reasons and all comments of cited or selected items.
+  Titles are not findings. Reproduce the premise on
   current `origin/main`; a stale local clone is not the repository.
-- Identify work already in flight, overlapping files, dependencies, and
-  blockers. Use three-dot PR diffs; two-dot diffs make a behind branch resemble
-  a revert.
+- Reconcile open work, overlaps, dependencies and blockers. Use three-dot PR
+  diffs; two-dot diffs can make a behind branch resemble a revert.
 - Rank silently-wrong behavior first, then blast radius, blockers, missing
   regression gates, and cost. State what was not inspected.
 - If no item was named, recommend one and pause for the user's choice. Also
@@ -28,22 +27,24 @@ provider credits or mutate curated data without explicit authorization.
 
 ## 2. Implement in isolation
 
-- Fetch `origin/main`, then create a dedicated branch in a scratch worktree
-  before the first edit. Never use a dirty shared checkout.
+- Fetch `origin/main`; branch before edits in a dedicated worktree under
+  gitignored `<repo>/.temp/`, or `~/agent-work/<repo>/` for a separate clone.
+  Never use `/tmp`, `/private/tmp` or `$TMPDIR` for campaigns, clones, helpers or handoffs;
+  only disposable caches and pytest temp may. Never use a dirty shared checkout.
 - Fix the cause. Add the smallest regression test that would have caught it.
   Mutate or otherwise prove the test fails on the old behavior.
 - Mutators default to dry-run and require explicit apply/write. Do not make
   network/provider calls merely to test integration.
-- Run focused tests, repository-native checks from `CLAUDE.md`, exact relevant
-  CI commands, `git diff --check`, and inspect skips. A green command that found
-  zero targets is not evidence.
+- Run focused tests, native and relevant CI checks, and `git diff --check`.
+  Inspect skips; a green command finding zero targets is not evidence.
 - Review every changed file for scope. Stage files explicitly; do not sweep
   runtime artifacts with `git add -A`.
 
 ## 3. Commit, push, and review
 
-- Commit why the defect occurred and reference the issue. Push with an explicit
-  branch refspec and open a PR whose claims are supported by measured results.
+- Commit cause and issue. Push each batch branch to origin the same day,
+  even without a PR; verify its remote head. Commits that exist only locally
+  block goal closure. Use explicit refspecs and measured PR claims.
 - Perform a separate read-only adversarial review. Check description versus
   diff, false factual claims, edge cases, whether the regression test kills the
   old behavior, CI path filters/skips, security-sensitive workflow changes,

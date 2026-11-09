@@ -50,6 +50,7 @@ KGM_ROOT_PATH = Path(
 )
 
 sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_utils.ingredient_identity_rejections import rejection_reason  # noqa: E402
 from kg_microbe_fleet import require_mech_roots  # noqa: E402
 WORKSPACE = REPO_ROOT / "workspace"
 MIM_MAPPED_DIR = MIM_ROOT / "data/ingredients/mapped"
@@ -119,7 +120,12 @@ def search_ols(term: str, cache: dict, ontology: str = "chebi") -> list[dict]:
 def classify_search(term: str, candidates: list[dict]) -> tuple[str, str, dict | None]:
     if not candidates or candidates[0].get("error"):
         return "NONE", "no hits", None
-    non_obs = [c for c in candidates if not c.get("is_obsolete")]
+    reasons = [reason for c in candidates if (reason := rejection_reason(
+        ontology_id=c.get("chebi", ""), name=term))]
+    non_obs = [c for c in candidates if not c.get("is_obsolete") and not rejection_reason(
+        ontology_id=c.get("chebi", ""), name=term)]
+    if not non_obs and reasons:
+        return "NONE", "rejected: " + "; ".join(sorted(set(reasons))), None
     if not non_obs:
         return "NONE", "only obsolete", None
     t = _norm(term)
@@ -272,6 +278,7 @@ def main() -> None:
     for i, r in enumerate(fresh, 1):
         # Try preferred_term and raw_label across CHEBI then NCIT,
         # picking the highest-confidence outcome.
+        rejections = []
         best_outcome = ("NONE", "no hits", None, [], "")
         order = ("CHEBI", "HIGH", "MEDIUM", "LOW", "NONE")
         for ontology in ("chebi", "ncit"):
@@ -281,12 +288,24 @@ def main() -> None:
                 if (ontology == "chebi" and query == r["preferred_term"]) or \
                    ontology != "chebi" or query != r["preferred_term"]:
                     candidates = search_ols(query, cache, ontology=ontology)
+                    accepted_candidates = []
+                    for candidate in candidates:
+                        reason = rejection_reason(ontology_id=candidate.get("chebi", ""),
+                                                  name=r["preferred_term"])
+                        if reason:
+                            rejections.append({"candidate": candidate, "reason": reason})
+                        else:
+                            accepted_candidates.append(candidate)
+                    candidates = accepted_candidates
                     conf, rationale, best = classify_search(query, candidates)
                     cur_idx = order.index(best_outcome[0]) if best_outcome[0] in order else 99
                     new_idx = order.index(conf) if conf in order else 99
                     if new_idx < cur_idx:
                         best_outcome = (conf, rationale, best, candidates, ontology)
         conf, rationale, best, candidates, ont_hit = best_outcome
+        r["rejections"] = json.dumps(rejections, sort_keys=True)
+        if not best and rejections:
+            rationale = "rejected: " + "; ".join(sorted({r["reason"] for r in rejections}))
         r["candidates"] = candidates[:3]
         r["confidence"] = conf
         r["rationale"] = rationale
@@ -398,7 +417,7 @@ def main() -> None:
             "rationale", "best_chebi", "best_chebi_label",
             "candidate_2_chebi", "candidate_2_label",
             "candidate_3_chebi", "candidate_3_label",
-            "blocker"]
+            "blocker", "rejections"]
     QUEUE_TSV.parent.mkdir(parents=True, exist_ok=True)
     with QUEUE_TSV.open("w") as f:
         f.write("\t".join(cols) + "\n")
@@ -421,7 +440,7 @@ def main() -> None:
                 cands[1]["label"] if len(cands) > 1 else "",
                 cands[2]["chebi"] if len(cands) > 2 else "",
                 cands[2]["label"] if len(cands) > 2 else "",
-                blocker,
+                blocker, r.get("rejections", "[]"),
             ]) + "\n")
     print(f"\nWrote {QUEUE_TSV} ({len(pending)} pending rows)")
 

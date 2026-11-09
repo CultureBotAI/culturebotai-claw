@@ -1,0 +1,35 @@
+{
+  "at": "2026-11-01T13:43:38.978943+00:00",
+  "head": "1f5ad6779cdb3f39f39ba6f9f26d31840b7e7077",
+  "package": "reports/mim_owned_name_export_20261101",
+  "complete_git_archive": {
+    "file": "complete-package-at-1f5ad677.tar.gz",
+    "sha256": "d0772873d7d6419573adeb0969b8842579fedeaaad529d71309ac57cd28a6193",
+    "decompressed_sha256": "7932dc43623e93b148017ec45c72ca6e4cfa953c1e8f6f4de07fecfe2df24d22",
+    "bytes": 1330740
+  },
+  "metadata": {
+    "manifest.json": {
+      "sha256": "c5715dca489558d2f0315aaa657bf3d18b7770f3e857d75a53b3dee9cfe4fa22",
+      "bytes": 375694
+    },
+    "final-inputs.json": {
+      "sha256": "672c0bc071e69f6edc1117d74660492a4d3fdff0a91adcf8d11af780ce93a93f",
+      "bytes": 221361
+    },
+    "selection.final.json": {
+      "sha256": "4a85c37ccbf6b6ed3c0483271d0a1c6569ccdea08abe7d9e57119b6eec68103c",
+      "bytes": 212335
+    },
+    "verify.py": {
+      "sha256": "74ade999a59f91d61e83d1b41de9d6b00dbae2fd58a9b28f285724359b18c821",
+      "bytes": 14702
+    },
+    "README.md": {
+      "sha256": "1c3747f49aad56e0f8f73007a3ea1a0827399ba5673a52d5a6e7e8d9cb2be9d2",
+      "bytes": 4586
+    }
+  },
+  "preservation_only": true,
+  "maintained_or_package_files_changed": false
+}

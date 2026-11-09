@@ -1,0 +1,22 @@
+{
+  "name": "mutant-no-readme-binding",
+  "argv": [
+    "/opt/homebrew/Caskroom/miniforge/base/bin/python",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v5.py",
+    "--module",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-708/controls-v2/mutant-no-readme-binding/packager.py",
+    "--results",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-708/controls-v2/mutant-no-readme-binding/results.json"
+  ],
+  "started_at": "2026-11-01T13:16:35.670215+00:00",
+  "finished_at": "2026-11-01T13:16:36.066686+00:00",
+  "exit_code": 1,
+  "expected_pass": false,
+  "expected_assertion_failure": true,
+  "module_sha256": "b453af121ee13c26aa5279d8b090d48bd8cc43afd35e7ac8fcda5d1de3ecdaf0",
+  "log_sha256": "7197d2dc6285954afe9bd0ec3045f15ec0cf3267b9ab31e23867d1c465fffbcf",
+  "mutation": [
+    "require(read(package/'README.md') == selected['package_readme'].encode(), 'Packaged README differs from bound selection')",
+    "pass  # deliberately disabled README binding"
+  ]
+}

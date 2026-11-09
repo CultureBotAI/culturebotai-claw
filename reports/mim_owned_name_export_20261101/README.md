@@ -1,0 +1,30 @@
+# Owned-name export evidence
+
+This package preserves implementation, negative controls, independent review, and diagnostic candidate generation for Claw issues [#701](https://github.com/CultureBotAI/culturebotai-claw/issues/701)–[#708](https://github.com/CultureBotAI/culturebotai-claw/issues/708), plus [#710](https://github.com/CultureBotAI/culturebotai-claw/issues/710). It grants no scientific approval and publishes no MediaIngredientMech canonical mapping or baseline changes. Source authorship and independent review are separately attributed in the archived receipts.
+
+The diagnostic candidate was generated at Claw `90d110e663c10146351b09ae98d387dabdec0b1c`. The subsequent `a56f3ae4563619a5129ad944878c9205267315d6` commit changes only README mypy-target documentation. The final full suite ran at that later source head. Generation receipts retain their actual earlier revision and exact producer/source hashes. The source entrypoint and captured dependency graph assume a trusted caller/interpreter; this is not cryptographic runtime attestation.
+
+Actual v4 candidate acceptance is **PASS_WITH_LIMITATIONS**: schema and unmodified native invariants pass with zero rejected data rows, including Rule K with an empty in-memory baseline. B4 checks the available transforms; BTO (1 row) and MICRO (73 rows) are unavailable under the native warning-and-skip contract. The standalone B4 report preserves affected rows and available input hashes. This is not full ontology coverage. The prior v3 acceptance FAIL remains archived: its harness required all B4 transforms to exist, a stronger precondition than the native gate.
+
+The candidate has 2,974 rows. The builder produced 25 suppression events, aggregated into 20 sidecar rows for distinct subject/name pairs: 7 previously published tokens are removed, while 13 encountered aliases were already excluded by dedicated-label handling. These diagnostic encounters do not imply promotion of deferred canonical policy changes. Detailed before/after classification and captured label-resolution differences remain in the acceptance evidence. MIM YAML, canonical SSSOM, and Rule K baseline remained unchanged.
+
+The completed v5 full suite passed **6,660 tests**, with 390 skips and 16 warnings; measured coverage was **87.19%**. Safety-module coverage was **76%**, above its 60% gate. Final maintained mypy and Ruff checks passed. The final validation summary binds their exact receipts and logs, along with configuration, canary QC, generation, acceptance, and README-parity checks. Each archived command retains its own actual execution context; earlier configuration/canary runs are not relabeled as final-head executions.
+
+Independent source-repair review and the #708 packaging repair review both record **PASS_WITH_LIMITATIONS**, no remaining findings within their reviewed scope, and the trusted-caller and review-stage boundaries. The #708 repair binds the frozen plan to the hash-bound selection plus explicit run root and checks the packaged README against selected content. Its original successful substitution proof is retained. The repaired packager passes 21 fixture checks; old code and four fresh guard-removal mutants fail actual assertions.
+
+Failed probes and interrupted suites remain archived with dispositions. These include the real full-suite-v3 README/AGENTS/CI parity failure and README-only repair; the v4 sandbox refusal of `/bin/ps` in an existing lifecycle fixture; the successful authorized focused rerun; and the complete, successful v5 rerun with process access. Earlier incomplete suites and source/candidate evidence remain historical where later repairs supersede them. None is relabeled as a successful final check.
+
+`manifest.json` maps each retained original path and SHA-256 to its portable payload. Large files use deterministic gzip; identical bytes may share one payload. Historical indexes remain unchanged and may reference explicitly omitted bulky fixture trees, copied repositories, or caches. The portable selection and omission list define this package's exact scope.
+
+From the repository root:
+
+```bash
+python reports/mim_owned_name_export_20261101/verify.py verify \
+  --package reports/mim_owned_name_export_20261101 --repository . --require-tracked
+```
+
+Verification checks bytes, membership, source references, command/log bindings, artifact/receipt links, and recorded limitations. It does not rerun checks or approve scientific assertions. The independent review of the replacement package commit and PR body remains external to avoid circular self-binding; this package does not claim that future review, remote CI, publication, or merge has completed.
+
+The actual first merge-queue integration exposed #710 after the earlier code and package checks: v3 portable verification required pre-squash feature ancestry and Git objects, even though the integration tree matched. PR #709 was dequeued without merging. V4 preserves strict historical checks during author freeze/publication, while portable verification binds selected SHA-256/size, working bytes, and the current committed Git blobs. It passes real single-parent squash and depth-one consumer fixtures with the old feature object absent; working-byte, committed-byte and selected-hash tampering still refuse. Five fresh mutation controls detect weakened checks. These artifact-only changes do not alter the 13 maintained source references or rerun/relabel source generation.
+
+The complete v3 package at public commit `1f5ad6779cdb3f39f39ba6f9f26d31840b7e7077`, its five exact metadata files, and the actual failed queue verification are retained. All 572 prior original evidence identities remain unchanged. Independent #710 re-review records **PASS_WITH_LIMITATIONS**, no remaining findings within its repair scope, and separately demonstrates refusal by v3 and success by v4 on actual integration evidence and a depth-one consumer without a56 objects. That review leaves the replacement package, exact new commit/body, and subsequent actual queue integration for separate review; it does not retroactively approve the blocked first queue attempt.

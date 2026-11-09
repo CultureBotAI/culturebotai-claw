@@ -1,0 +1,11 @@
+{
+  "started_at": "2026-11-01T05:29:55.818151+00:00",
+  "finished_at": "2026-11-01T05:29:56.095720+00:00",
+  "url": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/461-05-2/property/Title,MolecularFormula,InChI,InChIKey/JSON",
+  "final_url": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/461-05-2/property/Title,MolecularFormula,InChI,InChIKey/JSON",
+  "status": 200,
+  "bytes": 312,
+  "sha256": "d7760ddfaff2de1febd179fbb96b0e384920cbf78ab910bec3e722059cb649df",
+  "source_receipt_sha256": "ce04c8b61d96747abe938d7cf7f254761196c7d91257504f02bf4ded7527902e",
+  "capture_note": "Projection of retained original receipt; transport headers omitted."
+}

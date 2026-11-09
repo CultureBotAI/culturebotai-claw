@@ -1,0 +1,206 @@
+FFFFFFFF                                                                 [100%]
+=================================== FAILURES ===================================
+____ test_all_alias_inputs_use_complete_unsupported_owner_snapshot[stored] _____
+
+tmp_path = PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8503/test_all_alias_inputs_use_comp0')
+origin = 'stored'
+
+    @pytest.mark.parametrize("origin", ["stored", "kg-name", "kg-synonym", "yaml", "pipe"])
+    def test_all_alias_inputs_use_complete_unsupported_owner_snapshot(tmp_path, origin):
+        subject = write_record(tmp_path)
+        write_record(tmp_path, "Owned", identifier="UNMAPPED_001", mapping_status="AMBIGUOUS",
+                     ontology_mapping={})
+        data = yaml.safe_load(subject.read_bytes())
+        labels = {}
+        if origin == "stored":
+            data["ontology_mapping"]["ontology_label"] = "Owned"
+        elif origin == "kg-name":
+            labels = {"CHEBI:1": ("Owned", [])}
+        elif origin == "kg-synonym":
+            labels = {"CHEBI:1": ("Subject", ["Owned"])}
+        else:
+            data["synonyms"] = [{"synonym_text": "allowed| OWNED |still allowed" if origin == "pipe" else "Owned",
+                                 "synonym_type": "EXACT_SYNONYM"}]
+        subject.write_text(yaml.safe_dump(data))
+        events = []
+        rows = builder._row_from_yaml(subject, {}, {}, labels, {"CHEBI:1": "Subject"}, suppressions=events)
+>       assert "owned" not in {x.strip().casefold() for x in rows[0]["other"].split("|")}
+E       AssertionError: assert 'owned' not in {'owned'}
+
+tests/test_mim_owned_name_export.py:68: AssertionError
+____ test_all_alias_inputs_use_complete_unsupported_owner_snapshot[kg-name] ____
+
+tmp_path = PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8503/test_all_alias_inputs_use_comp1')
+origin = 'kg-name'
+
+    @pytest.mark.parametrize("origin", ["stored", "kg-name", "kg-synonym", "yaml", "pipe"])
+    def test_all_alias_inputs_use_complete_unsupported_owner_snapshot(tmp_path, origin):
+        subject = write_record(tmp_path)
+        write_record(tmp_path, "Owned", identifier="UNMAPPED_001", mapping_status="AMBIGUOUS",
+                     ontology_mapping={})
+        data = yaml.safe_load(subject.read_bytes())
+        labels = {}
+        if origin == "stored":
+            data["ontology_mapping"]["ontology_label"] = "Owned"
+        elif origin == "kg-name":
+            labels = {"CHEBI:1": ("Owned", [])}
+        elif origin == "kg-synonym":
+            labels = {"CHEBI:1": ("Subject", ["Owned"])}
+        else:
+            data["synonyms"] = [{"synonym_text": "allowed| OWNED |still allowed" if origin == "pipe" else "Owned",
+                                 "synonym_type": "EXACT_SYNONYM"}]
+        subject.write_text(yaml.safe_dump(data))
+        events = []
+        rows = builder._row_from_yaml(subject, {}, {}, labels, {"CHEBI:1": "Subject"}, suppressions=events)
+>       assert "owned" not in {x.strip().casefold() for x in rows[0]["other"].split("|")}
+E       AssertionError: assert 'owned' not in {'owned'}
+
+tests/test_mim_owned_name_export.py:68: AssertionError
+__ test_all_alias_inputs_use_complete_unsupported_owner_snapshot[kg-synonym] ___
+
+tmp_path = PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8503/test_all_alias_inputs_use_comp2')
+origin = 'kg-synonym'
+
+    @pytest.mark.parametrize("origin", ["stored", "kg-name", "kg-synonym", "yaml", "pipe"])
+    def test_all_alias_inputs_use_complete_unsupported_owner_snapshot(tmp_path, origin):
+        subject = write_record(tmp_path)
+        write_record(tmp_path, "Owned", identifier="UNMAPPED_001", mapping_status="AMBIGUOUS",
+                     ontology_mapping={})
+        data = yaml.safe_load(subject.read_bytes())
+        labels = {}
+        if origin == "stored":
+            data["ontology_mapping"]["ontology_label"] = "Owned"
+        elif origin == "kg-name":
+            labels = {"CHEBI:1": ("Owned", [])}
+        elif origin == "kg-synonym":
+            labels = {"CHEBI:1": ("Subject", ["Owned"])}
+        else:
+            data["synonyms"] = [{"synonym_text": "allowed| OWNED |still allowed" if origin == "pipe" else "Owned",
+                                 "synonym_type": "EXACT_SYNONYM"}]
+        subject.write_text(yaml.safe_dump(data))
+        events = []
+        rows = builder._row_from_yaml(subject, {}, {}, labels, {"CHEBI:1": "Subject"}, suppressions=events)
+>       assert "owned" not in {x.strip().casefold() for x in rows[0]["other"].split("|")}
+E       AssertionError: assert 'owned' not in {'owned'}
+
+tests/test_mim_owned_name_export.py:68: AssertionError
+_____ test_all_alias_inputs_use_complete_unsupported_owner_snapshot[yaml] ______
+
+tmp_path = PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8503/test_all_alias_inputs_use_comp3')
+origin = 'yaml'
+
+    @pytest.mark.parametrize("origin", ["stored", "kg-name", "kg-synonym", "yaml", "pipe"])
+    def test_all_alias_inputs_use_complete_unsupported_owner_snapshot(tmp_path, origin):
+        subject = write_record(tmp_path)
+        write_record(tmp_path, "Owned", identifier="UNMAPPED_001", mapping_status="AMBIGUOUS",
+                     ontology_mapping={})
+        data = yaml.safe_load(subject.read_bytes())
+        labels = {}
+        if origin == "stored":
+            data["ontology_mapping"]["ontology_label"] = "Owned"
+        elif origin == "kg-name":
+            labels = {"CHEBI:1": ("Owned", [])}
+        elif origin == "kg-synonym":
+            labels = {"CHEBI:1": ("Subject", ["Owned"])}
+        else:
+            data["synonyms"] = [{"synonym_text": "allowed| OWNED |still allowed" if origin == "pipe" else "Owned",
+                                 "synonym_type": "EXACT_SYNONYM"}]
+        subject.write_text(yaml.safe_dump(data))
+        events = []
+        rows = builder._row_from_yaml(subject, {}, {}, labels, {"CHEBI:1": "Subject"}, suppressions=events)
+>       assert "owned" not in {x.strip().casefold() for x in rows[0]["other"].split("|")}
+E       AssertionError: assert 'owned' not in {'owned'}
+
+tests/test_mim_owned_name_export.py:68: AssertionError
+_____ test_all_alias_inputs_use_complete_unsupported_owner_snapshot[pipe] ______
+
+tmp_path = PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8503/test_all_alias_inputs_use_comp4')
+origin = 'pipe'
+
+    @pytest.mark.parametrize("origin", ["stored", "kg-name", "kg-synonym", "yaml", "pipe"])
+    def test_all_alias_inputs_use_complete_unsupported_owner_snapshot(tmp_path, origin):
+        subject = write_record(tmp_path)
+        write_record(tmp_path, "Owned", identifier="UNMAPPED_001", mapping_status="AMBIGUOUS",
+                     ontology_mapping={})
+        data = yaml.safe_load(subject.read_bytes())
+        labels = {}
+        if origin == "stored":
+            data["ontology_mapping"]["ontology_label"] = "Owned"
+        elif origin == "kg-name":
+            labels = {"CHEBI:1": ("Owned", [])}
+        elif origin == "kg-synonym":
+            labels = {"CHEBI:1": ("Subject", ["Owned"])}
+        else:
+            data["synonyms"] = [{"synonym_text": "allowed| OWNED |still allowed" if origin == "pipe" else "Owned",
+                                 "synonym_type": "EXACT_SYNONYM"}]
+        subject.write_text(yaml.safe_dump(data))
+        events = []
+        rows = builder._row_from_yaml(subject, {}, {}, labels, {"CHEBI:1": "Subject"}, suppressions=events)
+>       assert "owned" not in {x.strip().casefold() for x in rows[0]["other"].split("|")}
+E       AssertionError: assert 'owned' not in {'allowed', 'owned', 'still allowed'}
+
+tests/test_mim_owned_name_export.py:68: AssertionError
+___ test_late_cas_and_direct_and_b1_registry_paths_are_filtered[EXACT_MATCH] ___
+
+tmp_path = PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8503/test_late_cas_and_direct_and_b0')
+quality = 'EXACT_MATCH'
+
+    @pytest.mark.parametrize("quality", ["EXACT_MATCH", "CLOSE_MATCH", "NARROW_MATCH"])
+    def test_late_cas_and_direct_and_b1_registry_paths_are_filtered(tmp_path, quality):
+        subject = write_record(tmp_path, identifier="cas:12-34-5", chemical_properties={"cas_rn": "12-34-5"},
+                               ontology_mapping={"ontology_id": "CHEBI:2", "ontology_label": "Parent", "mapping_quality": quality})
+        write_record(tmp_path, "CAS owner", preferred_term="CAS:12-34-5", ontology_mapping={})
+        events = []
+        rows = builder._row_from_yaml(subject, {}, {}, {}, {}, suppressions=events)
+        assert len(rows) >= 2
+>       assert all("cas:12-34-5" not in row["other"].casefold() for row in rows)
+E       assert False
+E        +  where False = all(<generator object test_late_cas_and_direct_and_b1_registry_paths_are_filtered.<locals>.<genexpr> at 0x1071d8790>)
+
+tests/test_mim_owned_name_export.py:98: AssertionError
+___ test_late_cas_and_direct_and_b1_registry_paths_are_filtered[CLOSE_MATCH] ___
+
+tmp_path = PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8503/test_late_cas_and_direct_and_b1')
+quality = 'CLOSE_MATCH'
+
+    @pytest.mark.parametrize("quality", ["EXACT_MATCH", "CLOSE_MATCH", "NARROW_MATCH"])
+    def test_late_cas_and_direct_and_b1_registry_paths_are_filtered(tmp_path, quality):
+        subject = write_record(tmp_path, identifier="cas:12-34-5", chemical_properties={"cas_rn": "12-34-5"},
+                               ontology_mapping={"ontology_id": "CHEBI:2", "ontology_label": "Parent", "mapping_quality": quality})
+        write_record(tmp_path, "CAS owner", preferred_term="CAS:12-34-5", ontology_mapping={})
+        events = []
+        rows = builder._row_from_yaml(subject, {}, {}, {}, {}, suppressions=events)
+        assert len(rows) >= 2
+>       assert all("cas:12-34-5" not in row["other"].casefold() for row in rows)
+E       assert False
+E        +  where False = all(<generator object test_late_cas_and_direct_and_b1_registry_paths_are_filtered.<locals>.<genexpr> at 0x1071d81e0>)
+
+tests/test_mim_owned_name_export.py:98: AssertionError
+__ test_late_cas_and_direct_and_b1_registry_paths_are_filtered[NARROW_MATCH] ___
+
+tmp_path = PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8503/test_late_cas_and_direct_and_b2')
+quality = 'NARROW_MATCH'
+
+    @pytest.mark.parametrize("quality", ["EXACT_MATCH", "CLOSE_MATCH", "NARROW_MATCH"])
+    def test_late_cas_and_direct_and_b1_registry_paths_are_filtered(tmp_path, quality):
+        subject = write_record(tmp_path, identifier="cas:12-34-5", chemical_properties={"cas_rn": "12-34-5"},
+                               ontology_mapping={"ontology_id": "CHEBI:2", "ontology_label": "Parent", "mapping_quality": quality})
+        write_record(tmp_path, "CAS owner", preferred_term="CAS:12-34-5", ontology_mapping={})
+        events = []
+        rows = builder._row_from_yaml(subject, {}, {}, {}, {}, suppressions=events)
+        assert len(rows) >= 2
+>       assert all("cas:12-34-5" not in row["other"].casefold() for row in rows)
+E       assert False
+E        +  where False = all(<generator object test_late_cas_and_direct_and_b1_registry_paths_are_filtered.<locals>.<genexpr> at 0x106e79be0>)
+
+tests/test_mim_owned_name_export.py:98: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_mim_owned_name_export.py::test_all_alias_inputs_use_complete_unsupported_owner_snapshot[stored]
+FAILED tests/test_mim_owned_name_export.py::test_all_alias_inputs_use_complete_unsupported_owner_snapshot[kg-name]
+FAILED tests/test_mim_owned_name_export.py::test_all_alias_inputs_use_complete_unsupported_owner_snapshot[kg-synonym]
+FAILED tests/test_mim_owned_name_export.py::test_all_alias_inputs_use_complete_unsupported_owner_snapshot[yaml]
+FAILED tests/test_mim_owned_name_export.py::test_all_alias_inputs_use_complete_unsupported_owner_snapshot[pipe]
+FAILED tests/test_mim_owned_name_export.py::test_late_cas_and_direct_and_b1_registry_paths_are_filtered[EXACT_MATCH]
+FAILED tests/test_mim_owned_name_export.py::test_late_cas_and_direct_and_b1_registry_paths_are_filtered[CLOSE_MATCH]
+FAILED tests/test_mim_owned_name_export.py::test_late_cas_and_direct_and_b1_registry_paths_are_filtered[NARROW_MATCH]
+8 failed, 29 deselected in 0.10s

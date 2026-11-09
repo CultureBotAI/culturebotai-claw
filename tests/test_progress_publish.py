@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from kg_microbe_progress import collect_progress
+from kg_microbe_progress.prs import AssociationCollection
 
 ROOT = Path(__file__).parents[1]
 SPEC = importlib.util.spec_from_file_location("mech_progress_publish", ROOT / "scripts/mech_progress_publish.py")
@@ -132,7 +133,7 @@ def test_atomic_state_refuses_symlink_without_touching_target(tmp_path, bundle):
 def test_failed_publish_retains_local_history(tmp_path, monkeypatch, bundle):
     api = GitHub()
     api.fail_dispatch = True
-    monkeypatch.setattr(publisher, "gather_associations", lambda _: [])
+    monkeypatch.setattr(publisher, "collect_associations", lambda _: AssociationCollection([], {}))
     monkeypatch.setattr(publisher, "fetch_pr_observations", lambda _: [])
     monkeypatch.setattr(publisher, "collect_progress", lambda *a, **kw: (bundle["history"], bundle["snapshot"]))
     with pytest.raises(publisher.PublishError):
@@ -201,3 +202,215 @@ def test_refresh_skips_known_merged_bindings_but_checks_new_and_reopenable_prs()
     assert new_binding in refresh
     assert any(item["pr_number"] == 2 for item in refresh)
     assert old not in refresh
+
+
+def test_dry_run_excludes_orphan_and_preserves_public_history(tmp_path, monkeypatch):
+    from test_progress_model import KEY, pr_observation, runtime, save_ledger
+
+    from kg_microbe_progress import prs, validate_bundle
+
+    root, ledger = runtime(tmp_path)
+    ledger.update(adopted_goal={"conversation_id": "private", "started_at": ledger["created_at"],
+                                "start_step_index": 2}, workflow={"sha256": "c" * 64})
+    save_ledger(root, ledger)
+    orphan = {**prs._context(ledger), "schema_version": 1, "pr_number": 42,
+              "reported_at": ledger["last_observed_at"]}
+    orphan["goal_identity"] = {**ledger["adopted_goal"], "start_step_index": 1}
+    registry = root / KEY / prs.REGISTRY_NAME
+    registry.write_text(json.dumps(orphan) + "\n")
+    before = {p: p.read_bytes() for p in root.rglob("*") if p.is_file()}
+    history, snapshot = collect_progress([root], verified_pr_observations=[pr_observation(ledger)])
+    state = tmp_path / "state"
+    publisher.atomic_json(state / "bundle.json", {"history": history, "snapshot": snapshot})
+    queries = []
+    def fetch(associations):
+        queries.extend(associations)
+        return []
+    monkeypatch.setattr(publisher, "fetch_pr_observations", fetch)
+    api = GitHub()
+    result = publisher.collect_once([root], state, api=api)
+    bundle = json.loads((state / "bundle.json").read_text())
+    validate_bundle(bundle["history"], bundle["snapshot"])
+    row = next(r for r in bundle["snapshot"]["repositories"] if r["key"] == KEY)
+    assert result["status"] == "collected"
+    assert row["excluded_pr_associations"] == 1
+    assert [r["number"] for r in row["pull_requests"]] == [7]
+    assert [r["pr_number"] for r in queries] == [7]  # retained history, never orphan #42
+    assert bundle["history"]["associations"] == history["associations"]
+    assert bundle["snapshot"]["totals"] == snapshot["totals"]
+    assert api.calls == []
+    assert {p: p.read_bytes() for p in root.rglob("*") if p.is_file()} == before
+
+
+def test_published_association_later_orphaned_keeps_history_and_refreshes_pr(tmp_path, monkeypatch):
+    from test_progress_model import GITHUB, KEY, runtime, save_ledger
+
+    from kg_microbe_progress import prs, validate_bundle
+
+    root, ledger = runtime(tmp_path)
+    ledger.update(adopted_goal={"conversation_id": "private", "started_at": ledger["created_at"],
+                                "start_step_index": 2}, workflow={"sha256": "c" * 64})
+    save_ledger(root, ledger)
+    registry = root / KEY / prs.REGISTRY_NAME
+    registry.write_text(json.dumps({**prs._context(ledger), "schema_version": 1,
+        "pr_number": 42, "reported_at": ledger["last_observed_at"]}) + "\n")
+    queries = []
+    def github(args):
+        queries.append(args)
+        return subprocess.CompletedProcess(args, 0, stdout=json.dumps({
+            "number": 42, "base": {"repo": {"full_name": GITHUB}},
+            "head": {"sha": "a" * 40}, "html_url": f"https://github.com/{GITHUB}/pull/42",
+            "merged": False, "state": "open", "merged_at": None,
+        }))
+    monkeypatch.setattr(publisher, "fetch_pr_observations",
+                        lambda associations: prs.fetch_pr_observations(associations, gh=github))
+    state = tmp_path / "state"
+    api = GitHub()
+    publisher.collect_once([root], state, api=api, apply=True, initialize=True)
+    published = publisher.read_remote(api)[1]
+    assert published["snapshot"]["totals"]["unique_prs"] == 1
+    assert published["history"]["cursors"][0]["excluded_pr_associations"] == 0
+    ledger["adopted_goal"]["start_step_index"] = 99
+    save_ledger(root, ledger)
+    before = {p: p.read_bytes() for p in root.rglob("*") if p.is_file()}
+    collected = prs.collect_associations([root])
+    assert collected.records == []
+    assert collected.excluded_counts == {(ledger["run_id"], KEY): 1}
+    publisher.collect_once([root], state, api=api)
+    refreshed = json.loads((state / "bundle.json").read_text())
+    validate_bundle(refreshed["history"], refreshed["snapshot"])
+    assert refreshed["history"]["associations"] == published["history"]["associations"]
+    assert refreshed["history"]["pr_events"] == published["history"]["pr_events"]
+    assert refreshed["snapshot"]["totals"] == published["snapshot"]["totals"]
+    assert refreshed["history"]["cursors"][0]["excluded_pr_associations"] == 1
+    assert queries == [["gh", "api", f"repos/{GITHUB}/pulls/42"]] * 2
+    assert {p: p.read_bytes() for p in root.rglob("*") if p.is_file()} == before
+
+
+@pytest.mark.parametrize("stage", [1, 3, 6])
+@pytest.mark.parametrize("apply", [False, True])
+def test_unadopted_target_does_not_block_healthy_fleet_publication(tmp_path, monkeypatch, stage, apply):
+    from test_progress_model import GITHUB, KEY, runtime, save_ledger, write
+
+    from kg_microbe_fleet import load_fleet_manifest
+    from kg_microbe_progress import prs, validate_bundle
+
+    root, healthy = runtime(tmp_path)
+    healthy.update(adopted_goal={"conversation_id": "private", "started_at": healthy["created_at"],
+                                 "start_step_index": 2}, workflow={"sha256": "c" * 64})
+    save_ledger(root, healthy)
+    (root / KEY / prs.REGISTRY_NAME).write_text(json.dumps({**prs._context(healthy),
+        "schema_version": 1, "pr_number": 42, "reported_at": healthy["last_observed_at"]}) + "\n")
+    unadopted = {**healthy, "repository_key": "traitmech", "stage": stage,
+        "adopted_goal": None, "awaiting_goal": False, "phase": "blocked",
+        "blocked_reason": "no authoritative current goal; assessment required"}
+    write(root / "traitmech" / "ledger.json", unadopted)
+    config = json.loads((root / "config.json").read_text())
+    config["targets"].append({"repository_key": "traitmech",
+                              "github_repository": load_fleet_manifest().get("traitmech").github})
+    write(root / "config.json", config)
+    assert sorted(p.name for p in (root / "traitmech").iterdir()) == ["ledger.json"]
+    before = {p: p.read_bytes() for p in root.rglob("*") if p.is_file()}
+    queries = []
+    def github(args):
+        queries.append(args)
+        return subprocess.CompletedProcess(args, 0, stdout=json.dumps({
+            "number": 42, "base": {"repo": {"full_name": GITHUB}},
+            "head": {"sha": "a" * 40}, "html_url": f"https://github.com/{GITHUB}/pull/42",
+            "merged": False, "state": "open", "merged_at": None,
+        }))
+    monkeypatch.setattr(publisher, "fetch_pr_observations",
+                        lambda associations: prs.fetch_pr_observations(associations, gh=github))
+    api = GitHub()
+    state = tmp_path / "state"
+    result = publisher.collect_once([root], state, api=api, apply=apply, initialize=apply)
+    bundle = json.loads((state / "bundle.json").read_text())
+    validate_bundle(bundle["history"], bundle["snapshot"])
+    rows = {row["key"]: row for row in bundle["snapshot"]["repositories"]}
+    assert [pr["number"] for pr in rows[KEY]["pull_requests"]] == [42]
+    assert rows["traitmech"]["pull_requests"] == []
+    assert rows["traitmech"]["excluded_pr_associations"] == 0
+    assert bundle["snapshot"]["totals"]["unique_prs"] == 1
+    assert bundle["snapshot"]["totals"]["completed_goals"] == 0
+    assert queries == [["gh", "api", f"repos/{GITHUB}/pulls/42"]]
+    assert result["status"] == ("published" if apply else "collected")
+    if apply:
+        assert publisher.read_remote(api)[1] == bundle
+    else:
+        assert api.calls == []
+    assert {p: p.read_bytes() for p in root.rglob("*") if p.is_file()} == before
+
+
+def test_fleet_expansion_projects_prefix_remote_bundle_and_publishes_full_fleet(tmp_path, monkeypatch):
+    from kg_microbe_fleet import FleetManifest, load_fleet_manifest
+    from kg_microbe_progress import ProgressError, project_bundle_to_manifest, validate_bundle
+
+    fleet = load_fleet_manifest()
+    prefix_keys = list(fleet.keys[:-1])
+    added_key = fleet.keys[-1]
+    prefix_manifest = FleetManifest(
+        {key: fleet.mechs[key] for key in prefix_keys},
+        fleet.capability_catalogue,
+        fleet.vendored_governance,
+        fleet.source,
+    )
+    prefix_history, prefix_snapshot = collect_progress(
+        [], generated_at="2026-10-20T10:00:00Z", manifest=prefix_manifest,
+    )
+    prefix_bundle = {"history": prefix_history, "snapshot": prefix_snapshot}
+
+    api = GitHub()
+    monkeypatch.setattr(publisher, "validate_bundle", lambda h, s, m=None: validate_bundle(h, s, m or prefix_manifest))
+    initial_head = publisher.publish(prefix_bundle, None, None, initialize=True, api=api)
+    monkeypatch.setattr(publisher, "validate_bundle", validate_bundle)
+
+    observed_head, projected_bundle = publisher.read_remote(api)
+    assert observed_head == initial_head
+    assert [row["key"] for row in projected_bundle["snapshot"]["repositories"]] == list(fleet.keys)
+    added_row = projected_bundle["snapshot"]["repositories"][-1]
+    assert added_row["key"] == added_key
+    assert added_row["history_coverage"] == "unobserved"
+    assert "current" not in added_row
+    assert added_row["counters"]["completed_goals"] == 0
+
+    _, unprojected_bundle = publisher.read_remote(api, project_expanded=False)
+    assert [row["key"] for row in unprojected_bundle["snapshot"]["repositories"]] == prefix_keys
+
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "index.html").write_text("<!doctype html><title>Progress</title>")
+    monkeypatch.setattr(builder, "read_remote", lambda: (initial_head, prefix_bundle))
+    built = tmp_path / "built"
+    assert builder.build(source, built) == initial_head
+    built_progress = json.loads((built / "data/progress.json").read_text())
+    assert [row["key"] for row in built_progress["repositories"]] == list(fleet.keys)
+
+    # Even if generated_at matches the pre-expansion snapshot, collect_once must publish the expanded snapshot.
+    full_history, full_snapshot = collect_progress(
+        [], generated_at="2026-10-20T10:00:00Z", manifest=fleet,
+    )
+    monkeypatch.setattr(publisher, "collect_associations", lambda _: AssociationCollection([], {}))
+    monkeypatch.setattr(publisher, "fetch_pr_observations", lambda _: [])
+    monkeypatch.setattr(publisher, "collect_progress", lambda *a, **kw: (full_history, full_snapshot))
+    result = publisher.collect_once([], tmp_path / "state", apply=True, api=api)
+    assert result["status"] == "published"
+    assert result["data_commit"] != initial_head
+    _, after_publish = publisher.read_remote(api, project_expanded=False)
+    assert [row["key"] for row in after_publish["snapshot"]["repositories"]] == list(fleet.keys)
+
+    # Reject a prefix snapshot if history already contains evidence for the omitted suffix Mech.
+    bad_history = copy.deepcopy(prefix_history)
+    bad_history["cursors"].append({
+        "repository_key": added_key,
+        "run_key": publisher.run_key("run"),
+        "cycle": 1,
+        "stage_number": 1,
+        "stage_id": "add_new_records",
+        "phase": "waiting",
+        "blocker_code": None,
+        "observed_at": "2026-10-20T09:59:00Z",
+        "started_at": "2026-10-20T09:00:00Z",
+    })
+    with pytest.raises(ProgressError, match="complete manifest fleet"):
+        project_bundle_to_manifest(bad_history, prefix_snapshot, fleet)
+

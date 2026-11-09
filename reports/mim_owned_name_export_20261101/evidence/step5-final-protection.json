@@ -1,0 +1,39 @@
+{
+  "at": "2026-11-01T13:18:19.593277+00:00",
+  "claw_head": "a56f3ae4563619a5129ad944878c9205267315d6",
+  "claw_origin": "https://github.com/CultureBotAI/culturebotai-claw.git",
+  "claw_common_git": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw/.git",
+  "maintained_changed_paths": [
+    ".claude/skills/publish-sssom/SKILL.md",
+    ".github/workflows/tests.yaml",
+    "AGENTS.md",
+    "README.md",
+    "docs/guides/MIM_OWNED_NAME_EXPORT.md",
+    "scripts/build_mim_ingredient_sssom.py",
+    "scripts/publish_sssom.py",
+    "src/kg_microbe_utils/owned_name_policy.py",
+    "src/kg_microbe_utils/sssom_artifacts.py",
+    "tests/test_mim_owned_name_export.py",
+    "tests/test_mim_owned_name_policy.py",
+    "tests/test_mim_sssom_artifacts.py",
+    "tests/test_mim_sssom_header_dates.py"
+  ],
+  "maintained_path_count": 13,
+  "source_generation_revision": "90d110e663c10146351b09ae98d387dabdec0b1c",
+  "post_generation_diff": [
+    "README.md"
+  ],
+  "mim_revision": "be7170deb00a7c5490f8ade82facf86d45a852a4",
+  "mim_protected_or_canonical_sha256": {
+    ".github/workflows/qc-evidence.yaml": "288ef1795582105763952c4104d1455c1fef273a65528949f1e558d39c7306f3",
+    "scripts/.vendored_canon_ref": "ecbdb08d2094917a5ed8147086f46579e976df869eaea3942060c552d2e2015c",
+    "mappings/ingredient_mappings.sssom.tsv": "beef5e184ea0895d41d80f1b1b813f6983c5534ea59f9b4585feb71940e7c6f9",
+    "mappings/other_cross_record_baseline.tsv": "8305c7f06d05466de1c49bd76c9ddaba17e53ecbd28a5d9dde1d36e59db0e707"
+  },
+  "original_mim_status_clean": true,
+  "isolated_mim_status_clean": true,
+  "isolated_claw_status_clean": true,
+  "full_test_in_progress": "logs/step5-claw-full-tests-v5.log",
+  "shared_claw_mutation_authorized": false,
+  "goal_cycle_or_supervisor_binding": null
+}

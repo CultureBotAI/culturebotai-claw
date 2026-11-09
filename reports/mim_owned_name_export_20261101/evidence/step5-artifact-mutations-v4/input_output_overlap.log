@@ -1,0 +1,20 @@
+..F                                                                      [100%]
+=================================== FAILURES ===================================
+_ test_only_the_explicit_working_copy_input_can_overlap_outputs[unmatched_declaration] _
+
+setup = (PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8548/test_only_the_explic...ppression-sidecar-required"\nsubject_id\tother\nMIM:Subject\tkept\n', <function setup.<locals>.publish at 0x107d12840>)
+kind = 'unmatched_declaration'
+
+    @pytest.mark.parametrize("kind", ["undeclared_output", "sidecar_input", "unmatched_declaration"])
+    def test_only_the_explicit_working_copy_input_can_overlap_outputs(setup, kind):
+        output, paths, source, _, publish = setup
+        inputs = {"undeclared_output": [source, output], "sidecar_input": [source, paths[1]],
+                  "unmatched_declaration": [source]}[kind]
+>       with pytest.raises(ValueError, match="alias|undeclared"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_mim_sssom_artifacts.py:118: Failed
+=========================== short test summary info ============================
+FAILED tests/test_mim_sssom_artifacts.py::test_only_the_explicit_working_copy_input_can_overlap_outputs[unmatched_declaration]
+1 failed, 2 passed in 0.06s

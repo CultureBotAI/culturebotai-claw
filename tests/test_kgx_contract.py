@@ -216,3 +216,13 @@ def test_the_merged_graph_header_is_the_case_this_was_built_for():
     assert found["DUPLICATE_COLUMN"] == 1
     assert found["CARRIAGE_RETURN_IN_HEADER"] == 1
     assert found["READERS_DISAGREE"] == 1
+
+
+def test_check_cli_reports_disabled_kgx_export_status_and_reason(capsys):
+    from kg_microbe_kgx.__main__ import main
+
+    assert main(["check", "--mech", "culturemech"]) == 0
+    out = capsys.readouterr().out
+    assert "culturemech: kgx_export is disabled, so there is nothing to check:" in out
+    assert "CultureMech#490" in out
+

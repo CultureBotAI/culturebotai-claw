@@ -1,0 +1,24 @@
+{
+  "name": "mutant-all-author-history",
+  "scenario": "historical",
+  "expected": "assertion",
+  "argv": [
+    "/opt/homebrew/Caskroom/miniforge/base/bin/python",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v6.py",
+    "--module",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-710/controls/mutant-all-author-history/packager.py",
+    "--scenario",
+    "historical",
+    "--results",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-710/controls/mutant-all-author-history/results.json"
+  ],
+  "started_at": "2026-11-01T13:44:53.398749+00:00",
+  "finished_at": "2026-11-01T13:44:53.937486+00:00",
+  "exit_code": 1,
+  "log_sha256": "d1102ac30ddcccc16150dff89c4bc933e19b245510caff4737e34a1e755ec890",
+  "module_sha256": "4dc8a6f97703346546b40d0737c4219d8342fbd83a829d02711137d39fdc0672",
+  "mutation": [
+    "if historical:",
+    "if False:  # mutation disables author history"
+  ]
+}

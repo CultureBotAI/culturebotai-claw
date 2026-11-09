@@ -85,6 +85,7 @@ EXPECTED_PROFILES = {
 }
 
 EXPECTED_CAPABILITIES = {
+    "evidence_reference_validation",
     # Declared by #223: who keeps a download.yaml source catalogue, and why
     # the three who do not have decided against one rather than forgotten.
     "source_catalogue",
@@ -98,11 +99,14 @@ EXPECTED_CAPABILITIES = {
     # language, alt text, heading order and references that resolve -- and
     # which third-party host each of them has deliberately taken on.
     "site_contract",
-    # Whose term mappings are checked against the shared SSSOM contract, and
-    # why the two that publish none have decided rather than forgotten.
+    # Where each Mech names taxa, for kg-microbe-links taxa (#881 plan, Phase 1).
+    "taxon_links",
+    # Whose term mappings are checked against the shared SSSOM contract. It
+    # applies to every Mech (#503), so the rest are disabled, pending adoption.
     "sssom_export",
-    # Whose exported graph is checked against the shared KGX contract; only
-    # CommunityMech emits one today, and the rest say why not.
+    # Whose exported graph is checked against the shared KGX contract;
+    # CommunityMech, PathwayMech and DUFMech declare one today. It applies to
+    # every Mech (#503), so the rest are disabled, pending adoption.
     "kgx_export",
     # Who mints METPO terms. Two Mechs propose into one shared numeric ID
     # space from separate repositories, and the aggregate that finally reads
@@ -220,12 +224,13 @@ def test_cmmmech_admission_preserves_records_and_defers_unverified_adapters() ->
     assert "does not enable curation" in history.reason
     assert "append-only" in history.reason
     assert mech.supports("record_review")
-    assert set(history.reason_claims.absent) == {
-        ".claude/skills/curate-yaml-record/SKILL.md",
-        ".claude/skills/curate-yaml-record/references/review-checklist.md",
-    }
+    # The curate-yaml-record skill landed after admission (CMMMech#513), so
+    # its files are now claimed present; enabling curation awaits review (#785).
+    assert not history.reason_claims.absent
     assert set(history.reason_claims.present) == {
         "justfile", "src/cmmmech/history.py", "history",
+        ".claude/skills/curate-yaml-record/SKILL.md",
+        ".claude/skills/curate-yaml-record/references/review-checklist.md",
     }
 
 
@@ -259,7 +264,7 @@ def test_dufmech_keeps_generated_inventory_and_native_serialization() -> None:
     assert {
         name for name, capability in mech.capabilities.items()
         if capability.status == "disabled"
-    } == {"deep_research", "metpo_proposal", "causal_graph_coverage"}
+    } == {"deep_research", "metpo_proposal", "causal_graph_coverage", "evidence_reference_validation"}
     assert "execution is refused" in mech.capability("deep_research").reason
     assert mech.capability("corpus_statistics").settings["fields"] == (
         "id", "name", "seed_status", "characterization_status",

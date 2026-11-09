@@ -1,0 +1,24 @@
+{
+  "name": "step5-independent-builder-lexical-703-v1",
+  "argv": [
+    "python",
+    "-B",
+    "-m",
+    "pytest",
+    "-q",
+    "-o",
+    "addopts=",
+    "-p",
+    "no:cacheprovider",
+    "tests/test_mim_owned_name_export.py",
+    "-k",
+    "lexical_prior_stamp_alias"
+  ],
+  "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+  "started_at": "2026-11-01T12:45:29.435014+00:00",
+  "environment_profile": "generation-and-native-qc",
+  "finished_at": "2026-11-01T12:45:29.782697+00:00",
+  "exit_code": 0,
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-independent-builder-lexical-703-v1.log",
+  "log_sha256": "5804fed989a3b48f61ee674fff85800009e3a373896c945890a7764610ca16d4"
+}

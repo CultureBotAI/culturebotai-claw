@@ -103,6 +103,13 @@ new Mech should not adopt any of them without its own reason.
 - TraitMech — canonical example taxonomy, PR-checks-present, in-CI Claude review (PR shepherd was piloted here and is now vendored fleet-wide)
 - ProteinTraitsMech — page-size audit, reproducibility audit
 
+KGX and SSSOM export are the exception to "not gaps". Both apply to every
+Mech (#503): each is a declared capability, `kgx_export` and `sssom_export`,
+judged by a shared contract (`kg_microbe_kgx`, `kg_microbe_sssom`), and a Mech
+without one declares it `disabled`, a backlog item under the absence rule. The
+workflows listed above, MediaIngredientMech's SSSOM QC and CommunityMech's KGX
+release, remain each repository's own.
+
 The lesson from claw's Phase 6 is that a shared implementation is worth building
 when two or more Mechs already have one to consolidate — and is a trap when
 none do. Do not promote a Tier 3 item to Tier 2 on the argument that it *would*

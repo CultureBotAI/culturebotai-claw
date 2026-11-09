@@ -1,0 +1,5 @@
+Independent re-review verified that the original output-drift controls now refuse, then reproduced a remaining callback-order gap: the journal-directory symlink check still ran before `input_check`. Injecting a journal-directory symlink during the last native precommit callback redirected the recovery journal outside the artifact directory and returned complete.
+
+Extend #704 to recheck journal path safety after the callback too, including final completion verification. Add a real native transaction regression for the final precommit callback and preserve the ordinary publication/no-op controls. The repair must not report success with a redirected or subsequently changed recovery journal.
+
+Unmodified-code reproduction: `step5-claw-independent/rereview-703-704-v1/probe_journal_callback.py` and `journal-callback-result.json`; log SHA256 `af80ea5d31e135d4191358dd9c06b2760345cbe68e5e7468e3df4b3010a55364`. The isolated probe changed no maintained MIM data. This extension is recorded before its fix.

@@ -1,0 +1,19 @@
+{
+  "admission_sha256": "1d65bcbe0b6697c20cff09af817f2e864e564e8f62303ed76c30383072fc705f",
+  "applied_changes": 0,
+  "checked_artifacts": 19,
+  "checked_at": "2026-11-08T02:34:02.025405+00:00",
+  "claw_candidate_head": "a099f2559e334bdec9941b1d25fb3f714d36add0",
+  "committed_artifacts": 19,
+  "committed_pin_verified": true,
+  "consumer_clean": true,
+  "consumer_feature_head": "375a86e9d0ae56533d73b54654867d55c29026e4",
+  "format": "edgemech-infrastructure-admission-canary/v1",
+  "helper_sha256": "a6b64f7c0ba77d512335405f5e76251b74594869c9655eb2f85df9f20f993072",
+  "mode": "noop_sync_and_audit",
+  "planned_changes": 0,
+  "scientific_capabilities_enabled": false,
+  "source_manifest_sha256": "bfd4b703f46ce748487253d6fe093e79fe00ba7a9a88293f5cc6df176f11b519",
+  "source_ref": "7e672227fb246a8359ad57b6d3975ce5ed329007",
+  "trusted_admission_active": false
+}

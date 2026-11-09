@@ -1,0 +1,24 @@
+{
+  "name": "mutant-portable-history",
+  "scenario": "squash",
+  "expected": "old-red",
+  "argv": [
+    "/opt/homebrew/Caskroom/miniforge/base/bin/python",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v6.py",
+    "--module",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-710/controls/mutant-portable-history/packager.py",
+    "--scenario",
+    "squash",
+    "--results",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-710/controls/mutant-portable-history/results.json"
+  ],
+  "started_at": "2026-11-01T13:44:51.622456+00:00",
+  "finished_at": "2026-11-01T13:44:52.184568+00:00",
+  "exit_code": 1,
+  "log_sha256": "ff92550e689da9768623e87532dca885676e0c72ac82c34badc9282fa3485014",
+  "module_sha256": "15a1c0dfe4279cee8f3af60f26c93ea64c9e05f62d6d4b33647407743660a1d5",
+  "mutation": [
+    "        check_references(plan,repository)",
+    "        check_references(plan,repository,historical=True)"
+  ]
+}

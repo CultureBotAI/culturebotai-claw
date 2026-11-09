@@ -1,0 +1,25 @@
+[
+  {
+    "case": "missing",
+    "result": {
+      "exception": "Missing or invalid completed recovery journal: /Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/journal-initial-capture-controls/missing/out/.sssom-artifact-journals/write-xbq2hvqq.json",
+      "type": "ValueError"
+    },
+    "journal_files": [],
+    "artifacts_exist": true
+  },
+  {
+    "case": "invalid",
+    "result": {
+      "exception": "Missing or invalid completed recovery journal: /Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/journal-initial-capture-controls/invalid/out/.sssom-artifact-journals/write-3te_zo5n.json",
+      "type": "ValueError"
+    },
+    "journal_files": [
+      {
+        "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/journal-initial-capture-controls/invalid/out/.sssom-artifact-journals/write-3te_zo5n.json",
+        "bytes": "{}\n"
+      }
+    ],
+    "artifacts_exist": true
+  }
+]

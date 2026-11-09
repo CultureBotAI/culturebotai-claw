@@ -1,0 +1,21 @@
+{
+  "name": "step5-705-regressions",
+  "argv": [
+    "uv",
+    "run",
+    "--frozen",
+    "python",
+    "-m",
+    "pytest",
+    "-q",
+    "tests/test_mim_sssom_artifacts.py",
+    "tests/test_governed_workflow_pins.py"
+  ],
+  "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+  "started_at": "2026-11-01T12:54:48.382460+00:00",
+  "environment_profile": "generation-and-native-qc",
+  "finished_at": "2026-11-01T12:54:51.774584+00:00",
+  "exit_code": 0,
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-705-regressions.log",
+  "log_sha256": "bd60c40c954d4fe7bcb153c5e30ee64ead1bbf2661e712e5e3d1f9b9dfa8444a"
+}

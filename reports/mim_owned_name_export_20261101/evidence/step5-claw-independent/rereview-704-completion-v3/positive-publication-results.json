@@ -1,0 +1,142 @@
+[
+  {
+    "case": "first_create",
+    "result": {
+      "status": "complete",
+      "applied": true,
+      "changed": [],
+      "created": [
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/positive-caf\u00e9/out/candidate.tsv",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/positive-caf\u00e9/out/candidate.tsv.manifest.json",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/positive-caf\u00e9/out/suppressed_aliases.tsv"
+      ],
+      "unchanged": [],
+      "journal": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/positive-caf\u00e9/out/.sssom-artifact-journals/write-plfklx4e.json",
+      "artifacts": [
+        {
+          "role": "sssom",
+          "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/positive-caf\u00e9/out/candidate.tsv",
+          "sha256": "446a924fe0802ce877b3489867ee3409e179bfebf5445029ddc1ae12a9da151d"
+        },
+        {
+          "role": "suppressed_aliases",
+          "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/positive-caf\u00e9/out/suppressed_aliases.tsv",
+          "sha256": "675720ff302b6e852dee454dd9f937a6c6fdcb595998254183c30326ee6ce22a"
+        }
+      ],
+      "manifest_sha256": "521a842e72ad2c3d2d0e14f981ebb215d6a64901ad491fe46623711bd18fe25e"
+    },
+    "exact_postimages": true
+  },
+  {
+    "case": "replace_existing_tsv",
+    "result": {
+      "status": "complete",
+      "applied": true,
+      "changed": [
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/positive-caf\u00e9/out/candidate.tsv",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/positive-caf\u00e9/out/candidate.tsv.manifest.json"
+      ],
+      "created": [],
+      "unchanged": [
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/positive-caf\u00e9/out/suppressed_aliases.tsv"
+      ],
+      "journal": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/positive-caf\u00e9/out/.sssom-artifact-journals/write-b9n77h3g.json",
+      "artifacts": [
+        {
+          "role": "sssom",
+          "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/positive-caf\u00e9/out/candidate.tsv",
+          "sha256": "7fbdca27849e0ad5344ca5ac091b6be6978cec43f708fd7b5882abcc89d6813a"
+        },
+        {
+          "role": "suppressed_aliases",
+          "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/positive-caf\u00e9/out/suppressed_aliases.tsv",
+          "sha256": "675720ff302b6e852dee454dd9f937a6c6fdcb595998254183c30326ee6ce22a"
+        }
+      ],
+      "manifest_sha256": "48213ca266ad8f8c4b9297ea2f03d87d488002ba819adf7e000f5a007f12ebc2"
+    },
+    "exact_postimages": true
+  },
+  {
+    "case": "sidecar_only_refresh",
+    "result": {
+      "status": "complete",
+      "applied": true,
+      "changed": [
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/positive-caf\u00e9/out/candidate.tsv.manifest.json",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/positive-caf\u00e9/out/suppressed_aliases.tsv"
+      ],
+      "created": [],
+      "unchanged": [
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/positive-caf\u00e9/out/candidate.tsv"
+      ],
+      "journal": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/positive-caf\u00e9/out/.sssom-artifact-journals/write-z1gjygmx.json",
+      "artifacts": [
+        {
+          "role": "sssom",
+          "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/positive-caf\u00e9/out/candidate.tsv",
+          "sha256": "7fbdca27849e0ad5344ca5ac091b6be6978cec43f708fd7b5882abcc89d6813a"
+        },
+        {
+          "role": "suppressed_aliases",
+          "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/positive-caf\u00e9/out/suppressed_aliases.tsv",
+          "sha256": "0fe1cba751184b6be12746d2676b866ee7e6690cddc793c691fd7cd4a852a262"
+        }
+      ],
+      "manifest_sha256": "e3785ae8a221883f97ec9843c7355e0037223cfd698370926b98b773cd3329f2"
+    },
+    "exact_postimages": true
+  },
+  {
+    "case": "missing_manifest_refresh",
+    "result": {
+      "status": "complete",
+      "applied": true,
+      "changed": [],
+      "created": [
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/positive-caf\u00e9/out/candidate.tsv.manifest.json"
+      ],
+      "unchanged": [
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/positive-caf\u00e9/out/candidate.tsv",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/positive-caf\u00e9/out/suppressed_aliases.tsv"
+      ],
+      "journal": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/positive-caf\u00e9/out/.sssom-artifact-journals/write-58q60fm3.json",
+      "artifacts": [
+        {
+          "role": "sssom",
+          "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/positive-caf\u00e9/out/candidate.tsv",
+          "sha256": "7fbdca27849e0ad5344ca5ac091b6be6978cec43f708fd7b5882abcc89d6813a"
+        },
+        {
+          "role": "suppressed_aliases",
+          "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/positive-caf\u00e9/out/suppressed_aliases.tsv",
+          "sha256": "0fe1cba751184b6be12746d2676b866ee7e6690cddc793c691fd7cd4a852a262"
+        }
+      ],
+      "manifest_sha256": "e3785ae8a221883f97ec9843c7355e0037223cfd698370926b98b773cd3329f2"
+    },
+    "exact_postimages": true
+  },
+  {
+    "case": "true_all_artifact_noop",
+    "result": {
+      "status": "unchanged",
+      "artifacts": [
+        {
+          "role": "sssom",
+          "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/positive-caf\u00e9/out/candidate.tsv",
+          "sha256": "7fbdca27849e0ad5344ca5ac091b6be6978cec43f708fd7b5882abcc89d6813a"
+        },
+        {
+          "role": "suppressed_aliases",
+          "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-704-completion-v3/positive-caf\u00e9/out/suppressed_aliases.tsv",
+          "sha256": "0fe1cba751184b6be12746d2676b866ee7e6690cddc793c691fd7cd4a852a262"
+        }
+      ],
+      "manifest_sha256": "e3785ae8a221883f97ec9843c7355e0037223cfd698370926b98b773cd3329f2",
+      "journal": null
+    },
+    "exact_postimages": true
+  }
+]

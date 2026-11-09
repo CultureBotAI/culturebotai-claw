@@ -1,0 +1,15 @@
+{
+  "name": "step5-independent-policy-paths-preliminary-v1",
+  "argv": [
+    "python",
+    "-B",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/preliminary/probe_policy_and_paths.py"
+  ],
+  "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+  "started_at": "2026-11-01T12:43:24.880276+00:00",
+  "environment_profile": "generation-and-native-qc",
+  "finished_at": "2026-11-01T12:43:25.337372+00:00",
+  "exit_code": 0,
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-independent-policy-paths-preliminary-v1.log",
+  "log_sha256": "b70d4c6b9d7ad41ad2341c2af09bdb19a3b0678c981645b0a2d679a9b933b935"
+}

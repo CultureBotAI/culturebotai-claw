@@ -1,0 +1,70 @@
+F.F                                                                      [100%]
+=================================== FAILURES ===================================
+______ test_lexical_prior_stamp_alias_refuses_before_output_write[dotdot] ______
+
+cli = {'canonical': PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8511/test_le...57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8511/test_lexical_prior_stamp_alias0/mim/data/ingredients/mapped'), ...}
+shape = 'dotdot'
+
+    @pytest.mark.parametrize("shape", ["dotdot", "symlink", "symlink-dotdot"])
+    def test_lexical_prior_stamp_alias_refuses_before_output_write(cli, shape):
+        before = cli["canonical"].read_bytes()
+        if shape == "dotdot":
+            source = cli["canonical"].parent / ".." / "mappings" / cli["canonical"].name
+        else:
+            link = cli["root"] / "linked-mappings"
+            link.symlink_to(cli["canonical"].parent, target_is_directory=True)
+            source = link / cli["canonical"].name
+            if shape == "symlink-dotdot":
+                source = link / ".." / "mappings" / cli["canonical"].name
+>       with pytest.raises(ValueError):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_mim_owned_name_export.py:351: Failed
+----------------------------- Captured stderr call -----------------------------
+Scanning 2 MIM ingredient YAMLs...
+Fetching rdfs:labels for 1 CHEBI ids from OAK...
+  resolved 1 / 1
+Replayed 1 validation_method stamps (prior sources: published.tsv=1; 1 unique)
+Published 1 diagnostic rows to /private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8511/test_lexical_prior_stamp_alias0/artifacts/candidate.tsv (complete)
+  (skipped 1 MIM records without a supported ontology_id prefix: CHEBI:, FOODON:, UBERON:, ENVO:, NCIT:, MICRO:, mesh:, BTO:, kgmicrobe.compound:, kgmicrobe.ingredient:, cas:)
+Predicate breakdown:
+  skos:exactMatch          1
+Object-prefix breakdown:
+  CHEBI:     1
+__ test_lexical_prior_stamp_alias_refuses_before_output_write[symlink-dotdot] __
+
+cli = {'canonical': PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8511/test_le...57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8511/test_lexical_prior_stamp_alias2/mim/data/ingredients/mapped'), ...}
+shape = 'symlink-dotdot'
+
+    @pytest.mark.parametrize("shape", ["dotdot", "symlink", "symlink-dotdot"])
+    def test_lexical_prior_stamp_alias_refuses_before_output_write(cli, shape):
+        before = cli["canonical"].read_bytes()
+        if shape == "dotdot":
+            source = cli["canonical"].parent / ".." / "mappings" / cli["canonical"].name
+        else:
+            link = cli["root"] / "linked-mappings"
+            link.symlink_to(cli["canonical"].parent, target_is_directory=True)
+            source = link / cli["canonical"].name
+            if shape == "symlink-dotdot":
+                source = link / ".." / "mappings" / cli["canonical"].name
+>       with pytest.raises(ValueError):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests/test_mim_owned_name_export.py:351: Failed
+----------------------------- Captured stderr call -----------------------------
+Scanning 2 MIM ingredient YAMLs...
+Fetching rdfs:labels for 1 CHEBI ids from OAK...
+  resolved 1 / 1
+Replayed 1 validation_method stamps (prior sources: published.tsv=1; 1 unique)
+Published 1 diagnostic rows to /private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8511/test_lexical_prior_stamp_alias2/artifacts/candidate.tsv (complete)
+  (skipped 1 MIM records without a supported ontology_id prefix: CHEBI:, FOODON:, UBERON:, ENVO:, NCIT:, MICRO:, mesh:, BTO:, kgmicrobe.compound:, kgmicrobe.ingredient:, cas:)
+Predicate breakdown:
+  skos:exactMatch          1
+Object-prefix breakdown:
+  CHEBI:     1
+=========================== short test summary info ============================
+FAILED tests/test_mim_owned_name_export.py::test_lexical_prior_stamp_alias_refuses_before_output_write[dotdot]
+FAILED tests/test_mim_owned_name_export.py::test_lexical_prior_stamp_alias_refuses_before_output_write[symlink-dotdot]
+2 failed, 1 passed, 34 deselected in 0.18s

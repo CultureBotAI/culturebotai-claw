@@ -1,0 +1,11 @@
+{
+  "baseline_log_sha256": "ae85736bb401cfc48f5aa3ac7d454ca6322228e8ab065d0eaf310a96d1fa442a",
+  "baseline_tests_passed": 2,
+  "failure": "support shadowing no longer raises",
+  "helper_sha256": "cb91ebbb44ca566d6dda08d939f258553dd45c14647a27c27c4c6ae53ac838b3",
+  "issue": "CultureBotAI/culturebotai-claw#985",
+  "mutant_log_sha256": "96570a172205f089668059b6742b10b06f565a431d0416d64bd278c8ec5babec",
+  "mutant_tests_failed": 2,
+  "mutant_verifier_sha256": "a064cec88ac77251807ee5ee88c88368ed776f3f9df48e182c57c8e2b5de6c3f",
+  "source_verifier_sha256": "ddee8c1fc27109ff8279376f972a6e1f248857d10fdba98eab90c301c86b8b37"
+}

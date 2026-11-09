@@ -1,0 +1,18 @@
+{
+  "head": "dc5ac04feb59154fa62fba246fcce4dfd825e498",
+  "files": [
+    {
+      "path": "src/kg_microbe_utils/owned_name_policy.py",
+      "sha256": "18ffd0430d0256b6da6cbb1f3da2327c4cf3418e2b0b2da71ff283ee2f4351ae"
+    },
+    {
+      "path": "src/kg_microbe_utils/sssom_artifacts.py",
+      "sha256": "971e3cd2e8d65a1ff4a476d8c8c22a1e4209d3ea7bb0f98d184f1c7f92a820b0"
+    },
+    {
+      "path": "tests/test_mim_sssom_artifacts.py",
+      "sha256": "d82dc63c3efe5363d892137c8fef2af3c8e1c6ddb6f5ec1675465ab10266ad05"
+    }
+  ],
+  "scope": "Uncommitted journal repair only; not final-head approval."
+}
