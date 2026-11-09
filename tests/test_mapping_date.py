@@ -16,6 +16,8 @@ import importlib.util
 import sys
 from pathlib import Path
 
+import pytest
+
 _SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(_SCRIPTS))
 
@@ -69,3 +71,17 @@ def test_history_of_only_bad_timestamps_yields_empty(tmp_path):
     record.write_text("identifier: CHEBI:2\n", encoding="utf-8")
 
     assert builder._mapping_date(record, [_event(""), _event("soon")]) == ""
+
+
+@pytest.mark.parametrize('invalid', ['２０２５-01-01', '٢٠٢٥-01-01', '2026-02-30',
+                                   '2026-13-01', '2026-10-150'])
+def test_invalid_history_cannot_outrank_a_valid_curation_date(invalid, capsys):
+    history = [_event('2026-10-15T10:00:00Z'), _event(invalid)]
+    assert builder._mapping_date(Path('Water.yaml'), history) == '2026-10-15'
+    warning = capsys.readouterr().out
+    assert 'Water.yaml' in warning and invalid in warning
+
+
+def test_calendar_order_is_independent_of_history_order():
+    history = [_event('2024-02-29T00:00:00Z'), _event('2023-12-31')]
+    assert builder._mapping_date(Path('Water.yaml'), history) == '2024-02-29'

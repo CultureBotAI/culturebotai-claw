@@ -1,0 +1,9 @@
+# Preliminary re-review of #703/#704
+
+Artifact module SHA256 `9053a55006b10396edb9d470555ddd989cdac5816572ae1952570119ca63a664`; builder lexical normalization integration `772b7a70309396f705fd8eb0709088304978e76c6fdf5567c5f75c95d59e40dd`. Original preliminary evidence index remains unchanged.
+
+The exact original artifact probe was replayed from a new directory against the repaired module. Positive publication remains valid. Both absent filesystem-equivalent aliases now refuse before any artifact/journal writes. Both destination-drift cases now raise instead of reporting unchanged/complete; the postpublication failure explicitly reports its native recovery journal. The original lexical symlink/parent-traversal spelling also refuses before either possible output exists. Independent maintained tests: 37 artifact tests and 3 builder prior-stamp alias regressions passed.
+
+A confirmed journal-path gap remains: `check_before` validates `.sssom-artifact-journals` before the external source callback, then only rechecks destination beforeimages afterward. When a journal-directory symlink is introduced by a boundary injection during the final native validator callback, the actual native transaction follows it. It publishes the artifact set and returns complete with a complete recovery journal in `outside-journals`, outside the artifact directory. This uses exact frozen modules, the real native transaction and real lock. `probe_journal_callback.py` and `journal-callback-result.json` reproduce it.
+
+Recheck journal-directory safety after the callback, including final precommit and postpublication checks; preserve the scope of the journal and retention operations. The gap was reported to root before any repair. No production source edits or GitHub mutations were made by the reviewer. This is a bounded preliminary re-review, not a final-head approval.

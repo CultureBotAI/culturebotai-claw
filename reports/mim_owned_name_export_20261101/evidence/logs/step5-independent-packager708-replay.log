@@ -1,0 +1,56 @@
+{
+  "frozen": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/packaging-v3/fixture/packaging/inputs.json",
+  "sha256": "08704913a34e3b8e3319855087d55398b3d7253619dc76b39f3e7e613c3c7e1d"
+}
+{
+  "status": "PASS",
+  "archive_members": 12,
+  "original_identities": 7,
+  "tracked_checked": false,
+  "scientific_approval_added": false
+}
+{
+  "status": "PASS",
+  "archive_members": 12,
+  "original_identities": 7,
+  "tracked_checked": false,
+  "scientific_approval_added": false
+}
+{
+  "status": "PASS",
+  "archive_members": 12,
+  "original_identities": 7,
+  "tracked_checked": false,
+  "scientific_approval_added": false
+}
+{
+  "status": "PASS",
+  "archive_members": 12,
+  "original_identities": 7,
+  "tracked_checked": false,
+  "scientific_approval_added": false
+}
+{
+  "packager_sha256": "74ade999a59f91d61e83d1b41de9d6b00dbae2fd58a9b28f285724359b18c821",
+  "original_frozen_plan_substitution": "refused before package directory exists",
+  "normal_publication_and_portable_verification": "PASS",
+  "portable_rebindings": [
+    {
+      "case": "README",
+      "refused": "Frozen plan differs from bound selection"
+    },
+    {
+      "case": "extra field",
+      "refused": "Frozen plan differs from bound selection"
+    },
+    {
+      "case": "README only",
+      "refused": "Packaged README differs from bound selection"
+    },
+    {
+      "case": "equivalent JSON serialization with updated archive hash",
+      "passed": true
+    }
+  ],
+  "scope": "isolated synthetic repository only; no real publication or production edits"
+}

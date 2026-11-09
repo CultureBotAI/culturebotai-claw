@@ -1,0 +1,20 @@
+{
+  "name": "step5-helper-focused-v1",
+  "argv": [
+    "uv",
+    "run",
+    "--frozen",
+    "python",
+    "-m",
+    "pytest",
+    "tests/test_mim_owned_name_policy.py",
+    "-q"
+  ],
+  "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+  "started_at": "2026-11-01T12:38:41.760552+00:00",
+  "environment_profile": "generation-and-native-qc",
+  "finished_at": "2026-11-01T12:38:42.133143+00:00",
+  "exit_code": 0,
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-helper-focused-v1.log",
+  "log_sha256": "0dbab68005debfea8a5b6e50f5ff1f0e301366ce23cdb8dc229c9090cf28b79f"
+}

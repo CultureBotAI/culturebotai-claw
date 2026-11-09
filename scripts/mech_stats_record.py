@@ -286,10 +286,13 @@ def record_response_history(report_dir: Path, entries: list[dict], *,
             else:
                 report["responses" if row["snapshot_id"] is not None else "response_only_observations"].append(row)
         for older, newer in (supersedes or {}).items():
-            row = next(item for item in report["responses"] + report["response_only_observations"] if item["source_id"] == older)
-            if "superseded_by" in row and row["superseded_by"] != newer:
+            target = next((item for item in report["responses"] + report["response_only_observations"]
+                           if item["source_id"] == older), None)
+            if target is None:
+                raise ProgressError("superseded response does not reference another response")
+            if "superseded_by" in target and target["superseded_by"] != newer:
                 raise ProgressError("response already has a different successor")
-            row["superseded_by"] = newer
+            target["superseded_by"] = newer
         for collection in ("responses", "response_only_observations"):
             report[collection].sort(key=lambda row: (row["responded_at"] is None,
                 stamp(row["responded_at"] or row["recorded_at"]), row["source_id"]))
@@ -346,7 +349,7 @@ def record_stats(bundle_path: Path, report_dir: Path, *, manifest_path: Path | N
         validate_report(report_dir, report)
         before = encode(report)
         prior_response = next((row for row in report["responses"] if response and row["source_id"] == response["source_id"]), None)
-        if prior_response and not same_response(prior_response, response):
+        if prior_response and response is not None and not same_response(prior_response, response):
             raise ProgressError("response source_id already records different content")
         entry = next((row for row in report["snapshots"] if row["id"] == identity), None)
         if entry is None:

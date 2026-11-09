@@ -1,0 +1,32 @@
+{
+  "name": "baseline",
+  "argv": [
+    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python3",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "-c",
+    "/dev/null",
+    "--confcutdir",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-helper-implementation/controls/baseline",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-helper-implementation/controls/baseline/tests/test_mim_owned_name_policy.py"
+  ],
+  "started_at": "2026-11-01T12:39:55.267470+00:00",
+  "finished_at": "2026-11-01T12:39:55.785097+00:00",
+  "exit_code": 0,
+  "expected_failure": false,
+  "control_pass": true,
+  "selection": null,
+  "mutation": {
+    "before": null,
+    "after": null
+  },
+  "source_sha256": "18ffd0430d0256b6da6cbb1f3da2327c4cf3418e2b0b2da71ff283ee2f4351ae",
+  "test_sha256": "62c8675b32177dbc609218851ac13d409cf6dfd628fe37118a76a6c2cc7516b6",
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-helper-implementation/controls/baseline/pytest.log",
+  "log_sha256": "ebaff5b4c0cf4ab71b5ce74e3f961d6685d58a4535ebcda743f9a725c437973c",
+  "fresh_process": true,
+  "fresh_bytecode_prefix": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-helper-implementation/controls/baseline/bytecode"
+}

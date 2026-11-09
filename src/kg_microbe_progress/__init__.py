@@ -25,7 +25,7 @@ from linkml.generators.jsonschemagen import JsonSchemaGenerator
 from linkml_runtime.linkml_model.meta import SchemaDefinition
 
 from kg_microbe_fleet import FleetManifest, load_fleet_manifest
-from kg_microbe_workflows import STAGE_KEYS, load_document
+from kg_microbe_workflows import WorkflowError, load_document, stage_keys_for_version
 
 VERSION = "1.0.0"
 SCHEMA_PATH = Path(__file__).parent / "schema/progress.yaml"
@@ -70,6 +70,44 @@ def _positive(value: Any, label: str, maximum: int | None = None) -> int:
     if type(value) is not int or value < 1 or (maximum is not None and value > maximum):
         raise ProgressError(f"invalid {label}")
     return value
+
+
+def _stage_keys(value: dict[str, Any] | None = None) -> tuple[str, ...]:
+    """Absent version is the original six-stage public contract, never latest."""
+    try:
+        return stage_keys_for_version((value or {}).get("parent_version", "1.0.0"))
+    except (WorkflowError, TypeError, AttributeError) as exc:
+        raise ProgressError("unsupported cycle parent version") from exc
+
+
+def _cycle_version(ledger: dict[str, Any], record: dict[str, Any] | None = None) -> str:
+    source = ledger if record is None else record
+    cycle = source.get("cycle", 1)
+    versions = ledger.get("cycle_versions", {})
+    if not isinstance(versions, dict):
+        raise ProgressError("invalid cycle version history")
+    declared = source.get("parent_version")
+    recorded = versions.get(str(cycle))
+    if ("parent_version" in source and not isinstance(declared, str)) or (
+        str(cycle) in versions and not isinstance(recorded, str)
+    ):
+        raise ProgressError("invalid cycle parent version")
+    if declared is not None and recorded is not None and declared != recorded:
+        raise ProgressError("cycle parent version contradicts history")
+    version = declared if declared is not None else recorded
+    if record is None:
+        pinned = ledger.get("workflow", {}).get("effective", {}).get("parent_version")
+        if pinned is not None and version is not None and pinned != version:
+            raise ProgressError("cycle parent version contradicts pinned workflow")
+        version = pinned if version is None else version
+    version = "1.0.0" if version is None else version
+    _stage_keys({"parent_version": version})
+    return version
+
+
+def _version_fields(version: str) -> dict[str, str]:
+    # Keep existing public v1 closures byte-for-byte compatible with old bundles.
+    return {"parent_version": version} if version != "1.0.0" else {}
 
 
 def _sha(value: Any, length: int = 64) -> str:
@@ -179,7 +217,8 @@ def _blocker(reason: Any, phase: str) -> str:
 
 def _receipt(directory: Path, record: dict[str, Any], ledger: dict[str, Any]) -> dict[str, Any]:
     receipt_sha = _sha(record["receipt_sha256"])
-    stage = _positive(record["stage"], "closure stage", 6)
+    version = _cycle_version(ledger, record)
+    stage = _positive(record["stage"], "closure stage", len(_stage_keys({"parent_version": version})))
     cycle = _positive(record.get("cycle", 1), "closure cycle")
     basename = f"stage-{stage}-{receipt_sha[:12]}.json"
     candidates = [
@@ -203,8 +242,13 @@ def _receipt(directory: Path, record: dict[str, Any], ledger: dict[str, Any]) ->
 
 
 def _closure(directory: Path, record: dict[str, Any], ledger: dict[str, Any],
-             github: str) -> tuple[dict[str, Any], dict[str, Any] | None]:
+             github: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     receipt = _receipt(directory, record, ledger)
+    from kg_microbe_workflows.closure import multi_pr_members
+    try:
+        members = multi_pr_members(receipt)
+    except ValueError as error:
+        raise ProgressError(str(error)) from error
     verification = record.get("verification", {})
     outcome = verification.get("status")
     if outcome not in {"merged", "no_changes"}:
@@ -212,11 +256,16 @@ def _closure(directory: Path, record: dict[str, Any], ledger: dict[str, Any],
     _date(verification.get("verified_at"))
     key = ledger["repository_key"]
     ref = _goal_ref(key, run_key(ledger["run_id"]), record.get("cycle", 1), record["stage"])
+    version = _cycle_version(ledger, record)
+    key_for_stage = _stage_keys({"parent_version": version})[record["stage"] - 1]
+    if "stage_key" in record and record["stage_key"] != key_for_stage:
+        raise ProgressError("closure stage key contradicts pinned cycle")
     event = {
-        **ref, "stage_id": STAGE_KEYS[record["stage"] - 1], "outcome": outcome,
+        **ref, **_version_fields(version),
+        "stage_id": key_for_stage, "outcome": outcome,
         "verified_at": verification["verified_at"], "receipt_sha256": record["receipt_sha256"],
     }
-    observation = None
+    observations = []
     if outcome == "merged":
         number = _positive(verification.get("pr_number"), "PR number")
         if (receipt.get("status") != "completed"
@@ -234,9 +283,33 @@ def _closure(directory: Path, record: dict[str, Any], ledger: dict[str, Any],
             "head_sha": head, "merge_commit_sha": merge, "merged_at": verification["merged_at"],
             "observed_at": verification["verified_at"], "source": "supervisor_closure",
         }
+        observations.append(observation)
+        if members:
+            proofs = verification.get("prs")
+            if not isinstance(proofs, list) or len(proofs) != len(members):
+                raise ProgressError("ordered closure lacks all verified PRs")
+            observations = []
+            for member, proof in zip(members, proofs, strict=True):
+                if (not isinstance(proof, dict) or proof.get("status") != "merged"
+                        or type(proof.get("pr_number")) is not int or proof["pr_number"] != member["number"]
+                        or proof.get("head_sha") != member["head_sha"]
+                        or proof.get("merge_commit_sha") != member["merge_commit_sha"]):
+                    raise ProgressError("ordered receipt PR differs from verified member")
+                _date(proof.get("merged_at"))
+                _date(proof.get("verified_at"))
+                observations.append({**observation, "number": member["number"],
+                                     "head_sha": member["head_sha"], "merge_commit_sha": member["merge_commit_sha"],
+                                     "merged_at": proof["merged_at"], "observed_at": proof["verified_at"]})
+            if any(proofs[-1].get(field) != verification.get(field) for field in
+                   ("pr_number", "head_sha", "merge_commit_sha", "merged_at", "verified_at")):
+                raise ProgressError("ordered closure final proof differs from top-level proof")
+        elif "prs" in verification:
+            raise ProgressError("single closure contains unexpected ordered proofs")
     elif receipt.get("status") != "no_changes" or receipt.get("pr") is not None:
         raise ProgressError("no-change closure contains a PR")
-    return event, observation
+    elif "prs" in verification:
+        raise ProgressError("no-change closure contains ordered proofs")
+    return event, observations
 
 
 def _pr_id(key: str, number: int) -> str:
@@ -301,7 +374,8 @@ def validate_history(history: dict[str, Any], manifest: FleetManifest | None = N
             raise ProgressError("duplicate or altered goal closure identity")
         if event["repository_key"] not in fleet.mechs:
             raise ProgressError("unknown repository in history")
-        if event["stage_id"] != STAGE_KEYS[event["stage_number"] - 1]:
+        keys = _stage_keys(event)
+        if event["stage_number"] > len(keys) or event["stage_id"] != keys[event["stage_number"] - 1]:
             raise ProgressError("stage identity mismatch")
         _date(event["verified_at"])
         if event["outcome"] == "merged":
@@ -348,14 +422,28 @@ def validate_history(history: dict[str, Any], manifest: FleetManifest | None = N
         association_ids.add(item["id"])
     cursor_ids = set()
     for item in history["cursors"]:
+        if "excluded_pr_associations" in item and type(item["excluded_pr_associations"]) is not int:
+            raise ProgressError("excluded association count must be a nonnegative integer")
         identity = (item["repository_key"], item["run_key"])
         if identity in cursor_ids or item["repository_key"] not in fleet.mechs:
             raise ProgressError("duplicate or unknown run cursor")
         cursor_ids.add(identity)
-        if item["stage_id"] != STAGE_KEYS[item["stage_number"] - 1]:
+        keys = _stage_keys(item)
+        if item["stage_number"] > len(keys) or item["stage_id"] != keys[item["stage_number"] - 1]:
             raise ProgressError("cursor stage identity mismatch")
         _date(item["observed_at"])
         _date(item["started_at"])
+    cycle_versions: dict[tuple[str, str, int], str] = {}
+    for item in history["closures"] + history["cursors"]:
+        cycle_id = (item["repository_key"], item["run_key"], item["cycle"])
+        version = item.get("parent_version", "1.0.0")
+        if cycle_versions.setdefault(cycle_id, version) != version:
+            raise ProgressError("one cycle cannot mix parent versions")
+    for item in history["associations"]:
+        cycle_id = (item["repository_key"], item["run_key"], item["cycle"])
+        version = cycle_versions.get(cycle_id, "1.0.0")
+        if item["stage_number"] > len(_stage_keys({"parent_version": version})):
+            raise ProgressError("PR association stage is outside its cycle")
     for closure in history["closures"]:
         if (closure["repository_key"], closure["run_key"]) not in cursor_ids:
             raise ProgressError("closure lacks run cursor")
@@ -378,10 +466,15 @@ def validate_history(history: dict[str, Any], manifest: FleetManifest | None = N
 
 def _counts(closures: list[dict[str, Any]], prs: list[dict[str, Any]]) -> dict[str, int]:
     cycles: dict[tuple[str, str, int], set[int]] = {}
+    required: dict[tuple[str, str, int], set[int]] = {}
     for event in closures:
-        cycles.setdefault((event["repository_key"], event["run_key"], event["cycle"]), set()).add(event["stage_number"])
+        identity = (event["repository_key"], event["run_key"], event["cycle"])
+        cycles.setdefault(identity, set()).add(event["stage_number"])
+        expected = set(range(1, len(_stage_keys(event)) + 1))
+        if required.setdefault(identity, expected) != expected:
+            raise ProgressError("one cycle cannot mix parent versions")
     return {
-        "completed_cycles": sum(stages == set(range(1, 7)) for stages in cycles.values()),
+        "completed_cycles": sum(stages == required[identity] for identity, stages in cycles.items()),
         "completed_goals": len(closures), "unique_prs": len(prs),
         "merged_prs": sum(pr["state"] == "merged" for pr in prs),
         "open_prs": sum(pr["state"] == "open" for pr in prs),
@@ -414,7 +507,7 @@ def snapshot_from_history(history: dict[str, Any], *, generated_at: str,
             ]
             prs.append(pr)
         stages = []
-        for number, stage_key in enumerate(STAGE_KEYS, 1):
+        for number, stage_key in enumerate(_stage_keys(current), 1):
             completed = current is not None and any(
                 event["run_key"] == current["run_key"] and event["cycle"] == current["cycle"]
                 and event["stage_number"] == number for event in closures
@@ -434,8 +527,11 @@ def snapshot_from_history(history: dict[str, Any], *, generated_at: str,
             "history_coverage": "partial" if cursors else "unobserved",
         }
         if current:
-            row["current"] = {k: v for k, v in current.items() if k not in {"repository_key", "started_at"}}
+            row["current"] = {k: v for k, v in current.items()
+                              if k not in {"repository_key", "started_at", "excluded_pr_associations"}}
             row["last_observed_at"] = current["observed_at"]
+        if any("excluded_pr_associations" in cursor for cursor in cursors):
+            row["excluded_pr_associations"] = sum(cursor.get("excluded_pr_associations", 0) for cursor in cursors)
         repositories.append(row)
     result = {
         "schema_version": VERSION, "generated_at": generated_at,
@@ -457,12 +553,14 @@ def validate_snapshot(snapshot: dict[str, Any], manifest: FleetManifest | None =
     if [row["key"] for row in snapshot["repositories"]] != list(fleet.keys):
         raise ProgressError("snapshot must contain the complete manifest fleet in order")
     for row in snapshot["repositories"]:
+        if "excluded_pr_associations" in row and type(row["excluded_pr_associations"]) is not int:
+            raise ProgressError("excluded association count must be a nonnegative integer")
         mech = fleet.mechs[row["key"]]
         if row["github_url"] != f"https://github.com/{mech.github}" or row["name"] != mech.display_name:
             raise ProgressError("snapshot repository identity differs from manifest")
         if row["counters"] != _counts(row["closures"], row["pull_requests"]):
             raise ProgressError("snapshot counts differ from evidence")
-        if [(stage["number"], stage["key"]) for stage in row["stages"]] != list(enumerate(STAGE_KEYS, 1)):
+        if [(stage["number"], stage["key"]) for stage in row["stages"]] != list(enumerate(_stage_keys(row.get("current")), 1)):
             raise ProgressError("snapshot stages differ from canonical workflow")
         pr_ids = set()
         for pr in row["pull_requests"]:
@@ -489,6 +587,57 @@ def validate_bundle(history: dict[str, Any], snapshot: dict[str, Any],
         raise ProgressError("snapshot differs from its history")
 
 
+def project_bundle_to_manifest(
+    history: dict[str, Any], snapshot: dict[str, Any],
+    manifest: FleetManifest | None = None,
+) -> dict[str, Any]:
+    """Validate a bundle against ``manifest``, projecting across append-only fleet expansion.
+
+    When ``snapshot["repositories"]`` covers a non-empty strict prefix of the
+    current manifest keys and none of the newly admitted suffix Mechs have
+    entries in ``history``, the bundle is first validated strictly against the
+    prefix manifest and then projected to ``manifest`` with zero-counter
+    ``unobserved`` rows for the newly admitted Mechs. Any reordering, dropped
+    historical Mech, shrunk manifest, or historical evidence for a missing
+    snapshot row still fails closed through ``validate_bundle``.
+    """
+    fleet = manifest or load_fleet_manifest()
+    repositories = snapshot.get("repositories") if isinstance(snapshot, dict) else None
+    snapshot_keys = (
+        [str(row["key"]) for row in repositories]
+        if isinstance(repositories, list)
+        and all(isinstance(row, dict) and isinstance(row.get("key"), str) for row in repositories)
+        else []
+    )
+    if (
+        0 < len(snapshot_keys) < len(fleet.keys)
+        and snapshot_keys == list(fleet.keys[:len(snapshot_keys)])
+        and isinstance(history, dict)
+    ):
+        added_keys = set(fleet.keys[len(snapshot_keys):])
+        has_added_history = any(
+            isinstance(item, dict) and item.get("repository_key") in added_keys
+            for field in ("closures", "pr_events", "associations", "cursors")
+            if isinstance(items := history.get(field), list)
+            for item in items
+        )
+        if not has_added_history:
+            prefix_manifest = FleetManifest(
+                {key: fleet.mechs[key] for key in snapshot_keys},
+                fleet.capability_catalogue,
+                fleet.vendored_governance,
+                fleet.source,
+            )
+            validate_bundle(history, snapshot, prefix_manifest)
+            projected = snapshot_from_history(
+                history, generated_at=snapshot["generated_at"], manifest=fleet,
+            )
+            validate_bundle(history, projected, fleet)
+            return projected
+    validate_bundle(history, snapshot, fleet)
+    return snapshot
+
+
 def validate_extension(previous: dict[str, Any], new: dict[str, Any],
                        manifest: FleetManifest | None = None) -> None:
     """Reject history replacement, deletion, rewriting and cursor rollback."""
@@ -506,17 +655,22 @@ def validate_extension(previous: dict[str, Any], new: dict[str, Any],
                 or (current["cycle"], current["stage_number"]) < (old["cycle"], old["stage_number"])
                 or _date(current["observed_at"]) < _date(old["observed_at"])):
             raise ProgressError("historical run cursor regressed")
+        if (current["cycle"] == old["cycle"]
+                and current.get("parent_version", "1.0.0") != old.get("parent_version", "1.0.0")):
+            raise ProgressError("parent version changed inside an active cycle")
 
 
 def collect_progress(
     runtime_dirs: list[Path], previous_history: dict[str, Any] | None = None, *,
     generated_at: str | None = None, manifest: FleetManifest | None = None,
     verified_pr_observations: list[dict[str, Any]] | None = None,
+    excluded_association_counts: dict[tuple[str, str], int] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Read explicit supervisor runs and return history plus a public snapshot.
 
     Omitted old runs retain their history. Supplied runs must retain every
     previously observed closure and must not regress cycle, stage or timestamp.
+    Omitted exclusion counts retain their last observed values.
     Repeated collection is idempotent apart from fresher observation cursors.
     The caller must serialize this read/modify/write operation with an exclusive
     lock, and preserve the previous history on failure.
@@ -529,6 +683,11 @@ def collect_progress(
     validate_history(history, fleet)
     old_closures = {event["id"]: event for event in history["closures"]}
     observations: list[dict[str, Any]] = []
+    diagnostic_sources: set[tuple[str, str]] = set()
+    if excluded_association_counts is not None and any(
+        type(count) is not int or count < 0 for count in excluded_association_counts.values()
+    ):
+        raise ProgressError("excluded association count must be a nonnegative integer")
     run_sources: set[str] = set()
     for runtime in runtime_dirs:
         runtime = Path(runtime)
@@ -554,7 +713,9 @@ def collect_progress(
                     or ledger.get("repository_key") != key or ledger.get("run_id") != config["run_id"]):
                 raise ProgressError("ledger identity differs from run config")
             cycle = _positive(ledger.get("cycle", 1), "cycle")
-            stage = _positive(ledger["stage"], "stage", 6)
+            version = _cycle_version(ledger)
+            keys = _stage_keys({"parent_version": version})
+            stage = _positive(ledger["stage"], "stage", len(keys))
             observed_at = ledger["last_observed_at"]
             if generated is not None and _date(observed_at) > generated:
                 raise ProgressError("supervisor observation is in the future")
@@ -562,13 +723,21 @@ def collect_progress(
             phase = phase if isinstance(phase, str) and phase in PHASES else "unknown"
             cursor = {
                 "repository_key": key, "run_key": run, "cycle": cycle, "stage_number": stage,
-                "stage_id": STAGE_KEYS[stage - 1], "phase": phase,
+                **_version_fields(version), "stage_id": keys[stage - 1], "phase": phase,
                 "blocker_code": _blocker(ledger.get("blocked_reason"), phase),
                 "observed_at": observed_at, "started_at": ledger["created_at"],
             }
+            source = (config["run_id"], key)
+            diagnostic_sources.add(source)
+            if excluded_association_counts is not None:
+                if source not in excluded_association_counts:
+                    raise ProgressError("missing excluded association count for runtime target")
+                cursor["excluded_pr_associations"] = excluded_association_counts[source]
             prior_cursor = next((c for c in history["cursors"]
                                  if c["repository_key"] == key and c["run_key"] == run), None)
             if prior_cursor:
+                if excluded_association_counts is None and "excluded_pr_associations" in prior_cursor:
+                    cursor["excluded_pr_associations"] = prior_cursor["excluded_pr_associations"]
                 if (cursor["started_at"] != prior_cursor["started_at"]
                         or (cycle, stage) < (prior_cursor["cycle"], prior_cursor["stage_number"])
                         or _date(observed_at) < _date(prior_cursor["observed_at"])):
@@ -580,7 +749,7 @@ def collect_progress(
             if not isinstance(records, list):
                 raise ProgressError("ledger has no completed-stage history")
             for record in records:
-                event, observation = _closure(directory, record, ledger, fleet.mechs[key].github)
+                event, closure_observations = _closure(directory, record, ledger, fleet.mechs[key].github)
                 if (event["cycle"], event["stage_number"]) >= (cycle, stage):
                     raise ProgressError("closure is not before the current goal")
                 if event["id"] in found:
@@ -592,8 +761,7 @@ def collect_progress(
                 if old is None:
                     history["closures"].append(event)
                     old_closures[event["id"]] = event
-                if observation:
-                    observations.append(observation)
+                observations.extend(closure_observations)
             prior_ids = {event["id"] for event in history["closures"]
                          if event["repository_key"] == key and event["run_key"] == run}
             if not prior_ids <= found:
@@ -601,6 +769,8 @@ def collect_progress(
         old_targets = {cursor["repository_key"] for cursor in history["cursors"] if cursor["run_key"] == run}
         if not old_targets <= target_keys:
             raise ProgressError("previously observed run target disappeared")
+    if excluded_association_counts is not None and set(excluded_association_counts) != diagnostic_sources:
+        raise ProgressError("excluded association counts contain unknown runtime targets")
     for observation in verified_pr_observations or []:
         item = copy.deepcopy(observation)
         key = item["repository_key"]
@@ -624,7 +794,7 @@ def collect_progress(
             if "stage_number" in item and item["stage_number"] != stage_value:
                 raise ProgressError("PR association has conflicting stage identity")
             item["stage_number"] = stage_value
-        _positive(item["stage_number"], "PR goal stage", 6)
+        _positive(item["stage_number"], "PR goal stage", 7)
         _positive(item["cycle"], "PR goal cycle")
         pr_cursor = next((c for c in history["cursors"]
                           if c["repository_key"] == key and c["run_key"] == item["run_key"]), None)

@@ -54,6 +54,7 @@ MIM_ROOT = Path(
 )
 
 sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_utils.ingredient_identity_rejections import rejection_reason  # noqa: E402
 from kg_microbe_fleet import require_mech_roots  # noqa: E402
 CULTUREBOT_ROOT = CULTUREBOTHT_ROOT_PATH / "CultureBotHT"
 COMPOUNDS_CSV = CULTUREBOT_ROOT / "data/raw/google_sheets/compounds_to_cas.csv"
@@ -130,7 +131,11 @@ def search_ols_by_cas(cas: str, cache: dict) -> dict | None:
     """Return CHEBI candidate that has the given CAS xref, or None."""
     key = f"cas::{cas}"
     if key in cache:
-        return cache[key]
+        candidate = cache[key]
+        reason = rejection_reason(ontology_id=(candidate or {}).get("chebi", ""), cas=cas)
+        if reason:
+            return {**candidate, "error": f"rejected: {reason}"}
+        return candidate
     params = urllib.parse.urlencode({
         "q": cas, "ontology": "chebi",
         "queryFields": "annotation_property,obo_xref",
@@ -150,20 +155,29 @@ def search_ols_by_cas(cas: str, cache: dict) -> dict | None:
         curie = d.get("obo_id") or d.get("short_form", "").replace("_", ":")
         if not curie.startswith("CHEBI:"):
             continue
+        reason = rejection_reason(ontology_id=curie, cas=cas)
+        if reason:
+            cache[key] = {"chebi": curie, "label": d.get("label", ""),
+                          "error": f"rejected: {reason}"}
+            continue
         cache[key] = {
             "chebi": curie, "label": d.get("label", ""),
             "synonyms": d.get("synonym", []),
         }
         return cache[key]
-    cache[key] = None
-    return None
+    cache.setdefault(key, None)
+    return cache[key]
 
 
 def search_ols_by_name(name: str, cache: dict) -> dict | None:
     """Return HIGH-confidence CHEBI candidate (exact label or synonym match)."""
     key = f"name::{name}"
     if key in cache:
-        return cache[key]
+        candidate = cache[key]
+        reason = rejection_reason(ontology_id=(candidate or {}).get("chebi", ""), name=name)
+        if reason:
+            return {**candidate, "error": f"rejected: {reason}"}
+        return candidate
     params = urllib.parse.urlencode({
         "q": name, "ontology": "chebi",
         "rows": 5, "exact": "false", "type": "class",
@@ -182,6 +196,11 @@ def search_ols_by_name(name: str, cache: dict) -> dict | None:
         curie = d.get("obo_id") or d.get("short_form", "").replace("_", ":")
         if not curie.startswith("CHEBI:"):
             continue
+        reason = rejection_reason(ontology_id=curie, name=name)
+        if reason:
+            cache[key] = {"chebi": curie, "label": d.get("label", ""),
+                          "error": f"rejected: {reason}"}
+            continue
         if (d.get("label", "") or "").lower().strip() == n:
             cache[key] = {
                 "chebi": curie, "label": d.get("label", ""),
@@ -195,8 +214,8 @@ def search_ols_by_name(name: str, cache: dict) -> dict | None:
                 "match_type": "synonym-exact",
             }
             return cache[key]
-    cache[key] = None
-    return None
+    cache.setdefault(key, None)
+    return cache[key]
 
 
 # ---------- YAML emission ----------
@@ -213,6 +232,9 @@ def _create_yaml(path: Path, name: str, chebi: str, label: str, cas: str,
                  panels: list[str], media: list[str], synonyms_csv: str) -> tuple[bool, str]:
     if path.exists():
         return False, "yaml exists"
+    reason = rejection_reason(ontology_id=chebi, cas=cas, name=name)
+    if reason:
+        return False, f"rejected: {reason}"
     evidence_notes = "Imported from CultureBotHT."
     if panels:
         evidence_notes += f" FEBA/Hans80 panels: {', '.join(panels)}."
@@ -356,9 +378,15 @@ def main() -> None:
                 best = search_ols_by_name(name, cache)
             if best is None or "error" in (best or {}):
                 results["queued_no_match"] += 1
-                queued_rows.append({**r, "_reason": "no CHEBI match"})
+                queued_rows.append({**r, "_reason": (best or {}).get("error", "no CHEBI match"),
+                                    "_chebi": (best or {}).get("chebi", "")})
                 continue
             chebi = best["chebi"]
+            reason = rejection_reason(ontology_id=chebi, cas=cas, name=name)
+            if reason:
+                results["queued_no_match"] += 1
+                queued_rows.append({**r, "_reason": f"rejected: {reason}", "_chebi": chebi})
+                continue
             if chebi in mim_by_chebi:
                 results["chebi_already_in_mim"] += 1
                 queued_rows.append({
@@ -429,9 +457,16 @@ def main() -> None:
             if best is None or "error" in (best or {}):
                 results["queued_no_match"] += 1
                 queued_rows.append({"Compound": n, "CAS": cas,
-                                    "_reason": "no CHEBI match (media-only)"})
+                                    "_reason": (best or {}).get("error", "no CHEBI match (media-only)"),
+                                    "_chebi": (best or {}).get("chebi", "")})
                 continue
             chebi = best["chebi"]
+            reason = rejection_reason(ontology_id=chebi, cas=cas, name=n)
+            if reason:
+                results["queued_no_match"] += 1
+                queued_rows.append({"Compound": n, "CAS": cas,
+                                    "_reason": f"rejected: {reason}", "_chebi": chebi})
+                continue
             if chebi in mim_by_chebi:
                 results["chebi_already_in_mim"] += 1
                 continue

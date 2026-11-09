@@ -26,13 +26,11 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote, unquote, urlparse
+from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parents[1]
 SHA = re.compile(r"[0-9a-f]{40}\Z")
 DIGEST = re.compile(r"[0-9a-f]{64}\Z")
-HISTORICAL_RESOLUTION_FIELDS = ("github_repository", "pr_number", "base", "head_sha",
-                                "merge_commit_sha", "receipt_sha256")
 KEY = re.compile(r"[a-z][a-z0-9_-]*\Z")
 BLOCKING_RECEIPTS = {"reserved", "sent", "accepted", "uncertain"}
 
@@ -122,7 +120,13 @@ def terminal_busy_reason(screen: str) -> str | None:
     while lines and not lines[-1].strip():
         lines.pop()
     footer = "\n".join(lines[-32:])
-    if re.search(r"esc to interrupt|Compacting conversation|\b(?:messages?|tasks?) queued\b|\bqueued (?:messages?|tasks?)\b|"
+    # Queue wording and counts also occur in completed thoughts/replies.
+    # Counts must occupy a complete status line or a middle-dot footer field.
+    queue_count = re.search(
+        r"(?:^|·)\s*(?:[1-9]\d* (?:messages?|tasks?) queued|"
+        r"queued (?:messages?|tasks?):\s*[1-9]\d*)\s*(?=$|·)", footer, re.I | re.M,
+    )
+    if queue_count or re.search(r"esc to interrupt|Compacting conversation|"
                  r"alt\+m to send immediately|Press up to edit queued messages|"
                  r"\b[1-9]\d* (?:background )?task\(s\)|\b[1-9]\d* background tasks?\b|"
                  r"\bbackground tasks?:\s*[1-9]\d*|^\s*● .* running\s*$", footer, re.I | re.M):
@@ -217,9 +221,80 @@ def load_effective(config: dict, target: dict, *, next_cycle: bool = False, prof
     profile = profile or target.get("workflow_profile_path")
     if not profile:
         raise SupervisorError("canonical workflow profile missing; explicit migration required")
-    return load_effective_workflow(
-        Path(config.get("workflow_parent_path", PARENT_PATH)), Path(profile),
-        target["repository_key"], schema_path=Path(config.get("workflow_schema_path", SCHEMA_PATH)))
+    def source(kind: str, default: Path) -> Path:
+        current = target.get(f"workflow_{kind}_path", config.get(f"workflow_{kind}_path", default))
+        candidate = target.get(f"workflow_next_{kind}_path", config.get(f"workflow_next_{kind}_path", current))
+        return Path(candidate if next_cycle else current)
+
+    return load_effective_workflow(source("parent", PARENT_PATH), Path(profile),
+                                  target["repository_key"], schema_path=source("schema", SCHEMA_PATH))
+
+
+
+def native_delivery_proof(action: dict, target: dict, observation: dict) -> dict | None:
+    """A transport return or marker substring is never delivery acceptance.
+
+    Match one full user input in this exact native workspace/conversation after
+    the reserved step/time. Truncation, duplicates and bounded-out observations
+    hold the reservation; they never authorize retry. Historical accepted actions
+    remain intact and cannot by themselves adopt a later native goal.
+    """
+    native = observation.get("native") or {}
+    if (observation.get("error") or native.get("error")
+            or native.get("conversation_id") != target["native_session_id"]
+            or action.get("native_session_id") != target["native_session_id"]
+            or native.get("root") != target["root"]
+            or native.get("workspace_identity", {}).get("verified") is not True):
+        return None
+    message = action.get("message")
+    boundary = action.get("native_step_index")
+    reserved = action.get("reserved_epoch_ms")
+    if (not isinstance(message, str) or not message
+            or type(boundary) is not int or boundary < 0
+            or type(reserved) is not int or reserved < 0):
+        return None
+    expected_hash = hashlib.sha256(message.encode("utf-8")).hexdigest()
+    if action.get("message_sha256", expected_hash) != expected_hash:
+        return None
+    evidence = native.get("user_input_evidence") or {}
+    if evidence.get("schema_version") != 1 or not isinstance(evidence.get("inputs"), list):
+        return None
+    inputs = evidence["inputs"]
+    # If the reservation predates the bounded window, an earlier duplicate may
+    # have fallen out. Absence or uniqueness cannot then be established.
+    if evidence.get("truncated") and (not inputs or inputs[0].get("step_index", -1) > boundary):
+        return None
+    matches = []
+    for entry in inputs:
+        index = entry.get("step_index")
+        if (type(index) is not int or index <= boundary
+                or entry.get("text_sha256") != expected_hash
+                or entry.get("text_length") != len(message)):
+            continue
+        try:
+            created = datetime.fromisoformat(entry["created_at"].replace("Z", "+00:00"))
+            if created.tzinfo is None or created.timestamp() * 1000 < reserved:
+                return None
+        except (KeyError, TypeError, ValueError, AttributeError):
+            return None
+        matches.append(entry)
+    if len(matches) != 1:
+        return None
+    proof = matches[0]
+    if proof.get("status_number") != 3 or proof.get("supported_input_shape") is not True:
+        return None
+    if action.get("kind") == "start_goal":
+        identity = observation.get("goal_identity") or {}
+        if (proof.get("native_goal_declaration") is not True
+                or identity.get("conversation_id") != target["native_session_id"]
+                or identity.get("start_step_index") != proof["step_index"]
+                or identity.get("started_at") != proof["created_at"]):
+            return None
+    elif observation.get("goal_identity") != action.get("goal_identity"):
+        return None
+    return {"native_step_index": proof["step_index"], "text_sha256": expected_hash,
+            "created_at": proof["created_at"],
+            "native_goal_declaration": proof.get("native_goal_declaration") is True}
 
 
 def scoped(action: dict, ledger: dict) -> bool:
@@ -231,9 +306,56 @@ def pin_workflow(effective: dict) -> dict:
     return {"sha256": digest(effective), "effective": copy.deepcopy(effective)}
 
 
+def workflow_stage_key(ledger: dict, stage: int | None = None) -> str | None:
+    """Interpret positions through this cycle's immutable contract, never today's parent."""
+    selected = ledger["stage"] if stage is None else stage
+    stages = ledger.get("workflow", {}).get("effective", {}).get("stages", [])
+    return next((item["key"] for item in stages if item["stage"] == selected), None)
+
+
+def last_stage(ledger: dict) -> int:
+    stages = ledger.get("workflow", {}).get("effective", {}).get("stages", [])
+    return len(stages) if stages else 4
+
+
+def record_stage_key(ledger: dict, record: dict) -> str | None:
+    """Old records keep their original stage and evidence paths after migration."""
+    if record.get("stage_key"):
+        return record["stage_key"]
+    evidence = record.get("goal_evidence_snapshot")
+    if evidence:
+        from kg_microbe_workflows import evidence_stage_key
+        return evidence_stage_key(evidence)
+    from kg_microbe_workflows import stage_keys_for_version
+    version = ledger.get("cycle_versions", {}).get(str(record.get("cycle", 1)))
+    version = version or record.get("parent_version") or "1.0.0"
+    keys = stage_keys_for_version(version)
+    stage = record.get("stage", 0)
+    return keys[stage - 1] if 0 < stage <= len(keys) else None
+
+
+def record_cycle_version(ledger: dict) -> None:
+    """Enrich the ledger's cycle metadata without rewriting historical records."""
+    if ledger.get("schema_version") != 2:
+        return
+    effective = ledger["workflow"]["effective"]
+    version = effective["parent_version"]
+    versions = ledger.setdefault("cycle_versions", {})
+    cycle = str(ledger["cycle"])
+    if cycle in versions and versions[cycle] != version:
+        raise SupervisorError("cycle parent version disagrees with its pinned workflow")
+    versions[cycle] = version
+    ledger["parent_version"] = version
+    for record in ledger["completed_stages"]:
+        historical_cycle = str(record.get("cycle", 1))
+        versions.setdefault(historical_cycle, record.get("parent_version", "1.0.0"))
+
+
 def migrate_ledger(ledger: dict, target: dict, effective: dict) -> dict:
     """Preserve native identity and history; an exact reviewed migration authorizes adoption."""
     migration = target.get("workflow_migration") or {}
+    if effective["parent_version"].split(".")[0] != "1":
+        raise SupervisorError("legacy four-goal ledgers must first adopt the reviewed six-goal contract")
     if migration.get("ledger_sha256") != digest(ledger):
         raise SupervisorError("legacy ledger requires an exact reviewed migration")
     if (migration.get("goal_identity") != ledger.get("adopted_goal")
@@ -258,10 +380,22 @@ def migrate_ledger(ledger: dict, target: dict, effective: dict) -> dict:
     if result["stage"] == 5:
         result["awaiting_goal"] = True
     result["legacy_receipt_stage"] = result["stage"] if result["stage"] < 4 else None
+    record_cycle_version(result)
     return result
 
 
 def validate_config(config: dict, *, resolve_repositories: bool = True) -> dict:
+    from kg_microbe_workflows.port_pressure import normalize_config
+
+    pressure = config.get("port_pressure", {"mode": "off"})
+    if not isinstance(pressure, dict):
+        raise SupervisorError("port_pressure must be an object")
+    try:
+        config["port_pressure"] = normalize_config({key: value for key, value in pressure.items() if key != "binding_files"})
+        if "binding_files" in pressure:
+            config["port_pressure"]["binding_files"] = pressure["binding_files"]
+    except ValueError as error:
+        raise SupervisorError(str(error)) from error
     config.setdefault("native_reader_path", str(ROOT / "scripts/mech_session_native.py"))
     config.setdefault("notifier_path", str(ROOT / "scripts/mech_session_terminal.py"))
     for field in ("run_id", "runtime_dir", "native_reader_path", "notifier_path", "input_lock_dir", "targets"):
@@ -300,9 +434,9 @@ def validate_config(config: dict, *, resolve_repositories: bool = True) -> dict:
                 raise SupervisorError(f"{key}: workflow GitHub identity mismatch")
             target["_workflow"] = effective
             target["stages"] = effective["stages"]
-        last_stage = 6 if target.get("_workflow") else 4
-        if target.get("initial_stage") not in range(0, last_stage + 1):
-            raise SupervisorError(f"{key}: initial_stage must be 0 through {last_stage}")
+        final_stage = len(target["_workflow"]["stages"]) if target.get("_workflow") else 4
+        if target.get("initial_stage") not in range(0, final_stage + 1):
+            raise SupervisorError(f"{key}: initial_stage must be 0 through {final_stage}")
         if not isinstance(target["pid"], int) or target["pid"] <= 0:
             raise SupervisorError(f"{key}: invalid PID")
         initial = target["initial_goal_identity"]
@@ -311,9 +445,9 @@ def validate_config(config: dict, *, resolve_repositories: bool = True) -> dict:
             raise SupervisorError(f"{key}: initial goal identity is incomplete")
         if not re.fullmatch(r"/dev/ttys\d+", target["tty"]):
             raise SupervisorError(f"{key}: invalid TTY")
-        if {stage.get("stage") for stage in target.get("stages", [])} != set(range(1, last_stage + 1)):
-            raise SupervisorError(f"{key}: exactly {last_stage} stages required")
-        if len(target["stages"]) != last_stage:
+        if {stage.get("stage") for stage in target.get("stages", [])} != set(range(1, final_stage + 1)):
+            raise SupervisorError(f"{key}: exactly {final_stage} stages required")
+        if len(target["stages"]) != final_stage:
             raise SupervisorError(f"{key}: duplicate stages")
         for stage in target["stages"]:
             if not isinstance(stage.get("goal_text"), str) or not stage["goal_text"].strip():
@@ -322,6 +456,17 @@ def validate_config(config: dict, *, resolve_repositories: bool = True) -> dict:
                 raise SupervisorError(f"{key}: stage skill_paths missing")
         if not Path(target["root"]).is_absolute():
             raise SupervisorError(f"{key}: repository root must be absolute")
+        for field in ("session_state_paths", "session_repository_roots"):
+            if field in target:
+                paths = target[field]
+                if (not isinstance(paths, list) or len(paths) > 64
+                        or any(not isinstance(path, str) or not Path(path).is_absolute()
+                               or "${" in path for path in paths)
+                        or len(paths) != len(set(paths))):
+                    raise SupervisorError(f"{key}: {field} must list unique explicit absolute owned paths")
+    allowed = config["port_pressure"]["restart_repository_keys"]
+    if allowed is not None and not set(allowed) <= seen:
+        raise SupervisorError("restart_repository_keys contains an unconfigured target")
     if resolve_repositories:
         sys.path.insert(0, str(ROOT))
         from kg_microbe_fleet import load_fleet_manifest
@@ -340,7 +485,17 @@ def validate_config(config: dict, *, resolve_repositories: bool = True) -> dict:
     return config
 
 
-def new_ledger(config: dict, target: dict) -> dict:
+def durability_repository_roots(target: dict) -> list[Path]:
+    """Revalidate owned standalone clones; never infer ownership from names."""
+    from plugins.repository_settings import RepositoryTarget
+    roots = list(dict.fromkeys([Path(target["root"]),
+                               *(Path(path) for path in target.get("session_repository_roots", []))]))
+    for root in roots:
+        RepositoryTarget(target["repository_key"], root, target["github_repository"]).open()
+    return roots
+
+
+def new_ledger(config: dict, target: dict, *, runner=command) -> dict:
     ledger = {"schema_version": 1, "run_id": config["run_id"],
             "repository_key": target["repository_key"], "stage": target["initial_stage"],
             "adopted_goal": None, "awaiting_goal": False, "actions": {},
@@ -348,8 +503,11 @@ def new_ledger(config: dict, target: dict) -> dict:
     if target.get("_workflow"):
         ledger.update(schema_version=2, cycle=1, workflow=pin_workflow(target["_workflow"]),
                       active_profile_path=target["workflow_profile_path"])
-        if ledger["stage"] == 6:
+        record_cycle_version(ledger)
+        if workflow_stage_key(ledger) == "infrastructure":
             ledger["infra_scope"] = freeze_infrastructure(target)
+        elif workflow_stage_key(ledger) == "open_issue_triage":
+            ledger["issue_scope"] = freeze_open_issues(target, runner=runner)
     return ledger
 
 
@@ -365,7 +523,7 @@ def decide(ledger: dict, observation: dict) -> dict:
         return {"phase": "unavailable", "reason": observation["error"]}
     if ledger.get("schema_version") == 1 and ledger["stage"] > 4:
         return {"phase": "requires_migration", "reason": "legacy four-goal sequence needs reviewed six-goal migration"}
-    if ledger["stage"] > 6:
+    if ledger["stage"] > last_stage(ledger):
         return {"phase": "blocked", "reason": "invalid stage; cannot infer a new cycle"}
     if not observation.get("ready"):
         return {"phase": "waiting", "reason": observation.get("readiness_reason", "not ready")}
@@ -482,21 +640,27 @@ def message_for(target: dict, ledger: dict, decision: dict, repository_runtime: 
                            "register", "--session-dir", str(repository_runtime), "--number", "NUMBER"])
     context = (f"[{marker}] Read {instruction} and {repository_runtime / 'status.json'}. "
                "Repository-local .claude/skills is the skill source of truth. "
+               "Keep session state and helper scripts in the repository's gitignored .temp/ "
+               "(separate clones: ~/agent-work/<repo>/), never /tmp, /private/tmp or $TMPDIR. "
+               "Push each committed batch the same day even without a PR, within existing publication authorization. "
+               "Report all owned clone/state paths for the supervisor inventory and record every deliverable commit in the receipt. "
                f"This is run {ledger['run_id']}, cycle {ledger.get('cycle', 1)}, stage {ledger['stage']}. "
                f"Fill status.json receipt_template with verified facts and write it to {repository_runtime / 'completion.json'}. "
                "Follow the pinned workflow stage, evidence requirements, infrastructure-note policy, and closure policy. "
                f"After prior closure is verified, update the tracked review latest index from {repository_runtime / 'verified-evidence-index.json'} in this goal. "
-               "Record-review goal findings are separate from the PR adversarial review; stage 5 resolves the former. "
-               "For stage 6, use the exact supervisor-frozen infra_scope content/hash/time in status.json. "
+               "Record-review goal findings are separate from the PR adversarial review; resolve_review_findings resolves the former. "
+               "For infrastructure, use the exact supervisor-frozen infra_scope content/hash/time in status.json. "
+               "For open_issue_triage, use the exact supervisor-frozen issue_scope and its prior-cycle carry-forward evidence; "
+               "new issues outside that inventory belong to the next cycle. "
                f"As soon as each goal PR is opened, including follow-up PRs, register it with {register}, "
                "replacing NUMBER with its PR number. Registration only records the PR-to-goal association; "
                "it does not complete a goal or replace the verified closure receipt. "
                "Do not start another goal: the supervisor verifies closure and chooses the next goal. ")
     if decision["action"] == "policy_update":
-        return (context + "Your existing native goal and its identity are unchanged. Adopt the reviewed six-stage workflow "
+        return (context + "Your existing native goal and its identity are unchanged. Adopt the reviewed pinned workflow "
                 "and its versioned review and infrastructure evidence requirements for the unfinished work. "
                 "Continue the same goal; this policy handoff itself is not goal completion. "
-                "Save proposed profile changes to the configured next-cycle candidate and include them in stage-6 review; "
+                "Save proposed profile changes to the configured next-cycle candidate and include them in infrastructure review; "
                 "do not edit the immutable runtime snapshot.")
     if decision["action"] == "start_goal":
         profile = stage_profile(target, ledger["stage"], ledger)
@@ -512,11 +676,6 @@ def message_for(target: dict, ledger: dict, decision: dict, repository_runtime: 
             "finish the configured closure sequence.")
 
 
-def normalized_input(message: str) -> str:
-    """The native slash-command item consumes only the leading /goal token."""
-    return (message[5:] if message.startswith("/goal ") else message).strip()
-
-
 def receipt_template(ledger: dict, target: dict) -> dict:
     """Provide the machine interface; placeholders are never closure evidence."""
     template = {key: copy.deepcopy(ledger[key]) for key in ("run_id", "repository_key", "stage")}
@@ -525,12 +684,14 @@ def receipt_template(ledger: dict, target: dict) -> dict:
                     review={"artifact": "", "sha256": "", "status": "pending", "head_sha": "", "remaining_findings": None},
                     validation=[{"artifact": "", "sha256": "", "command": "", "status": "pending", "head_sha": ""}],
                     issues=[], pr={"number": None, "head_sha": "", "branch": "", "base": target["default_branch"]},
-                    cleanup={"checkout_ready": False, "local_branch_deleted": False, "remote_branch_deleted": False})
+                    cleanup={"checkout_ready": False, "local_branch_deleted": False, "remote_branch_deleted": False},
+                    deliverable_commits=[""])
     if ledger.get("schema_version") == 2:
         from kg_microbe_workflows import evidence_directory
         template.update(cycle=ledger["cycle"], workflow_sha256=ledger["workflow"]["sha256"],
                         goal_outputs={"infra_tasks": {"path": "INFRA_TASKS.md", "sha256": ""}})
-        if ledger["stage"] >= 4 or (ledger["stage"] > 0 and stage_profile(target, ledger["stage"], ledger).get("required_outputs")):
+        if (workflow_stage_key(ledger) in {"record_review", "resolve_review_findings", "infrastructure", "open_issue_triage"}
+                or (ledger["stage"] > 0 and stage_profile(target, ledger["stage"], ledger).get("required_outputs"))):
             template["goal_outputs"]["goal_evidence"] = {
                 "path": evidence_directory(ledger["run_id"], ledger["cycle"], ledger["stage"], 1) + "/evidence.yaml",
                 "sha256": ""}
@@ -563,7 +724,7 @@ def artifact_errors(item: dict, allowed_roots: list[Path], label: str) -> list[s
 
 
 def freeze_infrastructure(target: dict) -> dict:
-    """Capture the input scope before stage 6 can start changing the notebook."""
+    """Capture the input scope before infrastructure can change the notebook."""
     from kg_microbe_workflows import validate_infra_notebook
 
     path = Path(target["root"]) / "INFRA_TASKS.md"
@@ -577,66 +738,255 @@ def freeze_infrastructure(target: dict) -> dict:
             "tasks": notebook["tasks"], "frozen_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
 
 
+def freeze_open_issues(target: dict, *, runner=command) -> dict:
+    """Freeze a complete, bounded read of open issues; uncertainty never means empty."""
+    from kg_microbe_workflows.issue_triage import validate_issue_snapshot
+
+    repository = target["github_repository"]
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
+        raise SupervisorError("issue inventory needs the verified GitHub repository")
+    owner, name = repository.split("/")
+    frozen_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    cutoff = datetime.fromisoformat(frozen_at.replace("Z", "+00:00"))
+    query = """query($owner:String!,$name:String!,$cursor:String){
+      repository(owner:$owner,name:$name){nameWithOwner issues(first:100,after:$cursor,
+        states:OPEN,orderBy:{field:CREATED_AT,direction:ASC}){
+        totalCount pageInfo{hasNextPage endCursor}
+        nodes{number title updatedAt labels(first:100){totalCount nodes{name} pageInfo{hasNextPage}}}
+      }}
+    }"""
+    items = []
+    seen_numbers = set()
+    seen_cursors = set()
+    cursor = None
+    total = None
+    deadline = time.monotonic() + 60
+    for page in range(1, 101):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise SupervisorError("issue inventory capture exceeded its 60-second deadline")
+        args = ["gh", "api", "graphql", "-f", "query=" + query,
+                "-f", "owner=" + owner, "-f", "name=" + name]
+        if cursor is not None:
+            args += ["-f", "cursor=" + cursor]
+        response = runner(args, timeout=max(1, min(45, int(remaining))))
+        if response.returncode:
+            raise SupervisorError("issue inventory query failed")
+        try:
+            payload = json.loads(response.stdout)
+            if payload.get("errors"):
+                raise ValueError("GraphQL errors")
+            source = payload["data"]["repository"]
+            if source["nameWithOwner"].casefold() != repository.casefold():
+                raise ValueError("repository identity mismatch")
+            connection = source["issues"]
+            count, nodes, info = connection["totalCount"], connection["nodes"], connection["pageInfo"]
+            if type(count) is not int or not 0 <= count <= 10000 or not isinstance(nodes, list) or len(nodes) > 100:
+                raise ValueError("invalid/truncated issue count")
+            if total is not None and total != count:
+                raise ValueError("open issue inventory changed while paginating")
+            total = count
+            if type(info["hasNextPage"]) is not bool:
+                raise ValueError("invalid pagination state")
+            for node in nodes:
+                number = node["number"]
+                if type(number) is not int or number <= 0 or number in seen_numbers:
+                    raise ValueError("duplicate or invalid issue number")
+                updated = datetime.fromisoformat(node["updatedAt"].replace("Z", "+00:00"))
+                if updated.tzinfo is None or updated > cutoff:
+                    raise ValueError("issue changed after the inventory cutoff")
+                labels = node["labels"]
+                label_names = [label["name"] for label in labels["nodes"]]
+                if (labels["pageInfo"]["hasNextPage"] is not False
+                        or labels["totalCount"] != len(label_names)
+                        or len(set(label_names)) != len(label_names)):
+                    raise ValueError("incomplete issue labels")
+                items.append({"number": number, "title": node["title"], "labels": sorted(label_names),
+                              "updatedAt": node["updatedAt"]})
+                seen_numbers.add(number)
+            if not info["hasNextPage"]:
+                if len(items) != total:
+                    raise ValueError("issue inventory pagination did not cover totalCount")
+                break
+            cursor = info["endCursor"]
+            if not nodes or not isinstance(cursor, str) or not cursor or cursor in seen_cursors:
+                raise ValueError("invalid or repeated issue cursor")
+            seen_cursors.add(cursor)
+        except (KeyError, TypeError, ValueError) as error:
+            raise SupervisorError("cannot freeze complete issue inventory: " + str(error)) from error
+    else:
+        raise SupervisorError("issue inventory exceeded its 100-page bound")
+    snapshot = {"repository": repository, "frozen_at": frozen_at, "issues": sorted(items, key=lambda item: item["number"]),
+                "complete": True, "total_count": total, "pages": page}
+    validate_issue_snapshot(snapshot, repository)
+    content = json.dumps(snapshot, sort_keys=True, indent=2) + "\n"
+    return {"sha256": hashlib.sha256(content.encode()).hexdigest(), "content": content,
+            "frozen_at": frozen_at, "issues": snapshot["issues"]}
+
+
+def validate_frozen_issue_scope(scope: dict, target: dict) -> None:
+    from kg_microbe_workflows.issue_triage import validate_issue_snapshot
+    content = scope.get("content")
+    if not isinstance(content, str) or hashlib.sha256(content.encode()).hexdigest() != scope.get("sha256"):
+        raise SupervisorError("frozen issue inventory checksum mismatch")
+    snapshot = json.loads(content)
+    validate_issue_snapshot(snapshot, target["github_repository"])
+    if scope.get("frozen_at") != snapshot["frozen_at"] or scope.get("issues") != snapshot["issues"]:
+        raise SupervisorError("frozen issue scope metadata differs from its inventory")
+
+
 def previous_evidence(ledger: dict, stage: int) -> dict | None:
-    """Stage 5 consumes this cycle's review; later reviews carry prior findings."""
-    if stage not in {4, 5}:
+    """Resolve findings within a cycle; carry reviews/issue groups across versions."""
+    key = workflow_stage_key(ledger, stage)
+    if key not in {"record_review", "resolve_review_findings", "open_issue_triage"}:
         return None
     cycle = ledger["cycle"]
+    accepted = ({"record_review"} if key == "resolve_review_findings" else
+                {"open_issue_triage"} if key == "open_issue_triage" else
+                {"record_review", "resolve_review_findings"})
     eligible = [record for record in ledger["completed_stages"]
-                if (record["stage"] == 4 if stage == 5 else record["stage"] in {4, 5}) and record.get("goal_evidence")
-                and (record.get("cycle", 1) == cycle if stage == 5 else record.get("cycle", 1) < cycle)]
+                if record_stage_key(ledger, record) in accepted and record.get("goal_evidence")
+                and (record.get("cycle", 1) == cycle if key == "resolve_review_findings" else record.get("cycle", 1) < cycle)]
     return eligible[-1] if eligible else None
 
 
+HISTORICAL_RESOLUTION_FIELDS = {
+    "github_repository", "pr_number", "base", "head_sha", "merge_commit_sha", "receipt_sha256",
+}
+
+
 def historical_resolution_record(issue: dict, receipt: dict, ledger: dict, target: dict) -> dict:
-    """Bind an explicit carry-forward resolution to one prior verified receipt."""
+    """Select one earlier, verified remediation closure; never another goal's PR member."""
     historical = issue.get("historical_resolution")
-    if (not isinstance(historical, dict) or set(historical) != set(HISTORICAL_RESOLUTION_FIELDS)
-            or ledger.get("schema_version") != 2 or ledger.get("stage") != 5
-            or receipt.get("schema_version") != 2 or receipt.get("status") != "completed"
+    if (not isinstance(historical, dict) or set(historical) != HISTORICAL_RESOLUTION_FIELDS
+            or ledger.get("schema_version") != 2 or receipt.get("schema_version") != 2
+            or workflow_stage_key(ledger) != "resolve_review_findings"
+            or receipt.get("status") != "completed" or "prs" in receipt
             or type(historical.get("pr_number")) is not int or historical["pr_number"] <= 0
             or historical["pr_number"] == (receipt.get("pr") or {}).get("number")
-            or not isinstance(historical.get("github_repository"), str)
-            or historical["github_repository"].casefold() != target["github_repository"].casefold()
+            or historical.get("github_repository") != target["github_repository"]
             or historical.get("base") != target["default_branch"]
             or any(not SHA.fullmatch(str(historical.get(key, ""))) for key in ("head_sha", "merge_commit_sha"))
             or not DIGEST.fullmatch(str(historical.get("receipt_sha256", "")))):
-        raise SupervisorError("historical issue resolution requires a completed stage-5 receipt and an exact distinct prior-PR descriptor")
+        raise SupervisorError("historical resolution requires a completed single-PR remediation receipt and exact prior identity")
     records = [record for record in ledger.get("completed_stages", [])
                if record.get("receipt_sha256") == historical["receipt_sha256"]]
     if len(records) != 1:
-        raise SupervisorError("historical issue resolution must bind one prior verified ledger receipt")
+        raise SupervisorError("historical resolution must bind one prior verified closure")
     record = records[0]
     verified = record.get("verification") or {}
-    if (type(record.get("cycle")) is not int or type(record.get("stage")) is not int
-            or (record["cycle"], record["stage"]) >= (ledger["cycle"], ledger["stage"])
+    if (type(record.get("cycle")) is not int or not 1 <= record["cycle"] < ledger["cycle"]
+            or record_stage_key(ledger, record) != "resolve_review_findings"
+            or record.get("completion_authority") not in {"native_completed", "verified_receipt_override"}
             or verified.get("status") != "merged" or not verified.get("merged_at")
             or any(verified.get(key) != historical[key] for key in ("pr_number", "head_sha", "merge_commit_sha"))):
-        raise SupervisorError("historical issue resolution differs from its prior verified merge")
+        raise SupervisorError("historical resolution differs from its earlier verified remediation closure")
+    closure_time(verified["merged_at"], "historical merge")
     return record
 
 
-def verify_historical_finding_scope(issue: dict, item: dict, receipt: dict, ledger: dict,
-                                    target: dict, previous_data: dict | None) -> None:
+def historical_finding_scope(issue: dict, receipt: dict, ledger: dict, target: dict,
+                             evidence: dict, previous_data: dict | None) -> dict:
+    """Require the same already-resolved finding group in retained bytes and this cycle's review."""
     record = historical_resolution_record(issue, receipt, ledger, target)
-    previous = record.get("goal_evidence_snapshot") or {}
-    url = item["issue_url"]
-    identities = set(item["finding_ids"])
-    candidates = [group for group in previous.get("groups", [])
-                  if group.get("status") == "resolved" and group.get("issue_url") == url
-                  and set(group.get("finding_ids", [])) == identities]
-    frozen = {finding["finding_id"]: finding for finding in (previous_data or {}).get("findings", [])}
-    carried = bool(identities) and all(frozen.get(key, {}).get("status") == "resolved"
-                                      and frozen[key].get("issue_url") == url for key in identities)
-    if not candidates or not carried:
-        raise SupervisorError("historical issue resolution must carry the same already-resolved finding scope")
+    descriptor = record.get("goal_evidence") or {}
+    root = Path(target["root"])
+    path = (root / descriptor.get("path", "")).resolve()
+    if not path.is_relative_to(root.resolve()) or not path.is_file():
+        raise SupervisorError("historical finding evidence must be a retained repository file")
+    # Read once, hash and parse those bytes; a ledger snapshot alone is not evidence.
+    flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0)
+    with os.fdopen(os.open(path, flags), "rb") as stream:
+        if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+            raise SupervisorError("historical finding evidence must be a regular file")
+        raw = stream.read()
+    from kg_microbe_workflows import load_document
+    retained = load_document(raw)
+    if (hashlib.sha256(raw).hexdigest() != descriptor.get("sha256")
+            or retained != record.get("goal_evidence_snapshot")
+            or retained.get("repository_key") != ledger["repository_key"]
+            or retained.get("github_repository") != target["github_repository"]
+            or retained.get("run_id") != ledger["run_id"]
+            or retained.get("cycle") != record["cycle"] or retained.get("stage") != record["stage"]):
+        raise SupervisorError("historical finding snapshot differs from its pinned evidence or closure context")
+    url = f"https://github.com/{target['github_repository']}/issues/{issue['number']}"
+    current = [item for item in evidence.get("groups", []) if item.get("issue_url") == url]
+    if len(current) != 1 or current[0].get("status") != "resolved":
+        raise SupervisorError("historical issue must identify exactly one current resolved group")
+    identities = set(current[0].get("finding_ids", []))
+    old = [item for item in retained.get("groups", []) if item.get("issue_url") == url
+           and item.get("status") == "resolved" and set(item.get("finding_ids", [])) == identities]
+    before = {item["finding_id"]: item for item in retained.get("findings", [])}
+    frozen = {item["finding_id"]: item for item in (previous_data or {}).get("findings", [])}
+    after = {item["finding_id"]: item for item in evidence.get("findings", [])}
+    if (len(old) != 1 or not identities or any(
+            key not in before or key not in frozen or key not in after
+            or any(row.get("status") != "resolved" or row.get("issue_url") != url
+                   for row in (before[key], frozen[key], after[key]))
+            or before[key].get("summary") != frozen[key].get("summary")
+            or frozen[key].get("summary") != after[key].get("summary") for key in identities)):
+        raise SupervisorError("historical resolution must carry the same already-resolved finding scope")
+    return record
+
+
+def verify_historical_issue_resolutions(receipt: dict, ledger: dict, target: dict,
+                                        evidence: dict | None, current_live: dict, runner) -> list[dict]:
+    """Fresh read-only identity, membership and ancestry checks after current-PR gates."""
+    historical_issues = [issue for issue in receipt["issues"] if "historical_resolution" in issue]
+    if not historical_issues:
+        return []
+    if not evidence:
+        raise SupervisorError("historical resolutions require verified finding evidence")
+    previous = previous_evidence(ledger, ledger["stage"])
+    proofs = []
+    github, root = target["github_repository"], target["root"]
+    for issue in historical_issues:
+        record = historical_finding_scope(issue, receipt, ledger, target, evidence,
+                                           previous.get("goal_evidence_snapshot") if previous else None)
+        historical = issue["historical_resolution"]
+        prior = json.loads(runner(["gh", "api", f"repos/{github}/pulls/{historical['pr_number']}"]).stdout)
+        if (prior.get("merged") is not True or not prior.get("merged_at")
+                or prior.get("base", {}).get("ref") != historical["base"]
+                or prior.get("base", {}).get("repo", {}).get("full_name") != github
+                or (prior.get("head", {}).get("repo") or {}).get("full_name") != github
+                or prior.get("head", {}).get("sha") != historical["head_sha"]
+                or prior.get("merge_commit_sha") != historical["merge_commit_sha"]
+                or closure_time(prior["merged_at"], "historical merge") !=
+                closure_time(record["verification"]["merged_at"], "retained historical merge")
+                or closure_time(prior["merged_at"], "historical merge") >=
+                closure_time(current_live["merged_at"], "current merge")):
+            raise SupervisorError("historical PR differs from the pinned verified merge")
+        commits = bounded_api_pages(f"repos/{github}/pulls/{historical['pr_number']}/commits",
+                                    lambda args: runner(args).stdout, label="historical PR commits")
+        shas = {item.get("sha") for item in commits}
+        count = prior.get("commits")
+        if (type(count) is not int or not 1 <= count <= 250 or len(commits) != count
+                or len(shas) != count or historical["head_sha"] not in shas
+                or any(not isinstance(sha, str) or not SHA.fullmatch(sha) for sha in shas)
+                or issue["fix_commit_sha"] not in shas):
+            raise SupervisorError("historical issue fix is not in a complete pinned PR commit inventory")
+        live_issue = json.loads(runner(["gh", "api", f"repos/{github}/issues/{issue['number']}"]).stdout)
+        if (live_issue.get("state") != "closed" or "pull_request" in live_issue
+                or live_issue.get("number") != issue["number"]
+                or live_issue.get("html_url") != f"https://github.com/{github}/issues/{issue['number']}"):
+            raise SupervisorError("historical issue is not actually closed in the expected repository")
+        base = current_live.get("base", {}).get("sha", "")
+        if not isinstance(base, str) or not SHA.fullmatch(base):
+            raise SupervisorError("current PR base commit unavailable for historical ancestry")
+        for descendant in (receipt["pr"]["head_sha"], base, "HEAD"):
+            if runner(["git", "-C", root, "merge-base", "--is-ancestor", historical["merge_commit_sha"],
+                       descendant], check=False).returncode:
+                raise SupervisorError("historical merge is absent from current reviewed head/base/default checkout")
+        proofs.append({**historical, "number": issue["number"], "fix_commit_sha": issue["fix_commit_sha"]})
+    return proofs
 
 
 def goal_output_data(receipt: dict, ledger: dict, target: dict) -> dict | None:
     if ledger.get("schema_version") != 2 or ledger["stage"] == 0:
         return None
     required_outputs = stage_profile(target, ledger["stage"], ledger).get("required_outputs") or []
-    if ledger["stage"] < 4 and not required_outputs:
+    stage_key = workflow_stage_key(ledger)
+    if stage_key not in {"record_review", "resolve_review_findings", "infrastructure", "open_issue_triage"} and not required_outputs:
         return None
     from kg_microbe_workflows import read_goal_evidence
 
@@ -646,25 +996,28 @@ def goal_output_data(receipt: dict, ledger: dict, target: dict) -> dict | None:
     if errors:
         raise SupervisorError("; ".join(errors))
     previous = previous_evidence(ledger, ledger["stage"])
-    if ledger["stage"] == 5 and previous is None:
-        raise SupervisorError("stage 5 requires the exact verified stage-4 review evidence from this cycle")
+    if stage_key == "resolve_review_findings" and previous is None:
+        raise SupervisorError("resolve_review_findings requires the exact verified record-review evidence from this cycle")
     previous_data = previous.get("goal_evidence_snapshot") if previous else None
     for artifact in historical_output_artifacts(ledger, root):
         errors = artifact_errors({"artifact": artifact["path"], "sha256": artifact["sha256"]}, [root], "archived workflow evidence")
         if errors:
             raise SupervisorError("; ".join(errors))
+    expected = {**{key: ledger[key] for key in ("repository_key", "run_id", "cycle", "stage")},
+                "github_repository": target["github_repository"]}
+    if ledger["workflow"]["effective"]["parent_version"].split(".")[0] == "2":
+        expected.update(parent_version=ledger["workflow"]["effective"]["parent_version"], stage_key=stage_key)
     data = read_goal_evidence(root / descriptor["path"], repository_root=root, previous=previous_data,
-                              expected={**{key: ledger[key] for key in ("repository_key", "run_id", "cycle", "stage")},
-                                        "github_repository": target["github_repository"]},
+                              expected=expected,
                               required_outputs=required_outputs)
     if previous is not None and data.get("previous_evidence") != previous["goal_evidence"]:
         raise SupervisorError("goal evidence does not bind the exact previous review manifest")
-    if ledger["stage"] == 6:
+    if stage_key == "infrastructure":
         scope = ledger.get("infra_scope") or {}
         snapshots = [artifact for artifact in data["artifacts"] if artifact["kind"] == "infra_snapshot"]
         if (not scope or len(snapshots) != 1 or snapshots[0]["sha256"] != scope.get("sha256")
                 or data.get("scope_frozen_at") != scope.get("frozen_at")):
-            raise SupervisorError("infrastructure plan must consume the supervisor-frozen stage-6 notebook scope")
+            raise SupervisorError("infrastructure plan must consume the supervisor-frozen notebook scope")
         from kg_microbe_workflows import read_infra_notebook
         notebook = read_infra_notebook(root / "INFRA_TASKS.md", target["github_repository"], root)
         current = {task["task_id"]: task for task in notebook["tasks"]}
@@ -675,26 +1028,30 @@ def goal_output_data(receipt: dict, ledger: dict, target: dict) -> dict | None:
         for task in scope.get("tasks", []):
             if task["task_id"] not in current:
                 raise SupervisorError("infrastructure history disappeared from the current notebook")
-    if ledger["stage"] == 5:
+    if stage_key == "open_issue_triage":
+        scope = ledger.get("issue_scope") or {}
+        snapshots = [artifact for artifact in data["artifacts"] if artifact["kind"] == "issue_inventory"]
+        if (not scope or len(snapshots) != 1 or snapshots[0]["sha256"] != scope.get("sha256")
+                or data.get("scope_frozen_at") != scope.get("frozen_at")):
+            raise SupervisorError("issue triage must consume the supervisor-frozen issue inventory")
+        from kg_microbe_workflows.issue_triage import issue_triage_blockers
+        blockers = issue_triage_blockers(data)
+        if blockers:
+            raise SupervisorError("critical/high issue prerequisites hold this goal: " + ", ".join(map(str, blockers)))
+    if stage_key == "resolve_review_findings":
         expected_ids = {item["finding_id"] for item in previous_data.get("findings", [])}
         actual_ids = [finding for group in data.get("groups", []) for finding in group["finding_ids"]]
         if set(actual_ids) != expected_ids or len(actual_ids) != len(set(actual_ids)):
             raise SupervisorError("review resolution groups must cover each frozen review finding exactly once")
-    historical_used = set()
     for item in data.get("groups", []) + data.get("infra_tasks", []):
         if item.get("status") == "resolved":
             url = item.get("issue_url", "")
             match = re.fullmatch(r"https://github\.com/" + re.escape(target["github_repository"]) + r"/issues/([1-9]\d*)", url, re.I)
-            matches = [issue for issue in receipt.get("issues", [])
-                       if isinstance(issue, dict) and match and issue.get("number") == int(match[1])]
-            if len(matches) != 1:
+            if not match or int(match[1]) not in {issue["number"] for issue in receipt.get("issues", [])}:
                 raise SupervisorError("resolved review/infra groups require matching independently verified closure issues")
-            if "historical_resolution" in matches[0]:
-                verify_historical_finding_scope(matches[0], item, receipt, ledger, target, previous_data)
-                historical_used.add(matches[0]["number"])
-    if any(isinstance(issue, dict) and "historical_resolution" in issue
-           and issue.get("number") not in historical_used for issue in receipt.get("issues", [])):
-        raise SupervisorError("historical issue resolutions require explicit carried-forward goal evidence")
+    for issue in receipt.get("issues", []):
+        if "historical_resolution" in issue:
+            historical_finding_scope(issue, receipt, ledger, target, data, previous_data)
     return data
 
 
@@ -782,6 +1139,15 @@ def validate_receipt(receipt: dict, ledger: dict, target: dict, runtime: Path) -
     head = no_changes.get("head_sha") if status == "no_changes" else pr.get("head_sha")
     if not isinstance(head, str) or not SHA.fullmatch(head):
         errors.append("valid final head SHA required")
+    publication_policy = ledger.get("workflow", {}).get("effective", {}).get("session_state_policy", {})
+    if "deliverable_commits" in receipt or publication_policy.get("require_origin_publication_at_closure"):
+        from kg_microbe_workflows.commit_publication import PublicationError, recorded_commits
+        try:
+            commits = recorded_commits(receipt.get("deliverable_commits"), head=head if status == "completed" else None)
+            if status == "no_changes" and commits:
+                errors.append("no-change closure cannot contain deliverable commits")
+        except PublicationError as error:
+            errors.append(str(error))
     review = receipt.get("review") or {}
     if review.get("status") != "complete" or review.get("remaining_findings") != 0 or review.get("head_sha") != head:
         errors.append("review incomplete, has findings, or does not cover final head")
@@ -809,13 +1175,13 @@ def validate_receipt(receipt: dict, ledger: dict, target: dict, runtime: Path) -
                     or issue.get("disposition") != "addressed"
                     or not SHA.fullmatch(str(issue.get("fix_commit_sha", "")))):
                 errors.append("each issue needs unique number and addressed fix commit")
-            if isinstance(number, int):
-                numbers.add(number)
             if "historical_resolution" in issue:
                 try:
                     historical_resolution_record(issue, receipt, ledger, target)
-                except (SupervisorError, AttributeError, TypeError) as error:
+                except SupervisorError as error:
                     errors.append(str(error))
+            if isinstance(number, int):
+                numbers.add(number)
     if status == "no_changes":
         if (receipt.get("pr") is not None or issues != [] or not no_changes.get("explanation")
                 or no_changes.get("no_goal_owned_changes") is not True
@@ -846,10 +1212,194 @@ def validate_receipt(receipt: dict, ledger: dict, target: dict, runtime: Path) -
             goal_output_data(receipt, ledger, target)
         except Exception as error:
             errors.append("goal outputs: " + str(error))
+    try:
+        from kg_microbe_workflows.closure import multi_pr_members
+        members = multi_pr_members(receipt)
+        for member in members:
+            if member["base"] != target["default_branch"]:
+                errors.append("ordered PR base differs from configured default branch")
+            errors += artifact_errors(member["review"], roots, f"PR {member['number']} review")
+            for validation in member["validation"]:
+                errors += artifact_errors(validation, roots, f"PR {member['number']} validation")
+    except ValueError as error:
+        errors.append(str(error))
     return errors
 
 
-def verify_remote_receipt(receipt: dict, ledger: dict, target: dict, runner=command) -> dict:
+def bounded_api_pages(endpoint: str, read, *, label: str) -> list[dict]:
+    """Read complete REST pages with a bounded, same-endpoint next-link chain."""
+    from urllib.parse import parse_qs, urlsplit
+    result = []
+    for page in range(1, 101):
+        raw = read(["gh", "api", "--include", f"{endpoint}?per_page=100&page={page}"]).replace("\r\n", "\n")
+        try:
+            headers, separator, body = raw.partition("\n\n")
+            if not separator or not re.match(r"^HTTP/\S+ 200\b", headers):
+                raise ValueError("pagination lacks a successful HTTP response")
+            rows = json.loads(body)
+            if not isinstance(rows, list) or len(rows) > 100 or any(not isinstance(row, dict) for row in rows):
+                raise ValueError("invalid page")
+            result.extend(rows)
+            links = [line.split(":", 1)[1].strip() for line in headers.splitlines() if line.lower().startswith("link:")]
+            if len(links) > 1:
+                raise ValueError("ambiguous pagination")
+            following = re.findall(r'<([^>]+)>;\s*rel="next"', links[0] if links else "")
+            if not following:
+                return result
+            parsed = urlsplit(following[0])
+            params = parse_qs(parsed.query)
+            if (len(following) != 1
+                    or f"{parsed.scheme}://{parsed.netloc}{parsed.path}".casefold() != f"https://api.github.com/{endpoint}".casefold()
+                    or params != {"per_page": ["100"], "page": [str(page + 1)]} or not rows):
+                raise ValueError("invalid next-page identity")
+        except (KeyError, TypeError, ValueError, AttributeError) as error:
+            raise SupervisorError(f"cannot verify {label}: {error}") from error
+    raise SupervisorError(f"{label} inventory exceeded its 100-page bound")
+
+
+def verify_triage_fix_provenance(evidence: dict, github: str, root: str, runner=command) -> dict:
+    """Verify prior or current fixes without falsely assigning them to this goal PR (#862)."""
+    fixed = [item for item in evidence["issue_triage"]["dispositions"] if item["status"] == "fixed"]
+    if len(fixed) > 10000:
+        raise SupervisorError("triage fix verification exceeds its bounded inventory")
+    deadline = time.monotonic() + 180
+
+    def read(args):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise SupervisorError("triage fix verification exceeded its 180-second deadline")
+        result = runner(args, timeout=max(1, min(45, int(remaining))))
+        if result.returncode:
+            raise SupervisorError("triage fix provenance query failed")
+        return result.stdout
+
+    default_head = read(["git", "-C", root, "rev-parse", "HEAD"]).strip()
+    if not SHA.fullmatch(default_head):
+        raise SupervisorError("triage fix provenance needs the verified default-branch head")
+    prs = {}
+    verified = []
+    for item in fixed:
+        commit = item["commit_sha"]
+        matched = []
+        for url in item["pr_urls"]:
+            match = re.fullmatch(r"https://github\.com/" + re.escape(github) + r"/pull/([1-9]\d*)", url, re.I)
+            if not match:
+                raise SupervisorError("triage fix PR belongs to another repository")
+            number = int(match[1])
+            if number not in prs:
+                try:
+                    live = json.loads(read(["gh", "api", f"repos/{github}/pulls/{number}"]))
+                    merge = live["merge_commit_sha"]
+                    if (live.get("number") != number or live.get("merged") is not True or not live.get("merged_at")
+                            or live.get("base", {}).get("repo", {}).get("full_name", "").casefold() != github.casefold()
+                            or not isinstance(merge, str) or not SHA.fullmatch(merge)):
+                        raise ValueError("referenced fix PR is not merged in the expected repository")
+                    read(["git", "-C", root, "merge-base", "--is-ancestor", merge, default_head])
+                    prs[number] = {"merge_commit_sha": merge, "commits": None}
+                except (KeyError, TypeError, ValueError) as error:
+                    raise SupervisorError("cannot verify triage fix PR: " + str(error)) from error
+            pr = prs[number]
+            if commit == pr["merge_commit_sha"]:
+                matched.append(number)
+                continue
+            if pr["commits"] is None:
+                rows = bounded_api_pages(f"repos/{github}/pulls/{number}/commits", read, label="fix PR commits")
+                commits = [row.get("sha") for row in rows]
+                if (any(not isinstance(value, str) or not SHA.fullmatch(value) for value in commits)
+                        or len(set(commits)) != len(commits)):
+                    raise SupervisorError("fix PR commit inventory is malformed or repeated")
+                pr["commits"] = set(commits)
+            if commit in pr["commits"]:
+                matched.append(number)
+        if not matched:
+            raise SupervisorError(f"issue {item['number']} claimed fix commit is absent from its merged PRs")
+        verified.append({"number": item["number"], "commit_sha": commit, "pr_numbers": matched})
+    return {"verified_at": now(), "default_branch_head": default_head, "fixed_issues": verified}
+
+
+def verify_remote_issue_triage(evidence: dict, github: str, runner=command) -> dict:
+    """Check label/state claims and actual sub-issue edges, without mutating GitHub (#852)."""
+    triage = evidence["issue_triage"]
+    inventory = {item["number"]: item for item in triage["inventory"]}
+    dispositions = {item["number"]: item for item in triage["dispositions"]}
+    tracked_groups = [group for group in triage["groups"] if group.get("tracking_issue_url")]
+    tracking = {int(group["tracking_issue_url"].rsplit("/", 1)[-1]): group for group in tracked_groups}
+    if len(tracking) != len(tracked_groups):
+        raise SupervisorError("active groups must have distinct tracking issues")
+    # A duplicate URL is not evidence that the surviving issue exists (#865).
+    duplicates = {item["number"]: int(item["duplicate_of"].rsplit("/", 1)[-1])
+                  for item in triage["dispositions"] if item["status"] == "duplicate"}
+    numbers = sorted(set(inventory) | set(tracking) | set(duplicates.values()))
+    if len(numbers) > 30000:
+        raise SupervisorError("triage remote verification exceeds its bounded inventory")
+    owner, name = github.split("/")
+    deadline = time.monotonic() + 180
+
+    def read(args):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise SupervisorError("triage remote verification exceeded its 180-second deadline")
+        result = runner(args, timeout=max(1, min(45, int(remaining))))
+        if result.returncode:
+            raise SupervisorError("triage remote verification query failed")
+        return result.stdout
+
+    live = {}
+    for start in range(0, len(numbers), 50):
+        batch = numbers[start:start + 50]
+        fields = " ".join(f"i{number}:issue(number:{number}){{__typename number state url "
+                          "labels(first:100){totalCount nodes{name} pageInfo{hasNextPage}}}" for number in batch)
+        query = "query($owner:String!,$name:String!){repository(owner:$owner,name:$name){nameWithOwner " + fields + "}}"
+        try:
+            payload = json.loads(read(["gh", "api", "graphql", "-f", "query=" + query,
+                                       "-f", "owner=" + owner, "-f", "name=" + name]))
+            source = payload["data"]["repository"]
+            if payload.get("errors") or source["nameWithOwner"].casefold() != github.casefold():
+                raise ValueError("unavailable issue data or wrong repository")
+            for number in batch:
+                issue = source[f"i{number}"]
+                labels = issue["labels"]
+                names = [item["name"] for item in labels["nodes"]]
+                if (issue["__typename"] != "Issue" or issue["number"] != number
+                        or issue["url"].casefold() != f"https://github.com/{github}/issues/{number}".casefold()
+                        or issue["state"] not in {"OPEN", "CLOSED"}
+                        or labels["pageInfo"]["hasNextPage"] is not False or labels["totalCount"] != len(names)
+                        or any(not isinstance(label, str) for label in names) or len(set(names)) != len(names)):
+                    raise ValueError("invalid issue identity/state or incomplete labels")
+                live[number] = {"state": issue["state"], "labels": names}
+        except (KeyError, TypeError, ValueError, AttributeError) as error:
+            raise SupervisorError("cannot verify triage issues: " + str(error)) from error
+    for number, item in inventory.items():
+        issue = live[number]
+        assigned = set(item["assigned_labels"])
+        if ([label for label in issue["labels"] if label.startswith("severity:")] != [f"severity:{item['severity']}"]
+                or not assigned <= set(issue["labels"])):
+            raise SupervisorError(f"issue {number} has not received its recorded severity labels")
+        terminal = dispositions[number]["status"] in {"fixed", "duplicate", "wont_fix"}
+        if issue["state"] != ("CLOSED" if terminal else "OPEN"):
+            raise SupervisorError(f"issue {number} live state disagrees with its triage disposition")
+        if number in duplicates and item["severity"] in {"critical", "high"} and live[duplicates[number]]["state"] != "CLOSED":
+            raise SupervisorError(f"critical/high duplicate {number} retains unresolved work in its surviving issue")
+    for number, group in tracking.items():
+        rows = bounded_api_pages(f"repos/{github}/issues/{number}/sub_issues", read, label="group sub-issues")
+        observed = set()
+        for child in rows:
+            url = child.get("html_url")
+            if not isinstance(url, str) or "pull_request" in child:
+                raise SupervisorError("sub-issue is not a real issue")
+            if url in observed:
+                raise SupervisorError("repeated sub-issue page or identity")
+            observed.add(url)
+        expected_children = {f"https://github.com/{github}/issues/{child}".casefold() for child in group["sub_issue_numbers"]}
+        if not expected_children <= {url.casefold() for url in observed}:
+            raise SupervisorError(f"group {group['group_id']} lacks its recorded GitHub sub-issue relationships")
+    return {"verified_at": now(), "issues_checked": len(inventory), "tracking_issues_checked": len(tracking),
+            "duplicate_targets_checked": len(set(duplicates.values())),
+            "severity_labels_verified": True, "dispositions_verified": True, "sub_issue_relationships_verified": True}
+
+
+def verify_remote_receipt(receipt: dict, ledger: dict, target: dict, runner=command,
+                          *, runtime: Path | None = None) -> dict:
     """Read-only independent checks. Query failure is never branch absence."""
     root, github = target["root"], target["github_repository"]
 
@@ -877,6 +1427,10 @@ def verify_remote_receipt(receipt: dict, ledger: dict, target: dict, runner=comm
                 if issue.get("state") not in {"open", "closed"} or "pull_request" in issue:
                     raise SupervisorError("infrastructure notebook must reference real GitHub issues")
     evidence = goal_output_data(receipt, ledger, target)
+    triage_verification = (verify_remote_issue_triage(evidence, github, runner)
+                          if evidence and evidence.get("stage_key") == "open_issue_triage" else None)
+    if triage_verification is not None:
+        triage_verification["fix_provenance"] = verify_triage_fix_provenance(evidence, github, root, runner)
     if evidence:
         for item in evidence.get("groups", []) + evidence.get("infra_tasks", []):
             if item["status"] == "deferred":
@@ -900,8 +1454,40 @@ def verify_remote_receipt(receipt: dict, ledger: dict, target: dict, runner=comm
         prs = gh_json("pr", "list", "-R", github, "--state", "open", "--limit", "1000", "--json", "number")
         if prs:
             raise SupervisorError("open PR exists for no-change branch")
-        return {"verified_at": now(), "status": "no_changes", "head_sha": head}
-    pr = receipt["pr"]
+        return {"verified_at": now(), "status": "no_changes", "head_sha": head,
+                **({"issue_triage": triage_verification} if triage_verification is not None else {})}
+    if "prs" in receipt:
+        proof = verify_ordered_prs(receipt, ledger, target, runtime, evidence, runner)
+    else:
+        current_issues = [item for item in receipt["issues"] if "historical_resolution" not in item]
+        proof, live, commits = verify_pr_member(receipt["pr"], current_issues, target, runner)
+        historical = verify_historical_issue_resolutions(receipt, ledger, target, evidence, live, runner)
+        if historical:
+            proof["historical_issue_resolutions"] = historical
+        proof["commit_publication"] = verify_receipt_publication(
+            receipt, target, {item["sha"] for item in commits}, runner)
+    return {**proof, **({"issue_triage": triage_verification} if triage_verification is not None else {})}
+
+
+def verify_receipt_publication(receipt: dict, target: dict, verified_commits: set[str], runner=command) -> dict:
+    """Use only independently verified merged members as publication authority."""
+    from kg_microbe_workflows.commit_publication import recorded_commits, verify_origin_publication
+    head = receipt["pr"]["head_sha"]
+    deliverables = recorded_commits(receipt.get("deliverable_commits", [head]), head=head)
+    return verify_origin_publication(deliverables, [Path(target["root"])], target["github_repository"],
+        verified_merged_pr_commits=sorted(verified_commits), runner=runner)
+
+
+def verify_pr_member(pr: dict, issues: list[dict], target: dict, runner=command, *, ordered=False):
+    """The existing single-PR gates, repeated independently for every member."""
+    root, github = target["root"], target["github_repository"]
+
+    def git(*args, **kwargs):
+        return runner(["git", "-C", root, *args], **kwargs)
+
+    def gh_json(*args):
+        return json.loads(runner(["gh", *args]).stdout)
+
     live = gh_json("api", f"repos/{github}/pulls/{pr['number']}")
     if (live.get("merged") is not True or not live.get("merged_at")
             or live.get("base", {}).get("ref") != pr["base"]
@@ -942,61 +1528,229 @@ def verify_remote_receipt(receipt: dict, ledger: dict, target: dict, runner=comm
         by_name = {check["name"]: check for check in all_checks}
         if any(name not in by_name or by_name[name].get("bucket") != "pass" for name in declared_checks):
             raise SupervisorError("repository-declared CI policy is not satisfied")
-    commits = gh_json("api", "--paginate", "--slurp", f"repos/{github}/pulls/{pr['number']}/commits?per_page=100")
-    commit_shas = {item["sha"] for page in commits for item in page}
-    historical_proofs = []
-    prior_prs = {}
-    for issue in receipt["issues"]:
+    if ordered:
+        commits = bounded_api_pages(f"repos/{github}/pulls/{pr['number']}/commits",
+                                    lambda args: runner(args).stdout, label="ordered PR commits")
+        commit_shas = {item.get("sha") for item in commits}
+        # GitHub's PR commit endpoint is capped at 250. Never mistake a
+        # successful last page for a complete larger PR.
+        count = live.get("commits")
+        if (type(count) is not int or not 1 <= count <= 250 or len(commits) != count
+                or len(commit_shas) != count or pr["head_sha"] not in commit_shas
+                or any(not isinstance(sha, str) or not SHA.fullmatch(sha) for sha in commit_shas)):
+            raise SupervisorError("ordered PR commit inventory is incomplete or repeated")
+    else:
+        pages = gh_json("api", "--paginate", "--slurp", f"repos/{github}/pulls/{pr['number']}/commits?per_page=100")
+        commits = [item for page in pages for item in page]
+        commit_shas = {item["sha"] for item in commits}
+    for issue in issues:
         live_issue = gh_json("api", f"repos/{github}/issues/{issue['number']}")
-        if live_issue.get("state") != "closed" or "pull_request" in live_issue:
+        if (live_issue.get("state") != "closed" or "pull_request" in live_issue
+                or issue["fix_commit_sha"] not in commit_shas):
             raise SupervisorError(f"issue {issue['number']} not closed with a fix in this PR")
-        if "historical_resolution" not in issue:
-            if issue["fix_commit_sha"] not in commit_shas:
-                raise SupervisorError(f"issue {issue['number']} not closed with a fix in this PR")
-            continue
-        historical_resolution_record(issue, receipt, ledger, target)
-        if ledger.get("stage") != 5 or not evidence:
-            raise SupervisorError("historical issue resolutions require verified carry-forward goal evidence")
-        historical = issue["historical_resolution"]
-        number = historical["pr_number"]
-        identity = (number, historical["head_sha"], historical["merge_commit_sha"], historical["base"])
-        if identity not in prior_prs:
-            prior = gh_json("api", f"repos/{github}/pulls/{number}")
-            if (prior.get("merged") is not True or not prior.get("merged_at")
-                    or prior.get("base", {}).get("ref") != historical["base"]
-                    or prior.get("base", {}).get("repo", {}).get("full_name", "").casefold() != github.casefold()
-                    or (prior.get("head", {}).get("repo") or {}).get("full_name", "").casefold() != github.casefold()
-                    or prior.get("head", {}).get("sha") != historical["head_sha"]
-                    or prior.get("merge_commit_sha") != historical["merge_commit_sha"]):
-                raise SupervisorError("historical resolution PR is not merged at its pinned repository/base/head/merge")
-            current_base = live.get("base", {}).get("sha", "")
-            if not isinstance(current_base, str) or not SHA.fullmatch(current_base):
-                raise SupervisorError("current PR base commit unavailable for historical resolution ancestry")
-            for descendant in (pr["head_sha"], current_base, "HEAD"):
-                if git("merge-base", "--is-ancestor", historical["merge_commit_sha"], descendant, check=False).returncode != 0:
-                    raise SupervisorError("historical resolution merge is not in current reviewed head/base/default checkout")
-            pages = gh_json("api", "--paginate", "--slurp", f"repos/{github}/pulls/{number}/commits?per_page=100")
-            if (not isinstance(pages, list) or not pages or any(not isinstance(page, list) for page in pages)
-                    or any(not isinstance(item, dict) or not SHA.fullmatch(str(item.get("sha", "")))
-                           for page in pages for item in page)):
-                raise SupervisorError("historical resolution PR commit membership unavailable")
-            prior_prs[identity] = {item["sha"] for page in pages for item in page}
-        if issue["fix_commit_sha"] not in prior_prs[identity]:
-            raise SupervisorError(f"issue {issue['number']} fix is not in its historical resolution PR")
-        historical_proofs.append({**{key: historical[key] for key in HISTORICAL_RESOLUTION_FIELDS},
-                                  "number": issue["number"], "fix_commit_sha": issue["fix_commit_sha"]})
     remote = git("ls-remote", "--exit-code", "--heads", "origin", f"refs/heads/{pr['branch']}", check=False)
     if remote.returncode != 2:
         raise SupervisorError("remote branch still exists or absence query failed")
     local = git("show-ref", "--verify", "--quiet", f"refs/heads/{pr['branch']}", check=False)
     if local.returncode != 1:
         raise SupervisorError("local branch still exists or absence query failed")
-    proof = {"verified_at": now(), "status": "merged", "pr_number": pr["number"],
+    return ({"verified_at": now(), "status": "merged", "pr_number": pr["number"],
              "head_sha": pr["head_sha"], "merge_commit_sha": live.get("merge_commit_sha"),
-             "merged_at": live["merged_at"], "checks": checks}
-    if historical_proofs:
-        proof["historical_issue_resolutions"] = historical_proofs
-    return proof
+             "merged_at": live["merged_at"], "checks": checks}, live, commits)
+
+
+def closure_time(value, label: str) -> datetime:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            raise ValueError("timezone absent")
+        return parsed
+    except (AttributeError, TypeError, ValueError) as error:
+        raise SupervisorError(f"invalid {label} timestamp") from error
+
+
+GitEntry = tuple[str, str] | None
+
+
+def commit_changes(root: str, commit: str, runner) -> dict[str, tuple[GitEntry, GitEntry]]:
+    """Complete non-merge, non-rename content changes at an exact commit.
+
+    A merge's combined diff can omit paths; rename/copy attribution has multiple
+    names. Refuse those ambiguous producers instead of inferring authorship.
+    """
+    identity = runner(["git", "-C", root, "rev-list", "--parents", "-n", "1", commit]).stdout.strip().split()
+    if (not 1 <= len(identity) <= 2 or identity[0] != commit
+            or any(not SHA.fullmatch(item) for item in identity)):
+        raise SupervisorError("evidence/fix producer must be an exact non-merge commit")
+    raw = runner(["git", "-C", root, "diff-tree", "--root", "--no-commit-id", "--raw",
+                  "--no-abbrev", "-r", "-M", "-z", commit]).stdout
+    parts = raw.split("\0")
+    if parts[-1] != "" or len(parts) > 20001 or len(parts) % 2 != 1:
+        raise SupervisorError("invalid or incomplete producer change inventory")
+    changes = {}
+    for index in range(0, len(parts) - 1, 2):
+        meta, path = parts[index:index + 2]
+        match = re.fullmatch(r":(000000|100644|100755) (000000|100644|100755) ([0-9a-f]{40}) ([0-9a-f]{40}) ([AMD])", meta)
+        if (not match or not path or path in changes or path.startswith("/")
+                or any(part in {"", ".", ".."} for part in path.split("/"))
+                or any(ord(char) < 32 for char in path)):
+            raise SupervisorError("ambiguous rename, merge, mode or path in producer changes")
+        old = None if match[1] == "000000" and match[3] == "0" * 40 else (match[1], match[3])
+        new = None if match[2] == "000000" and match[4] == "0" * 40 else (match[2], match[4])
+        if ((old is not None and (old[0] == "000000" or old[1] == "0" * 40))
+                or (new is not None and (new[0] == "000000" or new[1] == "0" * 40))
+                or (match[5] == "A" and (old is not None or new is None))
+                or (match[5] == "D" and (old is None or new is not None))
+                or (match[5] == "M" and (old is None or new is None))):
+            raise SupervisorError("producer entry modes, blobs and change kind disagree")
+        changes[path] = (old, new)
+    return changes
+
+
+def tree_entry(root: str, head: str, path: str, runner) -> GitEntry:
+    # Even after --, Git parses pathspec magic and globs. A literal lookup is
+    # essential when absence is used as evidence that a deletion survives.
+    raw = runner(["git", "-C", root, "--literal-pathspecs", "ls-tree", "-z", head, "--", path]).stdout
+    if not raw:
+        return None
+    match = re.fullmatch(r"(100644|100755) blob ([0-9a-f]{40})\t" + re.escape(path) + "\x00", raw)
+    if not match:
+        raise SupervisorError("exact regular-file blob unavailable")
+    return match[1], match[2]
+
+
+def verify_ordered_prs(receipt: dict, ledger: dict, target: dict, runtime: Path | None,
+                       evidence: dict | None, runner=command) -> dict:
+    """Corroborated same-goal membership plus independent remote and Git proof."""
+    from kg_microbe_progress.prs import AssociationError, require_current_pr_associations
+    from kg_microbe_workflows.closure import multi_pr_members
+    try:
+        members = multi_pr_members(receipt)
+        if runtime is None:
+            raise ValueError("ordered closure requires the supervisor's session directory")
+        errors = validate_receipt(receipt, ledger, target, runtime)
+        if errors:
+            raise ValueError("; ".join(errors))
+        require_current_pr_associations(runtime, ledger, {item["number"] for item in members})
+    except (AssociationError, ValueError) as error:
+        raise SupervisorError(str(error)) from error
+    root = target["root"]
+    start = closure_time(ledger["adopted_goal"]["started_at"], "goal start")
+    cutoff = closure_time(now(), "verification")
+    deadline = time.monotonic() + 300
+
+    def read(args, **kwargs):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise SupervisorError("ordered closure verification exceeded its deadline")
+        # Publication queries impose a tighter bound than ordinary member
+        # verification; preserve it within the shared ordered-closure deadline.
+        kwargs["timeout"] = min(kwargs.get("timeout", 45), 45, remaining)
+        result = runner(args, **kwargs)
+        if result.returncode and kwargs.get("check", True):
+            raise SupervisorError("ordered closure query failed")
+        return result
+
+    expected = {}
+    if evidence:
+        current = [receipt["goal_outputs"]["goal_evidence"], *evidence["artifacts"]]
+        expected = {item["path"]: item["sha256"] for item in current}
+    attributed = {item["path"]: item["sha256"] for item in receipt["evidence_attributions"]}
+    if attributed != expected:
+        raise SupervisorError("evidence attribution set differs from exact current-stage outputs")
+    proofs, commits_by_pr, changed = [], {}, {}
+    previous = None
+    for member in members:
+        issues = [item for item in receipt["issues"] if item["pr_number"] == member["number"]]
+        proof, live, commits = verify_pr_member(member, issues, target, read, ordered=True)
+        if member["merge_commit_sha"] != proof["merge_commit_sha"]:
+            raise SupervisorError("ordered PR merge commit differs from independently verified merge")
+        created, merged = closure_time(live.get("created_at"), "PR creation"), closure_time(live.get("merged_at"), "PR merge")
+        if not start <= created <= merged <= cutoff:
+            raise SupervisorError("ordered PR lies outside the adopted-goal closure window")
+        for sha in (member["head_sha"], member["merge_commit_sha"]):
+            if read(["git", "-C", root, "cat-file", "-t", sha]).stdout.strip() != "commit":
+                raise SupervisorError("ordered PR identity is not a commit")
+        if previous and (closure_time(previous["merged_at"], "previous merge") > merged
+                or read(["git", "-C", root, "merge-base", "--is-ancestor", previous["merge_commit_sha"],
+                         member["head_sha"]], check=False).returncode != 0):
+            raise SupervisorError("ordered PRs are unordered or final integration omits an earlier merge")
+        commit_shas = set()
+        for item in commits:
+            when = closure_time((item.get("commit") or {}).get("committer", {}).get("date"), "PR commit")
+            if not start <= when <= merged:
+                raise SupervisorError("ordered PR commit lies outside the adopted-goal closure window")
+            if read(["git", "-C", root, "merge-base", "--is-ancestor", item["sha"], member["head_sha"]], check=False).returncode:
+                raise SupervisorError("PR commit is not in its reviewed head")
+            commit_shas.add(item["sha"])
+        commits_by_pr[member["number"]] = commit_shas
+        proofs.append(proof)
+        previous = proof
+    final = members[-1]["head_sha"]
+    for attribution in receipt["evidence_attributions"]:
+        commit, path = attribution["commit_sha"], attribution["path"]
+        if commit not in commits_by_pr[attribution["pr_number"]]:
+            raise SupervisorError("evidence producer is not in its attributed PR")
+        if commit not in changed:
+            changed[commit] = commit_changes(root, commit, read)
+        entries = changed[commit].get(path)
+        final_entry = tree_entry(root, final, path, read)
+        if (not entries or entries[1] is None or entries[1] != final_entry
+                or (entries[0] is not None and entries[0][1] == entries[1][1])):
+            raise SupervisorError("evidence was not produced with the final bytes by its attributed commit")
+    member_by_number = {item["number"]: item for item in members}
+    member_order = {item["number"]: index for index, item in enumerate(members)}
+    evidence_by_path = {item["path"]: item for item in receipt["evidence_attributions"]}
+    attributed_fixes = {(item["pr_number"], item["fix_commit_sha"]) for item in receipt["issues"]}
+    for issue in receipt["issues"]:
+        commit = issue["fix_commit_sha"]
+        if commit not in changed:
+            changed[commit] = commit_changes(root, commit, read)
+        changes = changed[commit]
+        if not changes or not any(old != new for old, new in changes.values()):
+            raise SupervisorError("issue fix commit has no entry changes")
+        member = member_by_number[issue["pr_number"]]
+        superseded = {item["path"]: item for item in issue.get("superseded_paths", [])}
+        if not superseded.keys() <= changes.keys() or superseded.keys() & expected.keys():
+            raise SupervisorError("fix supersession must name original non-evidence changed paths")
+        for path, (old, produced) in changes.items():
+            if path in expected:
+                producer = evidence_by_path[path]
+                successor = producer["commit_sha"]
+                if producer["pr_number"] == issue["pr_number"]:
+                    ancestor = commit
+                elif member_order[producer["pr_number"]] > member_order[issue["pr_number"]]:
+                    ancestor = member["merge_commit_sha"]
+                else:
+                    raise SupervisorError("evidence supersession precedes its affected fix")
+                if read(["git", "-C", root, "merge-base", "--is-ancestor", ancestor, successor], check=False).returncode:
+                    raise SupervisorError("evidence producer does not descend from its affected fix")
+                continue
+            retained = produced
+            if path in superseded:
+                successor = superseded[path]
+                successor_sha = successor["commit_sha"]
+                if ((successor["pr_number"], successor_sha) not in attributed_fixes
+                        or successor["pr_number"] != issue["pr_number"] or successor_sha == commit
+                        or read(["git", "-C", root, "merge-base", "--is-ancestor", commit, successor_sha], check=False).returncode):
+                    raise SupervisorError("fix successor must be another descendant attributed fix in the same PR")
+                if successor_sha not in changed:
+                    changed[successor_sha] = commit_changes(root, successor_sha, read)
+                successor_change = changed[successor_sha].get(path)
+                if (old == produced or not successor_change or successor_change[0] == successor_change[1]
+                        or successor_change[1] == produced):
+                    raise SupervisorError("fix supersession is unchanged, unrelated or unnecessary")
+                retained = successor_change[1]
+            if tree_entry(root, member["head_sha"], path, read) != retained:
+                raise SupervisorError("member reviewed head does not retain the attributed fix producer entry")
+            if tree_entry(root, final, path, read) != retained:
+                raise SupervisorError("final integration head no longer retains an earlier reviewed fix entry")
+    # Preserve squash-source publication across all verified members after
+    # every membership, time-window, evidence and fix-retention gate has passed.
+    publication = verify_receipt_publication(receipt, target,
+        set().union(*commits_by_pr.values()), read)
+    return {**proofs[-1], "prs": proofs, "evidence_attributions": copy.deepcopy(receipt["evidence_attributions"]),
+            "commit_publication": publication}
 
 
 SEND_JS = r'''
@@ -1029,6 +1783,14 @@ function run(argv) {
             groups = system.doShellScript('/bin/ps -p ' + expected.pid + ' -o pgid=,tpgid=').trim().split(/\s+/);
         } catch (error) { return 'process-unavailable'; }
         if (identity !== expected.identity || cwd.length !== 1 || cwd[0] !== expected.cwd || groups.length !== 2 || groups[0] !== groups[1]) return 'identity-changed';
+        if (expected.agy_inventory) {
+            let inventory;
+            try {
+                inventory = system.doShellScript('/bin/ps -ax -o pid=,tty=,lstart=,comm=').split(/\r?\n|\r/)
+                    .map(x => x.trim()).filter(x => /(?:^|\s)agy$/.test(x)).sort();
+            } catch (error) { return 'process-inventory-unavailable'; }
+            if (JSON.stringify(inventory) !== JSON.stringify(expected.agy_inventory)) return 'process-inventory-changed';
+        }
         let currentScreen, expectedScreen;
         try {
             currentScreen = currentTail(tab);
@@ -1110,6 +1872,36 @@ class Supervisor:
         self.runner = runner
         self.stop_requested = stop_requested or (lambda: False)
         self.native_cache: dict[str, tuple[tuple, dict]] = {}
+        self._port_pressure_helpers = {
+            "read_json": read_json, "atomic_json": atomic_json, "file_lock": file_lock,
+            "send_js": SEND_JS, "busy": terminal_busy_reason,
+        }
+
+    def port_pressure(self, *, apply: bool = False, report_only: bool = False, boundary: dict | None = None,
+                      excluded_repository_keys: tuple[str, ...] = ()) -> dict:
+        from kg_microbe_workflows.port_pressure import normalize_config
+
+        # The one-setting off switch is reread each tick, not just at startup.
+        if self.config.get("_config_path"):
+            source = read_json(Path(self.config["_config_path"]))
+            self.config["port_pressure"] = source.get("port_pressure", {"mode": "off"})
+        if report_only:
+            self.config["port_pressure"] = {**self.config.get("port_pressure", {}), "mode": "report"}
+        raw = self.config.get("port_pressure", {"mode": "off"})
+        normalized = normalize_config({key: value for key, value in raw.items() if key != "binding_files"})
+        allowed = normalized["restart_repository_keys"]
+        if allowed is not None and not set(allowed) <= {target["repository_key"] for target in self.config["targets"]}:
+            raise SupervisorError("restart_repository_keys contains an unconfigured target")
+        self.config["port_pressure"] = {**raw, **normalized}
+        if normalized["mode"] == "off":
+            return {"phase": "off", "candidate": None}
+        adapter = import_file(ROOT / "scripts/mech_session_port_pressure.py", "supervisor_port_pressure")
+        kwargs = {"apply": apply and not report_only}
+        if boundary is not None:
+            kwargs["boundary"] = boundary
+        if excluded_repository_keys:
+            kwargs["excluded_repository_keys"] = excluded_repository_keys
+        return adapter.PortPressureGuard(self).tick(**kwargs)
 
     def stopping(self) -> bool:
         return self.stop_requested() or (self.runtime / "STOP").exists()
@@ -1125,6 +1917,21 @@ class Supervisor:
 
     def write(self, path: Path, value: Any) -> None:
         atomic_json(path, value, boundary=self.runtime)
+
+    def durability(self, target: dict) -> dict:
+        """Observe known owned state only; a failed observation never means safe."""
+        from kg_microbe_workflows.session_durability import observe_mech
+        try:
+            roots = durability_repository_roots(target)
+            paths = target.get("session_state_paths")
+            return observe_mech(roots, session_state_paths=None if paths is None else [Path(p) for p in paths])
+        except Exception:
+            # Do not retain arbitrary remote errors, credential-bearing URLs or
+            # native session data in an operational alert.
+            return {"schema_version": "1.0.0", "observed_at": now(), "status": "unknown",
+                    "alert": True, "complete": False, "repository_count": 0,
+                    "unpushed_commits": None, "at_risk_files": None, "overdue_files": None,
+                    "errors": ["repository_identity_or_observation_unavailable"]}
 
     def redraw_tab(self, target: dict, tab: dict, *, lock_held: bool = False) -> dict:
         payload = {**tab, "pid": target["pid"], "identity": target["process_identity"], "cwd": target["root"]}
@@ -1223,114 +2030,22 @@ class Supervisor:
                 observation.update(error="native goal differs from the assessed initial goal; reassessment required", ready=False)
                 return
             ledger["adopted_goal"] = native_id
-        history_path = Path(self.config.get("history_path", Path.home() / ".gemini/antigravity-cli/history.jsonl"))
         pending = [a for a in ledger["actions"].values() if scoped(a, ledger) and a["state"] in BLOCKING_RECEIPTS]
-        if pending and history_path.is_file():
-            with history_path.open() as stream:
-                for line in stream:
-                    try:
-                        row = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
-                    if row.get("workspace") != target["root"]:
-                        continue
-                    display = row.get("display")
-                    for action in pending:
-                        payload = action.get("transport_message", action.get("message"))
-                        if (payload and isinstance(display, str) and display.strip() == payload.strip()
-                                and row.get("timestamp", 0) >= action["reserved_epoch_ms"]
-                                and row.get("conversationId") == target["native_session_id"]
-                                and action["native_session_id"] == target["native_session_id"]):
-                            # History is populated when input is queued, before native consumption.
-                            action.setdefault("submission_evidence", {"source": "workspace_history_exact",
-                                "timestamp": row["timestamp"], "text_sha256": hashlib.sha256(payload.encode()).hexdigest()})
-        candidates = [a for a in pending if a.get("transport_message", a.get("message"))
-                      and a.get("native_session_id") == target["native_session_id"]
-                      and not a.get("native_consumption", {}).get("verified")]
         for action in pending:
-            if action["state"] == "accepted":
-                action.setdefault("native_consumption", {"verified": False,
-                    "reason": "historical acceptance has no exact native input verification"})
-        if candidates:
-            baseline = min(a.get("native_step_index") if type(a.get("native_step_index")) is int else -1
-                           for a in candidates)
-            try:
-                inputs = self.native_inputs(target, baseline)
-            except Exception as error:
-                observation["acceptance_error"] = str(error)[:500]
-                inputs = []
-            for action in candidates:
-                payload = action.get("transport_message", action.get("message"))
-                baseline = action.get("native_step_index")
-                for item in inputs:
-                    if (type(baseline) is int and item["step_index"] <= baseline
-                            or item["timestamp_ms"] < action["reserved_epoch_ms"]
-                            or item["goal_declaration"] != payload.startswith("/goal ")
-                            or item["text"].strip() != normalized_input(payload)):
-                        continue
-                    action.update(state="accepted", acceptance="native_user_input_exact",
-                                  native_consumption={"verified": True, "step_index": item["step_index"],
-                                      "created_at": item["created_at"],
-                                      "text_sha256": hashlib.sha256(item["text"].encode()).hexdigest()})
-                    action.setdefault("accepted_at", now())
-                    if action["kind"] == "policy_update":
-                        ledger["policy_notification_required"] = False
-                    break
-        if ledger.get("awaiting_goal") and native_id and native_id != ledger["adopted_goal"]:
-            for action in pending:
-                # The exact declaration is already verified; later goal text may be amended.
-                if (action["kind"] == "start_goal" and scoped(action, ledger)
-                        and action.get("native_consumption", {}).get("verified")
-                        and action["native_consumption"]["step_index"] == native_id["start_step_index"]):
-                    action["accepted_goal_identity"] = native_id
-                    ledger.update(adopted_goal=native_id, awaiting_goal=False)
-                    break
-
-    def native_inputs(self, target: dict, after: int) -> list[dict]:
-        """Read completed user inputs from a verified private native snapshot."""
-        cid = target["native_session_id"]
-        if not cid or Path(cid).name != cid or "/" in cid or "\\" in cid:
-            raise SupervisorError("invalid native conversation ID")
-        directory = Path(self.config.get("conversation_dir", Path.home() / ".gemini/antigravity-cli/conversations"))
-        with self.native.snapshot(directory / f"{cid}.db") as (connection, _):
-            trajectory = connection.execute("select * from trajectory_meta").fetchall()
-            if len(trajectory) != 1 or trajectory[0][1] != cid:
-                raise SupervisorError("native input conversation identity mismatch")
-            metadata = connection.execute("select data from trajectory_metadata_blob where id=?", ("main",)).fetchone()
-            uri = self.native.text(self.native.one(metadata[0], 7, b"")) if metadata else ""
-            parsed = urlparse(uri)
-            if parsed.scheme != "file" or Path(unquote(parsed.path)).resolve() != Path(target["root"]).resolve():
-                raise SupervisorError("native input workspace identity mismatch")
-            result = []
-            for index, payload in connection.execute(
-                    "select idx,step_payload from steps where step_type=14 and status=3 and idx>? order by idx", (after,)):
-                created = self.native.metadata_times(payload)["created_at"]
-                if not created:
-                    continue
-                stamp = datetime.fromisoformat(created.replace("Z", "+00:00"))
-                if stamp.tzinfo is None:
-                    continue
-                result.append({"step_index": index, "created_at": created, "timestamp_ms": stamp.timestamp() * 1000,
-                               "text": "\n".join(self.native.user_parts(payload)),
-                               "goal_declaration": self.native.native_goal_declaration(payload)})
-            return result
-
-    def action_transport(self, target: dict, identifier: str, kind: str, message: str) -> tuple[str, dict]:
-        """Write the full instruction once; keep terminal input short and reviewable."""
-        path = self.directory(target) / "instructions" / f"{identifier}.json"
-        artifact = {"action_id": identifier, "kind": kind, "instruction": normalized_input(message)}
-        expected_bytes = (json.dumps(artifact, indent=2, sort_keys=True) + "\n").encode()
-        if path.is_symlink() or not path.parent.resolve().is_relative_to(self.runtime):
-            raise SupervisorError("action instruction must not be a symlink")
-        if path.exists():
-            if read_json(path) != artifact or path.read_bytes() != expected_bytes:
-                raise SupervisorError("immutable action instruction changed")
-        else:
-            self.write(path, artifact)
-        payload = ("/goal " if message.startswith("/goal ") else "") + (
-            f"[MECH-WORKFLOW-{identifier}] Read {path} and carry out its instruction. "
-            "It contains the full objective and closure requirements.")
-        return payload, {"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+            adopting = ledger.get("awaiting_goal") and action.get("kind") == "start_goal"
+            if action["state"] == "accepted" and not adopting:
+                continue  # historical acceptance timestamps are immutable
+            proof = native_delivery_proof(action, target, observation)
+            if proof is None:
+                continue
+            if action["state"] != "accepted":
+                action.update(state="accepted", accepted_at=now(), acceptance="native_exact_user_input")
+            action.update(delivery_proof=proof, delivery_verified_at=now())
+            if action["kind"] == "policy_update":
+                ledger["policy_notification_required"] = False
+            if adopting and native_id and native_id != ledger["adopted_goal"]:
+                action["accepted_goal_identity"] = native_id
+                ledger.update(adopted_goal=native_id, awaiting_goal=False)
 
     def baseline(self, target: dict, ledger: dict) -> None:
         if "baseline_head" not in ledger:
@@ -1382,9 +2097,89 @@ class Supervisor:
         except Exception as error:
             return {"authority": "ignored", "error": str(error)[:300]}
 
+    def goal_boundary(self, target: dict, ledger: dict, decision: dict) -> dict | None:
+        """Bind maintenance to the retained verified closure, never a stage number."""
+        if decision.get("action") != "start_goal" or not ledger.get("awaiting_goal"):
+            return None
+        records = ledger.get("completed_stages", [])
+        if not records:
+            return None  # Initial adoption is not a completed-goal boundary.
+        closed = records[-1]
+        if (closed.get("goal_identity") != ledger.get("adopted_goal")
+                or closed.get("verification", {}).get("status") not in {"merged", "no_changes"}
+                or closed.get("completion_authority") not in {"native_completed", "verified_receipt_override"}
+                or not re.fullmatch(r"[0-9a-f]{64}", closed.get("receipt_sha256", ""))):
+            raise SupervisorError("goal-boundary recycling requires the retained verified completion")
+        stage = stage_profile(target, ledger["stage"], ledger)
+        key = stage.get("key") if stage else None
+        if not key:
+            raise SupervisorError("goal-boundary recycling requires a canonical stage key")
+        return {"repository_key": target["repository_key"], "pid": target["pid"],
+                "action_id": decision["action_id"], "next_stage_key": key,
+                "receipt_sha256": closed["receipt_sha256"],
+                "completion_authority": closed["completion_authority"],
+                "goal_identity": copy.deepcopy(closed["goal_identity"])}
+
+    def boundary_maintenance(self, target: dict, ledger: dict, decision: dict) -> dict | None:
+        if self.config.get("port_pressure", {"mode": "off"}).get("mode") == "off":
+            return None
+        allowed = self.config["port_pressure"].get("restart_repository_keys")
+        if allowed is not None and target["repository_key"] not in allowed:
+            return None  # Canary scope does not hold other sessions' normal goals.
+        boundary = self.goal_boundary(target, ledger, decision)
+        if boundary is None:
+            return None
+        self._port_pressure_boundary_seen = True
+        fresh = self.observe(target, fresh=True, allow_redraw=False)
+        fresh["agent_progress"] = self.progress(target, ledger)
+        reason = None
+        if decide(ledger, fresh).get("action_id") != decision.get("action_id"):
+            reason = "goal prerequisite changed before boundary maintenance"
+        else:
+            errors = self.skill_errors(target, ledger["stage"], ledger)
+            if (boundary["next_stage_key"] == "resolve_review_findings"
+                    and not previous_evidence(ledger, ledger["stage"])):
+                errors.append("next goal requires the verified review manifest")
+            try:
+                self.check_workflow(target, ledger)
+            except Exception as error:
+                errors.append(str(error))
+            reason = "; ".join(errors) if errors else None
+        if reason:
+            report = {"phase": "blocked", "reason": reason}
+            marker = {**boundary, **report, "updated_at": now()}
+            ledger["port_pressure_boundary"] = marker
+            self.save(target, ledger)
+            self._port_pressure_boundary_report = marker
+            return marker
+        prior = ledger.get("port_pressure_boundary", {})
+        if (prior.get("action_id") == boundary["action_id"]
+                and prior.get("receipt_sha256") == boundary["receipt_sha256"]
+                and prior.get("phase") == "restarted"
+                and prior.get("new_pid") == target["pid"]
+                and prior.get("process_identity") == target["process_identity"]):
+            self._port_pressure_boundary_report = prior
+            return prior  # A failed goal send must not spend another restart.
+        if getattr(self, "_port_pressure_recycled", False):
+            report = {"phase": "limited", "limit_reason": "one recycle per supervisor tick"}
+        else:
+            report = self.port_pressure(apply=True, boundary=boundary)
+        if report["phase"] == "restarted":
+            self._port_pressure_recycled = True
+        marker = {**boundary, **report, "process_identity": target["process_identity"], "updated_at": now()}
+        # Durable hold/restart proof survives a failed send or supervisor tick.
+        ledger["port_pressure_boundary"] = marker
+        self.save(target, ledger)
+        self._port_pressure_boundary_report = marker
+        return marker
+
     def dispatch(self, target: dict, ledger: dict, decision: dict) -> dict:
         if self.stopping():
             return {"state": "not-sent", "reason": "supervisor stop requested"}
+        boundary = self.boundary_maintenance(target, ledger, decision)
+        if boundary and boundary["phase"] not in {"off", "healthy", "restarted"}:
+            return {"state": "not-sent", "reason": "goal boundary held for port-pressure maintenance",
+                    "port_pressure": boundary}
         lock = Path(self.config["input_lock_dir"]) / (Path(target["tty"]).name + ".lock")
         with file_lock(lock):
             observation = self.observe(target, fresh=True, allow_redraw=True, lock_held=True)
@@ -1404,8 +2199,8 @@ class Supervisor:
             if current.get("action_id") != decision.get("action_id"):
                 return {"state": "not-sent", "reason": "prerequisite changed before send"}
             errors = self.skill_errors(target, ledger["stage"], ledger)
-            if ledger.get("schema_version") == 2 and ledger["stage"] == 5 and not previous_evidence(ledger, 5):
-                errors.append("stage 5 requires the verified stage-4 review manifest")
+            if workflow_stage_key(ledger) == "resolve_review_findings" and not previous_evidence(ledger, ledger["stage"]):
+                errors.append("resolve_review_findings requires the verified record-review manifest")
             if errors:
                 return {"state": "not-sent", "reason": "; ".join(errors)}
             if ledger.get("schema_version") == 2:
@@ -1416,12 +2211,11 @@ class Supervisor:
                 return {"state": "not-sent", "reason": "workflow instruction file missing"}
             identifier = decision["action_id"]
             message = message_for(target, ledger, decision, self.directory(target))
-            transport, instruction_artifact = self.action_transport(target, identifier, decision["action"], message)
             action = {"id": identifier, "kind": decision["action"], "stage": ledger["stage"], "cycle": ledger.get("cycle", 1),
                       "marker": "MECH-WORKFLOW-" + identifier, "state": "reserved", "reserved_at": now(),
                       "reserved_epoch_ms": int(time.time() * 1000), "native_session_id": target["native_session_id"],
                       "goal_identity": ledger["adopted_goal"], "message": message,
-                      "transport_message": transport, "instruction_artifact": instruction_artifact,
+                      "message_sha256": hashlib.sha256(message.encode("utf-8")).hexdigest(),
                       "native_step_index": ((observation.get("native") or {}).get("last_step") or {}).get("index"),
                       "instruction_sha256": hashlib.sha256(prompt.read_bytes()).hexdigest()}
             ledger["actions"][identifier] = action
@@ -1431,8 +2225,12 @@ class Supervisor:
                     action.update(state="not-sent", outcome="stop-requested", updated_at=now())
                 else:
                     result = self.notifier.jxa(SEND_JS, {**observation["tab"], "pid": target["pid"],
-                        "identity": target["process_identity"], "cwd": target["root"], "message": transport})
-                    action.update(state="sent" if result == "sent" else "not-sent", outcome=result, updated_at=now())
+                        "identity": target["process_identity"], "cwd": target["root"], "message": message})
+                    # Terminal returning proves only that the transport was
+                    # invoked: it may leave a partial unsent composer. Keep a
+                    # blocking uncertain reservation until native exact-input
+                    # reconciliation, never retry or append Enter automatically.
+                    action.update(state="uncertain" if result == "sent" else "not-sent", outcome=result, updated_at=now())
             except Exception as error:
                 action.update(state="uncertain", error=str(error)[:500], updated_at=now())
             self.save(target, ledger)
@@ -1443,19 +2241,23 @@ class Supervisor:
         if digest(effective) != ledger["workflow"]["sha256"]:
             raise SupervisorError("pinned workflow snapshot changed")
         queued = target.get("workflow_next_profile_path")
-        if queued and Path(queued).resolve() == Path(ledger["active_profile_path"]).resolve():
-            # The canonical repository profile is now a next-cycle candidate.
-            # Its edits cannot change the already validated effective snapshot.
-            for source in effective.get("sources", []):
-                if source["kind"] in {"parent", "schema"}:
-                    errors = artifact_errors({"artifact": source["path"], "sha256": source["sha256"]},
-                                              [Path(source["path"]).parent], "pinned core input")
-                    if errors:
-                        raise SupervisorError("; ".join(errors))
-        else:
-            current = load_effective(self.config, target, profile_path=ledger.get("active_profile_path"))
-            if digest(current) != ledger["workflow"]["sha256"]:
-                raise SupervisorError("pinned workflow inputs changed during the active cycle; reviewed migration required")
+        candidate_replaces_active = bool(queued and Path(queued).resolve() == Path(ledger["active_profile_path"]).resolve())
+        from kg_microbe_workflows import LEGACY_PARENT_PATH, LEGACY_SCHEMA_PATH
+        retained = {"parent": LEGACY_PARENT_PATH, "schema": LEGACY_SCHEMA_PATH}
+        for source in effective.get("sources", []):
+            # A candidate may replace repository-local inputs, never the already
+            # validated immutable effective contract. Core release replacement
+            # can use only a retained byte-identical legacy source.
+            if candidate_replaces_active and source["kind"] not in retained:
+                continue
+            errors = artifact_errors({"artifact": source["path"], "sha256": source["sha256"]},
+                                     [Path(source["path"]).parent], "pinned workflow input")
+            if errors and source["kind"] in retained:
+                fallback = retained[source["kind"]]
+                errors = artifact_errors({"artifact": str(fallback), "sha256": source["sha256"]},
+                                         [fallback.parent], "retained pinned core input")
+            if errors:
+                raise SupervisorError("pinned workflow inputs changed during the active cycle: " + "; ".join(errors))
         path = self.directory(target) / "effective-workflow.json"
         snapshot = {"cycle": ledger["cycle"], "workflow_sha256": ledger["workflow"]["sha256"],
                     "effective": ledger["workflow"]["effective"]}
@@ -1468,6 +2270,13 @@ class Supervisor:
         if archive.exists() and read_json(archive) != snapshot:
             raise SupervisorError("archived cycle instruction snapshot changed")
         self.write(archive, snapshot)
+        if workflow_stage_key(ledger) == "open_issue_triage":
+            scope = ledger.get("issue_scope") or {}
+            validate_frozen_issue_scope(scope, target)
+            scope_path = archive.parent / "issue-scope.json"
+            if scope_path.exists() and read_json(scope_path) != scope:
+                raise SupervisorError("archived issue inventory changed")
+            self.write(scope_path, scope)
 
     def advance(self, target: dict, ledger: dict, receipt: dict, verification: dict, authority: str) -> dict:
         closed_stage = ledger["stage"]
@@ -1477,28 +2286,41 @@ class Supervisor:
         if ledger.get("schema_version") == 2:
             evidence = goal_output_data(receipt, ledger, target)
             record["workflow_sha256"] = ledger["workflow"]["sha256"]
+            record["parent_version"] = ledger["workflow"]["effective"]["parent_version"]
+            record["stage_key"] = workflow_stage_key(ledger)
             if evidence:
                 record["goal_evidence"] = copy.deepcopy(receipt["goal_outputs"]["goal_evidence"])
                 record["goal_evidence_snapshot"] = evidence
         advanced["completed_stages"].append(record)
-        if ledger.get("schema_version") == 2 and closed_stage == 6:
+        record_cycle_version(advanced)
+        if ledger.get("schema_version") == 2 and closed_stage == last_stage(ledger):
             effective = load_effective(self.config, target, next_cycle=True)
             current = ledger["workflow"]["effective"]
             parent_fields = ("parent_id", "parent_version", "parent_sha256", "schema_sha256", "parent_repository", "parent_revision")
+            migration = None
             if any(effective[field] != current[field] for field in parent_fields):
-                raise SupervisorError("next-cycle parent provenance changed; a reviewed shared-contract migration is required")
+                migration = self.verify_parent_migration(target, ledger, effective)
+                advanced.setdefault("parent_migrations", []).append(migration)
             candidate = target.get("workflow_next_profile_path") or target["workflow_profile_path"]
             head = receipt.get("pr", {}).get("head_sha") if receipt["status"] == "completed" else receipt["no_changes"]["head_sha"]
-            self.verify_next_profile(target, effective, candidate, head)
+            self.verify_next_profile(target, effective, candidate, head, migration=migration)
             advanced.update(cycle=ledger["cycle"] + 1, stage=1, awaiting_goal=True,
                             workflow=pin_workflow(effective), active_profile_path=candidate)
+            record_cycle_version(advanced)
         else:
-            advanced.update(stage=closed_stage + 1, awaiting_goal=(closed_stage < 6 if ledger.get("schema_version") == 2 else closed_stage < 4))
-        if advanced.get("schema_version") == 2 and advanced["stage"] == 6:
+            advanced.update(stage=closed_stage + 1, awaiting_goal=closed_stage < last_stage(ledger))
+        if workflow_stage_key(advanced) == "infrastructure":
             advanced["infra_scope"] = freeze_infrastructure(target)
             self.write(self.directory(target) / "cycles" / f"cycle-{advanced['cycle']:06d}" / "infra-scope.json", advanced["infra_scope"])
-        elif advanced["stage"] != 6:
+        else:
             advanced.pop("infra_scope", None)
+        if workflow_stage_key(advanced) == "open_issue_triage":
+            path = self.directory(target) / "cycles" / f"cycle-{advanced['cycle']:06d}" / "issue-scope.json"
+            advanced["issue_scope"] = read_json(path) if path.exists() else freeze_open_issues(target, runner=self.runner)
+            validate_frozen_issue_scope(advanced["issue_scope"], target)
+            self.write(path, advanced["issue_scope"])
+        else:
+            advanced.pop("issue_scope", None)
         for key in ("baseline_head", "baseline_status", "legacy_receipt_stage"):
             advanced.pop(key, None)
         self.baseline(target, advanced)
@@ -1506,13 +2328,42 @@ class Supervisor:
         self.write(path, receipt)
         return advanced
 
-    def verify_next_profile(self, target: dict, effective: dict, candidate: str, head: str) -> None:
+    def verify_parent_migration(self, target: dict, ledger: dict, effective: dict) -> dict:
+        """A reviewed exact-pair migration may activate only at final closure."""
+        current = ledger["workflow"]["effective"]
+        migration = target.get("workflow_parent_migration") or {}
+        if (workflow_stage_key(ledger) != "infrastructure"
+                or current["parent_version"].split(".")[0] != "1"
+                or effective["parent_version"] != "2.0.0"
+                or effective["parent_id"] != current["parent_id"]
+                or effective["parent_repository"] != current["parent_repository"]):
+            raise SupervisorError("next-cycle parent provenance changed outside the supported six-to-seven boundary migration")
+        if (migration.get("from_sha256") != ledger["workflow"]["sha256"]
+                or migration.get("to_sha256") != digest(effective)
+                or not isinstance(migration.get("reviewed_by"), str) or not migration["reviewed_by"].strip()
+                or not isinstance(migration.get("reason"), str) or not migration["reason"].strip()):
+            raise SupervisorError("next-cycle parent provenance changed; an exact reviewed shared-contract migration is required")
+        errors = artifact_errors(migration.get("review", {}), [Path(target["root"])], "parent migration review")
+        if errors:
+            raise SupervisorError("; ".join(errors))
+        return {**copy.deepcopy(migration), "from_cycle": ledger["cycle"], "to_cycle": ledger["cycle"] + 1,
+                "from_parent_version": current["parent_version"], "to_parent_version": effective["parent_version"],
+                "activated_at": now()}
+
+    def verify_next_profile(self, target: dict, effective: dict, candidate: str, head: str, *, migration=None) -> None:
         if (effective["repository_key"] != target["repository_key"]
                 or effective["github_repository"].casefold() != target["github_repository"].casefold()):
             raise SupervisorError("next-cycle profile repository identity differs from its verified target")
         root = Path(target["root"]).resolve()
         inputs = [{"path": candidate, "sha256": effective["profile_sha256"]}]
         inputs += [source for source in effective.get("sources", []) if source.get("kind") == "extension"]
+        if migration:
+            review = migration["review"]
+            review_path = Path(review["artifact"])
+            inputs.append({"path": str(review_path if review_path.is_absolute() else root / review_path),
+                           "sha256": review["sha256"]})
+            inputs += [source for source in effective.get("sources", []) if source.get("kind") in {"parent", "schema"}
+                       and Path(source["path"]).resolve().is_relative_to(root)]
         for source in inputs:
             path = Path(source["path"])
             errors = artifact_errors({"artifact": str(path), "sha256": source["sha256"]}, [root], "next-cycle profile input")
@@ -1528,7 +2379,25 @@ class Supervisor:
                 raise SupervisorError("next-cycle profile/extension is not committed at the verified closure head")
 
     def sweep(self, *, apply: bool = False) -> dict:
+        self._port_pressure_recycled = False
+        self._port_pressure_boundary_seen = False
+        self._port_pressure_boundary_report = None
+        fallback_attempted = False
+        # Observe pressure first, but do not let an idle-scan candidate preempt
+        # a session whose verified goal boundary is established below.
+        pressure = self.port_pressure(apply=False)
+        initial_pressure = pressure
+        if (self.config.get("port_pressure", {}).get("mode") == "restart"
+                and pressure["phase"] in {"restarted", "disabled", "unknown"}):
+            # A maintenance tick never sends ordinary workflow/goal text. An
+            # uncertain transaction stays stopped for operator reconciliation.
+            result = {"run_id": self.config["run_id"], "updated_at": now(),
+                      "mode": "apply" if apply else "observe", "sessions": [],
+                      "port_pressure": pressure}
+            self.write(self.runtime / "dashboard.json", result)
+            return result
         rows = []
+        deliveries = []
         for target in self.config["targets"]:
             if self.stopping():
                 break
@@ -1536,7 +2405,7 @@ class Supervisor:
             ledger_path = directory / "ledger.json"
             if ledger_path.is_symlink():
                 raise SupervisorError("runtime ledger must not be a symlink")
-            ledger = read_json(ledger_path) if ledger_path.exists() else new_ledger(self.config, target)
+            ledger = read_json(ledger_path) if ledger_path.exists() else new_ledger(self.config, target, runner=self.runner)
             if ledger.get("run_id") != self.config["run_id"] or ledger.get("repository_key") != target["repository_key"]:
                 raise SupervisorError("runtime ledger belongs to another workflow")
             workflow_error = None
@@ -1544,6 +2413,7 @@ class Supervisor:
                 if target.get("_workflow"):
                     if ledger.get("schema_version") == 1:
                         ledger = migrate_ledger(ledger, target, target["_workflow"])
+                    record_cycle_version(ledger)
                     self.check_workflow(target, ledger)
                 elif apply:
                     raise SupervisorError("legacy workflow is observation-only; canonical profile and reviewed migration required")
@@ -1563,7 +2433,7 @@ class Supervisor:
             receipt_path = directory / "completion.json"
             verification = None
             receipt_errors = []
-            if receipt_path.exists() and ledger["stage"] <= (6 if ledger.get("schema_version") == 2 else 4) and not ledger.get("awaiting_goal") and not ledger.get("policy_notification_required") and not workflow_error:
+            if receipt_path.exists() and ledger["stage"] <= last_stage(ledger) and not ledger.get("awaiting_goal") and not ledger.get("policy_notification_required") and not workflow_error:
                 try:
                     if receipt_path.is_symlink() or receipt_path.resolve().parent != directory.resolve() or not receipt_path.is_file():
                         raise SupervisorError("completion receipt is not a regular file inside this repository runtime")
@@ -1573,7 +2443,7 @@ class Supervisor:
                     receipt_errors = [] if archived else validate_receipt(receipt, ledger, target, directory)
                     if not archived and not receipt_errors and observation.get("ready"):
                         authority = completion_authority(target, ledger, observation)
-                        verification = verify_remote_receipt(receipt, ledger, target, self.runner)
+                        verification = verify_remote_receipt(receipt, ledger, target, self.runner, runtime=self.directory(target))
                         ledger = self.advance(target, ledger, receipt, verification, authority)
                         # Do not delete the producer's file; mismatched old receipts
                         # are ignored only while a new goal is awaiting acceptance.
@@ -1587,15 +2457,15 @@ class Supervisor:
                 decision = repair_decision(ledger, observation, decision["repair_reason"], hashlib.sha256(receipt_path.read_bytes()).hexdigest())
             if decision.get("action"):
                 errors = self.skill_errors(target, ledger["stage"], ledger)
-                if ledger.get("schema_version") == 2 and ledger["stage"] == 5 and not previous_evidence(ledger, 5):
-                    errors.append("stage 5 requires the verified stage-4 review manifest")
+                if workflow_stage_key(ledger) == "resolve_review_findings" and not previous_evidence(ledger, ledger["stage"]):
+                    errors.append("resolve_review_findings requires the verified record-review manifest")
                 if errors:
                     decision = {"phase": "blocked", "reason": "; ".join(errors)}
             ledger.update(phase=decision["phase"], last_observed_at=observation["observed_at"],
                           blocked_reason=decision.get("reason"))
             if not workflow_error:
                 self.save(target, ledger)
-                verified_outputs = [{key: record[key] for key in ("cycle", "stage", "goal_evidence", "receipt_sha256", "verification")}
+                verified_outputs = [{key: record[key] for key in ("cycle", "stage", "parent_version", "stage_key", "goal_evidence", "receipt_sha256", "verification") if key in record}
                                     for record in ledger["completed_stages"] if record.get("goal_evidence")]
                 if verified_outputs:
                     self.write(directory / "verified-evidence-index.json", {"authority": "verified_closure", "entries": verified_outputs})
@@ -1603,6 +2473,7 @@ class Supervisor:
             native = observation.get("native") or {}
             status = {"run_id": ledger["run_id"], "repository_key": target["repository_key"],
                       "stage": ledger["stage"], "cycle": ledger.get("cycle", 1), "workflow_sha256": ledger.get("workflow", {}).get("sha256"),
+                      "parent_version": ledger.get("parent_version"), "stage_key": workflow_stage_key(ledger),
                       "goal_identity": ledger["adopted_goal"],
                       "phase": decision["phase"], "decision": decision, "observation": public_observation,
                       "native_execution_state": native.get("native_execution_state"),
@@ -1616,23 +2487,79 @@ class Supervisor:
                       "active_profile_path": ledger.get("active_profile_path"),
                       "next_profile_path": target.get("workflow_next_profile_path"),
                       "infra_scope": ledger.get("infra_scope"),
+                      "issue_scope": ledger.get("issue_scope"), "cycle_versions": ledger.get("cycle_versions", {}),
                       "completed_stages": ledger["completed_stages"], "updated_at": now()}
+            status["session_durability"] = self.durability(target)
+            status["updated_at"] = now()
             self.write(directory / "status.json", status)
             if apply and decision.get("action"):
-                try:
-                    status["delivery"] = self.dispatch(target, ledger, decision)
-                except Exception as error:
-                    status["delivery"] = {"state": "not-sent", "reason": str(error)[:700]}
-                self.write(directory / "status.json", status)
+                if self.config.get("port_pressure", {}).get("mode") == "off":
+                    # Disabled deployments retain the existing per-target STOP
+                    # and dispatch order; observation adds no maintenance lane.
+                    try:
+                        status["delivery"] = self.dispatch(target, ledger, decision)
+                    except Exception as error:
+                        status["delivery"] = {"state": "not-sent", "reason": str(error)[:700]}
+                    self.write(directory / "status.json", status)
+                else:
+                    deliveries.append((target, ledger, decision, status))
+            from kg_microbe_workflows.session_durability import public_summary
             rows.append({"repository": target["repository_key"], "stage": ledger["stage"], "cycle": ledger.get("cycle", 1),
                          "phase": decision["phase"], "reason": decision.get("reason"),
                          "goal_state": observation.get("goal_state"),
                          "agent_progress": status["agent_progress"],
+                         "session_durability": public_summary(status["session_durability"]),
                          "delivery": (status.get("delivery") or {}).get("state")})
             self.write(self.runtime / "heartbeat.json", {"pid": os.getpid(), "updated_at": now(),
                 "running": True, "mode": "apply" if apply else "observe", "sweep_in_progress": True,
                 "repositories_observed": len(rows), "repositories_total": len(self.config["targets"])})
-        dashboard = {"run_id": self.config["run_id"], "updated_at": now(), "mode": "apply" if apply else "observe", "sessions": rows}
+        # Goal starts run first irrespective of target-list order. They retain
+        # their closure proof and use their own target-specific maintenance.
+        deliveries.sort(key=lambda entry: entry[2].get("action") != "start_goal")
+        attempted = []
+        boundary_reports = []
+        for target, ledger, decision, status in deliveries:
+            if self.stopping():
+                break
+            if (decision.get("action") != "start_goal"
+                    and not self._port_pressure_recycled and not fallback_attempted
+                    and initial_pressure.get("phase") == "candidate"
+                    and pressure.get("phase") not in {"disabled", "unknown"}):
+                fallback_attempted = True
+                pressure = self.port_pressure(apply=apply, excluded_repository_keys=tuple(attempted))
+                self._port_pressure_recycled = pressure.get("phase") == "restarted"
+                if pressure.get("phase") in {"restarted", "disabled", "unknown"}:
+                    break
+            try:
+                attempted.append(target["repository_key"])
+                self._port_pressure_boundary_report = None
+                status["delivery"] = self.dispatch(target, ledger, decision)
+            except Exception as error:
+                status["delivery"] = {"state": "not-sent", "reason": str(error)[:700]}
+            directory = self.directory(target)
+            current_status = read_json(directory / "status.json")
+            if current_status.get("port_pressure_restart"):
+                status["port_pressure_restart"] = current_status["port_pressure_restart"]
+            if ledger.get("port_pressure_boundary"):
+                status["port_pressure_boundary"] = ledger["port_pressure_boundary"]
+            self.write(directory / "status.json", status)
+            next(row for row in rows if row["repository"] == target["repository_key"])["delivery"] = status["delivery"]["state"]
+            if self._port_pressure_boundary_report:
+                pressure = self._port_pressure_boundary_report
+                boundary_reports.append(pressure)
+            if pressure.get("phase") in {"disabled", "unknown"}:
+                break
+        if (apply and not self.stopping()
+                and not self._port_pressure_recycled and not fallback_attempted
+                and initial_pressure.get("phase") == "candidate"
+                and pressure.get("phase") not in {"disabled", "unknown"}):
+            pressure = self.port_pressure(apply=True, excluded_repository_keys=tuple(attempted))
+            self._port_pressure_recycled = pressure.get("phase") == "restarted"
+        if boundary_reports:
+            pressure = {**pressure, "initial_idle_scan": initial_pressure, "goal_boundaries": boundary_reports,
+                        "recycle_performed_this_tick": self._port_pressure_recycled}
+        dashboard = {"run_id": self.config["run_id"], "updated_at": now(), "mode": "apply" if apply else "observe", "sessions": rows,
+                     "port_pressure": pressure}
         self.write(self.runtime / "dashboard.json", dashboard)
         lines = ["# Mech session workflow", "", f"Updated: {dashboard['updated_at']}", "",
                  "| Repository | Stage | Phase | Native goal | Detail |", "|---|---:|---|---|---|"]
@@ -1641,6 +2568,10 @@ class Supervisor:
             progress = row.get("agent_progress") or {}
             if progress.get("authority") == "informational_only" and progress.get("phase"):
                 detail += " Agent phase: " + progress["phase"].replace("|", "\\|").replace("\n", " ")
+            durability = row["session_durability"]
+            detail += (f" Durability {durability['status']}: "
+                       f"unpushed={durability['unpushed_commits']}, "
+                       f"at-risk={durability['at_risk_files']}, overdue={durability['overdue_files']}.")
             lines.append(f"| {row['repository']} | {row['stage']} | {row['phase']} | {row.get('goal_state', '')} | {detail} |")
         dashboard_path = self.runtime / "dashboard.md"
         if dashboard_path.is_symlink():
@@ -1658,14 +2589,20 @@ def main(argv=None) -> int:
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--observe", action="store_true", help="read-only observation (default)")
     mode.add_argument("--apply", action="store_true", help="submit guarded instructions at idle composers")
+    mode.add_argument("--port-pressure-report", action="store_true",
+                      help="only report port pressure and blocked tasks; never send session input")
+    mode.add_argument("--port-pressure-restart", action="store_true",
+                      help="only run the explicitly enabled maintenance guard; never dispatch goal text")
     parser.add_argument("--loop", action="store_true")
     parser.add_argument("--interval", type=float, default=30)
     args = parser.parse_args(argv)
     if not 5 <= args.interval <= 60:
         parser.error("--interval must be between 5 and 60 seconds")
     config = validate_config(read_json(args.config))
+    config["_config_path"] = str(args.config.resolve())
     stopped = False
     supervisor = Supervisor(config, stop_requested=lambda: stopped)
+    guard_failed = False
 
     def stop(_signal, _frame):
         nonlocal stopped
@@ -1673,10 +2610,26 @@ def main(argv=None) -> int:
 
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
+    if args.port_pressure_report or args.port_pressure_restart:
+        # A standalone observation must not acquire the workflow loop's lock or
+        # overwrite its heartbeat. The guard owns a separate transaction lock.
+        while not stopped and not supervisor.stopping():
+            result = supervisor.port_pressure(report_only=args.port_pressure_report,
+                                              apply=args.port_pressure_restart)
+            print(json.dumps(result), flush=True)
+            guard_failed = guard_failed or result.get("phase") in {"unknown", "disabled"}
+            if not args.loop:
+                return int(guard_failed)
+            deadline = time.monotonic() + args.interval
+            while not stopped and time.monotonic() < deadline:
+                time.sleep(min(0.5, max(0, deadline - time.monotonic())))
+        return int(guard_failed)
     with file_lock(supervisor.runtime / "supervisor.lock"):
         try:
             while not stopped and not (supervisor.runtime / "STOP").exists():
-                print(json.dumps(supervisor.sweep(apply=args.apply)), flush=True)
+                result = supervisor.sweep(apply=args.apply)
+                print(json.dumps(result), flush=True)
+                guard_failed = guard_failed or result.get("port_pressure", {}).get("phase") in {"unknown", "disabled"}
                 if not args.loop:
                     break
                 deadline = time.monotonic() + args.interval
@@ -1685,7 +2638,7 @@ def main(argv=None) -> int:
         finally:
             supervisor.write(supervisor.runtime / "heartbeat.json", {"pid": os.getpid(), "updated_at": now(),
                 "running": False, "mode": "apply" if args.apply else "observe"})
-    return 0
+    return int(guard_failed)
 
 
 if __name__ == "__main__":

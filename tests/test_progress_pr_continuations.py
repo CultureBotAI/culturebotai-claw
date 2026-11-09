@@ -95,7 +95,7 @@ def test_multi_hop_and_later_workflow_change(session, tmp_path):
 
 
 @pytest.mark.parametrize("case", ["self", "disconnected", "cycle", "fork", "merge", "wrong-stage",
-                                 "wrong-cycle", "wrong-workflow", "wrong-run", "wrong-repo"])
+                                 "stage-out-of-cycle", "wrong-cycle", "wrong-workflow", "wrong-run", "wrong-repo"])
 def test_invalid_lineage_fails_closed(session, tmp_path, case):
     _, ledger, old = session
     links = ledger["same_stage_continuations"]
@@ -110,6 +110,10 @@ def test_invalid_lineage_fails_closed(session, tmp_path, case):
         links.append(bind(tmp_path, ledger, goal(1), goal(9), "other"))
     elif case == "merge":
         links.append(bind(tmp_path, ledger, goal(9), goal(2), "other"))
+    elif case == "stage-out-of-cycle":
+        changed = copy.deepcopy(ledger)
+        changed["stage"] = 7
+        links[:] = [bind(tmp_path, changed, goal(1), goal(2))]
     else:
         changed = copy.deepcopy(ledger)
         if case == "wrong-workflow":

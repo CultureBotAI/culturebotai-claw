@@ -1,0 +1,17 @@
+{
+  "created_at": "2026-11-01T12:36:39.589457+00:00",
+  "url": "https://github.com/CultureBotAI/culturebotai-claw/issues/701",
+  "argv": [
+    "gh",
+    "issue",
+    "create",
+    "-R",
+    "CultureBotAI/culturebotai-claw",
+    "--title",
+    "Enforce MIM owned-name exclusivity with a bound suppression sidecar",
+    "--body-file",
+    "output/approved-plan-20261101T031134Z/step5-claw-issue-body.md"
+  ],
+  "stdout": "https://github.com/CultureBotAI/culturebotai-claw/issues/701\n",
+  "stderr": ""
+}

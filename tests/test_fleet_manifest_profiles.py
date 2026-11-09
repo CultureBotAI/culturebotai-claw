@@ -85,6 +85,7 @@ EXPECTED_PROFILES = {
 }
 
 EXPECTED_CAPABILITIES = {
+    "evidence_reference_validation",
     # Declared by #223: who keeps a download.yaml source catalogue, and why
     # the three who do not have decided against one rather than forgotten.
     "source_catalogue",
@@ -220,12 +221,13 @@ def test_cmmmech_admission_preserves_records_and_defers_unverified_adapters() ->
     assert "does not enable curation" in history.reason
     assert "append-only" in history.reason
     assert mech.supports("record_review")
-    assert set(history.reason_claims.absent) == {
-        ".claude/skills/curate-yaml-record/SKILL.md",
-        ".claude/skills/curate-yaml-record/references/review-checklist.md",
-    }
+    # The curate-yaml-record skill landed after admission (CMMMech#513), so
+    # its files are now claimed present; enabling curation awaits review (#785).
+    assert not history.reason_claims.absent
     assert set(history.reason_claims.present) == {
         "justfile", "src/cmmmech/history.py", "history",
+        ".claude/skills/curate-yaml-record/SKILL.md",
+        ".claude/skills/curate-yaml-record/references/review-checklist.md",
     }
 
 
@@ -259,7 +261,7 @@ def test_dufmech_keeps_generated_inventory_and_native_serialization() -> None:
     assert {
         name for name, capability in mech.capabilities.items()
         if capability.status == "disabled"
-    } == {"deep_research", "metpo_proposal", "causal_graph_coverage"}
+    } == {"deep_research", "metpo_proposal", "causal_graph_coverage", "evidence_reference_validation"}
     assert "execution is refused" in mech.capability("deep_research").reason
     assert mech.capability("corpus_statistics").settings["fields"] == (
         "id", "name", "seed_status", "characterization_status",

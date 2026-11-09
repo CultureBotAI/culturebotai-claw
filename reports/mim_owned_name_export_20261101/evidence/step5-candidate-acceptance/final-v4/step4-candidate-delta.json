@@ -1,0 +1,522 @@
+{
+  "old_rows": 2974,
+  "new_rows": 2974,
+  "added": [],
+  "removed": [],
+  "changed_rows": 11,
+  "unchanged_rows": 2963,
+  "class_counts": {
+    "owned-name suppression": 7,
+    "observed canonical-label resolution from stored-label fallback": 4,
+    "stored target label exposed by observed canonical-label resolution": 1
+  },
+  "changes": [
+    {
+      "subject_id": "MIM:Beta-lactose",
+      "object_id": "CHEBI:36218",
+      "classes": [
+        "owned-name suppression"
+      ],
+      "columns": {
+        "other": {
+          "before": "lactose|beta-D-galactopyranosyl-(1->4)-beta-D-glucopyranose|CAS:5965-66-2",
+          "after": "beta-D-galactopyranosyl-(1->4)-beta-D-glucopyranose|CAS:5965-66-2"
+        }
+      },
+      "lost_token_keys": [
+        "lactose"
+      ],
+      "gained_token_keys": []
+    },
+    {
+      "subject_id": "MIM:D-mannitol",
+      "object_id": "CHEBI:16899",
+      "classes": [
+        "owned-name suppression"
+      ],
+      "columns": {
+        "other": {
+          "before": "(2R,3R,4R,5R)-Hexane-1,2,3,4,5,6-hexaol|(2R,3R,4R,5R)-hexane-1,2,3,4,5,6-hexol|D-(-)-Mannitol|E 421|E-421|E421|Osmitrol|dulcite|manna sugar|mannite|Mannitol|CAS:69-65-8",
+          "after": "(2R,3R,4R,5R)-Hexane-1,2,3,4,5,6-hexaol|(2R,3R,4R,5R)-hexane-1,2,3,4,5,6-hexol|D-(-)-Mannitol|E 421|E-421|E421|Osmitrol|dulcite|manna sugar|mannite|CAS:69-65-8"
+        }
+      },
+      "lost_token_keys": [
+        "mannitol"
+      ],
+      "gained_token_keys": []
+    },
+    {
+      "subject_id": "MIM:L-asparagine",
+      "object_id": "CHEBI:17196",
+      "classes": [
+        "owned-name suppression"
+      ],
+      "columns": {
+        "other": {
+          "before": "(2S)-2,4-diamino-4-oxobutanoic acid|(2S)-2-amino-3-carbamoylpropanoic acid|(S)-2-amino-3-carbamoylpropanoic acid|(S)-Asparagine|2-Aminosuccinamic acid|Aspartamic acid|L-2-aminosuccinamic acid|L-Asparagin|L-aspartic acid beta-amide|alpha-aminosuccinamic acid|ASPARAGINE|CAS:70-47-3",
+          "after": "(2S)-2,4-diamino-4-oxobutanoic acid|(2S)-2-amino-3-carbamoylpropanoic acid|(S)-2-amino-3-carbamoylpropanoic acid|(S)-Asparagine|2-Aminosuccinamic acid|Aspartamic acid|L-2-aminosuccinamic acid|L-Asparagin|L-aspartic acid beta-amide|alpha-aminosuccinamic acid|CAS:70-47-3"
+        }
+      },
+      "lost_token_keys": [
+        "asparagine"
+      ],
+      "gained_token_keys": []
+    },
+    {
+      "subject_id": "MIM:L-cysteine",
+      "object_id": "CHEBI:17561",
+      "classes": [
+        "owned-name suppression"
+      ],
+      "columns": {
+        "other": {
+          "before": "(2R)-2-amino-3-mercaptopropanoic acid|(2R)-2-amino-3-sulfanylpropanoic acid|(2R)-2-ammonio-3-mercaptopropanoate|(2R)-2-ammonio-3-sulfanylpropanoate|(R)-2-amino-3-mercaptopropanoic acid|E 920|E-920|E920|FREE CYSTEINE|L-2-Amino-3-mercaptopropionic acid|L-Cystein|L-Zystein|CYSTEINE|L-cysteine (Sigma)|CAS:52-90-4",
+          "after": "(2R)-2-amino-3-mercaptopropanoic acid|(2R)-2-amino-3-sulfanylpropanoic acid|(2R)-2-ammonio-3-mercaptopropanoate|(2R)-2-ammonio-3-sulfanylpropanoate|(R)-2-amino-3-mercaptopropanoic acid|E 920|E-920|E920|FREE CYSTEINE|L-2-Amino-3-mercaptopropionic acid|L-Cystein|L-Zystein|L-cysteine (Sigma)|CAS:52-90-4"
+        }
+      },
+      "lost_token_keys": [
+        "cysteine"
+      ],
+      "gained_token_keys": []
+    },
+    {
+      "subject_id": "MIM:L-glutamic_Acid",
+      "object_id": "CHEBI:16015",
+      "classes": [
+        "owned-name suppression"
+      ],
+      "columns": {
+        "other": {
+          "before": "L-Glutamate|(2S)-2-aminopentanedioic acid|(S)-2-aminopentanedioic acid|(S)-glutamic acid|L-Glu|L-Glutaminic acid|L-Glutaminsaeure|acide glutamique|acido glutamico|acidum glutamicum|GLUTAMIC ACID|CAS:56-86-0",
+          "after": "L-Glutamate|(2S)-2-aminopentanedioic acid|(S)-2-aminopentanedioic acid|(S)-glutamic acid|L-Glu|L-Glutaminic acid|L-Glutaminsaeure|acide glutamique|acido glutamico|acidum glutamicum|CAS:56-86-0"
+        }
+      },
+      "lost_token_keys": [
+        "glutamic acid"
+      ],
+      "gained_token_keys": []
+    },
+    {
+      "subject_id": "MIM:L-proline",
+      "object_id": "CHEBI:17203",
+      "classes": [
+        "owned-name suppression"
+      ],
+      "columns": {
+        "other": {
+          "before": "(-)-(S)-proline|(-)-2-pyrrolidinecarboxylic acid|(-)-proline|(2S)-pyrrolidine-2-carboxylic acid|(S)-2-carboxypyrrolidine|(S)-2-pyrrolidinecarboxylic acid|(S)-pyrrolidine-2-carboxylic acid|2-Pyrrolidinecarboxylic acid|L-(-)-proline|L-Prolin|L-alpha-pyrrolidinecarboxylic acid|L-pyrrolidine-2-carboxylic acid|prolinum|PROLINE|CAS:147-85-3",
+          "after": "(-)-(S)-proline|(-)-2-pyrrolidinecarboxylic acid|(-)-proline|(2S)-pyrrolidine-2-carboxylic acid|(S)-2-carboxypyrrolidine|(S)-2-pyrrolidinecarboxylic acid|(S)-pyrrolidine-2-carboxylic acid|2-Pyrrolidinecarboxylic acid|L-(-)-proline|L-Prolin|L-alpha-pyrrolidinecarboxylic acid|L-pyrrolidine-2-carboxylic acid|prolinum|CAS:147-85-3"
+        }
+      },
+      "lost_token_keys": [
+        "proline"
+      ],
+      "gained_token_keys": []
+    },
+    {
+      "subject_id": "MIM:L-tryptophan",
+      "object_id": "CHEBI:16828",
+      "classes": [
+        "owned-name suppression"
+      ],
+      "columns": {
+        "other": {
+          "before": "(2S)-2-amino-3-(1H-indol-3-yl)propanoic acid|(S)-alpha-Amino-beta-(3-indolyl)-propionic acid|(S)-alpha-amino-1H-indole-3-propanoic acid|(S)-tryptophan|L-(-)-tryptophan|L-beta-3-indolylalanine|Tryptophan|CAS:73-22-3",
+          "after": "(2S)-2-amino-3-(1H-indol-3-yl)propanoic acid|(S)-alpha-Amino-beta-(3-indolyl)-propionic acid|(S)-alpha-amino-1H-indole-3-propanoic acid|(S)-tryptophan|L-(-)-tryptophan|L-beta-3-indolylalanine|CAS:73-22-3"
+        }
+      },
+      "lost_token_keys": [
+        "tryptophan"
+      ],
+      "gained_token_keys": []
+    },
+    {
+      "subject_id": "MIM:Natural_Sea_Water",
+      "object_id": "ENVO:00002149",
+      "classes": [
+        "observed canonical-label resolution from stored-label fallback"
+      ],
+      "columns": {
+        "object_label": {
+          "before": "sea water",
+          "after": "ocean water"
+        }
+      },
+      "lost_token_keys": [],
+      "gained_token_keys": []
+    },
+    {
+      "subject_id": "MIM:Pasteurized_Seawater",
+      "object_id": "ENVO:00002149",
+      "classes": [
+        "observed canonical-label resolution from stored-label fallback"
+      ],
+      "columns": {
+        "object_label": {
+          "before": "sea water",
+          "after": "ocean water"
+        }
+      },
+      "lost_token_keys": [],
+      "gained_token_keys": []
+    },
+    {
+      "subject_id": "MIM:Seawater",
+      "object_id": "ENVO:00002149",
+      "classes": [
+        "stored target label exposed by observed canonical-label resolution",
+        "observed canonical-label resolution from stored-label fallback"
+      ],
+      "columns": {
+        "object_label": {
+          "before": "sea water",
+          "after": "ocean water"
+        },
+        "other": {
+          "before": "Seawater (30 ppt)|Seawater(non-sterilized)",
+          "after": "sea water|Seawater (30 ppt)|Seawater(non-sterilized)"
+        }
+      },
+      "lost_token_keys": [],
+      "gained_token_keys": [
+        "sea water"
+      ]
+    },
+    {
+      "subject_id": "MIM:Supplemented_Seawater",
+      "object_id": "ENVO:00002149",
+      "classes": [
+        "observed canonical-label resolution from stored-label fallback"
+      ],
+      "columns": {
+        "object_label": {
+          "before": "sea water",
+          "after": "ocean water"
+        }
+      },
+      "lost_token_keys": [],
+      "gained_token_keys": []
+    }
+  ],
+  "observed_label_resolution_changes": {
+    "ENVO:00001998": {
+      "before_returned": null,
+      "after_returned": "soil"
+    },
+    "ENVO:00002005": {
+      "before_returned": null,
+      "after_returned": "air"
+    },
+    "ENVO:00002010": {
+      "before_returned": null,
+      "after_returned": "saline water"
+    },
+    "ENVO:00002044": {
+      "before_returned": null,
+      "after_returned": "sludge"
+    },
+    "ENVO:00002149": {
+      "before_returned": null,
+      "after_returned": "ocean water"
+    },
+    "ENVO:00002263": {
+      "before_returned": null,
+      "after_returned": "garden soil"
+    },
+    "ENVO:00002984": {
+      "before_returned": null,
+      "after_returned": "petroleum"
+    },
+    "ENVO:00003031": {
+      "before_returned": null,
+      "after_returned": "animal manure"
+    },
+    "ENVO:00003870": {
+      "before_returned": null,
+      "after_returned": "rice straw"
+    },
+    "ENVO:00005749": {
+      "before_returned": null,
+      "after_returned": "farm soil"
+    },
+    "ENVO:01000173": {
+      "before_returned": null,
+      "after_returned": "anoxic water"
+    },
+    "ENVO:06105101": {
+      "before_returned": null,
+      "after_returned": "plastic"
+    },
+    "FOODON:00001059": {
+      "before_returned": null,
+      "after_returned": "apple juice"
+    },
+    "FOODON:00001282": {
+      "before_returned": null,
+      "after_returned": "beef (ground)"
+    },
+    "FOODON:00003412": {
+      "before_returned": null,
+      "after_returned": "sugar beet"
+    },
+    "FOODON:00004062": {
+      "before_returned": null,
+      "after_returned": "Vino de Mesa"
+    },
+    "FOODON:00004410": {
+      "before_returned": null,
+      "after_returned": "beef heart"
+    },
+    "FOODON:00005198": {
+      "before_returned": null,
+      "after_returned": "agave"
+    },
+    "FOODON:02020891": {
+      "before_returned": null,
+      "after_returned": "cow milk"
+    },
+    "FOODON:02020911": {
+      "before_returned": null,
+      "after_returned": "beef brain"
+    },
+    "FOODON:03000441": {
+      "before_returned": null,
+      "after_returned": "liver powder supplement"
+    },
+    "FOODON:03301056": {
+      "before_returned": null,
+      "after_returned": "malt extract"
+    },
+    "FOODON:03301312": {
+      "before_returned": null,
+      "after_returned": "oat flour"
+    },
+    "FOODON:03301328": {
+      "before_returned": null,
+      "after_returned": "mineral water"
+    },
+    "FOODON:03301454": {
+      "before_returned": null,
+      "after_returned": "tomato juice"
+    },
+    "FOODON:03301484": {
+      "before_returned": null,
+      "after_returned": "skim milk food product"
+    },
+    "FOODON:03301670": {
+      "before_returned": null,
+      "after_returned": "sake"
+    },
+    "FOODON:03301826": {
+      "before_returned": null,
+      "after_returned": "olive oil"
+    },
+    "FOODON:03302088": {
+      "before_returned": null,
+      "after_returned": "beef extract"
+    },
+    "FOODON:03302142": {
+      "before_returned": null,
+      "after_returned": "soybean flour"
+    },
+    "FOODON:03302378": {
+      "before_returned": null,
+      "after_returned": "potato flour"
+    },
+    "FOODON:03305103": {
+      "before_returned": null,
+      "after_returned": "meat (cooked)"
+    },
+    "FOODON:03306272": {
+      "before_returned": null,
+      "after_returned": "oat flakes"
+    },
+    "FOODON:03307110": {
+      "before_returned": null,
+      "after_returned": "rolled oats"
+    },
+    "FOODON:03310257": {
+      "before_returned": null,
+      "after_returned": "cornmeal"
+    },
+    "FOODON:03310367": {
+      "before_returned": null,
+      "after_returned": "cellulose powder"
+    },
+    "FOODON:03311582": {
+      "before_returned": null,
+      "after_returned": "rye bran"
+    },
+    "FOODON:03315081": {
+      "before_returned": null,
+      "after_returned": "tea food product"
+    },
+    "FOODON:03315306": {
+      "before_returned": null,
+      "after_returned": "protein hydrolyzates"
+    },
+    "FOODON:03315424": {
+      "before_returned": null,
+      "after_returned": "meat extract"
+    },
+    "FOODON:03315426": {
+      "before_returned": null,
+      "after_returned": "yeast extract"
+    },
+    "FOODON:03315719": {
+      "before_returned": null,
+      "after_returned": "mammalian milk protein (hydrolyzed)"
+    },
+    "FOODON:03315720": {
+      "before_returned": null,
+      "after_returned": "vegetable protein, hydrolyzed"
+    },
+    "FOODON:03315772": {
+      "before_returned": null,
+      "after_returned": "chicken egg yolk food product"
+    },
+    "FOODON:03411345": {
+      "before_returned": null,
+      "after_returned": "yeast"
+    },
+    "FOODON:03412975": {
+      "before_returned": null,
+      "after_returned": "gum arabic"
+    },
+    "FOODON:03413044": {
+      "before_returned": null,
+      "after_returned": "calcium lactate"
+    },
+    "FOODON:03413045": {
+      "before_returned": null,
+      "after_returned": "calcium malate"
+    },
+    "FOODON:03413132": {
+      "before_returned": null,
+      "after_returned": "locust bean gum"
+    },
+    "FOODON:03413240": {
+      "before_returned": null,
+      "after_returned": "sodium adipate"
+    },
+    "FOODON:03413299": {
+      "before_returned": null,
+      "after_returned": "tara gum"
+    },
+    "FOODON:03413797": {
+      "before_returned": null,
+      "after_returned": "baker's yeast"
+    },
+    "FOODON:03420180": {
+      "before_returned": null,
+      "after_returned": "casein"
+    },
+    "FOODON:03530244": {
+      "before_returned": null,
+      "after_returned": "sodium tripolyphosphate"
+    },
+    "UBERON:0000178": {
+      "before_returned": null,
+      "after_returned": "blood"
+    },
+    "UBERON:0001913": {
+      "before_returned": null,
+      "after_returned": "milk"
+    },
+    "UBERON:0001977": {
+      "before_returned": null,
+      "after_returned": "blood serum"
+    },
+    "UBERON:0010228": {
+      "before_returned": null,
+      "after_returned": "ruminal fluid"
+    }
+  },
+  "policy_encounter_classes": {
+    "candidate encounter already excluded as a dedicated label": 13,
+    "previously published token removed": 7
+  },
+  "unique_suppression_pairs": 20,
+  "previously_published_pairs_removed": 7,
+  "current_counterfactual_published_pairs_removed": 7,
+  "scope_warning": "These are diagnostic candidate encounters, not canonical removals. Do not copy this sidecar into the bounded MIM promotion.",
+  "metadata_before": [
+    "# curie_map:",
+    "#   CHEBI: \"http://purl.obolibrary.org/obo/CHEBI_\"",
+    "#   FOODON: \"http://purl.obolibrary.org/obo/FOODON_\"",
+    "#   UBERON: \"http://purl.obolibrary.org/obo/UBERON_\"",
+    "#   ENVO: \"http://purl.obolibrary.org/obo/ENVO_\"",
+    "#   NCIT: \"http://purl.obolibrary.org/obo/NCIT_\"",
+    "#   MICRO: \"http://purl.obolibrary.org/obo/MICRO_\"",
+    "#   mesh: \"http://id.nlm.nih.gov/mesh/\"",
+    "#   BTO: \"http://purl.obolibrary.org/obo/BTO_\"",
+    "#   kgmicrobe.compound: \"https://w3id.org/kg-microbe/compound/\"",
+    "#   kgmicrobe.ingredient: \"https://w3id.org/kg-microbe/ingredient/\"",
+    "#   cas: \"https://commonchemistry.cas.org/detail?cas_rn=\"",
+    "#   registry: \"https://w3id.org/kg-microbe/registry/\"",
+    "#   MIM: \"https://github.com/CultureBotAI/MediaIngredientMech/blob/main/data/ingredients/mapped/\"",
+    "#   obo: \"http://purl.obolibrary.org/obo/\"",
+    "#   kgm: \"https://w3id.org/kg-microbe/\"",
+    "#   semapv: \"https://w3id.org/semapv/vocab/\"",
+    "#   skos: \"http://www.w3.org/2004/02/skos/core#\"",
+    "#   orcid: \"https://orcid.org/\"",
+    "#   cbclaw: \"https://github.com/culturebotai/culturebotai-claw/blob/main/\"",
+    "# license: \"https://creativecommons.org/publicdomain/zero/1.0/\"",
+    "# mapping_set_id: \"https://w3id.org/sssom/mappings/culturebotai_mim_ingredient\"",
+    "# mapping_set_version: \"2026-11-01\"",
+    "# mapping_set_description: \"Canonical MediaIngredientMech → ingredient-ontology mappings (CHEBI + FOODON; UBERON/ENVO when populated). One row per mapped MIM ingredient record. Per-row object_source distinguishes ontologies. Predicate is skos:exactMatch by default; narrowMatch/broadMatch/closeMatch where residual-P2.5 triage found a specificity or symmetry difference, or where mapping_quality != EXACT_MATCH. The `source` extension column records the upstream origin (MIM evidence + kg-microbe source pipeline, CHEBI only).\"",
+    "# mapping_date: \"2026-11-01\"",
+    "# predicate_semantics: skos",
+    "# creator_id:",
+    "#   - \"orcid:0000-0001-8175-045X\"",
+    "# subject_source: \"MIM:ingredients\"",
+    "# extension_definitions:",
+    "#   - slot_name: source",
+    "#     property: \"cbclaw:provenance-source\"",
+    "#     type_hint: \"xsd:string\"",
+    "#   - slot_name: validation_method",
+    "#     property: \"cbclaw:validation-method\"",
+    "#     type_hint: \"xsd:string\""
+  ],
+  "metadata_after": [
+    "# curie_map:",
+    "#   CHEBI: \"http://purl.obolibrary.org/obo/CHEBI_\"",
+    "#   FOODON: \"http://purl.obolibrary.org/obo/FOODON_\"",
+    "#   UBERON: \"http://purl.obolibrary.org/obo/UBERON_\"",
+    "#   ENVO: \"http://purl.obolibrary.org/obo/ENVO_\"",
+    "#   NCIT: \"http://purl.obolibrary.org/obo/NCIT_\"",
+    "#   MICRO: \"http://purl.obolibrary.org/obo/MICRO_\"",
+    "#   mesh: \"http://id.nlm.nih.gov/mesh/\"",
+    "#   BTO: \"http://purl.obolibrary.org/obo/BTO_\"",
+    "#   kgmicrobe.compound: \"https://w3id.org/kg-microbe/compound/\"",
+    "#   kgmicrobe.ingredient: \"https://w3id.org/kg-microbe/ingredient/\"",
+    "#   cas: \"https://commonchemistry.cas.org/detail?cas_rn=\"",
+    "#   registry: \"https://w3id.org/kg-microbe/registry/\"",
+    "#   MIM: \"https://github.com/CultureBotAI/MediaIngredientMech/blob/main/data/ingredients/mapped/\"",
+    "#   obo: \"http://purl.obolibrary.org/obo/\"",
+    "#   kgm: \"https://w3id.org/kg-microbe/\"",
+    "#   semapv: \"https://w3id.org/semapv/vocab/\"",
+    "#   skos: \"http://www.w3.org/2004/02/skos/core#\"",
+    "#   orcid: \"https://orcid.org/\"",
+    "#   cbclaw: \"https://github.com/culturebotai/culturebotai-claw/blob/main/\"",
+    "# license: \"https://creativecommons.org/publicdomain/zero/1.0/\"",
+    "# mapping_set_id: \"https://w3id.org/sssom/mappings/culturebotai_mim_ingredient\"",
+    "# mapping_set_version: \"2026-11-01\"",
+    "# mapping_set_description: \"Canonical MediaIngredientMech → ingredient-ontology mappings (CHEBI + FOODON; UBERON/ENVO when populated). One row per mapped MIM ingredient record. Per-row object_source distinguishes ontologies. Predicate is skos:exactMatch by default; narrowMatch/broadMatch/closeMatch where residual-P2.5 triage found a specificity or symmetry difference, or where mapping_quality != EXACT_MATCH. The `source` extension column records the upstream origin (MIM evidence + kg-microbe source pipeline, CHEBI only). owned-name-policy-v1; suppression-sidecar-required.\"",
+    "# mapping_date: \"2026-11-01\"",
+    "# predicate_semantics: skos",
+    "# creator_id:",
+    "#   - \"orcid:0000-0001-8175-045X\"",
+    "# subject_source: \"MIM:ingredients\"",
+    "# extension_definitions:",
+    "#   - slot_name: source",
+    "#     property: \"cbclaw:provenance-source\"",
+    "#     type_hint: \"xsd:string\"",
+    "#   - slot_name: validation_method",
+    "#     property: \"cbclaw:validation-method\"",
+    "#     type_hint: \"xsd:string\""
+  ],
+  "old_candidate_sha256": "c96267c778bf86af6125b144fc32b3382df7c22883439190f88dc3c15005143a",
+  "new_candidate_sha256": "2efdd39fd54e5d63199dd2419874e508a51f6c598a64137c4858a9b8a829749a",
+  "note": "Full diagnostic comparison, not canonical promotion. Source owners are unchanged; native replay uses observed label maps and recorded prior stamps. Counts are measured, not pinned."
+}

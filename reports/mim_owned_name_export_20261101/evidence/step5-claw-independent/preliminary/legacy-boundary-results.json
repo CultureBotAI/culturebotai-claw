@@ -1,0 +1,48 @@
+[
+  {
+    "case": "policy_refusal_different",
+    "exit_code": 2,
+    "canonical_preserved": true,
+    "manifest_absent": true
+  },
+  {
+    "case": "policy_refusal_equal",
+    "exit_code": 2,
+    "canonical_preserved": true,
+    "manifest_absent": true
+  },
+  {
+    "case": "validator_real_process",
+    "returncode": 0,
+    "stderr": "Informational extension warning",
+    "errors": [],
+    "correctly_refused": false
+  },
+  {
+    "case": "validator_real_process",
+    "returncode": 1,
+    "stderr": "Unexpected validation failure",
+    "errors": [
+      "sssom validate exited 1: Unexpected validation failure"
+    ],
+    "correctly_refused": true
+  },
+  {
+    "case": "validator_real_process",
+    "returncode": 2,
+    "stderr": "",
+    "errors": [
+      "sssom validate exited 2: "
+    ],
+    "correctly_refused": true
+  },
+  {
+    "case": "validator_real_process",
+    "returncode": 0,
+    "stderr": "subject_id must be supplied",
+    "errors": [
+      "subject_id must be supplied"
+    ],
+    "correctly_refused": true
+  }
+]

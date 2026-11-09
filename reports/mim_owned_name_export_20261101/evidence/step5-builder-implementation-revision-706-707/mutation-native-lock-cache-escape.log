@@ -1,0 +1,21 @@
+.F                                                                       [100%]
+=================================== FAILURES ===================================
+__ test_lazy_policy_and_native_lock_use_the_same_source_snapshot[native-lock] __
+
+tmp_path = PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8577/test_lazy_policy_and_native_lo1')
+mode = 'native-lock'
+
+    @pytest.mark.parametrize("mode", ["lazy-public-contamination", "native-lock"])
+    def test_lazy_policy_and_native_lock_use_the_same_source_snapshot(tmp_path, mode):
+        result = isolated_producer_probe(tmp_path, mode)
+>       assert result["status"] == "published", result
+E       AssertionError: {'error': "'claw_lock_manager'", 'exception': 'KeyError', 'output_exists': True, 'status': 'refused'}
+E       assert 'refused' == 'published'
+E         
+E         - published
+E         + refused
+
+tests/test_mim_owned_name_export.py:533: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_mim_owned_name_export.py::test_lazy_policy_and_native_lock_use_the_same_source_snapshot[native-lock]
+1 failed, 1 passed, 53 deselected in 0.55s

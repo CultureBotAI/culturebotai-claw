@@ -12,6 +12,7 @@ distinction is implemented (#286).
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from pathlib import Path
 
@@ -19,7 +20,8 @@ import pytest
 import yaml
 
 from kg_microbe_corpus import collect as corpus_report
-from kg_microbe_fleet import load_fleet_manifest
+from kg_microbe_evidence import EvidenceConfig
+from kg_microbe_fleet import Capability, load_fleet_manifest
 from kg_microbe_fleet.roots import MechRootError, resolve_mech_root
 from kg_microbe_graph.coverage import (
     CAPABILITY,
@@ -428,6 +430,200 @@ def test_evidence_and_grounding_are_counted_where_present(tmp_path):
     report = _report(tmp_path, {"data/a.yaml": {"causal_graphs": [graph]}})
     assert report["graphs"]["edges_with_evidence"] == 1
     assert report["graphs"]["nodes_grounded"] == 1
+
+
+def _quotes(
+    config: CoverageConfig | None = None, *, evidence_paths=(),
+    evidence_fields=("evidence",), **overrides,
+) -> CoverageConfig:
+    return dataclasses.replace(
+        config or _config(), evidence_config=EvidenceConfig(
+            cache_dir="references_cache", evidence_paths=evidence_paths,
+            evidence_fields=evidence_fields,
+        ),
+        **{"evidence_status": "enabled", **overrides},
+    )
+
+
+def _reference_cache(root: Path) -> None:
+    cache = root / "references_cache"
+    cache.mkdir()
+    (cache / "PMID_1.md").write_text(
+        "# PMID:1\n\nTitle: A plausible invented quote.\n\n## Abstract\n"
+        "A source result sentence. A second verified result.\n", encoding="utf-8",
+    )
+    (cache / "PMID_2.md").write_text("# PMID:2\nNo abstract section.\n", encoding="utf-8")
+
+
+def _mixed_quotes() -> dict:
+    graph = _graph("quotes", 9)
+    cases = [
+        [{"reference": "PMID:1", "snippet": "A source result sentence."},
+         {"reference": "PMID:1", "snippet": "A second verified result."}],
+        [{"reference": "PMID:1", "snippet": "A plausible invented quote."}],
+        [{"reference": "PMID:1"}],
+        [{"snippet": "A source result sentence."}],
+        [{"reference": "PMID:999", "snippet": "Uncached quote."}],
+        [{"reference": "ISBN:1234", "snippet": "Unverified book quote."}],
+        ["not a structured evidence item"],
+        [{"reference": "PMID:2", "snippet": "No abstract section."}],
+        [],
+    ]
+    for edge, evidence in zip(graph["edges"], cases):
+        edge["evidence"] = evidence
+    return graph
+
+
+def test_populated_evidence_is_not_quote_validation_and_items_are_not_edges(tmp_path):
+    """Nine items on eight evidenced edges, only two quotes on one edge pass.
+
+    The invented quote appears in metadata, so matching the full cache instead
+    of its source body would also turn this contrast incorrectly green.
+    """
+    root = _corpus(tmp_path, {"data/a.yaml": {"causal_graphs": [_mixed_quotes()]}})
+    _reference_cache(root)
+    report = collect("m", root, GLOBS, _quotes()).as_dict()
+    graphs = report["graphs"]
+    assert graphs["edges_with_evidence"] == 8
+    assert graphs["edges_with_quote_validated_evidence"] == 1
+    assert graphs["edge_evidence_items"] == {
+        "total": 9, "quote_validated": 2,
+        "by_verdict": {
+            "OK": 2, "NO_QUOTE": 1, "MISSING_REFERENCE": 1, "MISSING_CACHE": 1,
+            "UNSUPPORTED_REFERENCE": 1, "INVALID_EVIDENCE": 1, "INVALID_CACHE": 1,
+            "SNIPPET_NOT_IN_SOURCE": 1,
+        },
+    }
+    definition = report["definition"]["edge_evidence"]
+    assert not definition["presence_is_quote_validation"]
+    assert definition["quote_validation"]["measured"]
+    assert "does not establish" in definition["quote_validation"]["meaning"]
+
+
+@pytest.mark.parametrize("status", ["disabled", "not_applicable", "undeclared", "not_configured"])
+def test_unmeasured_quotes_are_null_even_if_valid_source_is_available(tmp_path, status):
+    root = _corpus(tmp_path, {"data/a.yaml": {"causal_graphs": [_mixed_quotes()]}})
+    _reference_cache(root)
+    config = _quotes(evidence_status=status, evidence_reason="Gate not adopted.")
+    report = collect("m", root, GLOBS, config).as_dict()
+    assert report["graphs"]["edges_with_evidence"] == 8
+    assert report["graphs"]["edges_with_quote_validated_evidence"] is None
+    assert report["graphs"]["edge_evidence_items"] is None
+    declaration = report["definition"]["edge_evidence"]["quote_validation"]
+    assert declaration["status"] == status and declaration["measured"] is False
+    assert declaration["reason"] == "Gate not adopted." and declaration["cache_dir"] is None
+
+
+@pytest.mark.parametrize("selected", [False, True])
+def test_quote_measurement_requires_the_actual_edge_evidence_selector(tmp_path, selected):
+    root = _corpus(tmp_path, {"data/a.yaml": {"causal_graphs": [_mixed_quotes()]}})
+    _reference_cache(root)
+    selector = "causal_graphs[].edges[].evidence"
+    paths = ("ontology_mapping.evidence", selector) if selected else ("ontology_mapping.evidence",)
+    report = collect("m", root, GLOBS, _quotes(evidence_paths=paths)).as_dict()
+    assert report["graphs"]["edges_with_evidence"] == 8
+    assert report["graphs"]["edges_with_quote_validated_evidence"] == (1 if selected else None)
+    definition = report["definition"]["edge_evidence"]
+    assert definition["selector"] == selector
+    validation = definition["quote_validation"]
+    assert validation["status"] == "enabled"
+    assert validation["measured"] is selected
+    assert validation["evidence_paths"] == list(paths)
+    if selected:
+        assert validation["reason"] is None
+        assert report["graphs"]["edge_evidence_items"]["quote_validated"] == 2
+    else:
+        assert "outside the declared quote-validation selectors" in validation["reason"]
+        assert selector in validation["reason"]
+        assert validation["cache_dir"] is None
+        assert report["graphs"]["edge_evidence_items"] is None
+
+
+@pytest.mark.parametrize("selected", [False, True])
+def test_quote_measurement_requires_the_declared_evidence_field_even_without_paths(tmp_path, selected):
+    """An unrestricted path selector still respects the profile's slot names."""
+    from kg_microbe_evidence import validate_corpus
+
+    root = _corpus(tmp_path, {"data/a.yaml": {"causal_graphs": [_mixed_quotes()]}})
+    _reference_cache(root)
+    config = _quotes(evidence_fields=("evidence",) if selected else ("support",))
+    report = collect("m", root, GLOBS, config).as_dict()
+    gate = validate_corpus(root, GLOBS, config.evidence_config)
+    assert report["graphs"]["edges_with_evidence"] == 8
+    assert report["graphs"]["edges_with_quote_validated_evidence"] == (1 if selected else None)
+    validation = report["definition"]["edge_evidence"]["quote_validation"]
+    assert validation["measured"] is selected
+    assert gate["evidence_items"] == (9 if selected else 0)
+    if selected:
+        assert validation["reason"] is None
+        assert report["graphs"]["edge_evidence_items"]["quote_validated"] == gate["quote_validated_items"] == 2
+    else:
+        assert "outside the declared quote-validation evidence fields" in validation["reason"]
+        assert report["graphs"]["edge_evidence_items"] is None
+        assert validation["cache_dir"] is None
+
+
+@pytest.mark.parametrize("kind", ["graph_list", "node_nested_edges"])
+def test_quote_selectors_derive_from_custom_graph_shape_fields(kind):
+    settings = (
+        {"graph_shape": kind, "graphs_field": "mechanisms", "edges_field": "links"}
+        if kind == "graph_list"
+        else {**NESTED, "nodes_field": "processes", "edges_field": "effects"}
+    )
+    expected = (
+        "mechanisms[].links[].support" if kind == "graph_list"
+        else "processes[].effects[].support"
+    )
+    shape = CoverageConfig.from_settings({**settings, "edge_evidence_field": "support"})
+    config = _quotes(shape, evidence_paths=(expected,), evidence_fields=("support",))
+    assert config.edge_evidence_selector == expected
+    assert config.measures_quotes
+    assert not _quotes(shape, evidence_paths=("ontology_mapping.evidence",)).measures_quotes
+
+
+def test_node_evidence_does_not_become_quote_validated_edge_evidence(tmp_path):
+    evidence = [{"reference": "PMID:1", "snippet": "A source result sentence."}]
+    root = _corpus(tmp_path, {"data/a.yaml": {"ecological_interactions": [
+        {"name": "a", "evidence": evidence, "downstream": [{"target": "b"}]},
+        {"name": "b"},
+    ]}})
+    _reference_cache(root)
+    config = _quotes(CoverageConfig.from_settings(NESTED))
+    report = collect("m", root, GLOBS, config).as_dict()
+    assert report["graphs"]["edges_with_evidence"] is None
+    assert report["graphs"]["edges_with_quote_validated_evidence"] is None
+    assert report["graphs"]["edge_evidence_items"] is None
+    assert "node evidence is not edge evidence" in report["definition"]["edge_evidence"]["quote_validation"]["reason"]
+
+
+def test_nested_edges_use_only_their_declared_evidence_field(tmp_path):
+    root = _corpus(tmp_path, {"data/a.yaml": {"ecological_interactions": [
+        {"name": "a", "downstream": [{"target": "b", "sources": [
+            {"reference": "PMID:1", "snippet": "A source result sentence."}]}]},
+        {"name": "b", "downstream": [{"target": "c", "sources": [
+            {"reference": "PMID:1", "snippet": "Untrue quotation."}]}]},
+        {"name": "c"},
+    ]}})
+    _reference_cache(root)
+    config = _quotes(CoverageConfig.from_settings({**NESTED, "edge_evidence_field": "sources"}),
+                     evidence_fields=("sources",))
+    report = collect("m", root, GLOBS, config).as_dict()
+    assert report["graphs"]["edges_with_evidence"] == 2
+    assert report["graphs"]["edges_with_quote_validated_evidence"] == 1
+
+
+def test_quote_item_counts_merge_identically_across_processes(tmp_path, monkeypatch):
+    import kg_microbe_graph.coverage as coverage
+
+    root = _corpus(tmp_path, {f"data/{i}.yaml": {"causal_graphs": [_mixed_quotes()]} for i in range(7)})
+    _reference_cache(root)
+    sequential = collect("m", root, GLOBS, _quotes(), jobs=1).to_json()
+    monkeypatch.setattr(coverage, "PARALLEL_THRESHOLD", 0)
+    assert collect("m", root, GLOBS, _quotes(), jobs=3).to_json() == sequential
+    result = json.loads(sequential)["graphs"]
+    assert result["edges_with_quote_validated_evidence"] == 7
+    assert result["edge_evidence_items"]["quote_validated"] == 14
+    assert result["edge_evidence_items"]["by_verdict"]["MISSING_CACHE"] == 7
 
 
 def test_node_and_edge_counts_are_spread_and_bucketed(tmp_path):
@@ -1020,8 +1216,8 @@ def test_a_summary_row_carries_the_reports_numbers_and_marks_a_sample(tmp_path, 
     assert main(["coverage", "--mech", "traitmech", "--root", str(root), "--summary"]) == 0
     row = next(line for line in capsys.readouterr().out.splitlines()
                if line.startswith("traitmech"))
-    # records exempt eligible w/graph % mechan. % edgeless graphs flagged
-    assert row.split()[1:] == ["4", "1", "3", "2", "66.7%", "1", "33.3%", "0", "2", "2"]
+    # records exempt eligible w/graph % mechan. % edgeless graphs flagged w/evid quoteOK
+    assert row.split()[1:] == ["4", "1", "3", "2", "66.7%", "1", "33.3%", "0", "2", "2", "0", "-"]
 
     assert main(["coverage", "--mech", "traitmech", "--root", str(root),
                  "--summary", "--sample", "2"]) == 0
@@ -1417,3 +1613,62 @@ def test_a_summary_row_with_excluded_files_is_marked(tmp_path, capsys):
     row = next(line for line in out.splitlines() if line.startswith("traitmech"))
     assert row.split()[1] == "1!"
     assert "! traitmech: 1 file(s) excluded from every count" in out
+
+
+def _enable_cli_quotes(monkeypatch, settings=None):
+    import kg_microbe_graph.__main__ as cli
+
+    manifest = load_fleet_manifest()
+    mech = manifest.mechs["traitmech"]
+    enabled = dataclasses.replace(mech, capabilities={
+        **mech.capabilities,
+        cli.EVIDENCE_CAPABILITY: Capability(
+            name=cli.EVIDENCE_CAPABILITY, status="enabled",
+            settings={"cache_dir": "references_cache"} if settings is None else settings,
+        ),
+    })
+    monkeypatch.setattr(manifest, "_mechs", {**manifest.mechs, "traitmech": enabled})
+    monkeypatch.setattr(cli, "load_fleet_manifest", lambda: manifest)
+    return cli
+
+
+def test_quote_counts_in_cli_json_and_summary_do_not_replace_presence(tmp_path, monkeypatch, capsys):
+    cli = _enable_cli_quotes(monkeypatch)
+    root = _traitmech_root(tmp_path, {"a.yaml": {"causal_graphs": [_mixed_quotes()]}})
+    _reference_cache(root)
+    # Coverage is a report, not the separate strict CI validator; bad quotes
+    # stay visible rather than making this command omit the report.
+    assert cli.main(["coverage", "--mech", "traitmech", "--root", str(root)]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["graphs"]["edges_with_evidence"] == 8
+    assert report["graphs"]["edges_with_quote_validated_evidence"] == 1
+    assert report["graphs"]["edge_evidence_items"]["by_verdict"]["SNIPPET_NOT_IN_SOURCE"] == 1
+    assert cli.main(["coverage", "--mech", "traitmech", "--root", str(root), "--summary"]) == 0
+    output = capsys.readouterr().out
+    row = next(line for line in output.splitlines() if line.startswith("traitmech"))
+    assert row.split()[-2:] == ["8", "1"]
+    assert "evidence field populated" in output and "does not establish claim support" in output
+
+
+def test_invalid_quote_capability_cannot_silently_disable_measurement(tmp_path, monkeypatch, capsys):
+    cli = _enable_cli_quotes(monkeypatch, {"cache_dir": "../outside"})
+    root = _traitmech_root(tmp_path, {"a.yaml": {"causal_graphs": [_mixed_quotes()]}})
+    assert cli.main(["coverage", "--mech", "traitmech", "--root", str(root)]) == 2
+    captured = capsys.readouterr()
+    assert "evidence_reference_validation is declared incorrectly" in captured.err
+    assert not captured.out
+
+
+def test_a_changed_cache_is_part_of_quote_report_revision_provenance(tmp_path):
+    from kg_microbe_graph.__main__ import _revision
+
+    root = tmp_path / "mech"
+    _git_init(root)
+    _reference_cache(root)
+    assert "uncommitted" not in _revision(root, GLOBS)
+    observed = _revision(root, GLOBS, cache_dir="references_cache")
+    assert "uncommitted changes under the record globs or reference cache" in observed
+    # A locally ignored cache still feeds validation and cannot be presented
+    # as the committed source merely because normal git status omits it.
+    (root / ".gitignore").write_text("references_cache/\n")
+    assert "uncommitted" in _revision(root, GLOBS, cache_dir="references_cache")

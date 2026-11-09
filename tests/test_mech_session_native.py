@@ -1,6 +1,8 @@
 """Goal reconstruction must not turn stale/quoted completions into transitions."""
 
+import hashlib
 import importlib.util
+import json
 import sqlite3
 from pathlib import Path
 
@@ -181,6 +183,46 @@ def test_completed_goal_with_queued_last_step_stays_busy(tmp_path, monkeypatch):
     assert not (tmp_path / "conversations" / "example.db-wal").exists()
 
 
+@pytest.mark.parametrize("status", [1, 2, 8, 9, 11])
+def test_older_active_tool_is_reported_when_latest_step_is_done(tmp_path, monkeypatch, status):
+    monkeypatch.setattr(native, "ROOT", tmp_path)
+    (tmp_path / "conversations").mkdir()
+    call = bytefield(2, b"run_command") + bytefield(3, json.dumps({
+        "toolAction": "run_command", "toolSummary": "git push", "private_argument": "omit-me",
+    }).encode())
+    payload = bytefield(5, bytefield(1, intfield(1, 1793790000)) + bytefield(4, call))
+    with sqlite3.connect(tmp_path / "conversations" / "example.db") as db:
+        db.executescript(
+            "CREATE TABLE trajectory_meta (trajectory_id text,cascade_id text);"
+            "CREATE TABLE steps (idx integer,step_type integer,status integer,step_payload blob);"
+            "CREATE TABLE trajectory_metadata_blob (id text,data blob);"
+        )
+        db.execute("INSERT INTO trajectory_meta VALUES (?,?)", ("trajectory", "example"))
+        db.execute("INSERT INTO trajectory_metadata_blob VALUES (?,?)",
+                   ("main", bytefield(7, b"file:///example/PathwayMech")))
+        db.executemany("INSERT INTO steps VALUES (?,?,?,?)", [
+            (1, 1, 3, payload),  # Completed tool is not a blocker.
+            (2, 1, status, payload),
+            (3, 15, 3, bytefield(20, bytefield(1, b"A later assistant response."))),
+        ])
+    row = native.inspect("/example/PathwayMech", "example")
+    assert row["last_step"]["status"] == "done"
+    assert row["native_execution_state"] == "busy"
+    assert len(row["active_tools"]) == 1
+    task = row["active_tools"][0]
+    assert task["step_index"] == 2 and task["status"] == native.STATUS_NAMES[status]
+    assert task["tool_name"] == "run_command" and task["toolSummary"] == "git push"
+    assert task["created_at"] and task["completed_at"] is None
+    assert "private_argument" not in task and "omit-me" not in json.dumps(row)
+
+
+@pytest.mark.parametrize("arguments", [b"[]", b"null", b"not-json", b'{"toolSummary": {"nested":"value"}}'])
+def test_tool_metadata_keeps_presence_without_retaining_unrecognized_arguments(arguments):
+    payload = bytefield(5, bytefield(4, bytefield(2, b"run_command") + bytefield(3, arguments)))
+    assert native.tool_metadata(payload) == {"tool_name": "run_command"}
+    assert native.tool_metadata(b"") is None
+
+
 @pytest.mark.parametrize(
     "quoted_context",
     [
@@ -293,3 +335,80 @@ def test_snapshot_removes_private_copy_on_every_failure(snapshot_files, monkeypa
     assert created and all(not path.exists() for path in created)
     if failure == "pragma":
         assert closed
+
+
+@pytest.mark.parametrize("declaration", [False, True])
+def test_user_input_proof_keeps_full_text_hash_and_real_goal_metadata_separate(declaration):
+    message = " review the entire record inventory [MECH-WORKFLOW-example]"
+    body = bytefield(3, bytefield(1, message.encode())) + (goal_context() if declaration else b"")
+    payload = bytefield(19, body)
+    proof = native.user_input_evidence(40, 3, payload)
+    expected = "/goal" + message if declaration else message
+    assert proof["text_sha256"] == hashlib.sha256(expected.encode()).hexdigest()
+    assert proof["text_length"] == len(expected)
+    assert proof["native_goal_declaration"] is declaration
+    assert "review the entire" not in json.dumps(proof)
+
+
+def test_literal_goal_text_does_not_gain_native_goal_authority():
+    message = "/goal review [MECH-WORKFLOW-example]"
+    proof = native.user_input_evidence(40, 3, bytefield(19, bytefield(3, bytefield(1, message.encode()))))
+    assert proof["text_sha256"] == hashlib.sha256(message.encode()).hexdigest()
+    assert proof["native_goal_declaration"] is False
+
+
+def test_recent_input_evidence_is_bounded_and_excludes_assistant_text(tmp_path, monkeypatch):
+    monkeypatch.setattr(native, "ROOT", tmp_path)
+    monkeypatch.setattr(native, "USER_INPUT_LIMIT", 2)
+    (tmp_path / "conversations").mkdir()
+    with sqlite3.connect(tmp_path / "conversations" / "example.db") as db:
+        db.executescript(
+            "CREATE TABLE trajectory_meta (trajectory_id text,cascade_id text);"
+            "CREATE TABLE steps (idx integer,step_type integer,status integer,step_payload blob);"
+            "CREATE TABLE trajectory_metadata_blob (id text,data blob);"
+        )
+        db.execute("INSERT INTO trajectory_meta VALUES (?,?)", ("trajectory", "example"))
+        db.execute("INSERT INTO trajectory_metadata_blob VALUES (?,?)",
+                   ("main", bytefield(7, b"file:///example/TraitMech")))
+        for index in (10, 11, 12):
+            payload = bytefield(19, bytefield(3, bytefield(1, f"instruction {index}".encode())))
+            db.execute("INSERT INTO steps VALUES (?,?,?,?)", (index, 14, 3, payload))
+        db.execute("INSERT INTO steps VALUES (?,?,?,?)",
+                   (13, 15, 3, bytefield(20, bytefield(1, b"[MECH-WORKFLOW-example] instruction 10"))))
+    evidence = native.inspect("/example/TraitMech", "example")["user_input_evidence"]
+    assert evidence["truncated"] is True
+    assert [row["step_index"] for row in evidence["inputs"]] == [11, 12]
+    assert "instruction" not in json.dumps(evidence)
+
+
+def test_structured_goal_prefix_does_not_collapse_literal_prefix_in_suffix():
+    suffix = "/goal review [MECH-WORKFLOW-example]"
+    payload = bytefield(19, bytefield(3, bytefield(1, suffix.encode())) + goal_context())
+    proof = native.user_input_evidence(40, 3, payload)
+    assert proof["text_sha256"] == hashlib.sha256(("/goal" + suffix).encode()).hexdigest()
+    assert proof["text_sha256"] != hashlib.sha256(suffix.encode()).hexdigest()
+    assert proof["text_length"] == len(suffix) + len("/goal")
+
+
+@pytest.mark.parametrize("shape", ["plain", "goal", "file", "unknown", "two_goals", "split_text", "legacy", "reordered_goal"])
+def test_delivery_proof_rejects_extra_scopes_and_ambiguous_text_shapes(shape):
+    text = bytefield(3, bytefield(1, b" review [MECH-WORKFLOW-example]"))
+    body = text
+    if shape == "goal":
+        body = goal_context() + text
+    elif shape == "file":
+        body = text + bytefield(3, bytefield(2, bytefield(11, b"file context")))
+    elif shape == "unknown":
+        body = text + bytefield(3, bytefield(99, b"unknown context"))
+    elif shape == "two_goals":
+        body = goal_context() + goal_context() + text
+    elif shape == "split_text":
+        body = text + bytefield(3, bytefield(1, b"second segment"))
+    elif shape == "legacy":
+        body = bytefield(1, b"legacy text") + text
+    elif shape == "reordered_goal":
+        body = text + goal_context()
+    proof = native.user_input_evidence(40, 3, bytefield(19, body))
+    assert proof["supported_input_shape"] is (shape in {"plain", "goal"})
+    if shape in {"plain", "file", "unknown"}:
+        assert proof["text_sha256"] == hashlib.sha256(b" review [MECH-WORKFLOW-example]").hexdigest()

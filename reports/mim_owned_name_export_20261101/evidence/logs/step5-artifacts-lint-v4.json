@@ -1,0 +1,19 @@
+{
+  "name": "step5-artifacts-lint-v4",
+  "argv": [
+    "uvx",
+    "--offline",
+    "ruff@0.16.3",
+    "check",
+    "src/kg_microbe_utils/sssom_artifacts.py",
+    "tests/test_mim_sssom_artifacts.py",
+    "scripts/publish_sssom.py"
+  ],
+  "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+  "started_at": "2026-11-01T12:48:42.553867+00:00",
+  "environment_profile": "generation-and-native-qc",
+  "finished_at": "2026-11-01T12:48:42.573487+00:00",
+  "exit_code": 0,
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-artifacts-lint-v4.log",
+  "log_sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+}

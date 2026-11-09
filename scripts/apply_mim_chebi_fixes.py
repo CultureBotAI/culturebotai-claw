@@ -44,6 +44,7 @@ MIM_ROOT = Path(
 )
 
 sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_utils.ingredient_identity_rejections import rejection_reason  # noqa: E402
 from kg_microbe_fleet import require_mech_roots  # noqa: E402
 MIM_ROOT = MIM_ROOT
 INGREDIENTS_DIR = MIM_ROOT / "data" / "ingredients" / "mapped"
@@ -67,12 +68,22 @@ def _slug(term: str) -> str:
     return "_".join(out_parts) or "Unnamed"
 
 
+def _patch_rejection(doc: dict, patch: dict) -> str | None:
+    return next((why for name in (doc.get("preferred_term"), patch.get("preferred_term"))
+                 for cas in ((doc.get("chemical_properties") or {}).get("cas_rn"),
+                             doc.get("identifier"), patch.get("cas_rn"), patch.get("CAS"))
+                 if (why := rejection_reason(ontology_id=patch.get("new_chebi", ""), name=name, cas=cas))), None)
+
+
 def _update_existing_yaml(path: Path, patch: dict) -> tuple[bool, str]:
     """Return (applied, message)."""
     doc = yaml.safe_load(path.read_text())
     if not isinstance(doc, dict):
         return False, "not a dict"
 
+    reason = _patch_rejection(doc, patch)
+    if reason:
+        return False, f"rejected: {reason}"
     old_id = doc.get("ontology_mapping", {}).get("ontology_id")
     if old_id != patch["bad_chebi"]:
         return False, f"ontology_id is {old_id}, expected {patch['bad_chebi']}"
@@ -96,6 +107,9 @@ def _update_existing_yaml(path: Path, patch: dict) -> tuple[bool, str]:
 def _create_new_yaml(path: Path, source_id: str, term: str, chebi: str, label: str) -> tuple[bool, str]:
     if path.exists():
         return False, f"yaml already exists: {path.name}"
+    reason = rejection_reason(ontology_id=chebi, name=term, cas=source_id)
+    if reason:
+        return False, f"rejected: {reason}"
 
     doc = {
         "identifier": chebi,
@@ -154,7 +168,16 @@ def main() -> None:
     recur_patches = []
     if RECURATION_YAML.exists():
         recur_patches = yaml.safe_load(RECURATION_YAML.read_text()) or []
-    high_recur = [p for p in recur_patches if p.get("confidence") == "HIGH"]
+    high_recur = []
+    for p in recur_patches:
+        if p.get("confidence") != "HIGH":
+            continue
+        doc = yaml.safe_load((MIM_ROOT / p["file"]).read_text()) or {}
+        reason = _patch_rejection(doc, p)
+        if reason:
+            print(f"[REJECTED] {p['file']} → {p['new_chebi']}: {reason}")
+        else:
+            high_recur.append(p)
     print(f"Re-curation patches: {len(recur_patches)} total, {len(high_recur)} HIGH (applyable)")
     for p in recur_patches:
         marker = "APPLY" if p in high_recur else "SKIP"
@@ -169,6 +192,12 @@ def main() -> None:
     with CANDIDATES_TSV.open() as f:
         for r in csv.DictReader(f, delimiter="\t"):
             if r.get("confidence") == "HIGH" and r.get("candidate_1_chebi"):
+                reason = next((why for cas in (r.get("source_id"), r.get("CAS"), r.get("cas_rn"))
+                               if (why := rejection_reason(ontology_id=r["candidate_1_chebi"],
+                                      name=r.get("preferred_term"), cas=cas))), None)
+                if reason:
+                    print(f"[REJECTED] {r.get('preferred_term')} → {r['candidate_1_chebi']}: {reason}")
+                    continue
                 candidates.append(r)
     print(f"New-ingredient creates from HIGH candidates: {len(candidates)}")
 

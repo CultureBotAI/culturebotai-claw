@@ -1,0 +1,150 @@
+{
+  "at": "2026-11-01T13:17:09.587052+00:00",
+  "classification": "Author packaging repair and isolated tests, not independent review",
+  "files": {
+    "EXECUTION-v3.md": {
+      "bytes": 4259,
+      "sha256": "502782653306b74fc1b10cb9214a2ede60ea68947023a9b7ce9d93064af7a2ac"
+    },
+    "PACKAGE-README-v3.draft.md": {
+      "bytes": 3478,
+      "sha256": "fb211b9a39f7458e3977e574973406e2402a835ec43d1c44eead03038e744df8"
+    },
+    "package_evidence_v3.py": {
+      "bytes": 14702,
+      "sha256": "74ade999a59f91d61e83d1b41de9d6b00dbae2fd58a9b28f285724359b18c821"
+    },
+    "revision-708/control-results-v2.json": {
+      "bytes": 8066,
+      "sha256": "9992e07652178229a8db9f635f4900d60464b2cddf9fcd05576b8a1e4d5a08db"
+    },
+    "revision-708/controls-v2/mutant-no-plan-equality/receipt.json": {
+      "bytes": 1206,
+      "sha256": "65961c2274df0282d3200ab95861f74ffa316ef2b43d6114d6246fd7e95672c1"
+    },
+    "revision-708/controls-v2/mutant-no-plan-equality/test.log": {
+      "bytes": 1200,
+      "sha256": "b42e83b0e4d6e2932eb42a5627911ca54323521e8ad2c72aeba954c8fee44250"
+    },
+    "revision-708/controls-v2/mutant-no-portable-binding/receipt.json": {
+      "bytes": 1242,
+      "sha256": "bd197ea3e37fef55de97306262958296454280aa09968044bdc4224f74a5cdc7"
+    },
+    "revision-708/controls-v2/mutant-no-portable-binding/test.log": {
+      "bytes": 1597,
+      "sha256": "80c0c8a6242b5fc2742d3f5d92875b4cb7c45366cea61ee2aa3ee14ded2cc276"
+    },
+    "revision-708/controls-v2/mutant-no-publish-binding/receipt.json": {
+      "bytes": 1244,
+      "sha256": "8ece58c372826e7bf7249c8f077ee1adc8d58b55ebf636e22cc3fce3b6515ae7"
+    },
+    "revision-708/controls-v2/mutant-no-publish-binding/test.log": {
+      "bytes": 664,
+      "sha256": "137e6563ec57a44b24104d3acd46ed2d1fad859e9115df84886a24665d8c04a4"
+    },
+    "revision-708/controls-v2/mutant-no-readme-binding/receipt.json": {
+      "bytes": 1270,
+      "sha256": "002b9a33510eb6bef4a465795e7345ec91eb415740f5aab7e933c93c4624304a"
+    },
+    "revision-708/controls-v2/mutant-no-readme-binding/test.log": {
+      "bytes": 1614,
+      "sha256": "7197d2dc6285954afe9bd0ec3045f15ec0cf3267b9ab31e23867d1c465fffbcf"
+    },
+    "revision-708/controls-v2/old-v2/receipt.json": {
+      "bytes": 1014,
+      "sha256": "cffeebdc6a22031be38610082cb06dfc20cd5b29036b6f050fb8a869b37b7aff"
+    },
+    "revision-708/controls-v2/old-v2/test.log": {
+      "bytes": 1200,
+      "sha256": "e13f895a86cb064b830c100306fdaf174dad4de08671687b69adb090c00dec32"
+    },
+    "revision-708/controls-v2/repaired-v3/receipt.json": {
+      "bytes": 1049,
+      "sha256": "e09f42ca561aee8660b7c1b81ec2a501337af839e4bd3c5c8b78e703dcfba498"
+    },
+    "revision-708/controls-v2/repaired-v3/results.json": {
+      "bytes": 2921,
+      "sha256": "e45b311b521e91d1f91b4d0377217c54bc90744e1aacf87abfd7629b925fcf30"
+    },
+    "revision-708/controls-v2/repaired-v3/test.log": {
+      "bytes": 3425,
+      "sha256": "582fdf5307973dbf2fb01a36a596dbea36ad7ee77fe1b41293fc9f35fd847e03"
+    },
+    "revision-708/green-results.json": {
+      "bytes": 2758,
+      "sha256": "38760cd21c1496fab4ea4915f62976b1400c5ad9b6bc47c13850904275f48b35"
+    },
+    "revision-708/green.log": {
+      "bytes": 3272,
+      "sha256": "ed13bd7287b0f5788a181b964abf038ec455ae3da4c92fc011923e1c152b9879"
+    },
+    "revision-708/initial-control-disposition.json": {
+      "bytes": 777,
+      "sha256": "94a7f07cb4bbf425777bcbfadd2cf863ee8f2f7a29bbe20b4eafc07c3dada578"
+    },
+    "revision-708/mutant-no-plan-equality/receipt.json": {
+      "bytes": 1182,
+      "sha256": "0b631007429d03ee8bd92e30a7395a6ad486782df8841a5b81d4a5967d6feba1"
+    },
+    "revision-708/mutant-no-plan-equality/test.log": {
+      "bytes": 1200,
+      "sha256": "850bc0a915209c982a882cc4d8b502fb58e5d280605ea494108b54a7833f5d47"
+    },
+    "revision-708/mutant-no-publish-binding/test.log": {
+      "bytes": 530,
+      "sha256": "917da72206d5a257257e26750492c0d50024699934c40db88c24309bc68cc295"
+    },
+    "revision-708/old-v2/receipt.json": {
+      "bytes": 1002,
+      "sha256": "0037bf72495f4b2dc1a996039626af18013f5f18b3bbaf33dc175d9692b41a9d"
+    },
+    "revision-708/old-v2/test.log": {
+      "bytes": 1200,
+      "sha256": "3214d0f6f9e40a371ada4ea179bd9d3a0b9d9545fb15ebb94cc4e26e705742e4"
+    },
+    "revision-708/repaired-v3/receipt.json": {
+      "bytes": 1037,
+      "sha256": "02af9c256a9427178d6fd8f18d145fabc66e4263d93bf7e0479af86734b7bd98"
+    },
+    "revision-708/repaired-v3/results.json": {
+      "bytes": 2921,
+      "sha256": "e45b311b521e91d1f91b4d0377217c54bc90744e1aacf87abfd7629b925fcf30"
+    },
+    "revision-708/repaired-v3/test.log": {
+      "bytes": 3425,
+      "sha256": "1d91dbfc47d511df3f9974e9465d023891e368ff61c7726a4c5d2cabdea251fa"
+    },
+    "revision-708/run_controls.py": {
+      "bytes": 3155,
+      "sha256": "6bb225bdc5c73e86daa4bfad9a635b6de1896de65d6dfaa9eb595d9bf7fa7bb1"
+    },
+    "revision-708/run_controls_v2.py": {
+      "bytes": 3094,
+      "sha256": "02b22f90a3ab23fb93d5f270a26b102fe0a96d6b31ee244e154f1bd180cf6ba6"
+    },
+    "revision-708/source-change.json": {
+      "bytes": 678,
+      "sha256": "15090fb3843dc74f7dbf70b547192cd7533bf00f537bae4d19aff494176ba8cd"
+    },
+    "revision-708/source-v2.py": {
+      "bytes": 13640,
+      "sha256": "5dfe1381dbc435d6196f1529e90d039205f33097bebc4386abc73a326324d907"
+    },
+    "revision-708/source-v3.py": {
+      "bytes": 14702,
+      "sha256": "74ade999a59f91d61e83d1b41de9d6b00dbae2fd58a9b28f285724359b18c821"
+    },
+    "revision-708/test-before-control-refinement.py": {
+      "bytes": 9894,
+      "sha256": "b04731ebe1a7f73e42f4e5bc49b66e1044460dcec58cb3e746abc30804ed9edb"
+    },
+    "test_packager_v5.py": {
+      "bytes": 9962,
+      "sha256": "bbe219fb38b06899a4c080b42b1eaeecc3fbe861f3e5b819a88b30e5f463f23a"
+    }
+  },
+  "issue": "https://github.com/CultureBotAI/culturebotai-claw/issues/708",
+  "omitted": "Copied mutation modules reconstructable from source and exact replacement strings in run_controls_v2.py; all bytecode caches; disposed synthetic Git fixtures. Original source snapshots, controls, initial diagnostic and all result/log bytes retained.",
+  "production_changes": false,
+  "source_sha256": "74ade999a59f91d61e83d1b41de9d6b00dbae2fd58a9b28f285724359b18c821"
+}

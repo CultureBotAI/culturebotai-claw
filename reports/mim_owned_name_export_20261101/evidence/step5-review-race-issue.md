@@ -1,0 +1,5 @@
+Independent preliminary review of #701 injected an output change during the last source snapshot callback. An established candidate returned `unchanged` with a corrupted sidecar; fresh publication returned `complete` with a corrupted sidecar and a complete native journal. The callback models a concurrent output change during potentially expensive source hashing; no publisher source was modified for the probe.
+
+Validate output beforeimages after the source callback at the native precommit boundary, and verify intended final artifact bytes after the last source callback before reporting complete or unchanged. Add regressions for the no-op, precommit and completed-publication paths, plus the unchanged positive control. Retain truthful partial-failure evidence; do not claim multi-file filesystem atomicity.
+
+The independent native-lock/native-transaction probe is saved as `step5-claw-independent/preliminary/probe_artifacts.py` and `artifact-probe-results.json`. The reviewed module SHA256 is `126d891db86251083d462fd48dd9ded6354ccd3acb6ff34fd39075d9641607e5`. This reproduction used isolated artifacts and changed no maintained MIM data.

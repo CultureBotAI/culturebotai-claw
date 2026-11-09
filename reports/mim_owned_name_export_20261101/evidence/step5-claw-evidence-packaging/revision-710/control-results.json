@@ -1,0 +1,304 @@
+{
+  "scope": "Author run-owned copied packagers and disposable real Git repositories; no maintained or package publication edits",
+  "source_hashes": {
+    "package_evidence_v3.py": "74ade999a59f91d61e83d1b41de9d6b00dbae2fd58a9b28f285724359b18c821",
+    "package_evidence_v4.py": "1377772d93374ce6a31de85fab0ba9fe5697f63430db1e075431360e35018422",
+    "test_packager_v6.py": "96020ddec66007c600e96616d672205504082050e453554e6ed7d17b27ccb102"
+  },
+  "results": [
+    {
+      "name": "old-v3-squash",
+      "scenario": "squash",
+      "expected": "old-red",
+      "argv": [
+        "/opt/homebrew/Caskroom/miniforge/base/bin/python",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v6.py",
+        "--module",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/package_evidence_v3.py",
+        "--scenario",
+        "squash",
+        "--results",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-710/controls/old-v3-squash/results.json"
+      ],
+      "started_at": "2026-11-01T13:44:46.912997+00:00",
+      "finished_at": "2026-11-01T13:44:47.436493+00:00",
+      "exit_code": 1,
+      "log_sha256": "dfc3b873b3f958d47e5b1465a78976eded383479aab7509c1c559d120340e246",
+      "module_sha256": "74ade999a59f91d61e83d1b41de9d6b00dbae2fd58a9b28f285724359b18c821",
+      "mutation": null
+    },
+    {
+      "name": "old-v3-shallow",
+      "scenario": "shallow",
+      "expected": "old-red",
+      "argv": [
+        "/opt/homebrew/Caskroom/miniforge/base/bin/python",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v6.py",
+        "--module",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/package_evidence_v3.py",
+        "--scenario",
+        "shallow",
+        "--results",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-710/controls/old-v3-shallow/results.json"
+      ],
+      "started_at": "2026-11-01T13:44:47.436704+00:00",
+      "finished_at": "2026-11-01T13:44:48.062086+00:00",
+      "exit_code": 1,
+      "log_sha256": "f1cca8ec607176ace6408b702f29d755e18aaab2e6ac90fbee4311c3442a02ad",
+      "module_sha256": "74ade999a59f91d61e83d1b41de9d6b00dbae2fd58a9b28f285724359b18c821",
+      "mutation": null
+    },
+    {
+      "name": "fixed-v4-squash",
+      "scenario": "squash",
+      "expected": "pass",
+      "argv": [
+        "/opt/homebrew/Caskroom/miniforge/base/bin/python",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v6.py",
+        "--module",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/package_evidence_v4.py",
+        "--scenario",
+        "squash",
+        "--results",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-710/controls/fixed-v4-squash/results.json"
+      ],
+      "started_at": "2026-11-01T13:44:48.062320+00:00",
+      "finished_at": "2026-11-01T13:44:48.549093+00:00",
+      "exit_code": 0,
+      "log_sha256": "f31854df6cd3d3bf6e98058731435d79f8de02497b4691f43e7922240ad7660e",
+      "module_sha256": "1377772d93374ce6a31de85fab0ba9fe5697f63430db1e075431360e35018422",
+      "mutation": null,
+      "passing_assertions": 22
+    },
+    {
+      "name": "fixed-v4-shallow",
+      "scenario": "shallow",
+      "expected": "pass",
+      "argv": [
+        "/opt/homebrew/Caskroom/miniforge/base/bin/python",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v6.py",
+        "--module",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/package_evidence_v4.py",
+        "--scenario",
+        "shallow",
+        "--results",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-710/controls/fixed-v4-shallow/results.json"
+      ],
+      "started_at": "2026-11-01T13:44:48.549361+00:00",
+      "finished_at": "2026-11-01T13:44:49.148180+00:00",
+      "exit_code": 0,
+      "log_sha256": "385c8e533b6271b8d6b9fbd65ee10cf45479379950a56774524dca933902a085",
+      "module_sha256": "1377772d93374ce6a31de85fab0ba9fe5697f63430db1e075431360e35018422",
+      "mutation": null,
+      "passing_assertions": 22
+    },
+    {
+      "name": "fixed-v4-working",
+      "scenario": "working",
+      "expected": "pass",
+      "argv": [
+        "/opt/homebrew/Caskroom/miniforge/base/bin/python",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v6.py",
+        "--module",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/package_evidence_v4.py",
+        "--scenario",
+        "working",
+        "--results",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-710/controls/fixed-v4-working/results.json"
+      ],
+      "started_at": "2026-11-01T13:44:49.148456+00:00",
+      "finished_at": "2026-11-01T13:44:49.735281+00:00",
+      "exit_code": 0,
+      "log_sha256": "bc607101dcd49964e57fd309e54751959939607a2e9ad4f21a0479d0aa281e2c",
+      "module_sha256": "1377772d93374ce6a31de85fab0ba9fe5697f63430db1e075431360e35018422",
+      "mutation": null,
+      "passing_assertions": 22
+    },
+    {
+      "name": "fixed-v4-committed",
+      "scenario": "committed",
+      "expected": "pass",
+      "argv": [
+        "/opt/homebrew/Caskroom/miniforge/base/bin/python",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v6.py",
+        "--module",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/package_evidence_v4.py",
+        "--scenario",
+        "committed",
+        "--results",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-710/controls/fixed-v4-committed/results.json"
+      ],
+      "started_at": "2026-11-01T13:44:49.735560+00:00",
+      "finished_at": "2026-11-01T13:44:50.387214+00:00",
+      "exit_code": 0,
+      "log_sha256": "110e7e214feb28bd28c1b2a0c05f789e06c52dc9643966ef5cfaaca16b7064ea",
+      "module_sha256": "1377772d93374ce6a31de85fab0ba9fe5697f63430db1e075431360e35018422",
+      "mutation": null,
+      "passing_assertions": 22
+    },
+    {
+      "name": "fixed-v4-manifest",
+      "scenario": "manifest",
+      "expected": "pass",
+      "argv": [
+        "/opt/homebrew/Caskroom/miniforge/base/bin/python",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v6.py",
+        "--module",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/package_evidence_v4.py",
+        "--scenario",
+        "manifest",
+        "--results",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-710/controls/fixed-v4-manifest/results.json"
+      ],
+      "started_at": "2026-11-01T13:44:50.387505+00:00",
+      "finished_at": "2026-11-01T13:44:50.997161+00:00",
+      "exit_code": 0,
+      "log_sha256": "954f253dac60bc8ada2e9d1b7296d0a809d5bc4446076de04ccff45777277a41",
+      "module_sha256": "1377772d93374ce6a31de85fab0ba9fe5697f63430db1e075431360e35018422",
+      "mutation": null,
+      "passing_assertions": 22
+    },
+    {
+      "name": "fixed-v4-historical",
+      "scenario": "historical",
+      "expected": "pass",
+      "argv": [
+        "/opt/homebrew/Caskroom/miniforge/base/bin/python",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v6.py",
+        "--module",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/package_evidence_v4.py",
+        "--scenario",
+        "historical",
+        "--results",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-710/controls/fixed-v4-historical/results.json"
+      ],
+      "started_at": "2026-11-01T13:44:50.997630+00:00",
+      "finished_at": "2026-11-01T13:44:51.622073+00:00",
+      "exit_code": 0,
+      "log_sha256": "675d944e7c2b2d3b2d7b94d86e0778443d6111da802f4c9b24e281da3d0398f7",
+      "module_sha256": "1377772d93374ce6a31de85fab0ba9fe5697f63430db1e075431360e35018422",
+      "mutation": null,
+      "passing_assertions": 23
+    },
+    {
+      "name": "mutant-portable-history",
+      "scenario": "squash",
+      "expected": "old-red",
+      "argv": [
+        "/opt/homebrew/Caskroom/miniforge/base/bin/python",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v6.py",
+        "--module",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-710/controls/mutant-portable-history/packager.py",
+        "--scenario",
+        "squash",
+        "--results",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-710/controls/mutant-portable-history/results.json"
+      ],
+      "started_at": "2026-11-01T13:44:51.622456+00:00",
+      "finished_at": "2026-11-01T13:44:52.184568+00:00",
+      "exit_code": 1,
+      "log_sha256": "ff92550e689da9768623e87532dca885676e0c72ac82c34badc9282fa3485014",
+      "module_sha256": "15a1c0dfe4279cee8f3af60f26c93ea64c9e05f62d6d4b33647407743660a1d5",
+      "mutation": [
+        "        check_references(plan,repository)",
+        "        check_references(plan,repository,historical=True)"
+      ]
+    },
+    {
+      "name": "mutant-selected-hash",
+      "scenario": "manifest",
+      "expected": "assertion",
+      "argv": [
+        "/opt/homebrew/Caskroom/miniforge/base/bin/python",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v6.py",
+        "--module",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-710/controls/mutant-selected-hash/packager.py",
+        "--scenario",
+        "manifest",
+        "--results",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-710/controls/mutant-selected-hash/results.json"
+      ],
+      "started_at": "2026-11-01T13:44:52.184859+00:00",
+      "finished_at": "2026-11-01T13:44:52.775539+00:00",
+      "exit_code": 1,
+      "log_sha256": "f646015cd687259ca2c6d4caf4e0361da6085a053b664c371f5979e5258397fa",
+      "module_sha256": "b5a3914b4726f41f3fa81e25fa8dd9edb453da1bba31f750645d79a51f614e31",
+      "mutation": [
+        "require(digest(raw) == expected['sha256'] and len(raw) == expected['bytes'],",
+        "require(True,"
+      ]
+    },
+    {
+      "name": "mutant-current-git-blob",
+      "scenario": "committed",
+      "expected": "assertion",
+      "argv": [
+        "/opt/homebrew/Caskroom/miniforge/base/bin/python",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v6.py",
+        "--module",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-710/controls/mutant-current-git-blob/packager.py",
+        "--scenario",
+        "committed",
+        "--results",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-710/controls/mutant-current-git-blob/results.json"
+      ],
+      "started_at": "2026-11-01T13:44:52.775847+00:00",
+      "finished_at": "2026-11-01T13:44:53.398437+00:00",
+      "exit_code": 1,
+      "log_sha256": "d9b2dc7a7a5fde26b477f901931b85b05d2b3ed22e7a1750761df65958790b53",
+      "module_sha256": "f8d1ecbb17cc8eb3672bff326b1e84170860a5284dda212702eb5dc8c09bc495",
+      "mutation": [
+        "require(committed == raw,",
+        "require(True,"
+      ]
+    },
+    {
+      "name": "mutant-all-author-history",
+      "scenario": "historical",
+      "expected": "assertion",
+      "argv": [
+        "/opt/homebrew/Caskroom/miniforge/base/bin/python",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v6.py",
+        "--module",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-710/controls/mutant-all-author-history/packager.py",
+        "--scenario",
+        "historical",
+        "--results",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-710/controls/mutant-all-author-history/results.json"
+      ],
+      "started_at": "2026-11-01T13:44:53.398749+00:00",
+      "finished_at": "2026-11-01T13:44:53.937486+00:00",
+      "exit_code": 1,
+      "log_sha256": "d1102ac30ddcccc16150dff89c4bc933e19b245510caff4737e34a1e755ec890",
+      "module_sha256": "4dc8a6f97703346546b40d0737c4219d8342fbd83a829d02711137d39fdc0672",
+      "mutation": [
+        "if historical:",
+        "if False:  # mutation disables author history"
+      ]
+    },
+    {
+      "name": "mutant-author-original-bytes",
+      "scenario": "historical",
+      "expected": "assertion",
+      "argv": [
+        "/opt/homebrew/Caskroom/miniforge/base/bin/python",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v6.py",
+        "--module",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-710/controls/mutant-author-original-bytes/packager.py",
+        "--scenario",
+        "historical",
+        "--results",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-710/controls/mutant-author-original-bytes/results.json"
+      ],
+      "started_at": "2026-11-01T13:44:53.937790+00:00",
+      "finished_at": "2026-11-01T13:44:54.513321+00:00",
+      "exit_code": 1,
+      "log_sha256": "d25eaa5e7455f3a6b168571304fdec868d27fbf3813017e46e60033f27492a0e",
+      "module_sha256": "2fcfe4ea3f56b6cb6392d5ad8e60de0fa26bd023dd5b6df6d9d861793a826b92",
+      "mutation": [
+        "original = subprocess.check_output(['git','show',revision+':'+name],cwd=repository)",
+        "original = raw"
+      ]
+    }
+  ]
+}

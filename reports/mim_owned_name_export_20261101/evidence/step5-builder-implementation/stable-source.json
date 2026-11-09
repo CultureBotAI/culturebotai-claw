@@ -1,0 +1,21 @@
+{
+  "timestamp": "2026-11-01T12:43:34.426499+00:00",
+  "author_role": "implementation author, not independent reviewer",
+  "repository": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+  "head": "6a7172585eb68da7f4fe01aee75a82458ddd470c",
+  "owned_files": {
+    "scripts/build_mim_ingredient_sssom.py": "569410baa56b4c9d0004c9583253035d5b332c459043d6ecfb1adb3490934549",
+    "tests/test_mim_owned_name_export.py": "4fb09d6e9f4b56b372d7a426b25f602de0544665bb293e20f87338227f626002",
+    "tests/test_mim_sssom_header_dates.py": "abfde63fff697f3869568ccb57e4d311128e48ba6a26832347135c621d1b4b79"
+  },
+  "issue_urls": [
+    "https://github.com/CultureBotAI/culturebotai-claw/issues/701",
+    "https://github.com/CultureBotAI/culturebotai-claw/issues/702"
+  ],
+  "source_frozen": true,
+  "scope": "Diagnostic builder, attributed ownership suppression, frozen file inputs, staged validation and guarded working-copy triplet publication. No production generation or downstream source mutation.",
+  "input_version_dependencies": {
+    "src/kg_microbe_utils/owned_name_policy.py": "18ffd0430d0256b6da6cbb1f3da2327c4cf3418e2b0b2da71ff283ee2f4351ae",
+    "src/kg_microbe_utils/sssom_artifacts.py": "e7b6c7769d87eba76d4a10be81a5f2c244af9007343ba45d1c0361b79bc4c8b6"
+  }
+}

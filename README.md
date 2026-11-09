@@ -19,6 +19,11 @@ current goals, verified six-goal cycles, and distinct PR rounds across the fleet
 See the [progress accounting and publication guide](docs/guides/MECH_PROGRESS.md)
 for evidence rules, historical coverage, and automatic refresh.
 
+Session working state belongs in a durable repository-owned location, and
+committed batches should be published promptly. See the
+[session-state and publication guide](docs/guides/SESSION_STATE_DURABILITY.md)
+for the work-root policy, read-only risk reporting and closure requirements.
+
 ## Current support status
 
 | Surface | Status |
@@ -190,9 +195,17 @@ uv run --extra dev mypy \
   src/kg_microbe_merge_queue src/kg_microbe_research src/kg_microbe_write \
   src/kg_microbe_workflows src/kg_microbe_progress \
   src/kg_microbe_consistency src/kg_microbe_patches \
+  src/kg_microbe_evidence src/kg_microbe_graph \
+  src/kg_microbe_corpus src/kg_microbe_curation src/kg_microbe_health src/kg_microbe_kgx \
+  src/kg_microbe_pages src/kg_microbe_site src/kg_microbe_skills \
+  src/kg_microbe_source_queue src/kg_microbe_sources \
+  src/kg_microbe_sssom src/kg_microbe_writers \
+  src/kg_microbe_utils/owned_name_policy.py src/kg_microbe_utils/sssom_artifacts.py \
   src/kg_microbe_governance/__init__.py \
   src/kg_microbe_governance/__main__.py \
   src/kg_microbe_governance/fleet_audit.py \
+  src/kg_microbe_governance/cycle_release_audit.py \
+  src/kg_microbe_governance/artifacts/scripts/run_shared_evidence_validator.py \
   src/kg_microbe_governance/artifacts/scripts/check_vendored_sync.py
 uv run --extra dev python -m pytest -q \
   --cov=src --cov=cli.main --cov=plugins.repository_settings \

@@ -1,0 +1,5 @@
+{
+  "check": "ast.parse only; no execution",
+  "status": "PASS",
+  "verifier_sha256": "d53310a4b0c3080e989e474d4d0359e74bb757c1a739f617b66e93fea98425e9"
+}

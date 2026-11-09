@@ -1,0 +1,22 @@
+{
+  "observed_at": "2026-11-01T12:43:02.084584+00:00",
+  "classification": "operator cwd error; no existing source file changed",
+  "original_path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/tests/test_mim_owned_name_export.py",
+  "fragment_sha256": "ced683a84091fc515a715d6d52facef1de48c5c5ca4b572d4b8e6761cbc3e0ef",
+  "fragment_lines": 62,
+  "author_confirmation": "Fragment consisted only of four tests authored in this turn. Its exact content was checked before removal.",
+  "prior_tool_observation": {
+    "git_status_short": "?? tests/test_mim_owned_name_export.py",
+    "wc_lines": 62,
+    "first_function": "test_frozen_kgm_consumption_survives_transient_source_replacement",
+    "assertions_before_removal": [
+      "starts with authored function",
+      "contains exactly four test definitions"
+    ]
+  },
+  "correct_destination": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name/tests/test_mim_owned_name_export.py",
+  "destination_has_exact_fragment_suffix": true,
+  "original_exists_now": false,
+  "targeted_shared_status_after": "",
+  "correction": "Appended the exact fragment to the owned isolated Claw test, then unlinked only the newly created untracked fragment. No existing MIM file was modified."
+}

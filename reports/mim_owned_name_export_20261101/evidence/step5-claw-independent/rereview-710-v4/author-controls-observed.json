@@ -1,0 +1,80 @@
+[
+  {
+    "name": "old-v3-squash",
+    "exit_code": 1,
+    "log_sha256": "dfc3b873b3f958d47e5b1465a78976eded383479aab7509c1c559d120340e246",
+    "tail": "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/homebrew/Caskroom/miniforge/base/lib/python3.14/subprocess.py\", line 578, in run\n    raise CalledProcessError(retcode, process.args,\n                             output=stdout, stderr=stderr)\nsubprocess.CalledProcessError: Command '['git', 'merge-base', '--is-ancestor', '70c1f75f252babd2561eb0e0dc36534898bdb172', 'HEAD']' returned non-zero exit status 1.\n"
+  },
+  {
+    "name": "old-v3-shallow",
+    "exit_code": 1,
+    "log_sha256": "f1cca8ec607176ace6408b702f29d755e18aaab2e6ac90fbee4311c3442a02ad",
+    "tail": "^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/homebrew/Caskroom/miniforge/base/lib/python3.14/subprocess.py\", line 578, in run\n    raise CalledProcessError(retcode, process.args,\n                             output=stdout, stderr=stderr)\nsubprocess.CalledProcessError: Command '['git', 'merge-base', '--is-ancestor', '70c1f75f252babd2561eb0e0dc36534898bdb172', 'HEAD']' returned non-zero exit status 128.\n"
+  },
+  {
+    "name": "fixed-v4-squash",
+    "exit_code": 0,
+    "log_sha256": "f31854df6cd3d3bf6e98058731435d79f8de02497b4691f43e7922240ad7660e",
+    "tail": "\n    \"error\": \"Frozen plan differs from bound selection\"\n  },\n  {\n    \"name\": \"portable rehashed README substitution refuses\",\n    \"expected_refusal\": true,\n    \"error\": \"Packaged README differs from bound selection\"\n  },\n  {\n    \"name\": \"portable restored bytes verify\",\n    \"passed\": true\n  },\n  {\n    \"name\": \"actual squash tree verifies without implementation ancestry\",\n    \"passed\": true\n  }\n]\n"
+  },
+  {
+    "name": "fixed-v4-shallow",
+    "exit_code": 0,
+    "log_sha256": "385c8e533b6271b8d6b9fbd65ee10cf45479379950a56774524dca933902a085",
+    "tail": "rue,\n    \"error\": \"Frozen plan differs from bound selection\"\n  },\n  {\n    \"name\": \"portable rehashed README substitution refuses\",\n    \"expected_refusal\": true,\n    \"error\": \"Packaged README differs from bound selection\"\n  },\n  {\n    \"name\": \"portable restored bytes verify\",\n    \"passed\": true\n  },\n  {\n    \"name\": \"shallow consumer without implementation object verifies\",\n    \"passed\": true\n  }\n]\n"
+  },
+  {
+    "name": "fixed-v4-working",
+    "exit_code": 0,
+    "log_sha256": "bc607101dcd49964e57fd309e54751959939607a2e9ad4f21a0479d0aa281e2c",
+    "tail": "rom bound selection\"\n  },\n  {\n    \"name\": \"portable rehashed README substitution refuses\",\n    \"expected_refusal\": true,\n    \"error\": \"Packaged README differs from bound selection\"\n  },\n  {\n    \"name\": \"portable restored bytes verify\",\n    \"passed\": true\n  },\n  {\n    \"name\": \"working source tamper refuses\",\n    \"expected_refusal\": true,\n    \"error\": \"Maintained reference differs: source.py\"\n  }\n]\n"
+  },
+  {
+    "name": "fixed-v4-committed",
+    "exit_code": 0,
+    "log_sha256": "110e7e214feb28bd28c1b2a0c05f789e06c52dc9643966ef5cfaaca16b7064ea",
+    "tail": "\": \"portable rehashed README substitution refuses\",\n    \"expected_refusal\": true,\n    \"error\": \"Packaged README differs from bound selection\"\n  },\n  {\n    \"name\": \"portable restored bytes verify\",\n    \"passed\": true\n  },\n  {\n    \"name\": \"selected working bytes cannot hide different current Git blob\",\n    \"expected_refusal\": true,\n    \"error\": \"Current committed reference differs: source.py\"\n  }\n]\n"
+  },
+  {
+    "name": "fixed-v4-manifest",
+    "exit_code": 0,
+    "log_sha256": "954f253dac60bc8ada2e9d1b7296d0a809d5bc4446076de04ccff45777277a41",
+    "tail": "selection\"\n  },\n  {\n    \"name\": \"portable rehashed README substitution refuses\",\n    \"expected_refusal\": true,\n    \"error\": \"Packaged README differs from bound selection\"\n  },\n  {\n    \"name\": \"portable restored bytes verify\",\n    \"passed\": true\n  },\n  {\n    \"name\": \"maintained selected hash tamper refuses\",\n    \"expected_refusal\": true,\n    \"error\": \"Maintained reference differs: source.py\"\n  }\n]\n"
+  },
+  {
+    "name": "fixed-v4-historical",
+    "exit_code": 0,
+    "log_sha256": "675d944e7c2b2d3b2d7b94d86e0778443d6111da802f4c9b24e281da3d0398f7",
+    "tail": "refuses\",\n    \"expected_refusal\": true,\n    \"error\": \"Packaged README differs from bound selection\"\n  },\n  {\n    \"name\": \"portable restored bytes verify\",\n    \"passed\": true\n  },\n  {\n    \"name\": \"author historical check still refuses missing object\",\n    \"expected_refusal\": true\n  },\n  {\n    \"name\": \"author historical source still required at declared revision\",\n    \"expected_refusal\": true\n  }\n]\n"
+  },
+  {
+    "name": "mutant-portable-history",
+    "exit_code": 1,
+    "log_sha256": "ff92550e689da9768623e87532dca885676e0c72ac82c34badc9282fa3485014",
+    "tail": "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/homebrew/Caskroom/miniforge/base/lib/python3.14/subprocess.py\", line 578, in run\n    raise CalledProcessError(retcode, process.args,\n                             output=stdout, stderr=stderr)\nsubprocess.CalledProcessError: Command '['git', 'merge-base', '--is-ancestor', '87a731420de7ff73884350d756be2cb74c574e1b', 'HEAD']' returned non-zero exit status 1.\n"
+  },
+  {
+    "name": "mutant-selected-hash",
+    "exit_code": 1,
+    "log_sha256": "f646015cd687259ca2c6d4caf4e0361da6085a053b664c371f5979e5258397fa",
+    "tail": "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v6.py\", line 20, in check\n    assert error is None, (name,'did not refuse')\n           ^^^^^^^^^^^^^\nAssertionError: ('maintained selected hash tamper refuses', 'did not refuse')\n"
+  },
+  {
+    "name": "mutant-current-git-blob",
+    "exit_code": 1,
+    "log_sha256": "d9b2dc7a7a5fde26b477f901931b85b05d2b3ed22e7a1750761df65958790b53",
+    "tail": "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v6.py\", line 20, in check\n    assert error is None, (name,'did not refuse')\n           ^^^^^^^^^^^^^\nAssertionError: ('selected working bytes cannot hide different current Git blob', 'did not refuse')\n"
+  },
+  {
+    "name": "mutant-all-author-history",
+    "exit_code": 1,
+    "log_sha256": "d1102ac30ddcccc16150dff89c4bc933e19b245510caff4737e34a1e755ec890",
+    "tail": "ts/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v6.py\", line 161, in <module>\n    else:raise AssertionError('author historical check did not refuse missing object')\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: author historical check did not refuse missing object\n"
+  },
+  {
+    "name": "mutant-author-original-bytes",
+    "exit_code": 1,
+    "log_sha256": "d25eaa5e7455f3a6b168571304fdec868d27fbf3813017e46e60033f27492a0e",
+    "tail": "MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v6.py\", line 165, in <module>\n    else:raise AssertionError('author historical source did not refuse missing original file')\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: author historical source did not refuse missing original file\n"
+  }
+]

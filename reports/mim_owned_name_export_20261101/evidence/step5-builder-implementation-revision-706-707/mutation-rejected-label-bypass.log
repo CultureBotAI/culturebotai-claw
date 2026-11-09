@@ -1,0 +1,20 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______ test_source_bound_rejection_is_not_a_suppression_or_kg_backdoor ________
+
+tmp_path = PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8567/test_source_bound_rejection_is0')
+
+    def test_source_bound_rejection_is_not_a_suppression_or_kg_backdoor(tmp_path):
+        subject = write_record(tmp_path, synonyms=[{"synonym_text": "Wrong|Also wrong", "synonym_type": "REJECTED_LABEL"}])
+        events = []
+        rows = builder._row_from_yaml(subject, {}, {}, {"CHEBI:1": ("Wrong", ["ALSO WRONG", "safe"])}, {}, suppressions=events)
+>       assert rows[0]["other"] == "safe"
+E       AssertionError: assert 'Wrong|ALSO WRONG|safe' == 'safe'
+E         
+E         - safe
+E         + Wrong|ALSO WRONG|safe
+
+tests/test_mim_owned_name_export.py:121: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_mim_owned_name_export.py::test_source_bound_rejection_is_not_a_suppression_or_kg_backdoor
+1 failed, 54 deselected in 0.07s

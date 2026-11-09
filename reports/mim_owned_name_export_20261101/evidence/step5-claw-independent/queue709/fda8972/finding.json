@@ -1,0 +1,36 @@
+{
+  "status": "CONFIRMED_FINDING",
+  "severity": "medium",
+  "at": "2026-11-01T13:40:52.995003+00:00",
+  "reviewer": "/root/step4_design_review",
+  "integration": "fda8972b1820964d2d839d44165fb948b2917762",
+  "integration_tree": "5a7bb23f17d5c537e332fd0c40330942629ca866",
+  "parents": [
+    "6a7172585eb68da7f4fe01aee75a82458ddd470c"
+  ],
+  "reviewed_head": "1f5ad6779cdb3f39f39ba6f9f26d31840b7e7077",
+  "reviewed_feature_tree_identical": true,
+  "changed_paths": 479,
+  "all_unrelated_base_paths_preserved": true,
+  "implementation_ancestor_exit_code": 1,
+  "actual_portable_verify_exit_code": 1,
+  "actual_portable_argv": [
+    "python",
+    "-B",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/queue709/fda8972/integration-export/reports/mim_owned_name_export_20261101/verify.py",
+    "verify",
+    "--package",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/queue709/fda8972/integration-export/reports/mim_owned_name_export_20261101",
+    "--repository",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/queue709/fda8972/integration-export",
+    "--require-tracked"
+  ],
+  "stderr_sha256": "3a6801ee658ac19767b05efce33db0022aab7b4b14672b6aaea0e2ddec5b17e3",
+  "finding": "The documented portable verification requires historical implementation a56 to be an ancestor of HEAD, so the exact actual native squash integration fails despite identical reviewed tree/package bytes.",
+  "suggested_contract": "Bind maintained evidence to exact reviewed content and authentic historical implementation objects without requiring a pre-squash feature commit to be an ancestor of the current squash. Review the canonical post-merge portability contract; preserve historical source attribution. Add a real single-parent squash regression before re-review.",
+  "production_edits": false,
+  "github_mutations": false,
+  "branch_or_checkout_operations": false,
+  "queue_checks": "Not reviewed/completed by this content probe",
+  "supervisor_binding": null
+}

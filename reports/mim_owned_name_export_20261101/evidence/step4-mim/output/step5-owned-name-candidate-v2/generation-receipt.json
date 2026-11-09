@@ -1,0 +1,28 @@
+{
+  "timestamp": "2026-11-01T13:06:41.411600+00:00",
+  "candidate": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/output/step5-owned-name-candidate-v2/candidate.sssom.tsv",
+  "candidate_sha256": "2efdd39fd54e5d63199dd2419874e508a51f6c598a64137c4858a9b8a829749a",
+  "sidecar_sha256": "d2c6942d210c64d3ab3528e7eef61186e9fb326e555ca0a3a4e9c7d631153390",
+  "native_generation_manifest_sha256": "7c2783921744b34e614034708fc51d954c3116c6d130ba3dfae1fffb99311788",
+  "prior_stamps": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim/mappings/ingredient_mappings.sssom.tsv",
+  "prior_sha256": "beef5e184ea0895d41d80f1b1b813f6983c5534ea59f9b4585feb71940e7c6f9",
+  "executed_entry_source_sha256": "38d59f42953305f6fc51e4fc24dfc59ee1919bfb961595b67a8afe9f8a46a1bc",
+  "producer_revision": "90d110e663c10146351b09ae98d387dabdec0b1c",
+  "producer_sha256": "38d59f42953305f6fc51e4fc24dfc59ee1919bfb961595b67a8afe9f8a46a1bc",
+  "harness_sha256": "060f915ab0234c42661882e56ec21f86033d21bad818a8a5e07e4f5ee42e70e0",
+  "input_manifest_sha256": "3d3ec1f58a99ae62d611ec7c11614380eb3f182a972d27d0264f2fdba7719805",
+  "label_maps": {
+    "label-input-01.json": "126412ee9d162bdf5c5a2b2277eb99e56e8c60e0a9c61211fd44e59fa03801e7",
+    "label-input-02.json": "4833b8fe6bac72d5ae352d80b0c4610d111f58b16639cc524941144233629016",
+    "label-input-03.json": "87d670fe9ba124be14950024eb7cabfd1fe67cbbcd6e9b3dd6f5219c55673a27",
+    "label-input-04.json": "1e94d8aafbb9a65d4477b14ade094ce98fc7c924e9e7506e98d6694aa5ceeede"
+  },
+  "optional_residual": {
+    "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name/workspace/reports/kg_microbe_residual_p25_categorized.json",
+    "present": false
+  },
+  "comparison_input_scope": "CultureMech outputs and Mediadive nodes are not imported by this SSSOM producer.",
+  "input_bytes_unchanged": true,
+  "scientific_approval_added": false,
+  "supervisor_binding": null
+}

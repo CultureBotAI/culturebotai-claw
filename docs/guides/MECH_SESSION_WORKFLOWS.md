@@ -7,7 +7,7 @@ the supervisor verifies evidence before starting the next goal. Importing the
 committed Terminal adapter performs no UI actions. This guide can serve as the
 legacy agent's `workflow_prompt_path`; canonical cycles use the validated YAML contract and immutable runtime snapshot described below.
 
-See [the shared workflow contract](MECH_WORKFLOW_CONTRACT.md) for the six goals,
+See [the shared workflow contract](MECH_WORKFLOW_CONTRACT.md) for parent v2's seven goals,
 versioned review outputs, infrastructure intake, and cycle restart. Its YAML
 parent and LinkML schema are the source of truth.
 
@@ -36,7 +36,8 @@ repository paths from their names.
 The following creates a **TraitMech example** configuration using an existing
 process. First inspect `/bin/ps ax -o pid=,tty=,lstart=,comm=` and the relevant
 Terminal tab, then set `MECH_SESSION_PID` to its observed numeric PID and
-`MECH_INITIAL_STAGE` to the stage matching its actual last goal (1–6).
+`MECH_INITIAL_STAGE` to the stage matching its actual last goal in the pinned
+parent version (1–7 for v2, 1–6 for v1).
 Never relabel a different existing goal merely to fit the example. Stage 0 is
 available for closing unrelated adopted work before starting stage 1.
 Set `MECH_MANIFEST_PATH` to the verified manifest if needed.
@@ -114,9 +115,10 @@ PY
 ```
 
 Review the printed goal and generated configuration before running it. The
-profile supplies all six stages; do not copy a second stage list into the runtime
+profile supplies every stage; do not copy a second stage list into the runtime
 configuration. The active cycle retains an immutable effective-profile snapshot;
-`workflow_next_profile_path` selects the candidate to validate after stage 6.
+`workflow_next_profile_path` selects the candidate to validate after the active
+infrastructure goal's closure (v2 stage 7; v1 stage 6).
 `native_reader_path` and `notifier_path` default to the committed sibling
 scripts; explicit overrides remain supported for a reviewed local adapter.
 For other Mechs, assess native skills and domain applicability separately.
@@ -126,12 +128,57 @@ objective, its appropriate local review skill, and an evidence-backed no-change
 result. Do not invent graph fields
 or UniProt annotations to satisfy a generic sequence.
 
-## Migrating an existing four-stage run
+## Migrating a six-goal cycle to seven goals
+
+An active v1 cycle stays on its saved effective workflow while a v2 profile is
+prepared and reviewed. Do not edit its snapshot, shift its stage, replace its
+native goal, rewrite old receipts or rename historical evidence directories.
+The ledger's `cycle_versions` records each cycle's parent version, and status
+exposes `parent_version` and `stage_key` so a stage number is not mistaken for
+the same goal across versions. Stage 0 remains not started.
+
+Configure the target's reviewed `workflow_parent_migration` for the exact old
+and candidate effective workflow hashes and its review artifact:
+
+```json
+{
+  "workflow_parent_migration": {
+    "from_sha256": "<old effective workflow digest>",
+    "to_sha256": "<candidate effective workflow digest>",
+    "reviewed_by": "<reviewer>",
+    "reason": "<reviewed migration rationale>",
+    "review": {"artifact": "<review artifact path>", "sha256": "<64 hex>"}
+  }
+}
+```
+
+The review artifact must be inside the Mech repository and committed at the
+verified final closure head. Set `workflow_next_parent_path` and
+`workflow_next_schema_path` when the candidate parent/schema inputs differ
+from the active ones; these are target settings, with configuration defaults.
+The supervisor
+validates that candidate against the verified infrastructure closure commit.
+Only after the current v1 infrastructure goal closes can it increment the
+cycle, pin v2 and dispatch stage 1 `open_issue_triage`. Missing, changed or
+invalid migration evidence blocks activation; it never replaces the active
+goal as a recovery action. Keep the ordinary cycle-boundary review and all
+existing closure gates effective.
+
+Release and deployment are separate from preparing this code. DUFMech is the
+chosen test Mech after a reviewed release and explicit adoption, followed by
+the remaining fleet only after a complete stage-1 test closure. No downstream
+pin is changed by the phase-1 Claw PR.
+
+## Migrating an existing four-stage run to pinned v1
 
 Stop the goal supervisor and save its configuration, ledgers, receipts, and
 status before migration. Preserve the current run, conversation, native goal,
 stage, and action history. Validate every repository profile and review the
 proposed binding before changing the configuration.
+
+This legacy mapping adopts a reviewed six-goal v1 profile first. It does not
+reinterpret the four old stage numbers against v2's inserted first goal. Use
+the six-to-seven boundary migration above only after that pinned cycle closes.
 
 For each legacy target, add `workflow_profile_path`,
 `workflow_next_profile_path`, and `workflow_migration`. The migration contains
@@ -167,29 +214,35 @@ verification can lengthen a sweep. `heartbeat.json` includes sweep progress;
 `dashboard.md` summarizes all targets. Per-repository directories contain
 `status.json`, `ledger.json`, receipts, and optional agent progress.
 
-Use `scripts/mech_monitor_control.py stop --service supervisor` and the matching
-`start` command to pause and resume. Preserve the same config and ledger:
+Stop with SIGTERM or create `STOP` inside `runtime_dir`. Remove `STOP` only when
+intentionally resuming. Restart the same run with the same config and ledger:
 durable reserved/sent/uncertain actions suppress duplicate sends. Do not delete
 receipts or reset the ledger to retry an uncertain delivery.
-
-Each dispatched action saves its complete instructions under the session's
-`instructions/` directory. The terminal receives a short marker and file-reading
-instruction; the ledger preserves both texts and the instruction file hash.
-A `sent` result proves only that Terminal accepted the transport call. CLI
-history can also contain queued input, so acceptance requires the exact native
-user message in the bound conversation after the send baseline. The first
-acceptance timestamp is retained. Historical acceptances without matching
-native input are explicitly marked unverified, without resetting workflow
-progress. Inspect an existing draft or queue before repairing it; do not resend
-an instruction or add Return merely because its display is collapsed.
 
 Binding checks include PID/start time, foreground process group, exact TTY,
 working directory/origin, native conversation and initial goal identity, one
 matching Terminal tab, empty composer, idle native execution, and absence of
 queued/background work. Drafts, menus and unfamiliar screens remain untouched.
 The final send rechecks process identity and the exact captured screen.
-A send is acknowledged only through the exact native user input. A new goal
-must also match that input's native goal identity before adoption.
+A successful Terminal API return is an attempted transport, not proof that the
+agent submitted the whole instruction. The reservation remains `uncertain`
+until the native reader proves one exact full user input after the reserved
+step and time, in the same workspace, conversation and goal context. Hash-only
+input evidence is bounded to the latest 200 user steps; a reservation older
+than that window remains held for operator assessment. Missing, partial,
+different or duplicate inputs never authorize a retry or an automatic Enter. Matching pending, queued or unknown-status inputs also defeat uniqueness. Only the observed plain-text input shape, or one SYSTEM goal declaration followed by its plain-text suffix, is supported; extra file or unknown scopes fail closed even when their displayed text has the same hash.
+Workspace-history markers alone are not acceptance authority.
+
+A `start_goal` additionally requires actual native SYSTEM `/goal` metadata and
+a matching new goal identity. Literal `/goal` text or a marker in a checkpoint
+cannot substitute for that declaration. Previously accepted action records are
+preserved; they do not independently authorize adoption of another goal.
+
+For an existing unsent draft, preserve the screen, action and native-input
+evidence and prepare a separately reviewed recovery proposal. Do not clear or
+submit it under an ordinary sweep, rewrite its action state, or resend a goal.
+A valid ordinary closure receipt may still close an already completed goal once
+all readiness and closure gates pass; delivery evidence is not closure proof.
 
 A replacement agy process or conversation blocks the old binding. Stop,
 inspect its current goal and any already delivered instructions/PRs, preserve
@@ -201,6 +254,16 @@ An independently running approval monitor must acquire the **same**
 Configure both tools to the same absolute directory (for example
 `ttys030.lock`); using separate lock directories does not coordinate them.
 The supervisor itself does not approve command, file, or URL menus.
+
+The optional [agy port-pressure guard](MECH_PORT_PRESSURE.md) adds a separate
+report-only maintenance command and an explicitly enabled exact-ID restart
+transaction. It preserves the adopted goal and never dispatches goal text during
+a maintenance transaction. At a verified completed-goal boundary, an eligible
+agy session with at least the configured 500 listeners is recycled before the
+supervisor's fresh checks and dispatch of its legitimate next goal. The idle
+pressure scan remains a fallback; both paths share their limits and failure
+latch. A report-mode boundary reports and holds instead of sending input.
+Existing configurations keep this guard off.
 
 Blocked progress requires operator assessment. At most three closure-repair
 messages are allowed per stage, each after new native progress and the minimum
@@ -292,54 +355,35 @@ not completion claims.
 }
 ```
 
-For a stage-5 finding already resolved in the frozen review, an issue
-may explicitly reference its original verified closure instead of claiming that
-its old fix belongs to the current PR:
-
-```json
-{
-  "number": 76,
-  "disposition": "addressed",
-  "fix_commit_sha": "74aec27df2af344f46a4b183578f641d465e2a74",
-  "historical_resolution": {
-    "github_repository": "CultureBotAI/TaxonMech",
-    "pr_number": 151,
-    "base": "main",
-    "head_sha": "74aec27df2af344f46a4b183578f641d465e2a74",
-    "merge_commit_sha": "c520694e483373bf5274bac5bc08327d4f0d364c",
-    "receipt_sha256": "7c5a12af4437a1eecb654bf2f9623241eec4881ecfecf23cddf5b9356707e0cb"
-  }
-}
-```
-
-`receipt_sha256` is the supervisor's canonical JSON digest recorded in
-`completed_stages`, not the raw archive-file hash. It must identify one earlier
-verified merged receipt with the same PR/head/merge. The prior evidence and
-current frozen review must both identify the same already-resolved finding; a reopened or new finding requires a current fix. The
-supervisor rechecks that the issue is a closed real issue, the original PR is
-merged at its pinned repository/base/head/merge, and the stated fix is a member
-of that PR. Its merge commit must be an ancestor of the current reviewed head,
-current PR base and default checkout. For squash merges, membership is checked
-for the original fix, while ancestry is checked for the squash merge commit.
-Historical references are reported separately and do not add a new PR or goal
-completion. Omitting `historical_resolution` retains the requirement that the
-fix commit belongs to the current PR. Current review, CI and cleanup gates are
-unchanged. Stage 6 continues to use its existing unresolved-task intake and
-current-PR fix rules; this historical field is not accepted there. This optional receipt field does not alter the LinkML goal-evidence
-manifest or its pinned workflow schema.
-
-All canonical receipts include `goal_outputs.infra_tasks`. Stages 4–6 also
+All canonical receipts include `goal_outputs.infra_tasks`. The open_issue_triage,
+record_review, resolve_review_findings and infrastructure goals also
 include `goal_outputs.goal_evidence` with the repository-relative path and
 SHA-256 of the versioned LinkML evidence manifest. The manifest binds the
-stage's required reports and data artifacts. Stage 5 must point to this cycle's
-exact verified stage-4 manifest. Stage 6 uses the supervisor's frozen intake
+stage's required reports and data artifacts. Resolve_review_findings must point
+to this cycle's exact verified record_review manifest. Infrastructure uses the supervisor's frozen intake
 snapshot from status, accounts for every outstanding task in it, and retains
 new tasks in the current notebook for the next cycle.
+
+For open_issue_triage (v2 stage 1), status supplies `issue_scope` with the exact
+frozen queue content, hash and cutoff. Retain those bytes as issue_inventory;
+save reviewed severity/reasons, stable groups, plans, dispositions and the
+shared four-hour budget in the structured issue_triage evidence. A critical or
+high blocker retains its prerequisite and prevents goal closure. The budget
+starts only after critical/high work is resolved, is shared across both
+workers, and cannot reset for a second group or another worker. Stage-1 work
+does not alter the current cycle's later review-findings or infrastructure
+policy. See the [contract](MECH_WORKFLOW_CONTRACT.md) and the stage's
+triage-and-resolve-issues skill for selection and label rules.
+
+The selected-group list and work intervals are cumulative across revisions.
+Previously worked groups remain within the two-group cap even if later blocked;
+new selections and intervals append without rewriting earlier work or clock
+origins.
 
 Use `python -m kg_microbe_workflows validate-evidence <manifest> --root <repo>`
 from the reviewed CLAW environment; supply `--previous <manifest>` when required
 for finding continuity. Packaged examples under
-`src/kg_microbe_workflows/examples/` show the three stage-specific records.
+`src/kg_microbe_workflows/examples/` show versioned stage-specific records.
 Validation checks shape and evidence; it does not replace Git and GitHub closure.
 
 Use `issues: []` when the PR adversarial review found no issues. For a proven no-change goal, use
@@ -373,8 +417,145 @@ By default the native goal must also be completed. The opt-in target setting
 `allow_receipt_completion_override: true` permits a fully verified receipt for
 an active goal only after a matching accepted instruction; use it only after
 assessing why ordinary continuation left native goal state active.
-A canonical six-stage run advances only after each verified closure. Stage 6
+A canonical run advances only after each verified closure. Its infrastructure goal
 then increments `cycle`, validates and pins the committed next-cycle profile,
 and returns to stage 1. Actions, progress, receipts, archives, and reports carry
 the cycle identity, so older evidence cannot complete a later cycle. Legacy
 four-stage configurations remain supported until explicitly migrated.
+
+## Previously resolved findings in later remediation goals
+
+A completed single-PR `resolve_review_findings` receipt may identify an issue
+whose same finding scope was already resolved in an earlier verified cycle.
+Keep the current PR as the current goal's sole PR; a prior cycle's PR is not
+an ordered same-goal member. Use the issue's top-level `fix_commit_sha` for
+the actual fixing commit in the earlier PR, with this exact descriptor:
+
+```json
+{
+  "number": 23,
+  "disposition": "addressed",
+  "fix_commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "historical_resolution": {
+    "github_repository": "CultureBotAI/ExampleMech",
+    "pr_number": 42,
+    "base": "main",
+    "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "merge_commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+    "receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  }
+}
+```
+
+These values are illustrative placeholders, not evidence. There is no nested
+`fix_commit_sha`, alternative fixing PR, or automatic fallback when the
+current PR lacks a claimed commit. The descriptor must bind exactly one earlier
+verified remediation closure by canonical receipt digest, PR head and merge.
+The retained manifest bytes must match its recorded snapshot. Its resolved
+group and stable finding IDs, issue and summaries must match the current
+cycle's frozen review and the current resolution group; a reopened or different
+finding cannot inherit historical credit.
+
+The verifier freshly checks the prior merged repository/base/head/merge,
+complete bounded commit inventory, actual issue closure, and that the merge
+is an ancestor of the current reviewed head, PR base and checkout. The issue's
+fix must be in that historical PR. This proves declared provenance and
+retention of the reviewed finding scope; commit membership alone is not a new
+scientific review. Current-goal review, final-head artifacts, checks, merge,
+cleanup, publication and native-goal gates still apply. Successful verification
+retains `historical_issue_resolutions` in the new closure proof without rewriting
+old records. Existing ordinary receipts and previously retained historical
+proofs stay unchanged. This additive path is deliberately not combined with
+ordered multi-PR receipts.
+
+Incorrect existing receipts require a separately reviewed exact correction
+record and user approval before any runtime replacement. Preparing or testing
+this compatibility code grants no authority to edit a receipt, reset a repair
+budget, replay a goal, or deploy it. See claw issue #1031.
+
+## Ordered multi-PR closure receipts
+
+A goal whose fixes and final evidence land in separate PRs may use the additive
+version-2 `prs` and `evidence_attributions` fields. Existing single-PR receipts,
+including their archived shape and public goal event, remain unchanged. This
+format changes neither native completion authority nor stage dispatch: a native
+goal mismatch still needs the documented operator assessment before closure.
+
+Start from the supervisor's ordinary receipt template. Keep its top-level `pr`,
+`review`, `validation`, and `cleanup` as the **final integration PR**. Add `prs`
+with two to sixteen members, ordered by merge and integration ancestry. Every
+member contains exactly `number`, `head_sha`, `branch`, `base`,
+`merge_commit_sha`, `review`, `validation`, and `cleanup`. Copy the final
+member's identity and proofs to the top-level fields without alteration. Each
+member needs its own saved review and validation evidence at that exact head.
+See [the illustrative receipt](../examples/ordered-closure-receipt.json); its
+synthetic hashes and artifact names must be replaced with observed evidence.
+
+Each `issues` entry additionally names `pr_number`. Its `fix_commit_sha` must
+belong to that exact PR's independently queried complete commit inventory; an
+issue fixed by an earlier PR must never be attributed to the evidence-repair PR.
+Each `evidence_attributions` entry contains exactly `path`, `sha256`, `pr_number`,
+and `commit_sha`. The set must equal the current goal evidence manifest plus
+its current artifact payloads. The producer commit must belong to that PR,
+actually change the path's blob, and produce the exact bytes retained at the
+final reviewed head. Merely finding an inherited matching file in a later
+commit does not prove production. `INFRA_TASKS.md`, earlier stage evidence,
+and ancestor manifests remain independently checked at the final head; do not
+claim that a current PR produced those retained files.
+
+The supervisor reads only its configured session's private PR registry. Every
+member must have the current run, repository, cycle, stage, adopted native goal,
+and workflow digest recorded there. A conflicting retained goal, another stage
+or workflow, or an already verified earlier closure blocks this multi-PR path.
+A current valid binding takes precedence over an orphaned native identity in
+the same cycle, stage and workflow; the orphan alone supplies no membership. This corroboration is not completion authority: every PR still
+needs independent merged/base/head, exact merge commit, passing required and
+repository-declared checks, issue-fix membership, and local/remote branch-cleanup
+verification. A malformed or unsafe registry fails closed without being edited.
+
+The goal window starts at the retained adopted goal's timestamp and ends at the
+verification timestamp sampled once for this closure attempt. PR creation,
+merge, and each PR commit's GitHub committer timestamp must be coherent within
+that window. Evidence-repair PRs may merge after native goal completion while
+the same stage awaits closure. No receipt assertion can extend the window or
+borrow a prior-stage PR. Commit inventories are paginated and checked against
+GitHub's exact PR commit count; PRs above the endpoint's 250-commit limit are
+refused rather than treated as complete.
+
+Every earlier merge commit must be an ancestor of the following reviewed head.
+For squash merges this uses the merge commit, not the original feature commit.
+Every changed path of an issue fix must retain the entry actually produced by
+that fix commit at both its member's reviewed head and the final head. Entries
+include the blob and executable mode, or exact absence for deletions. Git paths
+are looked up literally, including names containing pathspec magic or globs. Comparing
+only the two reviewed heads would incorrectly accept a fix reverted before
+review. Exact content and mode reintroduction is accepted; a reverted fix is
+refused even if the two reviewed trees agree.
+
+A subsequent issue fix in the **same PR** may deliberately replace a path from
+an earlier fix. Declare each necessary replacement in that earlier issue's
+optional `superseded_paths` list, with one to 256 exact entries containing only
+`path`, `pr_number`, and `commit_sha`. The successor must itself be another
+independently verified attributed issue-fix commit in this receipt, strictly
+descend from the original fix, and actually change that original changed path.
+Its produced entry must survive at both the member and final reviewed heads.
+Unknown paths, duplicate or self references, unnecessary or unchanged
+replacements, unlisted mismatches, and cross-PR code replacements are refused.
+No path prefix grants an exemption. DUFMech's PR365 is the motivating example:
+its eight structured review files are explicitly replaced by the later fix
+for issue366, while the scientific-data fixes retain their original entries.
+
+Current-stage evidence uses only the separate `evidence_attributions` mechanism.
+Its producer must be at or after the affected fix in the same PR, or belong to
+a later ordered PR and descend from the affected PR's verified merge. An
+unrelated earlier producer cannot waive a lost fix. This permits PR367's exact
+manifest repair without attributing PR365's issue fixes to it. Producer/fix merge commits,
+rename/copy diffs, symlinks, and submodules are refused because their attribution
+is ambiguous under this deliberately bounded format.
+
+The retained supervisor verification records every member's independently
+verified merge plus the exact evidence attributions. Progress collection exports
+all member PR observations and associations, but still only one goal closure,
+whose existing top-level PR is the final integration PR. A candidate receipt
+contributes informational associations only. No runtime ledger, registry,
+counter, active workflow, or migration is rewritten by this feature.

@@ -1,0 +1,11 @@
+{
+  "started_at": "2026-11-01T05:29:20.899950+00:00",
+  "finished_at": "2026-11-01T05:29:21.337754+00:00",
+  "url": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/5970/property/MolecularFormula,MolecularWeight,IUPACName,InChI,InChIKey,CanonicalSMILES,IsomericSMILES/JSON",
+  "final_url": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/5970/property/MolecularFormula,MolecularWeight,IUPACName,InChI,InChIKey,CanonicalSMILES,IsomericSMILES/JSON",
+  "status": 200,
+  "bytes": 502,
+  "sha256": "deccda58718bdec8e08efcd641918524dd5c8ed5cc05bfb7fbc3c1ccbec2064c",
+  "source_receipt_sha256": "b64ac53ae1f4de8056f8096a09da8898c2f0dd3367395b9cfa0eb03a7071d526",
+  "capture_note": "Projection of retained original receipt; transport headers omitted."
+}

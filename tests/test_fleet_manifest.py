@@ -37,6 +37,7 @@ EXPECTED_MECHS = (
     "dufmech",
     "cmmmech",
     "aimech",
+    "edgemech",
 )
 
 

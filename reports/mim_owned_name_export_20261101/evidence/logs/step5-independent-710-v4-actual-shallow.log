@@ -1,0 +1,27 @@
+fatal: Not a valid commit name a56f3ae4563619a5129ad944878c9205267315d6
+{
+  "status": "PASS_WITH_LIMITATIONS",
+  "reviewer": "/root/step4_design_review",
+  "at": "2026-11-01T13:46:10.950947+00:00",
+  "issue": 710,
+  "v4_sha256": "1377772d93374ce6a31de85fab0ba9fe5697f63430db1e075431360e35018422",
+  "original_actual_integration": "fda8972b1820964d2d839d44165fb948b2917762",
+  "original_implementation": "a56f3ae4563619a5129ad944878c9205267315d6",
+  "actual_integration_current_source_references": "unchanged all13selectedrefs",
+  "original_v3_actual_squash": "REFUSED as recorded",
+  "v4_actual_squash": "PASS",
+  "v4_real_depth_one_clone_without_old_feature_objects": "PASS",
+  "working_byte_refusal": "PASS",
+  "current_HEAD_blob_refusal": "PASS",
+  "selected_hash_refusal": "PASS",
+  "strict_author_history_refusal": "PASS",
+  "original_proof_unchanged": true,
+  "limitations": [
+    "This tests frozen v4 source using isolated copies of the actual blocked integration package with verifier/version hash fields rebound; no replacement production package or new PR head has been published or reviewed.",
+    "A future final package/head/body and its actual queue integration must be reviewed separately.",
+    "Portable checks establish selected content/current tracked Git identity; historical provenance remains asserted and frozen under the separate author publication checks.",
+    "No scientific approval, production edits or GitHub mutations."
+  ],
+  "remaining_findings": [],
+  "supervisor_binding": null
+}

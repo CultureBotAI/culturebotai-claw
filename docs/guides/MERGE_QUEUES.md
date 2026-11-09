@@ -44,18 +44,23 @@ requirements. ProteinTraitsMech runs full validation for merge groups.
 
 ## Inspect and reconcile
 
+Keep plans, admission reports and receipts under the gitignored `<repo>/.temp/`
+durable work root. Create the directory before these commands and choose
+unique filenames; retain the reviewed plan and its actual receipt.
+
 These commands use `gh` authentication. Reading the public fleet needs no local
 Mech checkouts. Applying settings requires repository administration permission.
 The automatic rollout supports public organization repositories with main as the
 default branch and squash merges already enabled.
 
 ```bash
+mkdir -p .temp
 uv run kg-microbe-merge-queue check
-uv run kg-microbe-merge-queue plan --output /tmp/queue-plan.json
+uv run kg-microbe-merge-queue plan --output .temp/queue-plan.json
 # Optional scope: --repository taxonmech (repeat for several repositories).
 # Review the saved desired rules, existing settings and readiness evidence.
-uv run kg-microbe-merge-queue apply --plan /tmp/queue-plan.json \
-  --receipt /tmp/queue-apply.json
+uv run kg-microbe-merge-queue apply --plan .temp/queue-plan.json \
+  --receipt .temp/queue-apply.json
 ```
 
 `plan` and `check` never write GitHub. `check` exits nonzero for drift or readiness
@@ -72,7 +77,32 @@ remove an existing protection merely to make adoption succeed.
 
 Readiness checks cover triggers, cancellation, required jobs and their transitive
 prerequisites, candidate repository and commit, and separate immutable auxiliary
-checkouts. Concurrency belongs at workflow level to avoid jobs contending with
+checkouts.
+
+An auxiliary checkout must name a literal 40-character commit, with two
+exceptions:
+
+- **claw's own trusted audit base:** `fleet/trusted-claw` at the event's base
+  commit.
+- **A claw checkout at a step output** (`${{ steps.<id>.outputs.ref }}`), only
+  when the whole workflow file is byte-identical to a claw-governed workflow
+  artifact.
+  - The governed `qc-evidence.yaml` derives that ref from the consumer's
+    committed pin, and the consumer's `vendored-sync` check holds those bytes
+    to the canon.
+  - A hand-written lookalike, or any byte change to the governed file
+    (including CRLF line endings or a byte-order mark), still needs a literal
+    commit
+    ([#793](https://github.com/CultureBotAI/culturebotai-claw/issues/793),
+    [#818](https://github.com/CultureBotAI/culturebotai-claw/issues/818)).
+
+The accepted digests come from the claw governance package that runs the plan,
+not from the consumer's pin. During a rollout, a consumer still pinned to an
+earlier version of a governed workflow therefore gets a blocked plan until it
+re-pins. That fails closed by design
+([#819](https://github.com/CultureBotAI/culturebotai-claw/issues/819)).
+
+Concurrency belongs at workflow level to avoid jobs contending with
 their own workflow. The checker also requires exact unique successful job names observed in the ten latest
 completed runs using the same workflow bytes. No match requires a fresh CI run.
 This is not a proof of arbitrary workflow shell code: review step conditions,
@@ -165,7 +195,7 @@ The separate reviewer App is not used to manufacture approvals.
 ```bash
 # Local inspection never writes by default.
 python scripts/auto_merge_ready_prs.py --repository OWNER/REPO \
-  --report /tmp/merge-admission.json
+  --report .temp/merge-admission.json
 # In claw, use src/kg_microbe_governance/artifacts/scripts/ instead of scripts/.
 gh workflow run merge-queue-admission.yaml -R OWNER/REPO -f apply=false
 # Operational pause; resume by deleting the variable or setting it false.
@@ -220,7 +250,7 @@ verification after resolving transient lookup/reporting failures.
 
 ```bash
 python scripts/verify_merge_integrity.py --repository OWNER/REPO \
-  --repo-root . --before FULL_SHA --after FULL_SHA --report /tmp/integrity.json
+  --repo-root . --before FULL_SHA --after FULL_SHA --report .temp/integrity.json
 # Issue reporting is explicitly opt-in locally via --report-issues.
 gh workflow run verify-merge-integrity.yaml -R OWNER/REPO
 ```

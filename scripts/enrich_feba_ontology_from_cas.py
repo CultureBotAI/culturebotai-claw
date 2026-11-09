@@ -25,6 +25,7 @@ CULTUREMECH_ROOT_PATH = Path(
     os.environ.get("CULTUREMECH_ROOT", REPO_ROOT.parent / "CultureMech")
 )
 sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_utils.ingredient_identity_rejections import rejection_reason  # noqa: E402
 from kg_microbe_fleet import require_mech_roots  # noqa: E402
 
 class ChEBIEnricher:
@@ -41,6 +42,15 @@ class ChEBIEnricher:
         # ChEBI REST API endpoint
         self.base_url = "https://www.ebi.ac.uk/webservices/chebi/2.0/test"
         self.results = {}
+        self.rejections = []
+
+    def reject_claim(self, chebi_id, cas_rn, ingredient_name=None):
+        reason = rejection_reason(ontology_id=chebi_id, cas=cas_rn, name=ingredient_name)
+        if reason:
+            self.rejections.append({"chebi_id": chebi_id, "cas_rn": cas_rn,
+                                    "ingredient_name": ingredient_name, "reason": reason})
+            print(f"[REJECTED] {ingredient_name or cas_rn} → {chebi_id}: {reason}")
+        return reason
 
     def query_chebi_by_cas(self, cas_rn: str) -> Optional[Dict]:
         """
@@ -101,6 +111,9 @@ class ChEBIEnricher:
             chebi_name = entity.find('chebi:chebiAsciiName', ns)
 
             if chebi_id is not None and chebi_id.text:
+                candidate = f"CHEBI:{chebi_id.text.replace('CHEBI:', '')}"
+                if self.reject_claim(candidate, cas_rn):
+                    return None
                 return {
                     'chebi_id': f"CHEBI:{chebi_id.text.replace('CHEBI:', '')}",
                     'chebi_name': chebi_name.text if chebi_name is not None else '',
@@ -159,6 +172,8 @@ class ChEBIEnricher:
             # Look for ChEBI ID
             for reg_id in registry_ids:
                 if reg_id.startswith('CHEBI:'):
+                    if self.reject_claim(reg_id, cas_rn):
+                        continue
                     # Get ChEBI name
                     chebi_num = reg_id.replace('CHEBI:', '')
 
@@ -186,6 +201,8 @@ class ChEBIEnricher:
         # Try simple PubChem approach first
         result = self.query_chebi_simple(cas_rn)
 
+        if result and self.reject_claim(result["chebi_id"], cas_rn, ingredient_name):
+            result = None
         if result:
             self.stats['chebi_found'] += 1
             self.results[ingredient_name] = {
@@ -211,7 +228,8 @@ class ChEBIEnricher:
                 'success_rate': f"{(self.stats['chebi_found'] / self.stats['total_processed'] * 100):.1f}%" if self.stats['total_processed'] > 0 else '0%'
             },
             'statistics': self.stats,
-            'enrichments': self.results
+            'enrichments': self.results,
+            'rejections': self.rejections
         }
 
         with open(output_file, 'w') as f:

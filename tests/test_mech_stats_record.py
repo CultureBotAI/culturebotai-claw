@@ -314,3 +314,6 @@ def test_supersession_allows_shared_successor_and_acyclic_chains(recorder, sourc
     rows = report["responses"] + report["response_only_observations"]
     assert [row["source_id"] for row in rows if "superseded_by" not in row] == ["d"]
     assert recorder.record_response_history(archive, [], supersedes=links, now=NOW)["status"] == "unchanged"
+    with pytest.raises(ProgressError, match="superseded response does not reference another response"):
+        recorder.record_response_history(archive, [], supersedes={"missing-source": "d"}, now=NOW)
+

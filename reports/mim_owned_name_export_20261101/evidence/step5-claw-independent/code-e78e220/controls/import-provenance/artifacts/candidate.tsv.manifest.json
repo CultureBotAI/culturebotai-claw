@@ -1,0 +1,117 @@
+{
+  "artifacts": [
+    {
+      "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/code-e78e220/controls/import-provenance/artifacts/candidate.tsv",
+      "role": "sssom",
+      "sha256": "ac10ee5ee052447d617bda70177190117b24e27029a2bf136bf035439d73735d"
+    },
+    {
+      "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/code-e78e220/controls/import-provenance/artifacts/suppressed_aliases.tsv",
+      "role": "suppressed_aliases",
+      "sha256": "63560d117d03146b6f736ac1836beb8388b1572a5e90eb2b79537efff3c8982b"
+    }
+  ],
+  "canonical_label_resolution": {
+    "CHEBI:1": "Subject"
+  },
+  "emitted_rows": 1,
+  "external_sssom_validation": "skipped_explicitly",
+  "mapped_record_paths": [
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/code-e78e220/controls/import-provenance/mim/data/ingredients/mapped/Owned.yaml",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/code-e78e220/controls/import-provenance/mim/data/ingredients/mapped/Subject.yaml"
+  ],
+  "policy_evidence": [
+    "https://github.com/CultureBotAI/MediaIngredientMech/issues/669#issuecomment-6558035777",
+    "https://github.com/CultureBotAI/culturebotai-claw/issues/701"
+  ],
+  "policy_version": "owned-name-policy-v1",
+  "prior_stamp_sources": [
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/code-e78e220/controls/import-provenance/artifacts/candidate.tsv",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/code-e78e220/controls/import-provenance/absent-canonical.tsv"
+  ],
+  "schema_version": 1,
+  "scope": "diagnostic candidate; not canonical promotion or scientific approval",
+  "source_inputs": [
+    {
+      "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/code-e78e220/controls/import-provenance/absent-canonical.tsv",
+      "sha256": null
+    },
+    {
+      "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/code-e78e220/controls/import-provenance/absent-kgm.tsv.gz",
+      "sha256": null
+    },
+    {
+      "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/code-e78e220/controls/import-provenance/absent-residual.json",
+      "sha256": null
+    },
+    {
+      "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/code-e78e220/controls/import-provenance/artifacts/candidate.tsv",
+      "sha256": null
+    },
+    {
+      "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/code-e78e220/controls/import-provenance/mim/data/ingredients/mapped/Owned.yaml",
+      "sha256": "e7d8064795ad65cee2ff29db98271c9c9441792917d8ffc30c32756272599bfc"
+    },
+    {
+      "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/code-e78e220/controls/import-provenance/mim/data/ingredients/mapped/Subject.yaml",
+      "sha256": "37c18ebe6ffa74c1c9b666e810b94a636531de6020f8798833f853c187d716f2"
+    },
+    {
+      "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/code-e78e220/producer-fixture/plugins/lock_manager.py",
+      "sha256": "e36effe07ea8f925c61f31044b178c6b639027ff6060ee2f91d6d26612b85b93"
+    },
+    {
+      "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/code-e78e220/producer-fixture/scripts/build_mim_ingredient_sssom.py",
+      "sha256": "772b7a70309396f705fd8eb0709088304978e76c6fdf5567c5f75c95d59e40dd"
+    },
+    {
+      "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/code-e78e220/producer-fixture/scripts/kgm_unified_mappings.py",
+      "sha256": "bdcec27470bf7d9ce52ec969fa6cddd35eec966ac7bd9f30def86fa91c36db24"
+    },
+    {
+      "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/code-e78e220/producer-fixture/src/kg_microbe_fleet/__init__.py",
+      "sha256": "8280395a8c3542f3c7c2d1b59ab0cf5790680b6d2124679477fce8073b70a589"
+    },
+    {
+      "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/code-e78e220/producer-fixture/src/kg_microbe_fleet/__main__.py",
+      "sha256": "ec38bef19c73e716a1e56bb85216c8941f5bbdd4c044a3da5ec1bf81a3bcbc35"
+    },
+    {
+      "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/code-e78e220/producer-fixture/src/kg_microbe_fleet/roots.py",
+      "sha256": "21039ea705b99323913d0705c04ac24417246feb5972d4c8e26077fb00f72d3b"
+    },
+    {
+      "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/code-e78e220/producer-fixture/src/kg_microbe_utils/__init__.py",
+      "sha256": "55592e20cc266eefac40a71502f6f53c0d3672da01474409307487421bb1da82"
+    },
+    {
+      "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/code-e78e220/producer-fixture/src/kg_microbe_utils/owned_name_policy.py",
+      "sha256": "02fbd2306351e8ae688d359580e3364ff8b02798a168162f337ba01daffefed6"
+    },
+    {
+      "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/code-e78e220/producer-fixture/src/kg_microbe_utils/sssom_artifacts.py",
+      "sha256": "bd94f9d4930967cad055c18b3c7f042d5b5a8f0db7d863845841649ce5ee98a6"
+    },
+    {
+      "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/code-e78e220/producer-fixture/src/kg_microbe_write/__init__.py",
+      "sha256": "70a953d943bb8bf0c289811c180a6da9be117ce52bb2994a5bdbe9e9d671167c"
+    },
+    {
+      "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/code-e78e220/producer-fixture/src/kg_microbe_write/registry.py",
+      "sha256": "737ae8a7f8047b4355c6e38e370859be068ff9ddbca154f244d1c4b743ea0c7a"
+    },
+    {
+      "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/code-e78e220/producer-fixture/src/kg_microbe_write/serialize.py",
+      "sha256": "c5f52036c5b0d6ab78099aadc2c11beac2fb9997920aef453b97658483df17ec"
+    },
+    {
+      "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/code-e78e220/producer-fixture/src/kg_microbe_write/transaction.py",
+      "sha256": "aa5b5bd082b14ae094f6decd5dbe3d75343a7436dc95d6b1fcbfb65c56e6f17e"
+    }
+  ],
+  "source_revisions": {
+    "claw": "9559329e836eca4f6086cb0df3158eef991cf19c",
+    "kg_microbe": "d6baf5b90003a2032747559d94c00f86a7a4c615",
+    "mim": "9559329e836eca4f6086cb0df3158eef991cf19c"
+  }
+}

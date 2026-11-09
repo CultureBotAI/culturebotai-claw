@@ -52,6 +52,24 @@ capability_catalogue:
   vendored_sync: {}
   unmapped_inventory_input: {}
   source_catalogue: {}
+  # Cached-source quote matching is independent of citation/field presence.
+  # Domain/source adapters must be reviewed before enabling another Mech.
+  evidence_reference_validation:
+    settings:
+      cache_dir:
+        type: string
+        required_when_enabled: true
+      reference_fields:
+        type: string_list
+      snippet_fields:
+        type: string_list
+      evidence_fields:
+        type: string_list
+      evidence_paths:
+        type: string_list
+      # Issue-owned findings that are reported but do not block (#729).
+      known_findings:
+        type: string
   corpus_statistics:
     settings:
       fields:
@@ -207,6 +225,15 @@ mechs:
       - data/merge_yaml/merged/*.yaml
     vendored_role: consumer
     capabilities:
+      evidence_reference_validation:
+        status: disabled
+        reason: >-
+          Measured 2026-11-04 (claw#729): the record_globs name the derived
+          merged layer, whose 91 quote-bearing items are stale, while the
+          authoritative normalized corpus holds 38,580, of which 37,626 (97.5%)
+          cite neither a PMID nor a DOI. Adoption needs the gate to read the
+          authoritative layer (claw#779) and a source adapter for web and
+          database citations.
       id_label_validation:
         status: enabled
       record_review:
@@ -352,6 +379,19 @@ mechs:
       - data/ingredients/**/*.yaml
     vendored_role: consumer
     capabilities:
+      evidence_reference_validation:
+        status: enabled
+        settings:
+          cache_dir: references_cache
+          reference_fields: [pmid, doi, reference]
+          snippet_fields: [snippet, excerpt, supporting_text]
+          evidence_fields: [evidence]
+          # Preserve the existing gate's scope. The two role selectors are
+          # legacy names; current role facets need their own reviewed adapter.
+          evidence_paths:
+            - ontology_mapping.evidence
+            - role_assignments[].evidence
+            - cellular_role_assignments[].evidence
       id_label_validation:
         status: enabled
       record_review:
@@ -487,6 +527,15 @@ mechs:
       - data/isolates/*.yaml
     vendored_role: consumer
     capabilities:
+      evidence_reference_validation:
+        status: disabled
+        reason: >-
+          Measured 2026-11-04 (claw#729): of 8,360 PMID-cited quotes, 4,629 occur
+          in the cited abstract and 3,727 do not; 2,509 of those occur in the
+          Mech's tracked PMID text caches, which hold full texts and longer
+          abstract exports. The 1,232 DOI- and web-cited quotes were not compared.
+          Adoption needs a reviewed source adapter for those texts and the native
+          front-matter caches; the native evidence-repair backlog remains open.
       id_label_validation:
         status: enabled
       record_review:
@@ -624,6 +673,14 @@ mechs:
       - data/traits/**/*.yaml
     vendored_role: consumer
     capabilities:
+      evidence_reference_validation:
+        status: disabled
+        reason: >-
+          Measured 2026-11-04 (claw#729): of 9,775 quotes, 283 cite a PMID, 5,717
+          a DOI, 933 a journal supplement or article full text, and 2,842 a web or
+          database source (mostly model files and a wiki). Adoption needs a
+          measurement of the DOI-cited quotes, a full-text and supplement source
+          adapter, and a quote-versus-database-assertion adapter.
       id_label_validation:
         status: enabled
       record_review:
@@ -696,7 +753,7 @@ mechs:
       page_budgets:
         status: disabled
         reason: >-
-          Serves 490 tracked pages under pages/ straight from main via GitHub
+          Serves its tracked pages under pages/ straight from main via GitHub
           Pages -- it has no generate-pages.yaml, unlike the other four -- and
           declares no size or file-count budgets, so nothing watches them grow.
           Adopting them applies here; the limits are the repository's to set.
@@ -780,6 +837,13 @@ mechs:
       - data/traits/**/*.yaml
     vendored_role: consumer
     capabilities:
+      evidence_reference_validation:
+        status: disabled
+        reason: >-
+          Measured 2026-11-04 (claw#729): 601,978 of 647,311 quoted items cite a
+          database record rather than literature, so those snippets are database
+          assertions, not quotations. A reviewed quote-versus-database-assertion
+          adapter is required before a literature quote gate applies.
       id_label_validation:
         status: enabled
       record_review:
@@ -941,6 +1005,13 @@ mechs:
       - data/antibiotics/**/*.yaml
     vendored_role: consumer
     capabilities:
+      evidence_reference_validation:
+        status: disabled
+        reason: >-
+          Measured 2026-11-04 (claw#729): of 651 quoted items, 441 cite a database
+          or web source, 205 a DOI and 5 a PMID. A reviewed
+          quote-versus-database-assertion adapter, and a measurement of the
+          DOI-cited quotes, come before adoption.
       # These arrive with the vendoring PR this declaration obliges
       # (AntibioticMech#29). Enabled rather than disabled-with-an-absent-claim
       # (#255): a claim that the files are absent is true only until that lands,
@@ -1103,6 +1174,17 @@ mechs:
       - data/structures/**/*.yaml
     vendored_role: consumer
     capabilities:
+      evidence_reference_validation:
+        status: enabled
+        settings:
+          cache_dir: references_cache
+          reference_fields: [reference]
+          snippet_fields: [snippet]
+          evidence_fields: [evidence]
+          known_findings: curation/evidence_known_findings.tsv
+          # Every evidence slot is an EvidenceItem or SupportingReference whose
+          # snippet the schema defines as a verbatim quote, so all are in scope
+          # (#729). Residual findings are owned by the issue the ledger names.
       # Enabled rather than disabled-with-an-absent-claim (#255): both arrive in
       # CellStructureMech#53, which is open and green, so a claim that the files
       # are absent is true only until that merges. An enabled declaration carries
@@ -1133,12 +1215,17 @@ mechs:
       deep_research:
         status: disabled
         reason: >-
-          Research so far is source assessment written by hand under research/
-          with no provider client or research recipe in the justfile; the
-          repository has not decided on a paid research route.
+          Has research-cell-structure, research-entity and deep-research-canary
+          recipes in the justfile and a research/ tree, but no
+          conf/deep_research_provider.yaml -- the profile every deep-research
+          Mech declares and the contract resolves. The recipes are a research
+          route, not the declared provider contract (#848).
         reason_claims:
           present:
             - research
+            - justfile
+          absent:
+            - conf/deep_research_provider.yaml
       edison_key_discovery:
         status: not_applicable
         reason: >-
@@ -1153,10 +1240,11 @@ mechs:
       knowledge_gap_scan:
         status: disabled
         reason: >-
-          Records carry the shared Discussion section, so the scan applies, but
-          the corpus is four records and the repository is not yet in the
-          knowledge-gap-scan workflow matrix; enable once the first tranche of
-          records lands (CellStructureMech#12).
+          Records carry the shared Discussion section, so the scan applies. The
+          condition this declaration set, enabling once the first tranche of
+          records lands (CellStructureMech#12), is met; the scan matrix follows
+          this declaration, so the switch awaits review (CellStructureMech#1642,
+          CellStructureMech#404).
       # An authoritative consumer must sync; the loader rejects anything else.
       # CellStructureMech#48 vendors the artifact set and pin that this
       # declaration obliges; until it lands, the fleet audit reports the gap.
@@ -1214,8 +1302,7 @@ mechs:
         status: disabled
         reason: >-
           Records carry GO cellular-component identifiers inline rather than
-          through a mapping file, and the corpus is four records. Adopting one
-          applies once it grows.
+          through a mapping file, and no SSSOM mapping product exists yet.
       metpo_proposal:
         status: disabled
         reason: >-
@@ -1227,8 +1314,7 @@ mechs:
       kgx_export:
         status: disabled
         reason: >-
-          Four structure records and no exporter; adopting KGX applies once the
-          corpus grows.
+          No KGX exporter or graph export product exists yet.
       source_queue:
         status: enabled
         settings:
@@ -1287,6 +1373,17 @@ mechs:
       - data/habitats/**/*.yaml
     vendored_role: consumer
     capabilities:
+      evidence_reference_validation:
+        status: enabled
+        settings:
+          cache_dir: references_cache
+          reference_fields: [reference]
+          snippet_fields: [snippet]
+          evidence_fields: [evidence]
+          known_findings: curation/evidence_known_findings.tsv
+          # Every evidence slot is an EvidenceItem or SupportingReference whose
+          # snippet the schema defines as a verbatim quote, so all are in scope
+          # (#729). Residual findings are owned by the issue the ledger names.
       id_label_validation:
         status: enabled
       record_review:
@@ -1331,8 +1428,8 @@ mechs:
       environment_coverage:
         status: disabled
         reason: >-
-          HabitatMech is itself an environment vocabulary: 3,213 habitat
-          records grounded in ENVO, UBERON, FOODON and BTO. Environment
+          HabitatMech is itself an environment vocabulary: habitat records
+          grounded in ENVO, UBERON, FOODON and BTO. Environment
           coverage compares culture media, ingredients and communities against
           ENVO and has no loader for HabitatRecord, so it cannot yet read this
           corpus as either an input or the reference set. Adopting it applies
@@ -1382,7 +1479,7 @@ mechs:
       page_budgets:
         status: disabled
         reason: >-
-          Serves 3,404 published HTML pages under pages/ straight from main
+          Serves its published HTML pages under pages/ straight from main
           via GitHub Pages -- it has no generate-pages.yaml -- and declares no
           size or file-count budgets, so nothing watches them grow. Adopting
           them applies here; the limits are the repository's to set.
@@ -1448,7 +1545,7 @@ mechs:
       site_contract:
         status: disabled
         reason: >-
-          Publishes 3,404 HTML pages under pages/ straight from main, so
+          Publishes its HTML pages under pages/ straight from main, so
           the check has a directory to judge, but it has not been measured on
           this site yet. Enable after measuring on joining, as AntibioticMech
           did, so the contract's numbers keep describing what it runs on.
@@ -1508,6 +1605,13 @@ mechs:
         allow_unicode: true
         width: 80
     capabilities:
+      evidence_reference_validation:
+        status: disabled
+        reason: >-
+          Measured 2026-11-04 (claw#729): none of 3,554 quoted items cites a PMID;
+          2,052 cite web or database sources and 1,502 cite DOIs. A reviewed
+          adapter for those sources, and a measurement of the DOI-cited quotes,
+          come before adoption.
       id_label_validation:
         status: enabled
       record_review:
@@ -1679,6 +1783,12 @@ mechs:
         generic serialization must not bypass the native seeder and corpus
         reproduction gate.
     capabilities:
+      evidence_reference_validation:
+        status: disabled
+        reason: >-
+          Measured 2026-11-04 (claw#729): none of the 306 evidence items carries a
+          quote, so the gate would check nothing. The native EvidenceItem allows
+          optional verbatim snippets; enable once quoted literature evidence exists.
       id_label_validation:
         status: enabled
       record_review:
@@ -1844,6 +1954,12 @@ mechs:
         already written in safe_dump's style; 79 use block scalars or
         indented sequences that safe_dump never emits. Measured on joining.
     capabilities:
+      evidence_reference_validation:
+        status: disabled
+        reason: >-
+          Measured 2026-11-04 (claw#729): 655 of 869 PMID-cited quotes are absent
+          from the cited abstract, most of them quoting the full text by
+          source_locator. Adoption needs a reviewed full-text source adapter.
       id_label_validation:
         status: disabled
         reason: >-
@@ -1865,14 +1981,15 @@ mechs:
       curation_history:
         status: disabled
         reason: >-
-          No record carries curation history yet. The governed
-          src/pathwaymech/schema/history.yaml is vendored and records may
-          carry an optional curation_history of CurationEvent, but no recipe
-          appends events and nothing in CI validates history records; history/
-          holds only a README. Enable once a recipe appends events, checked in
-          CI (#515).
+          Pathway records carry an inline curation_history of CurationEvent, a
+          class of PathwayMech's own src/pathwaymech/schema/pathwaymech.yaml;
+          the governed src/pathwaymech/schema/history.yaml is vendored, the
+          justfile's new-history recipe scaffolds history/ records, and CI
+          validates history/ through pathwaymech-run-qc. That meets the
+          condition this declaration set for enabling (#515), where the switch
+          awaits review.
         reason_claims:
-          present: ["history", "src/pathwaymech/schema/history.yaml"]
+          present: ["history", "src/pathwaymech/schema/history.yaml", "src/pathwaymech/schema/pathwaymech.yaml", "justfile"]
       # Closed-mode LinkML validation (pathwaymech-validate-strict) runs in
       # `just validate` and in the "Build and test" workflow on every pull
       # request (PathwayMech #190).
@@ -1962,12 +2079,12 @@ mechs:
       writer_audit:
         status: disabled
         reason: >-
-          Has no scripts/audit_writers.py, and no tracked script writes a
-          record: the importers print to stdout, either YAML drafts or TSV
-          seed rows. Adopting it applies
-          once a script writes records; the settings are the repository's to
-          declare.
+          Has no scripts/audit_writers.py, though a tracked script writes
+          records: scripts/backfill_source_mappings.py rewrites pathway records
+          in place. Adopting the audit applies; the settings are the
+          repository's to declare (#848).
         reason_claims:
+          present: ["scripts/backfill_source_mappings.py"]
           absent: ["scripts/audit_writers.py"]
       sssom_export:
         status: enabled
@@ -2040,6 +2157,13 @@ mechs:
       verified: false
       reason: Generated family projections use native seeding and reproduction gates; shared writers must not reserialize them.
     capabilities:
+      evidence_reference_validation:
+        status: disabled
+        reason: >-
+          Measured 2026-11-04 (claw#729): 1,658 of 1,893 PMID-cited quotes are
+          absent from the cited abstract; each quote is bound to a native full-text
+          excerpt (cache_path and cache_sha256). Adoption needs a reviewed adapter
+          for those native caches.
       id_label_validation:
         status: enabled
         reason: >-
@@ -2180,6 +2304,15 @@ mechs:
         Material records exist, but shared round-trip options have not been
         verified against the native validation and authoring contract.
     capabilities:
+      evidence_reference_validation:
+        status: disabled
+        reason: >-
+          Measured 2026-11-04 (claw#729): none of the 3,526 evidence items carries
+          a quote; native MechanismEvidence (source_ref, supports, explanation) has
+          no verbatim-quote slot, so the gate would check nothing. Adoption needs
+          that slot filled with verbatim quotes, and either a PMID or DOI on each
+          evidence item or a reviewed adapter that resolves source_ref through the
+          record's sources list.
       id_label_validation:
         status: disabled
         reason: >-
@@ -2194,14 +2327,17 @@ mechs:
         reason: >-
           Native inline events and canonical sidecars are implemented through
           src/cmmmech/history.py and justfile, with history/ validated as append-only
-          in CI. Generic curation remains disabled because neither
-          .claude/skills/curate-yaml-record/SKILL.md nor
-          .claude/skills/curate-yaml-record/references/review-checklist.md exists
-          to implement that write contract. Read-only structured review has its own record_review capability
-          and does not enable curation.
+          in CI. .claude/skills/curate-yaml-record/SKILL.md and
+          .claude/skills/curate-yaml-record/references/review-checklist.md now exist,
+          added with CMMMech's canonical skill adapters (CMMMech#513), so the
+          write contract's files are present; enabling generic curation awaits
+          review (#1059). Read-only structured review has its own record_review
+          capability and does not enable curation.
         reason_claims:
-          present: ["justfile", "src/cmmmech/history.py", "history"]
-          absent:
+          present:
+            - "justfile"
+            - "src/cmmmech/history.py"
+            - "history"
             - ".claude/skills/curate-yaml-record/SKILL.md"
             - ".claude/skills/curate-yaml-record/references/review-checklist.md"
       strict_validation:
@@ -2267,9 +2403,10 @@ mechs:
         reason: Mechanism evidence is modeled without nodes or directed causal edges.
       page_budgets:
         status: disabled
-        reason: No pages/ tree or conf/pages_budgets.json defines a site and its budgets.
+        reason: A pages/ tree exists, but no conf/pages_budgets.json declares its budgets.
         reason_claims:
-          absent: ["pages", "conf/pages_budgets.json"]
+          present: ["pages"]
+          absent: ["conf/pages_budgets.json"]
       kgx_export:
         status: disabled
         reason: No curated graph or KGX export product exists yet.
@@ -2295,9 +2432,11 @@ mechs:
           absent: ["scripts/audit_writers.py"]
       site_contract:
         status: disabled
-        reason: No pages/ tree exists for the shared site contract to audit.
+        reason: >-
+          A pages/ tree exists, but no site_path and published_root have been
+          declared for it or verified against the shared HTML contract.
         reason_claims:
-          absent: ["pages"]
+          present: ["pages"]
       source_catalogue:
         status: disabled
         reason: No download.yaml declares sources in the fleet catalogue format.
@@ -2325,6 +2464,14 @@ mechs:
         and reproduction; shared round-trip serialization is not an authoring
         contract for generated records.
     capabilities:
+      evidence_reference_validation:
+        status: disabled
+        reason: >-
+          Measured 2026-11-04 (claw#729): the AIO concept records carry no
+          evidence items, so the gate would check nothing; curated concepts cite
+          sources by source_id and locator. Adoption needs gated records whose
+          evidence carries verbatim quotes, and either a PMID or DOI on each item
+          or a reviewed adapter that resolves source_id through evidence_sources.
       id_label_validation:
         status: disabled
         reason: >-
@@ -2337,14 +2484,14 @@ mechs:
       curation_history:
         status: disabled
         reason: >-
-          The native new-history recipe in justfile does not establish the
-          shared curation write contract. Neither
-          .claude/skills/curate-yaml-record/SKILL.md nor
-          .claude/skills/curate-yaml-record/references/review-checklist.md
-          implements it. Structured record review is separately enabled.
+          The native new-history recipe in justfile does not establish the shared
+          curation write contract. .claude/skills/curate-yaml-record/SKILL.md and
+          .claude/skills/curate-yaml-record/references/review-checklist.md now
+          exist (AIMech#428); enabling generic curation awaits review (#1059).
+          Structured record review is separately enabled.
         reason_claims:
-          present: ["justfile"]
-          absent:
+          present:
+            - "justfile"
             - ".claude/skills/curate-yaml-record/SKILL.md"
             - ".claude/skills/curate-yaml-record/references/review-checklist.md"
       strict_validation:
@@ -2447,3 +2594,104 @@ mechs:
       unmapped_inventory_input:
         status: not_applicable
         reason: AI concepts are not a culture-medium ingredient corpus.
+
+  edgemech:
+    display_name: EdgeMech
+    github: CultureBotAI/EdgeMech
+    environment_variable: EDGEMECH_ROOT
+    package_path: src/edgemech
+    schema_paths:
+    - src/edgemech/schema/edgemech.yaml
+    record_globs:
+    - curation/packets/*.yaml
+    vendored_role: consumer
+    serialization:
+      verified: false
+      reason: >-
+        EdgeMech preserves canonical JSON bundles and immutable external ledger
+        artifacts. Shared YAML record emit options have not been verified;
+        no native scientific corpus serialization is declared.
+    capabilities:
+      id_label_validation:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      curation_history:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      record_review:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      strict_validation:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      schema_sync:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      release_management:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      build_coordination:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      documentation:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      testing:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      refactoring:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      coordination_hooks:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      deep_research:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      edison_key_discovery:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      environment_coverage:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      knowledge_gap_scan:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      vendored_sync:
+        status: enabled
+      unmapped_inventory_input:
+        status: not_applicable
+        reason: External edge accounting is not a culture-medium ingredient corpus.
+      source_catalogue:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      evidence_reference_validation:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      corpus_statistics:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      causal_graph_coverage:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      page_budgets:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      kgx_export:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      source_queue:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      metpo_proposal:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      sssom_export:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      writer_audit:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.
+      site_contract:
+        status: disabled
+        reason: Initial integration scaffold; this fleet capability has not been verified.

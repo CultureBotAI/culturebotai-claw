@@ -66,6 +66,8 @@ def test_general_agents_use_validated_manifest_capability_scopes():
         )
         # Native validation alone does not establish the fleet recipe adapter.
         excluded = {"aimech", "cmmmech"} if capability in {"strict_validation", "schema_sync"} else set()
+        # EdgeMech has no verified generic agent adapters at initial admission.
+        excluded.add("edgemech")
         assert set(manifest.with_capability(capability)) == set(manifest.keys) - excluded
         assert all(
             capability in mech.capabilities for mech in manifest.mechs.values()

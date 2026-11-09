@@ -45,6 +45,7 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "src"))
+from kg_microbe_utils.ingredient_identity_rejections import rejection_reason  # noqa: E402
 from kg_microbe_write import dump_record  # noqa: E402
 
 sys.path.insert(0, str(REPO_ROOT / "src"))
@@ -203,6 +204,12 @@ def needs_parent(record: dict) -> bool:
 
 
 def apply_parent(record: dict, parent: dict) -> None:
+    reason = next((why for cas in ((record.get("chemical_properties") or {}).get("cas_rn"),
+                                  record.get("identifier"))
+                   if (why := rejection_reason(ontology_id=parent["id"],
+                              name=record.get("preferred_term"), cas=cas))), None)
+    if reason:
+        raise ValueError(f"rejected: {reason}")
     om = record.setdefault("ontology_mapping", {})
     om["ontology_id"] = parent["id"]
     om["ontology_label"] = parent.get("label", "")
@@ -307,11 +314,17 @@ def main() -> int:
             if i % 10 == 0:
                 save_cache(cache)
 
-        verdict = "FOUND" if parent else "NO_HIT"
+        reason = next((why for cas in ((record.get("chemical_properties") or {}).get("cas_rn"), ident)
+                       if (why := rejection_reason(ontology_id=parent.get("id", ""),
+                                                   name=name, cas=cas))), None)
+        verdict = "REJECTED" if reason else ("FOUND" if parent else "NO_HIT")
         counts[verdict] = counts.get(verdict, 0) + 1
 
         action = ""
-        if parent and args.apply:
+        if reason:
+            action = f"rejected: {reason}"
+            print(f"[REJECTED] {name} → {parent.get('id')}: {reason}")
+        elif parent and args.apply:
             apply_parent(record, parent)
             with open(path, "w") as f:
                 f.write(dump_record("mediaingredientmech", record))

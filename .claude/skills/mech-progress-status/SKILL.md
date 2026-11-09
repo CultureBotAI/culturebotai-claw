@@ -1,6 +1,6 @@
 ---
 name: mech-progress-status
-description: "Report tracked Mech sequence progress in one line: Mechs, distinct PRs by state, completed goals, and completed six-goal cycles. Use for a progress summary or round counts, rather than a full open-PR inventory."
+description: "Report tracked Mech sequence progress in one line: Mechs, distinct PRs by state, completed goals, and completed versioned cycles. Use for a progress summary or round counts, rather than a full open-PR inventory."
 metadata:
   tags: [fleet, progress, reporting, read-only]
 ---
@@ -20,6 +20,15 @@ through authenticated `gh` instead of the local publisher bundle:
 uv run python scripts/mech_progress_status.py --published
 ```
 
+When the caller supplies the verified local supervisor runtime, append its
+saved per-Mech durability observations with `--durability-runtime PATH`.
+Do not guess a runtime, edit its inventory, or start a scan to produce this
+report. Missing, stale or incomplete observations remain unknown; unpublished
+commits and near-cutoff files are alerts. Preserve those lines and exit-3
+qualifications with the progress summary. This optional local view does not
+publish private paths or change the public tracker schema. See
+[durable session state](../../../docs/guides/SESSION_STATE_DURABILITY.md).
+
 Return the command's stdout unchanged. Here `N` represents the tracked fleet size:
 
 ```text
@@ -30,7 +39,9 @@ Use newly read values, never this example or a previous response. The command
 validates the history and snapshot together; its validator uses
 `load_fleet_manifest` to require the complete canonical fleet. Counts cover explicitly tracked
 activity; earlier history remains unknown. PRs are distinct repository/number
-pairs, goals require verified closure, and a cycle requires all six goals.
+pairs, goals require verified closure, and a cycle requires every goal under its
+pinned parent: six for v1 and seven for v2. Historical stage numbers retain their
+original meanings; a current v2 cycle does not relabel old closures.
 Closed PRs that were not merged appear separately when present.
 
 For a tracker running a pinned release, the command uses its bundle-adjacent
@@ -38,7 +49,8 @@ For a tracker running a pinned release, the command uses its bundle-adjacent
 the checkout's packaged manifest. A mismatch is an error. Do not remove a pin
 or edit the active fleet configuration to force counts through validation.
 
-Exit 0 means fresh observations. Exit 3 still prints verified counts but reports
+Exit 0 means fresh observations and, when requested, healthy durability results.
+Exit 3 still prints verified counts but reports
 stale, missing, or future-dated observations on stderr: retain that qualification
 after the summary. Exit 1 means unavailable or invalid evidence; report the error
 without inventing counts. Exit 2 means invalid arguments.
