@@ -237,6 +237,71 @@ def native_goal_declaration(payload):
     return False
 
 
+
+# Bounded, hash-only proof of actual user input, separate from workspace history.
+USER_INPUT_LIMIT = 200
+
+
+
+def supported_user_input_shape(payload):
+    """Only the observed plain item or SYSTEM goal plus plain item is supported.
+
+    File/unknown scopes and multiple text items must not collapse to the same
+    text hash as a generated plain instruction. Other UserInput body metadata
+    is not an input item; deprecated query text is explicitly unsupported.
+    """
+    body = fields(one(payload, 19, b""))
+    if any(number == 1 for number, _, _ in body):
+        return False
+    items = []
+    for number, wire, item in body:
+        if number == 3:
+            if wire != 2:
+                return False
+            items.append(fields(item))
+    if not items or len(items) > 2:
+        return False
+    plain = items[-1]
+    if len(plain) != 1 or plain[0][:2] != (1, 2):
+        return False
+    if len(items) == 1:
+        return True
+    scope_item = items[0]
+    if len(scope_item) != 1 or scope_item[0][:2] != (2, 2):
+        return False
+    scope = fields(scope_item[0][2])
+    if len(scope) != 1 or scope[0][:2] != (27, 2):
+        return False
+    command = fields(scope[0][2])
+    if len(command) != 1 or command[0][:2] != (1, 2):
+        return False
+    info = fields(command[0][2])
+    return ([(n, w) for n, w, _ in info] == [(1, 2), (2, 2), (3, 0)]
+            and native_goal_declaration(payload))
+
+
+def user_input_evidence(index, status, payload):
+    """Retain exact text identity without publishing arbitrary user messages.
+
+    Native /goal input stores the slash command in structured metadata and the
+    text suffix in items. Reconstruct that prefix only when the real declaration
+    exists; a literal /goal string is not a native goal declaration.
+    """
+    value = "\n".join(user_parts(payload))
+    declaration = native_goal_declaration(payload)
+    if declaration:
+        value = "/goal" + value
+    return {
+        "step_index": index,
+        "status_number": status,
+        "text_sha256": hashlib.sha256(value.encode("utf-8")).hexdigest(),
+        "text_length": len(value),
+        "native_goal_declaration": declaration,
+        "supported_input_shape": supported_user_input_shape(payload),
+        **metadata_times(payload),
+    }
+
+
 def terminal_marker(visible):
     """Accept only a column-zero native marker outside recognized code fences.
 
@@ -447,6 +512,17 @@ def inspect(repo, cid):
             if len(public) >= 3:
                 break
         row["latest_public_messages"] = public
+        inputs = c.execute(
+            "select idx,status,step_payload from steps where step_type=14 "
+            "order by idx desc limit ?", (USER_INPUT_LIMIT + 1,),
+        ).fetchall()
+        row["user_input_evidence"] = {
+            "schema_version": 1,
+            "limit": USER_INPUT_LIMIT,
+            "truncated": len(inputs) > USER_INPUT_LIMIT,
+            "inputs": [user_input_evidence(idx, status, payload)
+                       for idx, status, payload in reversed(inputs[:USER_INPUT_LIMIT])],
+        }
         # An older background tool can still be running after the latest step is
         # done. Inspect every active tool, retaining metadata rather than its
         # arbitrary command arguments. Completed tools are not active evidence.

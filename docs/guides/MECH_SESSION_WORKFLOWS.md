@@ -224,7 +224,25 @@ working directory/origin, native conversation and initial goal identity, one
 matching Terminal tab, empty composer, idle native execution, and absence of
 queued/background work. Drafts, menus and unfamiliar screens remain untouched.
 The final send rechecks process identity and the exact captured screen.
-A send is acknowledged only through matching native history or a new goal marker.
+A successful Terminal API return is an attempted transport, not proof that the
+agent submitted the whole instruction. The reservation remains `uncertain`
+until the native reader proves one exact full user input after the reserved
+step and time, in the same workspace, conversation and goal context. Hash-only
+input evidence is bounded to the latest 200 user steps; a reservation older
+than that window remains held for operator assessment. Missing, partial,
+different or duplicate inputs never authorize a retry or an automatic Enter. Matching pending, queued or unknown-status inputs also defeat uniqueness. Only the observed plain-text input shape, or one SYSTEM goal declaration followed by its plain-text suffix, is supported; extra file or unknown scopes fail closed even when their displayed text has the same hash.
+Workspace-history markers alone are not acceptance authority.
+
+A `start_goal` additionally requires actual native SYSTEM `/goal` metadata and
+a matching new goal identity. Literal `/goal` text or a marker in a checkpoint
+cannot substitute for that declaration. Previously accepted action records are
+preserved; they do not independently authorize adoption of another goal.
+
+For an existing unsent draft, preserve the screen, action and native-input
+evidence and prepare a separately reviewed recovery proposal. Do not clear or
+submit it under an ordinary sweep, rewrite its action state, or resend a goal.
+A valid ordinary closure receipt may still close an already completed goal once
+all readiness and closure gates pass; delivery evidence is not closure proof.
 
 A replacement agy process or conversation blocks the old binding. Stop,
 inspect its current goal and any already delivered instructions/PRs, preserve

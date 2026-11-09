@@ -1,0 +1,50 @@
+name: Minimal curation contract distribution
+
+on:
+  pull_request:
+  merge_group:
+    types: [checks_requested]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13"
+          enable-cache: true
+      - name: Stage exact canonical bytes and build wheel through source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          contract_pin=$(git rev-parse HEAD)
+          uv run --no-project python scripts/adhoc/stage_curation_distribution_20261107.py --root . --source-commit "$contract_pin" --output workspace/package-check/source
+          uv build --project workspace/package-check/source --out-dir workspace/package-check/dist
+          contract_wheels=(workspace/package-check/dist/*.whl)
+          test "${#contract_wheels[@]}" -eq 1
+          contract_provenance=$(sha256sum workspace/package-check/source/staging-manifest.json | cut -d ' ' -f 1)
+          echo "CONTRACT_PIN=$contract_pin" >> "$GITHUB_ENV"
+          echo "CONTRACT_PROVENANCE=$contract_provenance" >> "$GITHUB_ENV"
+          echo "CONTRACT_WHEEL=${contract_wheels[0]}" >> "$GITHUB_ENV"
+      - name: Prove base validators install without LinkML or orchestration
+        run: |
+          uv venv --python 3.13 workspace/package-check/native-env
+          uv pip install --python workspace/package-check/native-env/bin/python "$CONTRACT_WHEEL"
+          workspace/package-check/native-env/bin/python scripts/adhoc/verify_curation_distribution_20261107.py --source-commit "$CONTRACT_PIN" --provenance-sha256 "$CONTRACT_PROVENANCE" --native-only --output workspace/package-check/native-installation.json
+      - name: Prove optional review contracts against installed wheel
+        run: |
+          uv venv --python 3.13 workspace/package-check/reviews-env
+          uv pip install --python workspace/package-check/reviews-env/bin/python "${CONTRACT_WHEEL}[reviews]" pytest
+          workspace/package-check/reviews-env/bin/python scripts/adhoc/verify_curation_distribution_20261107.py --source-commit "$CONTRACT_PIN" --provenance-sha256 "$CONTRACT_PROVENANCE" --reviews --output workspace/package-check/reviews-installation.json
+          mkdir workspace/package-check/consumer-tests
+          cp tests/test_curation_native.py tests/test_curation_artifact.py tests/test_curation_contract.py tests/test_curation_ledger.py workspace/package-check/consumer-tests/
+          cd workspace/package-check/consumer-tests
+          ../reviews-env/bin/python -m pytest -c /dev/null -q test_curation_native.py test_curation_artifact.py test_curation_contract.py test_curation_ledger.py

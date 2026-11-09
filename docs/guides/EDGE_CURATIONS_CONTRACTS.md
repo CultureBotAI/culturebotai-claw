@@ -147,16 +147,3 @@ publication-contract work. This local external generation contract does not
 claim to implement authenticated remote release publication, asset promotion,
 or a shared fleet release-manifest format. Those boundaries must be resolved
 before publishing a release or linking a claimed production artifact.
-
-## Governance applicability
-
-EdgeMech is a canonical vendored-artifact consumer. Shared schemas, validators,
-review helpers and applicable integrity checks remain pinned in its repository.
-Three native-adoption tests retain an explicit existing-native-consumer scope:
-`curation_timestamp_contract`, `record_review_contract`, and
-`skill_frontmatter_contract`. They require a native CurationEvent, native review
-profile/skill, or native skill catalogue respectively. EdgeMech has not adopted
-those interfaces; its canonical external ledger is not a new native record
-schema. Its absence from that test cohort does not weaken the shared curation,
-RecordReview, storage or native assertion tests. See #959. Future native-review
-adoption requires its actual profile, execution path and corresponding tests.

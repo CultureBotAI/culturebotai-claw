@@ -230,6 +230,73 @@ def load_effective(config: dict, target: dict, *, next_cycle: bool = False, prof
                                   target["repository_key"], schema_path=source("schema", SCHEMA_PATH))
 
 
+
+def native_delivery_proof(action: dict, target: dict, observation: dict) -> dict | None:
+    """A transport return or marker substring is never delivery acceptance.
+
+    Match one full user input in this exact native workspace/conversation after
+    the reserved step/time. Truncation, duplicates and bounded-out observations
+    hold the reservation; they never authorize retry. Historical accepted actions
+    remain intact and cannot by themselves adopt a later native goal.
+    """
+    native = observation.get("native") or {}
+    if (observation.get("error") or native.get("error")
+            or native.get("conversation_id") != target["native_session_id"]
+            or action.get("native_session_id") != target["native_session_id"]
+            or native.get("root") != target["root"]
+            or native.get("workspace_identity", {}).get("verified") is not True):
+        return None
+    message = action.get("message")
+    boundary = action.get("native_step_index")
+    reserved = action.get("reserved_epoch_ms")
+    if (not isinstance(message, str) or not message
+            or type(boundary) is not int or boundary < 0
+            or type(reserved) is not int or reserved < 0):
+        return None
+    expected_hash = hashlib.sha256(message.encode("utf-8")).hexdigest()
+    if action.get("message_sha256", expected_hash) != expected_hash:
+        return None
+    evidence = native.get("user_input_evidence") or {}
+    if evidence.get("schema_version") != 1 or not isinstance(evidence.get("inputs"), list):
+        return None
+    inputs = evidence["inputs"]
+    # If the reservation predates the bounded window, an earlier duplicate may
+    # have fallen out. Absence or uniqueness cannot then be established.
+    if evidence.get("truncated") and (not inputs or inputs[0].get("step_index", -1) > boundary):
+        return None
+    matches = []
+    for entry in inputs:
+        index = entry.get("step_index")
+        if (type(index) is not int or index <= boundary
+                or entry.get("text_sha256") != expected_hash
+                or entry.get("text_length") != len(message)):
+            continue
+        try:
+            created = datetime.fromisoformat(entry["created_at"].replace("Z", "+00:00"))
+            if created.tzinfo is None or created.timestamp() * 1000 < reserved:
+                return None
+        except (KeyError, TypeError, ValueError, AttributeError):
+            return None
+        matches.append(entry)
+    if len(matches) != 1:
+        return None
+    proof = matches[0]
+    if proof.get("status_number") != 3 or proof.get("supported_input_shape") is not True:
+        return None
+    if action.get("kind") == "start_goal":
+        identity = observation.get("goal_identity") or {}
+        if (proof.get("native_goal_declaration") is not True
+                or identity.get("conversation_id") != target["native_session_id"]
+                or identity.get("start_step_index") != proof["step_index"]
+                or identity.get("started_at") != proof["created_at"]):
+            return None
+    elif observation.get("goal_identity") != action.get("goal_identity"):
+        return None
+    return {"native_step_index": proof["step_index"], "text_sha256": expected_hash,
+            "created_at": proof["created_at"],
+            "native_goal_declaration": proof.get("native_goal_declaration") is True}
+
+
 def scoped(action: dict, ledger: dict) -> bool:
     """Legacy actions can only belong to the explicitly adopted first cycle."""
     return action.get("cycle", 1) == ledger.get("cycle", 1) and action["stage"] == ledger["stage"]
@@ -1958,39 +2025,27 @@ class Supervisor:
     def reconcile(self, target: dict, ledger: dict, observation: dict) -> None:
         """Receipt reconciliation never infers completion from message delivery."""
         native_id = observation.get("goal_identity")
-        native_goal = (observation.get("native") or {}).get("current_goal") or {}
         if not ledger["adopted_goal"] and native_id:
             if native_id != target["initial_goal_identity"]:
                 observation.update(error="native goal differs from the assessed initial goal; reassessment required", ready=False)
                 return
             ledger["adopted_goal"] = native_id
-        history_path = Path(self.config.get("history_path", Path.home() / ".gemini/antigravity-cli/history.jsonl"))
         pending = [a for a in ledger["actions"].values() if scoped(a, ledger) and a["state"] in BLOCKING_RECEIPTS]
-        if pending and history_path.is_file():
-            with history_path.open() as stream:
-                for line in stream:
-                    try:
-                        row = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
-                    if row.get("workspace") != target["root"]:
-                        continue
-                    for action in pending:
-                        if (action["marker"] in str(row.get("display", ""))
-                                and row.get("timestamp", 0) >= action["reserved_epoch_ms"]
-                                and row.get("conversationId") == target["native_session_id"]
-                                and action["native_session_id"] == target["native_session_id"]):
-                            action.update(state="accepted", accepted_at=now(), acceptance="native_workspace_history_marker")
-                            if action["kind"] == "policy_update":
-                                ledger["policy_notification_required"] = False
-        if ledger.get("awaiting_goal") and native_id and native_id != ledger["adopted_goal"]:
-            for action in pending:
-                if (action["kind"] == "start_goal" and scoped(action, ledger)
-                        and action["marker"] in native_goal.get("goal_text", "")):
-                    action.update(state="accepted", accepted_at=now(), acceptance="native_goal_marker")
-                    action["accepted_goal_identity"] = native_id
-                    ledger.update(adopted_goal=native_id, awaiting_goal=False)
-                    break
+        for action in pending:
+            adopting = ledger.get("awaiting_goal") and action.get("kind") == "start_goal"
+            if action["state"] == "accepted" and not adopting:
+                continue  # historical acceptance timestamps are immutable
+            proof = native_delivery_proof(action, target, observation)
+            if proof is None:
+                continue
+            if action["state"] != "accepted":
+                action.update(state="accepted", accepted_at=now(), acceptance="native_exact_user_input")
+            action.update(delivery_proof=proof, delivery_verified_at=now())
+            if action["kind"] == "policy_update":
+                ledger["policy_notification_required"] = False
+            if adopting and native_id and native_id != ledger["adopted_goal"]:
+                action["accepted_goal_identity"] = native_id
+                ledger.update(adopted_goal=native_id, awaiting_goal=False)
 
     def baseline(self, target: dict, ledger: dict) -> None:
         if "baseline_head" not in ledger:
@@ -2160,6 +2215,7 @@ class Supervisor:
                       "marker": "MECH-WORKFLOW-" + identifier, "state": "reserved", "reserved_at": now(),
                       "reserved_epoch_ms": int(time.time() * 1000), "native_session_id": target["native_session_id"],
                       "goal_identity": ledger["adopted_goal"], "message": message,
+                      "message_sha256": hashlib.sha256(message.encode("utf-8")).hexdigest(),
                       "native_step_index": ((observation.get("native") or {}).get("last_step") or {}).get("index"),
                       "instruction_sha256": hashlib.sha256(prompt.read_bytes()).hexdigest()}
             ledger["actions"][identifier] = action
@@ -2170,7 +2226,11 @@ class Supervisor:
                 else:
                     result = self.notifier.jxa(SEND_JS, {**observation["tab"], "pid": target["pid"],
                         "identity": target["process_identity"], "cwd": target["root"], "message": message})
-                    action.update(state="sent" if result == "sent" else "not-sent", outcome=result, updated_at=now())
+                    # Terminal returning proves only that the transport was
+                    # invoked: it may leave a partial unsent composer. Keep a
+                    # blocking uncertain reservation until native exact-input
+                    # reconciliation, never retry or append Enter automatically.
+                    action.update(state="uncertain" if result == "sent" else "not-sent", outcome=result, updated_at=now())
             except Exception as error:
                 action.update(state="uncertain", error=str(error)[:500], updated_at=now())
             self.save(target, ledger)
