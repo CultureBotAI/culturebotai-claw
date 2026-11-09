@@ -52,6 +52,7 @@ manifest when no source checkout is present:
 - CMMMech (`CMMMECH_ROOT`)
 - AIMech (`AIMECH_ROOT`)
 - EdgeMech (`EDGEMECH_ROOT`)
+- ScaleupMech (`SCALEUPMECH_ROOT`) — admission pending; see the admission guide
 
 You do not need every Mech cloned. `openclaw-cli config validate` reports an
 unset root as "not configured locally" rather than a failure; pass

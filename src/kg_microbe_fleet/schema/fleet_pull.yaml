@@ -93,6 +93,9 @@ enums:
       edgemech:
         description: EdgeMech occurrence accounting and curation infrastructure.
 
+      scaleupmech:
+        description: ScaleupMech repository.
+
   FleetPullStatusEnum:
     description: Per-repository status returned by fleet_pull.py.
     permissible_values:

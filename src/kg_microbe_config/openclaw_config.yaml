@@ -109,6 +109,13 @@ repositories:
     task_runner: just
     description: "Release-occurrence accounting and inherited review eligibility"
 
+  scaleupmech:
+    path: ${SCALEUPMECH_ROOT}
+    type: python
+    package_manager: uv
+    task_runner: just
+    description: "Organism- and strain-level titer, rate, yield and oxygen-transfer evidence across scales"
+
 agents:
   discovery_paths:
     - kg_microbe_agents/definitions
