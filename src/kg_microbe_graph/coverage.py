@@ -85,7 +85,10 @@ CAPABILITY = "causal_graph_coverage"
 
 GRAPH_LIST = "graph_list"
 NODE_NESTED_EDGES = "node_nested_edges"
-SHAPES = frozenset({GRAPH_LIST, NODE_NESTED_EDGES})
+RECORD_GRAPH = "record_graph"
+SHAPES = frozenset({GRAPH_LIST, NODE_NESTED_EDGES, RECORD_GRAPH})
+# The node type given to the record itself under `record_is_node`.
+RECORD_NODE_TYPE = "record"
 
 UNSET = "<unset>"
 DIRECTORY_STRATUM = "@directory"
@@ -259,6 +262,12 @@ class GraphShape:
     edge is the node it sits under, so there is no subject field, and nothing
     is defaulted: a field that is not declared is reported as not measured,
     never as zero.
+
+    `record_graph`: the record is one graph whose nodes sit in several
+    record-level lists and whose edges are one record-level list, each edge
+    naming its own subject -- PathwayMech's `taxa`/`participants`/`reactions`
+    and `mechanistic_edges` (#509). A node's type is the list it came from, and
+    `record_is_node` adds the record itself, which edges may name.
     """
 
     kind: str
@@ -273,6 +282,13 @@ class GraphShape:
     edge_object_field: str
     edge_predicate_field: str | None
     edge_evidence_field: str | None
+    node_list_fields: tuple[str, ...] = ()
+    record_is_node: bool = False
+
+    @property
+    def has_node_types(self) -> bool:
+        """A `record_graph` node's type is the list it came from."""
+        return bool(self.node_type_field) or self.kind == RECORD_GRAPH
 
 
 _GRAPH_LIST_DEFAULTS = {
@@ -290,6 +306,10 @@ _GRAPH_LIST_DEFAULTS = {
 }
 _NESTED_REQUIRED = ("nodes_field", "edges_field", "node_id_field", "edge_object_field")
 _NESTED_FORBIDDEN = ("graphs_field", "graph_id_field", "edge_subject_field")
+_RECORD_REQUIRED = ("edges_field", "node_id_field", "edge_subject_field", "edge_object_field")
+# The graph object, the single node list, and a type read from a node: each
+# is what the other shapes have instead of what this one reads.
+_RECORD_FORBIDDEN = ("graphs_field", "graph_id_field", "nodes_field", "node_type_field")
 _SHAPE_FIELDS = tuple(_GRAPH_LIST_DEFAULTS)
 
 
@@ -321,6 +341,8 @@ class CoverageConfig:
         shape = self.shape
         if shape.edge_evidence_field is None:
             return None
+        if shape.kind == RECORD_GRAPH:
+            return f"{shape.edges_field}[].{shape.edge_evidence_field}"
         container = shape.nodes_field if shape.kind == NODE_NESTED_EDGES else shape.graphs_field
         return f"{container}[].{shape.edges_field}[].{shape.edge_evidence_field}"
 
@@ -378,11 +400,40 @@ class CoverageConfig:
                 raise CoverageConfigError(
                     f"{name} {value!r} must be a single key, not a path"
                 )
+        node_lists = tuple(settings.get("node_list_fields", ()))
+        record_is_node = bool(settings.get("record_is_node", False))
+        if kind != RECORD_GRAPH and (
+            settings.get("node_list_fields") is not None
+            or settings.get("record_is_node") is not None
+        ):
+            raise CoverageConfigError(
+                f"node_list_fields and record_is_node belong to {RECORD_GRAPH}"
+            )
         if kind == GRAPH_LIST:
             resolved = {
                 name: declared[name] or default
                 for name, default in _GRAPH_LIST_DEFAULTS.items()
             }
+        elif kind == RECORD_GRAPH:
+            missing = [name for name in _RECORD_REQUIRED if not declared[name]]
+            if not node_lists:
+                missing.append("node_list_fields")
+            if missing:
+                raise CoverageConfigError(
+                    f"{RECORD_GRAPH} needs {', '.join(missing)}: nothing is "
+                    f"defaulted for this shape"
+                )
+            forbidden = [name for name in _RECORD_FORBIDDEN if declared[name]]
+            if forbidden:
+                raise CoverageConfigError(
+                    f"{RECORD_GRAPH} has no {', '.join(forbidden)}: the record is "
+                    f"the graph, its nodes sit in node_list_fields, and a node's "
+                    f"type is the list it came from"
+                )
+            for name in node_lists:
+                if not _KEY.match(name):
+                    raise CoverageConfigError(f"node list {name!r} must be a single key")
+            resolved = {**declared, "nodes_field": "+".join(node_lists)}
         else:
             missing = [name for name in _NESTED_REQUIRED if not declared[name]]
             if missing:
@@ -397,14 +448,16 @@ class CoverageConfig:
                     f"is the graph and an edge's subject is the node it sits under"
                 )
             resolved = dict(declared)
-        shape = GraphShape(kind=kind, **resolved)
+        shape = GraphShape(
+            kind=kind, node_list_fields=node_lists, record_is_node=record_is_node, **resolved
+        )
 
         scope_field = settings.get("scope_field")
         mechanistic = settings.get("mechanistic_scopes")
         facets = tuple(settings.get("graph_facets", ()))
-        if kind == NODE_NESTED_EDGES and (scope_field or facets):
+        if kind in (NODE_NESTED_EDGES, RECORD_GRAPH) and (scope_field or facets):
             raise CoverageConfigError(
-                f"{NODE_NESTED_EDGES} graphs are the record itself; scope_field and "
+                f"{kind} graphs are the record itself; scope_field and "
                 f"graph_facets describe a graph object this shape does not have"
             )
         if mechanistic is not None and not scope_field:
@@ -416,7 +469,7 @@ class CoverageConfig:
                 raise CoverageConfigError(f"{name!r} must be a single graph key")
 
         anchors = tuple(settings.get("anchor_node_types", ()))
-        if anchors and not shape.node_type_field:
+        if anchors and not shape.has_node_types:
             raise CoverageConfigError(
                 "anchor_node_types needs node_type_field: without node types no "
                 "node can be an anchor, and every graph would read NO_ANCHOR_NODE"
@@ -458,11 +511,19 @@ class CoverageConfig:
         shape = self.shape
         return {
             "graph_shape": shape.kind,
-            "graph_slot": shape.graphs_field or shape.nodes_field,
+            "graph_slot": (
+                shape.edges_field if shape.kind == RECORD_GRAPH
+                else shape.graphs_field or shape.nodes_field
+            ),
             "edges": (
                 f"{shape.nodes_field}[].{shape.edges_field}[].{shape.edge_object_field}"
                 if shape.kind == NODE_NESTED_EDGES
+                else f"{shape.edges_field}[]" if shape.kind == RECORD_GRAPH
                 else f"{shape.graphs_field}[].{shape.edges_field}"
+            ),
+            **(
+                {"node_lists": list(shape.node_list_fields), "record_is_node": shape.record_is_node}
+                if shape.kind == RECORD_GRAPH else {}
             ),
             "scope_field": self.scope_field,
             "mechanistic_scopes": (
@@ -651,6 +712,24 @@ def _graphs(
             for j, raw_edge in enumerate(_list(raw.get(shape.edges_field), f"{what}.{shape.edges_field}")):
                 edges.append(_edge(raw_edge, node[0].id, shape, f"{what}.{shape.edges_field}[{j}]", validator))
         return [_assemble(shape.nodes_field, nodes, edges, None, {})]
+
+    if shape.kind == RECORD_GRAPH:
+        nodes = []
+        if shape.record_is_node:
+            own = _identifier(record.get(shape.node_id_field), "the record")
+            nodes.append((Node(own, RECORD_NODE_TYPE), None))
+        for list_field in shape.node_list_fields:
+            for j, raw in enumerate(_list(record.get(list_field), list_field)):
+                parsed_node, grounding = _node(raw, shape, f"{list_field}[{j}]")
+                nodes.append((Node(parsed_node.id, list_field), grounding))
+        edges = [
+            _edge(e, None, shape, f"{shape.edges_field}[{j}]", validator)
+            for j, e in enumerate(_list(record.get(shape.edges_field), shape.edges_field))
+        ]
+        listed = len(nodes) - (1 if shape.record_is_node else 0)
+        if not listed and not edges:
+            return []
+        return [_assemble(shape.edges_field, nodes, edges, None, {})]
 
     assert shape.graphs_field is not None and shape.graph_id_field is not None
     parsed = []
@@ -847,7 +926,7 @@ class CoverageReport:
                 # Undeclared means unmeasured, as for evidence and grounding:
                 # a count of "<unset>" would read as data (#477).
                 "node_types": (
-                    dict(sorted(self.node_types.items())) if shape.node_type_field else None
+                    dict(sorted(self.node_types.items())) if shape.has_node_types else None
                 ),
                 "predicates": (
                     {
