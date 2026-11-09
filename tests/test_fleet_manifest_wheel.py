@@ -338,6 +338,18 @@ assert Path(sys.modules["kg_microbe_evidence"].__file__).resolve().is_relative_t
 assert EvidenceValidator(unpacked, EvidenceConfig("references_cache")).check_item({"pmid": "1"}).verdict == "NO_QUOTE"
 assert load_pin_contract()["uv_version"]
 assert governance_main(["list", "--repository", "proteintraitsmech", "--json"]) == 0
+from kg_microbe_governance import automatic_private_audit, automatic_private_audit_cli
+from kg_microbe_governance import automatic_fleet_component, private_audit_coverage
+for module in (automatic_private_audit, automatic_private_audit_cli, automatic_fleet_component, private_audit_coverage):
+    assert Path(module.__file__).resolve().is_relative_to(unpacked)
+for entry in (automatic_private_audit_cli.main, automatic_fleet_component.main):
+    try:
+        entry(["--help"])
+    except SystemExit as exc:
+        assert exc.code == 0
+    else:
+        raise AssertionError("Installed automatic CLI parser did not handle help")
+
 history_schema = Path(_default_schema_path()).resolve()
 assert history_schema.is_relative_to(unpacked)
 assert history_schema == (

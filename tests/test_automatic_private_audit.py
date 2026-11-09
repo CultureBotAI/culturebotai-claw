@@ -35,6 +35,7 @@ class MetadataAPI(PublicAPI):
             "run_attempt": ATTEMPT,
             "repository": {"id": manual.CONTROL_ID},
             "workflow_id": 501,
+            "head_repository": {"id": 700},
             "path": auto.PARENT_WORKFLOW,
             "head_sha": HEAD,
             "head_branch": "feature",
@@ -50,6 +51,13 @@ class MetadataAPI(PublicAPI):
             "base": {"sha": MAIN, "ref": "main", "repo": {"id": manual.CONTROL_ID}},
             "merge_commit_sha": MERGE,
         }
+        self.parent["pull_requests"] = [
+            {
+                "number": 17,
+                "head": copy.deepcopy(self.pr["head"]),
+                "base": copy.deepcopy(self.pr["base"]),
+            }
+        ]
         self.merge = {"sha": MERGE, "parents": [{"sha": MAIN}, {"sha": HEAD}]}
         self.associations = [{"number": 17}]
         self.jobs = {
@@ -155,6 +163,7 @@ def verify(public, source):
         attempt=2,
         app_id=APP_ID,
         now=NOW + timedelta(seconds=2),
+        clock=lambda: NOW + timedelta(seconds=2),
     )
 
 
@@ -323,3 +332,140 @@ def test_automatic_receipt_rejects_replay_and_counterfeits(source, change):
         public.artifact["name"] = f"scaleup-automatic-{PARENT}-{ATTEMPT}-101-2"
     with pytest.raises(manual.AuditError):
         verify(public, source)
+
+
+def test_verifier_refreshes_parent_before_and_after_artifact(source):
+    public, _, _ = packaged(source)
+    frozen = binding(public)
+    public.pr["state"] = "closed"
+    with pytest.raises(manual.AuditError):
+        auto.verify_producer(
+            public,
+            source[0],
+            frozen,
+            run_id=101,
+            attempt=2,
+            app_id=APP_ID,
+            now=NOW + timedelta(seconds=2),
+            clock=lambda: NOW + timedelta(seconds=2),
+        )
+    public.pr["state"] = "open"
+    original_request = public.request
+
+    def moved_after_download(path, *, archive=False):
+        raw = original_request(path, archive=archive)
+        public.pr["head"]["sha"] = "f" * 40
+        return raw
+
+    public.request = moved_after_download
+    with pytest.raises(manual.AuditError):
+        auto.verify_producer(
+            public,
+            source[0],
+            frozen,
+            run_id=101,
+            attempt=2,
+            app_id=APP_ID,
+            now=NOW + timedelta(seconds=2),
+            clock=lambda: NOW + timedelta(seconds=2),
+        )
+
+
+@pytest.mark.parametrize("identity", [701, None, True])
+def test_fork_association_requires_the_actual_run_source_repository(source, identity):
+    public = MetadataAPI(source)
+    public.parent["pull_requests"] = []
+    public.parent["head_repository"] = {"id": identity}
+    with pytest.raises(manual.AuditError):
+        binding(public)
+
+
+@pytest.mark.parametrize(
+    "side,field", [("head", "sha"), ("base", "sha"), ("head", "repo"), ("base", "ref")]
+)
+def test_recorded_parent_pr_snapshot_cannot_be_replaced_by_current_api_metadata(
+    source, side, field
+):
+    public = MetadataAPI(source)
+    record = public.parent["pull_requests"][0][side]
+    record[field] = (
+        {"id": 999} if field == "repo" else "d" * 40 if field == "sha" else "other"
+    )
+    with pytest.raises(manual.AuditError):
+        binding(public)
+
+
+def test_private_observation_time_precedes_slow_public_revalidation(source):
+    public = MetadataAPI(source)
+    frozen = binding(public)
+    private = PrivateAPI(*source)
+    clock = {"now": NOW, "private_read": False}
+    original_private_get, original_public_get = private.get, public.get
+
+    def private_get(path):
+        value = original_private_get(path)
+        if private.ref_reads == 3:
+            clock["private_read"] = True
+        return value
+
+    def public_get(path):
+        if clock["private_read"]:
+            clock["now"] = NOW + timedelta(seconds=180)
+        return original_public_get(path)
+
+    private.get, public.get = private_get, public_get
+    context = {
+        "sha": MAIN,
+        "run_id": 101,
+        "run_attempt": 2,
+        "workflow": auto.PRODUCER_WORKFLOW,
+        "app_id": APP_ID,
+        "subject_head": MERGE,
+    }
+    value = auto.produce(
+        public,
+        private,
+        source[0],
+        source[1],
+        frozen,
+        context,
+        NOW,
+        clock=lambda: clock["now"],
+    )
+    assert manual.utc(value["private_tip_recheck"]["checked_at"]) == NOW
+    with pytest.raises(manual.AuditError):
+        auto.validate_envelope(
+            auto.canonical(value),
+            source[0],
+            frozen,
+            auto.private_obligation(public, frozen, source[0]),
+            app_id=APP_ID,
+            producer_run_id=101,
+            producer_attempt=2,
+            now=clock["now"],
+        )
+
+
+def test_verification_rechecks_age_after_slow_artifact_and_parent_metadata(source):
+    public, _, _ = packaged(source)
+    frozen = binding(public)
+    clock = {"now": NOW + timedelta(seconds=2)}
+    original_request = public.request
+
+    def slow_download(path, *, archive=False):
+        raw = original_request(path, archive=archive)
+        clock["now"] = NOW + timedelta(seconds=122)
+        return raw
+
+    public.request = slow_download
+    with pytest.raises(manual.AuditError):
+        auto.verify_producer(
+            public,
+            source[0],
+            frozen,
+            run_id=101,
+            attempt=2,
+            app_id=APP_ID,
+            now=NOW + timedelta(seconds=2),
+            clock=lambda: clock["now"],
+        )

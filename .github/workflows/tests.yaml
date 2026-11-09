@@ -92,6 +92,10 @@ jobs:
           src/kg_microbe_governance/__main__.py
           src/kg_microbe_governance/fleet_audit.py
           src/kg_microbe_governance/private_scaleup_audit.py
+          src/kg_microbe_governance/automatic_private_audit.py
+          src/kg_microbe_governance/automatic_private_audit_cli.py
+          src/kg_microbe_governance/automatic_fleet_component.py
+          src/kg_microbe_governance/private_audit_coverage.py
           src/kg_microbe_governance/cycle_release_audit.py
           src/kg_microbe_governance/artifacts/scripts/run_shared_evidence_validator.py
           src/kg_microbe_governance/artifacts/scripts/check_vendored_sync.py
