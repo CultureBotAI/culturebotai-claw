@@ -795,7 +795,7 @@ mechs:
       page_budgets:
         status: disabled
         reason: >-
-          Serves 490 tracked pages under pages/ straight from main via GitHub
+          Serves its tracked pages under pages/ straight from main via GitHub
           Pages -- it has no generate-pages.yaml, unlike the other four -- and
           declares no size or file-count budgets, so nothing watches them grow.
           Adopting them applies here; the limits are the repository's to set.
@@ -1289,12 +1289,17 @@ mechs:
       deep_research:
         status: disabled
         reason: >-
-          Research so far is source assessment written by hand under research/
-          with no provider client or research recipe in the justfile; the
-          repository has not decided on a paid research route.
+          Has research-cell-structure, research-entity and deep-research-canary
+          recipes in the justfile and a research/ tree, but no
+          conf/deep_research_provider.yaml -- the profile every deep-research
+          Mech declares and the contract resolves. The recipes are a research
+          route, not the declared provider contract (#848).
         reason_claims:
           present:
             - research
+            - justfile
+          absent:
+            - conf/deep_research_provider.yaml
       edison_key_discovery:
         status: not_applicable
         reason: >-
@@ -1309,10 +1314,11 @@ mechs:
       knowledge_gap_scan:
         status: disabled
         reason: >-
-          Records carry the shared Discussion section, so the scan applies, but
-          the corpus is four records and the repository is not yet in the
-          knowledge-gap-scan workflow matrix; enable once the first tranche of
-          records lands (CellStructureMech#12).
+          Records carry the shared Discussion section, so the scan applies. The
+          condition this declaration set, enabling once the first tranche of
+          records lands (CellStructureMech#12), is met; the scan matrix follows
+          this declaration, so the switch awaits review (CellStructureMech#1642,
+          CellStructureMech#404).
       # An authoritative consumer must sync; the loader rejects anything else.
       # CellStructureMech#48 vendors the artifact set and pin that this
       # declaration obliges; until it lands, the fleet audit reports the gap.
@@ -1370,8 +1376,7 @@ mechs:
         status: disabled
         reason: >-
           Records carry GO cellular-component identifiers inline rather than
-          through a mapping file, and the corpus is four records. Adopting one
-          applies once it grows.
+          through a mapping file, and no SSSOM mapping product exists yet.
       metpo_proposal:
         status: disabled
         reason: >-
@@ -1383,8 +1388,7 @@ mechs:
       kgx_export:
         status: disabled
         reason: >-
-          Four structure records and no exporter; adopting KGX applies once the
-          corpus grows.
+          No KGX exporter or graph export product exists yet.
       source_queue:
         status: enabled
         settings:
@@ -1505,8 +1509,8 @@ mechs:
       environment_coverage:
         status: disabled
         reason: >-
-          HabitatMech is itself an environment vocabulary: 3,213 habitat
-          records grounded in ENVO, UBERON, FOODON and BTO. Environment
+          HabitatMech is itself an environment vocabulary: habitat records
+          grounded in ENVO, UBERON, FOODON and BTO. Environment
           coverage compares culture media, ingredients and communities against
           ENVO and has no loader for HabitatRecord, so it cannot yet read this
           corpus as either an input or the reference set. Adopting it applies
@@ -1556,7 +1560,7 @@ mechs:
       page_budgets:
         status: disabled
         reason: >-
-          Serves 3,404 published HTML pages under pages/ straight from main
+          Serves its published HTML pages under pages/ straight from main
           via GitHub Pages -- it has no generate-pages.yaml -- and declares no
           size or file-count budgets, so nothing watches them grow. Adopting
           them applies here; the limits are the repository's to set.
@@ -1622,7 +1626,7 @@ mechs:
       site_contract:
         status: disabled
         reason: >-
-          Publishes 3,404 HTML pages under pages/ straight from main, so
+          Publishes its HTML pages under pages/ straight from main, so
           the check has a directory to judge, but it has not been measured on
           this site yet. Enable after measuring on joining, as AntibioticMech
           did, so the contract's numbers keep describing what it runs on.
@@ -2085,14 +2089,15 @@ mechs:
       curation_history:
         status: disabled
         reason: >-
-          No record carries curation history yet. The governed
-          src/pathwaymech/schema/history.yaml is vendored and records may
-          carry an optional curation_history of CurationEvent, but no recipe
-          appends events and nothing in CI validates history records; history/
-          holds only a README. Enable once a recipe appends events, checked in
-          CI (#515).
+          Pathway records carry an inline curation_history of CurationEvent, a
+          class of PathwayMech's own src/pathwaymech/schema/pathwaymech.yaml;
+          the governed src/pathwaymech/schema/history.yaml is vendored, the
+          justfile's new-history recipe scaffolds history/ records, and CI
+          validates history/ through pathwaymech-run-qc. That meets the
+          condition this declaration set for enabling (#515), where the switch
+          awaits review.
         reason_claims:
-          present: ["history", "src/pathwaymech/schema/history.yaml"]
+          present: ["history", "src/pathwaymech/schema/history.yaml", "src/pathwaymech/schema/pathwaymech.yaml", "justfile"]
       # Closed-mode LinkML validation (pathwaymech-validate-strict) runs in
       # `just validate` and in the "Build and test" workflow on every pull
       # request (PathwayMech #190).
@@ -2182,12 +2187,12 @@ mechs:
       writer_audit:
         status: disabled
         reason: >-
-          Has no scripts/audit_writers.py, and no tracked script writes a
-          record: the importers print to stdout, either YAML drafts or TSV
-          seed rows. Adopting it applies
-          once a script writes records; the settings are the repository's to
-          declare.
+          Has no scripts/audit_writers.py, though a tracked script writes
+          records: scripts/backfill_source_mappings.py rewrites pathway records
+          in place. Adopting the audit applies; the settings are the
+          repository's to declare (#848).
         reason_claims:
+          present: ["scripts/backfill_source_mappings.py"]
           absent: ["scripts/audit_writers.py"]
       sssom_export:
         status: enabled
@@ -2442,14 +2447,17 @@ mechs:
         reason: >-
           Native inline events and canonical sidecars are implemented through
           src/cmmmech/history.py and justfile, with history/ validated as append-only
-          in CI. Generic curation remains disabled because neither
-          .claude/skills/curate-yaml-record/SKILL.md nor
-          .claude/skills/curate-yaml-record/references/review-checklist.md exists
-          to implement that write contract. Read-only structured review has its own record_review capability
-          and does not enable curation.
+          in CI. .claude/skills/curate-yaml-record/SKILL.md and
+          .claude/skills/curate-yaml-record/references/review-checklist.md now exist,
+          added with CMMMech's canonical skill adapters (CMMMech#513), so the
+          write contract's files are present; enabling generic curation awaits
+          review (#1059). Read-only structured review has its own record_review
+          capability and does not enable curation.
         reason_claims:
-          present: ["justfile", "src/cmmmech/history.py", "history"]
-          absent:
+          present:
+            - "justfile"
+            - "src/cmmmech/history.py"
+            - "history"
             - ".claude/skills/curate-yaml-record/SKILL.md"
             - ".claude/skills/curate-yaml-record/references/review-checklist.md"
       strict_validation:
@@ -2515,9 +2523,10 @@ mechs:
         reason: Mechanism evidence is modeled without nodes or directed causal edges.
       page_budgets:
         status: disabled
-        reason: No pages/ tree or conf/pages_budgets.json defines a site and its budgets.
+        reason: A pages/ tree exists, but no conf/pages_budgets.json declares its budgets.
         reason_claims:
-          absent: ["pages", "conf/pages_budgets.json"]
+          present: ["pages"]
+          absent: ["conf/pages_budgets.json"]
       kgx_export:
         status: disabled
         reason: No curated graph or KGX export product exists yet.
@@ -2543,9 +2552,11 @@ mechs:
           absent: ["scripts/audit_writers.py"]
       site_contract:
         status: disabled
-        reason: No pages/ tree exists for the shared site contract to audit.
+        reason: >-
+          A pages/ tree exists, but no site_path and published_root have been
+          declared for it or verified against the shared HTML contract.
         reason_claims:
-          absent: ["pages"]
+          present: ["pages"]
       source_catalogue:
         status: disabled
         reason: No download.yaml declares sources in the fleet catalogue format.
@@ -2598,14 +2609,14 @@ mechs:
       curation_history:
         status: disabled
         reason: >-
-          The native new-history recipe in justfile does not establish the
-          shared curation write contract. Neither
-          .claude/skills/curate-yaml-record/SKILL.md nor
-          .claude/skills/curate-yaml-record/references/review-checklist.md
-          implements it. Structured record review is separately enabled.
+          The native new-history recipe in justfile does not establish the shared
+          curation write contract. .claude/skills/curate-yaml-record/SKILL.md and
+          .claude/skills/curate-yaml-record/references/review-checklist.md now
+          exist (AIMech#428); enabling generic curation awaits review (#1059).
+          Structured record review is separately enabled.
         reason_claims:
-          present: ["justfile"]
-          absent:
+          present:
+            - "justfile"
             - ".claude/skills/curate-yaml-record/SKILL.md"
             - ".claude/skills/curate-yaml-record/references/review-checklist.md"
       strict_validation:
