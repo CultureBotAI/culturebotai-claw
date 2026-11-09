@@ -778,6 +778,24 @@ def graph_parts(record: Mapping[str, Any], config: CoverageConfig) -> list[Graph
             return []
         return [GraphParts(shape.edges_field, tuple(record_nodes), tuple(record_edges), None, {})]
 
+    if shape.kind == RECORD_GRAPH:
+        nodes = []
+        if shape.record_is_node:
+            own = _identifier(record.get(shape.node_id_field), "the record")
+            nodes.append((Node(own, RECORD_NODE_TYPE), None))
+        for list_field in shape.node_list_fields:
+            for j, raw in enumerate(_list(record.get(list_field), list_field)):
+                parsed_node, grounding = _node(raw, shape, f"{list_field}[{j}]")
+                nodes.append((Node(parsed_node.id, list_field), grounding))
+        edges = [
+            _edge(e, None, shape, f"{shape.edges_field}[{j}]", validator)
+            for j, e in enumerate(_list(record.get(shape.edges_field), shape.edges_field))
+        ]
+        listed = len(nodes) - (1 if shape.record_is_node else 0)
+        if not listed and not edges:
+            return []
+        return [_assemble(shape.edges_field, nodes, edges, None, {})]
+
     assert shape.graphs_field is not None and shape.graph_id_field is not None
     parsed = []
     for i, raw in enumerate(_list(record.get(shape.graphs_field), shape.graphs_field)):

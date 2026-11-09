@@ -21,6 +21,7 @@ from typing import Any
 
 from kg_microbe_progress import (
     collect_progress,
+    project_bundle_to_manifest,
     run_key,
     validate_bundle,
     validate_extension,
@@ -84,7 +85,7 @@ def read_json(path: Path) -> dict:
     return read_progress_json(path)
 
 
-def read_remote(api=gh, *, manifest=None) -> tuple[str | None, dict | None]:
+def read_remote(api=gh, *, manifest=None, project_expanded=True) -> tuple[str | None, dict | None]:
     ref = api(f"repos/{REPOSITORY}/git/ref/heads/{BRANCH}")
     if ref is None:
         return None, None
@@ -108,8 +109,8 @@ def read_remote(api=gh, *, manifest=None) -> tuple[str | None, dict | None]:
             raise PublishError("Public data blob is too large")
         documents[name] = json.loads(raw)
     history, snapshot = documents["history.json"], documents["progress.json"]
-    validate_bundle(history, snapshot, manifest)
-    return head, {"history": history, "snapshot": snapshot}
+    projected = project_bundle_to_manifest(history, snapshot, manifest)
+    return head, {"history": history, "snapshot": projected if project_expanded else snapshot}
 
 
 def newest_history(local: dict | None, remote: dict | None) -> dict | None:
@@ -197,7 +198,7 @@ def collect_once(runtime_dirs: list[Path], state_dir: Path, *, apply=False, init
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         local_path = state_dir / "bundle.json"
         local = read_json(local_path) if local_path.exists() else None
-        head, remote = read_remote(api) if apply else (None, None)
+        head, remote = read_remote(api, project_expanded=False) if apply else (None, None)
         prior = newest_history(local["history"] if local else None, remote["history"] if remote else None)
         associations = collect_associations(runtime_dirs)
         observations = fetch_pr_observations(refresh_associations(associations.records, prior))

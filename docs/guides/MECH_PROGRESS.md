@@ -173,7 +173,13 @@ workflow. A fifteen-minute GitHub schedule recovers missed dispatches.
 
 The Pages workflow executes reviewed main-branch code, pins the data-branch
 commit before reading its fixed files, validates the complete bundle, and builds
-`site/progress`. The deployment artifact includes `data/publication.json` with
+`site/progress`. When `fleet.yaml` admits a new Mech at the end of the manifest
+before `mech-progress-data` has been rewritten by an upgraded publisher,
+`project_bundle_to_manifest` validates the published bundle against the prefix
+manifest, confirms the newly admitted suffix Mechs have no historical entries,
+and projects `unobserved` zero-counter rows so Pages, `--published` status, and
+the first post-expansion publication succeed without losing strict validation.
+The deployment artifact includes `data/publication.json` with
 the exact data commit. Deployment alone does not make old observations fresh:
 the UI shows both collection time and per-Mech observation age, warns after
 15 minutes, and offers the underlying JSON for inspection.

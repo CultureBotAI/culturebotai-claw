@@ -153,6 +153,7 @@ def test_the_reasons_that_make_checkable_claims_are_the_ones_declared():
         "dufmech.id_label_validation",
         "dufmech.knowledge_gap_scan",
         "dufmech.metpo_proposal",
+        "edgemech.taxon_links",
         "habitatmech.deep_research",
         "habitatmech.environment_coverage",
         "habitatmech.kgx_export",
