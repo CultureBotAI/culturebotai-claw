@@ -6,6 +6,10 @@ completed native goal. It preserves the old goal identity for closure and record
 the external goal separately. It neither observes a terminal nor sends input.
 This is not a replacement for an ordinary receipt or permission to skip a goal.
 
+The separately versioned stage-3 protocol is documented in
+[historical protein-example boundary](HISTORICAL_STAGE3_RECONCILIATION.md).
+Its multi-PR external-work list does not broaden this version-1 contract.
+
 **DUFMech is not yet eligible.** Its historical ordered #365/#367 receipt and its
 later #455 infrastructure intake cannot currently satisfy the same final-head
 notebook gate. [Claw #1005](https://github.com/CultureBotAI/culturebotai-claw/issues/1005)

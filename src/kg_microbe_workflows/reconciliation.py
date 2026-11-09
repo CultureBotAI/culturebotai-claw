@@ -31,6 +31,17 @@ KEYS = {"schema_version", "operation", "record_status", "assessed_at", "expires_
         "fingerprints", "required_infra_tasks", "external_pr", "review", "prerequisites",
         "reconciliation_sha256", "implementation_commit", "implementation_sha256"}
 
+STAGE3_TRANSITION = "v1_protein_examples_to_record_review"
+STAGE3_KEYS = (KEYS - {"external_pr"}) | {"transition", "external_prs", "native_proof_mode"}
+
+
+def stage3_record(record: dict) -> bool:
+    return record.get("schema_version") == "2.0.0"
+
+
+def external_prs(record: dict) -> list[dict]:
+    return record["external_prs"] if stage3_record(record) else [record["external_pr"]]
+
 
 class ReconciliationError(ValueError):
     """Missing or changed authority; preserve state and stop."""
@@ -68,8 +79,8 @@ def timestamp(value: Any) -> datetime:
 
 
 def validate_record(record: dict, *, reviewed: bool = False) -> None:
-    object_keys(record, KEYS, "operator record")
-    require(record["schema_version"] == "1.0.0", "unsupported operator record version")
+    object_keys(record, STAGE3_KEYS if stage3_record(record) else KEYS, "operator record")
+    require(record["schema_version"] in {"1.0.0", "2.0.0"}, "unsupported operator record version")
     require(record["operation"] in {"close_historical_goal", "release_boundary"}, "unsupported operation")
     require(record["record_status"] in {"draft", "reviewed"}, "invalid record status")
     require(not reviewed or record["record_status"] == "reviewed", "draft record has no execution authority")
@@ -98,12 +109,42 @@ def validate_record(record: dict, *, reviewed: bool = False) -> None:
     for key in ("required_infra_tasks", "prerequisites"):
         require(isinstance(record[key], list) and all(isinstance(v, str) and v.strip() for v in record[key]), f"invalid {key}")
         require(len(record[key]) == len(set(record[key])), f"duplicate {key}")
-    require(record["required_infra_tasks"], "required infrastructure intake cannot be empty")
+    if stage3_record(record):
+        require(record["transition"] == STAGE3_TRANSITION and record["parent_version"] == "1.0.0",
+                "unsupported stage-3 transition or parent")
+        require(record["native_proof_mode"] in {"checkpoint_before_external", "retained_public_attestation"},
+                "unsupported explicit stage-3 native proof mode")
+        expected_stage = 3 if record["operation"] == "close_historical_goal" else 4
+        require(record["stage"] == expected_stage, "stage-3 protocol has the wrong operation stage")
+        require(record["required_infra_tasks"] == [], "stage-3 boundary cannot freeze infrastructure intake")
+    else:
+        require(record["required_infra_tasks"], "required infrastructure intake cannot be empty")
     require(not is_reviewed or not record["prerequisites"], "reviewed record has unmet prerequisites")
-    object_keys(record["external_pr"], {"number", "head_sha", "merge_commit_sha"}, "external PR")
-    require(type(record["external_pr"]["number"]) is int and record["external_pr"]["number"] > 0, "invalid external PR")
-    for key in ("head_sha", "merge_commit_sha"):
-        hex_value(record["external_pr"][key], 40, "invalid external PR commit")
+    if stage3_record(record):
+        require(isinstance(record["external_prs"], list) and 2 <= len(record["external_prs"]) <= 16,
+                "stage-3 boundary requires a bounded ordered set of external PRs")
+    seen_numbers, seen_merges = set(), set()
+    for external in external_prs(record):
+        fields = {"number", "head_sha", "merge_commit_sha"}
+        if stage3_record(record):
+            fields |= {"branch", "goal_identity", "native_statement"}
+        object_keys(external, fields, "external PR")
+        require(type(external["number"]) is int and external["number"] > 0, "invalid external PR")
+        for key in ("head_sha", "merge_commit_sha"):
+            hex_value(external[key], 40, "invalid external PR commit")
+        require(external["number"] not in seen_numbers and external["merge_commit_sha"] not in seen_merges,
+                "duplicate external PR or merge")
+        seen_numbers.add(external["number"])
+        seen_merges.add(external["merge_commit_sha"])
+        if stage3_record(record):
+            require(external["goal_identity"] == record["current_goal_identity"], "external PR belongs to another native goal")
+            require(isinstance(external["branch"], str) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,254}", external["branch"]),
+                    "invalid external branch")
+            statement = external["native_statement"]
+            object_keys(statement, {"step_index", "text_sha256"}, "external native statement")
+            require(type(statement["step_index"]) is int and statement["step_index"] > current["start_step_index"],
+                    "external statement is not after its own native declaration")
+            hex_value(statement["text_sha256"], 64, "invalid native statement digest")
     if record["review"] is not None or is_reviewed:
         object_keys(record["review"], {"reviewer", "artifact", "sha256"}, "independent review")
         require(isinstance(record["review"]["reviewer"], str) and record["review"]["reviewer"].strip()
@@ -180,7 +221,10 @@ def boundary_goal(ledger: dict) -> dict | None:
             and release_record["current_goal_identity"] == boundary["current_goal_identity"]
             and release_record["cycle"] == ledger["cycle"] and release_record["stage"] == ledger["stage"]
             and all(release_record[key] == record[key] for key in
-                    ("run_id", "repository_key", "parent_version", "workflow_sha256", "historical_goal_identity", "external_pr", "required_infra_tasks")), "release context changed")
+                    ("schema_version", "run_id", "repository_key", "parent_version", "workflow_sha256", "historical_goal_identity", "required_infra_tasks"))
+            and external_prs(release_record) == external_prs(record)
+            and release_record.get("transition") == record.get("transition")
+            and release_record.get("native_proof_mode") == record.get("native_proof_mode"), "release context changed")
     return boundary["current_goal_identity"]
 
 
@@ -230,8 +274,11 @@ def prepare(supervisor: Any, helpers: Any, config_path: Path, record_path: Path,
             and target["native_session_id"] == record["current_goal_identity"]["conversation_id"], "operator context differs from retained ledger")
     require(not ledger.get("policy_notification_required"), "policy handoff is pending")
     def prove():
+        options = ({"external_prs": record["external_prs"], "github_repository": target["github_repository"],
+                    "native_proof_mode": record["native_proof_mode"]}
+                   if stage3_record(record) else {})
         return supervisor.native.reconciliation_evidence(target["root"], target["native_session_id"],
-                                                         record["historical_goal_identity"], record["current_goal_identity"])
+                                                         record["historical_goal_identity"], record["current_goal_identity"], **options)
     proof = prove()
     expected = record["fingerprints"]
     require(fingerprints(config_path, directory, target, proof) == expected, "live fingerprint differs from approved assessment")
@@ -259,22 +306,56 @@ def prepare(supervisor: Any, helpers: Any, config_path: Path, record_path: Path,
     if record["operation"] == "close_historical_goal":
         require(not ledger.get("awaiting_goal") and "historical_goal_boundary" not in ledger, "historical closure is not eligible")
         stages = ledger["workflow"]["effective"]["stages"]
-        require(helpers.workflow_stage_key(ledger) == "resolve_review_findings"
-                and next((s["key"] for s in stages if s["stage"] == ledger["stage"] + 1), None) == "infrastructure",
-                "only review-remediation to infrastructure reconciliation is supported")
+        next_key = next((s["key"] for s in stages if s["stage"] == ledger["stage"] + 1), None)
+        if stage3_record(record):
+            require(helpers.workflow_stage_key(ledger) == "protein_examples" and next_key == "record_review"
+                    and ledger["workflow"]["effective"]["parent_version"] == "1.0.0",
+                    "stage-3 protocol requires the actual pinned v1 protein-examples to record-review transition")
+        else:
+            require(helpers.workflow_stage_key(ledger) == "resolve_review_findings" and next_key == "infrastructure",
+                    "only review-remediation to infrastructure reconciliation is supported")
         receipt = decode(regular_bytes(directory / "completion.json"))
         from kg_microbe_workflows.closure import multi_pr_members
         members = multi_pr_members(receipt)
-        require(members and len(members) >= 2, "historical closure requires the ordinary ordered receipt")
+        if stage3_record(record):
+            require(receipt.get("status") == "completed" and "prs" not in receipt and isinstance(receipt.get("pr"), dict),
+                    "stage-3 historical closure requires its ordinary single-PR receipt")
+            members = [receipt["pr"]]
+        else:
+            require(members and len(members) >= 2, "historical closure requires the ordinary ordered receipt")
         require(not helpers.validate_receipt(receipt, ledger, target, directory), "ordinary receipt validation failed")
-        require(record["external_pr"]["number"] not in {p["number"] for p in members}, "external work cannot receive stage credit")
+        require(not {p["number"] for p in external_prs(record)} & {p["number"] for p in members},
+                "external work cannot receive stage credit")
         verification = helpers.verify_remote_receipt(receipt, ledger, target, supervisor.runner, runtime=directory)
-        external = record["external_pr"]
-        remote = json.loads(supervisor.runner(["gh", "api", f"repos/{target['github_repository']}/pulls/{external['number']}"]).stdout)
-        require(remote.get("merged") is True and remote.get("head", {}).get("sha") == external["head_sha"]
-                and remote.get("merge_commit_sha") == external["merge_commit_sha"]
-                and remote.get("base", {}).get("repo", {}).get("full_name", "").casefold() == target["github_repository"].casefold(),
-                "external PR evidence differs")
+        external_verifications = []
+        previous_external = None
+        for external in external_prs(record):
+            remote = json.loads(supervisor.runner(["gh", "api", f"repos/{target['github_repository']}/pulls/{external['number']}"]).stdout)
+            require(remote.get("merged") is True and remote.get("head", {}).get("sha") == external["head_sha"]
+                    and remote.get("merge_commit_sha") == external["merge_commit_sha"]
+                    and remote.get("base", {}).get("repo", {}).get("full_name", "").casefold() == target["github_repository"].casefold(),
+                    "external PR evidence differs")
+            if stage3_record(record):
+                require(remote.get("base", {}).get("ref") == target["default_branch"]
+                        and remote.get("head", {}).get("ref") == external["branch"]
+                        and remote.get("head", {}).get("repo", {}).get("full_name", "").casefold() == target["github_repository"].casefold(),
+                        "external PR repository/base/branch differs")
+                require(timestamp(record["current_goal_identity"]["started_at"]) <= timestamp(remote.get("created_at"))
+                        <= timestamp(remote.get("merged_at")) <= timestamp(record["assessed_at"]),
+                        "external PR chronology differs from its native goal")
+                def ancestor(older, newer):
+                    return supervisor.runner(["git", "-C", target["root"], "merge-base", "--is-ancestor", older, newer], check=False).returncode == 0
+                require(ancestor(external["merge_commit_sha"], "HEAD"), "external merge is absent from the default checkout")
+                if previous_external is not None:
+                    require(timestamp(previous_external["merged_at"]) <= timestamp(remote["merged_at"])
+                            and ancestor(previous_external["merge_commit_sha"], external["merge_commit_sha"]),
+                            "external PR order is not verified")
+            external_verifications.append({"number": external["number"], "head_sha": remote["head"]["sha"],
+                "merge_commit_sha": remote["merge_commit_sha"], "merged": True,
+                **({"goal_identity": external["goal_identity"], "native_statement": external["native_statement"],
+                    "branch": external["branch"], "created_at": remote["created_at"], "merged_at": remote["merged_at"]}
+                   if stage3_record(record) else {})})
+            previous_external = remote
         # Ordinary advance is reused, but all its writes are captured until every
         # prerequisite and fresh native/fingerprint recheck has succeeded.
         previous_write = supervisor.write
@@ -283,16 +364,23 @@ def prepare(supervisor: Any, helpers: Any, config_path: Path, record_path: Path,
             ledger = supervisor.advance(target, ledger, receipt, verification, "reviewed_historical_native_completion")
         finally:
             supervisor.write = previous_write
-        scope = ledger["infra_scope"]
-        pending = {t["task_id"] for t in scope["tasks"] if t["status"] != "resolved"}
-        require(set(record["required_infra_tasks"]) <= pending, "required intake is missing from the actual frozen notebook")
-        notebook = Path(target["root"]) / "INFRA_TASKS.md"
-        committed = supervisor.runner(["git", "-C", target["root"], "show", "HEAD:INFRA_TASKS.md"]).stdout.encode()
-        require(committed == regular_bytes(notebook), "frozen intake is not the current committed notebook")
+        if stage3_record(record):
+            require("infra_scope" not in ledger and ledger["stage"] == 4 and ledger["cycle"] == original["cycle"],
+                    "stage-3 closure must hold exactly the record-review boundary")
+        else:
+            scope = ledger["infra_scope"]
+            pending = {t["task_id"] for t in scope["tasks"] if t["status"] != "resolved"}
+            require(set(record["required_infra_tasks"]) <= pending, "required intake is missing from the actual frozen notebook")
+            notebook = Path(target["root"]) / "INFRA_TASKS.md"
+            committed = supervisor.runner(["git", "-C", target["root"], "show", "HEAD:INFRA_TASKS.md"]).stdout.encode()
+            require(committed == regular_bytes(notebook), "frozen intake is not the current committed notebook")
         ledger["completed_stages"][-1]["reconciliation_sha256"] = record_id
-        ledger.setdefault("historical_reconciliations", {})[record_id] = {"assessment": record, "native_evidence": proof,
-                                                                       "external_pr_verification": {"number": external["number"], "head_sha": remote["head"]["sha"],
-                                                                           "merge_commit_sha": remote["merge_commit_sha"], "merged": True}}
+        entry: dict[str, Any] = {"assessment": record, "native_evidence": proof}
+        if stage3_record(record):
+            entry["external_pr_verifications"] = external_verifications
+        else:
+            entry["external_pr_verification"] = external_verifications[0]
+        ledger.setdefault("historical_reconciliations", {})[record_id] = entry
         ledger["historical_goal_boundary"] = {"assessment_sha256": record_id,
             "current_goal_identity": record["current_goal_identity"], "cycle": ledger["cycle"], "stage": ledger["stage"], "released_by": None}
         ledger.update(phase="blocked", blocked_reason="historical next-goal boundary awaits separate operator release")
