@@ -376,6 +376,15 @@ def test_fleet_expansion_projects_prefix_remote_bundle_and_publishes_full_fleet(
     _, unprojected_bundle = publisher.read_remote(api, project_expanded=False)
     assert [row["key"] for row in unprojected_bundle["snapshot"]["repositories"]] == prefix_keys
 
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "index.html").write_text("<!doctype html><title>Progress</title>")
+    monkeypatch.setattr(builder, "read_remote", lambda: (initial_head, prefix_bundle))
+    built = tmp_path / "built"
+    assert builder.build(source, built) == initial_head
+    built_progress = json.loads((built / "data/progress.json").read_text())
+    assert [row["key"] for row in built_progress["repositories"]] == list(fleet.keys)
+
     # Even if generated_at matches the pre-expansion snapshot, collect_once must publish the expanded snapshot.
     full_history, full_snapshot = collect_progress(
         [], generated_at="2026-10-20T10:00:00Z", manifest=fleet,
