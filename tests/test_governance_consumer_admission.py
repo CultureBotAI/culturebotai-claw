@@ -21,7 +21,10 @@ from test_governance_cycle_release_audit import (
 from test_governance_infrastructure_admission import admitted
 
 from kg_microbe_governance import GovernanceError
-from kg_microbe_governance.artifacts.scripts.check_vendored_sync import parse_manifest
+from kg_microbe_governance.artifacts.scripts.check_vendored_sync import (
+    expand_target,
+    parse_manifest,
+)
 from kg_microbe_governance.consumer_admission import SPECS, bootstrap_pending, compose, source_refs
 from kg_microbe_governance.cycle_release_audit import audit_release
 from kg_microbe_governance.infrastructure_admission import (
@@ -253,3 +256,23 @@ def test_resealed_fleet_entry_cannot_enable_scientific_capability():
 
     with pytest.raises(GovernanceError, match="cannot enable execution"):
         compose(read, yaml.safe_dump(fleet).encode(), (root / MANIFEST).read_bytes())
+
+
+@pytest.mark.parametrize('victim', ['traitmech', 'dufmech', 'edgemech'])
+def test_fully_matching_new_source_does_not_grant_other_consumers_its_pin(tmp_path, victim):
+    claw, roots, policy, *_ = native_admitted(tmp_path, installed=True)
+    assert audit_release(claw, roots)['ok']
+    source = parse_manifest((claw / SPEC.snapshot).read_bytes())
+    target = roots[victim]
+    consumer = source.consumers[victim]
+    for artifact in source.artifacts_for(consumer):
+        relative = expand_target(artifact, consumer)
+        put(target, relative, (claw / artifact.source).read_text())
+        (target / relative).chmod(artifact.mode)
+    put(target, PIN, policy['source_ref'] + '\n')
+    commit(target, 'Install valid but unauthorized native-consumer source')
+    result = audit_release(claw, roots)
+    assert not result['ok']
+    row = next(r for r in result['repositories'] if r['key'] == victim)
+    assert any(i['code'] == 'unexpected_pin' for i in row['issues'])
+    assert all(r['checked_artifacts'] == 0 for r in result['repositories'])

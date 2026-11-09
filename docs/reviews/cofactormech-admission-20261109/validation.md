@@ -30,3 +30,22 @@ remain byte-identical to protected main `ee3ae411`. The new source snapshot is
 exactly the manifest at published bootstrap `5790569e`; no payload or consumer
 repository was repinned. Runtime permission still requires a user-approved,
 immutable first-parent introduction on protected main.
+
+## Completed local suite and bounded follow-up
+
+The full coverage run at `903f263cc6c4fb462b1675af7b6e15fd1ec023b1` completed
+with 8,546 passes, 471 skips and 88.00% coverage. Its sole failure was #1065:
+README and AGENTS omitted two authority modules already present in CI's mypy
+command. This follow-up corrects both commands without changing runtime code.
+The existing parity regression and three newly persisted, independently authored
+pin-scope cases pass (4 tests). Each documentation omission goes red separately;
+accepting each consumer's actual pin makes all three unauthorized installs
+falsely pass and therefore makes those regression tests red. Restored checks pass.
+Core coverage is 77%; full maintained Ruff and all 109 workflow mypy targets pass.
+The next hosted full-suite run remains required for the published successor.
+
+The independent receipt reviews the frozen authority implementation at 903f263c,
+with 58 focused checks and separate mutation probes. This successor changes only
+documentation, tests and receipts; all production authority code and sealed
+source/declaration bytes remain unchanged. Final successor re-review remains
+explicit, and no merge or protected activation is performed.
