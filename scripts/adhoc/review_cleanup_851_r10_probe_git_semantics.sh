@@ -1,10 +1,10 @@
 #!/bin/bash
-# Historical review evidence: a Claude reviewer's probe for PR 851, the tenth round (8397708cd0); findings in culturebotai-claw issues; paths inside name that reviewer's scratch directories, so a re-run at head may need them recreated.
+# Historical review evidence: a Claude reviewer's probe for PR 851, the tenth round (8397708cd0); findings in culturebotai-claw issues; paths inside name that reviewer's scratch directories, so a re-run at head may need them recreated; the directory guard on line 7 was added after the run (#1063).
 # Review probes for PR 851 round 10 (2026-11-07): pushInsteadOf prefix realism, empty pushInsteadOf,
 # empty-star glob match, destination-less refspec on a push, valueless config key. Scratch only.
 set -u
 S=/Users/marcin/agent-work/culturebotai-claw/review851r10-scratch/gitprobe
-rm -rf "$S"; mkdir -p "$S"; cd "$S"
+rm -rf "$S"; mkdir -p "$S" && cd "$S" || { echo "cannot enter $S; refusing to run the relative rm -rf below elsewhere" >&2; exit 1; }
 export GIT_CONFIG_GLOBAL="$S/gitconfig" GIT_CONFIG_NOSYSTEM=1
 printf '[user]\n\tname = test\n\temail = test\n[init]\n\tdefaultBranch = main\n' > "$S/gitconfig"
 mkrepos() {
