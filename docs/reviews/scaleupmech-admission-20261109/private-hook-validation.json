@@ -1,0 +1,15 @@
+{
+  "scope": "Optional protected private-obligations adapter; no activation, source policy, bootstrap, consumer or workflow change",
+  "base": "c86ce6748139471c7428e32578811536e12d37b2",
+  "focused": "10 passed; default helper independence, fail-closed nonempty import, exact coverage dispatch, preserved source authentication and public failures",
+  "actual_helper": "14 passed; exact published 22-artifact policy and forged fields, real synthetic protected composition and missing private root",
+  "actual_helper_limits": "Helper read from automatic proposal while WIP; package resource root redirected to that real package. Synthetic history uses synthetic policy refs; a separate test authenticates actual published policy and all 22 obligations.",
+  "actual_helper_probe": "/Users/marcin/agent-work/claw/automatic-review-probes/test_scaleup_hook_real_helper.py",
+  "mutation_scope": "Separate copied package, fresh interpreter and PYTHONPYCACHEPREFIX for each run; production checkout not mutated while legacy regression suite runs",
+  "hosted_base": "At c86ce674 five hosted checks SUCCESS, fleet-audit still fails known anonymous private clone. New hook does not resolve protected automatic activation dependency.",
+  "legacy_regressions": "114 passed: consumer admission, release audit and release workflow",
+  "mypy": "1 module passed",
+  "ruff": "both changed Python files passed",
+  "source_sha256": "56532259d89180e7720bfc1218975b0ab4d2685b781ca5443c1fc563cbbfc614",
+  "mutation_source_note": "The mutation-source hash predates import-only Ruff formatting; its four behavioral contrasts are unchanged."
+}

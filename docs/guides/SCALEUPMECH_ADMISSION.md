@@ -84,3 +84,19 @@ ScaleupMech, matching the explicit descriptor order. The strict layout compariso
 also compares these ordered scopes. Each immutable source snapshot remains
 unchanged and may omit the other newcomers; reorder only the combined current
 manifest during the reviewed integration, never a sealed source snapshot.
+
+## Optional protected private-audit handoff
+
+`audit_release(..., private_obligations=...)` accepts a separately installed
+protected helper for an explicitly deferred private admission. The default
+all-roots call remains independent of that helper. Nonempty deferral requires
+exact disjoint public/private coverage, the protected additional declaration,
+and its authenticated immutable source objects. Missing helper code fails.
+
+The handoff returns `public_component_ok` for the checked public roots and
+`ok: false` while any private obligation remains. Its deferred row reports zero
+checked artifacts and no verified installation. Only the separate trusted
+automatic verifier can complete private coverage; this hook does not install
+that verifier, activate a receipt, supply credentials or remove the present
+private-clone failure from the hosted gate. Existing public failures still fail
+the public component.
