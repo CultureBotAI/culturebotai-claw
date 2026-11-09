@@ -9,6 +9,7 @@ import pytest
 import yaml
 
 from kg_microbe_workflows import (
+    LEGACY_SCHEMA_PATH,
     PARENT_PATH,
     SCHEMA_PATH,
     WorkflowError,
@@ -33,7 +34,7 @@ def write(path, data):
 def profile(tmp_path):
     parent = load_document(PARENT_PATH.read_bytes())
     data = {
-        "schema_version": "1.0.0", "profile_id": "traitmech-workflow", "profile_version": "1.0.0",
+        "schema_version": "2.0.0", "profile_id": "traitmech-workflow", "profile_version": "1.0.0",
         "repository_key": "traitmech", "github_repository": "CultureBotAI/TraitMech",
         "adaptation_skill": ".claude/skills/traitmech-evolve-workflow/SKILL.md",
         "parent": {"id": parent["id"], "version": parent["version"],
@@ -91,10 +92,10 @@ def resolution(root):
     return prior, data
 
 
-def test_packaged_parent_and_profile_resolve_exactly_six_stages(profile):
+def test_packaged_parent_and_profile_resolve_exactly_seven_stages(profile):
     path, data = profile
     result = load_effective_workflow(PARENT_PATH, path, "traitmech")
-    assert [s["stage"] for s in result["stages"]] == [1, 2, 3, 4, 5, 6]
+    assert [s["stage"] for s in result["stages"]] == [1, 2, 3, 4, 5, 6, 7]
     assert result["cycle_policy"]["restart_stage"] == 1
     assert result["schema_sha256"] == data["parent"]["schema_sha256"]
     assert len(result["sources"]) == 3
@@ -121,7 +122,7 @@ def test_profile_cannot_weaken_goal_contract(profile, change):
     elif change == "duplicate":
         data["stages"].append(data["stages"][0].copy())
     elif change == "skip_review":
-        data["stages"][3].update(applicability="not_applicable", applicability_reason="Too large")
+        data["stages"][4].update(applicability="not_applicable", applicability_reason="Too large")
     elif change == "no_skills":
         data["stages"][0]["skill_paths"] = []
     elif change == "traversal":
@@ -432,9 +433,9 @@ def test_packaged_examples_have_valid_hash_bound_artifacts():
 def test_published_linkml_review_classes_have_distinct_stage_constraints(tmp_path):
     from kg_microbe_workflows import _validator
     data = evidence(tmp_path, stage=4)
-    assert not list(_validator(SCHEMA_PATH.read_text(), "ReviewReport").iter_errors(data))
-    assert list(_validator(SCHEMA_PATH.read_text(), "FindingGroupResolution").iter_errors(data))
-    assert list(_validator(SCHEMA_PATH.read_text(), "InfrastructurePlan").iter_errors(data))
+    assert not list(_validator(LEGACY_SCHEMA_PATH.read_text(), "ReviewReport").iter_errors(data))
+    assert list(_validator(LEGACY_SCHEMA_PATH.read_text(), "FindingGroupResolution").iter_errors(data))
+    assert list(_validator(LEGACY_SCHEMA_PATH.read_text(), "InfrastructurePlan").iter_errors(data))
 
 
 @pytest.mark.parametrize("change", ["overwrite", "delete"])
@@ -521,10 +522,10 @@ def test_effective_parent_output_requirements_are_enforced(tmp_path, stage):
 
 def test_parent_rejects_unsupported_or_ambiguous_output_kinds():
     parent = load_document(PARENT_PATH.read_bytes())
-    parent["stages"][3]["required_outputs"].append("invented_output")
+    parent["stages"][4]["required_outputs"].append("invented_output")
     with pytest.raises(WorkflowError, match="supported artifact"):
         validate_parent(parent)
-    parent["stages"][3]["required_outputs"][-1] = "review_report"
+    parent["stages"][4]["required_outputs"][-1] = "review_report"
     with pytest.raises(WorkflowError, match="unique supported"):
         validate_parent(parent)
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -39,6 +40,26 @@ def test_progress_presentation_contract() -> None:
         capture_output=True,
         text=True,
     )
+
+
+def test_browser_reader_accepts_real_v2_collector_output(tmp_path: Path) -> None:
+    from test_progress_model import add_closure, collect, runtime, save_ledger
+
+    node = shutil.which("node")
+    if not node:
+        if os.environ.get("CI"):
+            pytest.fail("Node is required to check the progress dashboard in CI")
+        pytest.skip("Node is not installed")
+    root, ledger = runtime(tmp_path, stage=7)
+    ledger.update(parent_version="2.0.0", cycle_versions={"1": "2.0.0"})
+    for stage in range(1, 7):
+        add_closure(root, ledger, stage=stage)
+    save_ledger(root, ledger)
+    _, snapshot = collect(root)
+    path = tmp_path / "real-v2-snapshot.json"
+    path.write_text(json.dumps(snapshot))
+    subprocess.run([node, str(ROOT / "tests/progress_site_harness.mjs"),
+                    str(SITE / "model.mjs"), str(path)], check=True, capture_output=True, text=True)
 
 
 def test_progress_dynamic_content_has_no_html_interpolation() -> None:
