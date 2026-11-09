@@ -169,14 +169,12 @@ def validate_current_layout(admitted: GovernanceManifest, current_content: bytes
 
 def validate_packaged_transition(root: Path) -> dict[str, Any]:
     """Validate candidate/package bytes, without asserting protected activation."""
-    from .cycle_release_audit import FLEET_PATH, RELEASE_PATH, parse_release
+    from .consumer_admission import compose
+    from .cycle_release_audit import FLEET_PATH
 
-    historical = (root / RELEASE_PATH).read_bytes()
-    parse_release(historical)
-    policy = parse_admission((root / ADMISSION_PATH).read_bytes())
-    admitted = validate_transition(policy, historical, (root / HISTORICAL_MANIFEST_PATH).read_bytes(),
-                                   (root / ADMITTED_MANIFEST_PATH).read_bytes(), (root / FLEET_PATH).read_bytes())
-    current = validate_current_layout(admitted, (root / CANONICAL_MANIFEST_PATH).read_bytes())
+    policy, _, _ = compose(lambda p: (root / p).read_bytes(),
+                           (root / FLEET_PATH).read_bytes(), (root / CANONICAL_MANIFEST_PATH).read_bytes())
+    current = parse_manifest((root / CANONICAL_MANIFEST_PATH).read_bytes())
     for artifact in current.artifacts:
         if sha((root / artifact.source).read_bytes()) != artifact.sha256:
             raise GovernanceError(f"Current canonical payload checksum drift: {artifact.source}")
@@ -253,9 +251,16 @@ def trusted_source_ref(root: Path) -> str | None:
     baseline = _blob(root, release["release_ref"], CANONICAL_MANIFEST_PATH)
     if _blob(root, head, HISTORICAL_MANIFEST_PATH) != baseline:
         raise GovernanceError("Data preparation historical snapshot differs")
-    admitted = validate_transition(policy, historical, baseline, _blob(root, head, ADMITTED_MANIFEST_PATH),
-                                   _blob(root, head, FLEET_PATH))
-    validate_current_layout(admitted, _blob(root, head, CANONICAL_MANIFEST_PATH))
+    from .consumer_admission import compose, protected_additions
+
+    def read(path: str) -> bytes:
+        if _head_blob(root, head, path) is None:
+            raise FileNotFoundError(path)
+        return _blob(root, head, path)
+
+    _, _, additions = compose(read, _blob(root, head, FLEET_PATH),
+                              _blob(root, head, CANONICAL_MANIFEST_PATH))
+    protected_additions(root, head, protected, lane, additions)
     _require_clean_worktree(root)
     if _commit_at(root, "HEAD") != head or _commit_at(root, "refs/remotes/origin/main") != main:
         raise GovernanceError("Trusted history changed during data preparation")

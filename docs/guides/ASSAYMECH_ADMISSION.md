@@ -25,17 +25,24 @@ supply unconditional PR checks and `merge_group` before queue activation.
 The initial published registration commit is a data bootstrap for the supported
 synchronizer. A package at that same immutable commit can validate its exact
 remote manifest and payloads before installing them into the empty repository.
-This preserves canonical bytes without manually copied governance. The pin is
-not deployment approval or a completed fleet release.
+The published bootstrap pin is
+`89bfcebaee8a0fcf99055b2acd1709abb64f8666`. The separately sealed declaration
+and source manifest preserve those exact bytes, including all native tests.
+This is not deployment approval or a completed fleet release.
 
 Protected main `ee3ae4112834d79c1923a270cb454b87666f62e2` admits only its historical
 cohort plus the specifically approved EdgeMech identity. Its strict admission
-gate intentionally rejects this additional registration until a separate Assay
-declaration is reviewed. The bounded mechanism proposed in Cofactor onboarding
+gate intentionally rejects this additional registration without a separate Assay
+declaration. This proposal supplies that independently reviewable declaration. The bounded mechanism proposed in Cofactor onboarding
 PR #1056 is a shared implementation dependency; Cofactor's declaration is not
 Assay authority. Assay requires its own exact identity, source pin and manifest,
 empty-main tip, conservative fleet-entry digest and full native obligations.
-No existing DUF/Edge declaration or consumer pin is changed by this bootstrap.
+No existing DUF/Edge declaration or consumer pin is changed by this proposal.
+The exact source object must be authenticated before its data URLs are bound;
+later current payloads cannot substitute for its frozen bytes. Assay's separate
+pin is never an allowed pin for a historical or Edge consumer. The pending
+empty bootstrap state expires at any changed main tip and cannot excuse partial
+installation. Candidate policy cannot activate against an older protected base.
 
 Before the onboarding PR is opened, scaffold and separate seed PRs must exist.
 Before any merge decision, independently review the proposed Assay declaration,

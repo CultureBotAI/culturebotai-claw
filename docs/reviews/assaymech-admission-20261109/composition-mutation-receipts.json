@@ -1,0 +1,20 @@
+[
+  {
+    "mutation": "require-other-newcomer-in-independent-source",
+    "test": "tests/test_governance_consumer_admission.py::test_two_independent_native_snapshots_compose_without_each_other",
+    "red_exit": 1,
+    "restored_exit": 0,
+    "red_reason": true
+  },
+  {
+    "mutation": "accept-any-consumer-actual-pin",
+    "tests": [
+      "tests/test_governance_consumer_admission.py::test_fully_matching_new_source_does_not_grant_other_consumers_its_pin",
+      "tests/test_governance_consumer_admission.py::test_new_consumers_cannot_exchange_independently_bound_pins[True-cofactormech]",
+      "tests/test_governance_consumer_admission.py::test_new_consumers_cannot_exchange_independently_bound_pins[True-assaymech]"
+    ],
+    "red_exit": 1,
+    "restored_exit": 0,
+    "five_assertion_failures": true
+  }
+]
