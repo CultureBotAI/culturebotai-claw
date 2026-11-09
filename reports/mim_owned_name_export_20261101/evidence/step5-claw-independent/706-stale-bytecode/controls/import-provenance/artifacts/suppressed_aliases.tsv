@@ -1,0 +1,2 @@
+subject_id	token_key	token	owner_subject_ids	disposition	input_surfaces	source_refs	evidence_refs
+MIM:Subject	owned	Owned	"[""MIM:Owned""]"	SUPPRESS	"[""mim.synonym""]"	"[""/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/706-stale-bytecode/controls/import-provenance/mim/data/ingredients/mapped/Subject.yaml#synonyms[0]""]"	"[""https://github.com/CultureBotAI/MediaIngredientMech/issues/669#issuecomment-6558035777"",""https://github.com/CultureBotAI/culturebotai-claw/issues/701""]"

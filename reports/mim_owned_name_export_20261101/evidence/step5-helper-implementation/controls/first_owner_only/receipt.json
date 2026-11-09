@@ -1,0 +1,34 @@
+{
+  "name": "first_owner_only",
+  "argv": [
+    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python3",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "-c",
+    "/dev/null",
+    "--confcutdir",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-helper-implementation/controls/first_owner_only",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-helper-implementation/controls/first_owner_only/tests/test_mim_owned_name_policy.py",
+    "-k",
+    "test_tombstone_credits_all_live_identifier_holders_and_keeps_current_owner"
+  ],
+  "started_at": "2026-11-01T12:39:57.469694+00:00",
+  "finished_at": "2026-11-01T12:39:58.014104+00:00",
+  "exit_code": 1,
+  "expected_failure": true,
+  "control_pass": true,
+  "selection": "test_tombstone_credits_all_live_identifier_holders_and_keeps_current_owner",
+  "mutation": {
+    "before": "return {term: frozenset(subjects) for term, subjects in owners.items()}",
+    "after": "return {term: frozenset(sorted(subjects)[:1]) for term, subjects in owners.items()}"
+  },
+  "source_sha256": "be3f44d8d136f6790f1e0b01d694d552606339cd2fefdc56b76450a17d7ab793",
+  "test_sha256": "62c8675b32177dbc609218851ac13d409cf6dfd628fe37118a76a6c2cc7516b6",
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-helper-implementation/controls/first_owner_only/pytest.log",
+  "log_sha256": "7b6d3657ef5ce45ee42792855de5c53b63f1166837d51cc455b3d2e80e64de46",
+  "fresh_process": true,
+  "fresh_bytecode_prefix": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-helper-implementation/controls/first_owner_only/bytecode"
+}

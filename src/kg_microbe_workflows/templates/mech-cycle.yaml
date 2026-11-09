@@ -1,0 +1,153 @@
+schema_version: 2.0.0
+id: mech-goal-cycle
+version: 2.0.0
+title: Shared seven-goal Mech cycle
+session_state_policy:
+  work_root: .temp
+  separate_clone_root: ~/agent-work/<repo>
+  prohibit_system_temp_state: true
+  push_committed_batches_same_day: true
+  require_origin_publication_at_closure: true
+  disposable_cache_allowed: true
+stages:
+- stage: 1
+  key: open_issue_triage
+  goal_text: Use the triage-and-resolve-issues skill on the supervisor-frozen open-issue
+    inventory. Assign severity with reasons, retain stable groups and plans, resolve
+    all critical and high issues or hold on their blocking prerequisites, then work
+    the 1–2 largest remaining groups within one shared four-hour wall-clock budget.
+    Preserve every disposition and close through the standard publication sequence.
+  required_outputs:
+  - issue_inventory
+  - issue_groups
+  - group_plans
+  - dispositions
+  - validation
+- stage: 2
+  key: add_records
+  goal_text: Use the add-record skill to review evidence and add supported new records
+    until the bounded search frontier yields no new records.
+  required_outputs: []
+- stage: 3
+  key: causal_graphs
+  goal_text: Use the causal-graph skill to review, edit, and update causal graphs
+    in every applicable record.
+  required_outputs: []
+- stage: 4
+  key: protein_examples
+  goal_text: Review all applicable records and add evidence-backed UniProt protein
+    examples, especially for gene and protein elements of causal graphs.
+  required_outputs: []
+- stage: 5
+  key: record_review
+  goal_text: Use the record-review skill to review every record and save versioned
+    machine-readable findings and human-readable reports, explicitly recording empty
+    outcomes and carrying open or deferred findings forward.
+  required_outputs:
+  - review_report
+  - review_findings
+- stage: 6
+  key: resolve_review_findings
+  goal_text: Freeze the completed review scope, group related findings into real GitHub
+    issues, resolve those groups, validate the fixes, and preserve finding-to-issue-to-fix
+    traceability.
+  required_outputs:
+  - issue_map
+  - validation
+- stage: 7
+  key: infrastructure
+  goal_text: Freeze the INFRA_TASKS.md backlog into a bounded implementation plan,
+    make or link GitHub issues, implement and validate that plan, and retain deferred
+    or newly discovered tasks for the next cycle.
+  required_outputs:
+  - infra_snapshot
+  - implementation_plan
+  - validation
+closure_policy:
+  steps:
+  - commit_and_push_pr
+  - independent_adversarial_review
+  - make_issues
+  - address_issues
+  - independent_rereview
+  - verify_checks
+  - merge
+  - delete_branch
+  every_goal: true
+  independent_review: true
+  real_github_issues: true
+  rereview_after_fixes: true
+  verify_remote_merge: true
+  delete_only_reviewed_branch: true
+  checks_required: true
+  allow_no_change_receipt: true
+review_policy:
+  artifact_root: reviews/workflow
+  latest_index_path: reviews/workflow/latest.yaml
+  carry_forward_statuses:
+  - open
+  - deferred
+  immutable_versions: true
+  stable_finding_ids: true
+  explicit_no_findings: true
+  latest_index_after_verified_closure: true
+  require_tracked_committed: true
+  issue_group_traceability: true
+infrastructure_policy:
+  notebook_path: INFRA_TASKS.md
+  continuous_capture: true
+  issue_urls_required: true
+  freeze_scope_at_stage_start: true
+  new_tasks_next_cycle: true
+  explicit_empty_plan: true
+cycle_policy:
+  restart_stage: 1
+  restart_after_final_closure: true
+  preserve_active_goal_on_migration: true
+  bind_run_cycle_stage_and_goal: true
+  reload_profile_between_cycles_only: true
+issue_triage_policy:
+  severity_labels:
+  - severity:critical
+  - severity:high
+  - severity:medium
+  - severity:low
+  required_severities:
+  - critical
+  - high
+  deferred_budget_seconds: 14400
+  min_deferred_groups: 1
+  max_deferred_groups: 2
+  budget_clock: shared_wall_clock
+  budget_after_required_resolution: true
+  carry_unused_budget: false
+  freeze_scope_at_stage_start: true
+  new_issues_next_cycle: true
+  stable_group_ids: true
+  tracking_issue_and_subissues: true
+  primary_role: codex_primary
+  secondary_role: agy_secondary
+  rollout_label: rollout:cycle-v2
+  delegated_label: claw-delegated
+  legacy_priority_mappings:
+  - repository_key: cellstructuremech
+    label: P0
+    severity: critical
+  - repository_key: cellstructuremech
+    label: P1
+    severity: high
+  - repository_key: cellstructuremech
+    label: P2
+    severity: medium
+  - repository_key: cellstructuremech
+    label: P3
+    severity: low
+  - repository_key: habitatmech
+    label: 'priority: P0'
+    severity: critical
+  - repository_key: habitatmech
+    label: 'priority: P1'
+    severity: high
+  - repository_key: habitatmech
+    label: 'priority: P2'
+    severity: medium

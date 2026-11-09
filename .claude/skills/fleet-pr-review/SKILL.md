@@ -42,12 +42,15 @@ and it is not every name ending in `Mech`. An undeclared experimental or future
 repository is excluded until the manifest deliberately adopts it.
 
 Build the exact scope once and reuse that immutable file for inventory,
-coverage accounting, and subagent dispatch:
+coverage accounting, and subagent dispatch. Retain this evidence under the
+gitignored `<repo>/.temp/` durable root; verify the ignore rule before use:
 
 ```bash
 set -euo pipefail
 CLAW_REPOSITORY="CultureBotAI/culturebotai-claw"
-REVIEW_TMP="$(mktemp -d "${TMPDIR:-/tmp}/fleet-pr-review.XXXXXX")"
+REVIEW_ROOT="$(git rev-parse --show-toplevel)/.temp"
+mkdir -p "$REVIEW_ROOT"
+REVIEW_TMP="$(mktemp -d "$REVIEW_ROOT/fleet-pr-review.XXXXXX")"
 MECH_TSV="$REVIEW_TMP/mechs.tsv"
 REPOSITORIES="$REVIEW_TMP/repositories.txt"
 
@@ -115,8 +118,9 @@ Each row is `key`, display name, exact GitHub identity, root variable, and a
 validated absolute root or an empty unconfigured field. Match the PR's exact
 GitHub identity to field three. Never fall back from an empty field to a
 remembered directory. For an unconfigured Mech, or for the explicit claw
-control plane, make a private temporary clone from the exact identity in
-`$REPOSITORIES`, then create the counterfactual worktree inside that clone.
+control plane, make a private clone under `~/agent-work/<repo>/` from the
+exact identity in `$REPOSITORIES`, then create the counterfactual worktree
+inside that clone. Keep review bundles and handoffs in durable task state.
 This avoids both unvalidated local state and edits to a shared checkout.
 
 ### 2. Cross-PR analysis (do this before the per-PR passes)

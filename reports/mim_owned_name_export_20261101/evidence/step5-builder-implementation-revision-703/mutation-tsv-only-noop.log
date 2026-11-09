@@ -1,0 +1,49 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+___ test_working_copy_beforeimage_and_sidecar_refresh_are_not_tsv_only_noop ____
+
+cli = {'canonical': PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8508/test_wo...57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8508/test_working_copy_beforeimage_0/mim/data/ingredients/mapped'), ...}
+
+    def test_working_copy_beforeimage_and_sidecar_refresh_are_not_tsv_only_noop(cli):
+        paths = cli["run"]()
+        # The first refresh records the newly available working-copy stamp input.
+        cli["run"]()
+        settled = [p.read_bytes() for p in paths]
+        cli["run"]()
+        assert [p.read_bytes() for p in paths] == settled
+        paths[1].write_text("stale sidecar\n")
+        cli["run"]()
+>       assert [p.read_bytes() for p in paths] == settled
+E       assert [b'# curie_ma...ll\n  }\n}\n'] == [b'# curie_ma...ll\n  }\n}\n']
+E         
+E         At index 1 diff: b'stale sidecar\n' != b'subject_id\ttoken_key\ttoken\towner_subject_ids\tdisposition\tinput_surfaces\tsource_refs\tevidence_refs\nMIM:Subject\towned\tOwned\t"[""MIM:Owned""]"\tSUPPRESS\t"[""kgmicrobe.synonym"",""mim.synonym""]"\t"[""/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8508/test_working_copy_beforeimage_0/kgm.tsv.gz#object_id=CHEBI:1"",""/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8508/test_working_copy_beforeimage_0/mim/data/ingredients/mapped/Subject.yaml#synonyms[0]""]"\...
+E         
+E         ...Full output truncated (2 lines hidden), use '-vv' to show
+
+tests/test_mim_owned_name_export.py:210: AssertionError
+----------------------------- Captured stderr call -----------------------------
+Scanning 2 MIM ingredient YAMLs...
+Fetching rdfs:labels for 1 CHEBI ids from OAK...
+  resolved 1 / 1
+Replayed 1 validation_method stamps (prior sources: published.tsv=1; 1 unique)
+Published 1 diagnostic rows to /private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8508/test_working_copy_beforeimage_0/artifacts/candidate.tsv (complete)
+  (skipped 1 MIM records without a supported ontology_id prefix: CHEBI:, FOODON:, UBERON:, ENVO:, NCIT:, MICRO:, mesh:, BTO:, kgmicrobe.compound:, kgmicrobe.ingredient:, cas:)
+Predicate breakdown:
+  skos:exactMatch          1
+Object-prefix breakdown:
+  CHEBI:     1
+Scanning 2 MIM ingredient YAMLs...
+Fetching rdfs:labels for 1 CHEBI ids from OAK...
+  resolved 1 / 1
+Replayed 1 validation_method stamps (prior sources: candidate.tsv=1, published.tsv=1; 1 unique)
+Scanning 2 MIM ingredient YAMLs...
+Fetching rdfs:labels for 1 CHEBI ids from OAK...
+  resolved 1 / 1
+Replayed 1 validation_method stamps (prior sources: candidate.tsv=1, published.tsv=1; 1 unique)
+Scanning 2 MIM ingredient YAMLs...
+Fetching rdfs:labels for 1 CHEBI ids from OAK...
+  resolved 1 / 1
+Replayed 1 validation_method stamps (prior sources: candidate.tsv=1, published.tsv=1; 1 unique)
+=========================== short test summary info ============================
+FAILED tests/test_mim_owned_name_export.py::test_working_copy_beforeimage_and_sidecar_refresh_are_not_tsv_only_noop
+1 failed, 36 deselected in 0.15s

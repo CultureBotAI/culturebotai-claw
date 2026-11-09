@@ -172,6 +172,13 @@ def _validate_fleet_alignment(
         raise GovernanceError(
             "Provider-triage artifact applicability differs from the fleet capability scope"
         )
+    evidence_scope = set(fleet_manifest.with_capability("evidence_reference_validation"))
+    for artifact_id in ("evidence_validator_runner", "evidence_validation_workflow"):
+        artifact = next((a for a in manifest.artifacts if a.artifact_id == artifact_id), None)
+        if artifact is None or set(artifact.consumers) != evidence_scope:
+            raise GovernanceError(
+                f"{artifact_id} applicability differs from the evidence capability scope"
+            )
 
 
 def load_governance_manifest(
@@ -255,10 +262,13 @@ def _desired_files(
     manifest: GovernanceManifest,
     consumer: Consumer,
     canonical_ref: str,
+    *,
+    source_payloads: Optional[dict[str, bytes]] = None,
 ) -> tuple[tuple[str, str, bytes, int], ...]:
     desired: list[tuple[str, str, bytes, int]] = []
     for artifact in manifest.artifacts_for(consumer):
-        content = _artifact_resource(artifact.source).read_bytes()
+        content = (_artifact_resource(artifact.source).read_bytes() if source_payloads is None
+                   else source_payloads[artifact.source])
         if hashlib.sha256(content).hexdigest() != artifact.sha256:
             raise GovernanceError(
                 f"Canonical artifact checksum drift: {artifact.source}"
@@ -275,6 +285,56 @@ def _desired_files(
         ("canonical_pin", manifest.pin_path, (canonical_ref + "\n").encode("ascii"), 0o644)
     )
     return tuple(desired)
+
+
+def _sync_inputs(
+    repository: str, canonical_ref: str,
+) -> tuple[GovernanceManifest, Consumer, tuple[tuple[str, str, bytes, int], ...]]:
+    """Bind one immutable source bundle before planning or opening a transaction."""
+    from .cycle_release_audit import RELEASE_PATH
+    from .infrastructure_admission import (
+        ADMISSION_PATH,
+        ADMITTED,
+        ADMITTED_MANIFEST_PATH,
+        HISTORICAL_MANIFEST_PATH,
+        parse_admission,
+        validate_current_layout,
+        validate_transition,
+    )
+
+    manifest = load_governance_manifest()  # Current package/fleet/checksums remain mandatory.
+    consumer = manifest.consumer_for(repository)
+    package = files(PACKAGE_NAME)
+
+    def resource(path: str) -> bytes:
+        return package.joinpath(path.removeprefix(f"src/{PACKAGE_NAME}/")).read_bytes()
+
+    if consumer == ADMITTED:
+        policy = parse_admission(resource(ADMISSION_PATH))
+        if canonical_ref == policy["source_ref"]:
+            admitted_raw = resource(ADMITTED_MANIFEST_PATH)
+            admitted = validate_transition(
+                policy, resource(RELEASE_PATH), resource(HISTORICAL_MANIFEST_PATH),
+                admitted_raw, files("kg_microbe_fleet").joinpath("fleet.yaml").read_bytes(),
+            )
+            if validate_current_layout(admitted, _manifest_resource().read_bytes()) != manifest:
+                raise GovernanceError("Installed governance changed during source selection")
+            remote = fetch_url(raw_url(canonical_ref, CANONICAL_MANIFEST_PATH))
+            parse_manifest(remote)
+            if remote != admitted_raw:
+                raise GovernanceError("Pinned infrastructure manifest differs from admitted snapshot")
+            payloads = {}
+            for artifact in admitted.artifacts:
+                payload = fetch_url(raw_url(canonical_ref, artifact.source))
+                if hashlib.sha256(payload).hexdigest() != artifact.sha256:
+                    raise GovernanceError(f"Pinned infrastructure artifact checksum drift: {artifact.source}")
+                payloads[artifact.source] = payload
+            return admitted, consumer, _desired_files(
+                admitted, consumer, canonical_ref, source_payloads=payloads,
+            )
+    # No generic fallback accepts old manifests or a ref selected by the target.
+    _verify_canonical_ref(canonical_ref, manifest)
+    return manifest, consumer, _desired_files(manifest, consumer, canonical_ref)
 
 
 def _change_reason(
@@ -418,11 +478,13 @@ def _plan_sync(
     consumer: Consumer,
     root: Path,
     canonical_ref: str,
+    *,
+    desired: Optional[tuple[tuple[str, str, bytes, int], ...]] = None,
 ) -> tuple[SyncChange, ...]:
     changes: list[SyncChange] = []
-    for artifact_id, relative, content, mode in _desired_files(
-        manifest, consumer, canonical_ref
-    ):
+    if desired is None:
+        desired = _desired_files(manifest, consumer, canonical_ref)
+    for artifact_id, relative, content, mode in desired:
         target = _safe_local_file(root, relative)
         mode_mask = 0o111 if artifact_id == "canonical_pin" else stat.S_IXUSR
         reason = _change_reason(target, content, mode, executable_mask=mode_mask)
@@ -456,11 +518,9 @@ def plan_sync(
     """Return a provenance-verified plan; never mutate the target repository."""
 
     canonical_ref = _validate_ref(canonical_ref)
-    manifest = load_governance_manifest()
-    _verify_canonical_ref(canonical_ref, manifest)
-    consumer = manifest.consumer_for(repository)
+    manifest, consumer, desired = _sync_inputs(repository, canonical_ref)
     root = _validate_target_repository(root, consumer)
-    return _plan_sync(manifest, consumer, root, canonical_ref)
+    return _plan_sync(manifest, consumer, root, canonical_ref, desired=desired)
 
 
 def _close_descriptor_safely(
@@ -1060,14 +1120,11 @@ def sync_repository(
     """Plan or safely apply provenance-bound bytes; dry-run is the default."""
 
     canonical_ref = _validate_ref(canonical_ref)
-    manifest = load_governance_manifest()
-    _verify_canonical_ref(canonical_ref, manifest)
-    consumer = manifest.consumer_for(repository)
+    manifest, consumer, desired = _sync_inputs(repository, canonical_ref)
     root = _validate_target_repository(root, consumer)
     if not apply:
-        return _plan_sync(manifest, consumer, root, canonical_ref)
+        return _plan_sync(manifest, consumer, root, canonical_ref, desired=desired)
     _require_safe_dirfd_support()
-    desired = _desired_files(manifest, consumer, canonical_ref)
     with _repository_sync_lock(root):
         # All target state is revalidated and replanned while cooperating
         # writers are serialized. Remote verification intentionally happened
@@ -1107,7 +1164,7 @@ def sync_repository(
                     )
             for entry in entries:
                 _promote_entry(entry)
-            remaining = _plan_sync(manifest, consumer, root, canonical_ref)
+            remaining = _plan_sync(manifest, consumer, root, canonical_ref, desired=desired)
             final_states = _snapshot_target_states(root, desired)
             snapshot_remaining = _changes_from_snapshots(desired, final_states)
             if remaining or snapshot_remaining:

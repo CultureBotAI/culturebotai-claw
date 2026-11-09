@@ -1,0 +1,5 @@
+Independent re-review confirms another instance of #706 in the current repair: preload the original policy from the same source path, modify that file, then import the builder. The origin check passes and the bootstrap records the modified bytes, while Python reuses the old cached module. Native publication still succeeds with a manifest hash that does not describe the policy that ran.
+
+The repair must also handle a preloaded same-origin dependency whose disk source changed before builder import. Refuse the unbound cached runtime or load and verify the exact captured source through a bounded supported mechanism; do not treat matching module paths alone as proof of loaded bytes. Preserve normal command-line operation and state the trusted-caller boundary honestly.
+
+Independent evidence: `step5-claw-independent/706-same-origin-preload/probe_same_origin_preload.py` and `builder-boundary-results.json`; log SHA256 `cdc5448d1da7ea114cc92b32161489c6478a837991be108665e2c72ec391f89d`. This extension is recorded before its repair. The same probe confirms the rejected-CAS case in #707 is now corrected.

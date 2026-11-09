@@ -1,0 +1,67 @@
+{
+  "at": "2026-11-01T12:44:49.052580+00:00",
+  "scope": "Preliminary immutable helper/artifact/publisher review; not builder-integration or final-head approval.",
+  "reviewer": "/root/step4_design_review",
+  "snapshot": {
+    "at": "2026-11-01T12:41:15.692836+00:00",
+    "root": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+    "head": "6a7172585eb68da7f4fe01aee75a82458ddd470c",
+    "scope": "Preliminary helper/artifact/publisher review; builder integration is not frozen or reviewed as final.",
+    "files": [
+      {
+        "path": "src/kg_microbe_utils/owned_name_policy.py",
+        "sha256": "18ffd0430d0256b6da6cbb1f3da2327c4cf3418e2b0b2da71ff283ee2f4351ae",
+        "bytes": 7306
+      },
+      {
+        "path": "src/kg_microbe_utils/sssom_artifacts.py",
+        "sha256": "126d891db86251083d462fd48dd9ded6354ccd3acb6ff34fd39075d9641607e5",
+        "bytes": 9791
+      },
+      {
+        "path": "scripts/publish_sssom.py",
+        "sha256": "daf0eeed1c98a305b5d7fe538941df8e276e37d12e78c3776c6c5204d8db9bd5",
+        "bytes": 38420
+      },
+      {
+        "path": "tests/test_mim_owned_name_policy.py",
+        "sha256": "62c8675b32177dbc609218851ac13d409cf6dfd628fe37118a76a6c2cc7516b6",
+        "bytes": 12044
+      },
+      {
+        "path": "tests/test_mim_sssom_artifacts.py",
+        "sha256": "f2d7f211d28c23b3418580ef6c025ca178562f00758b4141762c040f36152857",
+        "bytes": 10189
+      }
+    ]
+  },
+  "findings": [
+    {
+      "issue": 703,
+      "severity": "medium",
+      "cases": [
+        "Initially absent case/NFC-equivalent output destinations write before refusal.",
+        "Original symlink/parent-traversal components disappear during normalization, redirecting successful publication."
+      ]
+    },
+    {
+      "issue": 704,
+      "severity": "medium",
+      "cases": [
+        "Source-check callback destination drift yields false unchanged status.",
+        "Last postpublication callback destination drift yields false complete status."
+      ]
+    }
+  ],
+  "positive_checks": {
+    "native_owner_snapshots": 100,
+    "native_rule_k_empty_baseline_comparisons": 700,
+    "frozen_pure_helper_tests_passed": 48,
+    "legacy_policy_refusal_cases": 2,
+    "real_validator_exit_cases": 4
+  },
+  "source_changes": false,
+  "github_mutations": false,
+  "paid_provider_calls": false,
+  "repairs_not_reviewed_here": true
+}

@@ -1,0 +1,34 @@
+{
+  "mim": {
+    "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step4-mim",
+    "revision": "be7170deb00a7c5490f8ade82facf86d45a852a4",
+    "origin": "https://github.com/CultureBotAI/MediaIngredientMech.git",
+    "branch": "",
+    "status": "",
+    "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "claw": {
+    "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+    "revision": "90d110e663c10146351b09ae98d387dabdec0b1c",
+    "origin": "https://github.com/CultureBotAI/culturebotai-claw.git",
+    "branch": "fix/mim-owned-name-export-669-20261101",
+    "status": "",
+    "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "kg_microbe": {
+    "path": "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe",
+    "revision": "d6baf5b90003a2032747559d94c00f86a7a4c615",
+    "origin": "https://github.com/Knowledge-Graph-Hub/kg-microbe",
+    "branch": "test/release-gate-repairs-20261027",
+    "status": "?? .claude/settings.json\n?? .claude/skills/kg-model-review/reviews/\n?? .claude/skills/kg-path-review/reviews/\n?? data/batch1-2-20261017/\n?? data/handover-20261014.md\n?? docs/REVIEW_FOLLOWUP_20260914.md\n?? merged_graph_stats_no_prego.yaml",
+    "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "culturemech": {
+    "path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/CultureMech",
+    "revision": "a74dd489720c9df96cc073ffd11568d407d3c06c",
+    "origin": "https://github.com/CultureBotAI/CultureMech.git",
+    "branch": "main",
+    "status": "",
+    "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

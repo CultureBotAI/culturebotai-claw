@@ -1,0 +1,405 @@
+{
+  "contract": "Unmodified native warn-and-skip for missing transforms; no synthetic transforms",
+  "full_prefix_coverage": false,
+  "in_use_prefixes": [
+    "BTO",
+    "CHEBI",
+    "ENVO",
+    "FOODON",
+    "MICRO",
+    "UBERON"
+  ],
+  "available_transform_sha256": {
+    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe/data/transformed/ontologies/chebi_nodes.tsv": "02024ca0a29cafaac16b43a06a786edd0368a8a646b75ab1002b6239c1219f60",
+    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe/data/transformed/ontologies/envo_nodes.tsv": "8eb6bf7473bee2bfd87c0c781be35564b1bdebac29f05f631841ce561b5d1806",
+    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe/data/transformed/ontologies/foodon_nodes.tsv": "5e423c14f9d263aac38ba33699363a968d35496e11483a720ef22c9b12dd4c56",
+    "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe/data/transformed/ontologies/uberon_nodes.tsv": "320908b15386832a32ac8016c33358ab2f5cc37756af515c3da45a17a2c6dd14"
+  },
+  "missing_transforms": [
+    {
+      "prefix": "BTO",
+      "expected_path": "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe/data/transformed/ontologies/bto_nodes.tsv",
+      "affected_rows": [
+        {
+          "subject_id": "MIM:Cell_Lysate",
+          "object_id": "BTO:0004304",
+          "object_label": "cell lysate"
+        }
+      ],
+      "affected_row_count": 1
+    },
+    {
+      "prefix": "MICRO",
+      "expected_path": "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/kg-microbe/data/transformed/ontologies/micro_nodes.tsv",
+      "affected_rows": [
+        {
+          "subject_id": "MIM:Algal_Trace_Elements_Solution",
+          "object_id": "MICRO:0000455",
+          "object_label": "trace elements solution"
+        },
+        {
+          "subject_id": "MIM:Artificial_seawater",
+          "object_id": "MICRO:0001715",
+          "object_label": "artificial seawater"
+        },
+        {
+          "subject_id": "MIM:Bacto-tryptone",
+          "object_id": "MICRO:0000182",
+          "object_label": "tryptone"
+        },
+        {
+          "subject_id": "MIM:Bacto_Brain_Heart_Infusion",
+          "object_id": "MICRO:0000193",
+          "object_label": "brain heart infusion"
+        },
+        {
+          "subject_id": "MIM:Bacto_Peptone",
+          "object_id": "MICRO:0000178",
+          "object_label": "peptone"
+        },
+        {
+          "subject_id": "MIM:Bacto_Tryptic_Soy_Agar",
+          "object_id": "MICRO:0000114",
+          "object_label": "tryptic soy agar"
+        },
+        {
+          "subject_id": "MIM:Bacto_Tryptic_Soy_Broth",
+          "object_id": "MICRO:0000113",
+          "object_label": "tryptic soy broth"
+        },
+        {
+          "subject_id": "MIM:Bg-11_Medium",
+          "object_id": "MICRO:0001348",
+          "object_label": "BG 11 medium"
+        },
+        {
+          "subject_id": "MIM:Biotin_Vitamin_Solution",
+          "object_id": "MICRO:0000460",
+          "object_label": "vitamin solution"
+        },
+        {
+          "subject_id": "MIM:Bovine_Albumin",
+          "object_id": "MICRO:0000307",
+          "object_label": "bovine albumin"
+        },
+        {
+          "subject_id": "MIM:Bovine_Calf_Serum",
+          "object_id": "MICRO:0001709",
+          "object_label": "calf serum"
+        },
+        {
+          "subject_id": "MIM:Brain_Heart_Infusion",
+          "object_id": "MICRO:0000193",
+          "object_label": "brain heart infusion"
+        },
+        {
+          "subject_id": "MIM:Brain_Heart_Infusion_Broth",
+          "object_id": "MICRO:0000193",
+          "object_label": "brain heart infusion"
+        },
+        {
+          "subject_id": "MIM:Brainheart_infusion_agar",
+          "object_id": "MICRO:0000566",
+          "object_label": "brain heart infusion agar"
+        },
+        {
+          "subject_id": "MIM:Brucella_Agar",
+          "object_id": "MICRO:0000595",
+          "object_label": "Brucella agar"
+        },
+        {
+          "subject_id": "MIM:Casein_hydrolysate",
+          "object_id": "MICRO:0001366",
+          "object_label": "casein hydrolysate"
+        },
+        {
+          "subject_id": "MIM:Casitone",
+          "object_id": "MICRO:0000606",
+          "object_label": "casitone"
+        },
+        {
+          "subject_id": "MIM:Chocolate_agar",
+          "object_id": "MICRO:0000591",
+          "object_label": "chocolate agar"
+        },
+        {
+          "subject_id": "MIM:Clarified_rumen_fluid",
+          "object_id": "MICRO:0000520",
+          "object_label": "clarified rumen fluid"
+        },
+        {
+          "subject_id": "MIM:Columbia_Agar_Base",
+          "object_id": "MICRO:0000536",
+          "object_label": "Columbia Agar Base"
+        },
+        {
+          "subject_id": "MIM:Defibrinated_horse_blood",
+          "object_id": "MICRO:0001572",
+          "object_label": "defibrinated horse blood"
+        },
+        {
+          "subject_id": "MIM:Defibrinated_sheep_blood",
+          "object_id": "MICRO:0001570",
+          "object_label": "defibrinated sheep blood"
+        },
+        {
+          "subject_id": "MIM:Digested_Serum",
+          "object_id": "MICRO:0001362",
+          "object_label": "digested serum"
+        },
+        {
+          "subject_id": "MIM:Dried_Bovine_Hemoglobin_BD_212392",
+          "object_id": "MICRO:0001599",
+          "object_label": "dried bovine hemoglobin"
+        },
+        {
+          "subject_id": "MIM:Eugon_agar_BD-Difco",
+          "object_id": "MICRO:0001358",
+          "object_label": "Eugon agar"
+        },
+        {
+          "subject_id": "MIM:Fildes_Enrichment",
+          "object_id": "MICRO:0001597",
+          "object_label": "fildes enrichment"
+        },
+        {
+          "subject_id": "MIM:Filtered_Seawater",
+          "object_id": "MICRO:0001773",
+          "object_label": "filtered seawater"
+        },
+        {
+          "subject_id": "MIM:Fish_peptone",
+          "object_id": "MICRO:0000462",
+          "object_label": "fish peptone"
+        },
+        {
+          "subject_id": "MIM:Heart_Infusion_Agar_BD_211065",
+          "object_id": "MICRO:0000567",
+          "object_label": "heart infusion agar"
+        },
+        {
+          "subject_id": "MIM:Hemin_solution_see_below",
+          "object_id": "MICRO:0001598",
+          "object_label": "hemin solution"
+        },
+        {
+          "subject_id": "MIM:Horse_Serum",
+          "object_id": "MICRO:0001235",
+          "object_label": "horse serum"
+        },
+        {
+          "subject_id": "MIM:Horse_blood",
+          "object_id": "MICRO:0001234",
+          "object_label": "horse blood"
+        },
+        {
+          "subject_id": "MIM:Kao_And_Michayluk_Vitamin_Solution",
+          "object_id": "MICRO:0000460",
+          "object_label": "vitamin solution"
+        },
+        {
+          "subject_id": "MIM:Lactalbumin_Hydrolysate",
+          "object_id": "MICRO:0001365",
+          "object_label": "lactalbumin hydrolysate"
+        },
+        {
+          "subject_id": "MIM:Liver_Digest",
+          "object_id": "MICRO:0001668",
+          "object_label": "liver digest"
+        },
+        {
+          "subject_id": "MIM:Liver_Extract",
+          "object_id": "MICRO:0001363",
+          "object_label": "liver extract"
+        },
+        {
+          "subject_id": "MIM:Liver_Extract_Concentrate",
+          "object_id": "MICRO:0001363",
+          "object_label": "liver extract"
+        },
+        {
+          "subject_id": "MIM:Liver_Extract_Infusion",
+          "object_id": "MICRO:0001363",
+          "object_label": "liver extract"
+        },
+        {
+          "subject_id": "MIM:MH_agar",
+          "object_id": "MICRO:0001328",
+          "object_label": "MH agar"
+        },
+        {
+          "subject_id": "MIM:MRS_agar_Oxoid",
+          "object_id": "MICRO:0000554",
+          "object_label": "MRS agar"
+        },
+        {
+          "subject_id": "MIM:Meat_peptone",
+          "object_id": "MICRO:0000176",
+          "object_label": "meat peptone"
+        },
+        {
+          "subject_id": "MIM:Metals_44_see_below",
+          "object_id": "MICRO:0000456",
+          "object_label": "trace metals 44"
+        },
+        {
+          "subject_id": "MIM:Na-caseinate",
+          "object_id": "MICRO:0001611",
+          "object_label": "sodium caseinate"
+        },
+        {
+          "subject_id": "MIM:Nutrient_Broth_No_2",
+          "object_id": "MICRO:0000082",
+          "object_label": "nutrient broth"
+        },
+        {
+          "subject_id": "MIM:Ox-bile",
+          "object_id": "MICRO:0000610",
+          "object_label": "ox bile"
+        },
+        {
+          "subject_id": "MIM:PPLO_medium",
+          "object_id": "MICRO:0000094",
+          "object_label": "PPLO medium"
+        },
+        {
+          "subject_id": "MIM:Pancreatic_Digest_of_Gelatin_Hardy_C6540",
+          "object_id": "MICRO:0000466",
+          "object_label": "pancreatic digest of gelatin"
+        },
+        {
+          "subject_id": "MIM:Peptone",
+          "object_id": "MICRO:0000178",
+          "object_label": "peptone"
+        },
+        {
+          "subject_id": "MIM:Porcine_Serum",
+          "object_id": "MICRO:0001238",
+          "object_label": "porcine serum"
+        },
+        {
+          "subject_id": "MIM:Proteose_Peptone",
+          "object_id": "MICRO:0000180",
+          "object_label": "proteose peptone"
+        },
+        {
+          "subject_id": "MIM:Proteose_Peptone_No_2",
+          "object_id": "MICRO:0002393",
+          "object_label": "Proteose Peptone No. 2"
+        },
+        {
+          "subject_id": "MIM:R2A_agar",
+          "object_id": "MICRO:0000543",
+          "object_label": "R2A agar"
+        },
+        {
+          "subject_id": "MIM:Rabbit_Blood",
+          "object_id": "MICRO:0001229",
+          "object_label": "rabbit blood"
+        },
+        {
+          "subject_id": "MIM:Rabbit_Serum",
+          "object_id": "MICRO:0002392",
+          "object_label": "rabbit serum"
+        },
+        {
+          "subject_id": "MIM:Sheep_blood",
+          "object_id": "MICRO:0001230",
+          "object_label": "sheep blood"
+        },
+        {
+          "subject_id": "MIM:Skim_milk_powder",
+          "object_id": "MICRO:0001241",
+          "object_label": "skim milk powder"
+        },
+        {
+          "subject_id": "MIM:Sludge_fluid",
+          "object_id": "MICRO:0000521",
+          "object_label": "sludge fluid"
+        },
+        {
+          "subject_id": "MIM:Soil_Extract",
+          "object_id": "MICRO:0000457",
+          "object_label": "soil extract"
+        },
+        {
+          "subject_id": "MIM:Thiamine_Vitamin_Solution",
+          "object_id": "MICRO:0000460",
+          "object_label": "vitamin solution"
+        },
+        {
+          "subject_id": "MIM:Trace_Metal_Mix_A5",
+          "object_id": "MICRO:0001349",
+          "object_label": "trace metal mix A5"
+        },
+        {
+          "subject_id": "MIM:Trypsin_Sigma-Aldrich",
+          "object_id": "MICRO:0000673",
+          "object_label": "trypsin assay"
+        },
+        {
+          "subject_id": "MIM:Trypticase",
+          "object_id": "MICRO:0000175",
+          "object_label": "Trypticase peptone"
+        },
+        {
+          "subject_id": "MIM:Trypticase_Peptone",
+          "object_id": "MICRO:0000175",
+          "object_label": "Trypticase peptone"
+        },
+        {
+          "subject_id": "MIM:Tryptone",
+          "object_id": "MICRO:0000182",
+          "object_label": "tryptone"
+        },
+        {
+          "subject_id": "MIM:Tryptone_Peptone",
+          "object_id": "MICRO:0000182",
+          "object_label": "tryptone"
+        },
+        {
+          "subject_id": "MIM:Tryptose",
+          "object_id": "MICRO:0000183",
+          "object_label": "tryptose"
+        },
+        {
+          "subject_id": "MIM:V-8_Juice",
+          "object_id": "MICRO:0002250",
+          "object_label": "V-8 juice"
+        },
+        {
+          "subject_id": "MIM:Vitamin_Solution",
+          "object_id": "MICRO:0000460",
+          "object_label": "vitamin solution"
+        },
+        {
+          "subject_id": "MIM:Vitamin_Solution_See_Medium_No_403",
+          "object_id": "MICRO:0000460",
+          "object_label": "vitamin solution"
+        },
+        {
+          "subject_id": "MIM:Vitamin_Solution_Thermophilic_Formulation",
+          "object_id": "MICRO:0000460",
+          "object_label": "vitamin solution"
+        },
+        {
+          "subject_id": "MIM:Washed_agar",
+          "object_id": "MICRO:0001723",
+          "object_label": "washed agar"
+        },
+        {
+          "subject_id": "MIM:Wc_Trace_Elements_Solution",
+          "object_id": "MICRO:0000455",
+          "object_label": "trace elements solution"
+        },
+        {
+          "subject_id": "MIM:Yeastolate_BD_2_autoclaved",
+          "object_id": "MICRO:0000522",
+          "object_label": "Yeastolate"
+        }
+      ],
+      "affected_row_count": 73
+    }
+  ],
+  "captured_label_comparison": "Separate observed-input supplement; not replacement ontology transforms"
+}

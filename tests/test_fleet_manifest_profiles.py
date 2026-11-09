@@ -17,6 +17,21 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = REPOSITORY_ROOT / "src" / "kg_microbe_fleet" / "fleet.yaml"
 
 EXPECTED_PROFILES = {
+    "aimech": (
+        "src/aimech",
+        ("src/aimech/schema/aimech.yaml",),
+        ("data/aio/*.yaml",),
+    ),
+    "cmmmech": (
+        "src/cmmmech",
+        ("src/cmmmech/schema/cmmmech.yaml",),
+        ("data/records/**/*.yaml", "data/records/**/*.yml"),
+    ),
+    "dufmech": (
+        "src/dufmech",
+        ("src/dufmech/schema/dufmech.yaml",),
+        ("data/families/*.yaml",),
+    ),
     "taxonmech": (
         "src/taxonmech",
         ("src/taxonmech/schema/taxonmech.yaml",),
@@ -70,6 +85,7 @@ EXPECTED_PROFILES = {
 }
 
 EXPECTED_CAPABILITIES = {
+    "evidence_reference_validation",
     # Declared by #223: who keeps a download.yaml source catalogue, and why
     # the three who do not have decided against one rather than forgotten.
     "source_catalogue",
@@ -104,6 +120,7 @@ EXPECTED_CAPABILITIES = {
     "causal_graph_coverage",
     "id_label_validation",
     "curation_history",
+    "record_review",
     "strict_validation",
     "schema_sync",
     "release_management",
@@ -140,7 +157,7 @@ def _parse(document: dict):
     return parse_fleet_manifest(document, Path("synthetic-fleet.yaml"))
 
 
-def test_shipped_profiles_are_verified_and_complete() -> None:
+def test_shipped_profiles_are_declared_and_complete() -> None:
     manifest = load_fleet_manifest(MANIFEST_PATH)
 
     assert set(manifest.capability_catalogue) == EXPECTED_CAPABILITIES
@@ -152,6 +169,112 @@ def test_shipped_profiles_are_verified_and_complete() -> None:
         assert set(mech.capabilities) == EXPECTED_CAPABILITIES
 
 
+def test_aimech_admission_preserves_native_generated_records() -> None:
+    manifest = load_fleet_manifest(MANIFEST_PATH)
+    mech = manifest.get("aimech")
+    assert mech.github == "CultureBotAI/AIMech"
+    assert mech.environment_variable == "AIMECH_ROOT"
+    assert mech.serialization is not None
+    assert not mech.serialization.verified
+    assert not mech.serialization.options
+    assert "native" in mech.serialization.reason
+    assert "pinned OBO JSON" in mech.serialization.reason
+    assert mech.supports("record_review")
+    assert mech.supports("testing")
+    assert mech.supports("vendored_sync")
+    assert mech.capability("corpus_statistics").settings["fields"] == (
+        "id", "name", "definition", "branches", "review_status",
+        "provenance.source_commit", "provenance.source_sha256",
+        "provenance.source_version", "provenance.source_node",
+    )
+    for capability in (
+        "strict_validation", "schema_sync", "curation_history",
+        "id_label_validation", "deep_research",
+        "causal_graph_coverage",
+    ):
+        assert "aimech" not in manifest.with_capability(capability)
+        assert mech.capability(capability).reason
+    assert mech.capability("environment_coverage").status == "not_applicable"
+    assert mech.capability("metpo_proposal").status == "not_applicable"
+
+
+def test_cmmmech_admission_preserves_records_and_defers_unverified_adapters() -> None:
+    manifest = load_fleet_manifest(MANIFEST_PATH)
+    mech = manifest.get("cmmmech")
+    assert mech.github == "CultureBotAI/CMMMech"
+    assert mech.environment_variable == "CMMMECH_ROOT"
+    assert mech.serialization is not None
+    assert not mech.serialization.verified
+    assert not mech.serialization.options
+    assert "Material records exist" in mech.serialization.reason
+    assert "Material records exist" in mech.capability("corpus_statistics").reason
+    assert mech.supports("testing")
+    assert mech.supports("vendored_sync")
+    for capability in (
+        "strict_validation", "schema_sync", "curation_history",
+        "id_label_validation", "deep_research", "corpus_statistics",
+    ):
+        assert "cmmmech" not in manifest.with_capability(capability)
+        assert mech.capability(capability).reason
+    history = mech.capability("curation_history")
+    assert "Native inline events and canonical sidecars are implemented" in history.reason
+    assert "does not enable curation" in history.reason
+    assert "append-only" in history.reason
+    assert mech.supports("record_review")
+    # The curate-yaml-record skill landed after admission (CMMMech#513), so
+    # its files are now claimed present; enabling curation awaits review (#785).
+    assert not history.reason_claims.absent
+    assert set(history.reason_claims.present) == {
+        "justfile", "src/cmmmech/history.py", "history",
+        ".claude/skills/curate-yaml-record/SKILL.md",
+        ".claude/skills/curate-yaml-record/references/review-checklist.md",
+    }
+
+
+def test_dufmech_keeps_generated_inventory_and_native_serialization() -> None:
+    mech = load_fleet_manifest(MANIFEST_PATH).get("dufmech")
+    assert mech.record_globs == ("data/families/*.yaml",)
+    assert mech.serialization is not None
+    assert not mech.serialization.verified
+    assert not mech.serialization.options
+    assert "native" in mech.serialization.reason
+    assert mech.supports("vendored_sync")
+    for capability in (
+        "schema_sync", "strict_validation", "curation_history",
+        "corpus_statistics", "source_catalogue", "source_queue",
+        "writer_audit", "site_contract", "page_budgets",
+        "id_label_validation", "knowledge_gap_scan", "kgx_export", "sssom_export",
+    ):
+        assert mech.supports(capability)
+    assert "Pfam" in mech.capability("id_label_validation").reason
+    assert "OAK" in mech.capability("id_label_validation").reason
+    assert mech.capability("knowledge_gap_scan").settings == {
+        "window": 25, "scheduled": False,
+    }
+    assert mech.capability("kgx_export").settings == {
+        "nodes_path": "exports/kgx/nodes.tsv",
+        "edges_path": "exports/kgx/edges.tsv",
+    }
+    assert mech.capability("sssom_export").settings["mapping_globs"] == (
+        "exports/sssom/*.sssom.tsv",
+    )
+    assert {
+        name for name, capability in mech.capabilities.items()
+        if capability.status == "disabled"
+    } == {"deep_research", "metpo_proposal", "causal_graph_coverage", "evidence_reference_validation"}
+    assert "execution is refused" in mech.capability("deep_research").reason
+    assert mech.capability("corpus_statistics").settings["fields"] == (
+        "id", "name", "seed_status", "characterization_status",
+        "curation_status", "provenance",
+    )
+    assert mech.capability("source_queue").settings["required_when_adopted"] == (
+        "script", "artifacts", "license_url", "review_basis",
+    )
+    assert mech.capability("writer_audit").settings["validators"] == (
+        r"validate_record\(", r"_validate_record\(", r"_validate_content\(",
+    )
+
+
 def test_capability_subsets_and_settings_are_manifest_driven() -> None:
     manifest = load_fleet_manifest(MANIFEST_PATH)
 
@@ -160,6 +283,7 @@ def test_capability_subsets_and_settings_are_manifest_driven() -> None:
         "mediaingredientmech",
         "communitymech",
         "traitmech",
+        "dufmech",
     )
     assert manifest.with_capability("environment_coverage") == (
         "culturemech",
@@ -180,6 +304,7 @@ def test_capability_subsets_and_settings_are_manifest_driven() -> None:
         "mediaingredientmech": 300,
         "communitymech": 305,
         "traitmech": 300,
+        "dufmech": 25,
     }
     assert {
         key: manifest.get(key)

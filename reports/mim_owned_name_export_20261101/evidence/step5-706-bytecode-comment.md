@@ -1,0 +1,5 @@
+Independent re-review also reproduced #706 through a timestamp/size-valid stale Python bytecode cache in a fresh process. The probe compiles the original policy, makes a same-length behavior change, restores mtime, and imports the builder. The old cached policy executes while the manifest binds the changed source hash. `-B` alone prevents writing bytecode, not reading an existing cache.
+
+The repair must execute the captured producer source bytes, or otherwise establish the exact loaded producer binding while refusing unbound caches. A bounded loader for the declared local producer dependency graph can compile those already captured bytes directly, leaving unrelated public modules untouched. Preserve native lock/transaction implementations and existing caller identities; do not describe the evidence as cryptographic runtime attestation.
+
+Independent proof: `step5-claw-independent/706-stale-bytecode/`, log SHA256 `3498b76a283c20303441dfeb3d2e7b1e0e01d61d4c56b3ef11a84facba2727d0`. Recorded before this repair.

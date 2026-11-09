@@ -65,6 +65,8 @@ from typing import Any, Mapping, Sequence
 
 from kg_microbe_corpus import EMPTY_DOCUMENT, iter_records, list_records, resolve_value
 from kg_microbe_corpus.loader import soundness
+from kg_microbe_evidence import VERDICTS as EVIDENCE_VERDICTS
+from kg_microbe_evidence import EvidenceConfig, EvidenceValidator
 from kg_microbe_graph.structure import Edge, Graph, Node, audit
 
 __all__ = [
@@ -322,6 +324,60 @@ class CoverageConfig:
     duplicate_grounding_check: bool = False
     exempt_when: tuple[ExemptionRule, ...] = ()
     strata: tuple[str, ...] = ()
+    evidence_config: EvidenceConfig | None = None
+    evidence_status: str = "not_configured"
+    evidence_reason: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.evidence_status not in {
+            "enabled", "disabled", "not_applicable", "not_configured", "undeclared"
+        }:
+            raise CoverageConfigError("Unknown evidence-reference-validation status")
+        if self.evidence_status == "enabled" and self.evidence_config is None:
+            raise CoverageConfigError("Enabled quote validation requires an EvidenceConfig")
+
+    @property
+    def edge_evidence_selector(self) -> str | None:
+        shape = self.shape
+        if shape.edge_evidence_field is None:
+            return None
+        if shape.kind == RECORD_GRAPH:
+            return f"{shape.edges_field}[].{shape.edge_evidence_field}"
+        container = shape.nodes_field if shape.kind == NODE_NESTED_EDGES else shape.graphs_field
+        return f"{container}[].{shape.edges_field}[].{shape.edge_evidence_field}"
+
+    @property
+    def measures_quotes(self) -> bool:
+        return (
+            self.shape.edge_evidence_field is not None
+            and self.evidence_status == "enabled"
+            and self.evidence_config is not None
+            and self.shape.edge_evidence_field in self.evidence_config.evidence_fields
+            and (
+                not self.evidence_config.evidence_paths
+                or self.edge_evidence_selector in self.evidence_config.evidence_paths
+            )
+        )
+
+    def _quote_validation_reason(self) -> str | None:
+        if self.shape.edge_evidence_field is None:
+            return "No edge-evidence field is declared; node evidence is not edge evidence."
+        if (self.evidence_status == "enabled" and self.evidence_config is not None
+                and self.shape.edge_evidence_field not in self.evidence_config.evidence_fields):
+            return (
+                f"Edge evidence field {self.shape.edge_evidence_field} is outside "
+                "the declared quote-validation evidence fields."
+            )
+        if (self.evidence_status == "enabled" and self.evidence_config is not None
+                and self.evidence_config.evidence_paths
+                and self.edge_evidence_selector not in self.evidence_config.evidence_paths):
+            return (
+                f"Edge evidence selector {self.edge_evidence_selector} is outside "
+                "the declared quote-validation selectors."
+            )
+        return self.evidence_reason or (
+            None if self.measures_quotes else "Quote validation is not configured for this report."
+        )
 
     @classmethod
     def from_settings(cls, settings: Mapping[str, Any]) -> CoverageConfig:
@@ -346,7 +402,10 @@ class CoverageConfig:
                 )
         node_lists = tuple(settings.get("node_list_fields", ()))
         record_is_node = bool(settings.get("record_is_node", False))
-        if kind != RECORD_GRAPH and (node_lists or record_is_node):
+        if kind != RECORD_GRAPH and (
+            settings.get("node_list_fields") is not None
+            or settings.get("record_is_node") is not None
+        ):
             raise CoverageConfigError(
                 f"node_list_fields and record_is_node belong to {RECORD_GRAPH}"
             )
@@ -473,6 +532,29 @@ class CoverageConfig:
             "exempt_when": [rule.text for rule in self.exempt_when],
             "anchor_node_types": list(self.anchor_node_types),
             "duplicate_grounding_check": self.duplicate_grounding_check,
+            "edge_evidence": {
+                "field": shape.edge_evidence_field,
+                "selector": self.edge_evidence_selector,
+                "presence_is_quote_validation": False,
+                "quote_validation": {
+                    "status": self.evidence_status,
+                    "measured": self.measures_quotes,
+                    "reason": self._quote_validation_reason(),
+                    "evidence_paths": (
+                        list(self.evidence_config.evidence_paths)
+                        if self.evidence_config is not None else []
+                    ),
+                    "cache_dir": (
+                        self.evidence_config.cache_dir
+                        if self.measures_quotes and self.evidence_config is not None else None
+                    ),
+                    "meaning": (
+                        "Quote-validated edges have at least one item with a matching cached "
+                        "source quote. A text match does not establish that the source "
+                        "supports the edge's scientific claim."
+                    ),
+                },
+            },
         }
 
 
@@ -491,6 +573,8 @@ class _Parsed:
     node_types: Counter[str]
     predicates: Counter[str]
     edges_with_evidence: int
+    edges_with_quote_validated_evidence: int
+    evidence_verdicts: Counter[str]
     nodes_grounded: int
 
 
@@ -560,7 +644,13 @@ def _node(raw: Any, shape: GraphShape, what: str) -> tuple[Node, str | None]:
     )
 
 
-def _edge(raw: Any, subject: Any, shape: GraphShape, what: str) -> tuple[Edge, bool]:
+def _edge(
+    raw: Any,
+    subject: Any,
+    shape: GraphShape,
+    what: str,
+    validator: EvidenceValidator | None,
+) -> tuple[Edge, bool, Counter[str]]:
     if not isinstance(raw, dict):
         raise _Malformed(f"{what} is not a mapping")
     if shape.edge_subject_field is not None:
@@ -574,30 +664,41 @@ def _edge(raw: Any, subject: Any, shape: GraphShape, what: str) -> tuple[Edge, b
     evidenced = bool(shape.edge_evidence_field) and _populated(
         raw.get(shape.edge_evidence_field)
     )
-    return edge, evidenced
+    verdicts: Counter[str] = Counter()
+    if validator is not None and evidenced:
+        value = raw[shape.edge_evidence_field]
+        # A malformed scalar is still an evidence item to classify, not a
+        # reason to discard the graph or call the field quote-validated.
+        items = value if isinstance(value, list) else [value]
+        verdicts.update(validator.check_item(item).verdict for item in items)
+    return edge, evidenced, verdicts
 
 
 def _assemble(
     graph_id: str,
     nodes: list[tuple[Node, str | None]],
-    edges: list[tuple[Edge, bool]],
+    edges: list[tuple[Edge, bool, Counter[str]]],
     scope: str | None,
     facets: dict[str, str],
 ) -> _Parsed:
     return _Parsed(
         graph_id=graph_id,
-        graph=Graph(graph_id, tuple(n for n, _ in nodes), tuple(e for e, _ in edges)),
+        graph=Graph(graph_id, tuple(n for n, _ in nodes), tuple(e for e, _, _ in edges)),
         groundings={n.id: g for n, g in nodes if g},
         scope=scope,
         facets=facets,
         node_types=Counter(n.type or UNSET for n, _ in nodes),
-        predicates=Counter(e.predicate or UNSET for e, _ in edges),
-        edges_with_evidence=sum(1 for _, evidenced in edges if evidenced),
+        predicates=Counter(e.predicate or UNSET for e, _, _ in edges),
+        edges_with_evidence=sum(1 for _, evidenced, _ in edges if evidenced),
+        edges_with_quote_validated_evidence=sum(1 for _, _, verdicts in edges if verdicts["OK"]),
+        evidence_verdicts=sum((verdicts for _, _, verdicts in edges), Counter()),
         nodes_grounded=sum(1 for _, g in nodes if g),
     )
 
 
-def _graphs(record: Mapping[str, Any], config: CoverageConfig) -> list[_Parsed]:
+def _graphs(
+    record: Mapping[str, Any], config: CoverageConfig, validator: EvidenceValidator | None
+) -> list[_Parsed]:
     shape = config.shape
     if shape.kind == NODE_NESTED_EDGES:
         raw_nodes = _list(record.get(shape.nodes_field), shape.nodes_field)
@@ -609,7 +710,7 @@ def _graphs(record: Mapping[str, Any], config: CoverageConfig) -> list[_Parsed]:
             node = _node(raw, shape, what)
             nodes.append(node)
             for j, raw_edge in enumerate(_list(raw.get(shape.edges_field), f"{what}.{shape.edges_field}")):
-                edges.append(_edge(raw_edge, node[0].id, shape, f"{what}.{shape.edges_field}[{j}]"))
+                edges.append(_edge(raw_edge, node[0].id, shape, f"{what}.{shape.edges_field}[{j}]", validator))
         return [_assemble(shape.nodes_field, nodes, edges, None, {})]
 
     if shape.kind == RECORD_GRAPH:
@@ -619,10 +720,10 @@ def _graphs(record: Mapping[str, Any], config: CoverageConfig) -> list[_Parsed]:
             nodes.append((Node(own, RECORD_NODE_TYPE), None))
         for list_field in shape.node_list_fields:
             for j, raw in enumerate(_list(record.get(list_field), list_field)):
-                node, grounding = _node(raw, shape, f"{list_field}[{j}]")
-                nodes.append((Node(node.id, list_field), grounding))
+                parsed_node, grounding = _node(raw, shape, f"{list_field}[{j}]")
+                nodes.append((Node(parsed_node.id, list_field), grounding))
         edges = [
-            _edge(e, None, shape, f"{shape.edges_field}[{j}]")
+            _edge(e, None, shape, f"{shape.edges_field}[{j}]", validator)
             for j, e in enumerate(_list(record.get(shape.edges_field), shape.edges_field))
         ]
         listed = len(nodes) - (1 if shape.record_is_node else 0)
@@ -643,7 +744,7 @@ def _graphs(record: Mapping[str, Any], config: CoverageConfig) -> list[_Parsed]:
             for j, n in enumerate(_list(raw.get(shape.nodes_field), f"{what}.{shape.nodes_field}"))
         ]
         edges = [
-            _edge(e, None, shape, f"{what}.{shape.edges_field}[{j}]")
+            _edge(e, None, shape, f"{what}.{shape.edges_field}[{j}]", validator)
             for j, e in enumerate(_list(raw.get(shape.edges_field), f"{what}.{shape.edges_field}"))
         ]
         scope = _key(raw.get(config.scope_field)) if config.scope_field else None
@@ -702,6 +803,8 @@ class CoverageReport:
     nodes_per_graph: list[int] = field(default_factory=list)
     edges_per_graph: list[int] = field(default_factory=list)
     edges_with_evidence: int = 0
+    edges_with_quote_validated_evidence: int = 0
+    evidence_verdicts: Counter[str] = field(default_factory=Counter)
     nodes_grounded: int = 0
     node_types: Counter[str] = field(default_factory=Counter)
     predicates: Counter[str] = field(default_factory=Counter)
@@ -802,6 +905,20 @@ class CoverageReport:
                 ),
                 "edges_with_evidence": (
                     self.edges_with_evidence if shape.edge_evidence_field else None
+                ),
+                "edges_with_quote_validated_evidence": (
+                    self.edges_with_quote_validated_evidence if config.measures_quotes else None
+                ),
+                "edge_evidence_items": (
+                    {
+                        "total": sum(self.evidence_verdicts.values()),
+                        "quote_validated": self.evidence_verdicts["OK"],
+                        "by_verdict": {
+                            verdict: self.evidence_verdicts[verdict]
+                            for verdict in EVIDENCE_VERDICTS
+                        },
+                    }
+                    if config.measures_quotes else None
                 ),
                 "nodes_grounded": (
                     self.nodes_grounded if shape.node_grounding_field else None
@@ -980,6 +1097,10 @@ def _walk(
     """One contiguous part of the walk: a partial report, the groundings its
     edge-bearing graphs carry, and the ids of its eligible graphless records."""
     report = CoverageReport(mech=mech, config=config)
+    validator = (
+        EvidenceValidator(root, config.evidence_config)
+        if config.measures_quotes and config.evidence_config is not None else None
+    )
     referenced: set[str] = set()
     graphless_ids: list[str] = []
 
@@ -997,7 +1118,7 @@ def _walk(
             report.malformed.append(f"{relative}: the record is not a mapping")
             continue
         try:
-            _account(report, record, relative, config, globbed, referenced, graphless_ids)
+            _account(report, record, relative, config, globbed, referenced, graphless_ids, validator)
         except _Malformed as exc:
             report.malformed.append(f"{relative}: {exc}")
         except RecursionError:
@@ -1018,6 +1139,7 @@ def _account(
     globbed: Mapping[str, set[str]],
     referenced: set[str],
     graphless_ids: list[str],
+    validator: EvidenceValidator | None,
 ) -> None:
     """Add one record to a partial report.
 
@@ -1026,7 +1148,7 @@ def _account(
     a record that raises is excluded whole rather than half-counted.
     """
     mechanistic_scopes = config.mechanistic_scopes
-    graphs = _graphs(record, config)
+    graphs = _graphs(record, config, validator)
     rule = next(
         (r for r in config.exempt_when
          if r.matches(record, relative, globbed.get(r.text, set()))),
@@ -1098,6 +1220,8 @@ def _measure(
     report.nodes_per_graph.append(len(graph.nodes))
     report.edges_per_graph.append(len(graph.edges))
     report.edges_with_evidence += parsed.edges_with_evidence
+    report.edges_with_quote_validated_evidence += parsed.edges_with_quote_validated_evidence
+    report.evidence_verdicts.update(parsed.evidence_verdicts)
     report.nodes_grounded += parsed.nodes_grounded
     report.node_types.update(parsed.node_types)
     report.predicates.update(parsed.predicates)

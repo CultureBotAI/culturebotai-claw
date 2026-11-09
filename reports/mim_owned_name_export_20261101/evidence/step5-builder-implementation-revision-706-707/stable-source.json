@@ -1,0 +1,27 @@
+{
+  "captured_at": "2026-11-01T13:02:47.140427+00:00",
+  "role": "implementation author; independent review required",
+  "base_head": "e78e220d153e41d4340ad0f8abfbd83d96d01b57",
+  "owned_files": {
+    "scripts/build_mim_ingredient_sssom.py": "38d59f42953305f6fc51e4fc24dfc59ee1919bfb961595b67a8afe9f8a46a1bc",
+    "tests/test_mim_owned_name_export.py": "bb26c9f0c6b9b2517bcd1ff91519ac5a11c31a5c130aa59ef484ab51002f1f20",
+    "tests/test_mim_sssom_header_dates.py": "771d31940c0dc38d57ec9aec0fd12698eb88186756394f8db83ae9edd27d6fc2"
+  },
+  "issue_urls": [
+    "https://github.com/CultureBotAI/culturebotai-claw/issues/706",
+    "https://github.com/CultureBotAI/culturebotai-claw/issues/707"
+  ],
+  "dependencies": {
+    "src/kg_microbe_utils/owned_name_policy.py": "18ffd0430d0256b6da6cbb1f3da2327c4cf3418e2b0b2da71ff283ee2f4351ae",
+    "src/kg_microbe_utils/sssom_artifacts.py": "44fb030a7884d76cef9fddf0a79f1d81bd2d49432d3c764ea4ac3e508115594b"
+  },
+  "source_frozen": true,
+  "trusted_boundary": "Supported script source entrypoint or caller compiling captured entrypoint bytes, standard interpreter and external libraries. Exact captured local dependency graph; no cryptographic runtime attestation.",
+  "checks": {
+    "focused": "302 passed, one existing skip, one warning",
+    "new_integration_baseline": "55 passed",
+    "old_code_control": "10 failed, 3 passed, 42 deselected",
+    "mutation_controls": "17 detected in separate processes; no import/collection failures",
+    "ruff": "0.16.3 PASS"
+  }
+}

@@ -1,0 +1,80 @@
+{
+  "captured_at": "2026-11-01T13:17:25.745465+00:00",
+  "kind": "frozen_step5_claw_evidence",
+  "packager_sha256": "74ade999a59f91d61e83d1b41de9d6b00dbae2fd58a9b28f285724359b18c821",
+  "plan": {
+    "commands": [
+      {
+        "expected_exit": 0,
+        "path": "check.json"
+      }
+    ],
+    "generation": {
+      "acceptance": "candidate/acceptance.json",
+      "journal": "candidate/journal.json",
+      "manifest": "candidate/candidate.tsv.manifest.json",
+      "sssom": "candidate/candidate.tsv",
+      "suppressed_aliases": "candidate/suppressed_aliases.tsv"
+    },
+    "implementation_revision": "b3f7dd1c065cead3b227492cecc179206a098e01",
+    "intended_worktree": "claw-owned-name",
+    "json_bindings": [
+      {
+        "json_source": "candidate/acceptance.json",
+        "pointer": "/artifact_sha256",
+        "target_source": "candidate/candidate.tsv"
+      }
+    ],
+    "maintained_file_references": {
+      "source.py": {
+        "bytes": 10,
+        "sha256": "585c93666fcb046b7b264d3fa73202aa2a38254ae82a4b3ba19e873c2d5a9886"
+      }
+    },
+    "package_readme": "Synthetic packager check only. No actual candidate approval.\n",
+    "pending_final_inputs": [],
+    "proposed_repository_destination": "reports/mim_owned_name_export_20261101",
+    "run_root": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/packaging-v3/fixture",
+    "selected_existing_files": {
+      "candidate/acceptance.json": {
+        "category": "synthetic",
+        "source_bytes": 105,
+        "source_sha256": "569872f3593a5bdda6905e504375f9d531ddd101aa179e474129c67f215c6252"
+      },
+      "candidate/candidate.tsv": {
+        "category": "synthetic",
+        "source_bytes": 80,
+        "source_sha256": "5c73bea3195e0b0aa2c83ae3c2881f3f62ed186963a3a204d278e37ff701c69c"
+      },
+      "candidate/candidate.tsv.manifest.json": {
+        "category": "synthetic",
+        "source_bytes": 595,
+        "source_sha256": "bec3b411c0e2fc28262fca62b4d8091fa69d339731ec6bde134204af77b4cc6e"
+      },
+      "candidate/journal.json": {
+        "category": "synthetic",
+        "source_bytes": 779,
+        "source_sha256": "9602863744dfa71df70d1575aeb9135d64bc96f13e72aa5eca6b2b89bf0922c7"
+      },
+      "candidate/suppressed_aliases.tsv": {
+        "category": "synthetic",
+        "source_bytes": 17,
+        "source_sha256": "6b9c835e90cedb6bb177297b5427788b512f3f6b8aa34fc38d5d2d61178cefcf"
+      },
+      "check.json": {
+        "category": "synthetic",
+        "source_bytes": 327,
+        "source_sha256": "44e10b8271b0bf8431ddd8ae9018d503e721bff8253869b9d0eced65ba224379"
+      },
+      "check.log": {
+        "category": "synthetic",
+        "source_bytes": 26,
+        "source_sha256": "ef1b64e2963e07c3c6d0af931fd26fc9c3123cd9b82fb6129eca0fdafadfdccf"
+      }
+    },
+    "state": "final"
+  },
+  "run_root": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/packaging-v3/fixture",
+  "selection_path": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/packaging-v3/fixture/packaging/selection.json",
+  "selection_sha256": "ec4cf34b175b2878fa9836291167ceb6763885a106050d46893f88cf91301194"
+}

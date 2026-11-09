@@ -1,0 +1,11 @@
+{
+  "at": "2026-11-01T12:49:44.934583+00:00",
+  "head": "e78e220d153e41d4340ad0f8abfbd83d96d01b57",
+  "tree": "6a11b998d157edf4e24aff472001455bd781fa26",
+  "files": {
+    "src/kg_microbe_utils/sssom_artifacts.py": "bd94f9d4930967cad055c18b3c7f042d5b5a8f0db7d863845841649ce5ee98a6",
+    "tests/test_mim_sssom_artifacts.py": "66dc74b0ea394665eacc84baa2e6c3b8dc3cf4dd3bf5a67eb28ef881450fa655"
+  },
+  "stdout": "[fix/mim-owned-name-export-669-20261101 e78e220] Verify native artifact recovery journals before reporting completion\n 2 files changed, 82 insertions(+), 4 deletions(-)\n",
+  "stderr": ""
+}

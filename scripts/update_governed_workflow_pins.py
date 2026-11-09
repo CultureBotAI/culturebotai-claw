@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Preview or apply reviewed action releases to the canonical workflow contract.
 
+Existing claw copies of registered workflows are updated in the same transaction.
 No schedules or downstream checkouts are changed. --check is offline; release
 resolution uses only GitHub's API and does not execute the action or a model.
 """
@@ -56,8 +57,33 @@ def resolve_tag(repository: str, version: str) -> str:
     raise GovernanceError(f"{repository}@{version}: tag did not resolve to a commit")
 
 
+def local_workflow_copies(root: Path) -> dict[Path, Path]:
+    """Identify existing registered claw copies, refusing independent edits.
+
+    The artifact target is the only copy location; no filename inference or
+    creation of missing local workflows. A copy must already equal its source
+    before it can participate in a pin-only transaction.
+    """
+    copies: dict[Path, Path] = {}
+    for entry in workflow_entries(root):
+        target, source = Path(entry["target"]), Path(entry["source"])
+        destination = root / target
+        if destination.is_symlink():
+            raise GovernanceError(f"Local workflow copy is a symlink: {target}")
+        if not destination.exists():
+            continue
+        if (not destination.is_file()
+                or not destination.resolve().is_relative_to(root.resolve())):
+            raise GovernanceError(f"Local workflow copy is not a regular file in this checkout: {target}")
+        if destination.read_bytes() != (root / source).read_bytes():
+            raise GovernanceError(f"Local workflow copy differs from canonical source: {target}")
+        copies[target] = source
+    return copies
+
+
 def update_plan(root: Path, contract: dict) -> dict[Path, str]:
     """Validate every candidate before preparing writes, including registry hashes."""
+    copies = local_workflow_copies(root)
     plan = {CONTRACT_PATH: json.dumps(contract, indent=2) + "\n"}
     document = json.loads((root / MANIFEST_PATH).read_text())
     for entry in workflow_entries(root):
@@ -66,6 +92,8 @@ def update_plan(root: Path, contract: dict) -> dict[Path, str]:
         plan[source] = content
         match = next(item for item in document["artifacts"] if item["id"] == entry["id"])
         match["sha256"] = hashlib.sha256(content.encode()).hexdigest()
+    for target, source in copies.items():
+        plan[target] = plan[source]
     plan[MANIFEST_PATH] = json.dumps(document, indent=2) + "\n"
     return {path: content for path, content in plan.items()
             if (root / path).read_text() != content}
@@ -73,7 +101,8 @@ def update_plan(root: Path, contract: dict) -> dict[Path, str]:
 
 def _validate_plan(root: Path, plan: dict[Path, str]) -> None:
     """Check the complete candidate in isolation before touching canonical files."""
-    paths = {CONTRACT_PATH, MANIFEST_PATH}
+    copies = local_workflow_copies(root)
+    paths = {CONTRACT_PATH, MANIFEST_PATH, *copies}
     paths.update(Path(entry["source"]) for entry in workflow_entries(root))
     if not set(plan) <= paths:
         raise GovernanceError("Update plan includes a file outside the workflow pin contract")
@@ -85,6 +114,7 @@ def _validate_plan(root: Path, plan: dict[Path, str]) -> None:
             content = plan[path].encode() if path in plan else (root / path).read_bytes()
             target.write_bytes(content)
         check_workflow_pins(candidate)
+        local_workflow_copies(candidate)
 
 
 def apply_plan(root: Path, plan: dict[Path, str]) -> None:
@@ -127,6 +157,7 @@ def apply_plan(root: Path, plan: dict[Path, str]) -> None:
             attempted.append(path)
             os.replace(temporary, root / path)
         check_workflow_pins(root)
+        local_workflow_copies(root)
         committed = True
     except BaseException as error:
         failure = error
@@ -173,7 +204,7 @@ def main(argv: list[str] | None = None, *, root: Path = ROOT) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--action", action="append", default=[], metavar="OWNER/REPO@vX.Y.Z")
     parser.add_argument("--uv-version", help="Exact uv version; retain it unless deliberately upgrading")
-    parser.add_argument("--apply", action="store_true", help="Apply the printed canonical-only patch")
+    parser.add_argument("--apply", action="store_true", help="Apply the printed canonical and existing-claw-copy patch")
     parser.add_argument("--check", action="store_true", help="Offline CI contract check; never writes")
     parser.add_argument("--verify-upstream", action="store_true", help="Check recorded tags against GitHub")
     args = parser.parse_args(argv)
@@ -182,6 +213,7 @@ def main(argv: list[str] | None = None, *, root: Path = ROOT) -> int:
     try:
         if args.check:
             check_workflow_pins(root)
+            local_workflow_copies(root)
             print("Governed action pins, version labels, uv runtime and checksums match.")
             return 0
         contract = load_pin_contract(root / CONTRACT_PATH)
@@ -210,7 +242,7 @@ def main(argv: list[str] | None = None, *, root: Path = ROOT) -> int:
             )), end="")
         if args.apply:
             apply_plan(root, plan)
-        print(f"{'Applied' if args.apply else 'Preview:'} {len(plan)} canonical files; downstream rollout separate.")
+        print(f"{'Applied' if args.apply else 'Preview:'} {len(plan)} local governed files; downstream rollout separate.")
         return 0
     except (GovernanceError, OSError, ValueError, KeyError, subprocess.SubprocessError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)

@@ -1,0 +1,24 @@
+{
+  "name": "step5-independent-repair-focused-705707",
+  "argv": [
+    "python",
+    "-B",
+    "-m",
+    "pytest",
+    "-q",
+    "tests/test_mim_owned_name_export.py",
+    "tests/test_mim_sssom_artifacts.py",
+    "tests/test_mim_sssom_header_dates.py",
+    "-o",
+    "addopts=",
+    "-p",
+    "no:cacheprovider"
+  ],
+  "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+  "started_at": "2026-11-01T13:03:58.841511+00:00",
+  "environment_profile": "claw-ci-no-sibling-roots",
+  "finished_at": "2026-11-01T13:04:03.778247+00:00",
+  "exit_code": 0,
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-independent-repair-focused-705707.log",
+  "log_sha256": "f57fb9bc322fd3496103961ed16a0ba342f3085cce79b78f92287d6a52dee675"
+}

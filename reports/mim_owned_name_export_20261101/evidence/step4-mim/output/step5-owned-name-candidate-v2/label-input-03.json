@@ -1,0 +1,22 @@
+{
+  "loader": "_load_ols_labels",
+  "args": [
+    [
+      "UBERON:0000178",
+      "UBERON:0001913",
+      "UBERON:0001977",
+      "UBERON:0010228"
+    ]
+  ],
+  "kwargs": {
+    "ontology": "uberon",
+    "iri_prefix": "http://purl.obolibrary.org/obo/UBERON_"
+  },
+  "labels": {
+    "UBERON:0000178": "blood",
+    "UBERON:0001913": "milk",
+    "UBERON:0001977": "blood serum",
+    "UBERON:0010228": "ruminal fluid"
+  },
+  "accessed_at": "2026-11-01T13:06:26.547074+00:00"
+}

@@ -1,0 +1,15 @@
+{
+  "at": "2026-11-01T13:16:13.882036+00:00",
+  "head": "a56f3ae4563619a5129ad944878c9205267315d6",
+  "source_changed": false,
+  "failure": "Existing lifecycle test could not run /bin/ps inside filesystem/process sandbox; no source repair needed",
+  "failed_suite_receipt": "logs/step5-claw-full-tests-v4.json",
+  "failed_suite_log_sha256": "dd3407b0f5fade1a4d5afb48f2559756d3c2659b05360880c02684bb48c76403",
+  "fixture": "tests/test_mech_monitor_control.py: environment writes fake_monitor.py/config.json under tmp_path, cleanup only own Popen children",
+  "fixture_sha256": "c55b3c0aeb9ed0c887ebcc63a6c4d6ffebad0897b970015bdbb8b73dc7bacb5c",
+  "focused_process_access_rerun": "logs/step5-claw-monitor-fixture-permission.json",
+  "focused_exit_code": 0,
+  "full_rerun": "logs/step5-claw-full-tests-v5.log",
+  "full_session": 22098,
+  "live_session_or_cycle_changed": false
+}

@@ -1,0 +1,266 @@
+{
+  "created_at": "2026-11-01T12:41:02.557822+00:00",
+  "scope": "Author implementation and synthetic test evidence only; independent integration review remains",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 3849,
+      "sha256": "64dac5d6b014c4aca12094373a04758db7f575c57edbad5a1abde1bba569af0c"
+    },
+    {
+      "path": "attempt-dispositions.json",
+      "bytes": 478,
+      "sha256": "10ab1f93af01f7570b8eec9480c5edeaccded5f153a34010a971c2d0fc7e390b"
+    },
+    {
+      "path": "commands/step5-helper-focused-v1.json",
+      "bytes": 723,
+      "sha256": "01d4d42cbd92fa2aee449b0a3e7c6ab1da70ac5f4d15025b9377f554074a6cd3"
+    },
+    {
+      "path": "commands/step5-helper-focused-v1.log",
+      "bytes": 99,
+      "sha256": "0dbab68005debfea8a5b6e50f5ff1f0e301366ce23cdb8dc229c9090cf28b79f"
+    },
+    {
+      "path": "commands/step5-helper-hermetic-v1.json",
+      "bytes": 725,
+      "sha256": "7dade3bad5fbda218eb335bbbad5d6d499a939403acccf28194277267bdedfb6"
+    },
+    {
+      "path": "commands/step5-helper-hermetic-v1.log",
+      "bytes": 99,
+      "sha256": "0dbab68005debfea8a5b6e50f5ff1f0e301366ce23cdb8dc229c9090cf28b79f"
+    },
+    {
+      "path": "commands/step5-helper-mutations-v1.json",
+      "bytes": 705,
+      "sha256": "ef5fc0c6c855df7a3fc84230a79933388b6ba9347fabdeabdea57843523f905b"
+    },
+    {
+      "path": "commands/step5-helper-mutations-v1.log",
+      "bytes": 582,
+      "sha256": "6b12bd5cf05ad14eece7f6ad03323429cbec1bf22d7f77bdf8f17a542fd7881f"
+    },
+    {
+      "path": "commands/step5-helper-native-parity-v1.json",
+      "bytes": 719,
+      "sha256": "65f29e29cc5f1a46ba43b0e7fbf3e0205caf66b31c71f553ed296ed677535be2"
+    },
+    {
+      "path": "commands/step5-helper-native-parity-v1.log",
+      "bytes": 795,
+      "sha256": "13bae7947230e90f9356933046f2626a8088f731ec4fe93d2e79c8994bd28a0e"
+    },
+    {
+      "path": "commands/step5-helper-ruff-offline-v1.json",
+      "bytes": 757,
+      "sha256": "363934fb95189857784b7cda2255c2ea8d6f259757a6cd5c2c7d4e4c8db3dfa6"
+    },
+    {
+      "path": "commands/step5-helper-ruff-offline-v1.log",
+      "bytes": 19,
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+    },
+    {
+      "path": "commands/step5-helper-ruff-v1.json",
+      "bytes": 724,
+      "sha256": "518d150ae93c623f8b6753f692f35626e9ad727467ea7dc71541308d69bcd63e"
+    },
+    {
+      "path": "commands/step5-helper-ruff-v1.log",
+      "bytes": 463,
+      "sha256": "ab960078234ac3697fb507c8fdadea23ac7e81c44106a364eadf43bd5b0a42b6"
+    },
+    {
+      "path": "controls/baseline/pytest.log",
+      "bytes": 99,
+      "sha256": "ebaff5b4c0cf4ab71b5ce74e3f961d6685d58a4535ebcda743f9a725c437973c"
+    },
+    {
+      "path": "controls/baseline/receipt.json",
+      "bytes": 1501,
+      "sha256": "08c2563720586bc5077e45a6cc75297cfaa07705e399a8096f46116f261ce275"
+    },
+    {
+      "path": "controls/baseline/src/kg_microbe_utils/__init__.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "controls/baseline/src/kg_microbe_utils/owned_name_policy.py",
+      "bytes": 7306,
+      "sha256": "18ffd0430d0256b6da6cbb1f3da2327c4cf3418e2b0b2da71ff283ee2f4351ae"
+    },
+    {
+      "path": "controls/baseline/tests/test_mim_owned_name_policy.py",
+      "bytes": 12044,
+      "sha256": "62c8675b32177dbc609218851ac13d409cf6dfd628fe37118a76a6c2cc7516b6"
+    },
+    {
+      "path": "controls/disable_suppression/pytest.log",
+      "bytes": 1577,
+      "sha256": "46352b0ef0fd07b8ae344d34467b931affe3e34e0b0cb917b2ea030a29f5f2a4"
+    },
+    {
+      "path": "controls/disable_suppression/receipt.json",
+      "bytes": 1754,
+      "sha256": "472794f1077ecac7abfd9ef182f5172d1c5a0e5f25b05b6689d01ab10b9b84de"
+    },
+    {
+      "path": "controls/disable_suppression/src/kg_microbe_utils/__init__.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "controls/disable_suppression/src/kg_microbe_utils/owned_name_policy.py",
+      "bytes": 7277,
+      "sha256": "290a29d95de6522f22114d77be44ac5a8e096381877b28c0cb3633058e35806b"
+    },
+    {
+      "path": "controls/disable_suppression/tests/test_mim_owned_name_policy.py",
+      "bytes": 12044,
+      "sha256": "62c8675b32177dbc609218851ac13d409cf6dfd628fe37118a76a6c2cc7516b6"
+    },
+    {
+      "path": "controls/discard_later_sources/pytest.log",
+      "bytes": 1388,
+      "sha256": "d91fd0c3d560dba8d595f2e67899c9526cf072da3de1de14276ef7214701597a"
+    },
+    {
+      "path": "controls/discard_later_sources/receipt.json",
+      "bytes": 1853,
+      "sha256": "19a0a229ca77a3dfc73dbb5255d8124d9bc953e2c861d92416e162817f10c9d8"
+    },
+    {
+      "path": "controls/discard_later_sources/src/kg_microbe_utils/__init__.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "controls/discard_later_sources/src/kg_microbe_utils/owned_name_policy.py",
+      "bytes": 7342,
+      "sha256": "c54331aeeb082199db921a7a00fc2bb1ad62bc595aba9125e54b611b9e78009c"
+    },
+    {
+      "path": "controls/discard_later_sources/tests/test_mim_owned_name_policy.py",
+      "bytes": 12044,
+      "sha256": "62c8675b32177dbc609218851ac13d409cf6dfd628fe37118a76a6c2cc7516b6"
+    },
+    {
+      "path": "controls/first_owner_only/pytest.log",
+      "bytes": 1078,
+      "sha256": "7b6d3657ef5ce45ee42792855de5c53b63f1166837d51cc455b3d2e80e64de46"
+    },
+    {
+      "path": "controls/first_owner_only/receipt.json",
+      "bytes": 1854,
+      "sha256": "fe4f1148c04c1ede21034679fef17d72d6e753415d6eba340005a49219e72c7e"
+    },
+    {
+      "path": "controls/first_owner_only/src/kg_microbe_utils/__init__.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "controls/first_owner_only/src/kg_microbe_utils/owned_name_policy.py",
+      "bytes": 7318,
+      "sha256": "be3f44d8d136f6790f1e0b01d694d552606339cd2fefdc56b76450a17d7ab793"
+    },
+    {
+      "path": "controls/first_owner_only/tests/test_mim_owned_name_policy.py",
+      "bytes": 12044,
+      "sha256": "62c8675b32177dbc609218851ac13d409cf6dfd628fe37118a76a6c2cc7516b6"
+    },
+    {
+      "path": "controls/lower_instead_of_casefold/pytest.log",
+      "bytes": 1118,
+      "sha256": "ab9447ce5c617bf55ff6e2473f397383c55ec509eb1032c89ba81d2ef14df8cf"
+    },
+    {
+      "path": "controls/lower_instead_of_casefold/receipt.json",
+      "bytes": 1762,
+      "sha256": "10e26751c4f10fffe53b0fe0476fb524fb75669768607ddc7facacb566cd3e05"
+    },
+    {
+      "path": "controls/lower_instead_of_casefold/src/kg_microbe_utils/__init__.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "controls/lower_instead_of_casefold/src/kg_microbe_utils/owned_name_policy.py",
+      "bytes": 7294,
+      "sha256": "b20e8fa3402a533aea34b4b8d2c823bf7a3ba55fac40665c306d7593e48f8ce7"
+    },
+    {
+      "path": "controls/lower_instead_of_casefold/tests/test_mim_owned_name_policy.py",
+      "bytes": 12044,
+      "sha256": "62c8675b32177dbc609218851ac13d409cf6dfd628fe37118a76a6c2cc7516b6"
+    },
+    {
+      "path": "controls/truthy_representative_fallback/pytest.log",
+      "bytes": 2173,
+      "sha256": "f2718e54ab987ebffe60f2f2ad200837dae6453108abcab29e0d9f69ccba4ce4"
+    },
+    {
+      "path": "controls/truthy_representative_fallback/receipt.json",
+      "bytes": 1932,
+      "sha256": "d6b6d5778dc7f75c61fb2da8408c57964cb1fd97cdcd08a5f5d02137391d4b3d"
+    },
+    {
+      "path": "controls/truthy_representative_fallback/src/kg_microbe_utils/__init__.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "controls/truthy_representative_fallback/src/kg_microbe_utils/owned_name_policy.py",
+      "bytes": 7276,
+      "sha256": "f7b7af98e5cd695614880da0c0819405d4e6f22ce116d37c47fa6149eb845807"
+    },
+    {
+      "path": "controls/truthy_representative_fallback/tests/test_mim_owned_name_policy.py",
+      "bytes": 12044,
+      "sha256": "62c8675b32177dbc609218851ac13d409cf6dfd628fe37118a76a6c2cc7516b6"
+    },
+    {
+      "path": "mutation-results.json",
+      "bytes": 11527,
+      "sha256": "0ea2e27e59a5a6f2343631df274452ab4d45084a1f104f3d8080fe3ded511019"
+    },
+    {
+      "path": "native-parity-results.json",
+      "bytes": 3666,
+      "sha256": "380a581c5de96d365a046172cb36a8401e4182415f9a9eb07577f2ffa83ddb41"
+    },
+    {
+      "path": "native-parity-sidecar.tsv",
+      "bytes": 38638,
+      "sha256": "43d9d9516864988465f22264b738719ccc0d870629298b2fea22d0dd0a239bba"
+    },
+    {
+      "path": "probe_native_rule_k.py",
+      "bytes": 4446,
+      "sha256": "d46cc733831cd13273ad6e3ee51a942bb6656cc0e65fe498309abbf5a484b200"
+    },
+    {
+      "path": "run_mutations.py",
+      "bytes": 3732,
+      "sha256": "d07326b31832241c90c9e49f51cac38318a275f5afe442477d82d8d32f5ad62a"
+    },
+    {
+      "path": "source/owned_name_policy.py",
+      "bytes": 7306,
+      "sha256": "18ffd0430d0256b6da6cbb1f3da2327c4cf3418e2b0b2da71ff283ee2f4351ae"
+    },
+    {
+      "path": "source/test_mim_owned_name_policy.py",
+      "bytes": 12044,
+      "sha256": "62c8675b32177dbc609218851ac13d409cf6dfd628fe37118a76a6c2cc7516b6"
+    },
+    {
+      "path": "source-freeze.json",
+      "bytes": 1533,
+      "sha256": "a57390eafe195248b8efec11530adac45cec8587863799155982d5a6252f1a37"
+    }
+  ]
+}

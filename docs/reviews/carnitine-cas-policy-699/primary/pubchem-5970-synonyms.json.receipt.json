@@ -1,0 +1,11 @@
+{
+  "started_at": "2026-11-01T05:29:21.337908+00:00",
+  "finished_at": "2026-11-01T05:29:21.677634+00:00",
+  "url": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/5970/synonyms/JSON",
+  "final_url": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/5970/synonyms/JSON",
+  "status": 200,
+  "bytes": 3831,
+  "sha256": "6687dc9bf22813e53e3db3bf8d41cfb17ebf347ff3632aed9e86fbc6251b4e80",
+  "source_receipt_sha256": "0380d6301d95b2b358dd7f95ba6435f6171f05c88e928caac26cf07ade651868",
+  "capture_note": "Projection of retained original receipt; transport headers omitted."
+}

@@ -1,0 +1,10 @@
+{
+  "exit_code": 1,
+  "expected_failure": "DID NOT RAISE",
+  "format": "edgemech-admitted-sync-mutation/v1",
+  "guard": "consumer",
+  "log_sha256": "5665816a37baceaa8be23a5fbd6f0f1483b911e546add9628c4c008b13898bc3",
+  "node": "test_admitted_source_is_never_a_generic_old_package_exception[other_consumer]",
+  "production_source_unchanged": true,
+  "source_sha256": "cd4e9b3f22d247804a792565daf867a161d9cc9ac99f9b49276c5a768ef7faf9"
+}

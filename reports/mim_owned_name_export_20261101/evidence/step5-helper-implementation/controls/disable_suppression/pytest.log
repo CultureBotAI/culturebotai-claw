@@ -1,0 +1,24 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+___ test_real_generic_and_form_examples_suppress_without_chemical_inference ____
+
+    def test_real_generic_and_form_examples_suppress_without_chemical_inference():
+        records = {
+            "MIM:L-asparagine": record("L-Asparagine", "CHEBI:17196"),
+            "MIM:Asparagine": record("Asparagine", "CHEBI:22653"),
+            "MIM:Magnesium_Chloride": record("Magnesium chloride", "CHEBI:86345"),
+            "MIM:Mgcl2_X_6_H2o": record("MgCl2 x 6 H2O", "CHEBI:86345"),
+        }
+        owners = build_owner_index(records)
+        for subject, token, expected in [
+            ("MIM:L-asparagine", "ASPARAGINE", "MIM:Asparagine"),
+            ("MIM:Magnesium_Chloride", "MgCl2 x 6 H2O", "MIM:Mgcl2_X_6_H2o"),
+        ]:
+            kept, events = filter_owned_aliases(subject, [alias(token)], owners)
+>           assert not kept and events[0].owner_subject_ids == frozenset({expected})
+E           AssertionError: assert (not (AliasCandidate(text='ASPARAGINE', input_surface='mim_yaml', source_refs=('record.yaml#/synonyms/0',), evidence_refs=('https://github.com/CultureBotAI/MediaIngredientMech/issues/669',)),))
+
+tests/test_mim_owned_name_policy.py:202: AssertionError
+=========================== short test summary info ============================
+FAILED ../../../../../../../../../../../../dev::test_real_generic_and_form_examples_suppress_without_chemical_inference
+1 failed, 47 deselected in 0.06s

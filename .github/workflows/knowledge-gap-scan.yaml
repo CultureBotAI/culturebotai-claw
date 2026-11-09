@@ -68,7 +68,7 @@ jobs:
         id: matrix
         run: |
           set -euo pipefail
-          matrix="$(uv run python -m kg_microbe_fleet matrix --capability knowledge_gap_scan --setting window)"
+          matrix="$(uv run python -m kg_microbe_fleet matrix --capability knowledge_gap_scan --setting window --scheduled-only)"
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
   scan:

@@ -32,8 +32,8 @@ Read the verdict column, not the counts:
 - **`canonical`** — already managed. Skip.
 
 Prefer high reach. A name three Mechs carry is worth more than one two carry,
-and one carried by seven Mechs that all wrote it themselves is the most valuable
-target in the list.
+and a name nearly every Mech carries, each copy written independently, is the
+most valuable target in the list.
 
 ## 2. Read every copy before writing anything
 

@@ -1,0 +1,139 @@
+{
+  "scope": "Run-owned copied code and disposable real Git fixtures only",
+  "issue": "https://github.com/CultureBotAI/culturebotai-claw/issues/708",
+  "source_hashes": {
+    "package_evidence_v2.py": "5dfe1381dbc435d6196f1529e90d039205f33097bebc4386abc73a326324d907",
+    "package_evidence_v3.py": "74ade999a59f91d61e83d1b41de9d6b00dbae2fd58a9b28f285724359b18c821",
+    "test_packager_v5.py": "bbe219fb38b06899a4c080b42b1eaeecc3fbe861f3e5b819a88b30e5f463f23a"
+  },
+  "results": [
+    {
+      "name": "old-v2",
+      "argv": [
+        "/opt/homebrew/Caskroom/miniforge/base/bin/python",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v5.py",
+        "--module",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/package_evidence_v2.py",
+        "--results",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-708/controls-v2/old-v2/results.json"
+      ],
+      "started_at": "2026-11-01T13:16:34.087783+00:00",
+      "finished_at": "2026-11-01T13:16:34.359313+00:00",
+      "exit_code": 1,
+      "expected_pass": false,
+      "expected_assertion_failure": true,
+      "module_sha256": "5dfe1381dbc435d6196f1529e90d039205f33097bebc4386abc73a326324d907",
+      "log_sha256": "e13f895a86cb064b830c100306fdaf174dad4de08671687b69adb090c00dec32",
+      "mutation": null
+    },
+    {
+      "name": "repaired-v3",
+      "argv": [
+        "/opt/homebrew/Caskroom/miniforge/base/bin/python",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v5.py",
+        "--module",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/package_evidence_v3.py",
+        "--results",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-708/controls-v2/repaired-v3/results.json"
+      ],
+      "started_at": "2026-11-01T13:16:34.359589+00:00",
+      "finished_at": "2026-11-01T13:16:34.751309+00:00",
+      "exit_code": 0,
+      "expected_pass": true,
+      "expected_assertion_failure": false,
+      "module_sha256": "74ade999a59f91d61e83d1b41de9d6b00dbae2fd58a9b28f285724359b18c821",
+      "log_sha256": "582fdf5307973dbf2fb01a36a596dbea36ad7ee77fe1b41293fc9f35fd847e03",
+      "mutation": null,
+      "passed_controls": 21
+    },
+    {
+      "name": "mutant-no-plan-equality",
+      "argv": [
+        "/opt/homebrew/Caskroom/miniforge/base/bin/python",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v5.py",
+        "--module",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-708/controls-v2/mutant-no-plan-equality/packager.py",
+        "--results",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-708/controls-v2/mutant-no-plan-equality/results.json"
+      ],
+      "started_at": "2026-11-01T13:16:34.751780+00:00",
+      "finished_at": "2026-11-01T13:16:35.022664+00:00",
+      "exit_code": 1,
+      "expected_pass": false,
+      "expected_assertion_failure": true,
+      "module_sha256": "c4b650f6f5538243baaa56c495778979e8290c1434e9e4793e730ae1d4c80e34",
+      "log_sha256": "b42e83b0e4d6e2932eb42a5627911ca54323521e8ad2c72aeba954c8fee44250",
+      "mutation": [
+        "require(json.dumps(frozen['plan'], sort_keys=True) == json.dumps(expected, sort_keys=True),",
+        "require(True,"
+      ]
+    },
+    {
+      "name": "mutant-no-publish-binding",
+      "argv": [
+        "/opt/homebrew/Caskroom/miniforge/base/bin/python",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v5.py",
+        "--module",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-708/controls-v2/mutant-no-publish-binding/packager.py",
+        "--results",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-708/controls-v2/mutant-no-publish-binding/results.json"
+      ],
+      "started_at": "2026-11-01T13:16:35.023023+00:00",
+      "finished_at": "2026-11-01T13:16:35.280314+00:00",
+      "exit_code": 1,
+      "expected_pass": false,
+      "expected_assertion_failure": true,
+      "module_sha256": "6c4a09a7a2f0b84de77c18e9ede4b347efb396fae3e6235204dc0eaaf45702a3",
+      "log_sha256": "137e6563ec57a44b24104d3acd46ed2d1fad859e9115df84886a24665d8c04a4",
+      "mutation": [
+        "selected = bound_selection(frozen, read(Path(frozen['selection_path'])), RUN)",
+        "selected = json.loads(read(Path(frozen['selection_path'])))"
+      ]
+    },
+    {
+      "name": "mutant-no-portable-binding",
+      "argv": [
+        "/opt/homebrew/Caskroom/miniforge/base/bin/python",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v5.py",
+        "--module",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-708/controls-v2/mutant-no-portable-binding/packager.py",
+        "--results",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-708/controls-v2/mutant-no-portable-binding/results.json"
+      ],
+      "started_at": "2026-11-01T13:16:35.280705+00:00",
+      "finished_at": "2026-11-01T13:16:35.669857+00:00",
+      "exit_code": 1,
+      "expected_pass": false,
+      "expected_assertion_failure": true,
+      "module_sha256": "7d8c0f874dde933e3bd5532fc40ea21b0bb28e2f036e0d4b0f1646f8fa140eaa",
+      "log_sha256": "80c0c8a6242b5fc2742d3f5d92875b4cb7c45366cea61ee2aa3ee14ded2cc276",
+      "mutation": [
+        "selected = bound_selection(frozen, read(package/'selection.final.json'))",
+        "selected = json.loads(read(package/'selection.final.json'))"
+      ]
+    },
+    {
+      "name": "mutant-no-readme-binding",
+      "argv": [
+        "/opt/homebrew/Caskroom/miniforge/base/bin/python",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v5.py",
+        "--module",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-708/controls-v2/mutant-no-readme-binding/packager.py",
+        "--results",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-708/controls-v2/mutant-no-readme-binding/results.json"
+      ],
+      "started_at": "2026-11-01T13:16:35.670215+00:00",
+      "finished_at": "2026-11-01T13:16:36.066686+00:00",
+      "exit_code": 1,
+      "expected_pass": false,
+      "expected_assertion_failure": true,
+      "module_sha256": "b453af121ee13c26aa5279d8b090d48bd8cc43afd35e7ac8fcda5d1de3ecdaf0",
+      "log_sha256": "7197d2dc6285954afe9bd0ec3045f15ec0cf3267b9ab31e23867d1c465fffbcf",
+      "mutation": [
+        "require(read(package/'README.md') == selected['package_readme'].encode(), 'Packaged README differs from bound selection')",
+        "pass  # deliberately disabled README binding"
+      ]
+    }
+  ],
+  "maintained_sources_modified": false
+}

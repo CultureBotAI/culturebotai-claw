@@ -3,8 +3,8 @@
 CultureBotAI CLAW coordinates validation, curation, and shared tooling across
 the Mech repositories: CultureMech, MediaIngredientMech (MIM),
 CommunityMech, TraitMech, ProteinTraitsMech, AntibioticMech,
-CellStructureMech, HabitatMech, NaturalProductMech, TaxonMech, and
-PathwayMech.
+CellStructureMech, HabitatMech, NaturalProductMech, TaxonMech,
+PathwayMech, DUFMech, CMMMech, and AIMech.
 `src/kg_microbe_fleet/fleet.yaml` is the
 canonical definition of that fleet. It contains repository-aware plugins,
 file-based coordination, curation pipelines, shared Mech utilities, and fleet
@@ -13,6 +13,16 @@ CI workflows.
 You do not need every repository cloned to work here — set only the roots you
 use, and `openclaw-cli config validate` will report the rest as "not
 configured locally" instead of failing.
+
+[Mech progress dashboard](https://culturebotai.github.io/culturebotai-claw/) tracks
+current goals, verified six-goal cycles, and distinct PR rounds across the fleet.
+See the [progress accounting and publication guide](docs/guides/MECH_PROGRESS.md)
+for evidence rules, historical coverage, and automatic refresh.
+
+Session working state belongs in a durable repository-owned location, and
+committed batches should be published promptly. See the
+[session-state and publication guide](docs/guides/SESSION_STATE_DURABILITY.md)
+for the work-root policy, read-only risk reporting and closure requirements.
 
 ## Current support status
 
@@ -76,6 +86,15 @@ until the OpenClaw execution integration is implemented.
 
 ## Shared Mech tools
 
+Inspect the complete PaCMAP adoption plan with
+`uv run kg-microbe-embeddings rollout`. The shared vector-set builder preserves
+separate definition and whole-record text, chemical structure, applicable protein,
+graph and future feature spaces, with per-set provenance and coverage. Each Mech
+chooses relevant sets. The builder creates local map assets from existing
+vectors; downstream registry and website adoption remain explicit rollout
+work. See [embedding sets](docs/guides/EMBEDDING_SETS.md) for validation,
+projection commands and the repository-specific adoption gates.
+
 Update local Mech checkouts with `just fleet-pull --apply`, or preview with
 `just fleet-pull`. The preview is offline and compares cached upstream refs.
 The updater fetches each clean current branch's existing `origin` upstream and
@@ -97,7 +116,9 @@ console-script forms are available:
 
 ```bash
 uv run kg-microbe-history --help
+uv run kg-microbe-embeddings --help
 uv run kg-microbe-research --help
+uv run kg-microbe-reviews --help
 uv run kg-microbe-governance --help
 uv run kg-microbe-kgscan --help
 uv run kg-microbe-qc --help
@@ -105,6 +126,7 @@ uv run kg-microbe-discussions --help
 
 uv run python -m kg_microbe_history --help
 uv run python -m kg_microbe_research --help
+uv run python -m kg_microbe_reviews --help
 uv run python -m kg_microbe_governance --help
 uv run python -m kg_microbe_kgscan --help
 uv run python -m kg_microbe_qc --help
@@ -124,6 +146,14 @@ documented in
 The separately governed provider execution and non-billing canary boundary is
 documented in
 [`docs/guides/DEEP_RESEARCH_EXECUTION.md`](docs/guides/DEEP_RESEARCH_EXECUTION.md).
+
+Structured record reviews share a LinkML schema, immutable timestamped YAML and
+Markdown bundles, and fleet triage. Run `uv run kg-microbe-reviews fleet --all`
+for JSON or add `--format markdown` or `--format tsv`. This reads local cached
+`origin/main` without fetching; missing repositories and missing review coverage
+remain visible. Findings close only through explicit, evidence-backed lineage,
+not merely because a later report omits them. See
+[`docs/guides/RECORD_REVIEWS.md`](docs/guides/RECORD_REVIEWS.md).
 
 ## Safety model
 
@@ -161,11 +191,21 @@ uv run --extra dev mypy \
   cli/main.py plugins/repository_settings.py plugins/lock_manager.py \
   plugins/git_integration.py plugins/just_runner.py \
   src/kg_microbe_history src/kg_microbe_kgscan src/kg_microbe_fleet \
+  src/kg_microbe_embeddings \
   src/kg_microbe_merge_queue src/kg_microbe_research src/kg_microbe_write \
+  src/kg_microbe_workflows src/kg_microbe_progress \
   src/kg_microbe_consistency src/kg_microbe_patches \
+  src/kg_microbe_evidence src/kg_microbe_graph \
+  src/kg_microbe_corpus src/kg_microbe_curation src/kg_microbe_health src/kg_microbe_kgx \
+  src/kg_microbe_pages src/kg_microbe_site src/kg_microbe_skills \
+  src/kg_microbe_source_queue src/kg_microbe_sources \
+  src/kg_microbe_sssom src/kg_microbe_writers \
+  src/kg_microbe_utils/owned_name_policy.py src/kg_microbe_utils/sssom_artifacts.py \
   src/kg_microbe_governance/__init__.py \
   src/kg_microbe_governance/__main__.py \
   src/kg_microbe_governance/fleet_audit.py \
+  src/kg_microbe_governance/cycle_release_audit.py \
+  src/kg_microbe_governance/artifacts/scripts/run_shared_evidence_validator.py \
   src/kg_microbe_governance/artifacts/scripts/check_vendored_sync.py
 uv run --extra dev python -m pytest -q \
   --cov=src --cov=cli.main --cov=plugins.repository_settings \
