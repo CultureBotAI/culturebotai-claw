@@ -631,6 +631,8 @@ copy and the Mech-owned update.
 
 See [CofactorMech admission](COFACTORMECH_ADMISSION.md) for the empty-main
 inspection, exact artifact ledger, branch-published bootstrap provenance and
-active cycle-v2 release hold. This registration must not merge while the
-active lane freezes the consumer cohort. It does not mutate existing consumers
-or claim a completed fleet release.
+separate immutable infrastructure declaration and release hold. This draft
+requires independent review, re-review, green checks and the user's explicit
+merge decision. Only protected approval can activate its bounded admission;
+the existing DUF/Edge policies and consumer pins remain unchanged. It does not
+claim a completed coordinated fleet release.

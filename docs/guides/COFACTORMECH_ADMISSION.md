@@ -44,27 +44,56 @@ the package at that exact same commit. The scaffold records that full SHA in
 An unmerged published commit is a bootstrap source, not an approved fleet
 release. Preserve the pin's commit until a later reviewed re-pin is complete.
 
-## Merge and release dependencies
+## Separate admission proposal and release hold
 
-The active DUFMech cycle-v2 canary release freezes the governance consumer cohort
-in `src/kg_microbe_governance/releases/mech-cycle-v2-canary.json`.
-`cycle_release_audit.py` rejects a change to that authority layout. A green PR
-fleet audit uses the trusted base cohort and therefore does not prove the new
-cohort can be released. Do not merge this admission while that lane is active.
-Do not edit its declaration or weaken the audit to admit CofactorMech.
-The concurrent [EdgeMech admission PR #953](https://github.com/CultureBotAI/culturebotai-claw/pull/953)
-also changes fleet authority. Refresh this admission against the current main
-before its merge; its EdgeMech-specific release exception is not CofactorMech
-authorization.
+Protected main merged EdgeMech admission PR #953 while CofactorMech was being
+reviewed. Its exact fifteen-member cohort correctly rejected this sixteenth
+registration (issue #1061). This PR therefore proposes a separate immutable
+Cofactor infrastructure admission. It does not extend EdgeMech's exception or
+retire the active single-DUF cycle release.
 
-After the release owner completes and retires that lane, the user decides the
-merge sequence. Re-check the new repository's committed main, remove completed
-admission gaps, reconcile capabilities against the merged scaffold, and publish
-a reviewed immutable claw revision containing this registration. Synchronize
-all manifest consumers to that revision, account for coupled pins, and pass the
-exact committed-main fleet audit. Existing consumers are outside this PR's
-mutation scope. Remote merge-queue activation, the X-Mech Suite projection and
-the coordinated re-pin remain separately reviewed release work.
+`releases/cofactormech-infrastructure-admission-v1.json` binds Cofactor's exact
+identity and conservative fleet entry, empty main above, and published source
+pin `5790569efd881bd8bca82a04ea278cc462c0c2c8`. The corresponding source manifest
+is retained verbatim. Cofactor owes all 22 applicable universal artifacts,
+including all three native contracts that EdgeMech deliberately excludes.
+Existing DUF/Edge declarations and source snapshots remain byte-identical;
+historical consumers retain their original permitted pins and EdgeMech retains
+only its separately approved source pin.
+
+The candidate validator proves the complete cohort equals the historical fleet
+plus individually declared additions before projecting the legacy Edge view.
+It rejects unknown members, altered prior identities or applicability, native
+test omissions and unbound source metadata. At runtime, each new declaration
+must have one immutable introduction on protected main's first-parent history
+after the original lane. Editing, deleting or resurrecting it is refused.
+Unmerged candidate declarations cannot activate against the protected PR base.
+
+Protected code selects each exact data ref. It reads committed Git bytes even
+when index flags hide a working-file edit, authenticates source objects before
+binding their data URLs, and never executes code from a downstream pin. The
+Cofactor sync route accepts only its exact declared identity/ref pair and fetches
+its frozen payload bytes; later current payloads cannot be served under that
+old ref. Normal canonical synchronization still requires package/ref equality.
+
+The exact empty bootstrap may report pending infrastructure with zero artifacts
+checked and `installation_verified: false`. Any change to main expires this
+state; partial installation or an unknown pin fails. The temporary completeness
+ledger cannot waive a different empty tip. Once the scaffold reaches main,
+remove its completed ledger entry and verify the actual committed artifacts.
+
+**This remains a draft proposal and is not merge-ready until independent review,
+re-review and all checks pass, followed by the user's explicit merge decision.**
+A green PR audits the protected base's deployed cohort, not an already deployed
+Cofactor admission. Only a user-approved protected merge can activate the new
+infrastructure declaration. It enables no scientific capability or worker.
+
+The normal coordinated shared-pin release remains a separate procedure: inspect
+all committed consumer tips, account for coupled pins, synchronize an approved
+canonical revision and pass the complete fleet audit. Existing consumers are
+outside this PR's mutation scope. Remote merge-queue activation and the X-Mech
+Suite projection are deferred to separately reviewed release work. Later Mechs
+need their own declarations and reviews; this proposal authorizes only Cofactor.
 
 Cofactor seeds are candidates derived from MIM roles, not automatic assertions
 of cofactor identity or biochemical requirement. Record evidence separately for
