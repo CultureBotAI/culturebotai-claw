@@ -110,6 +110,15 @@ def test_the_reasons_that_make_checkable_claims_are_the_ones_declared():
         f"{m}.{c}" for m, c, _, cap in _ALL if cap.reason_claims
     )
     assert declared == [
+        "aimech.curation_history",
+        "aimech.deep_research",
+        "aimech.id_label_validation",
+        "aimech.knowledge_gap_scan",
+        "aimech.page_budgets",
+        "aimech.schema_sync",
+        "aimech.source_catalogue",
+        "aimech.source_queue",
+        "aimech.strict_validation",
         "antibioticmech.deep_research",
         "antibioticmech.metpo_proposal",
         "antibioticmech.page_budgets",
@@ -120,6 +129,18 @@ def test_the_reasons_that_make_checkable_claims_are_the_ones_declared():
         "cellstructuremech.source_catalogue",
         "cellstructuremech.unmapped_inventory_input",
         "cellstructuremech.writer_audit",
+        "cmmmech.curation_history",
+        "cmmmech.deep_research",
+        "cmmmech.id_label_validation",
+        "cmmmech.knowledge_gap_scan",
+        "cmmmech.metpo_proposal",
+        "cmmmech.page_budgets",
+        "cmmmech.schema_sync",
+        "cmmmech.site_contract",
+        "cmmmech.source_catalogue",
+        "cmmmech.source_queue",
+        "cmmmech.strict_validation",
+        "cmmmech.writer_audit",
         "communitymech.page_budgets",
         "communitymech.source_catalogue",
         "communitymech.source_queue",
@@ -128,6 +149,10 @@ def test_the_reasons_that_make_checkable_claims_are_the_ones_declared():
         "culturemech.page_budgets",
         "culturemech.source_catalogue",
         "culturemech.source_queue",
+        "dufmech.deep_research",
+        "dufmech.id_label_validation",
+        "dufmech.knowledge_gap_scan",
+        "dufmech.metpo_proposal",
         "habitatmech.deep_research",
         "habitatmech.environment_coverage",
         "habitatmech.kgx_export",
@@ -157,7 +182,6 @@ def test_the_reasons_that_make_checkable_claims_are_the_ones_declared():
         "pathwaymech.page_budgets",
         "pathwaymech.source_catalogue",
         "pathwaymech.source_queue",
-        "pathwaymech.sssom_export",
         "pathwaymech.unmapped_inventory_input",
         "pathwaymech.writer_audit",
         "proteintraitsmech.metpo_proposal",
@@ -515,11 +539,12 @@ def test_a_directory_claim_is_matched_against_its_declaration():
 
 
 def test_the_widened_scanner_found_a_real_undeclared_claim():
-    """CellStructureMech's deep_research reason says its research is "written by
-    hand under research/". True, and undeclared until #246 -- the scanner could
-    not see a path without an extension, so the forward guarantee did not reach
-    it. This pins the declaration that closed it."""
+    """CellStructureMech's deep_research reason names its research/ tree. That
+    was undeclared until #246 -- the scanner could not see a path without an
+    extension, so the forward guarantee did not reach it. This pins the
+    declaration that closed it; the reason was re-measured for #848 and now
+    claims its justfile recipes and the absent provider profile too."""
     claims = (
         MANIFEST.mechs["cellstructuremech"].capabilities["deep_research"].reason_claims
     )
-    assert claims.present == ("research",)
+    assert "research" in claims.present

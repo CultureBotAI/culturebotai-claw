@@ -1,0 +1,144 @@
+{
+  "frozen": "/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/step5-evidence-test-wfi8177v/packaging/inputs.json",
+  "sha256": "81bca7f70554b31fc1c8325ec87468a9b2452dc37997a28c4cc1ed64f50b3f34"
+}
+{
+  "status": "PASS",
+  "archive_members": 12,
+  "original_identities": 7,
+  "tracked_checked": false,
+  "scientific_approval_added": false
+}
+{
+  "status": "PASS",
+  "archive_members": 12,
+  "original_identities": 7,
+  "tracked_checked": true,
+  "scientific_approval_added": false
+}
+{
+  "status": "PASS",
+  "archive_members": 12,
+  "original_identities": 7,
+  "tracked_checked": true,
+  "scientific_approval_added": false
+}
+{
+  "status": "PASS",
+  "archive_members": 12,
+  "original_identities": 7,
+  "tracked_checked": true,
+  "scientific_approval_added": false
+}
+{
+  "status": "PASS",
+  "archive_members": 12,
+  "original_identities": 7,
+  "tracked_checked": true,
+  "scientific_approval_added": false
+}
+[
+  {
+    "name": "limited acceptance preserves explicit coverage",
+    "passed": true
+  },
+  {
+    "name": "FAIL is never accepted",
+    "expected_refusal": true,
+    "error": "Actual candidate acceptance has not passed"
+  },
+  {
+    "name": "limited status without coverage refuses",
+    "expected_refusal": true,
+    "error": "Limited acceptance requires explicit incomplete B4 coverage"
+  },
+  {
+    "name": "limited status without limitation refuses",
+    "expected_refusal": true,
+    "error": "Limited acceptance requires the recorded B4 limitation"
+  },
+  {
+    "name": "different standalone coverage refuses",
+    "expected_refusal": true,
+    "error": "Standalone B4 coverage differs or was not archived"
+  },
+  {
+    "name": "draft refusal",
+    "expected_refusal": true,
+    "error": "Selection is draft or incomplete"
+  },
+  {
+    "name": "freeze exact completed fixture",
+    "passed": true
+  },
+  {
+    "name": "frozen plan README substitution refuses before publication",
+    "expected_refusal": true,
+    "error": "Frozen plan differs from bound selection"
+  },
+  {
+    "name": "frozen explicit run root substitution refuses",
+    "expected_refusal": true,
+    "error": "Recorded run root differs"
+  },
+  {
+    "name": "publish only fresh fixture package",
+    "passed": true
+  },
+  {
+    "name": "duplicate publication refuses",
+    "expected_refusal": true,
+    "error": "Package destination already exists"
+  },
+  {
+    "name": "untracked package refuses",
+    "expected_refusal": true,
+    "error": "Package or maintained evidence includes untracked files"
+  },
+  {
+    "name": "tracked package verifies",
+    "passed": true
+  },
+  {
+    "name": "tampered archive refuses",
+    "expected_refusal": true,
+    "error": "Archive bytes differ"
+  },
+  {
+    "name": "extra package member refuses",
+    "expected_refusal": true,
+    "error": "Package membership differs"
+  },
+  {
+    "name": "maintained source drift refuses",
+    "expected_refusal": true,
+    "error": "Maintained reference differs: source.py"
+  },
+  {
+    "name": "restored fixture verifies",
+    "passed": true
+  },
+  {
+    "name": "portable rehashed extra plan field refuses",
+    "expected_refusal": true,
+    "error": "Frozen plan differs from bound selection"
+  },
+  {
+    "name": "portable rehashed plan and README substitution refuses",
+    "expected_refusal": true,
+    "error": "Frozen plan differs from bound selection"
+  },
+  {
+    "name": "portable rehashed README substitution refuses",
+    "expected_refusal": true,
+    "error": "Packaged README differs from bound selection"
+  },
+  {
+    "name": "portable restored bytes verify",
+    "passed": true
+  },
+  {
+    "name": "actual squash tree verifies without implementation ancestry",
+    "passed": true
+  }
+]

@@ -1,0 +1,48 @@
+{
+  "head": "e78e220d153e41d4340ad0f8abfbd83d96d01b57",
+  "base": "6a7172585eb68da7f4fe01aee75a82458ddd470c",
+  "tree": "6a11b998d157edf4e24aff472001455bd781fa26",
+  "files": {
+    ".claude/skills/publish-sssom/SKILL.md": {
+      "sha256": "ed26e7362012ee14a1664b5dfaead2d10649da8df20ec6b5d7726c777c3adcd7",
+      "bytes": 7975
+    },
+    "docs/guides/MIM_OWNED_NAME_EXPORT.md": {
+      "sha256": "b8697658e24608647dc07b15c312b6d1c7eb2f2a35ee9a936b67c3c0d9751006",
+      "bytes": 3013
+    },
+    "scripts/build_mim_ingredient_sssom.py": {
+      "sha256": "772b7a70309396f705fd8eb0709088304978e76c6fdf5567c5f75c95d59e40dd",
+      "bytes": 67115
+    },
+    "scripts/publish_sssom.py": {
+      "sha256": "daf0eeed1c98a305b5d7fe538941df8e276e37d12e78c3776c6c5204d8db9bd5",
+      "bytes": 38420
+    },
+    "src/kg_microbe_utils/owned_name_policy.py": {
+      "sha256": "18ffd0430d0256b6da6cbb1f3da2327c4cf3418e2b0b2da71ff283ee2f4351ae",
+      "bytes": 7306
+    },
+    "src/kg_microbe_utils/sssom_artifacts.py": {
+      "sha256": "bd94f9d4930967cad055c18b3c7f042d5b5a8f0db7d863845841649ce5ee98a6",
+      "bytes": 12673
+    },
+    "tests/test_mim_owned_name_export.py": {
+      "sha256": "4d8a3eeb9946d7e0f2738a7a3c104d064c6f9ba8a847c6bd574c141d32dc183d",
+      "bytes": 15850
+    },
+    "tests/test_mim_owned_name_policy.py": {
+      "sha256": "62c8675b32177dbc609218851ac13d409cf6dfd628fe37118a76a6c2cc7516b6",
+      "bytes": 12044
+    },
+    "tests/test_mim_sssom_artifacts.py": {
+      "sha256": "66dc74b0ea394665eacc84baa2e6c3b8dc3cf4dd3bf5a67eb28ef881450fa655",
+      "bytes": 15186
+    },
+    "tests/test_mim_sssom_header_dates.py": {
+      "sha256": "abfde63fff697f3869568ccb57e4d311128e48ba6a26832347135c621d1b4b79",
+      "bytes": 8227
+    }
+  },
+  "worktree_clean": true
+}

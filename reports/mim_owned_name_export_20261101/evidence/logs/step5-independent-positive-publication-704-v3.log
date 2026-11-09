@@ -1,0 +1,27 @@
+[
+  {
+    "case": "first_create",
+    "status": "complete",
+    "exact_postimages": true
+  },
+  {
+    "case": "replace_existing_tsv",
+    "status": "complete",
+    "exact_postimages": true
+  },
+  {
+    "case": "sidecar_only_refresh",
+    "status": "complete",
+    "exact_postimages": true
+  },
+  {
+    "case": "missing_manifest_refresh",
+    "status": "complete",
+    "exact_postimages": true
+  },
+  {
+    "case": "true_all_artifact_noop",
+    "status": "unchanged",
+    "exact_postimages": true
+  }
+]

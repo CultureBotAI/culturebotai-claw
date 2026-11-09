@@ -1,0 +1,15 @@
+{
+  "name": "step5-independent-legacy-preliminary-v1",
+  "argv": [
+    "python",
+    "-B",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/preliminary/probe_legacy_boundary.py"
+  ],
+  "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+  "started_at": "2026-11-01T12:44:12.636281+00:00",
+  "environment_profile": "generation-and-native-qc",
+  "finished_at": "2026-11-01T12:44:13.290682+00:00",
+  "exit_code": 0,
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-independent-legacy-preliminary-v1.log",
+  "log_sha256": "040db20784eac0aad44f0fd1881309e933533e9eeb27f9739388ef87ed14c0b0"
+}

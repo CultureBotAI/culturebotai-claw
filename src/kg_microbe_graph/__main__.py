@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import os
 import subprocess
@@ -10,6 +11,7 @@ import sys
 from pathlib import Path
 from typing import Any, Sequence
 
+from kg_microbe_evidence import EvidenceConfig
 from kg_microbe_fleet import load_fleet_manifest
 from kg_microbe_fleet.roots import MechRootError, claw_root, resolve_mech_root
 from kg_microbe_graph.coverage import (
@@ -24,6 +26,7 @@ from kg_microbe_graph.coverage import (
 CLAW_ROOT = claw_root()
 SNAPSHOT = "not a git checkout (a snapshot?)"
 MAX_NAMED = 5
+EVIDENCE_CAPABILITY = "evidence_reference_validation"
 
 
 def _git(root: Path, *args: str, timeout: int) -> str:
@@ -56,7 +59,7 @@ def _glob_directory(pattern: str) -> str:
     return "/".join(fixed) or "."
 
 
-def _revision(root: Path, globs: Sequence[str]) -> str:
+def _revision(root: Path, globs: Sequence[str], *, cache_dir: str | None = None) -> str:
     """Which commit was read, for stderr: a local checkout can lag origin.
 
     Best effort and never part of the JSON. Answered only when `root` is
@@ -73,16 +76,21 @@ def _revision(root: Path, globs: Sequence[str]) -> str:
         head = _git(root, "rev-parse", "--short", "HEAD", timeout=30)
         # Untracked files count: a new record under the globs is read and
         # counted, so a tree holding one is not the commit named above.
+        inputs = {_glob_directory(pattern) for pattern in globs}
+        if cache_dir is not None:
+            inputs.add(cache_dir)
         changed = _git(
-            root, "status", "--porcelain", "--untracked-files=normal", "--",
-            *sorted({_glob_directory(pattern) for pattern in globs}),
+            root, "status", "--porcelain", "--untracked-files=normal",
+            *(["--ignored=matching"] if cache_dir is not None else []), "--",
+            *sorted(inputs),
             timeout=300,
         )
     except subprocess.TimeoutExpired:
         return "revision unknown: git timed out"
     except (OSError, subprocess.SubprocessError):
         return SNAPSHOT
-    return f"HEAD {head}" + (", with uncommitted changes under the record globs" if changed else "")
+    scope = "record globs or reference cache" if cache_dir is not None else "record globs"
+    return f"HEAD {head}" + (f", with uncommitted changes under the {scope}" if changed else "")
 
 
 def _summary_row(key: str, report: CoverageReport) -> str:
@@ -93,6 +101,8 @@ def _summary_row(key: str, report: CoverageReport) -> str:
         return "-" if value is None else f"{100 * value:5.1f}%"
 
     mechanistic = coverage["with_mechanistic_graph"]
+    evidenced = data["graphs"]["edges_with_evidence"]
+    quoted = data["graphs"]["edges_with_quote_validated_evidence"]
     # A sampled row is a different corpus, and a row with excluded files an
     # incomplete one; mark both where the number is read, not only on stderr,
     # which a captured table loses (#494).
@@ -105,13 +115,16 @@ def _summary_row(key: str, report: CoverageReport) -> str:
         f"{'-' if mechanistic is None else mechanistic:>8} "
         f"{pct(coverage['fraction_mechanistic']):>7} "
         f"{coverage['edgeless_only']:>8} {data['graphs']['total']:>7} "
-        f"{data['structure']['graphs_with_findings']:>8}"
+        f"{data['structure']['graphs_with_findings']:>8} "
+        f"{'-' if evidenced is None else evidenced:>8} "
+        f"{'-' if quoted is None else quoted:>8}"
     )
 
 
 SUMMARY_HEADER = (
     f"{'mech':<20} {'records':>8} {'exempt':>7} {'eligible':>8} {'w/graph':>8} "
-    f"{'':>7} {'mechan.':>8} {'':>7} {'edgeless':>8} {'graphs':>7} {'flagged':>8}"
+    f"{'':>7} {'mechan.':>8} {'':>7} {'edgeless':>8} {'graphs':>7} {'flagged':>8} "
+    f"{'w/evid':>8} {'quoteOK':>8}"
 )
 
 
@@ -192,13 +205,31 @@ def main(argv: list[str] | None = None) -> int:
         except CoverageConfigError as exc:
             print(f"{key}: {CAPABILITY} is declared incorrectly: {exc}", file=sys.stderr)
             return 2
+        evidence = mech.capabilities.get(EVIDENCE_CAPABILITY)
+        try:
+            config = dataclasses.replace(
+                config,
+                evidence_status=evidence.status if evidence is not None else "undeclared",
+                evidence_reason=evidence.reason if evidence is not None else "Not declared in the manifest.",
+                evidence_config=(
+                    EvidenceConfig.from_settings(evidence.settings)
+                    if evidence is not None and evidence.is_enabled else None
+                ),
+            )
+        except ValueError as exc:
+            print(f"{key}: {EVIDENCE_CAPABILITY} is declared incorrectly: {exc}", file=sys.stderr)
+            return 2
         try:
             root = args.root or resolve_mech_root(key, claw_root=CLAW_ROOT)
         except MechRootError as exc:
             unavailable[key] = str(exc)
             continue
         globs = list(mech.record_globs)
-        print(f"{key}: reading {root.name} ({_revision(root, globs)})", file=sys.stderr)
+        cache_dir = (
+            config.evidence_config.cache_dir
+            if config.measures_quotes and config.evidence_config is not None else None
+        )
+        print(f"{key}: reading {root.name} ({_revision(root, globs, cache_dir=cache_dir)})", file=sys.stderr)
         try:
             reports[key] = collect(
                 key, root, globs, config, sample=args.sample, jobs=args.jobs
@@ -233,6 +264,10 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{key:<20} {why}")
         for key, why in unavailable.items():
             print(f"{key:<20} UNAVAILABLE: {why}")
+        print(
+            "w/evid: evidence field populated; quoteOK: edges with at least one cached "
+            "source quote match; -: unmeasured. A quote match does not establish claim support."
+        )
         if args.sample is not None:
             print(f"* sampled: the first {args.sample} records only, not the corpus")
         for key, report in reports.items():

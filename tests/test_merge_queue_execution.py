@@ -1,7 +1,13 @@
 """A passing PR cannot establish that a skipped or foreign queue job validates it."""
+from pathlib import Path
+
 import pytest
 
 from kg_microbe_merge_queue import workflow_errors
+
+GOVERNED_QC_EVIDENCE = (Path(__file__).resolve().parents[1]
+                        / "src/kg_microbe_governance/artifacts/workflows/qc-evidence.yaml")
+AUXILIARY_ERROR = "auxiliary checkout needs an immutable full commit SHA"
 
 WORKFLOW = """on:
   pull_request:
@@ -73,6 +79,62 @@ def auxiliary(ref, path):
 
 def test_separate_pinned_auxiliary_checkout_is_allowed():
     assert workflow_errors(auxiliary('a' * 40, 'tools'), ['qc']) == []
+
+
+def test_governed_workflow_may_check_claw_out_at_its_pin_derived_ref():
+    """#793: the governed qc-evidence job checks claw out at the consumer's committed pin."""
+    text = GOVERNED_QC_EVIDENCE.read_text(encoding='utf-8')
+    assert 'ref: ${{ steps.claw-pin.outputs.ref }}' in text
+    assert workflow_errors(text, ['qc-evidence']) == []
+
+
+def test_pin_derived_claw_checkout_needs_the_governed_bytes():
+    """The same structure with one comment added is no longer the reviewed artifact."""
+    text = GOVERNED_QC_EVIDENCE.read_text(encoding='utf-8') + '# local edit\n'
+    assert any(AUXILIARY_ERROR in error for error in workflow_errors(text, ['qc-evidence']))
+
+
+@pytest.mark.parametrize('variant', [
+    lambda text: text.replace('\n', '\r\n'),  # CRLF line endings
+    lambda text: '﻿' + text,             # byte-order mark
+], ids=['crlf', 'bom'])
+def test_byte_variants_of_the_governed_workflow_are_not_the_governed_bytes(variant):
+    """#818: the digest is over the exact bytes; normalising them would admit a non-canonical file."""
+    text = variant(GOVERNED_QC_EVIDENCE.read_text(encoding='utf-8'))
+    assert any(AUXILIARY_ERROR in error for error in workflow_errors(text, ['qc-evidence']))
+
+
+def test_pin_derived_checkout_of_another_repository_is_rejected():
+    text = GOVERNED_QC_EVIDENCE.read_text(encoding='utf-8').replace(
+        'repository: CultureBotAI/culturebotai-claw', 'repository: CultureBotAI/other')
+    assert any(AUXILIARY_ERROR in error for error in workflow_errors(text, ['qc-evidence']))
+
+
+def test_step_output_ref_outside_a_governed_workflow_is_rejected():
+    candidate = auxiliary('${{ steps.pin.outputs.ref }}', 'tools').replace(
+        'repository: tools/project', 'repository: CultureBotAI/culturebotai-claw')
+    assert any(AUXILIARY_ERROR in error for error in workflow_errors(candidate, ['qc']))
+
+
+@pytest.mark.parametrize('ref,repository', [
+    ('main', 'CultureBotAI/culturebotai-claw'),                      # governed bytes, mutable ref
+    ('${{ steps.pin.outputs.ref }}', 'CultureBotAI/other'),         # governed bytes, other repository
+])
+def test_governed_bytes_alone_do_not_admit_any_checkout(monkeypatch, ref, repository):
+    """Each condition holds on its own: a governed digest admits only a pin-derived claw ref."""
+    import hashlib
+
+    import kg_microbe_merge_queue as queue
+
+    candidate = auxiliary(ref, 'tools').replace('repository: tools/project', f'repository: {repository}')
+    digest = hashlib.sha256(candidate.encode('utf-8')).hexdigest()
+    monkeypatch.setattr(queue, 'governed_workflow_digests', lambda: frozenset({digest}))
+    assert any(AUXILIARY_ERROR in error for error in workflow_errors(candidate, ['qc']))
+    allowed = auxiliary('${{ steps.pin.outputs.ref }}', 'tools').replace(
+        'repository: tools/project', 'repository: CultureBotAI/culturebotai-claw')
+    monkeypatch.setattr(queue, 'governed_workflow_digests',
+                        lambda: frozenset({hashlib.sha256(allowed.encode('utf-8')).hexdigest()}))
+    assert workflow_errors(allowed, ['qc']) == []
 
 
 @pytest.mark.parametrize('ref,path', [('main', 'tools'), ('a' * 40, 'candidate'),

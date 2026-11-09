@@ -1,0 +1,181 @@
+{
+  "status": "PASS_WITH_LIMITATIONS",
+  "reviewer": "/root/step4_design_review",
+  "at": "2026-11-01T13:46:10.950947+00:00",
+  "issue": 710,
+  "v4_sha256": "1377772d93374ce6a31de85fab0ba9fe5697f63430db1e075431360e35018422",
+  "original_actual_integration": "fda8972b1820964d2d839d44165fb948b2917762",
+  "original_implementation": "a56f3ae4563619a5129ad944878c9205267315d6",
+  "actual_integration_current_source_references": "unchanged all13selectedrefs",
+  "original_v3_actual_squash": "REFUSED as recorded",
+  "v4_actual_squash": "PASS",
+  "v4_real_depth_one_clone_without_old_feature_objects": "PASS",
+  "working_byte_refusal": "PASS",
+  "current_HEAD_blob_refusal": "PASS",
+  "selected_hash_refusal": "PASS",
+  "strict_author_history_refusal": "PASS",
+  "original_proof_unchanged": true,
+  "results": {
+    "old-actual-squash": {
+      "argv": [
+        "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+        "-B",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/full-integration/reports/mim_owned_name_export_20261101/verify.py",
+        "verify",
+        "--package",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/full-integration/reports/mim_owned_name_export_20261101",
+        "--repository",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/full-integration",
+        "--require-tracked"
+      ],
+      "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/full-integration",
+      "exit_code": 1,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "6f705f95df0298eecf9bf1b6522a940f6cef19f75a24b204bec950876404f505"
+    },
+    "clone-shallow": {
+      "argv": [
+        "git",
+        "clone",
+        "--no-local",
+        "--depth=1",
+        "--no-checkout",
+        "file:///Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/queue709/fda8972/isolated.git",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/shallow-consumer"
+      ],
+      "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4",
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e6b5c8cde13d489b170a60f4b15d10afb51928e977e75bc2900927b0e4f26fbd"
+    },
+    "old-objects-absent": {
+      "argv": [
+        "git",
+        "cat-file",
+        "-e",
+        "a56f3ae4563619a5129ad944878c9205267315d6^{commit}"
+      ],
+      "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/shallow-consumer",
+      "exit_code": 128,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "897548bc9f504566debe4c15aa2c94ec186bf2eef6fc5b7779a5a2f1ea18fb5b"
+    },
+    "old-shallow": {
+      "argv": [
+        "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+        "-B",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/shallow-consumer/reports/mim_owned_name_export_20261101/verify.py",
+        "verify",
+        "--package",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/shallow-consumer/reports/mim_owned_name_export_20261101",
+        "--repository",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/shallow-consumer",
+        "--require-tracked"
+      ],
+      "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/shallow-consumer",
+      "exit_code": 1,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "760de281508212d878fd7f63d07fd2e85c1b3b02ebe4a5234ddedf304291325f"
+    },
+    "v4-actual-squash": {
+      "argv": [
+        "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+        "-B",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/full-integration/reports/mim_owned_name_export_20261101/verify.py",
+        "verify",
+        "--package",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/full-integration/reports/mim_owned_name_export_20261101",
+        "--repository",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/full-integration",
+        "--require-tracked"
+      ],
+      "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/full-integration",
+      "exit_code": 0,
+      "stdout_sha256": "dbf62c6c7e4336b933ce51673ca057e53ffbdac06ed0d10f07f061af686fbcaa",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "v4-shallow-no-old-objects": {
+      "argv": [
+        "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+        "-B",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/shallow-consumer/reports/mim_owned_name_export_20261101/verify.py",
+        "verify",
+        "--package",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/shallow-consumer/reports/mim_owned_name_export_20261101",
+        "--repository",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/shallow-consumer",
+        "--require-tracked"
+      ],
+      "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/shallow-consumer",
+      "exit_code": 0,
+      "stdout_sha256": "dbf62c6c7e4336b933ce51673ca057e53ffbdac06ed0d10f07f061af686fbcaa",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "refuse-working-byte": {
+      "argv": [
+        "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+        "-B",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/shallow-consumer/reports/mim_owned_name_export_20261101/verify.py",
+        "verify",
+        "--package",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/shallow-consumer/reports/mim_owned_name_export_20261101",
+        "--repository",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/shallow-consumer",
+        "--require-tracked"
+      ],
+      "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/shallow-consumer",
+      "exit_code": 1,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "d93c4f72de1edc9d4b6192639ef2448fa895044d30d37e0544d14520bba5996e"
+    },
+    "refuse-current-git-blob": {
+      "argv": [
+        "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+        "-B",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/shallow-consumer/reports/mim_owned_name_export_20261101/verify.py",
+        "verify",
+        "--package",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/shallow-consumer/reports/mim_owned_name_export_20261101",
+        "--repository",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/shallow-consumer",
+        "--require-tracked"
+      ],
+      "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/shallow-consumer",
+      "exit_code": 1,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "8cb57bbbe3e5601211041805a2c4837b5ff8785b3f5f0cde759253defd32cc16"
+    },
+    "refuse-selected-hash": {
+      "status": "PASS",
+      "error": "Maintained reference differs: src/kg_microbe_utils/owned_name_policy.py"
+    },
+    "refuse-author-history-in-shallow": {
+      "status": "PASS"
+    },
+    "v4-restored-shallow": {
+      "argv": [
+        "/Users/marcin/Documents/VIMSS/ontology/KG-Hub/KG-Microbe/culturebotai-claw/.venv/bin/python",
+        "-B",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/shallow-consumer/reports/mim_owned_name_export_20261101/verify.py",
+        "verify",
+        "--package",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/shallow-consumer/reports/mim_owned_name_export_20261101",
+        "--repository",
+        "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/shallow-consumer",
+        "--require-tracked"
+      ],
+      "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-independent/rereview-710-v4/shallow-consumer",
+      "exit_code": 0,
+      "stdout_sha256": "dbf62c6c7e4336b933ce51673ca057e53ffbdac06ed0d10f07f061af686fbcaa",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "limitations": [
+    "This tests frozen v4 source using isolated copies of the actual blocked integration package with verifier/version hash fields rebound; no replacement production package or new PR head has been published or reviewed.",
+    "A future final package/head/body and its actual queue integration must be reviewed separately.",
+    "Portable checks establish selected content/current tracked Git identity; historical provenance remains asserted and frozen under the separate author publication checks.",
+    "No scientific approval, production edits or GitHub mutations."
+  ],
+  "remaining_findings": [],
+  "supervisor_binding": null
+}

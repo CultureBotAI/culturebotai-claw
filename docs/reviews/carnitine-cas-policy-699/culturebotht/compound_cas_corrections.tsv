@@ -1,0 +1,5 @@
+compound	wrong_cas	correct_cas	correct_form	evidence
+Phenethylamine Hydrochloride	64-04-0	156-28-5	hydrochloride	64-04-0 is phenethylamine free base (PubChem CID 1001, C8H11N); the hydrochloride is 156-28-5 (C8H12ClN)
+Carnitine (Dl) Hydrochloride	461-06-3	461-05-2	hydrochloride	461-06-3 is DL-carnitine free base (C7H15NO3); DL-carnitine hydrochloride is 461-05-2 (C7H16ClNO3); the catalogue already uses 461-05-2 for the "Carnitine Hydrochloride" row
+Glycyrrhizic Acid, Ammonium Salt	1405-86-3	53956-04-0	ammonium salt	1405-86-3 is glycyrrhizic acid free acid (C42H62O16); ammonium glycyrrhizinate is 53956-04-0 (C42H65NO16)
+Dimethylsulfoniopropionate hydrochloride	7314-30-9	4337-33-1	chloride salt	7314-30-9 is the DMSP zwitterion/inner salt (C5H10O2S); the chloride/hydrochloride salt is 4337-33-1 (C5H11ClO2S), corroborated by the catalogue FW 170.66 which matches C5H11ClO2S not the 134.20 zwitterion

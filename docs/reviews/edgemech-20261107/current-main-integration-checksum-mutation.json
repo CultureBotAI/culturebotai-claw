@@ -1,0 +1,14 @@
+{
+  "format": "edgemech-admission-mutation-proof/v1",
+  "helper_sha256": "a6b64f7c0ba77d512335405f5e76251b74594869c9655eb2f85df9f20f993072",
+  "mutations": [
+    {
+      "exit_code": 1,
+      "guard": "current_checksum",
+      "regression_failed_as_expected": true
+    }
+  ],
+  "production_sources_unchanged": true,
+  "source_sha256": "6a516835ce8417a206f5b96388df08b8aeb70b0ee305abfb2a86cfdf0ebb245c",
+  "workflow_sha256": "f0e51a8709bb656fa61693ecebad53a00ec71a9b546f024470b9378750b0b71e"
+}

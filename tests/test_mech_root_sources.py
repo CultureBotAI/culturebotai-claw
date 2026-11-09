@@ -28,12 +28,16 @@ import pytest
 
 from kg_microbe_fleet import load_fleet_manifest
 from kg_microbe_fleet.roots import (
+    CULTUREBOTAI_SITE_DIRECTORY,
+    CULTUREBOTAI_SITE_MARKER,
+    CULTUREBOTAI_SITE_VARIABLE,
     KG_MICROBE_DIRECTORY,
     KG_MICROBE_PACKAGE,
     KG_MICROBE_VARIABLE,
     MechRootError,
     dotenv_value,
     require_mech_roots,
+    resolve_culturebotai_site_root,
     resolve_kg_microbe_root,
     resolve_mech_root,
 )
@@ -301,6 +305,41 @@ def test_an_exported_kg_microbe_root_wins_over_the_dotenv_file(tmp_path):
     )
 
 
+def test_culturebotai_site_is_resolved_from_claws_dotenv_and_sibling_marker(tmp_path):
+    claw = tmp_path / "claw"
+    claw.mkdir()
+    sibling = tmp_path / CULTUREBOTAI_SITE_DIRECTORY
+    sibling.mkdir()
+    assert CULTUREBOTAI_SITE_MARKER == "_fleet/mechs_template.md"
+    assert resolve_culturebotai_site_root(claw_root=claw, environ={}) is None
+
+    marker = sibling / CULTUREBOTAI_SITE_MARKER
+    marker.parent.mkdir(parents=True)
+    marker.write_text("# X-Mech Suite\n", encoding="utf-8")
+    assert (
+        resolve_culturebotai_site_root(claw_root=claw, environ={})
+        == sibling.resolve()
+    )
+
+    from_file = tmp_path / "from-file"
+    from_file.mkdir()
+    write_dotenv(claw, f"{CULTUREBOTAI_SITE_VARIABLE}={from_file}\n")
+    assert (
+        resolve_culturebotai_site_root(claw_root=claw, environ={})
+        == from_file.resolve()
+    )
+
+    exported = tmp_path / "exported"
+    exported.mkdir()
+    assert (
+        resolve_culturebotai_site_root(
+            claw_root=claw,
+            environ={CULTUREBOTAI_SITE_VARIABLE: str(exported)},
+        )
+        == exported.resolve()
+    )
+
+
 # --------------------------------------------------------------------------
 # #374: the template and the readers must name the same variable
 # --------------------------------------------------------------------------
@@ -321,7 +360,7 @@ def test_the_env_template_declares_exactly_the_root_variables_that_are_read():
     }
     root_variables = {
         mech.environment_variable for mech in MANIFEST.mechs.values()
-    } | {KG_MICROBE_VARIABLE}
+    } | {KG_MICROBE_VARIABLE, CULTUREBOTAI_SITE_VARIABLE}
 
     missing = sorted(root_variables - declared)
     assert not missing, (

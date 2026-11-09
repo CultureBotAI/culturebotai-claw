@@ -1,0 +1,17 @@
+{
+  "name": "step5-helper-native-parity-v1",
+  "argv": [
+    "uv",
+    "run",
+    "--frozen",
+    "python",
+    "../step5-helper-implementation/probe_native_rule_k.py"
+  ],
+  "cwd": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/claw-owned-name",
+  "started_at": "2026-11-01T12:40:21.221390+00:00",
+  "environment_profile": "generation-and-native-qc",
+  "finished_at": "2026-11-01T12:40:21.339358+00:00",
+  "exit_code": 0,
+  "log": "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/logs/step5-helper-native-parity-v1.log",
+  "log_sha256": "13bae7947230e90f9356933046f2626a8088f731ec4fe93d2e79c8994bd28a0e"
+}

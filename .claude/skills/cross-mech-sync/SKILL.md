@@ -93,6 +93,13 @@ prepared offline, but it is not a completed cross-Mech sync.
 
 ### A. Prepare the validated scope
 
+Keep the audit, worktrees, operation helpers and PR handoffs under the
+gitignored `<repo>/.temp/` durable root; verify that ignore rule before use.
+Use `~/agent-work/<repo>/` for a separately cloned repository. Never use
+`/tmp/`, `/private/tmp/` or `$TMPDIR` for this retained session state.
+Push every authorized committed batch branch the same day, even before
+opening its PR; verify publication and retain any failed-push blocker.
+
 ```bash
 CAPABILITY="${CAPABILITY:-}"
 TASK_SLUG="${TASK_SLUG:-}"
@@ -104,7 +111,9 @@ case "$TASK_SLUG" in
 esac
 ORCHESTRATION_ROOT="$(git rev-parse --show-toplevel)"
 test -f "$ORCHESTRATION_ROOT/plugins/lock_manager.py"
-AUDIT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/cross-mech-audit.XXXXXX")"
+DURABLE_ROOT="$ORCHESTRATION_ROOT/.temp"
+mkdir -p "$DURABLE_ROOT"
+AUDIT_DIR="$(mktemp -d "$DURABLE_ROOT/cross-mech-audit.XXXXXX")"
 FLEET_TSV="$AUDIT_DIR/fleet.tsv"
 uv run python -m kg_microbe_fleet targets \
   --capability "$CAPABILITY" > "$FLEET_TSV"
@@ -243,7 +252,9 @@ For a **re-pin**, also run `uv run kg-microbe-governance pin-coupling --old-ref
 <outgoing pin>` with one `--target-root` per consumer. A governance dry run
 that plans only `scripts/.vendored_canon_ref` does not mean the re-pin is one
 file: a Mech can hard-code the pin in a workflow or commit a snapshot of
-claw's manifest, and each reported file belongs in that Mech's re-pin commit.
+claw's manifest. Judge each reported hit by the guide's rules: change a copy
+the Mech's own checks compare against the pin; leave dated records,
+provenance and commit permalinks as the history they are (#795).
 See `docs/guides/VENDORED_GOVERNANCE.md`.
 
 ### D. Make the change in an isolated worktree (per laggard repo)
@@ -260,7 +271,7 @@ case "$TARGET_GITHUB" in
   *) echo "Invalid owner/repository identity: $TARGET_GITHUB" >&2; exit 2 ;;
 esac
 
-SYNC_DIR="$(mktemp -d "${TMPDIR:-/tmp}/cross-mech-${TARGET_KEY}.XXXXXX")"
+SYNC_DIR="$(mktemp -d "$DURABLE_ROOT/cross-mech-${TARGET_KEY}.XXXXXX")"
 WT="$SYNC_DIR/worktree"
 OPERATION_SCRIPT="$SYNC_DIR/apply-reviewed-change.sh"
 PR_BODY_FILE="$SYNC_DIR/pr-body.md"
@@ -434,6 +445,13 @@ but refuses if that ref moved after review.
 - Update only tracking artifacts explicitly declared by the governing manifest
   or named in the task. Do not introduce or mutate a `NEXT_TASKS.md` merely
   because another Mech happens to carry one.
+- When the synced change affects fleet membership, schemas, record counts, prefix/subset
+  overlap, or published Mech Pages sites, check the companion X-Mech Suite checkout
+  (`$CULTUREBOTAI_SITE_ROOT`, `CultureBotAI.github.io/scripts/fleet/check_updates.py`)
+  and refresh `CultureBotAI.github.io/_fleet/data/manifest.json`,
+  `CultureBotAI.github.io/_fleet/data/site_audit.json`, and
+  `CultureBotAI.github.io/mechs.md` per
+  `CultureBotAI.github.io/.claude/skills/update-xmech-page/SKILL.md` when requested.
 - Comment + close the tracking issue (often in `culturebotai-claw`); record any
   **decision** made (e.g. "TraitMech deferred — net-new adoption, not a sync").
 

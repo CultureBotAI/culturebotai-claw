@@ -1,0 +1,53 @@
+{
+  "status": "PASS",
+  "files": {
+    "checkout-0/mapped/.gitignore": {
+      "sha256": "4ad674654d39a0d37f4f6e07f949dc20d51ff3fa03b815a95371bbffa7cf50e3",
+      "bytes": 7
+    },
+    "checkout-0/mapped/Stra\u00dfe stock.yaml": {
+      "sha256": "f68d488b5503d080685c87e5942d811b18ce25d769cd24c57cb6a7bc6667aade",
+      "bytes": 67
+    },
+    "checkout-0/mapped/literal~3911.yaml": {
+      "sha256": "e1409ec15bec3ae99c057d8791b0345b5b9d28afe211f072dc814bc95278558b",
+      "bytes": 99
+    },
+    "checkout-0/mapped/\u03911~ salt.yaml": {
+      "sha256": "5589a42f7e5f7759ee47cf2ec8b376ff9577b9b783769d3e2bc730bfecc54de9",
+      "bytes": 74
+    },
+    "checkout-0/mapped/\u03a9 dangling.yaml": {
+      "sha256": "d66a5ea7715f7683d6ae99c4864485d6c9e686b2fe0f14270f6f043f8d230db0",
+      "bytes": 93
+    },
+    "checkout-1/mapped/.gitignore": {
+      "sha256": "4ad674654d39a0d37f4f6e07f949dc20d51ff3fa03b815a95371bbffa7cf50e3",
+      "bytes": 7
+    },
+    "checkout-1/mapped/Stra\u00dfe stock.yaml": {
+      "sha256": "f68d488b5503d080685c87e5942d811b18ce25d769cd24c57cb6a7bc6667aade",
+      "bytes": 67
+    },
+    "checkout-1/mapped/literal~3911.yaml": {
+      "sha256": "e1409ec15bec3ae99c057d8791b0345b5b9d28afe211f072dc814bc95278558b",
+      "bytes": 99
+    },
+    "checkout-1/mapped/\u03911~ salt.yaml": {
+      "sha256": "4a70e10c592392b25f6f07b68793cf545522674e8e4b943044da38fe0d25b5b0",
+      "bytes": 81
+    },
+    "checkout-1/mapped/\u03a9 dangling.yaml": {
+      "sha256": "d66a5ea7715f7683d6ae99c4864485d6c9e686b2fe0f14270f6f043f8d230db0",
+      "bytes": 93
+    },
+    "probe.py": {
+      "sha256": "fe7a84297235be984a5d17e8a80def974bb3a00ed4c39dc944bfd09743d1214f",
+      "bytes": 3191
+    },
+    "result.json": {
+      "sha256": "9c1e897a058d606d770a6f80684c4e000cc850cb6b1e892e763c2fd4d45e6f72",
+      "bytes": 1623
+    }
+  }
+}

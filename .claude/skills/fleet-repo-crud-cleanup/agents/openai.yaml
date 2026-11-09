@@ -1,0 +1,4 @@
+interface:
+  display_name: "Mech Repository Cleanup"
+  short_description: "Review and clean clutter across the Mech fleet"
+  default_prompt: "Use $fleet-repo-crud-cleanup to inventory clutter across the current Mechs and carry out cleanup within my requested scope."

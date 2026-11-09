@@ -1,0 +1,24 @@
+{
+  "name": "mutant-current-git-blob",
+  "scenario": "committed",
+  "expected": "assertion",
+  "argv": [
+    "/opt/homebrew/Caskroom/miniforge/base/bin/python",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v6.py",
+    "--module",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-710/controls/mutant-current-git-blob/packager.py",
+    "--scenario",
+    "committed",
+    "--results",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-710/controls/mutant-current-git-blob/results.json"
+  ],
+  "started_at": "2026-11-01T13:44:52.775847+00:00",
+  "finished_at": "2026-11-01T13:44:53.398437+00:00",
+  "exit_code": 1,
+  "log_sha256": "d9b2dc7a7a5fde26b477f901931b85b05d2b3ed22e7a1750761df65958790b53",
+  "module_sha256": "f8d1ecbb17cc8eb3672bff326b1e84170860a5284dda212702eb5dc8c09bc495",
+  "mutation": [
+    "require(committed == raw,",
+    "require(True,"
+  ]
+}

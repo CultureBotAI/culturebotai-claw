@@ -81,6 +81,34 @@ repositories:
     task_runner: just
     description: "Pathway-level microbial mechanisms: participants, reactions and evidence-backed causal edges"
 
+  dufmech:
+    path: ${DUFMECH_ROOT}
+    type: python
+    package_manager: uv
+    task_runner: just
+    description: "Domain of Unknown Function mechanism knowledge base"
+
+  cmmmech:
+    path: ${CMMMECH_ROOT}
+    type: python
+    package_manager: uv
+    task_runner: just
+    description: "Critical minerals/materials and microbial extraction, transformation and recovery"
+
+  aimech:
+    path: ${AIMECH_ROOT}
+    type: python
+    package_manager: uv
+    task_runner: just
+    description: "AI concepts from pinned AIO ontology releases and evidence-backed curation"
+
+  edgemech:
+    path: ${EDGEMECH_ROOT}
+    type: python
+    package_manager: uv
+    task_runner: just
+    description: "Release-occurrence accounting and inherited review eligibility"
+
 agents:
   discovery_paths:
     - kg_microbe_agents/definitions

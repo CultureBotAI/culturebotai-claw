@@ -1,0 +1,97 @@
+FFF...                                                                   [100%]
+=================================== FAILURES ===================================
+_ test_rejected_cas_precedes_ownership_on_every_emitted_path[False-EXACT_MATCH] _
+
+tmp_path = PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8573/test_rejected_cas_precedes_own0')
+quality = 'EXACT_MATCH', eligible = False
+
+    @pytest.mark.parametrize("quality", ["EXACT_MATCH", "CLOSE_MATCH", "NARROW_MATCH"])
+    @pytest.mark.parametrize("eligible", [False, True])
+    def test_rejected_cas_precedes_ownership_on_every_emitted_path(tmp_path, quality, eligible):
+        subject = write_record(
+            tmp_path, identifier="cas:12-34-5", chemical_properties={"cas_rn": "12-34-5"},
+            ontology_mapping={"ontology_id": "CHEBI:2", "ontology_label": "Parent", "mapping_quality": quality},
+            synonyms=[] if eligible else [{"synonym_text": "cas:12-34-5", "synonym_type": "REJECTED_LABEL"}],
+        )
+        write_record(tmp_path, "CAS owner", preferred_term="CAS:12-34-5", ontology_mapping={})
+        events = []
+        rows = builder._row_from_yaml(subject, {}, {}, {}, {}, suppressions=events)
+        assert all("cas:12-34-5" not in row["other"].casefold() for row in rows)
+        assert len(rows) >= 2
+        if quality == "NARROW_MATCH":
+            assert len(rows) == 3
+        if eligible:
+            assert sidecar_rows(events)[0]["token_key"] == "cas:12-34-5"
+        else:
+>           assert events == []
+E           AssertionError: assert [Suppression(...issues/701'))] == []
+E             
+E             Left contains one more item: Suppression(subject_id='MIM:Subject', token='CAS:12-34-5', owner_subject_ids=frozenset({'MIM:CAS~20owner'}), input_sur...diaIngredientMech/issues/669#issuecomment-6558035777', 'https://github.com/CultureBotAI/culturebotai-claw/issues/701'))
+E             Use -v to get more diff
+
+tests/test_mim_owned_name_export.py:380: AssertionError
+_ test_rejected_cas_precedes_ownership_on_every_emitted_path[False-CLOSE_MATCH] _
+
+tmp_path = PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8573/test_rejected_cas_precedes_own1')
+quality = 'CLOSE_MATCH', eligible = False
+
+    @pytest.mark.parametrize("quality", ["EXACT_MATCH", "CLOSE_MATCH", "NARROW_MATCH"])
+    @pytest.mark.parametrize("eligible", [False, True])
+    def test_rejected_cas_precedes_ownership_on_every_emitted_path(tmp_path, quality, eligible):
+        subject = write_record(
+            tmp_path, identifier="cas:12-34-5", chemical_properties={"cas_rn": "12-34-5"},
+            ontology_mapping={"ontology_id": "CHEBI:2", "ontology_label": "Parent", "mapping_quality": quality},
+            synonyms=[] if eligible else [{"synonym_text": "cas:12-34-5", "synonym_type": "REJECTED_LABEL"}],
+        )
+        write_record(tmp_path, "CAS owner", preferred_term="CAS:12-34-5", ontology_mapping={})
+        events = []
+        rows = builder._row_from_yaml(subject, {}, {}, {}, {}, suppressions=events)
+        assert all("cas:12-34-5" not in row["other"].casefold() for row in rows)
+        assert len(rows) >= 2
+        if quality == "NARROW_MATCH":
+            assert len(rows) == 3
+        if eligible:
+            assert sidecar_rows(events)[0]["token_key"] == "cas:12-34-5"
+        else:
+>           assert events == []
+E           AssertionError: assert [Suppression(...issues/701'))] == []
+E             
+E             Left contains one more item: Suppression(subject_id='MIM:Subject', token='CAS:12-34-5', owner_subject_ids=frozenset({'MIM:CAS~20owner'}), input_sur...diaIngredientMech/issues/669#issuecomment-6558035777', 'https://github.com/CultureBotAI/culturebotai-claw/issues/701'))
+E             Use -v to get more diff
+
+tests/test_mim_owned_name_export.py:380: AssertionError
+_ test_rejected_cas_precedes_ownership_on_every_emitted_path[False-NARROW_MATCH] _
+
+tmp_path = PosixPath('/private/var/folders/8w/lrmvnnnj0n57zm8b9rnhw76m0000gn/T/pytest-of-marcin/pytest-8573/test_rejected_cas_precedes_own2')
+quality = 'NARROW_MATCH', eligible = False
+
+    @pytest.mark.parametrize("quality", ["EXACT_MATCH", "CLOSE_MATCH", "NARROW_MATCH"])
+    @pytest.mark.parametrize("eligible", [False, True])
+    def test_rejected_cas_precedes_ownership_on_every_emitted_path(tmp_path, quality, eligible):
+        subject = write_record(
+            tmp_path, identifier="cas:12-34-5", chemical_properties={"cas_rn": "12-34-5"},
+            ontology_mapping={"ontology_id": "CHEBI:2", "ontology_label": "Parent", "mapping_quality": quality},
+            synonyms=[] if eligible else [{"synonym_text": "cas:12-34-5", "synonym_type": "REJECTED_LABEL"}],
+        )
+        write_record(tmp_path, "CAS owner", preferred_term="CAS:12-34-5", ontology_mapping={})
+        events = []
+        rows = builder._row_from_yaml(subject, {}, {}, {}, {}, suppressions=events)
+        assert all("cas:12-34-5" not in row["other"].casefold() for row in rows)
+        assert len(rows) >= 2
+        if quality == "NARROW_MATCH":
+            assert len(rows) == 3
+        if eligible:
+            assert sidecar_rows(events)[0]["token_key"] == "cas:12-34-5"
+        else:
+>           assert events == []
+E           AssertionError: assert [Suppression(...issues/701'))] == []
+E             
+E             Left contains one more item: Suppression(subject_id='MIM:Subject', token='CAS:12-34-5', owner_subject_ids=frozenset({'MIM:CAS~20owner'}), input_sur...diaIngredientMech/issues/669#issuecomment-6558035777', 'https://github.com/CultureBotAI/culturebotai-claw/issues/701'))
+E             Use -v to get more diff
+
+tests/test_mim_owned_name_export.py:380: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_mim_owned_name_export.py::test_rejected_cas_precedes_ownership_on_every_emitted_path[False-EXACT_MATCH]
+FAILED tests/test_mim_owned_name_export.py::test_rejected_cas_precedes_ownership_on_every_emitted_path[False-CLOSE_MATCH]
+FAILED tests/test_mim_owned_name_export.py::test_rejected_cas_precedes_ownership_on_every_emitted_path[False-NARROW_MATCH]
+3 failed, 3 passed, 49 deselected in 0.08s

@@ -1,0 +1,50 @@
+{
+  "step5-claw-independent/queue709/fda8972/probe_squash_verification.py": {
+    "sha256": "d902aee3e35c015b47d77408f0598cb29c5148cc52c1539cd785f48bcc230f79",
+    "bytes": 4093
+  },
+  "step5-claw-independent/queue709/fda8972/finding.json": {
+    "sha256": "f843a8a06d9e2fc6b1076e1e1eb1fd15a5822d2fffa239fce3bd52a5464dc894",
+    "bytes": 2196
+  },
+  "step5-claw-independent/queue709/fda8972/actual-portable.stdout": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "step5-claw-independent/queue709/fda8972/actual-portable.stderr": {
+    "sha256": "3a6801ee658ac19767b05efce33db0022aab7b4b14672b6aaea0e2ddec5b17e3",
+    "bytes": 1992
+  },
+  "step5-claw-independent/queue709/fda8972/commit-metadata.txt": {
+    "sha256": "659a21b27aa8a5901e4534dd8ad9f671b25d8c2e64965e3ae33a6e468e3eda12",
+    "bytes": 195
+  },
+  "step5-claw-independent/queue709/fda8972/review.md": {
+    "sha256": "b0a252395f61ac32aa49562fe2717b431b5f8d56ab0cb3dc3b2315d3e97a7b22",
+    "bytes": 1294
+  },
+  "step5-claw-independent/queue709/fda8972/integration-export/reports/mim_owned_name_export_20261101/verify.py": {
+    "sha256": "74ade999a59f91d61e83d1b41de9d6b00dbae2fd58a9b28f285724359b18c821",
+    "bytes": 14702
+  },
+  "step5-claw-independent/queue709/fda8972/isolated.git/HEAD": {
+    "sha256": "361f5cb0dbbf0e7c574bc5d615256896877e21ae4fec077e467bbde72098ce6d",
+    "bytes": 41
+  },
+  "step5-claw-independent/queue709/fda8972/isolated.git/objects/info/alternates": {
+    "sha256": "839b70f13a1b1eea18f7da74bbd65495d45d7bd7a59da19c85b53c786217f4de",
+    "bytes": 121
+  },
+  "logs/step5-independent-queue709-fda8972-squash.json": {
+    "sha256": "1c3c9d3271a72d49dfbec4e0639229a583a521cad456fe12446ad60af9554e27",
+    "bytes": 834
+  },
+  "logs/step5-independent-queue709-fda8972-squash.log": {
+    "sha256": "68f7b6c701ac01c7bcc1427a22a9b817c4d571fcdc6ecec144164e0bb15b61e6",
+    "bytes": 4189
+  },
+  "step5-claw-independent/queue709/20261101T134004184676Z.json": {
+    "sha256": "58e7a1b608a4940515adae097dd406375de8ed2a2cf5c6f42fc76b54bcf8d32b",
+    "bytes": 4617
+  }
+}

@@ -1,0 +1,7 @@
+error: Failed to fetch: `https://pypi.org/simple/ruff/`
+  Caused by: Could not connect, are you offline?
+  Caused by: Request failed after 3 retries
+  Caused by: error sending request for url (https://pypi.org/simple/ruff/)
+  Caused by: client error (Connect)
+  Caused by: dns error: failed to lookup address information: nodename nor servname provided, or not known
+  Caused by: failed to lookup address information: nodename nor servname provided, or not known

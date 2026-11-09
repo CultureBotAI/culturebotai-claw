@@ -1,0 +1,58 @@
+{
+  "status": "PASS",
+  "scope": "Exact e78 builder _mim_curie AST executed unmodified; complete actual native forward filename index/owner index/Rule K; two distinct fixture directories with true Unicode and literal tilde filenames, ignored YAML included. No production files changed.",
+  "builder_sha256": "772b7a70309396f705fd8eb0709088304978e76c6fdf5567c5f75c95d59e40dd",
+  "native_validator_sha256": "89821559f9cbf999675b163396140c4b035cac7bf3ae23dd709f8b76e149de77",
+  "checks": [
+    {
+      "epoch": 0,
+      "subjects": [
+        "MIM:Stra~DFe~20stock",
+        "MIM:literal~7E3911",
+        "MIM:~3911~7E~20salt",
+        "MIM:~3A9~20dangling"
+      ],
+      "owner_index": {
+        "sibling": [
+          "MIM:Stra~DFe~20stock"
+        ],
+        "shared name": [
+          "MIM:~3911~7E~20salt"
+        ],
+        "unresolved": [
+          "MIM:~3A9~20dangling"
+        ],
+        "legacy name": [
+          "MIM:Stra~DFe~20stock",
+          "MIM:~3911~7E~20salt"
+        ]
+      },
+      "actual_native_rule_k_filtered_rows": 4
+    },
+    {
+      "epoch": 1,
+      "subjects": [
+        "MIM:Stra~DFe~20stock",
+        "MIM:literal~7E3911",
+        "MIM:~3911~7E~20salt",
+        "MIM:~3A9~20dangling"
+      ],
+      "owner_index": {
+        "sibling": [
+          "MIM:Stra~DFe~20stock"
+        ],
+        "changed owner name": [
+          "MIM:~3911~7E~20salt"
+        ],
+        "unresolved": [
+          "MIM:~3A9~20dangling"
+        ],
+        "legacy name": [
+          "MIM:Stra~DFe~20stock",
+          "MIM:~3911~7E~20salt"
+        ]
+      },
+      "actual_native_rule_k_filtered_rows": 4
+    }
+  ]
+}

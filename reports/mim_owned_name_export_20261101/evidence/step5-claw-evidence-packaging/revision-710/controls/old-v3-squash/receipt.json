@@ -1,0 +1,21 @@
+{
+  "name": "old-v3-squash",
+  "scenario": "squash",
+  "expected": "old-red",
+  "argv": [
+    "/opt/homebrew/Caskroom/miniforge/base/bin/python",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/test_packager_v6.py",
+    "--module",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/package_evidence_v3.py",
+    "--scenario",
+    "squash",
+    "--results",
+    "/Users/marcin/Documents/VIMSS/ontology/Mechs/MediaIngredientMech/output/approved-plan-20261101T031134Z/step5-claw-evidence-packaging/revision-710/controls/old-v3-squash/results.json"
+  ],
+  "started_at": "2026-11-01T13:44:46.912997+00:00",
+  "finished_at": "2026-11-01T13:44:47.436493+00:00",
+  "exit_code": 1,
+  "log_sha256": "dfc3b873b3f958d47e5b1465a78976eded383479aab7509c1c559d120340e246",
+  "module_sha256": "74ade999a59f91d61e83d1b41de9d6b00dbae2fd58a9b28f285724359b18c821",
+  "mutation": null
+}

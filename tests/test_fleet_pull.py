@@ -1,10 +1,15 @@
 """Exercise fleet updates against isolated Git remotes, never the live Mechs."""
 
 import json
+import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
+
+if not os.access(Path.home() / ".gitconfig", os.R_OK):
+    os.environ.setdefault("GIT_CONFIG_GLOBAL", "/dev/null")
+    os.environ.setdefault("GIT_CONFIG_NOSYSTEM", "1")
 
 import pytest
 from git import Repo
@@ -650,6 +655,99 @@ def test_preview_comparison_failure_retains_inspected_state(fleet: LocalFleet):
     assert git_files(fleet.checkout) == before
 
 
+def test_claw_is_a_first_class_fleet_pull_target(tmp_path: Path, fleet: LocalFleet):
+    claw = tmp_path / "claw"
+    git(tmp_path, "init", "--initial-branch=main", str(claw))
+    commit(claw, "tracked.txt", "initial\n")
+    git(
+        claw,
+        "remote",
+        "add",
+        "origin",
+        "https://github.com/CultureBotAI/culturebotai-claw.git",
+    )
+    git(claw, "update-ref", "refs/remotes/origin/main", "HEAD")
+    git(claw, "branch", "--set-upstream-to", "origin/main")
+    settings = fleet_pull.FleetPullSettings(fleet.settings, claw)
+
+    results = fleet_pull.run_fleet(
+        settings, ["claw", "culturemech"], locks=fleet.locks
+    )
+
+    assert [row["key"] for row in results] == ["claw", "culturemech"]
+    assert [row["status"] for row in results] == ["up_to_date", "up_to_date"]
+
+
+def test_site_is_a_fleet_pull_target_when_configured_or_selected(
+    tmp_path: Path, fleet: LocalFleet
+):
+    site = tmp_path / "CultureBotAI.github.io"
+    git(tmp_path, "init", "--initial-branch=main", str(site))
+    commit(site, "tracked.txt", "initial\n")
+    git(
+        site,
+        "remote",
+        "add",
+        "origin",
+        "https://github.com/CultureBotAI/CultureBotAI.github.io.git",
+    )
+    git(site, "update-ref", "refs/remotes/origin/main", "HEAD")
+    git(site, "branch", "--set-upstream-to", "origin/main")
+
+    unconfigured = fleet_pull.FleetPullSettings(fleet.settings)
+    unconfigured_results = fleet_pull.run_fleet(
+        unconfigured, ["site", "culturemech"], locks=fleet.locks
+    )
+    assert [row["status"] for row in unconfigured_results] == [
+        "not_configured",
+        "up_to_date",
+    ]
+
+    configured = fleet_pull.FleetPullSettings(fleet.settings, site_root=site)
+    configured_results = fleet_pull.run_fleet(
+        configured, ["site", "culturemech"], locks=fleet.locks
+    )
+    assert [row["key"] for row in configured_results] == ["site", "culturemech"]
+    assert [row["status"] for row in configured_results] == [
+        "up_to_date",
+        "up_to_date",
+    ]
+
+    symlinked = tmp_path / "site-link"
+    symlinked.symlink_to(site)
+    resolved_via_env = fleet_pull._resolve_site_root(
+        {fleet_pull.SUITE_SITE_VARIABLE: str(symlinked)},
+        claw_root=tmp_path / "claw",
+    )
+    assert resolved_via_env == site.resolve()
+    symlinked_settings = fleet_pull.FleetPullSettings(
+        fleet.settings, site_root=symlinked
+    )
+    symlinked_results = fleet_pull.run_fleet(
+        symlinked_settings, ["site"], locks=fleet.locks
+    )
+    assert symlinked_results[0]["status"] == "up_to_date"
+
+    sibling_parent = tmp_path / "sibling-parent"
+    sibling_claw = sibling_parent / "culturebotai-claw"
+    sibling_site = sibling_parent / "CultureBotAI.github.io"
+    sibling_claw.mkdir(parents=True)
+    sibling_site.mkdir(parents=True)
+    assert fleet_pull._resolve_site_root({}, claw_root=sibling_claw) is None
+    marker = sibling_site / "_fleet" / "mechs_template.md"
+    marker.parent.mkdir(parents=True)
+    marker.write_text("# X-Mech Suite\n", encoding="utf-8")
+    assert (
+        fleet_pull._resolve_site_root({}, claw_root=sibling_claw)
+        == sibling_site.resolve()
+    )
+
+    manifest = fleet_pull.load_fleet_manifest()
+    assert "site" not in fleet_pull.selected_keys(None, manifest, include_site=False)
+    assert "site" in fleet_pull.selected_keys(None, manifest, include_site=True)
+    assert fleet_pull.selected_keys(["site"], manifest) == ["site"]
+
+
 @pytest.mark.parametrize("apply", [False, True])
 def test_cli_selects_manifest_repositories_and_reports_coverage(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture, apply: bool
@@ -659,7 +757,11 @@ def test_cli_selects_manifest_repositories_and_reports_coverage(
     monkeypatch.setattr(
         fleet_pull.RepositorySettings, "from_environment", lambda **_kwargs: selected_settings
     )
-    selected = ["culturemech", "traitmech"] if apply else list(fleet_pull.load_fleet_manifest().mechs)
+    selected = (
+        ["claw", "traitmech", "culturemech"]
+        if apply
+        else ["claw", *fleet_pull.load_fleet_manifest().mechs]
+    )
     observed = []
 
     def record_fleet(settings, keys, **kwargs):
@@ -669,13 +771,20 @@ def test_cli_selects_manifest_repositories_and_reports_coverage(
     monkeypatch.setattr(fleet_pull, "run_fleet", record_fleet)
     argv = ["--json"]
     if apply:
-        argv.extend(["--apply", "--mech", "culturemech", "--mech", "traitmech",
+        argv.extend(["--apply", "--mech", "claw", "--mech", "traitmech",
+                     "--mech", "claw",
                      "--mech", "culturemech"])
 
     assert fleet_pull.main(argv) == 0
 
     report = json.loads(capsys.readouterr().out)
-    assert observed == [(selected_settings, selected, {"apply": apply, "timeout": 60})]
+    fleet_pull.validate_report(report)
+    assert len(observed) == 1
+    settings, keys, kwargs = observed[0]
+    assert isinstance(settings, fleet_pull.FleetPullSettings)
+    assert settings._settings is selected_settings
+    assert keys == selected
+    assert kwargs == {"apply": apply, "timeout": 60}
     assert report["selected"] == selected
     assert report["mode"] == ("apply" if apply else "dry_run")
     assert report["comparison"] == ("fetch_eligible_only" if apply else "cached_refs")
@@ -696,13 +805,19 @@ def test_cli_incomplete_report_has_nonzero_exit(
 
     assert fleet_pull.main(["--json", "--mech", "culturemech"]) == 1
 
-    assert json.loads(capsys.readouterr().out)["complete"] is False
+    report = json.loads(capsys.readouterr().out)
+    fleet_pull.validate_report(report)
+    assert report["complete"] is False
 
 
 @pytest.mark.parametrize(
     "argv",
-    [["--mech", "not-a-mech"], ["--timeout", "0"], ["--timeout", "301"],
-     ["--apply", "--dry-run"]],
+    [
+        ["--mech", "not-a-repo"],
+        ["--timeout", "0"],
+        ["--timeout", "301"],
+        ["--apply", "--dry-run"],
+    ],
 )
 def test_invalid_cli_usage_never_runs_git(monkeypatch: pytest.MonkeyPatch, argv: list[str]):
     def unexpected_run(*_args, **_kwargs):
@@ -714,3 +829,231 @@ def test_invalid_cli_usage_never_runs_git(monkeypatch: pytest.MonkeyPatch, argv:
         fleet_pull.main(argv)
 
     assert exc.value.code == 2
+
+
+def test_updated_and_preview_rows_report_merged_commits_and_prs_in_table(fleet: LocalFleet):
+    (fleet.writer / "first.txt").write_text("first\n", encoding="utf-8")
+    git(fleet.writer, "add", "first.txt")
+    git(fleet.writer, "commit", "-m", "rebuild CultureMech recipe membership (#879)")
+    first_sha = git(fleet.writer, "rev-parse", "--short", "HEAD")
+
+    (fleet.writer / "second.txt").write_text("second\n", encoding="utf-8")
+    git(fleet.writer, "add", "second.txt")
+    git(
+        fleet.writer,
+        "commit",
+        "-m",
+        "Merge pull request #908 from CultureBotAI/feat/review-bundles",
+    )
+    second_sha = git(fleet.writer, "rev-parse", "--short", "HEAD")
+    git(fleet.writer, "push", "origin", "HEAD")
+    git(fleet.checkout, "fetch", "origin")
+
+    preview = fleet.run(apply=False)
+    assert preview["status"] == "would_update"
+    assert preview["prs"] == ["#879", "#908"]
+    assert [c["sha"] for c in preview["commits"]] == [first_sha, second_sha]
+    fleet_pull.validate_report(
+        fleet_pull.build_report(["culturemech"], [preview], apply=False, incomplete=False)
+    )
+    preview_table = fleet_pull.render_table([preview])
+    assert "| Repository | Branch | Result | Merged Commits | Merged PRs | Details |" in preview_table
+    assert "| culturemech | main | would_update | 2 | #879, #908 |" in preview_table
+
+    applied = fleet.run(apply=True)
+    assert applied["status"] == "updated"
+    assert applied["prs"] == ["#879", "#908"]
+    assert [c["sha"] for c in applied["commits"]] == [first_sha, second_sha]
+    fleet_pull.validate_report(
+        fleet_pull.build_report(["culturemech"], [applied], apply=True, incomplete=False)
+    )
+    applied_table = fleet_pull.render_table([applied])
+    assert "| culturemech | main | updated | 2 | #879, #908 |" in applied_table
+
+
+def test_fleet_pull_schema_repository_keys_match_manifest():
+    import yaml
+
+    from kg_microbe_fleet import (
+        UniqueKeySafeLoader,
+        default_fleet_pull_schema_path,
+        load_fleet_manifest,
+    )
+
+    schema_path = default_fleet_pull_schema_path()
+    assert schema_path.is_file()
+    schema_doc = yaml.load(
+        schema_path.read_text(encoding="utf-8"), Loader=UniqueKeySafeLoader
+    )
+    enum_keys = set(
+        schema_doc["enums"]["FleetRepositoryKeyEnum"]["permissible_values"].keys()
+    )
+    expected_keys = {"claw", "site", *load_fleet_manifest().mechs}
+    assert enum_keys == expected_keys
+
+
+def test_fleet_pull_schema_validates_all_statuses_and_rejects_malformed_payloads():
+    sha_before = "a" * 40
+    sha_after = "b" * 40
+    valid_report = fleet_pull.build_report(
+        ["claw", "culturemech", "traitmech", "aimech"],
+        [
+            {
+                "key": "claw",
+                "status": "updated",
+                "detail": "",
+                "path": "/tmp/claw",
+                "branch": "main",
+                "upstream": "origin/main",
+                "remote_ref": "refs/remotes/origin/main",
+                "before": sha_before,
+                "after": sha_after,
+                "target": sha_after,
+                "ahead": 0,
+                "behind": 1,
+                "commits": [{"sha": "bbbbbbb", "subject": "feat: add schema (#910)"}],
+                "prs": ["#910"],
+            },
+            {
+                "key": "culturemech",
+                "status": "up_to_date",
+                "detail": "",
+                "path": "/tmp/CultureMech",
+                "branch": "main",
+                "upstream": "origin/main",
+                "remote_ref": "refs/remotes/origin/main",
+                "before": sha_before,
+                "after": sha_before,
+                "target": sha_before,
+                "ahead": 0,
+                "behind": 0,
+                "commits": [],
+                "prs": [],
+            },
+            {
+                "key": "traitmech",
+                "status": "skipped_dirty",
+                "detail": "dirty or untracked working tree",
+                "path": "/tmp/TraitMech",
+                "branch": "main",
+                "upstream": None,
+                "remote_ref": None,
+                "before": sha_before,
+                "after": sha_before,
+                "target": None,
+                "ahead": None,
+                "behind": None,
+                "commits": [],
+                "prs": [],
+            },
+            {
+                "key": "aimech",
+                "status": "not_configured",
+                "detail": "AIMECH_ROOT is not set",
+                "path": None,
+                "branch": None,
+                "upstream": None,
+                "remote_ref": None,
+                "before": None,
+                "after": None,
+                "target": None,
+                "ahead": None,
+                "behind": None,
+                "commits": [],
+                "prs": [],
+            },
+        ],
+        apply=True,
+        incomplete=True,
+        snapshot_utc="2026-10-18T21:00:00+00:00",
+    )
+    fleet_pull.validate_report(valid_report)
+
+    with pytest.raises(ValueError, match="Invalid FleetPullReport payload"):
+        fleet_pull.validate_report({**valid_report, "unexpected_field": True})
+
+    with pytest.raises(ValueError, match="Invalid FleetPullReport payload"):
+        fleet_pull.validate_report({**valid_report, "mode": "force_push"})
+
+    with pytest.raises(ValueError, match="requires comparison="):
+        fleet_pull.validate_report({**valid_report, "comparison": "cached_refs"})
+
+    with pytest.raises(ValueError, match="results keys must match selected order"):
+        fleet_pull.validate_report({**valid_report, "selected": ["claw"]})
+
+    with pytest.raises(ValueError, match="complete flag disagrees"):
+        fleet_pull.validate_report({**valid_report, "complete": True})
+
+    with pytest.raises(ValueError, match="dry_run report cannot contain updated"):
+        fleet_pull.validate_report(
+            {**valid_report, "mode": "dry_run", "comparison": "cached_refs"}
+        )
+
+    bad_behind_row = {**valid_report["results"][0], "behind": 2}
+    with pytest.raises(ValueError, match="commits count must match behind"):
+        fleet_pull.validate_report(
+            {**valid_report, "results": [bad_behind_row, *valid_report["results"][1:]]}
+        )
+
+    bad_pr_row = {**valid_report["results"][0], "prs": ["910"]}
+    with pytest.raises(ValueError, match="Invalid FleetPullReport payload"):
+        fleet_pull.validate_report(
+            {**valid_report, "results": [bad_pr_row, *valid_report["results"][1:]]}
+        )
+
+    bad_sha_row = {**valid_report["results"][0], "before": "not-a-sha"}
+    with pytest.raises(ValueError, match="Invalid FleetPullReport payload"):
+        fleet_pull.validate_report(
+            {**valid_report, "results": [bad_sha_row, *valid_report["results"][1:]]}
+        )
+
+
+def test_cli_json_fails_closed_when_report_violates_schema(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+):
+    monkeypatch.setattr(fleet_pull, "merged_repository_environment", lambda _path: {})
+    monkeypatch.setattr(
+        fleet_pull.RepositorySettings, "from_environment", lambda **_kwargs: object()
+    )
+    monkeypatch.setattr(
+        fleet_pull,
+        "run_fleet",
+        lambda *_args, **_kwargs: [{"key": "culturemech", "status": "bogus_status"}],
+    )
+
+    assert fleet_pull.main(["--json", "--mech", "culturemech"]) == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "Invalid FleetPullReport payload" in captured.err
+
+
+def test_validate_report_isolates_linkml_from_broken_default_yaml_loader(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    import importlib
+
+    import yaml
+
+    linkml_yaml_loader = importlib.import_module("linkml_runtime.loaders.yaml_loader")
+
+    class NullTagLoader(yaml.SafeLoader):
+        def compose_mapping_node(self, anchor):
+            node = super().compose_mapping_node(anchor)
+            node.tag = None
+            return node
+
+    fleet_pull._report_validator.cache_clear()
+    monkeypatch.setattr(linkml_yaml_loader, "DupCheckYamlLoader", NullTagLoader)
+    report = fleet_pull.build_report(
+        ["claw"],
+        [{"key": "claw", "status": "up_to_date"}],
+        apply=False,
+        incomplete=False,
+        snapshot_utc="2026-10-18T21:00:00+00:00",
+    )
+    fleet_pull.validate_report(report)
+    assert linkml_yaml_loader.DupCheckYamlLoader is NullTagLoader
+
+
+
+

@@ -1,0 +1,17 @@
+{
+  "created_at": "2026-11-01T12:40:16.239169+00:00",
+  "url": "https://github.com/CultureBotAI/culturebotai-claw/issues/702",
+  "argv": [
+    "gh",
+    "issue",
+    "create",
+    "-R",
+    "CultureBotAI/culturebotai-claw",
+    "--title",
+    "Reject every nonzero SSSOM validator exit before publication",
+    "--body-file",
+    "output/approved-plan-20261101T031134Z/step5-validator-exit-issue.md"
+  ],
+  "stdout": "https://github.com/CultureBotAI/culturebotai-claw/issues/702\n",
+  "stderr": ""
+}

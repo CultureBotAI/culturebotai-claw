@@ -1,0 +1,143 @@
+{
+  "schema_version": 2,
+  "run_id": "illustrative-run",
+  "repository_key": "dufmech",
+  "cycle": 3,
+  "stage": 5,
+  "workflow_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "goal_identity": {
+    "conversation_id": "synthetic-example-only",
+    "started_at": "2026-10-25T17:00:00Z",
+    "start_step_index": 20
+  },
+  "goal_complete": true,
+  "status": "completed",
+  "coverage": {
+    "artifact": "reviews/closure/coverage.md",
+    "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  },
+  "pr": {
+    "number": 42,
+    "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "branch": "goal/example-42",
+    "base": "main"
+  },
+  "review": {
+    "artifact": "reviews/closure/pr-42.md",
+    "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "status": "complete",
+    "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "remaining_findings": 0
+  },
+  "validation": [
+    {
+      "artifact": "reviews/closure/pr-42.md",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "command": "project validation command",
+      "status": "passed",
+      "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ],
+  "cleanup": {
+    "checkout_ready": true,
+    "local_branch_deleted": true,
+    "remote_branch_deleted": true
+  },
+  "prs": [
+    {
+      "number": 41,
+      "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "branch": "goal/example-41",
+      "base": "main",
+      "merge_commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+      "review": {
+        "artifact": "reviews/closure/pr-41.md",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "complete",
+        "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "remaining_findings": 0
+      },
+      "validation": [
+        {
+          "artifact": "reviews/closure/pr-41.md",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "command": "project validation command",
+          "status": "passed",
+          "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "cleanup": {
+        "checkout_ready": true,
+        "local_branch_deleted": true,
+        "remote_branch_deleted": true
+      }
+    },
+    {
+      "number": 42,
+      "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "branch": "goal/example-42",
+      "base": "main",
+      "merge_commit_sha": "dddddddddddddddddddddddddddddddddddddddd",
+      "review": {
+        "artifact": "reviews/closure/pr-42.md",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "status": "complete",
+        "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "remaining_findings": 0
+      },
+      "validation": [
+        {
+          "artifact": "reviews/closure/pr-42.md",
+          "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "command": "project validation command",
+          "status": "passed",
+          "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      ],
+      "cleanup": {
+        "checkout_ready": true,
+        "local_branch_deleted": true,
+        "remote_branch_deleted": true
+      }
+    }
+  ],
+  "issues": [
+    {
+      "number": 23,
+      "disposition": "addressed",
+      "fix_commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "pr_number": 41,
+      "superseded_paths": [
+        {
+          "path": "reviews/structured/example/review.yaml",
+          "pr_number": 41,
+          "commit_sha": "1111111111111111111111111111111111111111"
+        }
+      ]
+    },
+    {
+      "number": 24,
+      "disposition": "addressed",
+      "fix_commit_sha": "1111111111111111111111111111111111111111",
+      "pr_number": 41
+    }
+  ],
+  "goal_outputs": {
+    "infra_tasks": {
+      "path": "INFRA_TASKS.md",
+      "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    "goal_evidence": {
+      "path": "reviews/workflow/illustrative-run/cycle-000003/stage-05/revision-0001/evidence.yaml",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  },
+  "evidence_attributions": [
+    {
+      "path": "reviews/workflow/illustrative-run/cycle-000003/stage-05/revision-0001/evidence.yaml",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "pr_number": 42,
+      "commit_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ]
+}

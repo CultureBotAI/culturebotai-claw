@@ -6,7 +6,7 @@ metadata:
   category: curation
   requires_database: false
   requires_internet: true
-  version: 1.0.0
+  version: 2.0.0
 ---
 
 # Curate one {{ display_name }} record
@@ -18,6 +18,32 @@ metadata:
 ## The contract
 
 <!-- canonical:begin the-contract -->
+**Durable session state.**
+Use the gitignored `<repo>/.temp/` as the durable work root for review campaigns,
+worktrees, batch state, draft review bundles and handoffs. Use
+`~/agent-work/<repo>/` when a separate clone is needed. Verify `.temp/` is ignored
+before use; provision a missing ignore rule through an authorized repository
+change. Keep maintained helpers and accepted evidence in their native tracked
+directories; a durable scratch root does not replace their provenance contract.
+
+Never store session state or helper scripts in `/tmp/`, `/private/tmp/` or `$TMPDIR`.
+Only disposable caches and pytest temporary fixtures may use system temp roots.
+Use a unique subdirectory for each task and preserve other sessions' state.
+
+Report every auxiliary clone for identity verification and inventory in
+session_repository_roots, and owned campaign/handoff directories in
+session_state_paths. Missing inventory is unknown, not healthy. Report new paths
+to the supervisor/operator; do not edit live configuration or expand authority.
+
+For authorized Git work, push each committed batch branch to `origin` the same
+day, whether or not a PR is opened. Verify the exact pushed head with the remote;
+a local commit or remote-tracking ref alone is not publication proof. Inspect
+the repository's current workflow triggers before claiming a branch push runs
+no CI. A goal delivering commits cannot close while recorded commits exist only
+locally. Publication failure is a retained blocker, never permission to discard
+the branch. This rule grants no Git mutation, merge, cleanup or provider
+authorization beyond the task and the skill's existing boundaries.
+
 Produce a defensible record and an explicit account of four things: what is
 **supported**, what was **corrected**, what is **still unresolved**, and what is
 **genuinely unknown**. The last two are different — a gap you searched for and
@@ -29,9 +55,11 @@ disambiguate. Silently substituting a similar record is the error that no later
 check catches, because everything downstream is then correct about the wrong
 thing.
 
-**Audit is read-only. Curation authorises edits to the named record only.** A
-review or audit request changes nothing. A curate, improve, complete, correct or
-add-evidence request authorises local edits to that record and the smallest
+**Audit preserves scientific inputs. Curation authorises edits to the named
+record only.** A review or audit request changes no scientific record, status,
+or curation history. It does save a new timestamped structured review through
+`docs/record-reviews.md` and the native rubric in `docs/record-review-profile.md`.
+A curate, improve, complete, correct or add-evidence request authorises local edits to that record and the smallest
 maintained path its provenance requires — not to neighbours, not to whatever
 else looked wrong on the way.
 
@@ -182,6 +210,12 @@ defines, and read the emitted record again. Report: corrections and their
 sources; retained claims and what they were checked against; unresolved gaps
 and every bounded search that came back empty; which authoritative input each
 change lives in; every validation result.
+
+In audit-only mode, use the shared review helper to save the schema-valid YAML
+and rendered Markdown pair under `reviews/structured/`. Capture source hashes
+before assessing, persist partial or blocked checks honestly, and link both
+artifacts in the response. Never turn report validation into a scientific
+status promotion or a curation event.
 
 ## Related
 
