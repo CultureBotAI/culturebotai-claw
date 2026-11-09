@@ -100,6 +100,23 @@ def deferred_row(item: PrivateObligation) -> dict[str, Any]:
 
 
 def validate_admission(item: PrivateObligation, declaration: Mapping) -> None:
+    policy = manual.load_policy()
+    expected = tuple(
+        sorted(
+            (a["id"], a["target"], a["sha256"], a["mode"]) for a in policy["artifacts"]
+        )
+    )
+    if (
+        item.key != "scaleupmech"
+        or item.repository != manual.PRIVATE
+        or item.source_ref != policy["source_ref"]
+        or item.source_manifest_sha256 != policy["source_manifest_sha256"]
+        or item.bootstrap_main_ref != policy["bootstrap_main_ref"]
+        or item.expected_artifacts != expected
+    ):
+        raise GovernanceError(
+            "Private obligation differs from the fixed protected policy"
+        )
     if (
         declaration.get("source_ref") != item.source_ref
         or declaration.get("source_manifest_sha256") != item.source_manifest_sha256

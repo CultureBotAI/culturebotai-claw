@@ -101,3 +101,22 @@ def test_full_verdict_refuses_missing_unverified_or_replayed_coverage(source, ch
         coverage.complete_rows(
             model.consumers, rows, private, model, now=now, policy=source[0]
         )
+
+
+def test_admission_binds_the_entire_fixed_obligation_not_only_three_refs(
+    source, monkeypatch
+):
+    from dataclasses import replace
+
+    model = manifest(source)
+    item = coverage.obligation(model, source[0])
+    monkeypatch.setattr(manual, "load_policy", lambda: source[0])
+    policy = {
+        key: source[0][key]
+        for key in ("source_ref", "source_manifest_sha256", "bootstrap_main_ref")
+    }
+    coverage.validate_admission(item, policy)
+    with pytest.raises(GovernanceError):
+        coverage.validate_admission(
+            replace(item, expected_artifacts=item.expected_artifacts[:-1]), policy
+        )

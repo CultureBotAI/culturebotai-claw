@@ -156,7 +156,6 @@ def test_public_clone_never_includes_private_identity(
 ):
     public, _, values, _, _ = public_report
     calls = []
-    monkeypatch.setattr(component.git, "__doc__", component.git.__doc__)
     monkeypatch.setattr(component, "git", lambda root, *args: calls.append(args) or "")
     monkeypatch.setattr(component.coverage, "obligation", lambda model: object())
     public.get = lambda path: {
@@ -277,3 +276,53 @@ def test_actual_aggregate_shell_fails_for_any_unsuccessful_component(candidate, 
         timeout=10,
     )
     assert (result.returncode == 0) is (candidate == public == "success")
+
+
+def test_prospective_bootstrap_requires_protected_framework(tmp_path):
+    from kg_microbe_governance import GovernanceError
+
+    with pytest.raises(GovernanceError, match="protected consumer_admission framework"):
+        component.candidate_bootstrap_refs(tmp_path, {"checkout_sha": "e" * 40}, None)
+
+
+def test_private_producer_has_no_candidate_execution_cache_or_broad_token():
+    workflow = yaml.safe_load(
+        (ROOT / ".github/workflows/private-scaleup-automatic.yaml").read_text()
+    )
+    events = workflow.get("on", workflow.get(True))
+    assert events == {
+        "workflow_run": {
+            "workflows": ["authoritative governance fleet audit"],
+            "types": ["in_progress"],
+        }
+    }
+    assert workflow["permissions"] == {"contents": "read", "actions": "read"}
+    produce = workflow["jobs"]["produce"]
+    assert produce["environment"] == "scaleup-private-audit"
+    assert produce["if"] == "needs.preflight.outputs.required_private == 'true'"
+    for job in workflow["jobs"].values():
+        for step in job["steps"]:
+            uses = step.get("uses", "")
+            assert not uses.startswith(("actions/cache@", "actions/download-artifact@"))
+            if uses.startswith("actions/checkout@"):
+                assert step["with"]["ref"] == "${{ github.sha }}"
+                assert step["with"]["persist-credentials"] is False
+            if uses.startswith("astral-sh/setup-uv@"):
+                assert step["with"]["enable-cache"] is False
+    steps = produce["steps"]
+    mint = next(i for i, step in enumerate(steps) if step.get("id") == "private-token")
+    assert "--require-protected-environment" in steps[mint - 1]["run"]
+    assert steps[mint]["with"] == {
+        "app-id": "${{ vars.SCALEUP_AUDIT_APP_ID }}",
+        "private-key": "${{ secrets.SCALEUP_AUDIT_APP_PRIVATE_KEY }}",
+        "owner": "CultureBotAI",
+        "repositories": "ScaleupMech",
+        "permission-contents": "read",
+    }
+    private_steps = [
+        step for step in steps if "SCALEUP_PRIVATE_READ_TOKEN" in step.get("env", {})
+    ]
+    assert len(private_steps) == 1 and private_steps[0]["id"] == "receipt"
+    upload = steps[-1]
+    assert upload["with"]["path"] == ".temp/automatic-private/receipt.json"
+    assert upload["with"]["overwrite"] is False

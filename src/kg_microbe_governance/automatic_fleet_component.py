@@ -107,6 +107,83 @@ def bootstrap_refs(root: Path) -> dict[str, str]:
     return result
 
 
+def candidate_bootstrap_refs(trusted: Path, binding: dict, manifest) -> dict[str, str]:
+    """Proposed completeness only; these data never activate deployed admission."""
+    module = trusted / "src/kg_microbe_governance/consumer_admission.py"
+    if not module.is_file():
+        raise GovernanceError(
+            "Prospective public bootstrap requires protected consumer_admission framework (PR1056)"
+        )
+    from .consumer_admission import compose  # type: ignore[import-not-found]
+    from .fleet_audit import _head_blob
+
+    ref = binding["checkout_sha"]
+    auto.check(manual.is_sha(ref))
+    git(
+        trusted,
+        "fetch",
+        "--no-tags",
+        "--no-prune",
+        "--no-write-fetch-head",
+        "origin",
+        ref,
+    )
+
+    def read(path: str) -> bytes:
+        auto.check(
+            path in {auto.MANIFEST_PATH, "src/kg_microbe_fleet/fleet.yaml"}
+            or (
+                path.startswith("src/kg_microbe_governance/releases/")
+                and path.endswith(".json")
+                and ".." not in path
+            )
+        )
+        blob = _head_blob(trusted, ref, path)
+        if blob is None:
+            raise FileNotFoundError(path)
+        auto.check(blob[0] == "100644")
+        return blob[1]
+
+    _, composed, additions = compose(
+        read, read("src/kg_microbe_fleet/fleet.yaml"), read(auto.MANIFEST_PATH)
+    )
+    auto.check(composed.consumers == manifest.consumers)
+    result = {}
+    for key, admission in additions.items():
+        if key == "scaleupmech":
+            continue
+        source_ref = admission.policy["source_ref"]
+        git(
+            trusted,
+            "fetch",
+            "--no-tags",
+            "--no-prune",
+            "--no-write-fetch-head",
+            "origin",
+            source_ref,
+        )
+        source_blob = _head_blob(trusted, source_ref, auto.MANIFEST_PATH)
+        auto.check(
+            source_blob == ("100644", admission.source_content), "source_unverified"
+        )
+        result[key] = admission.policy["bootstrap_main_ref"]
+    return result
+
+
+def pending_by_lane(trusted: Path, binding: dict, values: dict, rows: dict) -> dict:
+    protected = bootstrap_refs(trusted)
+    candidate = dict(protected)
+    proposed = any(
+        row.get("state") == "pending_bootstrap" and row.get("key") not in protected
+        for row in rows.get("candidate", [])
+    )
+    if proposed:
+        candidate.update(
+            candidate_bootstrap_refs(trusted, binding, values["candidate"])
+        )
+    return {"protected": protected, "candidate": candidate}
+
+
 def clone_public(public, workspace: Path, values: dict) -> dict[str, Path]:
     consumers: dict[str, Any] = {}
     for manifest in values.values():
@@ -201,6 +278,7 @@ def public_component(public, trusted: Path, binding: dict, workspace: Path) -> d
         )
         raw_rows = [asdict(row) for row in fleet_result.repositories]
     pending = bootstrap_refs(trusted)
+    prospective = None
     rows: dict[str, list[dict[str, Any]]] = {"protected": [], "candidate": []}
     for row in raw_rows:
         count = len(protected.artifacts_for(protected.consumers[row["key"]]))
@@ -233,15 +311,25 @@ def public_component(public, trusted: Path, binding: dict, workspace: Path) -> d
                 != "blob"
             ):
                 missing.append(path)
+        if missing and key not in pending:
+            if prospective is None:
+                prospective = candidate_bootstrap_refs(
+                    trusted, binding, values["candidate"]
+                )
+            candidate_pending = {**pending, **prospective}
+        else:
+            candidate_pending = pending
         is_pending = bool(
-            missing and pending.get(key) == head and len(missing) == len(artifacts)
+            missing
+            and candidate_pending.get(key) == head
+            and len(missing) == len(artifacts)
         )
         if is_pending:
-            auto.check(
-                key in protected.consumers
-                and values["candidate"].artifacts_for(consumer)
-                == protected.artifacts_for(protected.consumers[key])
-            )
+            if key in protected.consumers:
+                auto.check(
+                    values["candidate"].artifacts_for(consumer)
+                    == protected.artifacts_for(protected.consumers[key])
+                )
         auto.check(not missing or is_pending, "inspection_invalid")
         rows["candidate"].append(
             {
@@ -265,7 +353,13 @@ def public_component(public, trusted: Path, binding: dict, workspace: Path) -> d
         "private_required": obligation["required"],
         "lanes": rows,
     }
-    validate_report(auto.canonical(report), values, hashes, binding, pending)
+    validate_report(
+        auto.canonical(report),
+        values,
+        hashes,
+        binding,
+        {"protected": pending, "candidate": {**pending, **(prospective or {})}},
+    )
     auto.check(
         auto.parent_binding(
             public,
@@ -340,7 +434,7 @@ def validate_report(
             )
             if row["state"] == "pending_bootstrap":
                 auto.check(
-                    pending.get(key) == row["head"]
+                    pending.get(lane, {}).get(key) == row["head"]
                     and row["pin"] is None
                     and row["checked_artifacts"] == 0
                 )
@@ -370,7 +464,18 @@ def authenticate_report(public, trusted: Path, binding: dict) -> dict:
         f'/repos/{manual.CONTROL}/actions/runs/{binding["run_id"]}/attempts/{binding["run_attempt"]}'
     )
     auto.check(manual.utc(artifact["created_at"]) >= manual.utc(run["run_started_at"]))
-    return validate_report(raw, values, hashes, binding, bootstrap_refs(trusted))
+    candidate_report = manual.parse_json(raw)
+    auto.check(
+        isinstance(candidate_report, dict)
+        and isinstance(candidate_report.get("lanes"), dict)
+    )
+    return validate_report(
+        raw,
+        values,
+        hashes,
+        binding,
+        pending_by_lane(trusted, binding, values, candidate_report["lanes"]),
+    )
 
 
 def finalize(public, trusted: Path, binding: dict, evidence, *, report: dict) -> None:
@@ -378,7 +483,11 @@ def finalize(public, trusted: Path, binding: dict, evidence, *, report: dict) ->
     # that obtained it earlier. Raw private JSON is never accepted here.
     values, hashes = manifests(public, binding)
     validate_report(
-        auto.canonical(report), values, hashes, binding, bootstrap_refs(trusted)
+        auto.canonical(report),
+        values,
+        hashes,
+        binding,
+        pending_by_lane(trusted, binding, values, report["lanes"]),
     )
     for lane in LANES:
         manifest = values[lane]

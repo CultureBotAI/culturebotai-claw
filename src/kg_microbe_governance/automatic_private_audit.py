@@ -85,7 +85,7 @@ def _pull_request(public, run: dict) -> dict:
         len(numbers) == len(rows) and all(manual.positive(number) for number in numbers)
     )
     candidates = []
-    for number in sorted(int(number) for number in numbers):
+    for number in sorted(numbers, key=str):
         pr = public.get(f"/repos/{manual.CONTROL}/pulls/{number}")
         if recorded_associations:
             recorded = next(row for row in rows if row["number"] == number)
@@ -244,6 +244,57 @@ def wait_components(
         )
         if component_state(public, binding):
             return
+        check(monotonic() < deadline)
+        sleep(10)
+
+
+def wait_verifier_ready(
+    public,
+    binding: dict,
+    *,
+    timeout: int = MAX_WAIT_SECONDS,
+    sleep=time.sleep,
+    monotonic=time.monotonic,
+) -> None:
+    """Do not age a private observation while the public verifier installs dependencies."""
+    check(type(timeout) is int and 0 < timeout <= MAX_WAIT_SECONDS)
+    deadline = monotonic() + timeout
+    while True:
+        check(
+            parent_binding(
+                public,
+                binding["run_id"],
+                binding["run_attempt"],
+                checkout_sha=binding["checkout_sha"],
+            )
+            == binding
+        )
+        page = public.get(
+            f'/repos/{manual.CONTROL}/actions/runs/{binding["run_id"]}/attempts/'
+            f'{binding["run_attempt"]}/jobs?per_page=100'
+        )
+        check(
+            type(page.get("total_count")) is int
+            and 0 <= page["total_count"] < 100
+            and isinstance(page.get("jobs"), list)
+            and len(page["jobs"]) == page["total_count"]
+        )
+        jobs = [job for job in page["jobs"] if job.get("name") == "fleet-audit"]
+        check(len(jobs) <= 1)
+        if jobs:
+            job = jobs[0]
+            check(job.get("status") != "completed")
+            steps = job.get("steps", [])
+            check(isinstance(steps, list))
+            ready = [
+                step
+                for step in steps
+                if step.get("name")
+                == "Verify exact full coverage or public-only bootstrap"
+            ]
+            check(len(ready) <= 1)
+            if ready and ready[0].get("status") == "in_progress":
+                return
         check(monotonic() < deadline)
         sleep(10)
 

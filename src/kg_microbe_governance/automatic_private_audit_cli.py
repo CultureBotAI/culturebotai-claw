@@ -183,6 +183,7 @@ def main(argv=None) -> int:
             if args.command == "producer-preflight":
                 if obligation["required"]:
                     auto.wait_components(public, binding)
+                    auto.wait_verifier_ready(public, binding)
                 if args.require_protected_environment:
                     auto.check(
                         obligation["required"]

@@ -409,6 +409,8 @@ jobs:
         with:
           python-version: "3.13"
           enable-cache: false
+      - name: Install protected verifier dependencies
+        run: uv sync --project fleet/trusted-claw --locked --no-dev
       - name: Verify exact full coverage or public-only bootstrap
         env:
           GH_PUBLIC_READ_TOKEN: ${{ github.token }}

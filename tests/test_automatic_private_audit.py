@@ -469,3 +469,46 @@ def test_verification_rechecks_age_after_slow_artifact_and_parent_metadata(sourc
             now=NOW + timedelta(seconds=2),
             clock=lambda: clock["now"],
         )
+
+
+@pytest.mark.parametrize("state", ["ready", "setup", "failed", "missing", "duplicate"])
+def test_private_mint_waits_until_final_verifier_has_finished_setup(source, state):
+    public = MetadataAPI(source)
+    bound = binding(public)
+    job = {
+        "name": "fleet-audit",
+        "status": "in_progress",
+        "steps": [
+            {
+                "name": "Verify exact full coverage or public-only bootstrap",
+                "status": "in_progress",
+            }
+        ],
+    }
+    if state == "setup":
+        job["steps"][0]["status"] = "queued"
+    elif state == "failed":
+        job["status"] = "completed"
+    if state != "missing":
+        public.jobs["jobs"].append(job)
+    if state == "duplicate":
+        public.jobs["jobs"].append(copy.deepcopy(job))
+    public.jobs["total_count"] = len(public.jobs["jobs"])
+    tick = iter([0, 11])
+    if state == "ready":
+        auto.wait_verifier_ready(
+            public,
+            bound,
+            timeout=10,
+            sleep=lambda n: None,
+            monotonic=lambda: next(tick),
+        )
+    else:
+        with pytest.raises(manual.AuditError):
+            auto.wait_verifier_ready(
+                public,
+                bound,
+                timeout=10,
+                sleep=lambda n: None,
+                monotonic=lambda: next(tick),
+            )
