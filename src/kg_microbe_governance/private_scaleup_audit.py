@@ -327,7 +327,7 @@ def inspect(policy: dict, private: GitHubRead, payloads: Mapping[str, bytes], pr
 
 
 def validate_receipt(raw: bytes, policy: dict, *, subject_head: str, app_id: int,
-                     now: datetime) -> dict:
+                     now: datetime, expected_workflow: str = WORKFLOW) -> dict:
     require(len(raw) <= MAX_RECEIPT, "invalid_receipt")
     receipt = parse_json(raw)
     fields = {"version", "scope", "repository", "repository_id", "private_main_sha", "source_ref",
@@ -342,7 +342,7 @@ def validate_receipt(raw: bytes, policy: dict, *, subject_head: str, app_id: int
     require(isinstance(producer, dict) and set(producer) == {
         "sha", "run_id", "run_attempt", "workflow", "app_id", "subject_head",
     } and is_sha(producer["sha"]) and producer["subject_head"] == subject_head
-        and is_sha(subject_head) and producer["workflow"] == WORKFLOW
+        and is_sha(subject_head) and producer["workflow"] == expected_workflow
         and positive(app_id) and positive(producer["app_id"]) and producer["app_id"] == app_id
         and positive(producer["run_id"]) and positive(producer["run_attempt"]), "invalid_receipt")
     created, expires = utc(receipt["created_at"]), utc(receipt["expires_at"])
