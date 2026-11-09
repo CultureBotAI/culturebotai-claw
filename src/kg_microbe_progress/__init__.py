@@ -604,7 +604,7 @@ def project_bundle_to_manifest(
     fleet = manifest or load_fleet_manifest()
     repositories = snapshot.get("repositories") if isinstance(snapshot, dict) else None
     snapshot_keys = (
-        [row.get("key") for row in repositories]
+        [str(row["key"]) for row in repositories]
         if isinstance(repositories, list)
         and all(isinstance(row, dict) and isinstance(row.get("key"), str) for row in repositories)
         else []
@@ -618,7 +618,8 @@ def project_bundle_to_manifest(
         has_added_history = any(
             isinstance(item, dict) and item.get("repository_key") in added_keys
             for field in ("closures", "pr_events", "associations", "cursors")
-            for item in (history.get(field) if isinstance(history.get(field), list) else [])
+            if isinstance(items := history.get(field), list)
+            for item in items
         )
         if not has_added_history:
             prefix_manifest = FleetManifest(
