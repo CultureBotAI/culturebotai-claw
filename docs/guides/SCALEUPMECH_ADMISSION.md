@@ -76,3 +76,11 @@ private-audit prerequisite is reviewable plumbing, not automatic fleet-gate
 integration. Until protected activation, safe App/environment configuration and
 a reviewed gate cutover exist, public hosted completeness cannot honestly pass
 for this private consumer. Missing access is never recorded as success.
+
+
+When integrating the three separately proposed admissions, preserve canonical
+native artifact scope order: existing consumers, CofactorMech, AssayMech, then
+ScaleupMech, matching the explicit descriptor order. The strict layout comparison
+also compares these ordered scopes. Each immutable source snapshot remains
+unchanged and may omit the other newcomers; reorder only the combined current
+manifest during the reviewed integration, never a sealed source snapshot.

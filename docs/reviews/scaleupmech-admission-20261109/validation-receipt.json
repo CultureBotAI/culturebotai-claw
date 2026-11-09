@@ -1,0 +1,28 @@
+{
+  "checked_at": "2026-11-09T03:56:53.440744+00:00",
+  "full_run_head": "e6620e105108b15009e6a0fa7827a2613e9dd411",
+  "full_run": {
+    "passed": 8556,
+    "skipped": 471,
+    "failed": 8,
+    "seconds": 928.11,
+    "coverage_percent": 87.94,
+    "safety_core_percent": 77
+  },
+  "failure_disposition": "All eight are invocation fixture ancestry: five claw-root, two non-repository reason fixtures, one no-ancestor-skill fixture. The original full run is not represented as passing.",
+  "followup": {
+    "reason_root_binding_suite": "511 passed,208 skipped outside checkout",
+    "skill_suite": "83 passed including positive ancestor discovery",
+    "reason_mutations": "five original Assay reasons each correctly resealed: domain test fails while binding test passes; restored two pass",
+    "composition_mutation": "three independent snapshots red/restored green; all15 victim/cross-pin controls red/restored green",
+    "ruff": "passed"
+  },
+  "fixture_isolation": {
+    "scope": "only negative no-ancestor-skills fixture ignores ambient home/.claude/skills; production source unchanged",
+    "plugin_sha256": "a8a2b1002f9506168c1dcc98a6d8343ea4655f513057d807a68eab0c177618d5",
+    "plugin_source": "\"\"\"Isolate one negative fixture from the real user's ancestor skill directory.\n\nAll retained test files remain under agent-work. This is invocation state, not\nproduction code or a changed assertion: the fixture requires no ancestor skills.\n\"\"\"\nfrom pathlib import Path\nimport pytest\n\n@pytest.hookimpl(tryfirst=True)\ndef pytest_runtest_call(item):\n    if item.nodeid.endswith(\"test_skill_references.py::test_no_checkout_is_a_refusal_not_an_empty_pass\"):\n        ambient = Path.home() / \".claude\" / \"skills\"\n        original = Path.is_dir\n        def isolated(path):\n            return False if path == ambient else original(path)\n        item.funcargs[\"monkeypatch\"].setattr(Path, \"is_dir\", isolated)\n"
+  },
+  "preservation": "all four DUF/Edge release files and complete88 bootstrap manifest unchanged",
+  "issue_fixed": "https://github.com/CultureBotAI/culturebotai-claw/issues/1076",
+  "hosted_hold": "private anonymous clone remains a failing full-fleet dependency; no bypass"
+}

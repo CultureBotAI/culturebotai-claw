@@ -2740,10 +2740,10 @@ mechs:
         reason: No shared research-provider adapter has been adopted.
       edison_key_discovery:
         status: not_applicable
-        reason: Assay bootstrap does not use an Edison provider integration.
+        reason: Scaleup bootstrap does not use an Edison provider integration.
       environment_coverage:
         status: not_applicable
-        reason: Assays are not a microbial environment inventory.
+        reason: Scale-transfer evidence is not a microbial environment inventory.
       knowledge_gap_scan:
         status: disabled
         reason: No shared knowledge-gap scanner adapter has been adopted.
@@ -2751,7 +2751,7 @@ mechs:
         status: enabled
       unmapped_inventory_input:
         status: not_applicable
-        reason: Assay records are not a culture-medium ingredient inventory.
+        reason: Scale-transfer records are not a culture-medium ingredient inventory.
       source_catalogue:
         status: disabled
         reason: The source catalogue contract awaits scaffold and seed adoption.
@@ -2763,7 +2763,7 @@ mechs:
         reason: No records exist on the inspected empty main; populated census fields remain to be measured.
       causal_graph_coverage:
         status: disabled
-        reason: Assay membership and requirement links do not themselves establish causal graphs.
+        reason: Observed changes across scales do not themselves establish causal mechanisms.
       page_budgets:
         status: disabled
         reason: No generated site is deployed or measured for the new repository.
@@ -2775,7 +2775,7 @@ mechs:
         reason: The shared source-queue contract has not been adopted.
       metpo_proposal:
         status: not_applicable
-        reason: Assay identity curation does not itself propose microbial phenotype ontology terms.
+        reason: Scale-transfer evidence curation does not itself propose microbial phenotype ontology terms.
       sssom_export:
         status: disabled
         reason: No reviewed SSSOM export adapter has been adopted.

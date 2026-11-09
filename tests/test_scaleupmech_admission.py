@@ -57,3 +57,15 @@ def test_new_member_is_visible_without_a_configured_root():
     assert "scaleupmech" not in settings.paths
     with pytest.raises(RepositoryConfigurationError, match="SCALEUPMECH_ROOT"):
         settings.get_target("scaleupmech")
+
+
+@pytest.mark.parametrize("key", ["edison_key_discovery", "environment_coverage",
+                                 "unmapped_inventory_input", "causal_graph_coverage", "metpo_proposal"])
+def test_withheld_capability_reasons_describe_scale_transfer_scope(key):
+    """Copied assay-specific reasons do not describe the Scaleup domain (#1076)."""
+    capability = load_fleet_manifest().get("scaleupmech").capabilities[key]
+    assert not capability.is_enabled
+    assert capability.reason is not None
+    reason = capability.reason.lower()
+    assert "assay" not in reason
+    assert "scale" in reason
