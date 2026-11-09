@@ -225,7 +225,7 @@ def test_footer_text_is_escaped_never_parsed():
 @pytest.mark.parametrize("href", [
     "javascript:alert(1)", "JavaScript:alert(1)", "java\tscript:alert(1)",
     " javascript:alert(1)", "javascript\n:alert(1)", "data:text/html,<p>x</p>",
-    "vbscript:msgbox", "", "https://x.org/a b",
+    "vbscript:msgbox", "", "https://x.org/a b", "http://", "https://", "//evil.example/x",
 ])
 def test_footer_links_must_be_http_or_relative(href):
     with pytest.raises(ThemeError, match="is not an http"):
@@ -246,6 +246,9 @@ def test_footer_links_may_be_http_or_relative(href):
     ([{"text": "x"}], "exactly 'text' and 'href'"),
     ([{"text": "x", "href": "https://x.org", "target": "_blank"}], "exactly 'text' and 'href'"),
     ([{"text": " ", "href": "https://x.org"}], "non-empty text"),
+    ([[]], "line must not be empty"),
+    (["   "], "line must not be empty"),
+    ([["", "  "]], "line must not be empty"),
     ([[3.5]], "neither text nor a link"),
     ([7], "expected text, a link"),
 ])

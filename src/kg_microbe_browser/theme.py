@@ -216,10 +216,13 @@ def _safe_href(href: str) -> bool:
     if not href or _URL_UNSAFE.search(href):
         return False
     try:
-        scheme = urlsplit(href).scheme
+        parts = urlsplit(href)
     except ValueError:
         return False
-    return scheme.lower() in _LINK_SCHEMES
+    scheme = parts.scheme.lower()
+    if scheme not in _LINK_SCHEMES:
+        return False
+    return bool(parts.netloc) if scheme else not parts.netloc
 
 
 def _footer_part(part: object, number: int) -> str | Link:
@@ -257,7 +260,10 @@ def validate_footer(value: object) -> tuple[FooterLine, ...]:
         parts = [line] if isinstance(line, (str, Mapping)) else line
         if isinstance(parts, bytes) or not isinstance(parts, Sequence):
             raise ThemeError(f"footer line {number}: expected text, a link, or a list of them")
-        lines.append(tuple(_footer_part(part, number) for part in parts))
+        rendered = tuple(_footer_part(part, number) for part in parts)
+        if not rendered or all(isinstance(part, str) and not part.strip() for part in rendered):
+            raise ThemeError(f"footer line {number}: line must not be empty")
+        lines.append(rendered)
     return tuple(lines)
 
 
