@@ -128,6 +128,7 @@ kg_microbe_governance = [
     "vendored_artifacts.json",
     "workflow_pins.json",
     "releases/*.json",
+    "private_audit/*.json",
     "artifacts/**/*.py",
     "artifacts/**/*.sh",
     "artifacts/**/*.yaml",
