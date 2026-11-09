@@ -1,24 +1,26 @@
 # Every NCBITaxon CURIE in Mech records, against TaxonMech's seed scope
 
-TaxonMech scope: 626048 taxa (curation/seed_scope.tsv at 4895ee09fec7).
+TaxonMech scope: 626048 taxa (curation/seed_scope.tsv at 4895ee09fec7), 14 of them retired by data/raw/ncbi_merged_ids.tsv and counted outside it.
 
-| Mech | HEAD | record files | distinct taxa cited | in scope | outside scope | records citing an outside taxon |
-|---|---|---:|---:|---:|---:|---:|
-| culturemech | 199cd9191881 | 6325 | 59 | 54 | 5 | 6 |
-| mediaingredientmech | 0dac27846669 | 2962 | 1 | 0 | 1 | 1 |
-| communitymech | fc0c501b9dea | 515 | 935 | 564 | 371 | 792 |
-| traitmech | 0c20b4c82a8b | 1130 | 359 | 333 | 26 | 32 |
-| proteintraitsmech | 8d08b33cfbee | 429421 | 9372 | 7433 | 1939 | 165160 |
-| antibioticmech | 9d3d0205b298 | 3105 | 238 | 195 | 43 | 198 |
-| cellstructuremech | 3b1731a6325f | 1022 | 221 | 137 | 84 | 865 |
-| habitatmech | 30fbe25f4c53 | 3209 | 6741 | 6172 | 569 | 1602 |
-| naturalproductmech | 18ca5dd6b902 | 3136 | 2625 | 1572 | 1053 | 2433 |
-| pathwaymech | 9584009d4957 | 282 | 110 | 105 | 5 | 95 |
-| dufmech | 5642a6453498 | 8296 | 94 | 82 | 12 | 39 |
-| cmmmech | 8287b17e542a | 698 | 170 | 144 | 26 | 39 |
-| aimech | 6fcaa4797e37 | 442 | 0 | 0 | 0 | 0 |
+A record file is one git tracks under a record glob. A record citation is one record citing one taxon, so a record citing three outside taxa is three citations and one record.
 
-## Taxa outside the scope: 3730 distinct across the fleet
+| Mech | HEAD | record files | distinct taxa cited | in scope | outside scope | record citations of an outside taxon | records citing an outside taxon |
+|---|---|---:|---:|---:|---:|---:|---:|
+| culturemech | 199cd9191881 | 6325 | 59 | 54 | 5 | 6 | 4 |
+| mediaingredientmech | 0dac27846669 | 2956 | 1 | 0 | 1 | 1 | 1 |
+| communitymech | fc0c501b9dea | 515 | 935 | 564 | 371 | 792 | 280 |
+| traitmech | 0c20b4c82a8b | 1130 | 359 | 333 | 26 | 32 | 32 |
+| proteintraitsmech | 8d08b33cfbee | 429421 | 9372 | 7433 | 1939 | 165160 | 75853 |
+| antibioticmech | 9d3d0205b298 | 3105 | 238 | 195 | 43 | 198 | 151 |
+| cellstructuremech | 3b1731a6325f | 1022 | 221 | 137 | 84 | 865 | 644 |
+| habitatmech | 30fbe25f4c53 | 3209 | 6741 | 6171 | 570 | 1604 | 326 |
+| naturalproductmech | 18ca5dd6b902 | 3136 | 2625 | 1572 | 1053 | 2433 | 1368 |
+| pathwaymech | 9584009d4957 | 282 | 110 | 105 | 5 | 95 | 94 |
+| dufmech | 5642a6453498 | 8296 | 94 | 82 | 12 | 39 | 28 |
+| cmmmech | 8287b17e542a | 698 | 170 | 144 | 26 | 39 | 33 |
+| aimech | 6fcaa4797e37 | 442 | 0 | 0 | 0 | 0 | 0 |
+
+## Taxa outside the scope: 3731 distinct across the fleet
 
 | taxon | records citing it | Mechs |
 |---|---:|---|

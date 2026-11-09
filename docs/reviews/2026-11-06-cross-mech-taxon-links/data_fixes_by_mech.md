@@ -2,7 +2,7 @@
 
 A hit in a `notes:` line or in prose counts here like one in a slot, so a Mech whose seeder or curator records a retired id beside the current one appears below without a defect; the slot-declared check (`kg-microbe-links taxa`, culturebotai-claw PR 897) decides which rows are citations to fix.
 
-Inputs (SHA-256, first 16 hex): `outside_scope_classified.tsv` f524115a45db72c4, `taxon_curies.tsv` 64ff446c2ac15460, `protein_example_taxa.tsv` ca896e7743af793f.
+Inputs (SHA-256, first 16 hex): `outside_scope_classified.tsv` 27fcebd766b21601, `taxon_curies.tsv` 5987811c0438354e, `protein_example_taxa.tsv` ca896e7743af793f.
 
 ## CommunityMech (CultureBotAI/CommunityMech)
 
@@ -34,6 +34,7 @@ Inputs (SHA-256, first 16 hex): `outside_scope_classified.tsv` f524115a45db72c4,
 | NCBITaxon:115561 | Vreelandella venusta | merged into NCBITaxon:44935 | 2 | `data/habitats/engineered/river.yaml`, `data/habitats/terrestrial/subpolar_coniferous_forest_biome.yaml` |
 | NCBITaxon:139174 | Rhizophydium brooksianum | merged into NCBITaxon:324673 (species, not a record) | 2 | `data/habitats/terrestrial/area_of_tundra.yaml`, `data/habitats/terrestrial/tundra_biome.yaml` |
 | NCBITaxon:184592 | Chaetoceros neogracilis | merged into NCBITaxon:240364 | 2 | `data/habitats/aquatic/mediterranean_sea_biome.yaml`, `data/habitats/aquatic/saline_water.yaml` |
+| NCBITaxon:388051 | Cupriavidus phytohabitans | merged into NCBITaxon:2821359 | 2 | `data/habitats/other/environmental_system.yaml`, `data/habitats/other/national_wildlife_refuge.yaml` |
 | NCBITaxon:1073081 | Halarchaeum nitratireducens | merged into NCBITaxon:489913 | 2 | `data/habitats/other/foam.yaml`, `data/habitats/other/industrial_production.yaml` |
 | NCBITaxon:1257027 | Streptomyces fenghuangensis | merged into NCBITaxon:713595 | 2 | `data/habitats/aquatic/brackish_water_body.yaml`, `data/habitats/engineered/solid_animal_waste.yaml` |
 | NCBITaxon:190486 | Xanthomonas citri subsp. citri 306 | merged into NCBITaxon:1203463 | 1 | `data/habitats/host_associated/vascular_tissue.yaml` |

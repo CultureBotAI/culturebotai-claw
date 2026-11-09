@@ -1,10 +1,10 @@
 # Taxa outside TaxonMech's scope, by domain, kingdom and rank class
 
-3730 distinct taxa cited outside the scope; scope 626048; taxdump 2026-09-13 (3013243 nodes).
+3731 distinct taxa cited outside the scope; scope 626048; taxdump 2026-09-13 (3013243 nodes).
 
-Inputs (SHA-256, first 16 hex): `protein_example_taxa.tsv` ca896e7743af793f, `taxon_curies.tsv` 64ff446c2ac15460; the Mech HEADs are those the two scan summaries record.
+Inputs (SHA-256, first 16 hex): `protein_example_taxa.tsv` ca896e7743af793f, `taxon_curies.tsv` 5987811c0438354e; the Mech HEADs are those the two scan summaries record.
 
-| domain | kingdom | class | distinct taxa | with an in-scope ancestor | protein examples | records citing |
+| domain | kingdom | class | distinct taxa | with an in-scope ancestor | protein examples | record citations |
 |---|---|---|---:|---:|---:|---:|
 | Eukaryota | Metazoa | species | 676 | 0 | 224014 | 124377 |
 | Eukaryota | Viridiplantae | species | 643 | 0 | 46693 | 21197 |
@@ -17,7 +17,7 @@ Inputs (SHA-256, first 16 hex): `protein_example_taxa.tsv` ca896e7743af793f, `ta
 | Viruses | - | species | 94 | 0 | 296 | 309 |
 | Eukaryota | Viridiplantae | below-species | 32 | 0 | 218 | 242 |
 | Eukaryota | - | species | 81 | 0 | 108 | 172 |
-| Bacteria | - | in scope after merge | 110 | 11 | 87 | 183 |
+| Bacteria | - | in scope after merge | 111 | 11 | 87 | 185 |
 | Eukaryota | Fungi | higher | 82 | 0 | 0 | 214 |
 | Eukaryota | - | higher | 22 | 0 | 0 | 156 |
 | Archaea | - | higher | 34 | 0 | 0 | 113 |
@@ -37,7 +37,7 @@ Inputs (SHA-256, first 16 hex): `protein_example_taxa.tsv` ca896e7743af793f, `ta
 | Eukaryota | - | retired, target not a record | 3 | 0 | 3 | 4 |
 | Eukaryota | Viridiplantae | retired, target not a record | 2 | 0 | 0 | 2 |
 
-## Resolvable one rank up: 222 taxa whose nearest in-scope ancestor is a record (25868 protein examples, 17935 records)
+## Resolvable one rank up: 222 taxa whose nearest in-scope ancestor is a record (25868 protein examples, 17935 record citations)
 
 | taxon | name | rank | ancestor | ancestor name | protein examples | records | Mechs |
 |---|---|---|---|---|---:|---:|---|
@@ -72,7 +72,7 @@ Inputs (SHA-256, first 16 hex): `protein_example_taxa.tsv` ca896e7743af793f, `ta
 | NCBITaxon:1314807 | Dendrothele bispora CBS 962.96 | strain | NCBITaxon:1314803 | Dendrothele bispora | 7 | 8 | naturalproductmech, proteintraitsmech |
 | NCBITaxon:322104 | Scheffersomyces stipitis CBS 6054 | strain | NCBITaxon:4924 | Scheffersomyces stipitis | 7 | 7 | proteintraitsmech |
 
-## Microbial species or strains with no in-scope ancestor (scope candidates): 548 (416 protein examples, 1051 records)
+## Microbial species or strains with no in-scope ancestor (scope candidates): 548 (416 protein examples, 1051 record citations)
 
 | taxon | name | domain | rank | protein examples | records | Mechs |
 |---|---|---|---|---:|---:|---|
@@ -119,15 +119,15 @@ Inputs (SHA-256, first 16 hex): `protein_example_taxa.tsv` ca896e7743af793f, `ta
 
 ## Outcomes, one per taxon
 
-| outcome | distinct taxa | protein examples | records citing |
+| outcome | distinct taxa | protein examples | record citations |
 |---|---:|---:|---:|
 | resolvable one rank up | 222 | 25868 | 17935 |
-| retired id | 181 | 182 | 345 |
+| retired id | 182 | 182 | 347 |
 | above species | 690 | 0 | 3274 |
 | microbial, not attested | 548 | 416 | 1051 |
 | outside TaxonMech's domain | 2087 | 273777 | 148635 |
 | not in taxdump | 2 | 21 | 22 |
-| total | 3730 | 300264 | 171262 |
+| total | 3731 | 300264 | 171264 |
 
 ## Per Mech: record citations of a taxon, by where that taxon falls
 
@@ -139,7 +139,7 @@ Inputs (SHA-256, first 16 hex): `protein_example_taxa.tsv` ca896e7743af793f, `ta
 | communitymech | 988 | 2 | 2 | 731 | 13 | 44 | 0 |
 | culturemech | 55 | 2 | 1 | 0 | 0 | 3 | 0 |
 | dufmech | 182 | 3 | 0 | 0 | 0 | 36 | 0 |
-| habitatmech | 11640 | 19 | 87 | 976 | 104 | 415 | 1 |
+| habitatmech | 11638 | 19 | 89 | 976 | 104 | 415 | 1 |
 | mediaingredientmech | 0 | 0 | 0 | 0 | 0 | 1 | 0 |
 | naturalproductmech | 4692 | 219 | 76 | 1044 | 452 | 642 | 0 |
 | pathwaymech | 351 | 86 | 0 | 9 | 0 | 0 | 0 |

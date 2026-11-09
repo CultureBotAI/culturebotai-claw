@@ -1,11 +1,11 @@
 # Protein-example taxa against TaxonMech's seed scope
 
-TaxonMech scope: 626048 taxa (curation/seed_scope.tsv at 4895ee09fec7).
+TaxonMech scope: 626048 taxa (curation/seed_scope.tsv at 4895ee09fec7), 14 of them retired by data/raw/ncbi_merged_ids.tsv and counted outside it.
 
 | Mech | HEAD | files | parsed | examples | distinct taxa | in scope | outside scope | malformed | no taxon |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|
 | culturemech | 199cd9191881 | 6325 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
-| mediaingredientmech | 0dac27846669 | 2962 | 23 | 0 | 0 | 0 | 0 | 0 | 0 |
+| mediaingredientmech | 0dac27846669 | 2956 | 23 | 0 | 0 | 0 | 0 | 0 | 0 |
 | communitymech | fc0c501b9dea | 515 | 202 | 0 | 0 | 0 | 0 | 0 | 0 |
 | traitmech | 0c20b4c82a8b | 1130 | 520 | 210 | 90 | 209 | 1 | 0 | 0 |
 | proteintraitsmech | 8d08b33cfbee | 429421 | 142411 | 420162 | 9368 | 70116 | 298658 | 0 | 51388 |

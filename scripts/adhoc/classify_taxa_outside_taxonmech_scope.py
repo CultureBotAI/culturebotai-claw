@@ -26,7 +26,9 @@ Outputs: DIR/outside_scope_classified.tsv (taxon, name, merged_into, domain,
 kingdom, rank, class, nearest in-scope ancestor and its name, protein
 examples, records citing it, Mechs) and DIR/summary_classified.md, which names
 the digests of the two input TSVs (culturebotai-claw#916); rows are written in
-a deterministic order so the TSV's own digest reproduces.
+a deterministic order so the TSV's own digest reproduces. Per taxon, "records
+citing" counts records; a sum over taxa is record citations, one per
+record-taxon pair, and the summary's column names say which (#1068).
 Read-only; writes only under DIR. The tarball is read twice (nodes, then the
 names of the ids that turned out to be needed).
 Serves: the cross-Mech taxon-link assessment, culturebotai-claw PR 881 (and
@@ -158,21 +160,21 @@ def main() -> int:
              f"({len(nodes)} nodes).", "",
              "Inputs (SHA-256, first 16 hex): " + ", ".join(f"`{n}` {d}" for n, d in digests.items())
              + "; the Mech HEADs are those the two scan summaries record.", "",
-             "| domain | kingdom | class | distinct taxa | with an in-scope ancestor | protein examples | records citing |",
+             "| domain | kingdom | class | distinct taxa | with an in-scope ancestor | protein examples | record citations |",
              "|---|---|---|---:|---:|---:|---:|"]
     for key, cell in sorted(cells.items(), key=lambda kv: -sum(r[9] + r[10] for r in kv[1])):
         lines.append(f"| {key[0]} | {key[1]} | {key[2]} | {len(cell)} | {sum(1 for r in cell if r[7])} | "
                      f"{sum(r[9] for r in cell)} | {sum(r[10] for r in cell)} |")
     resolvable = [r for r in rows if r[7] and not r[2]]  # a retired id is counted as retired, not here
     lines += ["", f"## Resolvable one rank up: {len(resolvable)} taxa whose nearest in-scope ancestor is a record "
-                  f"({sum(r[9] for r in resolvable)} protein examples, {sum(r[10] for r in resolvable)} records)", "",
+                  f"({sum(r[9] for r in resolvable)} protein examples, {sum(r[10] for r in resolvable)} record citations)", "",
               "| taxon | name | rank | ancestor | ancestor name | protein examples | records | Mechs |",
               "|---|---|---|---|---|---:|---:|---|"]
     lines += [f"| {r[0]} | {r[1]} | {r[5]} | {r[7]} | {r[8]} | {r[9]} | {r[10]} | {r[11]} |" for r in resolvable[:30]]
     candidates = [r for r in rows if r[6] in ("species", "below-species") and not r[7]
                   and (r[3] in ("Bacteria", "Archaea") or (r[3] == "Eukaryota" and r[4] not in ("Metazoa", "Viridiplantae")))]
     lines += ["", f"## Microbial species or strains with no in-scope ancestor (scope candidates): {len(candidates)} "
-                  f"({sum(r[9] for r in candidates)} protein examples, {sum(r[10] for r in candidates)} records)", "",
+                  f"({sum(r[9] for r in candidates)} protein examples, {sum(r[10] for r in candidates)} record citations)", "",
               "| taxon | name | domain | rank | protein examples | records | Mechs |", "|---|---|---|---|---:|---:|---|"]
     lines += [f"| {r[0]} | {r[1]} | {r[3]}{'/' + r[4] if r[4] else ''} | {r[5]} | {r[9]} | {r[10]} | {r[11]} |"
               for r in candidates[:40]]
@@ -199,7 +201,7 @@ def main() -> int:
         cell[0] += 1
         cell[1] += r[9]
         cell[2] += r[10]
-    lines += ["", "## Outcomes, one per taxon", "", "| outcome | distinct taxa | protein examples | records citing |",
+    lines += ["", "## Outcomes, one per taxon", "", "| outcome | distinct taxa | protein examples | record citations |",
               "|---|---:|---:|---:|"]
     lines += [f"| {c} | {totals[c][0]} | {totals[c][1]} | {totals[c][2]} |" for c in columns[1:]]
     lines.append(f"| total | {sum(v[0] for v in totals.values())} | {sum(v[1] for v in totals.values())} | "

@@ -17,7 +17,10 @@ is not a protein. Nothing nested inside a matched example is counted again
 (ProteinTraitsMech's trait_occurrences carry the parent's protein id). The
 taxon is the first of taxon_id, organism_term, target_organism or organism_id,
 as a string or as a mapping with an id. Files whose text mentions none of the
-keys are not parsed. TaxonMech itself is skipped: its records are the taxa.
+keys are not parsed, and a file git does not track is not a record
+(culturebotai-claw#1069). A scoped id that TaxonMech's merge table retires is
+outside the scope (culturebotai-claw#1067). TaxonMech itself is skipped: its
+records are the taxa.
 Not covered: PathwayMech's pathway participants, which name proteins as
 `identifier: UniProtKB:...` on a different shape.
 Inputs: claw's .env (set -a; . ./.env) for the Mech roots; --out DIR.
@@ -33,7 +36,8 @@ CellStructureMech's Complex Portal participants, and CommunityMech's
 `kb/taxa/*.yaml`, which lies outside its manifest record globs; the last two
 carry no taxon at all.
 Serves: the cross-Mech taxon-link assessment, culturebotai-claw PR 881.
-Written 2026-11-06.
+Written 2026-11-06; tracked files and retired scope ids since 2026-11-09
+(#1067, #1069).
 """
 from __future__ import annotations
 
@@ -113,6 +117,18 @@ def head_of(root: Path) -> str:
                           text=True, capture_output=True, check=True).stdout.strip()
 
 
+def tracked_files(root: Path) -> set[str]:
+    """Paths git tracks, relative to the root; existence is decided by git, not the filesystem."""
+    out = subprocess.run(["git", "-C", str(root), "ls-files", "-z"], capture_output=True, check=True).stdout
+    return {part.decode("utf-8", "surrogateescape") for part in out.split(b"\0") if part}
+
+
+def retired_scope_ids(taxonmech: Path, scope: set[str]) -> set[str]:
+    """Scope ids that TaxonMech's merge table retires; a link to one resolves to a retired id."""
+    with (taxonmech / "data/raw/ncbi_merged_ids.tsv").open(encoding="utf-8") as handle:
+        return {row["old_taxon_id"] for row in csv.DictReader(handle, delimiter="\t")} & scope
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", type=Path, required=True)
@@ -125,6 +141,8 @@ def main() -> int:
         raise SystemExit(f"taxonmech: {settings.errors.get('taxonmech', 'not configured')}")
     with (taxonmech / "curation/seed_scope.tsv").open(encoding="utf-8") as handle:
         scope = {row["identifier"] for row in csv.DictReader(handle, delimiter="\t")}
+    retired = retired_scope_ids(taxonmech, scope)
+    scoped = scope - retired
     heads = {"taxonmech": head_of(taxonmech)}
     rows = []
     stats: dict[str, Counter] = defaultdict(Counter)
@@ -136,9 +154,10 @@ def main() -> int:
             stats[key]["not_configured"] = 1
             continue
         heads[key] = head_of(root)
+        tracked = tracked_files(root)
         for pattern in mech.record_globs:
             for path in sorted(root.glob(pattern)):
-                if not path.is_file():
+                if not path.is_file() or path.relative_to(root).as_posix() not in tracked:
                     continue
                 stats[key]["files"] += 1
                 raw = path.read_bytes()
@@ -153,7 +172,7 @@ def main() -> int:
                     continue
                 rid = record_id(document)
                 for slot, pkey, uniprot, taxon, label in examples(document):
-                    in_scope = taxon in scope
+                    in_scope = taxon in scoped
                     rows.append((key, str(path.relative_to(root)), rid, slot, pkey, uniprot, taxon, label, in_scope))
                     stats[key]["examples"] += 1
                     if not taxon:
@@ -170,7 +189,8 @@ def main() -> int:
                          "taxon_label", "in_taxonmech_scope"])
         writer.writerows(rows)
     lines = ["# Protein-example taxa against TaxonMech's seed scope", "",
-             f"TaxonMech scope: {len(scope)} taxa (curation/seed_scope.tsv at {heads['taxonmech']}).", "",
+             f"TaxonMech scope: {len(scope)} taxa (curation/seed_scope.tsv at {heads['taxonmech']}), "
+             f"{len(retired)} of them retired by data/raw/ncbi_merged_ids.tsv and counted outside it.", "",
              "| Mech | HEAD | files | parsed | examples | distinct taxa | in scope | outside scope | malformed | no taxon |",
              "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|"]
     for key in manifest.mechs:

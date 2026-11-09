@@ -9,8 +9,9 @@ taxon. Those in slots become issues in their Mechs; an issue needs the exact
 ids, the merge targets and record paths, which the summaries do not list. This
 is the text-scan upper bound, and says so; the slot-declared check decides.
 Method: read the classifier's outside_scope_classified.tsv and the measurement
-TSVs, then walk each Mech's manifest record_globs once, scanning file text for
-the target ids, to collect up to three record paths per id.
+TSVs, then walk each Mech's manifest record_globs once, scanning the text of
+the files git tracks (culturebotai-claw#1069) for the target ids, to collect
+up to three record paths per id.
 Inputs: claw's .env (set -a; . ./.env) for the Mech roots; --classified PATH
 (outside_scope_classified.tsv); --curies PATH (taxon_curies.tsv); --examples
 PATH (protein_example_taxa.tsv from the tightened run); --out DIR.
@@ -25,6 +26,7 @@ import argparse
 import csv
 import hashlib
 import re
+import subprocess
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -34,6 +36,12 @@ from kg_microbe_fleet import load_fleet_manifest  # noqa: E402
 from plugins.repository_settings import RepositorySettings  # noqa: E402
 
 SAMPLES = 3
+
+
+def tracked_files(root: Path) -> set[str]:
+    """Paths git tracks, relative to the root; existence is decided by git, not the filesystem."""
+    out = subprocess.run(["git", "-C", str(root), "ls-files", "-z"], capture_output=True, check=True).stdout
+    return {part.decode("utf-8", "surrogateescape") for part in out.split(b"\0") if part}
 
 
 def main() -> int:
@@ -76,9 +84,10 @@ def main() -> int:
             continue
         targets = {t: re.compile(re.escape(t).encode() + rb"(?![0-9])") for t in fixes[mech]}
         samples: dict[str, list[str]] = defaultdict(list)
+        tracked = tracked_files(root)
         for pattern in manifest.mechs[mech].record_globs:
             for path in sorted(root.glob(pattern)):
-                if not path.is_file():
+                if not path.is_file() or path.relative_to(root).as_posix() not in tracked:
                     continue
                 raw = path.read_bytes()
                 if b"NCBITaxon:" not in raw:
