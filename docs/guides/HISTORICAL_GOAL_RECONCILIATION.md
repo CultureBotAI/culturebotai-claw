@@ -99,8 +99,11 @@ historical/current identities, workflow, external PR and required intake IDs.
 Apply it through the same interface and locks. Release sends nothing. After an
 independently authorized supervisor start, normal dispatch still rechecks the
 live process, terminal readiness, exact current identity, native completed state,
-skills, workflow, input lock and duplicate-delivery guards. Only a new native
-goal with the sent marker and a later identity consumes the boundary; the old
+skills, workflow, input lock and duplicate-delivery guards. Only exact native
+proof of the complete reserved user input and its new goal declaration can
+consume the boundary. The declaration must be in the same conversation and
+strictly later than the separately attributed external goal in both step and
+time. Existing acceptance timestamps and attribution remain immutable; the old
 closure and reconciliation audits remain retained. A held boundary cannot be
 consumed by an existing external goal repeating a marker.
 

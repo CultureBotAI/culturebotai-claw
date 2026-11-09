@@ -7,7 +7,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from test_historical_goal_reconciliation import new_record, tree
+from test_historical_goal_reconciliation import exact_start_input, new_record, tree
 from test_mech_session_supervisor import (  # noqa: F401 -- shared offline fixtures
     HEAD,
     CycleGitHubFixture,
@@ -222,7 +222,7 @@ def test_separate_release_retains_new_native_goal_acceptance_guard(npm):
     observation["native"]["current_goal"]["goal_text"] = "no accepted instruction"
     npm.instance.reconcile(npm.target, released, observation)
     assert released["awaiting_goal"]
-    observation["native"]["current_goal"]["goal_text"] = "synthetic-next-stage"
+    observation = exact_start_input(npm, released["actions"][decision["action_id"]], next_goal)
     npm.instance.reconcile(npm.target, released, observation)
     assert released["adopted_goal"] == next_goal and not released["awaiting_goal"]
     assert "historical_goal_boundary" not in released

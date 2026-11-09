@@ -135,6 +135,22 @@ def release(state):
     return read_ledger(state)
 
 
+def exact_start_input(state, action, identity):
+    """Synthetic native full-input proof, separate from goal text or transport."""
+    action.setdefault('message', '/goal next reviewed objective [' + action['marker'] + ']')
+    action.setdefault('native_step_index', state.ledger['adopted_goal']['start_step_index'])
+    observation = copy.deepcopy(state.observation)
+    observation.update(goal_identity=copy.deepcopy(identity))
+    observation['native'].update(conversation_id=identity['conversation_id'], root=state.target['root'],
+        workspace_identity={'verified': True},
+        current_goal={**identity, 'state': 'completed', 'goal_text': action['message']},
+        user_input_evidence={'schema_version': 1, 'truncated': False, 'inputs': [{
+            'step_index': identity['start_step_index'], 'status_number': 3, 'created_at': identity['started_at'],
+            'supported_input_shape': True, 'text_sha256': rec.sha(action['message'].encode()),
+            'text_length': len(action['message']), 'native_goal_declaration': True}]})
+    return observation
+
+
 def test_release_never_sends_and_future_dispatch_retains_readiness_identity_duplicate_gates(case):
     ledger = release(case)
     observation = {**case.observation, 'goal_identity': case.current}
@@ -152,7 +168,7 @@ def test_release_never_sends_and_future_dispatch_retains_readiness_identity_dupl
     case.instance.reconcile(case.target, ledger, observation)
     assert ledger['awaiting_goal']
     next_goal = {**case.current, 'start_step_index': 13000, 'started_at': '2026-11-07T01:00:00Z'}
-    observation.update(goal_identity=next_goal)
+    observation = exact_start_input(case, ledger['actions'][decision['action_id']], next_goal)
     case.instance.reconcile(case.target, ledger, observation)
     assert ledger['adopted_goal'] == next_goal and not ledger['awaiting_goal']
     assert 'historical_goal_boundary' not in ledger
