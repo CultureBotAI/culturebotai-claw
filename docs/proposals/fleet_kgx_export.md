@@ -11,7 +11,10 @@ predicate maps), #540 (release-asset contract), #541 (kg-microbe transform).
 
 ## The problem, measured
 
-`kgx_export` is enabled for one Mech of eleven, and no Mech's graph reaches
+At the 2026-09-30 baseline (11 manifest Mechs; `fleet.yaml` has since grown to
+15 entries with DUFMech, CMMMech, AIMech, and infrastructure EdgeMech, and
+PathwayMech and DUFMech now declare `kgx_export: enabled`), `kgx_export` is
+enabled for one Mech of eleven, and no Mech's graph reaches
 kg-microbe: its `download.yaml` and `merge.yaml` on `master` (1408e709) name no
 Mech, and its only Mech input is MediaIngredientMech's legacy SSSOM lookup
 inside `mim_ingredients` (#358). Three Mechs have written their own exporter --
