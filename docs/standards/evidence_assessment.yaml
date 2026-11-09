@@ -1,4 +1,6 @@
 version: 1
+baseline_date: "2026-09-17"
+cohort: Ten-Mech 2026-09-17 rollout cohort (prior to PathwayMech, DUFMech, CMMMech, AIMech, and infrastructure EdgeMech admissions)
 scope: Primary claim evidence, not extraction provenance or strain-link provenance
 upstream: https://github.com/diatomsRcool/ecomech/blob/5d3f55467f3caaa6e88eb7f33037e4a8103873a7/src/ecomech/schema/ecomech.yaml
 supports:

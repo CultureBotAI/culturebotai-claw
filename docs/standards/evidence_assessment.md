@@ -45,10 +45,13 @@ Checked against the published main branches on 2026-09-17:
 | TaxonMech | EvidenceItem | Absent | Add both optionally |
 
 The machine-readable agreement is [evidence_assessment.yaml](evidence_assessment.yaml).
-Its class keys cover the canonical fleet manifest. Existing support enums are
+Its class keys cover the ten-Mech 2026-09-17 rollout cohort (the canonical fleet
+manifest has since expanded to fifteen entries with PathwayMech, DUFMech,
+CMMMech, AIMech, and infrastructure EdgeMech). Existing support enums are
 reused, including the shared SupportLevelEnum; downstream vendored schemas are
-unchanged. Each repository has local usage documentation and closed-schema tests
-for valid assessments, invalid values, old payloads and requiredness.
+unchanged. Each repository in the ten-Mech rollout cohort has local usage
+documentation and closed-schema tests for valid assessments, invalid values,
+old payloads and requiredness.
 
 ## Deliberately separate provenance
 
