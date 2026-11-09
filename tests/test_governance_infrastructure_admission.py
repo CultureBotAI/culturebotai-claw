@@ -351,7 +351,14 @@ def test_post_admission_catalogue_addition_permits_withheld_capability_and_rejec
     fleet = yaml.safe_load((root / FLEET_PATH).read_bytes())
 
     expanded = deepcopy(fleet)
-    expanded["capability_catalogue"]["taxon_links"] = {}
+    expanded["capability_catalogue"]["taxon_links"] = {
+        "settings": {
+            "slots": {
+                "type": "string_list",
+                "required_when_enabled": True,
+            },
+        },
+    }
     for key, mech in expanded["mechs"].items():
         mech["capabilities"]["taxon_links"] = {
             "status": "disabled",
@@ -368,6 +375,7 @@ def test_post_admission_catalogue_addition_permits_withheld_capability_and_rejec
     enabled_on_edge = deepcopy(expanded)
     enabled_on_edge["mechs"][ADMITTED.key]["capabilities"]["taxon_links"] = {
         "status": "enabled",
+        "settings": {"slots": ["taxon"]},
     }
     with pytest.raises(GovernanceError, match="cannot enable scientific"):
         validate_transition(
@@ -376,6 +384,21 @@ def test_post_admission_catalogue_addition_permits_withheld_capability_and_rejec
             historical_manifest,
             admitted_manifest,
             yaml.safe_dump(enabled_on_edge).encode(),
+        )
+
+    settings_on_withheld = deepcopy(expanded)
+    settings_on_withheld["mechs"][ADMITTED.key]["capabilities"]["taxon_links"] = {
+        "status": "disabled",
+        "reason": "Withheld but carrying execution settings.",
+        "settings": {"slots": ["taxon"]},
+    }
+    with pytest.raises(GovernanceError, match="cannot enable scientific"):
+        validate_transition(
+            policy,
+            historical,
+            historical_manifest,
+            admitted_manifest,
+            yaml.safe_dump(settings_on_withheld).encode(),
         )
 
     tampered_original = deepcopy(expanded)

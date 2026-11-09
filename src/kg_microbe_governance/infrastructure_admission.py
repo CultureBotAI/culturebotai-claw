@@ -178,7 +178,7 @@ def validate_transition(
         if key == "vendored_sync":
             if capability != {"status": "enabled"}:
                 raise GovernanceError("Infrastructure admission requires exact vendored_sync capability")
-        elif capability.get("status") not in {"disabled", "not_applicable"}:
+        elif capability.get("status") not in {"disabled", "not_applicable"} or "settings" in capability:
             raise GovernanceError("Infrastructure admission cannot enable scientific or execution capabilities")
     admitted_entry = entry
     if (canonical_sha(admitted_entry) != policy["fleet_entry_sha256"]
