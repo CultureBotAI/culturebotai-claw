@@ -122,6 +122,10 @@ class _Malformed(Exception):
     """A record whose graph slot does not have the declared shape."""
 
 
+# The public name for callers outside this module, such as the KGX exporter.
+MalformedGraph = _Malformed
+
+
 # --------------------------------------------------------------------------
 # Configuration
 # --------------------------------------------------------------------------
@@ -644,12 +648,28 @@ def _node(raw: Any, shape: GraphShape, what: str) -> tuple[Node, str | None]:
     )
 
 
+def _edge_verdicts(
+    raw: Mapping[str, Any],
+    shape: GraphShape,
+    evidenced: bool,
+    validator: EvidenceValidator | None,
+) -> Counter[str]:
+    verdicts: Counter[str] = Counter()
+    if validator is not None and evidenced and shape.edge_evidence_field is not None:
+        value = raw[shape.edge_evidence_field]
+        # A malformed scalar is still an evidence item to classify, not a
+        # reason to discard the graph or call the field quote-validated.
+        items = value if isinstance(value, list) else [value]
+        verdicts.update(validator.check_item(item).verdict for item in items)
+    return verdicts
+
+
 def _edge(
     raw: Any,
     subject: Any,
     shape: GraphShape,
     what: str,
-    validator: EvidenceValidator | None,
+    validator: EvidenceValidator | None = None,
 ) -> tuple[Edge, bool, Counter[str]]:
     if not isinstance(raw, dict):
         raise _Malformed(f"{what} is not a mapping")
@@ -664,14 +684,7 @@ def _edge(
     evidenced = bool(shape.edge_evidence_field) and _populated(
         raw.get(shape.edge_evidence_field)
     )
-    verdicts: Counter[str] = Counter()
-    if validator is not None and evidenced:
-        value = raw[shape.edge_evidence_field]
-        # A malformed scalar is still an evidence item to classify, not a
-        # reason to discard the graph or call the field quote-validated.
-        items = value if isinstance(value, list) else [value]
-        verdicts.update(validator.check_item(item).verdict for item in items)
-    return edge, evidenced, verdicts
+    return edge, evidenced, _edge_verdicts(raw, shape, evidenced, validator)
 
 
 def _assemble(
@@ -696,9 +709,44 @@ def _assemble(
     )
 
 
-def _graphs(
-    record: Mapping[str, Any], config: CoverageConfig, validator: EvidenceValidator | None
-) -> list[_Parsed]:
+@dataclass(frozen=True)
+class GraphParts:
+    """One graph as the shape reads it, before anything is counted.
+
+    Each node is ``(Node, grounding, raw)`` and each edge ``(Edge, evidenced,
+    raw)``, where ``raw`` is the mapping it was read from (``None`` for the
+    record node under ``record_is_node``). The coverage report and the KGX
+    exporter both start here, so the graph that is measured is the graph that
+    is exported.
+    """
+
+    graph_id: str
+    nodes: tuple[tuple[Node, str | None, Mapping[str, Any] | None], ...]
+    edges: tuple[tuple[Edge, bool, Mapping[str, Any]], ...]
+    scope: str | None
+    facets: dict[str, str]
+
+
+def _node_part(
+    raw: Any, shape: GraphShape, what: str, node_type: str | None = None
+) -> tuple[Node, str | None, Mapping[str, Any]]:
+    node, grounding = _node(raw, shape, what)
+    if node_type is not None:
+        node = Node(node.id, node_type)
+    assert isinstance(raw, Mapping)
+    return node, grounding, raw
+
+
+def _edge_part(
+    raw: Any, subject: Any, shape: GraphShape, what: str
+) -> tuple[Edge, bool, Mapping[str, Any]]:
+    edge, evidenced, _ = _edge(raw, subject, shape, what)
+    assert isinstance(raw, Mapping)
+    return edge, evidenced, raw
+
+
+def graph_parts(record: Mapping[str, Any], config: CoverageConfig) -> list[GraphParts]:
+    """Every graph in ``record`` under ``config``'s shape; raises ``_Malformed``."""
     shape = config.shape
     if shape.kind == NODE_NESTED_EDGES:
         raw_nodes = _list(record.get(shape.nodes_field), shape.nodes_field)
@@ -707,29 +755,28 @@ def _graphs(
         nodes, edges = [], []
         for i, raw in enumerate(raw_nodes):
             what = f"{shape.nodes_field}[{i}]"
-            node = _node(raw, shape, what)
+            node = _node_part(raw, shape, what)
             nodes.append(node)
             for j, raw_edge in enumerate(_list(raw.get(shape.edges_field), f"{what}.{shape.edges_field}")):
-                edges.append(_edge(raw_edge, node[0].id, shape, f"{what}.{shape.edges_field}[{j}]", validator))
-        return [_assemble(shape.nodes_field, nodes, edges, None, {})]
+                edges.append(_edge_part(raw_edge, node[0].id, shape, f"{what}.{shape.edges_field}[{j}]"))
+        return [GraphParts(shape.nodes_field, tuple(nodes), tuple(edges), None, {})]
 
     if shape.kind == RECORD_GRAPH:
-        nodes = []
+        record_nodes: list[tuple[Node, str | None, Mapping[str, Any] | None]] = []
         if shape.record_is_node:
             own = _identifier(record.get(shape.node_id_field), "the record")
-            nodes.append((Node(own, RECORD_NODE_TYPE), None))
+            record_nodes.append((Node(own, RECORD_NODE_TYPE), None, None))
         for list_field in shape.node_list_fields:
             for j, raw in enumerate(_list(record.get(list_field), list_field)):
-                parsed_node, grounding = _node(raw, shape, f"{list_field}[{j}]")
-                nodes.append((Node(parsed_node.id, list_field), grounding))
-        edges = [
-            _edge(e, None, shape, f"{shape.edges_field}[{j}]", validator)
+                record_nodes.append(_node_part(raw, shape, f"{list_field}[{j}]", node_type=list_field))
+        record_edges = [
+            _edge_part(e, None, shape, f"{shape.edges_field}[{j}]")
             for j, e in enumerate(_list(record.get(shape.edges_field), shape.edges_field))
         ]
-        listed = len(nodes) - (1 if shape.record_is_node else 0)
-        if not listed and not edges:
+        listed = len(record_nodes) - (1 if shape.record_is_node else 0)
+        if not listed and not record_edges:
             return []
-        return [_assemble(shape.edges_field, nodes, edges, None, {})]
+        return [GraphParts(shape.edges_field, tuple(record_nodes), tuple(record_edges), None, {})]
 
     assert shape.graphs_field is not None and shape.graph_id_field is not None
     parsed = []
@@ -740,17 +787,37 @@ def _graphs(
         graph_id = raw.get(shape.graph_id_field)
         graph_id = str(graph_id) if _populated(graph_id) else f"#{i}"
         nodes = [
-            _node(n, shape, f"{what}.{shape.nodes_field}[{j}]")
+            _node_part(n, shape, f"{what}.{shape.nodes_field}[{j}]")
             for j, n in enumerate(_list(raw.get(shape.nodes_field), f"{what}.{shape.nodes_field}"))
         ]
         edges = [
-            _edge(e, None, shape, f"{what}.{shape.edges_field}[{j}]", validator)
+            _edge_part(e, None, shape, f"{what}.{shape.edges_field}[{j}]")
             for j, e in enumerate(_list(raw.get(shape.edges_field), f"{what}.{shape.edges_field}"))
         ]
         scope = _key(raw.get(config.scope_field)) if config.scope_field else None
         facets = {facet: _key(raw.get(facet)) for facet in config.graph_facets}
-        parsed.append(_assemble(graph_id, nodes, edges, scope, facets))
+        parsed.append(GraphParts(graph_id, tuple(nodes), tuple(edges), scope, facets))
     return parsed
+
+
+def _graphs(
+    record: Mapping[str, Any],
+    config: CoverageConfig,
+    validator: EvidenceValidator | None = None,
+) -> list[_Parsed]:
+    return [
+        _assemble(
+            part.graph_id,
+            [(n, g) for n, g, _ in part.nodes],
+            [
+                (e, ev, _edge_verdicts(raw, config.shape, ev, validator))
+                for e, ev, raw in part.edges
+            ],
+            part.scope,
+            part.facets,
+        )
+        for part in graph_parts(record, config)
+    ]
 
 
 # --------------------------------------------------------------------------
