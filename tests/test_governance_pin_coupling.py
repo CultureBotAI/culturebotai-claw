@@ -81,9 +81,26 @@ def test_a_committed_manifest_snapshot_is_found_by_name(tmp_path: Path) -> None:
     assert _found(root) == [("scripts/.vendored_manifest.json", "manifest-snapshot")]
 
 
-def test_dated_reports_are_records_not_couplings(tmp_path: Path) -> None:
-    root = _repo(tmp_path, {"reports/2026-09-21/run.json": f'{{"claw": "{OLD}"}}\n'})
-    assert _found(root) == []
+@pytest.mark.parametrize("record", [
+    "reports/2026-09-21/run.json",
+    # The shapes of #795's hits: dated review bundles and research runs.
+    "reviews/structured/20261010T210459Z-diatom/review.md",
+    "reviews/publication/20261015-round87/build-manifest.py",
+    "research/ingests/round26-20261011-publication.md",
+])
+def test_dated_records_are_not_couplings_but_the_same_text_elsewhere_is(tmp_path: Path, record: str) -> None:
+    """Only a top-level dated directory is exempt: the same text under docs/ is still found (#795)."""
+    text = f'{{"claw": "{OLD}"}}\n'
+    elsewhere = "docs/" + record
+    root = _repo(tmp_path, {record: text, elsewhere: text})
+    assert _found(root) == [(elsewhere, "pin-reference")]
+
+
+@pytest.mark.parametrize("directory", ["reports", "reviews", "research"])
+def test_a_manifest_snapshot_inside_a_dated_record_is_not_a_coupling(tmp_path: Path, directory: str) -> None:
+    root = _repo(tmp_path, {f"{directory}/2026-10-15/.vendored_manifest.json": "{}\n",
+                            "scripts/.vendored_manifest.json": "{}\n"})
+    assert _found(root) == [("scripts/.vendored_manifest.json", "manifest-snapshot")]
 
 
 def test_only_the_committed_tree_is_read(tmp_path: Path) -> None:
@@ -134,4 +151,45 @@ def test_a_consumer_not_pinning_the_outgoing_commit_is_not_ok(tmp_path: Path, ca
     assert main(["pin-coupling", "--old-ref", OLD,
                  "--target-root", f"culturemech={root}"]) == 0
     assert "not the outgoing pin" not in capsys.readouterr().out
+
+
+
+@pytest.mark.parametrize("lookalike", ["reviewsX", "research-notes", "Reviews", "Research", "REPORTS"])
+def test_a_lookalike_or_differently_cased_directory_is_not_exempt(tmp_path: Path, lookalike: str) -> None:
+    """The exemption is the exact top-level name, case and slash included (#842)."""
+    root = _repo(tmp_path, {f"{lookalike}/2026-10-15/run.json": f'{{"claw": "{OLD}"}}\n',
+                            f"{lookalike}/2026-10-15/.vendored_manifest.json": "{}\n"})
+    assert sorted(_found(root)) == [(f"{lookalike}/2026-10-15/.vendored_manifest.json", "manifest-snapshot"),
+                                    (f"{lookalike}/2026-10-15/run.json", "pin-reference")]
+
+
+def test_survey_pin_coupling_hits_reads_pin_path_from_governance_manifest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """#1055: survey_pin_coupling_hits_795.py must obtain pin_path from load_governance_manifest()."""
+    import dataclasses
+    import importlib.util
+
+    from kg_microbe_governance import load_governance_manifest
+
+    script_path = Path(__file__).resolve().parents[1] / "scripts" / "adhoc" / "survey_pin_coupling_hits_795.py"
+    spec = importlib.util.spec_from_file_location("survey_pin_coupling_hits_795", script_path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    custom_pin = "governance/.custom_pin_ref"
+    root = _repo(tmp_path, {custom_pin: OLD + "\n", ".github/workflows/qc.yaml": f"ref: {OLD}\n"})
+    manifest = dataclasses.replace(load_governance_manifest(), pin_path=custom_pin)
+    monkeypatch.setattr(module, "load_governance_manifest", lambda: manifest)
+    monkeypatch.setattr(
+        module.RepositorySettings,
+        "from_environment",
+        classmethod(lambda cls: type("_S", (), {"paths": {"culturemech": root}, "errors": {}})()),
+    )
+
+    assert module.main(["--old-ref", OLD]) == 0
+    out = capsys.readouterr().out
+    assert "culturemech\tpin-reference\t.github/workflows/qc.yaml:1" in out
+    assert custom_pin not in out
 

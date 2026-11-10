@@ -106,7 +106,8 @@ uv run kg-microbe-governance pin-coupling \
 
 It reports the pin in full or abbreviated to seven or more characters, in either case
 (`pin-reference`), and any committed snapshot of claw's manifest
-(`manifest-snapshot`), outside the pin file and dated `reports/`. A consumer
+(`manifest-snapshot`), outside the pin file and the dated records under
+`reports/`, `reviews/` and `research/`. A consumer
 whose committed pin is not `--old-ref` is reported as `PIN`, since that means
 a mistyped ref or a Mech already moved on. It exits 1 on either and never
 writes. Judge each hit:
@@ -626,3 +627,28 @@ closing the obsolete PR. A successful vendored-sync run from before the
 workflow became governed does not validate merging that old PR against today's
 main branch. Require checks on the current candidate containing the canonical
 copy and the Mech-owned update.
+
+### CofactorMech pending admission
+
+See [CofactorMech admission](COFACTORMECH_ADMISSION.md) for the empty-main
+inspection, exact artifact ledger, branch-published bootstrap provenance and
+separate immutable infrastructure declaration and release hold. This draft
+requires independent review, re-review, green checks and the user's explicit
+merge decision. Only protected approval can activate its bounded admission;
+the existing DUF/Edge policies and consumer pins remain unchanged. It does not
+claim a completed coordinated fleet release.
+
+### AssayMech pending admission
+
+See [AssayMech admission](ASSAYMECH_ADMISSION.md) for its exact empty-main
+inspection, 22-artifact obligation and published bootstrap procedure. It needs
+its own separately reviewed declaration; existing Edge or Cofactor policy is
+not authority for Assay. Candidate validation is not protected deployment.
+
+The AssayMech proposal adds its own sealed native-consumer admission, using the
+bounded mechanism reviewed for CofactorMech. Its declaration binds the exact
+published source manifest and pin, empty-main tip, conservative fleet entry,
+and all 22 native artifact obligations. It preserves the historical DUF and
+Edge declarations and permissions. A candidate declaration is data until its
+immutable introduction reaches protected first-parent history through a
+user-approved merge. See [AssayMech admission](ASSAYMECH_ADMISSION.md).

@@ -4,7 +4,7 @@ CultureBotAI CLAW coordinates validation, curation, and shared tooling across
 the Mech repositories: CultureMech, MediaIngredientMech (MIM),
 CommunityMech, TraitMech, ProteinTraitsMech, AntibioticMech,
 CellStructureMech, HabitatMech, NaturalProductMech, TaxonMech,
-PathwayMech, DUFMech, CMMMech, and AIMech.
+PathwayMech, DUFMech, CMMMech, AIMech, EdgeMech, CofactorMech (admission pending), and AssayMech (admission pending).
 `src/kg_microbe_fleet/fleet.yaml` is the
 canonical definition of that fleet. It contains repository-aware plugins,
 file-based coordination, curation pipelines, shared Mech utilities, and fleet
@@ -197,6 +197,7 @@ uv run --extra dev mypy \
   src/kg_microbe_consistency src/kg_microbe_patches \
   src/kg_microbe_evidence src/kg_microbe_graph \
   src/kg_microbe_corpus src/kg_microbe_curation src/kg_microbe_health src/kg_microbe_kgx \
+  src/kg_microbe_links \
   src/kg_microbe_pages src/kg_microbe_site src/kg_microbe_skills \
   src/kg_microbe_source_queue src/kg_microbe_sources \
   src/kg_microbe_sssom src/kg_microbe_writers \
@@ -206,6 +207,8 @@ uv run --extra dev mypy \
   src/kg_microbe_governance/fleet_audit.py \
   src/kg_microbe_governance/private_scaleup_audit.py \
   src/kg_microbe_governance/cycle_release_audit.py \
+  src/kg_microbe_governance/infrastructure_admission.py \
+  src/kg_microbe_governance/consumer_admission.py \
   src/kg_microbe_governance/artifacts/scripts/run_shared_evidence_validator.py \
   src/kg_microbe_governance/artifacts/scripts/check_vendored_sync.py
 uv run --extra dev python -m pytest -q \

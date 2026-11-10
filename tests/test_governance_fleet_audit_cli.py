@@ -1,4 +1,4 @@
-"""CLI contracts for the five-Mech governance pin audit."""
+"""CLI contracts for the manifest-defined governance pin audit."""
 
 from pathlib import Path
 

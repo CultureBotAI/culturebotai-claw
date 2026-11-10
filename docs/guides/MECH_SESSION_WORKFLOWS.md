@@ -233,6 +233,52 @@ than that window remains held for operator assessment. Missing, partial,
 different or duplicate inputs never authorize a retry or an automatic Enter. Matching pending, queued or unknown-status inputs also defeat uniqueness. Only the observed plain-text input shape, or one SYSTEM goal declaration followed by its plain-text suffix, is supported; extra file or unknown scopes fail closed even when their displayed text has the same hash.
 Workspace-history markers alone are not acceptance authority.
 
+New dispatches use an immutable `instructions/<action-id>.json` artifact for the
+full objective and closure instructions. It records the action/run/repository,
+cycle/stage, pre-dispatch `reservation_goal_identity`, and pinned
+workflow/instruction digest. For `start_goal`, this is the predecessor identity
+and may be null; it is not the newly adopted goal's receipt identity. The agent
+must use the current `status.json` `receipt_template` after adoption rather than
+copying the immutable artifact's predecessor identity into a new-goal receipt.
+The existing ledger action's `goal_identity` field is unchanged.
+The actual `action.message` sent to Terminal is a JSON-quoted absolute file
+reference plus its SHA-256, capped at 512 UTF-8 bytes. `start_goal` keeps the
+literal `/goal` command in this short reference; the artifact explains that the
+native goal is already established and must not be replayed. The 512-byte cap
+is a defensive envelope budget, **not a measured Terminal capacity**.
+
+Preparation rejects unsafe control characters, excessive size, path escapes and
+symlinks before workflow-message input or action reservation. Full instruction text preserves
+Unicode, newlines and tabs inside JSON; only the wire reference is single-line. Publication is append-only
+and atomic: identical bytes may be reused; a conflicting existing file is never
+overwritten. The artifact is rechecked immediately before transport. A definite
+pre-input refusal is `not-sent` and consumes no repair budget. If bytes disappear
+or change after reservation, the action remains recorded as definitely not sent.
+
+Native acceptance still requires exactly the entire actual wire reference,
+including its checksum, and actual SYSTEM goal metadata for `/goal`. Reception
+of a reference does not prove the agent read, verified or executed the file.
+An accepted reference whose file later changes must not be treated as execution
+or closure evidence; the instruction tells the agent to stop on mismatch, and
+ordinary independent closure gates remain mandatory. Legacy raw-message actions
+and historical accepted provenance are not rewritten.
+
+This reduces long Terminal input bursts; it does not claim to cure every
+transport failure. The transport still uses one `Terminal.doScript` call, so a
+return remains uncertain until exact native acceptance. There is no automatic
+Enter, retry, draft clearing or native-state repair. Existing Trait/Pathway
+partial composers predate this change and require separately approved,
+fingerprint-guarded recovery after preserving their complete text. A mixed or
+partial native input cannot authorize replay of the original instruction.
+
+A deployment of this code must add the absolute installed
+`src/kg_microbe_workflows/instructions.py` path and its reviewed SHA-256 to the
+supervisor service's `source_sha256` map, alongside refreshing the changed
+supervisor script pin. The controller validates every listed pin but has no
+built-in required/default source list; an unchanged old map does not pin this
+new module. This is a separately reviewed deployment, not a runtime config edit
+performed by the code change.
+
 A `start_goal` additionally requires actual native SYSTEM `/goal` metadata and
 a matching new goal identity. Literal `/goal` text or a marker in a checkpoint
 cannot substitute for that declaration. Previously accepted action records are
@@ -559,3 +605,11 @@ all member PR observations and associations, but still only one goal closure,
 whose existing top-level PR is the final integration PR. A candidate receipt
 contributes informational associations only. No runtime ledger, registry,
 counter, active workflow, or migration is rewritten by this feature.
+
+## Historical identity reconciliation
+
+A completed supervised goal followed by a separately directed native goal has a
+separate, explicitly approved [historical reconciliation procedure](HISTORICAL_GOAL_RECONCILIATION.md).
+It preserves ordinary closure evidence, installs a held next-goal boundary, and
+requires a second reviewed release. Neither operation sends input. The real
+DUFMech historical notebook versus later adoption intake remains blocked by #1005.

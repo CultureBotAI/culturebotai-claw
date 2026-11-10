@@ -37,6 +37,36 @@ HISTORICAL_MANIFEST_PATH = "src/kg_microbe_governance/releases/mech-cycle-v2-gov
 ADMITTED_MANIFEST_PATH = "src/kg_microbe_governance/releases/edgemech-infrastructure-source-manifest.json"
 ADMISSION_ID = "edgemech-post-cutoff-infrastructure-v1"
 ADMITTED = Consumer("edgemech", "CultureBotAI/EdgeMech", "src/edgemech")
+ADMITTED_CAPABILITIES = frozenset({
+    "id_label_validation",
+    "curation_history",
+    "record_review",
+    "strict_validation",
+    "schema_sync",
+    "release_management",
+    "build_coordination",
+    "documentation",
+    "testing",
+    "refactoring",
+    "coordination_hooks",
+    "deep_research",
+    "edison_key_discovery",
+    "environment_coverage",
+    "knowledge_gap_scan",
+    "vendored_sync",
+    "unmapped_inventory_input",
+    "source_catalogue",
+    "evidence_reference_validation",
+    "corpus_statistics",
+    "causal_graph_coverage",
+    "page_budgets",
+    "kgx_export",
+    "source_queue",
+    "metpo_proposal",
+    "sssom_export",
+    "writer_audit",
+    "site_contract",
+})
 NATIVE_TESTS = frozenset({
     "curation_timestamp_contract", "record_review_contract", "skill_frontmatter_contract",
 })
@@ -140,8 +170,6 @@ def validate_transition(
     }:
         raise GovernanceError("Admission fleet identities differ from governance")
     entry = fleet_doc["mechs"][ADMITTED.key]
-    if canonical_sha(entry) != policy["fleet_entry_sha256"]:
-        raise GovernanceError("Admission fleet entry hash differs")
     if (entry.get("vendored_role") != "consumer"
             or entry.get("serialization", {}).get("verified") is not False
             or set(entry.get("capabilities", {})) != set(fleet.capability_names)):
@@ -150,8 +178,20 @@ def validate_transition(
         if key == "vendored_sync":
             if capability != {"status": "enabled"}:
                 raise GovernanceError("Infrastructure admission requires exact vendored_sync capability")
-        elif capability.get("status") not in {"disabled", "not_applicable"}:
+        elif capability.get("status") not in {"disabled", "not_applicable"} or "settings" in capability:
             raise GovernanceError("Infrastructure admission cannot enable scientific or execution capabilities")
+    admitted_entry = entry
+    if (canonical_sha(admitted_entry) != policy["fleet_entry_sha256"]
+            and ADMITTED_CAPABILITIES < set(entry["capabilities"])):
+        admitted_entry = {
+            **entry,
+            "capabilities": {
+                key: value for key, value in entry["capabilities"].items()
+                if key in ADMITTED_CAPABILITIES
+            },
+        }
+    if canonical_sha(admitted_entry) != policy["fleet_entry_sha256"]:
+        raise GovernanceError("Admission fleet entry hash differs")
     return new
 
 
@@ -169,14 +209,12 @@ def validate_current_layout(admitted: GovernanceManifest, current_content: bytes
 
 def validate_packaged_transition(root: Path) -> dict[str, Any]:
     """Validate candidate/package bytes, without asserting protected activation."""
-    from .cycle_release_audit import FLEET_PATH, RELEASE_PATH, parse_release
+    from .consumer_admission import compose
+    from .cycle_release_audit import FLEET_PATH
 
-    historical = (root / RELEASE_PATH).read_bytes()
-    parse_release(historical)
-    policy = parse_admission((root / ADMISSION_PATH).read_bytes())
-    admitted = validate_transition(policy, historical, (root / HISTORICAL_MANIFEST_PATH).read_bytes(),
-                                   (root / ADMITTED_MANIFEST_PATH).read_bytes(), (root / FLEET_PATH).read_bytes())
-    current = validate_current_layout(admitted, (root / CANONICAL_MANIFEST_PATH).read_bytes())
+    policy, _, _ = compose(lambda p: (root / p).read_bytes(),
+                           (root / FLEET_PATH).read_bytes(), (root / CANONICAL_MANIFEST_PATH).read_bytes())
+    current = parse_manifest((root / CANONICAL_MANIFEST_PATH).read_bytes())
     for artifact in current.artifacts:
         if sha((root / artifact.source).read_bytes()) != artifact.sha256:
             raise GovernanceError(f"Current canonical payload checksum drift: {artifact.source}")
@@ -253,9 +291,16 @@ def trusted_source_ref(root: Path) -> str | None:
     baseline = _blob(root, release["release_ref"], CANONICAL_MANIFEST_PATH)
     if _blob(root, head, HISTORICAL_MANIFEST_PATH) != baseline:
         raise GovernanceError("Data preparation historical snapshot differs")
-    admitted = validate_transition(policy, historical, baseline, _blob(root, head, ADMITTED_MANIFEST_PATH),
-                                   _blob(root, head, FLEET_PATH))
-    validate_current_layout(admitted, _blob(root, head, CANONICAL_MANIFEST_PATH))
+    from .consumer_admission import compose, protected_additions
+
+    def read(path: str) -> bytes:
+        if _head_blob(root, head, path) is None:
+            raise FileNotFoundError(path)
+        return _blob(root, head, path)
+
+    _, _, additions = compose(read, _blob(root, head, FLEET_PATH),
+                              _blob(root, head, CANONICAL_MANIFEST_PATH))
+    protected_additions(root, head, protected, lane, additions)
     _require_clean_worktree(root)
     if _commit_at(root, "HEAD") != head or _commit_at(root, "refs/remotes/origin/main") != main:
         raise GovernanceError("Trusted history changed during data preparation")
