@@ -19,17 +19,26 @@ ROOT = Path(__file__).resolve().parents[1]
 REF = "7e672227fb246a8359ad57b6d3975ce5ed329007"
 
 
+def frozen_payload(artifact):
+    """Read exact declared bytes, independent of a later canonical publication."""
+    content = (ROOT / artifact.source).read_bytes()
+    if hashlib.sha256(content).hexdigest() != artifact.sha256:
+        provenance = json.loads((ROOT / "tests/fixtures/admitted-source-provenance.json").read_bytes())
+        matches = {row["fixture"] for row in provenance["records"]
+                   if row["source_path"] == artifact.source and row["sha256"] == artifact.sha256}
+        assert len(matches) == 1
+        content = (ROOT / matches.pop()).read_bytes()
+    assert hashlib.sha256(content).hexdigest() == artifact.sha256
+    return content
+
+
 @pytest.fixture
 def source(monkeypatch):
     raw = (ROOT / ADMITTED_MANIFEST_PATH).read_bytes()
     manifest = parse_manifest(raw)
     payloads = {CANONICAL_MANIFEST_PATH: raw}
     for artifact in manifest.artifacts:
-        content = (ROOT / artifact.source).read_bytes()
-        if hashlib.sha256(content).hexdigest() != artifact.sha256:
-            content = (ROOT / "tests/fixtures/edgemech-admitted-source" / Path(artifact.source).name).read_bytes()
-        assert hashlib.sha256(content).hexdigest() == artifact.sha256
-        payloads[artifact.source] = content
+        payloads[artifact.source] = frozen_payload(artifact)
 
     def fetch(url):
         path = url.split("/", 6)[-1]
@@ -128,3 +137,53 @@ def test_retained_old_fixtures_are_bound_to_admitted_manifest():
     expected = {Path(a["source"]).name: a["sha256"] for a in manifest["artifacts"]}
     for path in (ROOT / "tests/fixtures/edgemech-admitted-source").iterdir():
         assert hashlib.sha256(path.read_bytes()).hexdigest() == expected[path.name]
+
+
+def test_retained_fixture_provenance_matches_every_sealed_source():
+    provenance = json.loads((ROOT / "tests/fixtures/admitted-source-provenance.json").read_bytes())
+    assert provenance["version"] == 1
+    assert provenance["authority"] == "offline_fixture_provenance_only"
+    records = provenance["records"]
+    assert len(records) == 7
+    assert {row["consumer"] for row in records} == {"edgemech", "cofactormech", "assaymech"}
+    assert {row["fixture"] for row in records} == {
+        path.relative_to(ROOT).as_posix()
+        for folder in ("edgemech-admitted-source", "native-admitted-source")
+        for path in (ROOT / "tests/fixtures" / folder).iterdir()
+    }
+    for row in records:
+        assert row["source_repository"] == "CultureBotAI/culturebotai-claw"
+        policy = json.loads((ROOT / (
+            "src/kg_microbe_governance/releases/" + row["consumer"] + "-infrastructure-admission-v1.json"
+        )).read_bytes())
+        assert row["source_ref"] == policy["source_ref"]
+        snapshot = (ROOT / row["snapshot"]).read_bytes()
+        assert hashlib.sha256(snapshot).hexdigest() == row["snapshot_sha256"]
+        artifact = next(a for a in json.loads(snapshot)["artifacts"] if a["source"] == row["source_path"])
+        content = (ROOT / row["fixture"]).read_bytes()
+        assert hashlib.sha256(content).hexdigest() == artifact["sha256"] == row["sha256"]
+        assert len(content) == row["bytes"]
+        assert hashlib.sha1(b"blob " + str(len(content)).encode() + b"\0" + content).hexdigest() == row["source_blob"]
+
+
+def test_frozen_payload_rejects_missing_or_corrupt_retained_bytes(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    artifact = SimpleNamespace(source="current/controller.py", sha256=hashlib.sha256(b"frozen").hexdigest())
+    current = tmp_path / artifact.source
+    current.parent.mkdir()
+    current.write_bytes(b"new current version")
+    monkeypatch.setattr(__import__(__name__), "ROOT", tmp_path)
+    provenance = tmp_path / "tests/fixtures/admitted-source-provenance.json"
+    provenance.parent.mkdir(parents=True)
+    provenance.write_text(json.dumps({"records": [{"source_path": artifact.source,
+        "sha256": artifact.sha256, "fixture": "tests/fixtures/edgemech-admitted-source/controller.py"}]}))
+    with pytest.raises(FileNotFoundError):
+        frozen_payload(artifact)
+    retained = tmp_path / "tests/fixtures/edgemech-admitted-source/controller.py"
+    retained.parent.mkdir(parents=True)
+    retained.write_bytes(b"corrupt old bytes")
+    with pytest.raises(AssertionError):
+        frozen_payload(artifact)
+    retained.write_bytes(b"frozen")
+    assert frozen_payload(artifact) == b"frozen"
