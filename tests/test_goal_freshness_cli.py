@@ -157,3 +157,13 @@ def test_large_successful_inventory_round_trips_and_remains_usable(repo, gate_re
     assert cli.execute(gate_request, apply=True)['artifact'] == first['artifact']
     gate_request.update(phase='no_change', prior_inventory=first['artifact'])
     assert cli.execute(gate_request, apply=True)['status'] == 'verified'
+
+
+def test_batch_retains_actionable_remote_after_freeze_hold(repo, gate_request):
+    assert cli.run_batch([gate_request], apply=True)['status'] == 'verified'
+    old = repo.head()
+    repo.publish('late.txt', 'external change after inventory')
+    report = cli.run_batch([gate_request], apply=True)
+    assert report['status'] == 'hold'
+    assert report['results'][0]['reason'] == 'remote_moved_since_inventory_freshness'
+    assert repo.head() == old

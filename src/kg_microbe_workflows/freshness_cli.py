@@ -252,7 +252,10 @@ def run_batch(requests: list[dict[str, Any]], *, apply: bool = False) -> dict[st
     for request in requests:
         try:
             results.append(execute(request, apply=apply))
-        except (FreshnessError, WorkflowError, OSError, ValueError, TypeError, KeyError):
+        except FreshnessError as exc:
+            results.append({'status': 'hold', 'repository_key': request.get('repository_key'),
+                            'reason': str(exc)})
+        except (WorkflowError, OSError, ValueError, TypeError, KeyError):
             results.append({'status': 'hold', 'repository_key': request.get('repository_key'),
                             'reason': 'boundary_request_or_observation_failed'})
     return {'schema_version': '1.0.0', 'request_sha256': digest(requests), 'results': results,
@@ -277,7 +280,10 @@ def main(argv=None) -> int:
         result = run_batch(requests, apply=args.apply)
         print(json.dumps(result, indent=2, sort_keys=True))
         return 0 if result['status'] == 'verified' else 1
-    except (FreshnessError, WorkflowError, OSError, ValueError, TypeError, KeyError) as exc:
+    except FreshnessError as exc:
+        print(json.dumps({'status': 'hold', 'reason': str(exc)}), file=sys.stderr)
+        return 1
+    except (WorkflowError, OSError, ValueError, TypeError, KeyError) as exc:
         print(json.dumps({'status': 'hold', 'reason': type(exc).__name__}), file=sys.stderr)
         return 1
 
