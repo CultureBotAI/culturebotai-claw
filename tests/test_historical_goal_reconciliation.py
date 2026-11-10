@@ -397,3 +397,133 @@ def test_workflow_drift_during_auxiliary_commit_is_still_held(case, monkeypatch,
         apply(case)
     assert (case.session / 'ledger.json').read_bytes() == original
     assert json.loads(next((case.session / 'operator-reconciliations').glob('*/audit.json')).read_text())['result']['status'] == 'prepared'
+
+
+def _configure_later_intake_case(case):
+    """Set up real DUF chronology: 365/367 have old notebook, 455 adds DUF-INFRA-0004 at HEAD."""
+    current_notebook_bytes = (case.repo / 'INFRA_TASKS.md').read_bytes()
+    old_notebook = (
+        current_notebook_bytes.decode().split('\ntasks:')[0]
+        + '\ntasks: []\n```\n<!-- mech-infra-tasks:end -->\n'
+    )
+    old_notebook_bytes = old_notebook.encode()
+    old_blob = case.remote.blob(old_notebook_bytes)
+    current_blob = case.remote.blob(current_notebook_bytes)
+    for branch in case.remote.trees.values():
+        branch['INFRA_TASKS.md'] = old_blob
+    intake_pr = {
+        'number': 455,
+        'head_sha': 'a' * 40,
+        'merge_commit_sha': 'de2fdf959acb5e7a1cb1e4139e6936f4ffdf5498',
+    }
+    case.remote.trees['HEAD'] = {**case.remote.current_tree, 'INFRA_TASKS.md': current_blob}
+    case.remote.parents[intake_pr['merge_commit_sha']] = [case.receipt['prs'][-1]['merge_commit_sha']]
+    case.remote.raw_changes[intake_pr['merge_commit_sha']] = ''
+    case.remote.add_change(intake_pr['merge_commit_sha'], 'INFRA_TASKS.md', old_blob, current_blob)
+    case.receipt['goal_outputs']['infra_tasks']['sha256'] = rec.sha(old_notebook_bytes)
+    (case.session / 'completion.json').write_text(json.dumps(case.receipt))
+    head_367 = case.receipt['pr']['head_sha']
+    base_runner = case.instance.runner
+
+    def runner(args, **kwargs):
+        if args == ['git', '-C', str(case.repo), 'show', f'{head_367}:INFRA_TASKS.md']:
+            return SimpleNamespace(stdout=old_notebook, stderr='', returncode=0)
+        if args == ['gh', 'api', 'repos/CultureBotAI/DUFMech/pulls/455']:
+            return SimpleNamespace(
+                stdout=json.dumps({
+                    'merged': True,
+                    'head': {'sha': intake_pr['head_sha']},
+                    'merge_commit_sha': intake_pr['merge_commit_sha'],
+                    'base': {
+                        'ref': case.target['default_branch'],
+                        'repo': {'full_name': case.target['github_repository']},
+                    },
+                }),
+                stderr='',
+                returncode=0,
+            )
+        return base_runner(args, **kwargs)
+
+    case.instance.runner = runner
+    case.record = new_record(case)
+    case.record['schema_version'] = '1.1.0'
+    case.record['later_intake'] = {
+        'historical_infra_notebook_sha256': rec.sha(old_notebook_bytes),
+        'current_infra_notebook_sha256': rec.sha(current_notebook_bytes),
+        'intake_pr': intake_pr,
+    }
+    write_record(case)
+    return old_notebook_bytes, current_notebook_bytes, intake_pr
+
+
+def test_later_intake_contract_reconciles_real_duf_chronology_and_releases_boundary(case):
+    old_bytes, current_bytes, intake_pr = _configure_later_intake_case(case)
+    _, before_progress = progress.collect_progress([case.runtime])
+    result = apply(case)
+    assert result['status'] == 'applied'
+    ledger = read_ledger(case)
+    reconciliation_id = result['reconciliation_sha256']
+    entry = ledger['historical_reconciliations'][reconciliation_id]
+    assert entry['later_intake_verification'] == {
+        'number': 455,
+        'head_sha': intake_pr['head_sha'],
+        'merge_commit_sha': intake_pr['merge_commit_sha'],
+        'merged': True,
+        'historical_infra_notebook_sha256': rec.sha(old_bytes),
+        'current_infra_notebook_sha256': rec.sha(current_bytes),
+    }
+    assert [p['pr_number'] for p in ledger['completed_stages'][-1]['verification']['prs']] == [365, 367]
+    assert ledger['infra_scope']['tasks'][0]['task_id'] == 'DUF-INFRA-0004'
+    history, after_progress = progress.collect_progress([case.runtime])
+    assert after_progress['totals']['completed_goals'] == before_progress['totals']['completed_goals'] + 1
+    assert after_progress['totals']['unique_prs'] == after_progress['totals']['merged_prs'] == 2
+    public = json.dumps({'history': history, 'snapshot': after_progress})
+    assert '#387' not in public and '/pull/387' not in public
+    assert '#455' not in public and '/pull/455' not in public
+
+    release_record = new_record(case, 'release_boundary', reconciliation_id)
+    release_record['schema_version'] = '1.1.0'
+    release_record['later_intake'] = copy.deepcopy(case.record['later_intake'])
+    case.record = release_record
+    case.record_path = case.runtime / 'release.json'
+    write_record(case)
+    apply(case)
+    released = read_ledger(case)
+    assert rec.boundary_goal(released) == case.current
+
+
+@pytest.mark.parametrize('tamper', ['same_digest', 'duplicate_external', 'wrong_changes', 'already_in_367'])
+def test_later_intake_contract_refuses_invalid_provenance(case, tamper):
+    old_bytes, current_bytes, intake_pr = _configure_later_intake_case(case)
+    if tamper == 'same_digest':
+        case.record['later_intake']['historical_infra_notebook_sha256'] = rec.sha(current_bytes)
+    elif tamper == 'duplicate_external':
+        case.record['later_intake']['intake_pr']['number'] = 387
+    elif tamper == 'wrong_changes':
+        case.remote.add_change(
+            intake_pr['merge_commit_sha'],
+            'data/families/manifest.json',
+            '0' * 40,
+            case.remote.blob(b'changed\n'),
+        )
+    elif tamper == 'already_in_367':
+        head_367 = case.receipt['pr']['head_sha']
+        base_runner = case.instance.runner
+        case.receipt['goal_outputs']['infra_tasks']['sha256'] = rec.sha(current_bytes)
+        (case.session / 'completion.json').write_text(json.dumps(case.receipt))
+        case.record['later_intake']['historical_infra_notebook_sha256'] = rec.sha(current_bytes)
+        case.record['later_intake']['current_infra_notebook_sha256'] = 'b' * 64
+        case.record['fingerprints'] = rec.fingerprints(case.config_path, case.session, case.target, case.proof)
+        case.record['fingerprints']['infra_notebook_sha256'] = 'b' * 64
+
+        def runner_same(args, **kwargs):
+            if args == ['git', '-C', str(case.repo), 'show', f'{head_367}:INFRA_TASKS.md']:
+                return SimpleNamespace(stdout=current_bytes.decode(), stderr='', returncode=0)
+            return base_runner(args, **kwargs)
+
+        case.instance.runner = runner_same
+    write_record(case)
+    before = tree(case.runtime)
+    with pytest.raises((rec.ReconciliationError, supervisor.SupervisorError)):
+        apply(case)
+    assert tree(case.runtime) == before

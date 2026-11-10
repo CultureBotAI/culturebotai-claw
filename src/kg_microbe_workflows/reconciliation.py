@@ -33,10 +33,15 @@ KEYS = {"schema_version", "operation", "record_status", "assessed_at", "expires_
 
 STAGE3_TRANSITION = "v1_protein_examples_to_record_review"
 STAGE3_KEYS = (KEYS - {"external_pr"}) | {"transition", "external_prs", "native_proof_mode"}
+LATER_INTAKE_KEYS = KEYS | {"later_intake"}
 
 
 def stage3_record(record: dict) -> bool:
     return record.get("schema_version") == "2.0.0"
+
+
+def later_intake_record(record: dict) -> bool:
+    return record.get("schema_version") == "1.1.0"
 
 
 def external_prs(record: dict) -> list[dict]:
@@ -79,8 +84,11 @@ def timestamp(value: Any) -> datetime:
 
 
 def validate_record(record: dict, *, reviewed: bool = False) -> None:
-    object_keys(record, STAGE3_KEYS if stage3_record(record) else KEYS, "operator record")
-    require(record["schema_version"] in {"1.0.0", "2.0.0"}, "unsupported operator record version")
+    expected_keys = (STAGE3_KEYS if stage3_record(record)
+                     else LATER_INTAKE_KEYS if later_intake_record(record)
+                     else KEYS)
+    object_keys(record, expected_keys, "operator record")
+    require(record["schema_version"] in {"1.0.0", "1.1.0", "2.0.0"}, "unsupported operator record version")
     require(record["operation"] in {"close_historical_goal", "release_boundary"}, "unsupported operation")
     require(record["record_status"] in {"draft", "reviewed"}, "invalid record status")
     require(not reviewed or record["record_status"] == "reviewed", "draft record has no execution authority")
@@ -145,6 +153,25 @@ def validate_record(record: dict, *, reviewed: bool = False) -> None:
             require(type(statement["step_index"]) is int and statement["step_index"] > current["start_step_index"],
                     "external statement is not after its own native declaration")
             hex_value(statement["text_sha256"], 64, "invalid native statement digest")
+    if later_intake_record(record):
+        later = record["later_intake"]
+        object_keys(later, {"historical_infra_notebook_sha256", "current_infra_notebook_sha256", "intake_pr"}, "later intake")
+        for name in ("historical_infra_notebook_sha256", "current_infra_notebook_sha256"):
+            if later[name] is not None or is_reviewed:
+                hex_value(later[name], 64, f"invalid {name}")
+        if later["historical_infra_notebook_sha256"] is not None and later["current_infra_notebook_sha256"] is not None:
+            require(later["historical_infra_notebook_sha256"] != later["current_infra_notebook_sha256"],
+                    "later intake requires distinct historical and current notebook digests")
+        if later["current_infra_notebook_sha256"] is not None and record["fingerprints"].get("infra_notebook_sha256") is not None:
+            require(later["current_infra_notebook_sha256"] == record["fingerprints"]["infra_notebook_sha256"],
+                    "later intake current digest differs from live infra_notebook_sha256 fingerprint")
+        intake_pr = later["intake_pr"]
+        object_keys(intake_pr, {"number", "head_sha", "merge_commit_sha"}, "later intake PR")
+        require(type(intake_pr["number"]) is int and intake_pr["number"] > 0, "invalid later intake PR")
+        for key in ("head_sha", "merge_commit_sha"):
+            hex_value(intake_pr[key], 40, "invalid later intake PR commit")
+        require(intake_pr["number"] not in seen_numbers and intake_pr["merge_commit_sha"] not in seen_merges,
+                "later intake PR duplicates external PR or merge")
     if record["review"] is not None or is_reviewed:
         object_keys(record["review"], {"reviewer", "artifact", "sha256"}, "independent review")
         require(isinstance(record["review"]["reviewer"], str) and record["review"]["reviewer"].strip()
@@ -223,6 +250,7 @@ def boundary_goal(ledger: dict) -> dict | None:
             and all(release_record[key] == record[key] for key in
                     ("schema_version", "run_id", "repository_key", "parent_version", "workflow_sha256", "historical_goal_identity", "required_infra_tasks"))
             and external_prs(release_record) == external_prs(record)
+            and release_record.get("later_intake") == record.get("later_intake")
             and release_record.get("transition") == record.get("transition")
             and release_record.get("native_proof_mode") == record.get("native_proof_mode"), "release context changed")
     return boundary["current_goal_identity"]
@@ -323,10 +351,75 @@ def prepare(supervisor: Any, helpers: Any, config_path: Path, record_path: Path,
             members = [receipt["pr"]]
         else:
             require(members and len(members) >= 2, "historical closure requires the ordinary ordered receipt")
-        require(not helpers.validate_receipt(receipt, ledger, target, directory), "ordinary receipt validation failed")
-        require(not {p["number"] for p in external_prs(record)} & {p["number"] for p in members},
+        later = record["later_intake"] if later_intake_record(record) else None
+        historical_infra = ((later["historical_infra_notebook_sha256"], later["current_infra_notebook_sha256"])
+                            if later is not None else None)
+        require(not helpers.validate_receipt(receipt, ledger, target, directory,
+                                             historical_infra_notebook=historical_infra), "ordinary receipt validation failed")
+        non_stage_prs = {p["number"] for p in external_prs(record)}
+        if later is not None:
+            non_stage_prs.add(later["intake_pr"]["number"])
+        require(not non_stage_prs & {p["number"] for p in members},
                 "external work cannot receive stage credit")
-        verification = helpers.verify_remote_receipt(receipt, ledger, target, supervisor.runner, runtime=directory)
+        verification = helpers.verify_remote_receipt(
+            receipt, ledger, target, supervisor.runner, runtime=directory,
+            historical_infra_notebook=historical_infra,
+        )
+        later_intake_verification = None
+        if later is not None:
+            intake_pr = later["intake_pr"]
+            remote_intake = json.loads(
+                supervisor.runner(["gh", "api", f"repos/{target['github_repository']}/pulls/{intake_pr['number']}"]).stdout
+            )
+            require(
+                remote_intake.get("merged") is True
+                and remote_intake.get("head", {}).get("sha") == intake_pr["head_sha"]
+                and remote_intake.get("merge_commit_sha") == intake_pr["merge_commit_sha"]
+                and remote_intake.get("base", {}).get("ref") == target["default_branch"]
+                and remote_intake.get("base", {}).get("repo", {}).get("full_name", "").casefold()
+                == target["github_repository"].casefold(),
+                "later intake PR evidence differs",
+            )
+            def intake_ancestor(older, newer):
+                return supervisor.runner(
+                    ["git", "-C", target["root"], "merge-base", "--is-ancestor", older, newer],
+                    check=False,
+                ).returncode == 0
+            require(
+                intake_ancestor(verification["merge_commit_sha"], intake_pr["merge_commit_sha"])
+                and intake_ancestor(intake_pr["merge_commit_sha"], "HEAD"),
+                "later intake merge is unordered or absent from the default checkout",
+            )
+            intake_changes = helpers.commit_changes(target["root"], intake_pr["merge_commit_sha"], supervisor.runner)
+            head_entry = helpers.tree_entry(target["root"], "HEAD", "INFRA_TASKS.md", supervisor.runner)
+            require(
+                set(intake_changes) == {"INFRA_TASKS.md"}
+                and head_entry is not None
+                and intake_changes["INFRA_TASKS.md"][1] == head_entry,
+                "later intake commit must produce the current committed INFRA_TASKS.md",
+            )
+            from kg_microbe_workflows import validate_infra_notebook
+            historical_raw = supervisor.runner(
+                ["git", "-C", target["root"], "show", f"{receipt['pr']['head_sha']}:INFRA_TASKS.md"]
+            ).stdout.encode()
+            require(
+                sha(historical_raw) == later["historical_infra_notebook_sha256"],
+                "historical closure notebook bytes differ from approved digest",
+            )
+            historical_notebook = validate_infra_notebook(historical_raw, target["github_repository"])
+            historical_pending = {t["task_id"] for t in historical_notebook["tasks"] if t["status"] != "resolved"}
+            require(
+                not (set(record["required_infra_tasks"]) <= historical_pending),
+                "historical notebook already contains required intake; use 1.0.0",
+            )
+            later_intake_verification = {
+                "number": intake_pr["number"],
+                "head_sha": remote_intake["head"]["sha"],
+                "merge_commit_sha": remote_intake["merge_commit_sha"],
+                "merged": True,
+                "historical_infra_notebook_sha256": later["historical_infra_notebook_sha256"],
+                "current_infra_notebook_sha256": later["current_infra_notebook_sha256"],
+            }
         external_verifications = []
         previous_external = None
         for external in external_prs(record):
@@ -380,6 +473,8 @@ def prepare(supervisor: Any, helpers: Any, config_path: Path, record_path: Path,
             entry["external_pr_verifications"] = external_verifications
         else:
             entry["external_pr_verification"] = external_verifications[0]
+        if later_intake_verification is not None:
+            entry["later_intake_verification"] = later_intake_verification
         ledger.setdefault("historical_reconciliations", {})[record_id] = entry
         ledger["historical_goal_boundary"] = {"assessment_sha256": record_id,
             "current_goal_identity": record["current_goal_identity"], "cycle": ledger["cycle"], "stage": ledger["stage"], "released_by": None}

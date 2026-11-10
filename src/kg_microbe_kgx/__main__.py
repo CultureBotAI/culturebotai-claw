@@ -4,11 +4,18 @@ from __future__ import annotations
 
 import argparse
 import sys
+import tempfile
 from pathlib import Path
 
 from kg_microbe_fleet import load_fleet_manifest
 from kg_microbe_fleet.roots import MechRootError, claw_root, resolve_mech_root
-from kg_microbe_kgx.contract import KgxProfile, check_graph, summarise
+from kg_microbe_kgx.contract import (
+    KgxProfile,
+    check_graph,
+    check_release_bundle,
+    fetch_release_bundle,
+    summarise,
+)
 
 CLAW_ROOT = claw_root()
 
@@ -31,8 +38,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--nodes", type=Path)
     parser.add_argument("--edges", type=Path)
     parser.add_argument(
+        "--release-dir",
+        type=Path,
+        help="check: directory containing nodes.tsv.gz, edges.tsv.gz and manifest.json (#540)",
+    )
+    parser.add_argument(
+        "--release-tag",
+        type=str,
+        help="check: GitHub release tag (or 'latest') to download and check (#540)",
+    )
+    parser.add_argument(
         "--out", type=Path,
-        help="export: directory for nodes.tsv, edges.tsv and manifest.json",
+        help="export: directory for nodes.tsv, edges.tsv, .tsv.gz assets and manifest.json",
     )
     parser.add_argument(
         "--sample", type=int,
@@ -43,12 +60,58 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "export":
         return _export(manifest, args)
 
-    capability = manifest.mechs[args.mech].capabilities.get("kgx_export")
-    if capability is None or not capability.is_enabled:
+    declaration = manifest.mechs[args.mech]
+    capability = declaration.capabilities.get("kgx_export")
+    settings = capability.settings if capability is not None else {}
+    explicit_target = (
+        args.release_dir is not None
+        or args.release_tag is not None
+        or (args.nodes is not None and args.edges is not None)
+    )
+    if not explicit_target and (capability is None or not capability.is_enabled):
         reason = getattr(capability, "reason", "") or "not declared in the manifest"
         status = getattr(capability, "status", "undeclared")
         print(f"{args.mech}: kgx_export is {status}, so there is nothing to check: {reason}")
         return 0
+
+    profile = KgxProfile(
+        extra_prefixes=tuple(settings.get("extra_prefixes", ()))
+    )
+
+    if args.release_dir is not None:
+        findings = check_release_bundle(args.release_dir, profile)
+        for finding in findings:
+            print(f"  {finding}", file=sys.stderr)
+        print(f"{args.mech}: {summarise(findings) or 'clean'}")
+        return 1 if findings else 0
+
+    release_tag = args.release_tag
+    if (
+        release_tag is None
+        and args.nodes is None
+        and args.edges is None
+        and (
+            settings.get("release_asset")
+            or settings.get("source") == "release"
+            or ("release_tag" in settings and "nodes_path" not in settings)
+        )
+    ):
+        release_tag = str(settings.get("release_tag") or "latest")
+
+    if release_tag is not None:
+        with tempfile.TemporaryDirectory() as tmp:
+            try:
+                bundle_dir = fetch_release_bundle(
+                    declaration.github, Path(tmp), tag=release_tag
+                )
+            except RuntimeError as exc:
+                print(f"{args.mech}: {exc}", file=sys.stderr)
+                return 2
+            findings = check_release_bundle(bundle_dir, profile)
+        for finding in findings:
+            print(f"  {finding}", file=sys.stderr)
+        print(f"{args.mech}: {summarise(findings) or 'clean'}")
+        return 1 if findings else 0
 
     nodes, edges = args.nodes, args.edges
     if nodes is None or edges is None:
@@ -57,17 +120,14 @@ def main(argv: list[str] | None = None) -> int:
         except MechRootError as exc:
             print(str(exc), file=sys.stderr)
             return 2
-        nodes = nodes or root / capability.settings["nodes_path"]
-        edges = edges or root / capability.settings["edges_path"]
+        nodes = nodes or root / settings["nodes_path"]
+        edges = edges or root / settings["edges_path"]
 
     for path in (nodes, edges):
         if not path.is_file():
             print(f"{args.mech}: no KGX file at {path}", file=sys.stderr)
             return 2
 
-    profile = KgxProfile(
-        extra_prefixes=tuple(capability.settings.get("extra_prefixes", ()))
-    )
     findings = check_graph(nodes, edges, profile)
     for finding in findings:
         print(f"  {finding}", file=sys.stderr)

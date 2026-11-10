@@ -455,3 +455,15 @@ canonical:
       counts at run time through kg-microbe-corpus report and pair them with
       native validation and commit provenance, while keeping repository-specific
       recipes and domain strata outside the managed regions.
+  metpo-proposal:
+    capability: metpo_proposal
+    reason: >-
+      TraitMech and CommunityMech both publish METPO proposal cohorts under
+      proposals/<cohort>/ and their local metpo-proposal skills drifted (#385,
+      #386): TraitMech carried four reference documents (including
+      updating-proposals.md) and a prose-only ID reservation that CommunityMech
+      never saw, leading to the eight ID collisions in CommunityMech#756, while
+      the upstream contract lived only in kg-microbe outside the fleet manifest.
+      This canonical template governs the five-file cohort bundle, the 12-column
+      class and 13-column property ROBOT templates, fleet-wide ID coordination
+      via <claw-root>/scripts/fleet_metpo_aggregate.py, and additive cohort update rules.
