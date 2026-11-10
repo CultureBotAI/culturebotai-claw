@@ -558,7 +558,7 @@ def scan_culturemech(culturemech_root: Path) -> dict:
                 entry['term_id'] = term_id
                 term_ranks[name] = rank
             listed = examples[name][rank]
-            if len(listed) < 3:
+            if len(listed) < 3 and media_id not in listed:
                 listed.append(media_id)
         return counted
 

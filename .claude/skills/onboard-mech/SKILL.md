@@ -41,7 +41,8 @@ the working tree. Before concluding a path or feature is absent, search with
    Declare every current capability catalogue key. Enable only capabilities
    supported by implementation evidence, including all required settings;
    otherwise use `disabled` or `not_applicable` with a reason and the catalogue's
-   applicable path assertions. Recipe names alone do not prove shared-command
+   applicable path assertions. `kgx_export` and `sssom_export` apply to every
+   Mech, so they are `enabled` or `disabled`, never `not_applicable` (#503). Recipe names alone do not prove shared-command
    compatibility. Check required profiles and adapter contracts.
 2. Preserve `record_globs` for read-only corpus inventory, including generated
    records; exclude unrelated fixtures and runtime state. Generated corpora use
@@ -72,8 +73,14 @@ the working tree. Before concluding a path or feature is absent, search with
    the queue. Membership alone does not enable the remote queue.
 6. Reconcile `MechEnum` in
    `src/kg_microbe_research/schema/research.yaml`, required fleet contract tests,
-   and maintained setup documentation. Record Tier 1 gaps and deferred capability
-   work with evidence; registration alone does not implement missing features.
+   and maintained setup documentation. Verify the Mech's instruction and skill
+   layout matches the fleet convention (`AGENTS.md` as the real instruction file
+   with `CLAUDE.md -> AGENTS.md` as a relative symlink, and `.claude/skills/` as
+   the real skill directory with `.agents/skills -> ../.claude/skills` as a
+   relative symlink so `src/kg_microbe_governance/artifacts/scripts/record_review.py`'s
+   `O_NOFOLLOW` walker succeeds).
+   Record Tier 1 gaps and deferred capability work with evidence; registration
+   alone does not implement missing features.
 7. When the companion X-Mech Suite repository (`CultureBotAI/CultureBotAI.github.io`,
    `CULTUREBOTAI_SITE_ROOT`) is in scope, refresh `CultureBotAI.github.io/_fleet/data/manifest.json`,
    card copy (`CultureBotAI.github.io/_fleet/mechs_template.md` and

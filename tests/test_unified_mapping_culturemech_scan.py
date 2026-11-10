@@ -94,6 +94,8 @@ def test_inline_stocks_are_counted_at_every_depth(tmp_path):
         "NaCl": 2, "KCl": 1, "ZnSO4": 1, "CoCl2": 1, "Biotin": 1,
     }
     assert scan["CoCl2"]["example_media"] == ["CM:1"]
+    assert scan["NaCl"]["example_media"] == ["CM:1"]
+
 
 
 @pytest.mark.parametrize("reference", [

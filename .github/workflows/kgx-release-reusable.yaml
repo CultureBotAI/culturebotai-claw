@@ -1,0 +1,156 @@
+# A reusable KGX export, contract check, and release-asset workflow, called by
+# each Mech (#540, #538).
+#
+# Mechs that build KGX graphs in CI or on release tags do not commit large
+# generated `nodes.tsv` / `edges.tsv` files to `main`. This reusable workflow
+# checks out the caller and `culturebotai-claw` at the requested ref (or the
+# caller's `.claw-pin` when `claw-ref` is left empty), exports the Mech's graph
+# (`nodes.tsv`, `edges.tsv`, `nodes.tsv.gz`, `edges.tsv.gz`, and `manifest.json`
+# with SHA-256 digests), runs `kg-microbe-kgx check --release-dir`, uploads the
+# release bundle as a workflow artifact, and attaches `nodes.tsv.gz`,
+# `edges.tsv.gz`, and `manifest.json` to the GitHub Release when `release-tag`
+# is provided.
+#
+# A reusable workflow is only exercised by a caller, so this file proves nothing
+# until a Mech adopts it (#180, #540).
+
+name: kgx-release (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      mech:
+        description: "Manifest Mech key (e.g. communitymech, culturemech, mediaingredientmech)."
+        required: false
+        default: ""
+        type: string
+      python-version:
+        description: "Fleet runtime; override only for a documented compatibility requirement."
+        required: false
+        default: "3.13"
+        type: string
+      uv-version:
+        description: "Pin uv itself, or leave empty to use setup-uv's default."
+        required: false
+        default: ""
+        type: string
+      uv-sync-args:
+        description: "Extra arguments for uv sync in the caller checkout."
+        required: false
+        default: ""
+        type: string
+      claw-ref:
+        description: "Commit SHA or ref of culturebotai-claw; empty reads .claw-pin or main."
+        required: false
+        default: ""
+        type: string
+      output-dir:
+        description: "Directory where nodes.tsv.gz, edges.tsv.gz, and manifest.json are written."
+        required: false
+        default: "output/kgx"
+        type: string
+      release-tag:
+        description: "GitHub Release tag to attach nodes.tsv.gz, edges.tsv.gz, and manifest.json to."
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  kgx-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Mech repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Resolve claw ref
+        id: claw-ref
+        run: |
+          set -euo pipefail
+          if [ -n "${CLAW_REF_INPUT}" ]; then
+            echo "ref=${CLAW_REF_INPUT}" >> "$GITHUB_OUTPUT"
+          elif [ -f .claw-pin ]; then
+            pin="$(grep -E '^[0-9a-f]{40}$' .claw-pin | head -n 1 || true)"
+            echo "ref=${pin:-main}" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          CLAW_REF_INPUT: ${{ inputs.claw-ref }}
+
+      - name: Check out culturebotai-claw
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: CultureBotAI/culturebotai-claw
+          ref: ${{ steps.claw-ref.outputs.ref }}
+          path: .claw-tool
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: ${{ inputs.python-version }}
+          version: ${{ inputs.uv-version }}
+          enable-cache: true
+
+      - name: Install claw dependencies
+        run: uv sync --project .claw-tool ${{ inputs.uv-sync-args }}
+
+      - name: Export KGX graph and release bundle
+        run: |
+          set -euo pipefail
+          mech_key="${MECH_KEY}"
+          if [ -z "$mech_key" ]; then
+            mech_key="$(basename "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
+          fi
+          env_var="$(printf '%s_ROOT' "$mech_key" | tr '[:lower:]-' '[:upper:]_')"
+          export "${env_var}=${GITHUB_WORKSPACE}"
+          uv run --project .claw-tool kg-microbe-kgx export \
+            --mech "$mech_key" --out "${OUTPUT_DIR}"
+        env:
+          MECH_KEY: ${{ inputs.mech }}
+          OUTPUT_DIR: ${{ inputs.output-dir }}
+
+      - name: Check KGX release bundle against contract
+        run: |
+          set -euo pipefail
+          mech_key="${MECH_KEY}"
+          if [ -z "$mech_key" ]; then
+            mech_key="$(basename "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
+          fi
+          uv run --project .claw-tool kg-microbe-kgx check \
+            --mech "$mech_key" --release-dir "${OUTPUT_DIR}"
+        env:
+          MECH_KEY: ${{ inputs.mech }}
+          OUTPUT_DIR: ${{ inputs.output-dir }}
+
+      - name: Upload KGX release bundle artifact
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: kgx-release-bundle-${{ github.run_id }}
+          path: |
+            ${{ inputs.output-dir }}/nodes.tsv.gz
+            ${{ inputs.output-dir }}/edges.tsv.gz
+            ${{ inputs.output-dir }}/manifest.json
+          if-no-files-found: warn
+
+      - name: Attach KGX release assets to GitHub Release
+        if: inputs.release-tag != ''
+        run: |
+          set -euo pipefail
+          gh release upload "${RELEASE_TAG}" \
+            "${OUTPUT_DIR}/nodes.tsv.gz" \
+            "${OUTPUT_DIR}/edges.tsv.gz" \
+            "${OUTPUT_DIR}/manifest.json" \
+            --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release-tag }}
+          OUTPUT_DIR: ${{ inputs.output-dir }}

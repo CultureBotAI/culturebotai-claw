@@ -252,7 +252,9 @@ For a **re-pin**, also run `uv run kg-microbe-governance pin-coupling --old-ref
 <outgoing pin>` with one `--target-root` per consumer. A governance dry run
 that plans only `scripts/.vendored_canon_ref` does not mean the re-pin is one
 file: a Mech can hard-code the pin in a workflow or commit a snapshot of
-claw's manifest, and each reported file belongs in that Mech's re-pin commit.
+claw's manifest. Judge each reported hit by the guide's rules: change a copy
+the Mech's own checks compare against the pin; leave dated records,
+provenance and commit permalinks as the history they are (#795).
 See `docs/guides/VENDORED_GOVERNANCE.md`.
 
 ### D. Make the change in an isolated worktree (per laggard repo)

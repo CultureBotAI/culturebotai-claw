@@ -229,6 +229,28 @@ def test_a_token_the_table_names_is_not_reported_as_unexamined(tmp_path):
     assert check_stylesheet(path) == []
 
 
+def test_custom_pairings_govern_unexamined_foreground_detection(tmp_path):
+    """#673: `check_stylesheet` must compute examined foregrounds from its
+    `pairings` argument rather than module-level `_EXAMINED_FOREGROUNDS`, in
+    both directions."""
+    path = tmp_path / "style.css"
+    path.write_text(
+        ":root { --accent: #245a8d; --invented: #245a8d; --page: #ffffff; }\n"
+        "a { color: var(--accent); }\n"
+        ".thing { color: var(--invented); }\n",
+        encoding="utf-8",
+    )
+
+    findings = check_stylesheet(
+        path, pairings=(("--invented", "--page", "custom token on page"),)
+    )
+
+    assert [f.code for f in findings] == ["UNEXAMINED_FOREGROUND"]
+    assert "--accent" in findings[0].detail
+    assert "--invented" not in findings[0].detail
+
+
+
 def test_a_token_carrying_its_own_ground_is_judged_against_that_ground(tmp_path):
     """--warn is set beside `background: var(--warn-soft)` in every rule that
     uses it. Judging it against --page would report a failure on a surface it

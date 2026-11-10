@@ -37,8 +37,12 @@ The new `releases/edgemech-infrastructure-admission-v1.json` binds:
 
 Every other member, identity, capability, mode, target or applicability delta
 is refused. The admitted source payload hashes remain exact even when current
-canonical payload hashes evolve. Changing the admitted fleet entry requires another reviewed
-policy transition; enabling a scientific worker is not an admission side effect.
+canonical payload hashes evolve. When the fleet capability catalogue grows after
+admission, EdgeMech must declare each new catalogued capability as `disabled` or
+`not_applicable` while preserving the exact admitted digest across its original
+28 capabilities and identity fields. Changing the admitted fleet entry's original
+fields or enabling a scientific worker requires another reviewed policy transition;
+enabling a scientific worker is not an admission side effect.
 
 `cycle_release_audit` requires a clean trusted CLAW checkout on protected
 `origin/main` first-parent history. It proves that the new declaration has one

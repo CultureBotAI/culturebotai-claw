@@ -129,6 +129,34 @@ class GitHubFixture:
         return SimpleNamespace(stdout=out, stderr="", returncode=code)
 
 
+@pytest.mark.parametrize("command_name", ["node", "/opt/codex/bin/codex"])
+def test_codex_mechs_pane_never_reaches_native_reader_or_send(setup, monkeypatch, command_name):
+    terminal = supervisor.import_file(
+        Path(__file__).parents[1] / "scripts/mech_session_terminal.py", "codex_boundary_terminal")
+    identity = setup.target["process_identity"].removesuffix("agy") + command_name
+    setup.target["process_identity"] = identity
+
+    def read_identity(args, **_kwargs):
+        assert args == ["/bin/ps", "-p", str(setup.target["pid"]),
+                        "-o", "pid=,tty=,lstart=,comm="]
+        return identity
+
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError("Codex pane reached a native reader, terminal snapshot, or send")
+
+    monkeypatch.setattr(terminal, "command", read_identity)
+    monkeypatch.setattr(terminal, "jxa", forbidden)
+    instance = supervisor.Supervisor(setup.config, native=SimpleNamespace(inspect=forbidden),
+                                     notifier=terminal, runner=forbidden)
+    observed = instance.observe(setup.target, fresh=True, allow_redraw=True)
+    assert observed["ready"] is False
+    assert observed["error"] == "process/start/TTY identity changed"
+    result = instance.dispatch(setup.target, setup.ledger,
+                               {"action": "finalize", "action_id": "must-not-send"})
+    assert result["state"] == "not-sent"
+    assert setup.ledger["actions"] == {}
+
+
 def test_goal_identity_survives_amended_text(setup):
     native = setup.observation["native"]
     before = supervisor.goal_identity(native)
@@ -561,7 +589,10 @@ def test_repair_dispatch_uses_same_reason_and_receipt_hash_then_refuses_changed_
     receipt_hash = hashlib.sha256(path.read_bytes()).hexdigest()
     decision = supervisor.repair_decision(setup.ledger, setup.observation, "missing validation", receipt_hash)
     assert instance.dispatch(setup.target, setup.ledger, decision)["state"] == "uncertain"
-    assert "missing validation" in sent[0]
+    action = setup.ledger["actions"][decision["action_id"]]
+    assert sent[0] == action["message"]
+    instruction = json.loads(Path(action["instruction_artifact"]["path"]).read_text())
+    assert "missing validation" in instruction["instruction"]
     path.write_text('{"corrected": true}')
     assert instance.dispatch(setup.target, setup.ledger, decision)["state"] == "not-sent"
     assert len(sent) == 1
@@ -1678,3 +1709,104 @@ def test_legacy_accepted_goal_keeps_original_acceptance_when_exact_proof_arrives
     assert action["delivery_proof"]["native_step_index"] == 40
     assert action["delivery_verified_at"] != action["accepted_at"]
     assert action["accepted_goal_identity"] == setup.observation["goal_identity"]
+
+
+def test_dispatch_sends_short_exact_reference_preserving_full_instruction(setup, monkeypatch):
+    from kg_microbe_workflows.instructions import MAX_WIRE_BYTES
+    sent = []
+    instance = make_instance(setup, monkeypatch, lambda source, value: sent.append(value["message"]) or "sent")
+    decision = supervisor.decide(setup.ledger, setup.observation)
+    full = supervisor.message_for(setup.target, setup.ledger, decision, setup.runtime / "traitmech")
+    assert len(full.encode()) > MAX_WIRE_BYTES
+    action = instance.dispatch(setup.target, setup.ledger, decision)
+    assert action["state"] == "uncertain"
+    assert sent == [action["message"]] and len(sent[0].encode()) <= MAX_WIRE_BYTES
+    assert sent[0] != full
+    artifact = json.loads(Path(action["instruction_artifact"]["path"]).read_text())
+    assert artifact["instruction"] == full
+    assert artifact["reservation_goal_identity"] == GOAL
+    assert "goal_identity" not in artifact
+    assert action["goal_identity"] == GOAL
+    assert artifact["instruction_sha256"] == action["instruction_sha256"]
+    assert supervisor.native_delivery_proof(action, setup.target, setup.observation) is None
+    record_native_input(setup, action)
+    assert supervisor.native_delivery_proof(action, setup.target, setup.observation)
+    # A received short reference does not claim consumption of the artifact.
+    assert "artifact_consumed" not in action
+
+
+@pytest.mark.parametrize("fault", ["control", "oversize", "collision"])
+def test_instruction_preflight_failure_spends_no_action_or_repair_budget(setup, monkeypatch, fault):
+    from kg_microbe_workflows import instructions
+    instance = make_instance(setup, monkeypatch, lambda *_: pytest.fail("no input on preparation refusal"))
+    if fault == "control":
+        monkeypatch.setattr(supervisor, "message_for", lambda *_: "bad\x1binput")
+    elif fault == "oversize":
+        monkeypatch.setattr(instructions, "MAX_WIRE_BYTES", 5)
+    else:
+        decision = supervisor.decide(setup.ledger, setup.observation)
+        path = setup.runtime / "traitmech/instructions" / (decision["action_id"] + ".json")
+        path.parent.mkdir(parents=True)
+        path.write_text("preexisting different content")
+    before = copy.deepcopy(setup.ledger["actions"])
+    result = instance.dispatch(setup.target, setup.ledger, supervisor.decide(setup.ledger, setup.observation))
+    assert result["state"] == "not-sent" and "instruction preparation refused" in result["reason"]
+    assert setup.ledger["actions"] == before
+
+
+@pytest.mark.parametrize("change", ["changed", "missing"])
+def test_instruction_change_after_reservation_is_definitely_not_sent(setup, monkeypatch, change):
+    instance = make_instance(setup, monkeypatch, lambda *_: pytest.fail("no input for changed artifact"))
+    original = instance.save
+    changed = False
+    def save(target, ledger):
+        nonlocal changed
+        original(target, ledger)
+        if not changed and ledger["actions"]:
+            action = next(iter(ledger["actions"].values()))
+            if action.get("state") == "reserved":
+                path = Path(action["instruction_artifact"]["path"])
+                if change == "changed":
+                    path.write_text("tampered")
+                else:
+                    path.unlink()
+                changed = True
+    monkeypatch.setattr(instance, "save", save)
+    action = instance.dispatch(setup.target, setup.ledger, supervisor.decide(setup.ledger, setup.observation))
+    assert action["state"] == "not-sent" and action["outcome"] == "instruction-artifact-rejected"
+    assert supervisor.repair_decision(setup.ledger, setup.observation, "pending")["phase"] == "closure_blocked"
+
+
+def test_reference_goal_requires_real_native_declaration_not_literal_or_mixed_input(setup, monkeypatch):
+    instance = make_instance(setup, monkeypatch, lambda *_: "sent")
+    setup.ledger.update(awaiting_goal=True, stage=2)
+    action = instance.dispatch(setup.target, setup.ledger, supervisor.decide(setup.ledger, setup.observation))
+    assert action["kind"] == "start_goal" and action["message"].startswith("/goal [MECH-WORKFLOW-")
+    entry = record_native_input(setup, action, declaration=False)
+    assert supervisor.native_delivery_proof(action, setup.target, setup.observation) is None
+    entry["native_goal_declaration"] = True
+    assert supervisor.native_delivery_proof(action, setup.target, setup.observation)
+    entry["supported_input_shape"] = False
+    assert supervisor.native_delivery_proof(action, setup.target, setup.observation) is None
+    entry["supported_input_shape"] = True
+    full = json.loads(Path(action["instruction_artifact"]["path"]).read_text())["instruction"]
+    for bad in [action["message"][:-9], "<file>existing.yaml:4: " + action["message"] * 2, full]:
+        entry.update(text_sha256=hashlib.sha256(bad.encode()).hexdigest(), text_length=len(bad))
+        assert supervisor.native_delivery_proof(action, setup.target, setup.observation) is None
+
+
+def test_reference_artifact_predecessor_remains_distinct_from_adopted_receipt_identity(setup, monkeypatch):
+    instance = make_instance(setup, monkeypatch, lambda *_: "sent")
+    setup.ledger.update(awaiting_goal=True, stage=2)
+    action = instance.dispatch(setup.target, setup.ledger, supervisor.decide(setup.ledger, setup.observation))
+    artifact = json.loads(Path(action["instruction_artifact"]["path"]).read_text())
+    assert artifact["reservation_goal_identity"] == GOAL
+    assert "goal_identity" not in artifact
+    assert action["goal_identity"] == GOAL
+    record_native_input(setup, action)
+    instance.reconcile(setup.target, setup.ledger, setup.observation)
+    receipt = supervisor.receipt_template(setup.ledger, setup.target)
+    assert action["state"] == "accepted"
+    assert receipt["goal_identity"] == setup.observation["goal_identity"]
+    assert receipt["goal_identity"] != artifact["reservation_goal_identity"]
+    assert action["goal_identity"] == artifact["reservation_goal_identity"] == GOAL

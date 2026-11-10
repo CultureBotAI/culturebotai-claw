@@ -37,6 +37,36 @@ HISTORICAL_MANIFEST_PATH = "src/kg_microbe_governance/releases/mech-cycle-v2-gov
 ADMITTED_MANIFEST_PATH = "src/kg_microbe_governance/releases/edgemech-infrastructure-source-manifest.json"
 ADMISSION_ID = "edgemech-post-cutoff-infrastructure-v1"
 ADMITTED = Consumer("edgemech", "CultureBotAI/EdgeMech", "src/edgemech")
+ADMITTED_CAPABILITIES = frozenset({
+    "id_label_validation",
+    "curation_history",
+    "record_review",
+    "strict_validation",
+    "schema_sync",
+    "release_management",
+    "build_coordination",
+    "documentation",
+    "testing",
+    "refactoring",
+    "coordination_hooks",
+    "deep_research",
+    "edison_key_discovery",
+    "environment_coverage",
+    "knowledge_gap_scan",
+    "vendored_sync",
+    "unmapped_inventory_input",
+    "source_catalogue",
+    "evidence_reference_validation",
+    "corpus_statistics",
+    "causal_graph_coverage",
+    "page_budgets",
+    "kgx_export",
+    "source_queue",
+    "metpo_proposal",
+    "sssom_export",
+    "writer_audit",
+    "site_contract",
+})
 NATIVE_TESTS = frozenset({
     "curation_timestamp_contract", "record_review_contract", "skill_frontmatter_contract",
 })
@@ -140,8 +170,6 @@ def validate_transition(
     }:
         raise GovernanceError("Admission fleet identities differ from governance")
     entry = fleet_doc["mechs"][ADMITTED.key]
-    if canonical_sha(entry) != policy["fleet_entry_sha256"]:
-        raise GovernanceError("Admission fleet entry hash differs")
     if (entry.get("vendored_role") != "consumer"
             or entry.get("serialization", {}).get("verified") is not False
             or set(entry.get("capabilities", {})) != set(fleet.capability_names)):
@@ -150,8 +178,20 @@ def validate_transition(
         if key == "vendored_sync":
             if capability != {"status": "enabled"}:
                 raise GovernanceError("Infrastructure admission requires exact vendored_sync capability")
-        elif capability.get("status") not in {"disabled", "not_applicable"}:
+        elif capability.get("status") not in {"disabled", "not_applicable"} or "settings" in capability:
             raise GovernanceError("Infrastructure admission cannot enable scientific or execution capabilities")
+    admitted_entry = entry
+    if (canonical_sha(admitted_entry) != policy["fleet_entry_sha256"]
+            and ADMITTED_CAPABILITIES < set(entry["capabilities"])):
+        admitted_entry = {
+            **entry,
+            "capabilities": {
+                key: value for key, value in entry["capabilities"].items()
+                if key in ADMITTED_CAPABILITIES
+            },
+        }
+    if canonical_sha(admitted_entry) != policy["fleet_entry_sha256"]:
+        raise GovernanceError("Admission fleet entry hash differs")
     return new
 
 

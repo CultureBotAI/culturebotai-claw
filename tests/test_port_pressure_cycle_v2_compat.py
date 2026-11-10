@@ -12,6 +12,7 @@ from test_mech_session_supervisor import (
 from test_mech_session_supervisor import (
     setup as setup,
 )
+from test_port_pressure_goal_boundary import assert_bounded_goal_instruction
 
 
 def test_seven_goal_migration_dispatches_new_stage_key_through_boundary(cycle_setup, monkeypatch):
@@ -42,4 +43,7 @@ def test_seven_goal_migration_dispatches_new_stage_key_through_boundary(cycle_se
     assert 'action' not in supervisor.decide(ledger, fixture.observation)
     assert len(boundaries) == len(sent) == 1
     assert boundaries[0]['next_stage_key'] == 'open_issue_triage'
-    assert sent[0]['message'].startswith('/goal Use the native skill for open_issue_triage')
+    artifact = assert_bounded_goal_instruction(instance, fixture, ledger, sent[0]['message'])
+    assert artifact['cycle'] == 2 and artifact['stage'] == 1
+    assert artifact['stage_key'] == 'open_issue_triage'
+    assert artifact['instruction'].startswith('/goal Use the native skill for open_issue_triage')
