@@ -169,7 +169,7 @@
       "source": "src/kg_microbe_governance/artifacts/prompts/backlog-loop-goal.md",
       "target": "prompts/backlog-loop-goal.md",
       "consumers": "all",
-      "sha256": "0b75a1976f71ad8595ec9d1f293afcddafed4287ae0e67fc8bb348a6467df610",
+      "sha256": "d7786562ab5081a9f2ede8927fc4329632ccde79341284b43d972fca7cccf926",
       "mode": "0644"
     },
     {
