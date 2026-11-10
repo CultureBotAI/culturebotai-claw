@@ -44,16 +44,18 @@ def test_exactly_one_audit_lane_runs_and_release_uses_trusted_code():
     }
     legacy = [s for s in entries if s["name"] in legacy_names]
     assert len(legacy) == 3
-    assert all(s["if"] == "steps.release-contract.outputs.active != 'true'" for s in legacy)
+    assert all(s["if"] == "steps.automatic.outputs.available != 'true' && steps.release-contract.outputs.active != 'true'" for s in legacy)
     release = next(s for s in entries if s["name"] == "Audit the trusted bounded canary release")
-    assert release["if"] == "steps.release-contract.outputs.active == 'true'"
+    assert release["if"] == "steps.automatic.outputs.available != 'true' && steps.release-contract.outputs.active == 'true'"
     assert "uv run --project fleet/trusted-claw python -m kg_microbe_governance.cycle_release_audit" in release["run"]
     assert '--trusted-root "$GITHUB_WORKSPACE/fleet/trusted-claw"' in release["run"]
     assert '--target-root "$key=$GITHUB_WORKSPACE/fleet/$key"' in release["run"]
     assert "done < fleet/governance-consumers.tsv" in release["run"]
     assert "continue-on-error" not in release
     assert "|| true" not in release["run"]
-    candidate = next(s for s in entries if s["name"] == "Validate candidate authority contract")
+    workflow = yaml.load(WORKFLOW.read_text(), Loader=yaml.BaseLoader)
+    candidate = next(s for s in workflow["jobs"]["candidate-contracts"]["steps"]
+                     if s.get("name") == "Validate candidate authority contract")
     assert "control/tests/test_governance_cycle_release_audit.py" in candidate["run"]
     assert "control/tests/test_governance_infrastructure_admission.py" in candidate["run"]
     assert "control/tests/test_governance_cycle_release_workflow.py" in candidate["run"]
