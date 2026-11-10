@@ -12,6 +12,14 @@ for provenance; they do not describe the supported interface.
 
 Other maintained references:
 
+- [`guides/PUBLIC_FLEET_OUTPUT.md`](guides/PUBLIC_FLEET_OUTPUT.md) — validated
+  tags and filtering of public membership, data and statistics.
+- [`guides/COMBINED_FLEET_ADMISSION.md`](guides/COMBINED_FLEET_ADMISSION.md) —
+  CofactorMech, AssayMech and ScaleupMech integration and release dependencies.
+- [`guides/COFACTORMECH_ADMISSION.md`](guides/COFACTORMECH_ADMISSION.md),
+  [`guides/ASSAYMECH_ADMISSION.md`](guides/ASSAYMECH_ADMISSION.md), and
+  [`guides/SCALEUPMECH_ADMISSION.md`](guides/SCALEUPMECH_ADMISSION.md) —
+  preserved domain-specific admission rationale and source authorities.
 - [`guides/EMBEDDING_SETS.md`](guides/EMBEDDING_SETS.md) — PaCMAP projections,
   applicable text, chemical, protein, graph and future sets, and the fleet adoption plan.
 - [`guides/PYTHON_RUNTIME.md`](guides/PYTHON_RUNTIME.md) — the shared Python 3.13

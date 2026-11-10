@@ -59,10 +59,13 @@ def _identity(mech: MechDefinition) -> dict[str, Any]:
         "package_path": mech.package_path,
         "schema_paths": list(mech.schema_paths),
         "record_globs": list(mech.record_globs),
+        "tags": list(mech.tags),
     }
 
 
 def _list_command(args: argparse.Namespace, manifest: FleetManifest) -> None:
+    if args.public:
+        manifest = manifest.public()
     mechs = _select(manifest, args.capability)
     if args.format == "json":
         print(json.dumps([_identity(mech) for mech in mechs], sort_keys=True))
@@ -251,6 +254,10 @@ def _parser() -> argparse.ArgumentParser:
 
     list_parser = subparsers.add_parser("list", help="list applicable Mechs")
     list_parser.add_argument("--capability")
+    list_parser.add_argument(
+        "--public", action="store_true",
+        help="exclude members tagged exclude-from-public before emitting identities",
+    )
     list_parser.add_argument(
         "--format", choices=("lines", "json", "tsv"), default="lines"
     )

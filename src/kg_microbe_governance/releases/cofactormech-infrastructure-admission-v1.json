@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "admission_id": "cofactormech-post-cutoff-infrastructure-v1",
+  "authority": "infrastructure_only",
+  "consumer": {
+    "key": "cofactormech",
+    "github": "CultureBotAI/CofactorMech",
+    "package_path": "src/cofactormech"
+  },
+  "source_ref": "5790569efd881bd8bca82a04ea278cc462c0c2c8",
+  "source_manifest_sha256": "ae2cfdc4372e0054bca595281b2b88a10d672b9a70d8664c99c94105ef3b64b1",
+  "bootstrap_main_ref": "3cb9d7a6ce527c84277daf6ddfd5cd56decbb4d1",
+  "fleet_entry_sha256": "74c4ce1938a7e64cbe13e9cc08e21d18cd631168f560d8769cfeac40e33909a1",
+  "historical_declaration_sha256": "89a362436eb3df0f3b4bfdb9feeaf9a258b2476291e565a744568b41f9445697",
+  "historical_manifest_sha256": "368edbac106cb49c0a4159a87c07eeba4a5ed79c343ff042c0ddbc1b6b990ebb",
+  "edge_declaration_sha256": "1d65bcbe0b6697c20cff09af817f2e864e564e8f62303ed76c30383072fc705f",
+  "required_artifacts": [
+    "backlog_loop_contract",
+    "chemical_formula_helper",
+    "curation_history_schema",
+    "curation_timestamp_contract",
+    "deep_research_contract",
+    "id_label_empty_adapter_contract",
+    "id_label_plausibility_contract",
+    "id_label_unknown_prefix_contract",
+    "id_label_validator",
+    "merge_integrity_verifier",
+    "merge_integrity_workflow",
+    "merge_queue_admission_controller",
+    "merge_queue_admission_workflow",
+    "pr_shepherd_workflow",
+    "record_review_contract",
+    "record_review_guide",
+    "record_review_helper",
+    "record_review_schema",
+    "shared_mech_schema",
+    "skill_frontmatter_contract",
+    "vendored_checker",
+    "vendored_checker_launcher"
+  ]
+}

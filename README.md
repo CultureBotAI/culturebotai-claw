@@ -4,11 +4,17 @@ CultureBotAI CLAW coordinates validation, curation, and shared tooling across
 the Mech repositories: CultureMech, MediaIngredientMech (MIM),
 CommunityMech, TraitMech, ProteinTraitsMech, AntibioticMech,
 CellStructureMech, HabitatMech, NaturalProductMech, TaxonMech,
-PathwayMech, DUFMech, CMMMech, and AIMech.
+PathwayMech, DUFMech, CMMMech, AIMech, and EdgeMech, with pending
+CofactorMech, AssayMech, and ScaleupMech admissions.
 `src/kg_microbe_fleet/fleet.yaml` is the
 canonical definition of that fleet. It contains repository-aware plugins,
 file-based coordination, curation pipelines, shared Mech utilities, and fleet
 CI workflows.
+
+Public fleet outputs honor the reserved `exclude-from-public` tag; ScaleupMech
+remains in internal operations and is excluded from the public projections.
+See [public membership](docs/guides/PUBLIC_FLEET_OUTPUT.md) and the
+[combined admission dependencies](docs/guides/COMBINED_FLEET_ADMISSION.md).
 
 You do not need every repository cloned to work here — set only the roots you
 use, and `openclaw-cli config validate` will report the rest as "not
@@ -206,6 +212,8 @@ uv run --extra dev mypy \
   src/kg_microbe_governance/__main__.py \
   src/kg_microbe_governance/fleet_audit.py \
   src/kg_microbe_governance/cycle_release_audit.py \
+  src/kg_microbe_governance/infrastructure_admission.py \
+  src/kg_microbe_governance/consumer_admission.py \
   src/kg_microbe_governance/artifacts/scripts/run_shared_evidence_validator.py \
   src/kg_microbe_governance/artifacts/scripts/check_vendored_sync.py
 uv run --extra dev python -m pytest -q \

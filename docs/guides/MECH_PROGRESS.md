@@ -197,6 +197,21 @@ historical association or another valid binding.
 
 ## Durable records and public projection
 
+Fleet members tagged `exclude-from-public` remain in local collection, saved
+history and internal status. The publication boundary filters all four history
+collections before recomputing counters against `FleetManifest.public()`.
+Neither the public data branch nor the Pages build emits an excluded member's
+identity, PRs, cursors, closures or numerical contribution. `--published` status
+uses this same public fleet; ordinary local status retains the complete fleet.
+
+Public remote history is reconciled with the public projection of local history.
+A newer remote cursor or event cannot erase excluded local evidence. Existing
+full-fleet bundles remain valid inputs and are projected before serialization;
+malformed excluded evidence still fails validation. This updates code only:
+upgrade the publisher and Pages consumers to the reviewed release before
+publishing a run containing an excluded member. No running service, existing
+data-branch commit or deployed site changes merely by preparing this patch.
+
 `kg_microbe_progress.collect_progress` reads explicit supervisor runtime roots.
 The supervisor's archived receipt must match its recorded hash and goal identity
 before a closure is exported. The exporter trusts the supervisor's stored
