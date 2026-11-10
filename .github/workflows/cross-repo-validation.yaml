@@ -201,21 +201,25 @@ jobs:
               `its own environment setup. Read that step's log before assuming a data ` +
               `finding. Reports are uploaded as artifacts on every run that was not ` +
               `cancelled.`;
-            const rehearse =
-              context.eventName === "workflow_dispatch" &&
-              context.payload.inputs &&
-              (context.payload.inputs.rehearse_alarm === true ||
-                context.payload.inputs.rehearse_alarm === "true");
-            if (rehearse) {
-              await core.summary.addHeading(title, 2).addRaw(body, true).write();
-              return;
-            }
             const { data: issues } = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
               labels: "cross-repo-validation",
               state: "open",
             });
+            const rehearse =
+              context.eventName === "workflow_dispatch" &&
+              context.payload.inputs &&
+              (context.payload.inputs.rehearse_alarm === true ||
+                context.payload.inputs.rehearse_alarm === "true");
+            if (rehearse) {
+              await core.summary
+                .addHeading(title, 2)
+                .addRaw(body, true)
+                .addRaw(`\nOpen cross-repo-validation issues found: ${issues.length}`, true)
+                .write();
+              return;
+            }
             if (issues.length === 0) {
               await github.rest.issues.create({
                 owner: context.repo.owner,

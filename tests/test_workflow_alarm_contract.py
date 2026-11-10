@@ -370,5 +370,16 @@ def test_cross_repo_validation_supports_alarm_rehearsal_dispatch():
     )
     assert alarm_step is not None
     assert "inputs.rehearse_alarm" in str(alarm_step.get("if", ""))
-    assert "core.summary" in alarm_step["with"]["script"]
+    script = alarm_step["with"]["script"]
+    assert "core.summary" in script
+    # #1116: rehearsal must run both read-only calls (listJobsForWorkflowRun
+    # and issues.listForRepo) before returning via core.summary, bypassing only
+    # the mutating issues.create / issues.createComment calls.
+    assert (
+        script.index("listJobsForWorkflowRun")
+        < script.index("issues.listForRepo")
+        < script.index("if (rehearse)")
+        < script.index("issues.create(")
+    )
+
 
