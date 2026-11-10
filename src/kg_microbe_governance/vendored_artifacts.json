@@ -209,7 +209,7 @@
       "source": "src/kg_microbe_governance/artifacts/scripts/auto_merge_ready_prs.py",
       "target": "scripts/auto_merge_ready_prs.py",
       "consumers": "all",
-      "sha256": "b8d77dc73422c3fa84b6636d32533d21d5ed11aa3e9bcc42d1c9aa6cf60f49f1",
+      "sha256": "1011cac5fb1c3c66ea3dc2c528339b4ea019189b5716f52fdd088cabbfed5c38",
       "mode": "0644"
     },
     {
