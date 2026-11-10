@@ -52,6 +52,7 @@ manifest when no source checkout is present:
 - CMMMech (`CMMMECH_ROOT`)
 - AIMech (`AIMECH_ROOT`)
 - EdgeMech (`EDGEMECH_ROOT`)
+- CofactorMech (`COFACTORMECH_ROOT`) — admission pending; see the admission guide
 
 You do not need every Mech cloned. `openclaw-cli config validate` reports an
 unset root as "not configured locally" rather than a failure; pass
@@ -169,6 +170,8 @@ uv run --extra dev mypy \
   src/kg_microbe_governance/__main__.py \
   src/kg_microbe_governance/fleet_audit.py \
   src/kg_microbe_governance/cycle_release_audit.py \
+  src/kg_microbe_governance/infrastructure_admission.py \
+  src/kg_microbe_governance/consumer_admission.py \
   src/kg_microbe_governance/artifacts/scripts/run_shared_evidence_validator.py \
   src/kg_microbe_governance/artifacts/scripts/check_vendored_sync.py
 uv run --extra dev python -m pytest -q \

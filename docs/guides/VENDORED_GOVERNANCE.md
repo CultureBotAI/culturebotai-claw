@@ -627,3 +627,13 @@ closing the obsolete PR. A successful vendored-sync run from before the
 workflow became governed does not validate merging that old PR against today's
 main branch. Require checks on the current candidate containing the canonical
 copy and the Mech-owned update.
+
+### CofactorMech pending admission
+
+See [CofactorMech admission](COFACTORMECH_ADMISSION.md) for the empty-main
+inspection, exact artifact ledger, branch-published bootstrap provenance and
+separate immutable infrastructure declaration and release hold. This draft
+requires independent review, re-review, green checks and the user's explicit
+merge decision. Only protected approval can activate its bounded admission;
+the existing DUF/Edge policies and consumer pins remain unchanged. It does not
+claim a completed coordinated fleet release.

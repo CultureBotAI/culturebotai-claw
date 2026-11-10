@@ -109,6 +109,13 @@ repositories:
     task_runner: just
     description: "Release-occurrence accounting and inherited review eligibility"
 
+  cofactormech:
+    path: ${COFACTORMECH_ROOT}
+    type: python
+    package_manager: uv
+    task_runner: just
+    description: "Evidence-backed cofactors, suppliers, pathways and enzyme requirements"
+
 agents:
   discovery_paths:
     - kg_microbe_agents/definitions
