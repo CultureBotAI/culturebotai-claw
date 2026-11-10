@@ -293,6 +293,13 @@ def test_a_long_merge_chain_is_read_in_linear_time(taxonmech):
      "row 2 has a different number of cells than the header"),
     ("data/raw/ncbitaxon_taxa.tsv", "taxon_id\tlabel\n", "has no rank, parent_id column"),
     ("data/raw/ncbi_merged_ids.tsv", "old_taxon_id\n", "has no current_taxon_id column"),
+    ("curation/seed_scope.tsv", "identifier\n\n562\n", "row 3: '562' is not an NCBITaxon CURIE"),
+    ("data/raw/ncbi_merged_ids.tsv", "old_taxon_id\tcurrent_taxon_id\n\n562\tNCBITaxon:562\n",
+     "row 3: '562' is not an NCBITaxon CURIE"),
+    ("data/raw/ncbitaxon_taxa.tsv", "taxon_id\tlabel\trank\tparent_id\n\nNCBITaxon:1423\tBacillus subtilis\n",
+     "row 3 has a different number of cells than the header"),
+    ("data/raw/ncbitaxon_taxa.tsv", "taxon_id\tlabel\trank\tparent_id\n\n562\tEscherichia coli\tSPECIES\t\n",
+     "row 3: '562' is not an NCBITaxon CURIE"),
 ])
 def test_a_malformed_taxonmech_tsv_is_refused_not_a_traceback(taxonmech, relative, content, message):
     (taxonmech / relative).write_text(content, encoding="utf-8")

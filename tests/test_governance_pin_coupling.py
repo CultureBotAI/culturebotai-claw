@@ -161,3 +161,35 @@ def test_a_lookalike_or_differently_cased_directory_is_not_exempt(tmp_path: Path
                             f"{lookalike}/2026-10-15/.vendored_manifest.json": "{}\n"})
     assert sorted(_found(root)) == [(f"{lookalike}/2026-10-15/.vendored_manifest.json", "manifest-snapshot"),
                                     (f"{lookalike}/2026-10-15/run.json", "pin-reference")]
+
+
+def test_survey_pin_coupling_hits_reads_pin_path_from_governance_manifest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """#1055: survey_pin_coupling_hits_795.py must obtain pin_path from load_governance_manifest()."""
+    import dataclasses
+    import importlib.util
+
+    from kg_microbe_governance import load_governance_manifest
+
+    script_path = Path(__file__).resolve().parents[1] / "scripts" / "adhoc" / "survey_pin_coupling_hits_795.py"
+    spec = importlib.util.spec_from_file_location("survey_pin_coupling_hits_795", script_path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    custom_pin = "governance/.custom_pin_ref"
+    root = _repo(tmp_path, {custom_pin: OLD + "\n", ".github/workflows/qc.yaml": f"ref: {OLD}\n"})
+    manifest = dataclasses.replace(load_governance_manifest(), pin_path=custom_pin)
+    monkeypatch.setattr(module, "load_governance_manifest", lambda: manifest)
+    monkeypatch.setattr(
+        module.RepositorySettings,
+        "from_environment",
+        classmethod(lambda cls: type("_S", (), {"paths": {"culturemech": root}, "errors": {}})()),
+    )
+
+    assert module.main(["--old-ref", OLD]) == 0
+    out = capsys.readouterr().out
+    assert f"culturemech\tpin-reference\t.github/workflows/qc.yaml:1" in out
+    assert custom_pin not in out
+

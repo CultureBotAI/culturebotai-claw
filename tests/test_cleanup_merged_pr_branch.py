@@ -603,6 +603,7 @@ def run_printed(recovery: str, *, only: str | None = None) -> list[str]:
 
 
 @pytest.mark.parametrize("spec", ["+refs/heads/feature:refs/heads/victim", "+refs/heads/*:refs/heads/victim-*",
+                                  "+refs/heads/*e:refs/heads/victim-*",
                                   "refs/heads/fea*:refs/remotes/origin/mirror/*",
                                   "+refs/heads/feature*:refs/heads/victim*"])  # `*` matches the empty string
 def test_a_fetch_refspec_that_maps_the_branch_elsewhere_is_refused(fleet, spec):
@@ -612,7 +613,7 @@ def test_a_fetch_refspec_that_maps_the_branch_elsewhere_is_refused(fleet, spec):
     git(fleet["checkout"], "branch", "victim", main)
     git(fleet["checkout"], "config", "remote.origin.fetch", spec)
 
-    with pytest.raises(cleanup_script.Refused, match=r"maps refs/heads/feature onto refs/(heads/victim|remotes/origin/mirror/ture)"):
+    with pytest.raises(cleanup_script.Refused, match=r"maps refs/heads/feature onto refs/(heads/victim(-featur)?|remotes/origin/mirror/ture)"):
         run_cleanup(fleet, worktree=None)
 
     assert ref(fleet["checkout"], "refs/heads/victim") == main
@@ -909,7 +910,7 @@ def test_a_read_back_failure_after_an_accepted_delete_still_names_the_push(fleet
     assert ref(fleet["origin"], "refs/heads/feature") == fleet["head"]
 
 
-def test_an_interrupt_after_the_remote_delete_still_reports_the_recovery(fleet, monkeypatch):
+def test_an_interrupt_after_the_remote_delete_still_reports_the_recovery(fleet, monkeypatch, capsys):
     """A Ctrl-C landing after the push, outside the read-back's own handler: the record and the push-back line survive."""
     drop_worktree_and_local(fleet)
     real = cleanup_script.tracking_sha
@@ -918,17 +919,39 @@ def test_an_interrupt_after_the_remote_delete_still_reports_the_recovery(fleet, 
     def interrupt_at_the_tracking_read_back(checkout, branch):
         calls.append(branch)
         if len(calls) == 2:
-            raise _Interrupt("Ctrl-C")
+            raise _Interrupt()
         return real(checkout, branch)
 
     monkeypatch.setattr(cleanup_script, "tracking_sha", interrupt_at_the_tracking_read_back)
 
-    with pytest.raises(cleanup_script.PartialFailure) as caught:
+    assert run_main(fleet, monkeypatch, worktree=None) == 1
+
+    out, err = capsys.readouterr()
+    assert out.strip() == f"deleted remote feature (was {fleet['head'][:10]})"
+    assert "failed after the steps above: _Interrupt" in err
+    assert f"push origin {fleet['head']}:refs/heads/feature" in err
+    assert ref(fleet["origin"], "refs/heads/feature") is None
+
+
+def test_a_bare_keyboard_interrupt_at_the_remote_read_back_names_the_exception_type(fleet, monkeypatch):
+    """A real KeyboardInterrupt has an empty message; the read-back failure still names KeyboardInterrupt (#1048)."""
+    drop_worktree_and_local(fleet)
+    real = cleanup_script.remote_branch_sha
+    calls: list[str] = []
+
+    def bare_interrupt_at_the_read_back(checkout, branch):
+        calls.append(branch)
+        if len(calls) == 2:
+            raise KeyboardInterrupt()
+        return real(checkout, branch)
+
+    monkeypatch.setattr(cleanup_script, "remote_branch_sha", bare_interrupt_at_the_read_back)
+
+    with pytest.raises(cleanup_script.PartialFailure,
+                       match="accepted the delete but could not be asked again: KeyboardInterrupt") as caught:
         run_cleanup(fleet, worktree=None)
 
-    assert caught.value.done == [f"deleted remote feature (was {fleet['head'][:10]})"]
-    assert f"push origin {fleet['head']}:refs/heads/feature" in caught.value.recovery
-    assert ref(fleet["origin"], "refs/heads/feature") is None
+    assert f"deleted remote feature (was {fleet['head'][:10]}; accepted, not confirmed)" in caught.value.done
 
 
 def test_a_remote_branch_still_present_after_the_delete_is_a_failure(fleet, monkeypatch):
