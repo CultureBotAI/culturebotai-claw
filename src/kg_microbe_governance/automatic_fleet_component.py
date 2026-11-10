@@ -20,6 +20,7 @@ from . import private_audit_coverage as coverage
 from . import private_scaleup_audit as manual
 from .artifacts.scripts.check_vendored_sync import _git_environment, parse_manifest
 from .fleet_audit import _commit_at
+from .public_repository_metadata import PublicRepositoryMetadata
 
 LANES = ("protected", "candidate")
 ROW_FIELDS = {
@@ -195,10 +196,11 @@ def clone_public(public, workspace: Path, values: dict) -> dict[str, Path]:
                 key not in consumers or consumers[key] == consumer, "source_unverified"
             )
             consumers[key] = consumer
+    metadata_client = PublicRepositoryMetadata({consumer.github for consumer in consumers.values()})
     roots = {}
     workspace.mkdir(parents=True, exist_ok=False)
     for key, consumer in sorted(consumers.items()):
-        metadata = public.get(f"/repos/{consumer.github}")
+        metadata = metadata_client.get(consumer.github)
         auto.check(
             metadata.get("full_name") == consumer.github
             and metadata.get("private") is False

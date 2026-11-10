@@ -65,16 +65,44 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -I - <<'PYCODE'
-          import json, os
+          uv run --project fleet/trusted-claw --locked --no-dev python -I - <<'PYCODE'
+          import hashlib
+          import os
           from pathlib import Path
-          installed = Path("fleet/trusted-claw/src/kg_microbe_governance/automatic_fleet_component.py").is_file()
-          candidate = json.loads(Path("control/src/kg_microbe_governance/vendored_artifacts.json").read_bytes())
-          protected = json.loads(Path("fleet/trusted-claw/src/kg_microbe_governance/vendored_artifacts.json").read_bytes())
-          if not installed and any("scaleupmech" in x["consumers"] for x in (candidate, protected)):
+
+          from kg_microbe_governance.artifacts.scripts.check_vendored_sync import parse_manifest
+
+          trusted = Path("fleet/trusted-claw")
+          manifest_path = "src/kg_microbe_governance/vendored_artifacts.json"
+          manifests = [parse_manifest((root / manifest_path).read_bytes()) for root in (Path("control"), trusted)]
+          for manifest in manifests:
+              for key, consumer in manifest.consumers.items():
+                  reserved_identity = consumer.github.casefold() == "culturebotai/scaleupmech"
+                  if reserved_identity and key != "scaleupmech":
+                      raise SystemExit("Reserved audit identity has an unsupported declaration")
+                  if key == "scaleupmech" and consumer.github != "CultureBotAI/ScaleupMech":
+                      raise SystemExit("Reserved audit declaration has an unsupported identity")
+          private_required = any("scaleupmech" in manifest.consumers for manifest in manifests)
+          adapter = trusted / "src/kg_microbe_governance/automatic_fleet_component.py"
+          installed = adapter.is_file()
+          # Exact pre-repair protected bytes from 3cf04a277c9a059ca102a172eb4e45702fe3b1d2.
+          # Unknown or repaired adapters must use the automatic path, never this compatibility lane.
+          known = {
+              "automatic_fleet_component.py": "93e666029922aa4fa2f902922ae0aa54c28da41c618a2c33af173c65907e0252",
+              "automatic_private_audit_cli.py": "26376fcb7cac5ec84f40cd9529c53881e9c9a4ea256d57609a27fda858159ab5",
+              "private_scaleup_audit.py": "bab998c0f194e87cf6b510123c671dc45ccc830ccc5526c05aa636df200bffc7",
+          }
+          known_adapter = all(
+              (trusted / "src/kg_microbe_governance" / name).is_file()
+              and hashlib.sha256((trusted / "src/kg_microbe_governance" / name).read_bytes()).hexdigest() == digest
+              for name, digest in known.items()
+          )
+          if private_required and not installed:
               raise SystemExit("Private obligations require the protected automatic adapter")
+          legacy = not private_required and (not installed or known_adapter)
+          available = not legacy
           with Path(os.environ["GITHUB_OUTPUT"]).open("a") as output:
-              output.write("available=" + str(installed).lower() + "\n")
+              output.write("available=" + str(available).lower() + "\n")
           PYCODE
 
       - name: Audit protected public fleet and candidate completeness
@@ -438,19 +466,49 @@ jobs:
         run: |
           set -euo pipefail
           trusted="$GITHUB_WORKSPACE/fleet/trusted-claw"
-          if [ -f "$trusted/src/kg_microbe_governance/automatic_private_audit_cli.py" ]; then
-            test "$AUTOMATIC_AVAILABLE" = true
+          uv run --project fleet/trusted-claw --locked --no-dev python -I - <<'PYCODE'
+          import hashlib
+          import os
+          from pathlib import Path
+
+          from kg_microbe_governance.artifacts.scripts.check_vendored_sync import parse_manifest
+
+          trusted = Path("fleet/trusted-claw")
+          manifest_path = "src/kg_microbe_governance/vendored_artifacts.json"
+          manifests = [parse_manifest((root / manifest_path).read_bytes()) for root in (Path("control"), trusted)]
+          for manifest in manifests:
+              for key, consumer in manifest.consumers.items():
+                  reserved_identity = consumer.github.casefold() == "culturebotai/scaleupmech"
+                  if reserved_identity and key != "scaleupmech":
+                      raise SystemExit("Reserved audit identity has an unsupported declaration")
+                  if key == "scaleupmech" and consumer.github != "CultureBotAI/ScaleupMech":
+                      raise SystemExit("Reserved audit declaration has an unsupported identity")
+          private_required = any("scaleupmech" in manifest.consumers for manifest in manifests)
+          adapter = trusted / "src/kg_microbe_governance/automatic_fleet_component.py"
+          installed = adapter.is_file()
+          # Exact pre-repair protected bytes from 3cf04a277c9a059ca102a172eb4e45702fe3b1d2.
+          # Unknown or repaired adapters must use the automatic path, never this compatibility lane.
+          known = {
+              "automatic_fleet_component.py": "93e666029922aa4fa2f902922ae0aa54c28da41c618a2c33af173c65907e0252",
+              "automatic_private_audit_cli.py": "26376fcb7cac5ec84f40cd9529c53881e9c9a4ea256d57609a27fda858159ab5",
+              "private_scaleup_audit.py": "bab998c0f194e87cf6b510123c671dc45ccc830ccc5526c05aa636df200bffc7",
+          }
+          known_adapter = all(
+              (trusted / "src/kg_microbe_governance" / name).is_file()
+              and hashlib.sha256((trusted / "src/kg_microbe_governance" / name).read_bytes()).hexdigest() == digest
+              for name, digest in known.items()
+          )
+          if private_required and not installed:
+              raise SystemExit("Private obligations require the protected automatic adapter")
+          legacy = not private_required and (not installed or known_adapter)
+          available = not legacy
+          if os.environ.get("AUTOMATIC_AVAILABLE") != str(available).lower():
+              raise SystemExit("Protected public audit mode differs from selected component mode")
+          if legacy:
+              print("Complete protected public-only audit and candidate completeness passed")
+          PYCODE
+          if [ "$AUTOMATIC_AVAILABLE" = true ]; then
+            test -f "$trusted/src/kg_microbe_governance/automatic_private_audit_cli.py"
             uv run --project "$trusted" --locked --no-dev python -m kg_microbe_governance.automatic_private_audit_cli \
               verify --trusted-root "$trusted" --checkout-sha "$CANDIDATE_SHA"
-          else
-            test "$AUTOMATIC_AVAILABLE" = false
-            python3 -I - <<'PYCODE'
-          import json
-          from pathlib import Path
-          for root in ("control", "fleet/trusted-claw"):
-              value = json.loads((Path(root) / "src/kg_microbe_governance/vendored_artifacts.json").read_bytes())
-              if "scaleupmech" in value["consumers"]:
-                  raise SystemExit("Private obligations require the protected automatic adapter")
-          print("Existing protected public-only audit passed; private automation is not active")
-          PYCODE
           fi
