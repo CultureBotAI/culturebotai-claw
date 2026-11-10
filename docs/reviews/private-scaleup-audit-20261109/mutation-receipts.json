@@ -1,0 +1,86 @@
+[
+  {
+    "mutation": "sha-normalization",
+    "test": "tests/test_private_scaleup_audit.py::test_producer_version_requires_exact_authoritative_main_including_other_executable_files",
+    "red_exit": 1,
+    "restored_exit": 0,
+    "red_assertion": true
+  },
+  {
+    "mutation": "authoritative-main",
+    "test": "tests/test_private_scaleup_audit.py::test_producer_version_requires_exact_authoritative_main_including_other_executable_files",
+    "red_exit": 1,
+    "restored_exit": 0,
+    "red_assertion": true
+  },
+  {
+    "mutation": "source-binding",
+    "test": "tests/test_private_scaleup_audit.py::test_source_changes_cannot_redirect_private_reads[manifest]",
+    "red_exit": 1,
+    "restored_exit": 0,
+    "red_assertion": true
+  },
+  {
+    "mutation": "environment-branch",
+    "test": "tests/test_private_scaleup_audit.py::test_no_secret_environment_or_producer_authority_can_be_selected_by_candidate[wildcard]",
+    "red_exit": 1,
+    "restored_exit": 0,
+    "red_assertion": true
+  },
+  {
+    "mutation": "one-repo-token",
+    "test": "tests/test_private_scaleup_audit.py::test_private_preflight_fails_closed[broad_token]",
+    "red_exit": 1,
+    "restored_exit": 0,
+    "red_assertion": true
+  },
+  {
+    "mutation": "main-race",
+    "test": "tests/test_private_scaleup_audit.py::test_private_preflight_fails_closed[race]",
+    "red_exit": 1,
+    "restored_exit": 0,
+    "red_assertion": true
+  },
+  {
+    "mutation": "pin-binding",
+    "test": "tests/test_private_scaleup_audit.py::test_private_changes_never_become_success_or_leak_content[unknown_pin]",
+    "red_exit": 1,
+    "restored_exit": 0,
+    "red_assertion": true
+  },
+  {
+    "mutation": "receipt-closure",
+    "test": "tests/test_private_scaleup_audit.py::test_receipt_schema_is_closed_complete_bound_and_fresh[extra]",
+    "red_exit": 1,
+    "restored_exit": 0,
+    "red_assertion": true
+  },
+  {
+    "mutation": "freshness",
+    "test": "tests/test_private_scaleup_audit.py::test_receipt_schema_is_closed_complete_bound_and_fresh[expired]",
+    "red_exit": 1,
+    "restored_exit": 0,
+    "red_assertion": true
+  },
+  {
+    "mutation": "artifact-digest",
+    "test": "tests/test_private_scaleup_audit.py::test_public_provenance_rejects_forged_or_replayed_receipts[digest]",
+    "red_exit": 1,
+    "restored_exit": 0,
+    "red_assertion": true
+  },
+  {
+    "mutation": "redirect-authorization",
+    "test": "tests/test_private_scaleup_audit.py::test_transport_follows_only_bounded_artifact_redirect_without_authorization",
+    "red_exit": 1,
+    "restored_exit": 0,
+    "red_assertion": true
+  },
+  {
+    "mutation": "workflow-subject-injection",
+    "test": "tests/test_private_scaleup_audit.py::test_workflow_is_manual_protected_and_never_executes_candidate_or_private_checkout",
+    "red_exit": 1,
+    "restored_exit": 0,
+    "red_assertion": true
+  }
+]

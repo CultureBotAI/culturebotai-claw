@@ -1,0 +1,35 @@
+{
+  "checked_at": "2026-11-09T03:54:48.554012+00:00",
+  "full_run_head": "3441faa23aa2f2360121ac6a30d0b396ec84c0a4",
+  "full_run": {
+    "passed": 8502,
+    "skipped": 445,
+    "failed": 8,
+    "seconds": 647.66,
+    "coverage_percent": 88.01,
+    "safety_core_percent": 77
+  },
+  "failure_disposition": {
+    "four_claw_root": "35 unchanged tests pass with fixtures outside claw",
+    "two_manifest_reason_claims": "412 pass181skip with fixtures outside Git checkout",
+    "one_skill_references": "83 pass after isolating the negative fixture from ambient ~/.claude/skills, invocation-only plugin",
+    "one_workflow_provisioning": "issue1078 fixed;91 affected tests pass; original2command mutation2fail/restored2pass"
+  },
+  "remaining": "hosted successor checks and exact-head incremental independent re-review; live App setup and automatic integration remain separate",
+  "fixture_isolation": {
+    "plugin_sha256": "a8a2b1002f9506168c1dcc98a6d8343ea4655f513057d807a68eab0c177618d5",
+    "plugin_source": "\"\"\"Isolate one negative fixture from the real user's ancestor skill directory.\n\nAll retained test files remain under agent-work. This is invocation state, not\nproduction code or a changed assertion: the fixture requires no ancestor skills.\n\"\"\"\nfrom pathlib import Path\nimport pytest\n\n@pytest.hookimpl(tryfirst=True)\ndef pytest_runtest_call(item):\n    if item.nodeid.endswith(\"test_skill_references.py::test_no_checkout_is_a_refusal_not_an_empty_pass\"):\n        ambient = Path.home() / \".claude\" / \"skills\"\n        original = Path.is_dir\n        def isolated(path):\n            return False if path == ambient else original(path)\n        item.funcargs[\"monkeypatch\"].setattr(Path, \"is_dir\", isolated)\n",
+    "scope": "Only the negative no-checkout skill fixture; production source unchanged",
+    "positive_and_negative_group": "tests/test_skill_references.py:83passed",
+    "positive_selector": "test_the_claw_root_is_found_from_the_working_directory",
+    "negative_selector": "test_no_checkout_is_a_refusal_not_an_empty_pass"
+  },
+  "empty_tree_followup": {
+    "issue": "https://github.com/CultureBotAI/culturebotai-claw/issues/1079",
+    "tests": "96 passed, including installed wheel, all private audit and provisioning tests",
+    "mutations": "five red/restored green; original producer rejects actual-shaped empty tree while installed control passes",
+    "privacy": "only exact authenticated bootstrap commit plus canonical empty tree; no arbitrary404 fallback; commit metadata never serialized",
+    "ruff": "passed",
+    "mypy": "all108 safety-module files passed"
+  }
+}

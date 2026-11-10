@@ -205,6 +205,7 @@ uv run --extra dev mypy \
   src/kg_microbe_governance/__init__.py \
   src/kg_microbe_governance/__main__.py \
   src/kg_microbe_governance/fleet_audit.py \
+  src/kg_microbe_governance/private_scaleup_audit.py \
   src/kg_microbe_governance/cycle_release_audit.py \
   src/kg_microbe_governance/infrastructure_admission.py \
   src/kg_microbe_governance/consumer_admission.py \
