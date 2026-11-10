@@ -52,6 +52,9 @@ manifest when no source checkout is present:
 - CMMMech (`CMMMECH_ROOT`)
 - AIMech (`AIMECH_ROOT`)
 - EdgeMech (`EDGEMECH_ROOT`)
+- CofactorMech (`COFACTORMECH_ROOT`) — admission pending
+- AssayMech (`ASSAYMECH_ROOT`) — admission pending
+- ScaleupMech (`SCALEUPMECH_ROOT`) — admission pending; excluded from public outputs
 
 You do not need every Mech cloned. `openclaw-cli config validate` reports an
 unset root as "not configured locally" rather than a failure; pass
@@ -61,6 +64,11 @@ repository remains unusable — every access path still fails closed.
 Each Mech declares its capabilities in the manifest as `enabled`, `disabled`,
 or `not_applicable`; the latter two require a recorded reason. Consult the
 declaration rather than assuming a capability applies fleet-wide.
+
+Public fleet output must use the manifest's `public()` projection before
+serialization and aggregation; internal operations retain every member. See
+`docs/guides/PUBLIC_FLEET_OUTPUT.md` and the unresolved deployment gates in
+`docs/guides/COMBINED_FLEET_ADMISSION.md`.
 
 The companion X-Mech Suite site repository (`CultureBotAI/CultureBotAI.github.io`,
 published at `https://culturebotai.github.io/mechs/`, configured via
@@ -169,6 +177,8 @@ uv run --extra dev mypy \
   src/kg_microbe_governance/__main__.py \
   src/kg_microbe_governance/fleet_audit.py \
   src/kg_microbe_governance/cycle_release_audit.py \
+  src/kg_microbe_governance/infrastructure_admission.py \
+  src/kg_microbe_governance/consumer_admission.py \
   src/kg_microbe_governance/artifacts/scripts/run_shared_evidence_validator.py \
   src/kg_microbe_governance/artifacts/scripts/check_vendored_sync.py
 uv run --extra dev python -m pytest -q \

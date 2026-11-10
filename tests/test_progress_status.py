@@ -213,7 +213,7 @@ def test_published_bundle_is_validated_and_network_failure_has_no_zero_fallback(
 ):
     monkeypatch.setattr(status, "read_remote", lambda **kwargs: ("a" * 40, bundle))
     assert status.main(["--published"], now=NOW) == 0
-    assert capsys.readouterr().out == status.format_summary(bundle["snapshot"]) + "\n"
+    assert capsys.readouterr().out == status.format_summary(progress.public_bundle(**bundle)["snapshot"]) + "\n"
     bundle["history"]["closures"] = []
     assert status.main(["--published"], now=NOW) == 1
     assert capsys.readouterr().out == ""
@@ -321,7 +321,9 @@ def test_published_read_and_bundle_validation_use_pinned_manifest(
         arguments.extend(["--manifest", str(pin)])
     assert status.main(arguments, now=NOW) == 0
     output = capsys.readouterr()
-    assert output.out == status.format_summary(bundle["snapshot"]) + "\n"
+    assert output.out == status.format_summary(
+        progress.public_bundle(**bundle, manifest=load_fleet_manifest(pin))["snapshot"]
+    ) + "\n"
     assert output.err == ""
     assert len(seen) == 1
     assert seen[0].source == pin
@@ -352,4 +354,4 @@ def test_remote_reader_validates_with_the_selected_manifest(status, tmp_path, bu
         status.read_remote(api=responses.__getitem__)
     assert status.read_remote(
         api=responses.__getitem__, manifest=load_fleet_manifest(pin)
-    ) == ("a" * 40, bundle)
+    ) == ("a" * 40, progress.public_bundle(**bundle, manifest=load_fleet_manifest(pin)))

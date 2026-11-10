@@ -9,14 +9,15 @@ from pathlib import Path
 
 from mech_progress_publish import read_remote
 
-from kg_microbe_progress import project_bundle_to_manifest
+from kg_microbe_progress import public_bundle
 
 
 def build(source: Path, destination: Path) -> str:
     head, bundle = read_remote()
     if head is None or bundle is None:
         raise ValueError("No public progress snapshot has been published")
-    snapshot = project_bundle_to_manifest(bundle["history"], bundle["snapshot"])
+    bundle = public_bundle(bundle["history"], bundle["snapshot"])
+    snapshot = bundle["snapshot"]
     if destination.exists():
         raise ValueError("Build destination already exists")
     if not source.is_dir():

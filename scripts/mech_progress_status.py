@@ -16,6 +16,7 @@ from kg_microbe_fleet import load_fleet_manifest
 from kg_microbe_progress import (
     ProgressError,
     project_bundle_to_manifest,
+    public_bundle,
     read_json,
 )
 
@@ -113,6 +114,8 @@ def main(argv: list[str] | None = None, *, now: datetime | None = None) -> int:
             _, bundle = read_remote(manifest=manifest)
             if bundle is None:
                 raise ProgressError("no published progress bundle exists")
+            bundle = public_bundle(bundle["history"], bundle["snapshot"], manifest)
+            manifest = manifest.public()
         else:
             bundle = read_json(args.bundle)
         history, snapshot = bundle["history"], bundle["snapshot"]

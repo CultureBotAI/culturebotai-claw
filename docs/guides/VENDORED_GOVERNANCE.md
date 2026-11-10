@@ -451,6 +451,12 @@ cite the lane keep the revision they validated.
 
 ## Scoped seven-goal-cycle release
 
+The [combined Cofactor/Assay/Scaleup candidate](COMBINED_FLEET_ADMISSION.md)
+preserves this lane and the separately sealed Edge admission. It reuses the
+pending native-consumer proposals with conservative capabilities and adds public
+exclusion metadata. Registration consistency is not protected activation; the
+private audit prerequisites and a reviewed merge sequence remain release holds.
+
 The `mech-cycle-v2.0.0` release identifies Claw commit
 `c26f3a0906916f9641a5f82b004b5541ae5fbe52`, carrying parent v2.0.0 from
 [claw#866](https://github.com/CultureBotAI/culturebotai-claw/pull/866).
