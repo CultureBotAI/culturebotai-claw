@@ -541,3 +541,33 @@ def test_exit_between_ps_and_linux_proc_verification(environment, monkeypatch, f
         with pytest.raises(control.ControlError, match="different arguments|Cannot verify"):
             controller.identify("approvals", {1234: expected})
     assert not signals
+
+
+def test_reload_capability_requires_both_source_pins(environment):
+    data = environment['manifest']
+    approvals = data['services']['approvals']
+    approvals['binding_reload'] = {'version': 1, 'adapter': str(environment['source']),
+                                   'journal': str(environment['root'] / 'binding-reload.json'),
+                                   'input_lock_dir': str(environment['root'])}
+    environment['config'].write_text(json.dumps(data))
+    with pytest.raises(control.ControlError, match='requires adapter and target source pins'):
+        control.load_manifest(environment['config'])
+    targets = approvals['session_targets_file']
+    approvals['source_sha256'][targets] = hashlib.sha256(Path(targets).read_bytes()).hexdigest()
+    environment['config'].write_text(json.dumps(data))
+    assert control.load_manifest(environment['config'])['services']['approvals']['binding_reload']['version'] == 1
+
+
+@pytest.mark.parametrize('collision', ['controller', 'source', 'other-status', 'registry'])
+def test_reload_journal_cannot_overwrite_control_surface(environment, collision):
+    data = environment['manifest']
+    destination = {'controller': str(environment['config']), 'source': str(environment['source']),
+                   'other-status': data['services']['supervisor']['status_file'],
+                   'registry': str(Path(data['state_dir']) / 'registry.json')}[collision]
+    approvals = data['services']['approvals']
+    approvals['binding_reload'] = {'version': 1, 'adapter': str(environment['source']),
+                                   'journal': destination, 'input_lock_dir': str(environment['root'])}
+    approvals['source_sha256'][approvals['session_targets_file']] = hashlib.sha256(Path(approvals['session_targets_file']).read_bytes()).hexdigest()
+    environment['config'].write_text(json.dumps(data))
+    with pytest.raises(control.ControlError):
+        control.load_manifest(environment['config'])

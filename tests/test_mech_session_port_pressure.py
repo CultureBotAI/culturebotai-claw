@@ -1,7 +1,9 @@
 """Offline restart transaction tests; no live Terminal, processes or network."""
 import copy
+import hashlib
 import importlib.util
 import json
+import os
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -68,6 +70,50 @@ class SupervisorFixture:
         return self.runtime / row["repository_key"]
 
 
+def reload_fixture(supervisor, paths, row, module, clock):
+    root = supervisor.runtime.parent
+    control = root / "control"
+    control.mkdir(exist_ok=True)
+    Path(supervisor.config["input_lock_dir"]).mkdir(exist_ok=True)
+    monitor_source = root / "monitor-source.py"
+    monitor_source.write_text("# synthetic existing monitor\n")
+    controller = root / "controller.json"
+    status = root / "approval-status.json"
+    targets = paths[0]
+    adapter = Path(module.__file__).resolve()
+    config = {"version": 1, "state_dir": str(control), "services": {"approvals": {
+        "kind": "approval", "argv": ["/synthetic/python", str(monitor_source)], "cwd": str(root),
+        "status_file": str(status), "session_targets_file": str(targets),
+        "binding_reload": {"version": 1, "journal": str(control / "binding-reload.json"),
+                           "adapter": str(adapter), "input_lock_dir": supervisor.config["input_lock_dir"]},
+        "source_sha256": {str(path): hashlib.sha256(path.read_bytes()).hexdigest()
+                          for path in (adapter, monitor_source, targets)}}}}
+    atomic_json(controller, config)
+    supervisor.config["port_pressure"]["controller_config_path"] = str(controller)
+    atomic_json(Path(supervisor.config["_config_path"]), supervisor.config)
+    def identity_reader(pid):
+        return {"pid": pid, "started": "synthetic monitor start"}
+
+    def verifier(service, consumer):
+        pass  # only external OS operations are injected
+    resident = module.ResidentBindings(controller, targets, monitor_source, clock=clock,
+                                       identity_reader=identity_reader, consumer_verifier=verifier,
+                                       input_lock_dir=supervisor.config["input_lock_dir"])
+    recovery = SimpleNamespace(targets={})
+    def publish():
+        resident.refresh(recovery)
+        atomic_json(status, {"pid": os.getpid(), "binding_reload": resident.acknowledgment()})
+    publish()
+    def prepare(controller_path, binding_paths, target, *, now, input_lock_dir=None):
+        return module.prepare_rebind(controller_path, binding_paths, target, now=now,
+                                     identity_reader=identity_reader, consumer_verifier=verifier,
+                                       input_lock_dir=supervisor.config["input_lock_dir"])
+    wrapped = SimpleNamespace(prepare_rebind=prepare, rebind_lease=module.rebind_lease,
+                              check_before=module.check_before, install_rebind=module.install_rebind,
+                              await_rebind=module.await_rebind)
+    return wrapped, publish, resident, recovery, controller
+
+
 class TransportFixture:
     """Enumerated transaction operations; no method can submit a goal."""
     def __init__(self, supervisor, *, fail=None, measured=None):
@@ -98,6 +144,10 @@ class TransportFixture:
 
     def preflight(self, row):
         self.step("preflight")
+
+    @contextmanager
+    def transaction_lease(self):
+        yield
 
     def quit(self, row):
         self.step("quit")
@@ -217,6 +267,7 @@ def test_native_quit_rechecks_preflight_after_selection_before_any_input(tmp_pat
         return {"idle": True}
 
     native.preflight = preflight
+    native.transaction_lease = fixture.transaction_lease
     result = guard.PortPressureGuard(supervisor, transport=native, clock=lambda: NOW).tick(apply=True)
     assert result["phase"] == "disabled" and reason in result["alert"]
     assert calls == [42, 42]
@@ -291,12 +342,13 @@ def prepare_bindings(tmp_path):
     row = supervisor.config["targets"][0]
     root = Path(row["root"])
     unchanged = {"pid": 99, "tty": "/dev/ttys099", "root": str(root / "unrelated"),
-                 "process_identity": "unrelated process", "native_session_id": "other"}
+                 "process_identity": "unrelated process", "native_session_id": "other", "recovery_identity": "unrelated-stable"}
     monitor = tmp_path / "monitor.json"
     approval = tmp_path / "approval.json"
     config = tmp_path / "supervisor.json"
     atomic_json(monitor, [{"pid": row["pid"], "tty": row["tty"], "cwd": row["root"],
-                           "identity": row["process_identity"], "started": "old start"}, unchanged])
+                           "identity": row["process_identity"], "started": "old start",
+                           "native_session_id": CID, "recovery_identity": "stable-old"}, unchanged])
     atomic_json(approval, {"targets": [copy.deepcopy(row), unchanged], "other_setting": "retained"})
     supervisor.config.update(_config_path=str(config))
     supervisor.config["port_pressure"]["binding_files"] = [
@@ -314,7 +366,12 @@ def test_binding_plan_and_rebind_update_only_exact_old_identity(tmp_path):
     supervisor, row, new, paths, unchanged = prepare_bindings(tmp_path)
     plan = guard.binding_plan(supervisor, row, read_json)
     assert {role for item in plan for role in item["roles"]} == {"monitor", "approval", "supervisor"}
-    guard.apply_bindings(supervisor, row, new, plan, supervisor._port_pressure_helpers)
+    adapter, publish, _resident, _recovery, controller = reload_fixture(
+        supervisor, paths, row, guard.bindings, lambda: NOW)
+    plan = adapter.prepare_rebind(str(controller), [str(path) for path in paths], row, now=lambda: NOW)
+    with adapter.rebind_lease(plan):
+        guard.apply_bindings(supervisor, row, new, plan, supervisor._port_pressure_helpers,
+                             sleep=lambda _: publish(), binding_adapter=adapter)
     monitor, approval, config = [read_json(path) for path in paths]
     assert monitor[0]["pid"] == approval["targets"][0]["pid"] == config["targets"][0]["pid"] == 1042
     assert monitor[0]["identity"] == new["process_identity"] and monitor[0]["started"] == "new start"
@@ -325,7 +382,7 @@ def test_binding_plan_and_rebind_update_only_exact_old_identity(tmp_path):
     assert status["untouched"] == "preserved"
     assert status["port_pressure_restart"]["old_pid"] == 42
     assert status["port_pressure_restart"]["new_pid"] == 1042
-    assert read_json(supervisor.runtime / "port-pressure-rebind.json")["state"] == "complete"
+    assert read_json(supervisor.runtime.parent / "control/binding-reload.json")["state"] == "complete"
 
 
 @pytest.mark.parametrize("field,value", [("tty", "/dev/ttys100"), ("cwd", "/wrong"),
@@ -341,13 +398,16 @@ def test_binding_preflight_rejects_mismatched_tty_cwd_or_process_start(tmp_path,
 
 def test_binding_change_after_preflight_stops_before_any_replacement(tmp_path):
     supervisor, row, new, paths, _unchanged = prepare_bindings(tmp_path)
-    plan = guard.binding_plan(supervisor, row, read_json)
+    adapter, _publish, _resident, _recovery, controller = reload_fixture(
+        supervisor, paths, row, guard.bindings, lambda: NOW)
+    plan = adapter.prepare_rebind(str(controller), [str(path) for path in paths], row, now=lambda: NOW)
     data = read_json(paths[1])
     data["external_change"] = True
     atomic_json(paths[1], data)
     before = [path.read_bytes() for path in paths]
-    with pytest.raises(guard.GuardError, match="changed during restart"):
-        guard.apply_bindings(supervisor, row, new, plan, supervisor._port_pressure_helpers)
+    with pytest.raises(guard.bindings.BindingError, match="CAS drift"):
+        with adapter.rebind_lease(plan):
+            guard.apply_bindings(supervisor, row, new, plan, supervisor._port_pressure_helpers)
     assert [path.read_bytes() for path in paths] == before and row["pid"] == 42
 
 
@@ -373,11 +433,11 @@ def test_native_resume_uses_exact_id_same_model_and_effort_without_goal(tmp_path
     supervisor.runner = runner
     native = guard.NativeTransport(supervisor, clock=lambda: NOW)
     row = supervisor.config["targets"][0]
-    native.resume(row, {"tab": {"tty": row["tty"], "window": 1, "tab": 1},
-                        "shell": {"pid": 41, "identity": "shell start"}})
-    assert captured[0]["message"] == (
-        "/not/executed/agy --conversation=" + CID + " --model=gemini-3-pro --effort=high")
-    assert captured[0]["cwd"] == row["root"] and "/goal" not in captured[0]["message"]
+    with pytest.raises(guard.GuardError, match="registration evidence"):
+        native.resume(row, {"tab": {"tty": row["tty"], "window": 1, "tab": 1},
+                            "shell": {"pid": 41, "identity": "shell start"}})
+    assert captured == []
+
 
 
 @pytest.mark.parametrize("listener_count", [1, 2, 3])
@@ -397,6 +457,7 @@ def test_native_resumed_listener_count_must_be_exactly_two(tmp_path, listener_co
     native.observe = lambda _row: {"idle": True, "verified_identity": True, "observation": {"tab": tab}}
     text = "p1042\ncagy\n" + "".join(
         f"f{fd}\ntIPv4\nn127.0.0.1:{50000 + fd}\nTST=LISTEN\n" for fd in range(4, 4 + listener_count))
+    native.verify_restart_identity = lambda *_args: {}  # identity is tested through the production fixture
     native.sockets = lambda *_args, **_kwargs: {"stdout": text, "stderr": "", "returncode": 0}
     if listener_count == 2:
         result = native.wait_resumed(row, 45)
@@ -477,3 +538,15 @@ def test_unknown_canary_target_fails_before_any_observation(tmp_path):
     with pytest.raises(guard.GuardError, match='unconfigured target'):
         guard.PortPressureGuard(supervisor, transport=transport)
     assert transport.calls == [] and transport.inputs == []
+
+
+def test_exact_native_server_identity_line_accepts_one_id_and_rejects_lookalikes():
+    line = f"I1110 00:07:00.123456 123 server.go:3329] GetConversationDetail: found conversation {CID} (active=false)"
+    assert guard.log_conversation(line + "\n" + line) == CID
+    for invalid in ("quoted: " + line, line.replace("server.go", "tool.go"),
+                    line.replace("active=false", "active=unknown"), line[:-4],
+                    line.replace(CID, CID[:-1])):
+        with pytest.raises(guard.GuardError, match="missing or ambiguous"):
+            guard.log_conversation(invalid)
+    with pytest.raises(guard.GuardError, match="ambiguous"):
+        guard.log_conversation(line + "\n" + line.replace(CID, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"))
