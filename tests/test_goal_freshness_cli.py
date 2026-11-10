@@ -141,3 +141,19 @@ def test_frozen_inventory_repeat_is_idempotent(repo, gate_request):
     second = cli.execute(gate_request, apply=True)
     assert first['artifact'] == second['artifact']
     assert second['reused_frozen_inventory'] is True
+
+
+def test_large_successful_inventory_round_trips_and_remains_usable(repo, gate_request, monkeypatch):
+    original = cli.Git.run
+    def large_tree(self, *args, **kwargs):
+        if args[:3] == ('ls-tree', '-r', '-z'):
+            return ''.join(f'100644 blob {"a" * 40}\tdata/record-{i:05d}-long-record-name.yaml\0'
+                           for i in range(12000))
+        return original(self, *args, **kwargs)
+    monkeypatch.setattr(cli.Git, 'run', large_tree)
+    first = cli.execute(gate_request, apply=True)
+    assert Path(first['artifact']['path']).stat().st_size > 1_000_000
+    assert len(cli.read_artifact(first['artifact'])['files']) == 12000
+    assert cli.execute(gate_request, apply=True)['artifact'] == first['artifact']
+    gate_request.update(phase='no_change', prior_inventory=first['artifact'])
+    assert cli.execute(gate_request, apply=True)['status'] == 'verified'

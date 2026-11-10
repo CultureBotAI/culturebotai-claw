@@ -31,13 +31,15 @@ from .freshness import (
 )
 from .freshness_contract import load_adoption, repository_identity
 
+ARTIFACT_LIMIT = 32_000_000
+
 _FIELDS = {"schema_version", "repository_key", "repository_root", "lock_directory",
            "receipt_directory", "protected_roots", "adoption", "boundary_id", "phase",
            "workflow_sha256", "prior_inventory", "pull_requests"}
 
 
-def _load(path: Path) -> Any:
-    if not path.is_absolute() or path.resolve() != path or path.stat().st_size > 1_000_000:
+def _load(path: Path, *, limit: int = 1_000_000) -> Any:
+    if not path.is_absolute() or path.resolve() != path or path.stat().st_size > limit:
         raise FreshnessError("request_path_unsafe_or_unbounded")
     def pairs(items):
         result = {}
@@ -62,7 +64,7 @@ def read_artifact(reference: Any) -> dict[str, Any]:
     if not isinstance(reference, dict) or set(reference) != {"path", "sha256"}:
         raise FreshnessError("invalid_artifact_reference")
     path = _path(reference['path'])
-    value = _load(path)
+    value = _load(path, limit=ARTIFACT_LIMIT)
     if hashlib.sha256(path.read_bytes()).hexdigest() != reference['sha256'] or not isinstance(value, dict):
         raise FreshnessError("artifact_digest_or_shape_differs")
     return value
@@ -212,7 +214,11 @@ def execute(request: dict[str, Any], *, apply: bool = False,
             raise FreshnessError('merged_pull_request_not_for_canonical_default')
         artifact.update(kind='verified_post_merge_freshness', merges=merge_observations,
                         prior_inventory=request['prior_inventory'])
+    if len(json.dumps(artifact, sort_keys=True, indent=2).encode()) + 1 > ARTIFACT_LIMIT:
+        raise FreshnessError('inventory_artifact_exceeds_reader_bound')
     location = save_receipt(receipts / 'boundaries', artifact)
+    if read_artifact(location) != artifact:
+        raise FreshnessError('inventory_artifact_readback_failed')
     if phase == 'pre_goal':
         slot.parent.mkdir(parents=True, exist_ok=True)
         if slot.parent.resolve() != slot.parent:

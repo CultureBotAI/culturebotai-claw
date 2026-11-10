@@ -101,3 +101,16 @@ def test_original_v1_v2_parent_bytes_remain_available():
     assert load_document(LEGACY_PARENT_PATH.read_bytes())['version'].startswith('1.')
     assert load_document(PARENT_PATH.read_bytes())['version'] == '2.0.0'
     assert 'repository_freshness' not in load_document(PARENT_PATH.read_bytes())
+
+
+def test_identity_refuses_ambient_manifest_but_accepts_explicit_canonical(tmp_path, monkeypatch):
+    from kg_microbe_fleet import load_fleet_manifest
+    from kg_microbe_workflows.freshness_contract import CONTRACT_PATH, repository_identity
+    packaged = CONTRACT_PATH.parents[2] / 'kg_microbe_fleet/fleet.yaml'
+    manifest = load_fleet_manifest(packaged)
+    alternate = tmp_path / 'alternate.yaml'
+    alternate.write_bytes(packaged.read_bytes() + b'\n# alternate identity context\n')
+    monkeypatch.setenv('KG_MICROBE_FLEET_MANIFEST', str(alternate))
+    with pytest.raises(WorkflowError, match='ambient manifest'):
+        repository_identity('mediaingredientmech')
+    assert repository_identity('mediaingredientmech', manifest) == 'CultureBotAI/MediaIngredientMech'

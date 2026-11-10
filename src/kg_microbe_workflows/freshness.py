@@ -104,6 +104,13 @@ def state(git: Git) -> dict[str, str]:
         path = Path(git.run("rev-parse", "--path-format=absolute", "--git-path", marker))
         if os.path.lexists(path):
             raise FreshnessError("active_git_operation:" + marker)
+    for flag in ("-v", "-f"):
+        entries = git.run("ls-files", flag, "-z").split("\0")
+        if any(entry and (entry[0].islower() or entry[0] == "S") for entry in entries):
+            raise FreshnessError("hidden_index_flags:preserve_owner_flags_and_use_owned_base")
+    for option in ("core.sparseCheckout", "index.sparse"):
+        if git.run("config", "--bool", "--get", option, allowed=(0, 1)) == "true":
+            raise FreshnessError("sparse_checkout_requires_owned_full_base")
     tracked = git.run("status", "--porcelain=v1", "-z", "--untracked-files=no",
                       "--ignore-submodules=none")
     return {"branch": branch, "head": head, "tracked_status": tracked}
@@ -399,6 +406,7 @@ def ensure_freshness(
                             observation["outcome"] = "remote_ref_race"
                             continue
                         if behind:
+                            report["after"] = None  # Mutation outcome is unknown until read back.
                             git.run("merge", "--ff-only", "--no-squash", "--no-autostash",
                                     "--no-overwrite-ignore", "--no-edit", "--no-stat", fetched)
                         after = state(git)
@@ -411,7 +419,7 @@ def ensure_freshness(
                             first = after
                             continue
                         report.update(status="verified", reason="observed_revision_verified",
-                                      verified_at=utc(), outcome="fast_forwarded" if behind else "already_current")
+                                      verified_at=utc(), outcome="fast_forwarded" if report["before"] != after["head"] else "already_current")
                         observation["outcome"] = "verified"
                         break
                     else:
@@ -423,6 +431,17 @@ def ensure_freshness(
                             git.run("update-ref", "-d", ref, sha)
                         except FreshnessError:
                             report.update(status="hold", reason="owned_fetch_ref_cleanup_failed")
+                if apply and report["status"] != "verified":
+                    report["after"] = None
+                    try:
+                        recovery = Git(target.path, 10)
+                        identity(recovery, target)
+                        actual = recovery.run("rev-parse", "--verify", "HEAD^{commit}")
+                        if SHA.fullmatch(actual):
+                            report["after"] = actual
+                            report["after_observed_at"] = utc()
+                    except FreshnessError:
+                        report["after_readback"] = "unavailable:do_not_infer_unchanged"
     except (FreshnessError, RuntimeError, OSError, ValueError) as exc:
         report.update(status="hold", reason=str(exc) if isinstance(exc, FreshnessError)
                       else "repository_lease_or_observation_failed")

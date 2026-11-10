@@ -625,3 +625,41 @@ def test_supplied_frozen_path_digest_change_holds_even_with_clean_current_head(r
     assert result["reason"] == "frozen_workflow_bytes_changed"
     assert repo.head() == later
     repo.assert_receipt(result)
+
+
+@pytest.mark.parametrize('flag', ['--assume-unchanged', '--skip-worktree'])
+def test_hidden_index_flags_never_authorize_dirty_owner_tree(repo: LocalRepository, flag: str) -> None:
+    git(repo.checkout, 'update-index', flag, 'tracked.txt')
+    (repo.checkout / 'tracked.txt').write_text('hidden unique owner work\n')
+    assert git(repo.checkout, 'status', '--porcelain') == ''
+    result = repo.run()
+    assert result['status'] == 'hold'
+    assert result['reason'].startswith('hidden_index_flags:')
+    assert repo.head() == repo.initial
+    assert (repo.checkout / 'tracked.txt').read_text() == 'hidden unique owner work\n'
+    assert git(repo.checkout, 'ls-files', '-v', 'tracked.txt')[0] in {'h', 'S'}
+
+
+def test_sparse_index_configuration_holds_without_clearing_owner_setting(repo: LocalRepository) -> None:
+    git(repo.checkout, 'config', 'index.sparse', 'true')
+    result = repo.run()
+    assert result['status'] == 'hold'
+    assert result['reason'] == 'sparse_checkout_requires_owned_full_base'
+    assert git(repo.checkout, 'config', '--bool', 'index.sparse') == 'true'
+
+
+def test_failed_merge_transport_reports_actual_persisted_head(repo: LocalRepository,
+                                                            monkeypatch: pytest.MonkeyPatch) -> None:
+    wanted = repo.publish()
+    original = fresh.Git.run
+    def fail_after_merge(self, *args, **kwargs):
+        result = original(self, *args, **kwargs)
+        if args[0] == 'merge':
+            raise fresh.FreshnessError('simulated_transport_loss_after_successful_ff')
+        return result
+    monkeypatch.setattr(fresh.Git, 'run', fail_after_merge)
+    report = repo.run()
+    assert report['status'] == 'hold'
+    assert report['after'] == wanted == repo.head()
+    assert report['before'] != report['after']
+    repo.assert_receipt(report)

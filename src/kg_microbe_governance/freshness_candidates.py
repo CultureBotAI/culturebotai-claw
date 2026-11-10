@@ -11,12 +11,20 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import subprocess
 from pathlib import Path
 from typing import Any
 
-from kg_microbe_fleet import load_fleet_manifest
+import yaml
+
+from kg_microbe_fleet import (
+    FleetManifest,
+    UniqueKeySafeLoader,
+    load_fleet_manifest,
+    parse_fleet_manifest,
+)
 from kg_microbe_workflows.freshness import (
     FreshnessError,
     Git,
@@ -33,6 +41,10 @@ SOURCE_PATHS = {
     'contract.yaml': 'src/kg_microbe_workflows/templates/repository-freshness-v1.yaml',
     'schema.yaml': 'src/kg_microbe_workflows/schema/repository-freshness-v1.yaml',
     'SKILL.md': 'src/kg_microbe_skills/canonical/repository-freshness.md',
+}
+FLEET_SOURCE_PATHS = {
+    'manifest': 'src/kg_microbe_fleet/fleet.yaml',
+    'loader': 'src/kg_microbe_fleet/__init__.py',
 }
 CANDIDATE_PATH = Path('workflow/candidates/repository-freshness-v1')
 PRESERVED_PATHS = (
@@ -71,15 +83,17 @@ def _path(value: Any) -> Path:
     return path
 
 
-def _settings(key: str, root: Path) -> RepositoryTarget:
+def _settings(key: str, root: Path, manifest: FleetManifest | None = None) -> RepositoryTarget:
     # No implicit .env/current-directory fallback; claw is explicit control plane.
     try:
         if key == 'claw':
             target = RepositoryTarget(key, root, 'CultureBotAI/culturebotai-claw')
         else:
+            if manifest is None:
+                raise CandidateError('explicit pinned manifest is required')
             settings = RepositorySettings.from_environment(
                 {'repositories': {key: {'path': str(root)}}}, environ={},
-                manifest=load_fleet_manifest())
+                manifest=manifest)
             target = settings.get_target(key)
         identity(Git(root, timeout=30), target)
         target.open()
@@ -88,30 +102,59 @@ def _settings(key: str, root: Path) -> RepositoryTarget:
         raise CandidateError('configured repository identity/path validation failed') from exc
 
 
+def _verified_source_blob(root: Path, commit: str, source: str) -> bytes:
+    entry = _git(root, 'ls-tree', commit, '--', source)
+    if not entry.startswith('100644 blob '):
+        raise CandidateError(f'source is not a regular canonical blob: {source}')
+    # Prove exact bytes, including comments and terminal newlines. The loader is
+    # data-bound as well; no code from the proposed source commit is executed.
+    packaged = Path(__file__).parents[1] / source.removeprefix('src/')
+    raw = packaged.read_bytes()
+    if len(raw) > 1048576:
+        raise CandidateError('canonical candidate payload exceeds bound')
+    if _git(root, 'rev-parse', '--show-object-format') != 'sha1':
+        raise CandidateError('canonical Git object format is unsupported')
+    object_id = hashlib.sha1(b'blob ' + str(len(raw)).encode() + b'\0' + raw).hexdigest()
+    if entry.split()[2] != object_id:
+        raise CandidateError('source payload differs from the running canonical package')
+    return raw
+
+
 def _source(root: Path, commit: str) -> dict[str, bytes]:
     _path(str(root))
     _settings('claw', root)
     _full_sha(commit)
     if _git(root, 'rev-parse', commit + '^{commit}') != commit:
         raise CandidateError('source commit identity differs')
-    blobs = {}
-    for destination, source in SOURCE_PATHS.items():
-        entry = _git(root, 'ls-tree', commit, '--', source)
-        if not entry.startswith('100644 blob '):
-            raise CandidateError(f'source is not a regular canonical blob: {source}')
-        # Prove the exact packaged bytes against Git's immutable object ID;
-        # do not trim newlines or execute any code from the candidate commit.
-        packaged = Path(__file__).parents[1] / source.removeprefix('src/')
-        raw = packaged.read_bytes()
-        if len(raw) > 262144:
-            raise CandidateError('canonical candidate payload exceeds bound')
-        if _git(root, 'rev-parse', '--show-object-format') != 'sha1':
-            raise CandidateError('canonical Git object format is unsupported')
-        object_id = hashlib.sha1(b'blob ' + str(len(raw)).encode() + b'\0' + raw).hexdigest()
-        if entry.split()[2] != object_id:
-            raise CandidateError('source payload differs from the running canonical package')
-        blobs[destination] = raw
-    return blobs
+    return {destination: _verified_source_blob(root, commit, source)
+            for destination, source in SOURCE_PATHS.items()}
+
+
+def _pinned_fleet(root: Path, commit: str) -> tuple[FleetManifest, dict[str, str]]:
+    if 'KG_MICROBE_FLEET_MANIFEST' in os.environ:
+        raise CandidateError('candidate preparation forbids ambient manifest overrides')
+    _path(str(root))
+    _settings('claw', root)
+    _full_sha(commit)
+    if _git(root, 'rev-parse', commit + '^{commit}') != commit:
+        raise CandidateError('source commit identity differs')
+    manifest_path = Path(__file__).parents[1] / FLEET_SOURCE_PATHS['manifest'].removeprefix('src/')
+    fleet = load_fleet_manifest(manifest_path)
+    manifest_raw = _verified_source_blob(root, commit, FLEET_SOURCE_PATHS['manifest'])
+    loader_raw = _verified_source_blob(root, commit, FLEET_SOURCE_PATHS['loader'])
+    # The public loader caches by path. Prove its returned model still matches
+    # the exact bytes bound above, without mutating any shared loader cache.
+    fresh = parse_fleet_manifest(yaml.load(manifest_raw, Loader=UniqueKeySafeLoader), manifest_path)
+    if (fleet.source != manifest_path or fleet.mechs != fresh.mechs
+            or fleet.capability_catalogue != fresh.capability_catalogue
+            or fleet.vendored_governance != fresh.vendored_governance):
+        raise CandidateError('loaded manifest differs from the exact pinned bytes')
+    return fleet, {
+        'manifest_path': FLEET_SOURCE_PATHS['manifest'],
+        'manifest_sha256': _sha(manifest_raw),
+        'loader_path': FLEET_SOURCE_PATHS['loader'],
+        'loader_sha256': _sha(loader_raw),
+    }
 
 
 def _preserved(root: Path) -> dict[str, str | None]:
@@ -124,12 +167,12 @@ def _preserved(root: Path) -> dict[str, str | None]:
     return result
 
 
-def _verify(key: str, record: dict[str, Any], owner_id: str) -> tuple[Path, dict[str, Any]]:
+def _verify(key: str, record: dict[str, Any], owner_id: str, manifest: FleetManifest) -> tuple[Path, dict[str, Any]]:
     fields = {'root', 'expected_head', 'expected_branch', 'default_branch', 'ownership'}
     if not isinstance(record, dict) or set(record) != fields:
         raise CandidateError('root map row has unknown or missing fields')
     root = _path(record['root'])
-    _settings(key, root)
+    _settings(key, root, manifest)
     head = _full_sha(record['expected_head'])
     branch = record['expected_branch']
     if not isinstance(branch, str) or not branch or branch == record['default_branch'] or branch in {'main', 'master'}:
@@ -170,14 +213,16 @@ def _verify(key: str, record: dict[str, Any], owner_id: str) -> tuple[Path, dict
                   'owner_holders': owners['cwd_holders']}
 
 
-def _proposal(key: str, source_commit: str, blobs: dict[str, bytes], before: dict[str, Any]) -> dict[str, Any]:
+def _proposal(key: str, source_commit: str, blobs: dict[str, bytes], before: dict[str, Any],
+              fleet: FleetManifest, provenance: dict[str, str]) -> dict[str, Any]:
     return {
         'schema_version': '1.0.0', 'authority': 'proposal_only',
         'state': 'blocked_on_canonical_release', 'installed': False, 'adopted': False,
-        'repository_key': key, 'github_repository': repository_identity(key),
+        'repository_key': key, 'github_repository': repository_identity(key, fleet),
         'canonical_source': {'repository': 'CultureBotAI/culturebotai-claw',
                              'reviewed_source_commit': source_commit, 'released': False,
                              'files': {SOURCE_PATHS[p]: _sha(raw) for p, raw in sorted(blobs.items())}},
+        'fleet_provenance': provenance,
         'observed_base': {k: v for k, v in before.items() if k != 'owner_holders'},
         'activation_requirements': [
             'canonical merge and protected release proof', 'consumer review and merge',
@@ -200,7 +245,7 @@ def prepare_batch(
     declaration, not a scan for arbitrary OS processes. Never manufacture it
     for a live or other-owned checkout. Lock leases serialize cooperating edits.
     """
-    fleet = load_fleet_manifest()
+    fleet, provenance = _pinned_fleet(Path(source_root), source_commit)
     all_keys = [*fleet.keys, 'claw']
     selected = all_keys if keys is None else keys
     if not selected or len(set(selected)) != len(selected) or set(selected) - set(all_keys):
@@ -214,20 +259,20 @@ def prepare_batch(
     plans = []
     for key in selected:
         with manager.lock(key, 'prepare_freshness_candidate'):
-            root, before = _verify(key, root_map[key], owner_id)
+            root, before = _verify(key, root_map[key], owner_id, fleet)
             desired = dict(blobs)
             label = 'CLAW' if key == 'claw' else fleet.get(key).display_name
             desired['SKILL.md'] = (desired['SKILL.md']
                                    .replace(b'{{ display_name }}', label.encode())
-                                   .replace(b'{{ github }}', repository_identity(key).encode()))
-            desired['proposal.json'] = (json.dumps(_proposal(key, source_commit, blobs, before),
+                                   .replace(b'{{ github }}', repository_identity(key, fleet).encode()))
+            desired['proposal.json'] = (json.dumps(_proposal(key, source_commit, blobs, before, fleet, provenance),
                                                   indent=2, sort_keys=True) + '\n').encode()
             plans.append((key, root, before, desired))
     results: list[dict[str, Any]] = []
     for key, root, before, desired in plans:
         try:
             with manager.lock(key, 'prepare_freshness_candidate'):
-                if _verify(key, root_map[key], owner_id)[1] != before:
+                if _verify(key, root_map[key], owner_id, fleet)[1] != before:
                     raise CandidateError('target changed after batch preflight')
                 def validate(path: Path, content: str) -> None:
                     relative = path.relative_to(root / CANDIDATE_PATH).as_posix()
@@ -245,7 +290,7 @@ def prepare_batch(
                     transaction.stage(CANDIDATE_PATH / path, raw.decode())
                 transaction.commit(apply=False)
                 if apply:
-                    if _verify(key, root_map[key], owner_id)[1] != before:
+                    if _verify(key, root_map[key], owner_id, fleet)[1] != before:
                         raise CandidateError('target changed immediately before mutation')
                     transaction.commit(apply=True)
                     if _preserved(root) != before['preserved'] or _git(root, 'rev-parse', 'HEAD') != before['head']:
@@ -253,7 +298,7 @@ def prepare_batch(
                     for path, raw in desired.items():
                         if (root / CANDIDATE_PATH / path).read_bytes() != raw:
                             raise CandidateError('candidate readback differs')
-                results.append({'repository_key': key, 'github_repository': repository_identity(key),
+                results.append({'repository_key': key, 'github_repository': repository_identity(key, fleet),
                                 'status': 'prepared' if apply else 'would_prepare',
                                 'head': before['head'], 'candidate_path': str(CANDIDATE_PATH),
                                 'files': {p: _sha(b) for p, b in sorted(desired.items())},
@@ -261,7 +306,8 @@ def prepare_batch(
         except Exception as exc:
             raise CandidateError(f'{key}: {exc}; prior results={json.dumps(results)}') from exc
     return {'schema_version': '1.0.0', 'canonical_source_commit': source_commit,
-            'fleet_manifest_sha256': _sha(Path(__file__).parents[1].joinpath('kg_microbe_fleet/fleet.yaml').read_bytes()),
+            'fleet_manifest_sha256': provenance['manifest_sha256'],
+            'fleet_loader_sha256': provenance['loader_sha256'], 'fleet_provenance': provenance,
             'canonical_denominator': len(all_keys), 'selected': len(selected),
             'apply': apply, 'results': results}
 

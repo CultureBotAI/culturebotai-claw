@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from kg_microbe_fleet import load_fleet_manifest
+from kg_microbe_fleet import FleetManifest, load_fleet_manifest
 
 from . import WorkflowError, _validator, load_document
 
@@ -50,11 +50,15 @@ def _text(value: Any) -> str:
     return value
 
 
-def repository_identity(key: str) -> str:
+def repository_identity(key: str, manifest: FleetManifest | None = None) -> str:
+    if manifest is None:
+        if 'KG_MICROBE_FLEET_MANIFEST' in os.environ:
+            raise WorkflowError('freshness identity forbids ambient manifest overrides')
+        manifest = load_fleet_manifest(Path(__file__).parents[1] / 'kg_microbe_fleet/fleet.yaml')
     if key == 'claw':
         return 'CultureBotAI/culturebotai-claw'
     try:
-        return load_fleet_manifest().get(key).github
+        return manifest.get(key).github
     except (KeyError, ValueError) as exc:
         raise WorkflowError('freshness repository is outside the canonical fleet') from exc
 

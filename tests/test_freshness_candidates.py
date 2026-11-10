@@ -1,4 +1,5 @@
 """Isolated consumer proposals are inert, exact-source and batch-preflighted."""
+import hashlib
 import json
 import subprocess
 from pathlib import Path
@@ -34,7 +35,7 @@ def repo(path, identity, branch='candidate/freshness'):
 
 def setup(tmp_path):
     source = repo(tmp_path / 'claw', 'CultureBotAI/culturebotai-claw')
-    for relative in candidates.SOURCE_PATHS.values():
+    for relative in (*candidates.SOURCE_PATHS.values(), *candidates.FLEET_SOURCE_PATHS.values()):
         package = Path(candidates.__file__).parents[1] / relative.removeprefix('src/')
         target = source / relative
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -193,3 +194,59 @@ def test_all_targets_preflight_before_first_write(tmp_path):
         candidates.prepare_batch(**args, apply=True)
     assert not (target / candidates.CANDIDATE_PATH).exists()
     assert (second / 'unique-evidence.txt').read_text() == 'keep'
+
+
+def test_comment_only_manifest_override_is_refused(tmp_path, monkeypatch):
+    target, args = setup(tmp_path)
+    packaged = Path(candidates.__file__).parents[1] / 'kg_microbe_fleet/fleet.yaml'
+    alternate = tmp_path / 'alternate-fleet.yaml'
+    alternate.write_bytes(packaged.read_bytes() + b'\n# same identities, different provenance\n')
+    assert candidates.load_fleet_manifest(alternate).keys == candidates.load_fleet_manifest(packaged).keys
+    assert hashlib.sha256(alternate.read_bytes()).hexdigest() != hashlib.sha256(packaged.read_bytes()).hexdigest()
+    monkeypatch.setenv('KG_MICROBE_FLEET_MANIFEST', str(alternate))
+    with pytest.raises(candidates.CandidateError, match='ambient manifest overrides'):
+        candidates.prepare_batch(**args, apply=True)
+    assert not (target / candidates.CANDIDATE_PATH).exists()
+
+
+def test_manifest_and_loader_are_exact_source_bound_and_reported(tmp_path):
+    target, args = setup(tmp_path)
+    result = candidates.prepare_batch(**args, apply=True)
+    provenance = result['fleet_provenance']
+    for name, relative in candidates.FLEET_SOURCE_PATHS.items():
+        source_raw = subprocess.run(['git', '-C', str(args['source_root']), 'show',
+                                     args['source_commit'] + ':' + relative],
+                                    capture_output=True, check=True).stdout
+        assert provenance[name + '_sha256'] == hashlib.sha256(source_raw).hexdigest()
+        assert provenance[name + '_path'] == relative
+    assert result['fleet_manifest_sha256'] == provenance['manifest_sha256']
+    assert result['fleet_loader_sha256'] == provenance['loader_sha256']
+    proposal = json.loads((target / candidates.CANDIDATE_PATH / 'proposal.json').read_text())
+    assert proposal['fleet_provenance'] == provenance
+
+
+@pytest.mark.parametrize('source_kind', ['manifest', 'loader'])
+def test_manifest_or_loader_source_drift_refuses(tmp_path, source_kind):
+    target, args = setup(tmp_path)
+    source = args['source_root']
+    path = source / candidates.FLEET_SOURCE_PATHS[source_kind]
+    path.write_bytes(path.read_bytes() + b'\n# same semantics, unreviewed bytes\n')
+    git(source, 'add', '.')
+    git(source, 'commit', '-m', 'different source bytes')
+    args['source_commit'] = git(source, 'rev-parse', 'HEAD')
+    with pytest.raises(candidates.CandidateError, match='source payload'):
+        candidates.prepare_batch(**args, apply=True)
+    assert not (target / candidates.CANDIDATE_PATH).exists()
+
+
+def test_same_explicit_manifest_reaches_every_consumer(tmp_path, monkeypatch):
+    _, args = setup(tmp_path)
+    seen = []
+    original = candidates.repository_identity
+    def identity(key, manifest=None):
+        assert manifest is not None
+        seen.append(manifest)
+        return original(key, manifest)
+    monkeypatch.setattr(candidates, 'repository_identity', identity)
+    candidates.prepare_batch(**args)
+    assert seen and all(manifest is seen[0] for manifest in seen)

@@ -41,7 +41,7 @@ require explicit authorization.
 ## 3. Commit, push, and review
 
 - Commit cause/issue. Push each branch the same day, even without a PR; verify
-  its remote head. Unpublished commits block closure. Use explicit refspecs.
+  its remote head. Unpublished commits block goal closure. Use explicit refspecs.
 - Perform a separate read-only adversarial review. Check description versus
   diff, false factual claims, edge cases, whether the regression test kills the
   old behavior, CI path filters/skips, security-sensitive workflow changes,
