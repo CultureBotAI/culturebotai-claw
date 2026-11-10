@@ -12,6 +12,8 @@ for provenance; they do not describe the supported interface.
 
 Other maintained references:
 
+- [`proposals/MECH_EMBEDDING_MAP_CONTRACT.md`](proposals/MECH_EMBEDDING_MAP_CONTRACT.md) —
+  shared pinned BGE text maps, retained specialty views, cache provenance and PaCMAP rollout.
 - [`guides/EMBEDDING_SETS.md`](guides/EMBEDDING_SETS.md) — PaCMAP projections,
   applicable text, chemical, protein, graph and future sets, and the fleet adoption plan.
 - [`guides/PYTHON_RUNTIME.md`](guides/PYTHON_RUNTIME.md) — the shared Python 3.13
