@@ -752,3 +752,23 @@ def test_splicing_updates_the_regions_and_leaves_everything_else(tmp_path):
     assert "a glob over it\nmatches nothing in a fresh checkout (#686)" in out
     assert "## What it does" in out
     assert "{{" not in out
+
+
+def test_metpo_proposal_is_canonical_and_covers_proposing_mechs():
+    """#385, #386: `metpo-proposal` is declared canonical in claw, targets
+    Mechs with `metpo_proposal` enabled (`traitmech`, `communitymech`), and
+    governs the five-file cohort contract, ID coordination, and updating rules."""
+    canonical = load_canonical()
+    assert "metpo-proposal" in canonical
+    skill = canonical["metpo-proposal"]
+    assert skill.capability == "metpo_proposal"
+    assert applicable_mechs(skill) == ["communitymech", "traitmech"]
+    text = canonical_text("metpo-proposal")
+    assert set(canonical_regions(text)) == {
+        "contract",
+        "id-coordination",
+        "updating-proposals",
+    }
+    assert "https://w3id.org/metpo/" in text
+    assert "<claw-root>/scripts/fleet_metpo_aggregate.py" in text
+
