@@ -883,3 +883,41 @@ def test_preflight_unchanged_generation_can_be_staged(deployable_bundle, tmp_pat
                                   expected_bundle=approved.name)
     assert manifest == pipeline.validate_bundle(approved, input_path=source)
     assert manifest == pipeline.validate_bundle(destination, input_path=source)
+
+
+@pytest.mark.parametrize(
+    ("resource_path", "expected_sha256"),
+    [
+        (
+            "artifacts/scripts/embedding_pipeline.py",
+            "9ef7708303150938c8f2c2a81885d9184ed0a7af0a78d9acc88c01224339b5fe",
+        ),
+        (
+            "artifacts/scripts/graph_embedding_receipts.py",
+            "a05bd278bc09c3a9b4948da4cb27dd42105f8bca543d8b920d391142b5da8b37",
+        ),
+        (
+            "artifacts/embedding-runtime/pyproject.toml",
+            "175bc6d551c039f01c0f7348ad6417a89a5f948377083355f07a73673a53c8b1",
+        ),
+        (
+            "artifacts/embedding-runtime/uv.lock",
+            "c11077011f263fe174de5ae7a2cf176cf3fc6028e22c5c03847d4f9ae803edc5",
+        ),
+        (
+            "artifacts/embedding-runtime/README.md",
+            "4b833edb2ffb81cb01c5bcac4c7940bb798976543a2059a914c8dfa4ed0202a6",
+        ),
+    ],
+)
+def test_staged_canonical_embedding_artifacts_match_reviewed_digests(
+    resource_path: str, expected_sha256: str
+) -> None:
+    from importlib.resources import files
+
+    resource = files("kg_microbe_governance")
+    for part in resource_path.split("/"):
+        resource = resource.joinpath(part)
+    payload = resource.read_bytes()
+    assert hashlib.sha256(payload).hexdigest() == expected_sha256
+

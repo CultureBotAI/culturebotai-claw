@@ -250,3 +250,28 @@ def test_receipt_loader_requires_a_json_object(tmp_path, payload):
     path.write_text(payload)
     with pytest.raises(ValueError, match="JSON object"):
         receipts.load_receipt(path)
+
+
+@pytest.mark.parametrize(
+    ("section", "field", "bad_value"),
+    [
+        ("source", "bytes", True),
+        ("corpus", "count", True),
+        ("matrix", "shape", [True, 3]),
+        ("coverage", "projected", True),
+        ("coverage", "eligible", True),
+    ],
+)
+def test_receipt_rejects_boolean_integer_fields(tmp_path, section, field, bad_value):
+    value = copy.deepcopy(fixture_receipt(tmp_path))
+    value[section][field] = bad_value
+    with pytest.raises(ValueError):
+        receipts._validate_core(value)
+
+
+def test_receipt_rejects_boolean_effective_pair_counts(tmp_path):
+    value = copy.deepcopy(fixture_receipt(tmp_path))
+    value["projection"]["effective_pairs"]["neighbors"] = True
+    with pytest.raises(ValueError, match="effective PaCMAP"):
+        receipts._validate_core(value)
+

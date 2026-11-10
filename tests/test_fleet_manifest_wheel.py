@@ -301,7 +301,7 @@ assert review_entry.load()(["validate", sys.argv[3]]) == 0
 assert review_entry.load()(["render", "--content", sys.argv[3]]) == 0
 assert default_config_path().is_relative_to(unpacked)
 governance = load_governance_manifest(fleet_manifest=manifest)
-assert len(governance.artifacts) == 31
+assert len(governance.artifacts) == 26
 # Exercise admitted sync through installed resources, with only immutable
 # fixture DATA supplied from outside the unpacked wheel. No repository imports
 # or network calls can satisfy this installed-package proof.
