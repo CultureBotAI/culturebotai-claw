@@ -4,13 +4,40 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import importlib
 import io
 import json
 import re
 import subprocess
 import sys
+import threading
+from contextlib import contextmanager
 from pathlib import Path
 from types import ModuleType
+
+
+def load_owner_record(content):
+    """Parse captured stable-owner bytes without hiding duplicate keys.
+
+    This matches the native MIM stable-ID validator's unique-key policy at
+    every mapping depth. Legacy parsing is explicitly separate.
+    """
+    import yaml
+
+    class UniqueKeyLoader(yaml.SafeLoader):
+        pass
+
+    def mapping(loader, node, deep=False):
+        result = {}
+        for key_node, value_node in node.value:
+            key = loader.construct_object(key_node, deep=deep)
+            if key in result:
+                raise ValueError(f"Duplicate YAML key: {key}")
+            result[key] = loader.construct_object(value_node, deep=deep)
+        return result
+
+    UniqueKeyLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, mapping)
+    return yaml.load(content, Loader=UniqueKeyLoader)
 
 
 def identity_snapshot(root, records, mint, lifecycle, source, source_path, source_sha256):
@@ -65,6 +92,8 @@ def compatibility_registry_objects(records, subjects, index, canonical):
     )), delimiter="\t")
     if not rows.fieldnames or not {"subject_id", "predicate_id", "object_id"} <= set(rows.fieldnames):
         raise ValueError("Stable mode requires a complete canonical compatibility table")
+    if len(rows.fieldnames) != len(set(rows.fieldnames)):
+        raise ValueError("Duplicate canonical compatibility column name")
     for row in rows:
         if None in row or None in row.values():
             raise ValueError("Malformed canonical compatibility row")
@@ -120,6 +149,47 @@ def native_source_paths(root):
     }))
 
 
+@contextmanager
+def _pure_linkml_loader():
+    """Scope native schema loading away from PyYAML C import-state damage.
+
+    Use the existing shared LinkML loader lock convention. Do not replace
+    PyYAML globally or suppress any native parser/schema validation failure.
+    """
+    import yaml
+
+    class PureLinkMLLoader(yaml.SafeLoader):
+        yaml_path_resolvers = {}
+
+        def construct_mapping(self, node, deep=False):
+            self.flatten_mapping(node)
+            result = {}
+            for key_node, value_node in node.value:
+                key = self.construct_object(key_node, deep=deep)
+                try:
+                    duplicate = key in result
+                except TypeError as exc:
+                    raise yaml.constructor.ConstructorError(
+                        "while constructing a mapping", node.start_mark,
+                        "found an unhashable key", key_node.start_mark) from exc
+                if duplicate:
+                    raise yaml.constructor.ConstructorError(
+                        "while constructing a mapping", node.start_mark,
+                        f"found duplicate key {key!r}", key_node.start_mark)
+                result[key] = self.construct_object(value_node, deep=deep)
+            return result
+
+    loader_module = importlib.import_module("linkml_runtime.loaders.yaml_loader")
+    lock = vars(loader_module).setdefault("_claw_linkml_loader_lock", threading.RLock())
+    with lock:
+        original = loader_module.DupCheckYamlLoader
+        loader_module.DupCheckYamlLoader = PureLinkMLLoader
+        try:
+            yield
+        finally:
+            loader_module.DupCheckYamlLoader = original
+
+
 def validate_empty_candidate(path, columns, mim_prefix):
     """Validate a genuine zero-row table without accepting parser row loss.
 
@@ -145,12 +215,13 @@ def validate_empty_candidate(path, columns, mim_prefix):
             or not isinstance(metadata.get("curie_map"), dict)
             or metadata["curie_map"].get("MIM") != mim_prefix):
         raise ValueError("Empty candidate lacks explicit stable metadata")
-    native = parse_sssom_table(path, strict=True)
-    if len(native.df) or to_mapping_set_document(native).mapping_set.mappings:
-        raise ValueError("Empty candidate parser produced a mapping")
-    validate(native, [SchemaValidationType.JsonSchema,
-                      SchemaValidationType.PrefixMapCompleteness,
-                      SchemaValidationType.StrictCurieFormat], fail_on_error=True)
+    with _pure_linkml_loader():
+        native = parse_sssom_table(path, strict=True)
+        if len(native.df) or to_mapping_set_document(native).mapping_set.mappings:
+            raise ValueError("Empty candidate parser produced a mapping")
+        validate(native, [SchemaValidationType.JsonSchema,
+                          SchemaValidationType.PrefixMapCompleteness,
+                          SchemaValidationType.StrictCurieFormat], fail_on_error=True)
 
 
 def validate_source_bindings(root, bundle, review, manifest, producer_sha256, snapshot, stage):

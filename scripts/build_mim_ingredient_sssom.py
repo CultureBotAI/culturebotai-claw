@@ -762,7 +762,8 @@ def _join_sources(mim_ev: list[str], last_curator: str, kgm_src: str) -> str:
     return "|".join(parts)
 
 
-def _read_mapped_records(directory: Path, snapshot: dict[Path, bytes | None] | None = None) -> dict[Path, dict]:
+def _read_mapped_records(directory: Path, snapshot: dict[Path, bytes | None] | None = None,
+                         *, strict_identity: bool = False) -> dict[Path, dict]:
     """Parse the complete direct mapped-directory population, including ignored files."""
     paths = sorted(directory.glob("*.yaml"))
     contents = capture_beforeimages(paths) if snapshot is None else snapshot
@@ -772,7 +773,8 @@ def _read_mapped_records(directory: Path, snapshot: dict[Path, bytes | None] | N
         content = contents[checked_path(path)]
         if content is None:
             raise ValueError(f"Mapped record disappeared: {path}")
-        data = yaml.safe_load(content)
+        data = (_STABLE_PRODUCER.load_owner_record(content) if strict_identity
+                else yaml.safe_load(content))
         if not isinstance(data, dict):
             raise ValueError(f"Mapped record is not a mapping: {path}")
         subject = _mim_curie(path.name)
@@ -1449,7 +1451,7 @@ def main():
     if working_copy_input and snapshot[args.output] != before[args.output]:
         raise ValueError("Working-copy stamp beforeimage changed during capture")
     records = {p: record for directory in directories
-               for p, record in _read_mapped_records(directory, snapshot).items()}
+               for p, record in _read_mapped_records(directory, snapshot, strict_identity=stable).items()}
     args.stable_subjects, args.registry_objects, args.mim_prefix = {}, {}, None
     if stable:
         if any(snapshot[checked_path(p)] is None for p in identity_inputs):
