@@ -154,6 +154,16 @@ skills:
       Combines CBORG MCP servers (valency, tavily, context7), anonymous public
       literature APIs, local Zotero PDFs, and LBNL-licensed databases and TDM
       APIs for evidence-backed curation across manifest-resolved Mechs.
+  lbnl-mech-record-review:
+    scope: fleet
+    reason: >-
+      Performs content-triaged structured record reviews across manifest-resolved
+      Mechs that enable record_review, routing citations by DOI prefix and
+      journal family to LBNL publisher TDM APIs or open ACS Supporting
+      Information and routing chemical, crystallographic, and biological claims
+      to CAS Common Chemistry (with CC BY 4.0 ChEBI crosswalk and polysalt
+      SMILES stoichiometry guards), SciFinder-n, Reaxys, CHEMnetBASE, WebCSD,
+      ICSD, BioCyc, and iModulonDB.
   map-ingredients:
     scope: domain
     reason: Runs the unified ingredient-mapping pipeline over MIM.
