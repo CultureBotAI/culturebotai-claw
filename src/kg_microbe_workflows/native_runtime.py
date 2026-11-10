@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import stat
 import subprocess
 import uuid
@@ -148,6 +149,66 @@ def verify_future_release_tag(declaration: dict, published: dict, git: Git) -> N
         raise NativeFreshnessError("native release tag is not a valid Git reference") from exc
 
 
+
+def verify_package_filesystem(root: Path, prefixes: list[str], tracked: set[str]) -> None:
+    """Inspect ignored descendants too; only unused conventional caches may differ.
+
+    Unknown files are preserved and hold execution, including non-code resources:
+    reviewed Python may consume those resources. Evidence outside these executable
+    package roots is unaffected. Fresh pycache namespaces make the narrowly admitted
+    regular cache files unusable by the runner.
+    """
+    directories = set(prefixes)
+    for name in tracked:
+        parent = Path(name).parent
+        while str(parent) not in directories:
+            require(parent != Path("."), "native package source is outside package roots")
+            directories.add(str(parent))
+            parent = parent.parent
+    count = 0
+
+    def entries(relative: str):
+        nonlocal count
+        location = root / relative
+        require(
+            stat.S_ISDIR(location.lstat().st_mode),
+            "native runtime package directory is not a regular directory",
+        )
+        with os.scandir(location) as items:
+            for item in items:
+                count += 1
+                require(count <= 100_000, "native runtime package inventory exceeds bound")
+                yield item, str(Path(relative) / item.name)
+
+    try:
+        pending = list(prefixes)
+        while pending:
+            relative = pending.pop()
+            for item, name in entries(relative):
+                mode = item.stat(follow_symlinks=False).st_mode
+                if name in tracked:
+                    require(stat.S_ISREG(mode), "native runtime package source is not regular")
+                elif name in directories:
+                    require(stat.S_ISDIR(mode), "native runtime package directory is not regular")
+                    pending.append(name)
+                elif item.name == "__pycache__" and stat.S_ISDIR(mode):
+                    for cached, cached_name in entries(name):
+                        match = re.fullmatch(
+                            r"([^.]+)\.([A-Za-z0-9_-]+)(?:\.opt-[12])?\.pyc", cached.name
+                        )
+                        require(
+                            match is not None
+                            and str(Path(relative) / (match.group(1) + ".py")) in tracked
+                            and stat.S_ISREG(cached.stat(follow_symlinks=False).st_mode),
+                            "native runtime has an unreviewed cache descendant: " + cached_name,
+                        )
+                else:
+                    raise NativeFreshnessError(
+                        "native runtime has an unreviewed package descendant: " + name
+                    )
+    except OSError as exc:
+        raise NativeFreshnessError("native runtime package inventory is unreadable") from exc
+
 def verify_runtime(runtime: Any, *, expected_release: str) -> Path:
     """Bind actual Python import resolution to the exact approved release tree.
 
@@ -248,22 +309,9 @@ def verify_runtime(runtime: Any, *, expected_release: str) -> Path:
     require(
         not cache_directory.is_relative_to(root), "runtime caches must stay outside released source"
     )
-    probe = probe_python(executable, cache_directory)
-    require(
-        probe["prefix"] == runtime["venv_prefix"] and probe["executable"] == str(executable),
-        "native runner lost declared virtualenv context",
-    )
-    shape(probe["packages"], set(PACKAGES), "native runner package set differs")
-    prefixes = []
-    for package in PACKAGES:
-        package_root = root / package if package == "plugins" else root / "src" / package
-        observed = probe["packages"][package]
-        require(
-            observed
-            == {"origin": str(package_root / "__init__.py"), "locations": [str(package_root)]},
-            "native runner resolves a package outside the reviewed release",
-        )
-        prefixes.append(str(package_root.relative_to(root)))
+    prefixes = [
+        package if package == "plugins" else "src/" + package for package in PACKAGES
+    ]
     listing = git.run("ls-tree", "-r", "-z", expected_release, "--", *prefixes)
     seen = set()
     total = 0
@@ -283,6 +331,21 @@ def verify_runtime(runtime: Any, *, expected_release: str) -> Path:
         require(actual == oid, "native runtime package bytes differ from released tree")
         seen.add(name)
     require(set(REQUIRED) <= seen, "release lacks the native-compatible shared entrypoints")
+    verify_package_filesystem(root, prefixes, seen)
+    probe = probe_python(executable, cache_directory)
+    require(
+        probe["prefix"] == runtime["venv_prefix"] and probe["executable"] == str(executable),
+        "native runner lost declared virtualenv context",
+    )
+    shape(probe["packages"], set(PACKAGES), "native runner package set differs")
+    for package, prefix in zip(PACKAGES, prefixes, strict=True):
+        package_root = root / prefix
+        require(
+            probe["packages"][package]
+            == {"origin": str(package_root / "__init__.py"), "locations": [str(package_root)]},
+            "native runner resolves a package outside the reviewed release",
+        )
+    verify_package_filesystem(root, prefixes, seen)
     # Retain venv path, never return its resolved base interpreter.
     require(
         _python(runtime) == executable and git.run("rev-parse", "HEAD") == expected_release,

@@ -40,6 +40,9 @@ def installed(tmp_path):
     (source / "src/kg_microbe_workflows/freshness_cli.py").write_text(
         'import json\nprint(json.dumps({"marker":"reviewed-installed-runner"}))\n'
     )
+    (source / "src/kg_microbe_fleet/retained.py").write_text(
+        'MARKER = "reviewed-transitive-source"\n'
+    )
     git(source, "add", "--all")
     git(source, "commit", "-m", "Offline native runner fixture")
     commit = git(source, "rev-parse", "HEAD")
@@ -264,3 +267,71 @@ def test_future_release_requires_its_own_nonempty_valid_tag(installed, tmp_path,
     }
     with pytest.raises(NativeFreshnessError):
         runtime.verify_runtime(changed, expected_release=commit)
+
+
+@pytest.mark.parametrize("module", ["kg_microbe_workflows.freshness_cli", "kg_microbe_fleet.retained"])
+def test_ignored_package_cannot_shadow_reviewed_entrypoint_or_dependency(installed, module):
+    record, source, commit, purelib = installed
+    executable = runtime.verify_runtime(record, expected_release=commit)
+    relative = "src/" + module.replace(".", "/")
+    reviewed = source / (relative + ".py")
+    before = reviewed.read_bytes()
+    shadow = source / relative
+    shadow.mkdir()
+    (shadow / "__init__.py").write_text('MARKER = "ignored-unreviewed-package"\n')
+    (source / ".git/info/exclude").write_text(relative + "/\n")
+    assert git(source, "status", "--porcelain=v1", "--untracked-files=all") == ""
+    assert reviewed.read_bytes() == before
+    # This real installed import demonstrates why tracked hashes/top-level origins
+    # alone are insufficient, even with the existing fresh cache namespace.
+    command_text = (
+        f"import importlib,json; print(json.dumps({{\"marker\": "
+        f"importlib.import_module({module!r}).MARKER}}))"
+    )
+    with runtime.uncached_command(
+        executable, ["-c", command_text], Path(record["cache_directory"])
+    ) as command:
+        assert run_cli(command, timeout=15) == {"marker": "ignored-unreviewed-package"}
+    with pytest.raises(NativeFreshnessError, match="unreviewed package descendant"):
+        runtime.verify_runtime(record, expected_release=commit)
+    assert reviewed.read_bytes() == before and (shadow / "__init__.py").is_file()
+
+
+@pytest.mark.parametrize("name", ["extra.py", "extra.so", "extra.pyd", "notes.txt"])
+def test_unknown_ignored_package_file_holds_and_is_preserved(installed, name):
+    record, source, commit, purelib = installed
+    relative = "src/kg_microbe_fleet/" + name
+    unknown = source / relative
+    unknown.write_bytes(b"unreviewed artifact")
+    (source / ".git/info/exclude").write_text(relative + "\n")
+    assert git(source, "status", "--porcelain=v1", "--untracked-files=all") == ""
+    with pytest.raises(NativeFreshnessError, match="unreviewed package descendant"):
+        runtime.verify_runtime(record, expected_release=commit)
+    assert unknown.read_bytes() == b"unreviewed artifact"
+
+
+@pytest.mark.parametrize("name", ["__init__.py", "orphan.pyc", "retained.invalid.pyc"])
+def test_unreviewed_cache_descendants_are_not_a_package_bypass(installed, name):
+    record, source, commit, purelib = installed
+    cache = source / "src/kg_microbe_fleet/__pycache__"
+    cache.mkdir()
+    item = cache / name
+    if name == "retained.invalid.pyc":
+        item.symlink_to(source / "src/kg_microbe_fleet/retained.py")
+    else:
+        item.write_bytes(b"unreviewed executable descendant")
+    assert git(source, "status", "--porcelain=v1", "--untracked-files=all") == ""
+    with pytest.raises(NativeFreshnessError, match="unreviewed cache descendant"):
+        runtime.verify_runtime(record, expected_release=commit)
+    assert item.exists()
+
+
+def test_ignored_evidence_outside_executable_packages_is_preserved(installed):
+    record, source, commit, purelib = installed
+    evidence = source / "operator-evidence"
+    evidence.mkdir()
+    item = evidence / "notes.txt"
+    item.write_text("unique retained evidence")
+    (source / ".git/info/exclude").write_text("operator-evidence/\n")
+    assert runtime.verify_runtime(record, expected_release=commit) == Path(record["python"])
+    assert item.read_text() == "unique retained evidence"

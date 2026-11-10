@@ -121,3 +121,15 @@ native acceptance separately from transport and receipt success. Any uncovered
 route that crosses a held boundary fails the canary and blocks rollout. The
 coordinator owns this canary; no live client, hook or provider is invoked by the
 offline tests or this proposal.
+
+
+Runtime package integrity includes ignored descendants. Before the package-origin
+probe and again afterward, the adapter inventories each executable package root
+against the released tracked tree. Unknown packages, source files, extensions,
+links and resources hold without deletion. Only regular conventional
+`__pycache__` files corresponding to reviewed Python source are admitted; each
+runner invocation uses a fresh cache namespace, so those files cannot supply
+executed bytecode. Unique evidence outside these executable package roots is
+preserved and does not cause a hold. Keep operator evidence outside the released
+package directories. This check addresses issue #1167; clean Git status alone is
+not execution-source provenance.
