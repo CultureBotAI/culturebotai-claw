@@ -385,6 +385,34 @@ def test_category_output_retains_sample_scope_and_boundaries():
     assert "Sampled" in text and "uninspected remainder" in text
 
 
+def test_curate_yaml_record_evidence_standard_includes_shared_fleet_rules():
+    """#352: `curate-yaml-record`'s `evidence-standard` region must carry the
+    three rules shared across the deployed Mech copies (snippet/abstract
+    consistency, no self-citation, and in-vitro/assay-context boundary)."""
+    regions = canonical_regions(canonical_text("curate-yaml-record"))
+    evidence = regions["evidence-standard"]
+    assert "Snippet and source must agree" in evidence
+    assert "No self-citation" in evidence
+    assert "In-vitro and assay-context boundary" in evidence
+
+
+def test_mech_standard_and_onboarding_describe_agents_md_convention():
+    """#676: `MECH_STANDARD`, `onboard-mech`, and review templates name
+    `AGENTS.md` as the primary Mech instruction file with `CLAUDE.md` symlink
+    and the `O_NOFOLLOW` skill directory rule."""
+    standard = (ROOT / "docs" / "guides" / "MECH_STANDARD.md").read_text(
+        encoding="utf-8"
+    )
+    onboard = (ROOT / ".claude" / "skills" / "onboard-mech" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    assert "AGENTS.md" in standard and "O_NOFOLLOW" in standard
+    assert "AGENTS.md" in onboard and "O_NOFOLLOW" in onboard
+    assert "`AGENTS.md`" in canonical_text("review-yaml-record")
+    assert "`AGENTS.md`" in canonical_text("review-yaml-category")
+
+
+
 def test_the_adapter_reference_check_is_not_vacuous():
     """Guards the test above. A skill file with a path that exists in no
     repository must be reported broken; if it is not, that test is checking

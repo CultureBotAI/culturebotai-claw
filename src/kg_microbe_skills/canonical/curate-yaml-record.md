@@ -104,12 +104,20 @@ source, attached to the narrowest assertion it actually supports.
   paper, or an unrelated sentence from the right one, is not support.
 - A snippet is short verbatim text from the source. Interpretation belongs in a
   notes field, never inside the quotation.
+- **Snippet and source must agree.** The snippet must come from the cited
+  abstract or source text; never pair a snippet from one source with the
+  identifier of another.
 - **The kind of source is part of the citation.** A database assertion, a
   primary experiment, a review, a prediction and a search snippet are different
   strengths of support. Cite each as what it is; never present a database row
   or a review as if it were the primary study.
+- **No self-citation.** Another record in the same corpus is not independent
+  evidence for a scientific claim.
 - Association and prediction do not establish mechanism or causality. Do not
   let a co-occurrence or a computed score become a mechanism edge.
+- **In-vitro and assay-context boundary.** An assay observation or an in-vitro
+  measurement is not a claim about physiological or in-vivo behaviour without
+  source support for that step.
 - **A near-miss is not a match.** Never ground to a CURIE or canonical label
   because it looks plausible, and never use a broader or related term as an
   exact identity. Unresolved stays unresolved, recorded as such, until a source

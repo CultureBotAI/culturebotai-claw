@@ -34,6 +34,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -96,7 +97,14 @@ def _script_steps() -> list[tuple[str, str, str, dict]]:
 
 
 def _granted(permissions, scope: str) -> str:
-    """The level a `permissions:` value grants for one scope."""
+    """The level a `permissions:` value grants for one scope.
+
+    Note that in GitHub Actions, omitting `permissions:` (`permissions is None`)
+    falls back to the repository's default token permissions rather than `none`
+    (`permissions: {}`). `permission_violations` rejects `permissions is None`
+    explicitly on purpose so workflows calling `github.rest` must enumerate
+    their scopes (#451).
+    """
     if permissions == "write-all":
         return "write"
     if permissions == "read-all":
@@ -107,15 +115,53 @@ def _granted(permissions, scope: str) -> str:
 
 
 def required_scopes(script: str) -> set[tuple[str, str]]:
-    """(scope, level) every `github.rest` call in this script needs."""
+    """(scope, level) every `github.rest` call in this script needs.
+
+    Raises `ValueError` when a script calls an unmapped `github.rest.<namespace>`
+    rather than inventing a nonexistent `permissions:` scope name (#451).
+    """
     needed = set()
     for call in _REST_CALL.finditer(script):
-        scope = _SCOPE.get(call.group("namespace"))
-        if scope is None:  # an unmapped namespace is reported, not assumed safe
-            scope = call.group("namespace")
+        namespace = call.group("namespace")
+        scope = _SCOPE.get(namespace)
+        if scope is None:
+            raise ValueError(
+                f"unmapped github.rest namespace {namespace!r}; add it to _SCOPE"
+            )
         level = "write" if _WRITES.match(call.group("method")) else "read"
         needed.add((scope, level))
     return needed
+
+
+def permission_violations(
+    steps: list[tuple[str, str, str, object]],
+) -> list[str]:
+    """Report missing or unenumerated permissions for `github.rest` calls.
+
+    Omitting `permissions:` (`permissions is None`) is rejected on purpose even
+    though GitHub Actions would fall back to the repository's default token
+    permissions: a workflow that calls `github.rest` must enumerate the scopes
+    it uses (#451).
+    """
+    ungranted = []
+    for workflow, step, script, permissions in steps:
+        for scope, level in sorted(required_scopes(script)):
+            if permissions is None:
+                ungranted.append(
+                    f"{workflow} [{step}]: github.rest needs {scope}:{level}, "
+                    "no permissions: block declared; enumerate the scopes this step uses"
+                )
+                continue
+            granted = _granted(permissions, scope)
+            if not (
+                granted == "write"
+                or (granted == "read" and level == "read")
+            ):
+                ungranted.append(
+                    f"{workflow} [{step}]: github.rest needs {scope}:{level}, "
+                    f"permissions grant {granted}"
+                )
+    return ungranted
 
 
 def try_spans(script: str) -> list[tuple[int, int]]:
@@ -185,17 +231,9 @@ def test_the_workflows_actually_contain_an_alarm_that_calls_a_scoped_api():
 
 def test_every_github_script_call_has_the_permission_it_needs():
     """An enumerated `permissions:` block sets every unlisted scope to none, so a
-    call added without its scope fails only on the run that needed it."""
-    ungranted = [
-        f"{workflow} [{step}]: github.rest needs {scope}:{level}, "
-        f"permissions grant {_granted(permissions, scope)}"
-        for workflow, step, script, permissions in _script_steps()
-        for scope, level in sorted(required_scopes(script))
-        if not (
-            _granted(permissions, scope) == "write"
-            or (_granted(permissions, scope) == "read" and level == "read")
-        )
-    ]
+    call added without its scope fails only on the run that needed it. Omitting
+    `permissions:` altogether is also rejected on purpose (#451)."""
+    ungranted = permission_violations(_script_steps())
 
     assert not ungranted, "\n".join(ungranted)
 
@@ -271,3 +309,66 @@ def test_an_arrow_parameter_is_not_mistaken_for_something_measured():
     assert measured_names(script) == {"listing", "label"}
     assert reported_names(script) == {"step"}
     assert not measured_names(script) & reported_names(script)
+
+
+def test_unmapped_rest_namespace_raises_explicit_error():
+    """#451: an unmapped `github.rest.<namespace>` must raise an explicit
+    mapping error rather than inventing a nonexistent `permissions:` scope name
+    like `users:read`."""
+    with pytest.raises(
+        ValueError,
+        match="unmapped github.rest namespace 'users'; add it to _SCOPE",
+    ):
+        required_scopes("await github.rest.users.getAuthenticated();")
+
+
+def test_absent_permissions_block_reports_enumeration_requirement():
+    """#451: omitting `permissions:` (`None`) must report that no block was
+    declared rather than claiming `permissions grant none`."""
+    violations = permission_violations(
+        [("example.yaml", "Alarm", "await github.rest.issues.create({});", None)]
+    )
+    assert violations == [
+        "example.yaml [Alarm]: github.rest needs issues:write, "
+        "no permissions: block declared; enumerate the scopes this step uses"
+    ]
+
+
+def test_alarm_job_listing_uses_github_paginate():
+    """#452: `listJobsForWorkflowRun` returns 30 jobs per page by default; an
+    alarm step that inspects workflow jobs must paginate so a later failing job
+    cannot be truncated into 'No step reported a failure conclusion'."""
+    for workflow, step, script, _ in _alarms():
+        if "listJobsForWorkflowRun" in script:
+            assert re.search(
+                r"github\.paginate\(\s*github\.rest\.actions\.listJobsForWorkflowRun\b",
+                script,
+            ), f"{workflow} [{step}] calls listJobsForWorkflowRun without github.paginate"
+
+
+def test_cross_repo_validation_supports_alarm_rehearsal_dispatch():
+    """#453: `cross-repo-validation.yaml` must expose a `rehearse_alarm`
+    `workflow_dispatch` input that triggers a controlled failure and runs the
+    alarm step without waiting for a nightly schedule failure."""
+    workflow = _workflows()["cross-repo-validation.yaml"]
+    triggers = workflow.get("on") or workflow.get(True) or {}
+    dispatch = triggers.get("workflow_dispatch") or {}
+    inputs = dispatch.get("inputs") or {}
+    assert "rehearse_alarm" in inputs
+    assert inputs["rehearse_alarm"].get("default") is False
+
+    steps = workflow["jobs"]["validate"]["steps"]
+    rehearse_step = next(
+        (s for s in steps if s.get("name") == "Rehearse alarm failure"), None
+    )
+    assert rehearse_step is not None
+    assert "inputs.rehearse_alarm" in str(rehearse_step.get("if", ""))
+
+    alarm_step = next(
+        (s for s in steps if s.get("name") == "Open issue on validation failure"),
+        None,
+    )
+    assert alarm_step is not None
+    assert "inputs.rehearse_alarm" in str(alarm_step.get("if", ""))
+    assert "core.summary" in alarm_step["with"]["script"]
+
