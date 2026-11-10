@@ -9,6 +9,9 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -34,6 +37,31 @@ ROW_FIELDS = {
     "issues",
 }
 STATES = {"audited", "tracked", "pending_bootstrap"}
+
+DIAGNOSTIC_STAGES = frozenset({
+    "arguments", "configuration", "protected_runtime", "parent_binding",
+    "public_component", "manifest_binding", "coverage_obligation", "public_metadata",
+    "public_clone", "public_materialization", "source_preparation", "protected_audit",
+    "candidate_completeness", "receipt_validation", "parent_recheck", "receipt",
+})
+
+
+def failure_stage(error: Exception, fallback: str) -> str:
+    value = getattr(error, "_public_fleet_stage", None)
+    return value if isinstance(value, str) and value in DIAGNOSTIC_STAGES else fallback
+
+
+@contextmanager
+def diagnostic_stage(stage: str) -> Iterator[None]:
+    """Annotate failures with a closed phase while preserving their original type."""
+    if stage not in DIAGNOSTIC_STAGES:
+        raise ValueError("unsupported public diagnostic stage")
+    try:
+        yield
+    except Exception as error:
+        # An inner phase is more precise than its enclosing audit phase.
+        setattr(error, "_public_fleet_stage", failure_stage(error, stage))
+        raise
 
 
 def git(root: Path, *arguments: str) -> str:
@@ -200,26 +228,30 @@ def clone_public(public, workspace: Path, values: dict) -> dict[str, Path]:
     roots = {}
     workspace.mkdir(parents=True, exist_ok=False)
     for key, consumer in sorted(consumers.items()):
-        metadata = metadata_client.get(consumer.github)
-        auto.check(
-            metadata.get("full_name") == consumer.github
-            and metadata.get("private") is False
-            and metadata.get("default_branch") == "main",
-            "source_unverified",
-        )
+        with diagnostic_stage("public_metadata"):
+            metadata = metadata_client.get(consumer.github)
+            auto.check(
+                metadata.get("full_name") == consumer.github
+                and metadata.get("private") is False
+                and metadata.get("default_branch") == "main",
+                "source_unverified",
+            )
         target = workspace / key
-        git(
-            workspace,
-            "clone",
-            "--filter=blob:none",
-            "--no-checkout",
-            "--depth",
-            "1",
-            "--branch",
-            "main",
-            f"https://github.com/{consumer.github}.git",
-            str(target),
-        )
+        # Lazy fetching stays disabled for every Git command. Fetch the current
+        # tree's blobs up front; depth one avoids history and sparse checkout
+        # still limits materialized files. A blobless clone cannot do this checkout.
+        with diagnostic_stage("public_clone"):
+            git(
+                workspace,
+                "clone",
+                "--no-checkout",
+                "--depth",
+                "1",
+                "--branch",
+                "main",
+                f"https://github.com/{consumer.github}.git",
+                str(target),
+            )
         targets = set()
         for manifest in values.values():
             if key in manifest.consumers:
@@ -228,58 +260,64 @@ def clone_public(public, workspace: Path, values: dict) -> dict[str, Path]:
                     a.target.replace("{package_path}", consumer.package_path)
                     for a in manifest.artifacts_for(consumer)
                 )
-        git(target, "sparse-checkout", "init", "--no-cone")
-        git(target, "sparse-checkout", "set", "--no-cone", *sorted(targets))
-        git(target, "checkout", "--detach", "origin/main")
+        with diagnostic_stage("public_materialization"):
+            git(target, "sparse-checkout", "init", "--no-cone")
+            git(target, "sparse-checkout", "set", "--no-cone", *sorted(targets))
+            git(target, "checkout", "--detach", "origin/main")
         roots[key] = target
     return roots
 
 
 def public_component(public, trusted: Path, binding: dict, workspace: Path) -> dict:
-    values, hashes = manifests(public, binding)
-    protected = values["protected"]
-    auto.check(
-        (trusted / auto.MANIFEST_PATH).read_bytes()
-        == auto.public_blob(public, auto.MANIFEST_PATH, binding["protected_main_sha"])
-    )
-    obligation = auto.private_obligation(public, binding, manual.load_policy())
-    roots = clone_public(public, workspace, values)
-    prepare_sources(trusted)
-    item = coverage.obligation(protected)
-    deferred = {} if item is None else {item.key: item}
-    protected_roots = {
-        key: roots[key] for key in protected.consumers if key not in deferred
-    }
-    if (
-        trusted / "src/kg_microbe_governance/releases/mech-cycle-v2-canary.json"
-    ).exists():
-        from .cycle_release_audit import audit_release
-
-        result = audit_release(trusted, protected_roots, private_obligations=deferred)
-        auto.check(result.get("public_component_ok") is True)
-        raw_rows = [row for row in result["repositories"] if row["key"] not in deferred]
-    else:
-        from .fleet_audit import audit_fleet_pins
-
-        pins = {
-            git(root, "show", f"HEAD:{protected.pin_path}")
-            for root in protected_roots.values()
-        }
-        auto.check(len(pins) == 1)
-        ref = next(iter(pins))
-        auto.check(manual.is_sha(ref))
-        git(trusted, "merge-base", "--is-ancestor", ref, "HEAD")
-        fleet_result = audit_fleet_pins(
-            protected_roots, ref, private_obligations=deferred
-        )
+    with diagnostic_stage("manifest_binding"):
+        values, hashes = manifests(public, binding)
+        protected = values["protected"]
         auto.check(
-            all(
-                issue.code == "private_verification_required"
-                for issue in fleet_result.issues
-            )
+            (trusted / auto.MANIFEST_PATH).read_bytes()
+            == auto.public_blob(public, auto.MANIFEST_PATH, binding["protected_main_sha"])
         )
-        raw_rows = [asdict(row) for row in fleet_result.repositories]
-    pending = bootstrap_refs(trusted)
+    with diagnostic_stage("coverage_obligation"):
+        obligation = auto.private_obligation(public, binding, manual.load_policy())
+    with diagnostic_stage("public_materialization"):
+        roots = clone_public(public, workspace, values)
+    with diagnostic_stage("source_preparation"):
+        prepare_sources(trusted)
+    with diagnostic_stage("protected_audit"):
+        item = coverage.obligation(protected)
+        deferred = {} if item is None else {item.key: item}
+        protected_roots = {
+            key: roots[key] for key in protected.consumers if key not in deferred
+        }
+        if (
+            trusted / "src/kg_microbe_governance/releases/mech-cycle-v2-canary.json"
+        ).exists():
+            from .cycle_release_audit import audit_release
+
+            result = audit_release(trusted, protected_roots, private_obligations=deferred)
+            auto.check(result.get("public_component_ok") is True)
+            raw_rows = [row for row in result["repositories"] if row["key"] not in deferred]
+        else:
+            from .fleet_audit import audit_fleet_pins
+
+            pins = {
+                git(root, "show", f"HEAD:{protected.pin_path}")
+                for root in protected_roots.values()
+            }
+            auto.check(len(pins) == 1)
+            ref = next(iter(pins))
+            auto.check(manual.is_sha(ref))
+            git(trusted, "merge-base", "--is-ancestor", ref, "HEAD")
+            fleet_result = audit_fleet_pins(
+                protected_roots, ref, private_obligations=deferred
+            )
+            auto.check(
+                all(
+                    issue.code == "private_verification_required"
+                    for issue in fleet_result.issues
+                )
+            )
+            raw_rows = [asdict(row) for row in fleet_result.repositories]
+        pending = bootstrap_refs(trusted)
     prospective = None
     rows: dict[str, list[dict[str, Any]]] = {"protected": [], "candidate": []}
     for row in raw_rows:
@@ -297,54 +335,55 @@ def public_component(public, trusted: Path, binding: dict, workspace: Path) -> d
                 "issues": row["issues"],
             }
         )
-    for key, consumer in values["candidate"].consumers.items():
-        if key == "scaleupmech":
-            continue
-        root = roots[key]
-        head = _commit_at(root, "origin/main")
-        artifacts = values["candidate"].artifacts_for(consumer)
-        missing = []
-        for artifact in artifacts:
-            path = artifact.target.replace("{package_path}", consumer.package_path)
-            if (
-                git(
-                    root, "ls-tree", "--format=%(objecttype)", "origin/main", "--", path
-                )
-                != "blob"
-            ):
-                missing.append(path)
-        if missing and key not in pending:
-            if prospective is None:
-                prospective = candidate_bootstrap_refs(
-                    trusted, binding, values["candidate"]
-                )
-            candidate_pending = {**pending, **prospective}
-        else:
-            candidate_pending = pending
-        is_pending = bool(
-            missing
-            and candidate_pending.get(key) == head
-            and len(missing) == len(artifacts)
-        )
-        if is_pending:
-            if key in protected.consumers:
-                auto.check(
-                    values["candidate"].artifacts_for(consumer)
-                    == protected.artifacts_for(protected.consumers[key])
-                )
-        auto.check(not missing or is_pending, "inspection_invalid")
-        rows["candidate"].append(
-            {
-                "key": key,
-                "github": consumer.github,
-                "head": head,
-                "pin": None,
-                "state": "pending_bootstrap" if is_pending else "tracked",
-                "expected_artifacts": len(artifacts),
-                "checked_artifacts": 0 if is_pending else len(artifacts),
-                "issues": [],
-            }
-        )
+    with diagnostic_stage("candidate_completeness"):
+        for key, consumer in values["candidate"].consumers.items():
+            if key == "scaleupmech":
+                continue
+            root = roots[key]
+            head = _commit_at(root, "origin/main")
+            artifacts = values["candidate"].artifacts_for(consumer)
+            missing = []
+            for artifact in artifacts:
+                path = artifact.target.replace("{package_path}", consumer.package_path)
+                if (
+                    git(
+                        root, "ls-tree", "--format=%(objecttype)", "origin/main", "--", path
+                    )
+                    != "blob"
+                ):
+                    missing.append(path)
+            if missing and key not in pending:
+                if prospective is None:
+                    prospective = candidate_bootstrap_refs(
+                        trusted, binding, values["candidate"]
+                    )
+                candidate_pending = {**pending, **prospective}
+            else:
+                candidate_pending = pending
+            is_pending = bool(
+                missing
+                and candidate_pending.get(key) == head
+                and len(missing) == len(artifacts)
+            )
+            if is_pending:
+                if key in protected.consumers:
+                    auto.check(
+                        values["candidate"].artifacts_for(consumer)
+                        == protected.artifacts_for(protected.consumers[key])
+                    )
+            auto.check(not missing or is_pending, "inspection_invalid")
+            rows["candidate"].append(
+                {
+                    "key": key,
+                    "github": consumer.github,
+                    "head": head,
+                    "pin": None,
+                    "state": "pending_bootstrap" if is_pending else "tracked",
+                    "expected_artifacts": len(artifacts),
+                    "checked_artifacts": 0 if is_pending else len(artifacts),
+                    "issues": [],
+                }
+            )
     report = {
         "version": 1,
         "kind": "public_fleet_component",
@@ -355,22 +394,24 @@ def public_component(public, trusted: Path, binding: dict, workspace: Path) -> d
         "private_required": obligation["required"],
         "lanes": rows,
     }
-    validate_report(
-        auto.canonical(report),
-        values,
-        hashes,
-        binding,
-        {"protected": pending, "candidate": {**pending, **(prospective or {})}},
-    )
-    auto.check(
-        auto.parent_binding(
-            public,
-            binding["run_id"],
-            binding["run_attempt"],
-            checkout_sha=binding["checkout_sha"],
+    with diagnostic_stage("receipt_validation"):
+        validate_report(
+            auto.canonical(report),
+            values,
+            hashes,
+            binding,
+            {"protected": pending, "candidate": {**pending, **(prospective or {})}},
         )
-        == binding
-    )
+    with diagnostic_stage("parent_recheck"):
+        auto.check(
+            auto.parent_binding(
+                public,
+                binding["run_id"],
+                binding["run_attempt"],
+                checkout_sha=binding["checkout_sha"],
+            )
+            == binding
+        )
     return report
 
 
@@ -505,6 +546,23 @@ def finalize(public, trusted: Path, binding: dict, evidence, *, report: dict) ->
         )
 
 
+def failure_code(error: Exception) -> str:
+    """Return only closed public diagnostics, never exception text or subprocess output."""
+    if isinstance(error, manual.AuditError):
+        return error.code if isinstance(error.code, str) and error.code in manual.CODES else "unexpected_failure"
+    if isinstance(error, subprocess.TimeoutExpired):
+        return "subprocess_timeout"
+    if isinstance(error, subprocess.SubprocessError):
+        return "subprocess_failed"
+    if isinstance(error, GovernanceError):
+        return "governance_invalid"
+    if isinstance(error, OSError):
+        return "filesystem_error"
+    if isinstance(error, ValueError):
+        return "invalid_value"
+    return "unexpected_failure"
+
+
 def main(argv=None) -> int:
     import argparse
 
@@ -514,6 +572,7 @@ def main(argv=None) -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--checkout-sha", required=True)
     args = parser.parse_args(argv)
+    stage = "arguments"
     try:
         from .automatic_private_audit_cli import (
             append_receipt,
@@ -525,9 +584,12 @@ def main(argv=None) -> int:
             not args.output.exists() and manual.is_sha(args.checkout_sha),
             "invalid_arguments",
         )
+        stage = "configuration"
         run_id, run_attempt = integer("GITHUB_RUN_ID"), integer("GITHUB_RUN_ATTEMPT")
         public = manual.GitHubRead(os.environ.get("GH_PUBLIC_READ_TOKEN", ""))
+        stage = "protected_runtime"
         trusted_sha = protected_runtime(public, args.trusted_root)
+        stage = "parent_binding"
         binding = auto.parent_binding(
             public,
             run_id,
@@ -535,18 +597,18 @@ def main(argv=None) -> int:
             checkout_sha=args.checkout_sha,
         )
         auto.check(binding["protected_main_sha"] == trusted_sha)
+        stage = "public_component"
         report = public_component(public, args.trusted_root, binding, args.workspace)
+        stage = "receipt"
         append_receipt(args.output, report)
         print("public_fleet_component_complete_private_obligations_explicit")
         return 0
-    except (
-        manual.AuditError,
-        GovernanceError,
-        OSError,
-        ValueError,
-        subprocess.SubprocessError,
-    ):
-        print("public_fleet_component_failed", file=__import__("sys").stderr)
+    except Exception as error:
+        stage = failure_stage(error, stage)
+        print(
+            f"public_fleet_component_failed stage={stage} code={failure_code(error)}",
+            file=sys.stderr,
+        )
         return 2
 
 
