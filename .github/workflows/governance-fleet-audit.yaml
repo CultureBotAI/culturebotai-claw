@@ -85,17 +85,28 @@ jobs:
           private_required = any("scaleupmech" in manifest.consumers for manifest in manifests)
           adapter = trusted / "src/kg_microbe_governance/automatic_fleet_component.py"
           installed = adapter.is_file()
-          # Exact pre-repair protected bytes from 3cf04a277c9a059ca102a172eb4e45702fe3b1d2.
-          # Unknown or repaired adapters must use the automatic path, never this compatibility lane.
-          known = {
-              "automatic_fleet_component.py": "93e666029922aa4fa2f902922ae0aa54c28da41c618a2c33af173c65907e0252",
-              "automatic_private_audit_cli.py": "26376fcb7cac5ec84f40cd9529c53881e9c9a4ea256d57609a27fda858159ab5",
-              "private_scaleup_audit.py": "bab998c0f194e87cf6b510123c671dc45ccc830ccc5526c05aa636df200bffc7",
-          }
-          known_adapter = all(
-              (trusted / "src/kg_microbe_governance" / name).is_file()
-              and hashlib.sha256((trusted / "src/kg_microbe_governance" / name).read_bytes()).hexdigest() == digest
-              for name, digest in known.items()
+          # Exact known defective protected adapters: 3cf transport and e43 materialization.
+          # Unknown or repaired tuples use automatic mode; failure never selects fallback.
+          known_adapters = (
+              {
+                  "automatic_fleet_component.py": "93e666029922aa4fa2f902922ae0aa54c28da41c618a2c33af173c65907e0252",
+                  "automatic_private_audit_cli.py": "26376fcb7cac5ec84f40cd9529c53881e9c9a4ea256d57609a27fda858159ab5",
+                  "private_scaleup_audit.py": "bab998c0f194e87cf6b510123c671dc45ccc830ccc5526c05aa636df200bffc7",
+              },
+              {
+                  "automatic_fleet_component.py": "a3d06bd57166320e21e60bc76c444bf97d808b3487d53179169695f2f1e001ac",
+                  "automatic_private_audit_cli.py": "26376fcb7cac5ec84f40cd9529c53881e9c9a4ea256d57609a27fda858159ab5",
+                  "private_scaleup_audit.py": "bab998c0f194e87cf6b510123c671dc45ccc830ccc5526c05aa636df200bffc7",
+                  "public_repository_metadata.py": "def2853ddc83632900032f1953b50532de0001b52637b2db21b901c63116af51",
+              },
+          )
+          known_adapter = any(
+              all(
+                  (trusted / "src/kg_microbe_governance" / name).is_file()
+                  and hashlib.sha256((trusted / "src/kg_microbe_governance" / name).read_bytes()).hexdigest() == digest
+                  for name, digest in known.items()
+              )
+              for known in known_adapters
           )
           if private_required and not installed:
               raise SystemExit("Private obligations require the protected automatic adapter")
@@ -486,17 +497,28 @@ jobs:
           private_required = any("scaleupmech" in manifest.consumers for manifest in manifests)
           adapter = trusted / "src/kg_microbe_governance/automatic_fleet_component.py"
           installed = adapter.is_file()
-          # Exact pre-repair protected bytes from 3cf04a277c9a059ca102a172eb4e45702fe3b1d2.
-          # Unknown or repaired adapters must use the automatic path, never this compatibility lane.
-          known = {
-              "automatic_fleet_component.py": "93e666029922aa4fa2f902922ae0aa54c28da41c618a2c33af173c65907e0252",
-              "automatic_private_audit_cli.py": "26376fcb7cac5ec84f40cd9529c53881e9c9a4ea256d57609a27fda858159ab5",
-              "private_scaleup_audit.py": "bab998c0f194e87cf6b510123c671dc45ccc830ccc5526c05aa636df200bffc7",
-          }
-          known_adapter = all(
-              (trusted / "src/kg_microbe_governance" / name).is_file()
-              and hashlib.sha256((trusted / "src/kg_microbe_governance" / name).read_bytes()).hexdigest() == digest
-              for name, digest in known.items()
+          # Exact known defective protected adapters: 3cf transport and e43 materialization.
+          # Unknown or repaired tuples use automatic mode; failure never selects fallback.
+          known_adapters = (
+              {
+                  "automatic_fleet_component.py": "93e666029922aa4fa2f902922ae0aa54c28da41c618a2c33af173c65907e0252",
+                  "automatic_private_audit_cli.py": "26376fcb7cac5ec84f40cd9529c53881e9c9a4ea256d57609a27fda858159ab5",
+                  "private_scaleup_audit.py": "bab998c0f194e87cf6b510123c671dc45ccc830ccc5526c05aa636df200bffc7",
+              },
+              {
+                  "automatic_fleet_component.py": "a3d06bd57166320e21e60bc76c444bf97d808b3487d53179169695f2f1e001ac",
+                  "automatic_private_audit_cli.py": "26376fcb7cac5ec84f40cd9529c53881e9c9a4ea256d57609a27fda858159ab5",
+                  "private_scaleup_audit.py": "bab998c0f194e87cf6b510123c671dc45ccc830ccc5526c05aa636df200bffc7",
+                  "public_repository_metadata.py": "def2853ddc83632900032f1953b50532de0001b52637b2db21b901c63116af51",
+              },
+          )
+          known_adapter = any(
+              all(
+                  (trusted / "src/kg_microbe_governance" / name).is_file()
+                  and hashlib.sha256((trusted / "src/kg_microbe_governance" / name).read_bytes()).hexdigest() == digest
+                  for name, digest in known.items()
+              )
+              for known in known_adapters
           )
           if private_required and not installed:
               raise SystemExit("Private obligations require the protected automatic adapter")

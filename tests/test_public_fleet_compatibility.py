@@ -22,6 +22,15 @@ KNOWN = {
     "automatic_private_audit_cli.py": "26376fcb7cac5ec84f40cd9529c53881e9c9a4ea256d57609a27fda858159ab5",
     "private_scaleup_audit.py": "bab998c0f194e87cf6b510123c671dc45ccc830ccc5526c05aa636df200bffc7",
 }
+POSTMERGE_FIXTURES = ROOT / "tests/fixtures/public_fleet_e43_adapter"
+POSTMERGE = {
+    "automatic_fleet_component.py": "a3d06bd57166320e21e60bc76c444bf97d808b3487d53179169695f2f1e001ac",
+    "automatic_private_audit_cli.py": "26376fcb7cac5ec84f40cd9529c53881e9c9a4ea256d57609a27fda858159ab5",
+    "private_scaleup_audit.py": "bab998c0f194e87cf6b510123c671dc45ccc830ccc5526c05aa636df200bffc7",
+    "public_repository_metadata.py": "def2853ddc83632900032f1953b50532de0001b52637b2db21b901c63116af51"
+}
+KNOWN_ADAPTERS = {"3cf": KNOWN, "e43": POSTMERGE}
+
 
 
 def steps():
@@ -31,7 +40,7 @@ def steps():
     return selector, final
 
 
-def setup(tmp_path, *, adapter="known", protected=False, candidate=False):
+def setup(tmp_path, *, adapter="known", protected=False, candidate=False, version="3cf"):
     original = json.loads((ROOT / auto.MANIFEST_PATH).read_bytes())
     for root, private in (("control", candidate), ("fleet/trusted-claw", protected)):
         document = copy.deepcopy(original)
@@ -45,8 +54,11 @@ def setup(tmp_path, *, adapter="known", protected=False, candidate=False):
         target.write_text(json.dumps(document))
     trusted = tmp_path / "fleet/trusted-claw/src/kg_microbe_governance"
     if adapter != "absent":
-        for name, digest in KNOWN.items():
-            raw = (FIXTURES / (name + ".txt")).read_bytes()
+        for name, digest in KNOWN_ADAPTERS[version].items():
+            fixture = POSTMERGE_FIXTURES if version == "e43" and name in {
+                "automatic_fleet_component.py", "public_repository_metadata.py"
+            } else FIXTURES
+            raw = (fixture / (name + ".txt")).read_bytes()
             assert hashlib.sha256(raw).hexdigest() == digest
             (trusted / name).write_bytes(raw)
         if adapter != "known":
@@ -77,9 +89,10 @@ def shell(step, root, env):
                           capture_output=True, text=True, timeout=20)
 
 
+@pytest.mark.parametrize("version", ["3cf", "e43"])
 @pytest.mark.parametrize("protected,candidate", [(False, False), (True, False), (False, True), (True, True)])
-def test_exact_old_adapter_and_both_manifest_obligations(tmp_path, protected, candidate):
-    env = setup(tmp_path, protected=protected, candidate=candidate)
+def test_exact_old_adapter_and_both_manifest_obligations(tmp_path, protected, candidate, version):
+    env = setup(tmp_path, protected=protected, candidate=candidate, version=version)
     selector, final = steps()
     assert shell(selector, tmp_path, env).returncode == 0
     expected = protected or candidate
@@ -91,9 +104,11 @@ def test_exact_old_adapter_and_both_manifest_obligations(tmp_path, protected, ca
     assert shell(final, tmp_path, env).returncode != 0
 
 
-@pytest.mark.parametrize("changed", list(KNOWN))
-def test_unknown_or_repaired_protected_bytes_never_take_compatibility(tmp_path, changed):
-    env = setup(tmp_path, adapter=changed)
+@pytest.mark.parametrize("version,changed", [
+    (version, name) for version, known in KNOWN_ADAPTERS.items() for name in known
+])
+def test_unknown_or_repaired_protected_bytes_never_take_compatibility(tmp_path, changed, version):
+    env = setup(tmp_path, adapter=changed, version=version)
     selector, final = steps()
     assert shell(selector, tmp_path, env).returncode == 0
     assert (tmp_path / "output").read_text() == "available=true\n"
@@ -128,10 +143,11 @@ def test_missing_or_malformed_either_manifest_never_selects_compatibility(tmp_pa
     assert shell(final, tmp_path, env).returncode != 0
 
 
+@pytest.mark.parametrize("version", ["3cf", "e43"])
 @pytest.mark.parametrize("root", ["control", "fleet/trusted-claw"])
 @pytest.mark.parametrize("identity", ["CultureBotAI/ScaleupMech", "culturebotai/scaleupmech"])
-def test_reserved_identity_alias_is_not_a_public_only_manifest(tmp_path, root, identity):
-    env = setup(tmp_path)
+def test_reserved_identity_alias_is_not_a_public_only_manifest(tmp_path, root, identity, version):
+    env = setup(tmp_path, version=version)
     path = tmp_path / root / auto.MANIFEST_PATH
     document = json.loads(path.read_bytes())
     document["consumers"]["aliasedmech"] = {"github": identity, "package_path": "src/aliasedmech"}
@@ -194,3 +210,25 @@ def test_aggregate_refuses_every_unsuccessful_dependency(tmp_path, candidate, pu
     guard = workflow["jobs"]["verified-fleet"]["steps"][0]
     result = shell(guard, tmp_path, {"PATH": os.defpath, "CANDIDATE_RESULT": candidate, "PUBLIC_RESULT": public})
     assert (result.returncode == 0) is (candidate == public == "success")
+
+
+def test_actual_repaired_adapter_never_selects_compatibility(tmp_path):
+    env = setup(tmp_path, version="e43")
+    target = tmp_path / "fleet/trusted-claw/src/kg_microbe_governance/automatic_fleet_component.py"
+    target.write_bytes((ROOT / "src/kg_microbe_governance/automatic_fleet_component.py").read_bytes())
+    selector, final = steps()
+    assert shell(selector, tmp_path, env).returncode == 0
+    assert (tmp_path / "output").read_text() == "available=true\n"
+    env["AUTOMATIC_AVAILABLE"] = "true"
+    assert shell(final, tmp_path, env).returncode == 0
+    assert (tmp_path / "automatic-verifier-called").exists()
+
+
+def test_e43_historical_fixture_provenance():
+    proof = json.loads((POSTMERGE_FIXTURES / "provenance.json").read_bytes())
+    assert proof["source_commit"] == "e43afbf92e7ae0265943ca8a237efe07ecf074fb"
+    assert set(proof["files"]) == set(POSTMERGE)
+    for name, row in proof["files"].items():
+        raw = (ROOT / row["fixture"]).read_bytes()
+        assert hashlib.sha256(raw).hexdigest() == row["sha256"] == POSTMERGE[name]
+        assert hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\0" + raw).hexdigest() == row["git_blob"]
