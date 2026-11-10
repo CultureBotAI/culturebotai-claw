@@ -69,6 +69,8 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path, review)
     assert "src/kg_microbe_governance/releases/mech-cycle-v2-canary.json" in source_names
     admitted_snapshot = "kg_microbe_governance/releases/edgemech-infrastructure-source-manifest.json"
     assert "src/" + admitted_snapshot in source_names
+    private_policy = "kg_microbe_governance/private_audit/scaleup-v1.json"
+    assert "src/" + private_policy in source_names
     for artifact in governance_document["artifacts"]:
         assert artifact["source"] in source_names
     assert "src/kg_microbe_config/openclaw_config.yaml" in source_names
@@ -130,6 +132,7 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path, review)
         )
         assert "kg_microbe_governance/vendored_artifacts.json" in names
         assert wheel.read(admitted_snapshot) == (REPOSITORY_ROOT / "src" / admitted_snapshot).read_bytes()
+        assert wheel.read(private_policy) == (REPOSITORY_ROOT / "src" / private_policy).read_bytes()
         assert "kg_microbe_evidence/__init__.py" in names
         assert "kg_microbe_evidence/__main__.py" in names
         assert "kg_microbe_evidence/fetch.py" in names
@@ -195,6 +198,8 @@ import kg_microbe_config
 import kg_microbe_fleet
 import kg_microbe_governance
 import kg_microbe_governance.fleet_audit
+import kg_microbe_governance.private_scaleup_audit
+assert kg_microbe_governance.private_scaleup_audit.load_policy()["repository"] == "CultureBotAI/ScaleupMech"
 import kg_microbe_history
 import kg_microbe_merge_queue
 import kg_microbe_merge_queue.__main__
@@ -229,6 +234,9 @@ from kg_microbe_research import (
 )
 
 unpacked = Path(sys.argv[1]).resolve()
+private_help = subprocess.run([sys.executable, "-m", "kg_microbe_governance.private_scaleup_audit", "--help"], capture_output=True, text=True)
+assert private_help.returncode == 0, private_help.stderr
+assert "preflight" in private_help.stdout and "verify" in private_help.stdout
 runtime_modules = (
     cli_package,
     kg_microbe_agents,
@@ -330,6 +338,18 @@ assert Path(sys.modules["kg_microbe_evidence"].__file__).resolve().is_relative_t
 assert EvidenceValidator(unpacked, EvidenceConfig("references_cache")).check_item({"pmid": "1"}).verdict == "NO_QUOTE"
 assert load_pin_contract()["uv_version"]
 assert governance_main(["list", "--repository", "proteintraitsmech", "--json"]) == 0
+from kg_microbe_governance import automatic_private_audit, automatic_private_audit_cli
+from kg_microbe_governance import automatic_fleet_component, private_audit_coverage
+for module in (automatic_private_audit, automatic_private_audit_cli, automatic_fleet_component, private_audit_coverage):
+    assert Path(module.__file__).resolve().is_relative_to(unpacked)
+for entry in (automatic_private_audit_cli.main, automatic_fleet_component.main):
+    try:
+        entry(["--help"])
+    except SystemExit as exc:
+        assert exc.code == 0
+    else:
+        raise AssertionError("Installed automatic CLI parser did not handle help")
+
 history_schema = Path(_default_schema_path()).resolve()
 assert history_schema.is_relative_to(unpacked)
 assert history_schema == (

@@ -93,6 +93,10 @@ enums:
       edgemech:
         description: EdgeMech occurrence accounting and curation infrastructure.
 
+      cofactormech:
+        description: CofactorMech repository.
+      assaymech:
+        description: AssayMech repository.
       scaleupmech:
         description: ScaleupMech repository.
 

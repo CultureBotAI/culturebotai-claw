@@ -175,7 +175,7 @@ def test_the_fleet_size_the_prose_describes_is_the_manifest_size():
     """Pins the number the accurate prose uses to the manifest, so a Mech added
     or removed makes the documentation demonstrably wrong rather than quietly
     so."""
-    assert len(load_fleet_manifest().mechs) == 16
+    assert len(load_fleet_manifest().mechs) == 18
 
 
 def test_no_module_hardcodes_the_fleet_size_as_a_constant():
@@ -207,3 +207,68 @@ def test_the_governance_manifest_covers_exactly_the_declared_fleet():
     from kg_microbe_governance.fleet_audit import expected_mechs
 
     assert set(load_governance_manifest().consumers) == set(expected_mechs())
+
+
+# --------------------------------------------------------------------------
+# #1060: capability reasons may not state a record or page count without its
+#        measurement date or admission basis (#848 item 4, #355, #469)
+# --------------------------------------------------------------------------
+
+_REASON_RECORD_OR_PAGE_COUNT = re.compile(
+    rf"\b\d{{1,3}}(?:,\d{{3}})+\b|\b{_NUMBER}\s+(?:records?|pages?)\b",
+    re.IGNORECASE,
+)
+_REASON_COUNT_BASIS = re.compile(
+    r"\bMeasured\s+\d{4}-\d{2}-\d{2}\b|\bat\s+admission\b",
+    re.IGNORECASE,
+)
+
+
+def _reason_has_ungrounded_record_or_page_count(reason: str) -> bool:
+    """True when a capability reason states a record/page count without a date or admission basis."""
+    return bool(_REASON_RECORD_OR_PAGE_COUNT.search(reason)) and not bool(
+        _REASON_COUNT_BASIS.search(reason)
+    )
+
+
+def test_capability_reasons_state_the_basis_of_any_record_or_page_count() -> None:
+    manifest = load_fleet_manifest()
+    offenders = [
+        f"{mech_key}.{cap_name}: {cap.reason}"
+        for mech_key, mech in manifest.mechs.items()
+        for cap_name, cap in mech.capabilities.items()
+        if cap.reason and _reason_has_ungrounded_record_or_page_count(cap.reason)
+    ]
+
+    assert not offenders, (
+        "a capability reason states a record or page count without its basis; "
+        "drop the current-tense count or record 'Measured YYYY-MM-DD' / 'at admission':\n  "
+        + "\n  ".join(offenders)
+    )
+
+
+@pytest.mark.parametrize(
+    "reason",
+    [
+        "All 205 records carry an ENVO term.",
+        "The corpus holds 38,580 items without a PMID.",
+        "Serves 490 pages from main.",
+        "All six records are synthetic fixtures.",
+    ],
+)
+def test_an_ungrounded_record_or_page_count_in_a_reason_is_caught(reason: str) -> None:
+    assert _reason_has_ungrounded_record_or_page_count(reason), reason
+
+
+@pytest.mark.parametrize(
+    "reason",
+    [
+        "Measured 2026-11-04 (claw#729): the corpus holds 38,580 items.",
+        "Serves tracked pages from main -- 2,956 files and 30.1 MB measured at admission (#230).",
+        "Every curated record carries an ENVO term.",
+        "Each file holds 1 record.",
+        "Each file holds one record.",
+    ],
+)
+def test_a_grounded_or_countless_reason_passes(reason: str) -> None:
+    assert not _reason_has_ungrounded_record_or_page_count(reason), reason

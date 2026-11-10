@@ -216,3 +216,136 @@ def test_the_merged_graph_header_is_the_case_this_was_built_for():
     assert found["DUPLICATE_COLUMN"] == 1
     assert found["CARRIAGE_RETURN_IN_HEADER"] == 1
     assert found["READERS_DISAGREE"] == 1
+
+
+def test_check_cli_reports_disabled_kgx_export_status_and_reason(capsys):
+    from kg_microbe_kgx.__main__ import main
+
+    assert main(["check", "--mech", "culturemech"]) == 0
+    out = capsys.readouterr().out
+    assert "culturemech: kgx_export is disabled, so there is nothing to check:" in out
+    assert "CultureMech#490" in out
+
+
+def test_read_table_and_check_release_bundle_validate_gzip_assets_and_manifest(
+    tmp_path: Path, capsys
+):
+    """#540: `kg-microbe-kgx` reads `.tsv.gz` release assets and checks their
+    SHA-256 checksums and row counts in `manifest.json`."""
+    import json
+
+    from kg_microbe_kgx.__main__ import main
+    from kg_microbe_kgx.contract import check_release_bundle, write_release_bundle
+
+    write(
+        tmp_path,
+        "nodes.tsv",
+        NODE_HEADER + "\nX:1\tbiolink:Thing\tn\td\tinfores:x\n",
+    )
+    write(
+        tmp_path,
+        "edges.tsv",
+        EDGE_HEADER + "\ne1\tX:1\tbiolink:related_to\tX:1\n",
+    )
+    release_assets = write_release_bundle(tmp_path)
+    manifest = {
+        "mech": "culturemech",
+        "statistics": {"nodes": 1, "edges": 1},
+        "release_assets": release_assets,
+    }
+    (tmp_path / "manifest.json").write_text(
+        json.dumps(manifest, indent=2), encoding="utf-8"
+    )
+
+    assert (tmp_path / "nodes.tsv.gz").is_file()
+    assert (tmp_path / "edges.tsv.gz").is_file()
+    assert check_graph(tmp_path / "nodes.tsv.gz", tmp_path / "edges.tsv.gz") == []
+    assert check_release_bundle(tmp_path) == []
+    assert main(["check", "--mech", "culturemech", "--release-dir", str(tmp_path)]) == 0
+    assert "culturemech: clean" in capsys.readouterr().out
+
+    # Tamper with checksum in manifest.json -> MANIFEST_CHECKSUM_MISMATCH
+    bad_manifest = dict(manifest)
+    bad_manifest["release_assets"] = {
+        **release_assets,
+        "nodes.tsv.gz": {"sha256": "0" * 64, "bytes": 10},
+    }
+    (tmp_path / "manifest.json").write_text(
+        json.dumps(bad_manifest, indent=2), encoding="utf-8"
+    )
+    assert "MANIFEST_CHECKSUM_MISMATCH" in codes(check_release_bundle(tmp_path))
+    assert main(["check", "--mech", "culturemech", "--release-dir", str(tmp_path)]) == 1
+
+
+def test_fetch_release_bundle_and_check_cli_release_tag(tmp_path: Path, monkeypatch):
+    """#540: `kg-microbe-kgx check --release-tag` downloads `nodes.tsv.gz`,
+    `edges.tsv.gz`, and `manifest.json` from the Mech's GitHub Release and checks them."""
+    import json
+
+    from kg_microbe_kgx.__main__ import main
+    from kg_microbe_kgx.contract import write_release_bundle
+
+    source = tmp_path / "source"
+    source.mkdir()
+    write(
+        source,
+        "nodes.tsv",
+        NODE_HEADER + "\nX:1\tbiolink:Thing\tn\td\tinfores:x\n",
+    )
+    write(
+        source,
+        "edges.tsv",
+        EDGE_HEADER + "\ne1\tX:1\tbiolink:related_to\tX:1\n",
+    )
+    assets = write_release_bundle(source)
+    (source / "manifest.json").write_text(
+        json.dumps(
+            {
+                "mech": "communitymech",
+                "statistics": {"nodes": 1, "edges": 1},
+                "release_assets": assets,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def fake_fetch(github_repo: str, dest_dir: Path, *, tag: str | None = None):
+        assert github_repo == "CultureBotAI/CommunityMech"
+        assert tag == "v0.1.0"
+        for name in ("nodes.tsv.gz", "edges.tsv.gz", "manifest.json"):
+            (dest_dir / name).write_bytes((source / name).read_bytes())
+        return dest_dir
+
+    monkeypatch.setattr("kg_microbe_kgx.__main__.fetch_release_bundle", fake_fetch)
+    assert (
+        main(["check", "--mech", "communitymech", "--release-tag", "v0.1.0"]) == 0
+    )
+
+
+def test_check_release_bundle_rejects_boolean_or_missing_statistics(tmp_path: Path):
+    """#1136: `check_release_bundle` rejects boolean or missing row counts in `manifest.json`."""
+    import json
+
+    from kg_microbe_kgx.contract import check_release_bundle, write_release_bundle
+
+    write(
+        tmp_path,
+        "nodes.tsv",
+        NODE_HEADER + "\nX:1\tbiolink:Thing\tn\td\tinfores:x\n",
+    )
+    write(
+        tmp_path,
+        "edges.tsv",
+        EDGE_HEADER + "\ne1\tX:1\tbiolink:related_to\tX:1\n",
+    )
+    release_assets = write_release_bundle(tmp_path)
+    for bad_stats in (None, {"nodes": True, "edges": 1}, {"nodes": 1}):
+        manifest = {"mech": "culturemech", "release_assets": release_assets}
+        if bad_stats is not None:
+            manifest["statistics"] = bad_stats
+        (tmp_path / "manifest.json").write_text(
+            json.dumps(manifest, indent=2), encoding="utf-8"
+        )
+        assert "MISSING_MANIFEST_STATISTICS" in codes(check_release_bundle(tmp_path))
+
+

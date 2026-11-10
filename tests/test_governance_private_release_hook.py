@@ -125,3 +125,22 @@ def test_private_deferral_does_not_mask_public_failure(tmp_path, monkeypatch):
     assert not result["public_component_ok"] and not result["ok"]
     row = next(r for r in result["repositories"] if r["key"] == "traitmech")
     assert any(issue["code"] == "unexpected_pin" for issue in row["issues"])
+
+
+@pytest.mark.parametrize(
+    "bad_row",
+    [
+        {"key": "other", "state": "private_verification_required", "issues": [], "installation_verified": False, "checked_artifacts": 0},
+        {"key": KEY, "state": "installed_infrastructure", "issues": [], "installation_verified": False, "checked_artifacts": 0},
+        {"key": KEY, "state": "private_verification_required", "issues": [], "installation_verified": True, "checked_artifacts": 0},
+        {"key": KEY, "state": "private_verification_required", "issues": [], "installation_verified": False, "checked_artifacts": 22},
+    ],
+)
+def test_deferred_row_contract_rejects_forged_verification_or_counts(tmp_path, monkeypatch, bad_row):
+    claw, roots, policy, *_ = native_admitted(tmp_path)
+    roots.pop(KEY)
+    item = SimpleNamespace(key=KEY)
+    install_helper(monkeypatch, item, policy)
+    sys.modules[HELPER].deferred_row = lambda _observed: bad_row
+    with pytest.raises(GovernanceError, match="unverified-state contract"):
+        audit_release(claw, roots, private_obligations={KEY: item})

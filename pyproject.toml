@@ -79,6 +79,7 @@ kg-microbe-evidence-fetch = "kg_microbe_evidence.fetch:main"
 kg-microbe-pages = "kg_microbe_pages.__main__:main"
 kg-microbe-site = "kg_microbe_site.__main__:main"
 kg-microbe-kgx = "kg_microbe_kgx.__main__:main"
+kg-microbe-links = "kg_microbe_links.__main__:main"
 kg-microbe-source-queue = "kg_microbe_source_queue.__main__:main"
 kg-microbe-sssom = "kg_microbe_sssom.__main__:main"
 kg-microbe-writers = "kg_microbe_writers.__main__:main"
@@ -128,16 +129,21 @@ kg_microbe_governance = [
     "vendored_artifacts.json",
     "workflow_pins.json",
     "releases/*.json",
+    "private_audit/*.json",
     "artifacts/**/*.py",
     "artifacts/**/*.sh",
     "artifacts/**/*.yaml",
     "artifacts/**/*.yml",
     "artifacts/**/*.md",
+    "artifacts/embedding-runtime/pyproject.toml",
+    "artifacts/embedding-runtime/uv.lock",
 ]
 kg_microbe_config = ["openclaw_config.yaml"]
 kg_microbe_agents = ["definitions/**/*.yaml"]
 kg_microbe_qc = ["templates/*.j2"]
 kg_microbe_discussions = ["templates/*.html"]
+# The Biolink snapshot the KGX exporter maps to (scripts/snapshot_biolink.py).
+kg_microbe_kgx = ["data/*.json"]
 
 [tool.uv]
 package = true

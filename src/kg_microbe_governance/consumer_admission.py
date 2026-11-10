@@ -100,6 +100,7 @@ def compose(
     from .cycle_release_audit import RELEASE_PATH, parse_release
     from .infrastructure_admission import (
         ADMISSION_PATH,
+        ADMITTED_CAPABILITIES,
         ADMITTED_MANIFEST_PATH,
         HISTORICAL_MANIFEST_PATH,
         NATIVE_TESTS,
@@ -162,7 +163,18 @@ def compose(
                                    yaml.safe_dump(old_fleet).encode())
     for key, admission in additions.items():
         entry = fleet_doc["mechs"][key]
-        if canonical_sha(entry) != admission.policy["fleet_entry_sha256"]:
+        admitted_entry = entry
+        if (canonical_sha(admitted_entry) != admission.policy["fleet_entry_sha256"]
+                and isinstance(entry.get("capabilities"), dict)
+                and ADMITTED_CAPABILITIES < set(entry["capabilities"])):
+            admitted_entry = {
+                **entry,
+                "capabilities": {
+                    cap_key: cap_value for cap_key, cap_value in entry["capabilities"].items()
+                    if cap_key in ADMITTED_CAPABILITIES
+                },
+            }
+        if canonical_sha(admitted_entry) != admission.policy["fleet_entry_sha256"]:
             raise GovernanceError("Additional admission fleet entry digest differs")
         if (entry.get("vendored_role") != "consumer"
                 or entry.get("serialization", {}).get("verified") is not False
@@ -173,7 +185,11 @@ def compose(
             if name == "vendored_sync":
                 if capability != {"status": "enabled"}:
                     raise GovernanceError("Additional admission requires exact vendored_sync obligation")
-            elif capability.get("status") not in {"disabled", "not_applicable"}:
+            elif (
+                capability.get("status") not in {"disabled", "not_applicable"}
+                or "settings" in capability
+                or "reason_claims" in capability
+            ):
                 raise GovernanceError("Additional infrastructure admission cannot enable execution capabilities")
         source = admission.source
         minimum = set(historical.consumers) | {key}

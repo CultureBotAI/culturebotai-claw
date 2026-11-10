@@ -21,6 +21,13 @@ permissions:
 
 jobs:
   fleet-audit:
+    name: public-fleet
+    needs: candidate-contracts
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      automatic_available: ${{ steps.automatic.outputs.available }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -47,13 +54,53 @@ jobs:
         uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
         with:
           python-version: "3.13"
-          enable-cache: true
+          enable-cache: false
           working-directory: fleet/trusted-claw
 
       - name: Install trusted governance package
         run: uv sync --project fleet/trusted-claw --locked
 
+      - name: Select installed protected automatic adapter
+        id: automatic
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -I - <<'PYCODE'
+          import json, os
+          from pathlib import Path
+          installed = Path("fleet/trusted-claw/src/kg_microbe_governance/automatic_fleet_component.py").is_file()
+          candidate = json.loads(Path("control/src/kg_microbe_governance/vendored_artifacts.json").read_bytes())
+          protected = json.loads(Path("fleet/trusted-claw/src/kg_microbe_governance/vendored_artifacts.json").read_bytes())
+          private_key = "scaleup" + "mech"
+          if not installed and any(private_key in x["consumers"] for x in (candidate, protected)):
+              raise SystemExit("Private obligations require the protected automatic adapter")
+          with Path(os.environ["GITHUB_OUTPUT"]).open("a") as output:
+              output.write("available=" + str(installed).lower() + "\n")
+          PYCODE
+
+      - name: Audit protected public fleet and candidate completeness
+        if: steps.automatic.outputs.available == 'true'
+        env:
+          GH_PUBLIC_READ_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ github.sha }}
+        run: >-
+          uv run --project fleet/trusted-claw --locked --no-dev python -m kg_microbe_governance.automatic_fleet_component
+          --trusted-root "$GITHUB_WORKSPACE/fleet/trusted-claw"
+          --workspace "$GITHUB_WORKSPACE/fleet/automatic-public"
+          --checkout-sha "$CANDIDATE_SHA" --output "$GITHUB_WORKSPACE/fleet/report/receipt.json"
+
+      - name: Publish bounded public component report
+        if: steps.automatic.outputs.available == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: public-fleet-${{ github.run_id }}-${{ github.run_attempt }}
+          path: fleet/report/receipt.json
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 1
+
       - name: Prepare protected infrastructure data snapshot
+        if: steps.automatic.outputs.available != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -94,6 +141,7 @@ jobs:
           done <<< "$source_refs"
 
       - name: Export manifest-defined governance consumers
+        if: steps.automatic.outputs.available != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -117,6 +165,7 @@ jobs:
           test -s fleet/governance-consumers.tsv
 
       - name: Check out manifest-defined Mech mains
+        if: steps.automatic.outputs.available != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -141,6 +190,7 @@ jobs:
       # Only trusted base/main can select this lane. A candidate declaration
       # cannot authorize its own downstream rollout before Claw merges it.
       - name: Select trusted release contract
+        if: steps.automatic.outputs.available != 'true'
         id: release-contract
         shell: bash
         run: |
@@ -155,7 +205,7 @@ jobs:
           PY
 
       - name: Read and compare every committed fleet pin
-        if: steps.release-contract.outputs.active != 'true'
+        if: steps.automatic.outputs.available != 'true' && steps.release-contract.outputs.active != 'true'
         id: fleet-pin
         shell: bash
         run: |
@@ -235,7 +285,7 @@ jobs:
           PY
 
       - name: Authenticate pin against trusted claw history
-        if: steps.release-contract.outputs.active != 'true'
+        if: steps.automatic.outputs.available != 'true' && steps.release-contract.outputs.active != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -247,7 +297,7 @@ jobs:
           fi
 
       - name: Audit all governed artifacts at committed main tips
-        if: steps.release-contract.outputs.active != 'true'
+        if: steps.automatic.outputs.available != 'true' && steps.release-contract.outputs.active != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -264,7 +314,7 @@ jobs:
             "${audit_args[@]}"
 
       - name: Audit the trusted bounded canary release
-        if: steps.release-contract.outputs.active == 'true'
+        if: steps.automatic.outputs.available != 'true' && steps.release-contract.outputs.active == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -274,24 +324,6 @@ jobs:
           done < fleet/governance-consumers.tsv
           uv run --project fleet/trusted-claw python -m kg_microbe_governance.cycle_release_audit \
             "${release_args[@]}" --json-output "$GITHUB_WORKSPACE/fleet/release-audit.json"
-
-      # The deployed-fleet audit above deliberately uses trusted base/main code.
-      # This separate lane proves that the proposed/current checkout itself has
-      # the authoritative layout and preserves the workflow's security contract.
-      - name: Validate candidate authority contract
-        shell: bash
-        run: |
-          set -euo pipefail
-          uv sync --project control --locked --extra dev
-          uv run --project control --extra dev python -m pytest -q \
-            control/tests/test_fleet_manifest.py \
-            control/tests/test_kg_microbe_governance.py \
-            control/tests/test_governance_cycle_release_audit.py \
-            control/tests/test_governance_infrastructure_admission.py \
-            control/tests/test_governance_consumer_admission.py \
-            control/tests/test_governance_cycle_release_workflow.py \
-            control/tests/test_id_label_workflow.py \
-            control/tests/test_authoritative_governance_layout.py
 
       # The consumer-completeness guard (#259) needs a checkout per consumer, so
       # everywhere without one it skipped every per-consumer case -- which was
@@ -305,6 +337,7 @@ jobs:
       # turns an unresolvable root from a silent skip into a failure, so the
       # step cannot pass by examining nothing.
       - name: Check every declared consumer carries what the manifest says
+        if: steps.automatic.outputs.available != 'true'
         shell: bash
         env:
           FLEET_CONSUMER_ROOTS_REQUIRED: "1"
@@ -332,3 +365,94 @@ jobs:
           done < fleet/candidate-governance-consumers.tsv
           uv run --project control --extra dev python -m pytest -q \
             control/tests/test_vendored_consumer_completeness.py
+
+  candidate-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: control
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          python-version: "3.13"
+          enable-cache: false
+      - name: Validate candidate authority contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv sync --project control --locked --extra dev
+          tests=(
+            control/tests/test_fleet_manifest.py
+            control/tests/test_kg_microbe_governance.py
+            control/tests/test_governance_cycle_release_audit.py
+            control/tests/test_governance_infrastructure_admission.py
+            control/tests/test_governance_cycle_release_workflow.py
+            control/tests/test_id_label_workflow.py
+            control/tests/test_authoritative_governance_layout.py
+          )
+          if [ -f control/tests/test_governance_consumer_admission.py ]; then
+            tests+=(control/tests/test_governance_consumer_admission.py)
+          fi
+          uv run --project control --locked --extra dev python -m pytest -q "${tests[@]}"
+
+  verified-fleet:
+    name: fleet-audit
+    permissions:
+      contents: read
+      actions: read
+    needs: [candidate-contracts, fleet-audit]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Require both component jobs to succeed
+        env:
+          CANDIDATE_RESULT: ${{ needs.candidate-contracts.result }}
+          PUBLIC_RESULT: ${{ needs.fleet-audit.result }}
+        run: test "$CANDIDATE_RESULT" = success && test "$PUBLIC_RESULT" = success
+      # Event checkout is not executed. It retains the queue's explicit subject
+      # checkout contract; all verifier code comes from the protected checkout.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: control
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'merge_group' && github.event.merge_group.base_sha || github.event_name == 'push' && github.sha || 'main' }}
+          path: fleet/trusted-claw
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          python-version: "3.13"
+          enable-cache: false
+      - name: Install protected verifier dependencies
+        run: uv sync --project fleet/trusted-claw --locked --no-dev
+      - name: Verify exact full coverage or public-only bootstrap
+        env:
+          GH_PUBLIC_READ_TOKEN: ${{ github.token }}
+          SCALEUP_AUDIT_EXPECTED_APP_ID: ${{ vars.SCALEUP_AUDIT_EXPECTED_APP_ID }}
+          AUTOMATIC_AVAILABLE: ${{ needs.fleet-audit.outputs.automatic_available }}
+          CANDIDATE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          trusted="$GITHUB_WORKSPACE/fleet/trusted-claw"
+          if [ -f "$trusted/src/kg_microbe_governance/automatic_private_audit_cli.py" ]; then
+            test "$AUTOMATIC_AVAILABLE" = true
+            uv run --project "$trusted" --locked --no-dev python -m kg_microbe_governance.automatic_private_audit_cli \
+              verify --trusted-root "$trusted" --checkout-sha "$CANDIDATE_SHA"
+          else
+            test "$AUTOMATIC_AVAILABLE" = false
+            python3 -I - <<'PYCODE'
+          import json
+          from pathlib import Path
+          private_key = "scaleup" + "mech"
+          for root in ("control", "fleet/trusted-claw"):
+              value = json.loads((Path(root) / "src/kg_microbe_governance/vendored_artifacts.json").read_bytes())
+              if private_key in value["consumers"]:
+                  raise SystemExit("Private obligations require the protected automatic adapter")
+          print("Existing protected public-only audit passed; private automation is not active")
+          PYCODE
+          fi

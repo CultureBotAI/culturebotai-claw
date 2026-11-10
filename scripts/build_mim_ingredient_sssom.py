@@ -585,7 +585,8 @@ def _load_kgm_labels() -> dict[str, tuple[str, list[str]]]:
 def _load_chebi_labels(chebi_ids: list[str], batch: int = 80) -> dict[str, str]:
     """CHEBI:X → rdfs:label from the local OAK sqlite. Batched so we
     don't pay cold-start overhead per term. Writes nothing if OAK isn't
-    on PATH — the builder falls back to the MIM-stored ontology_label."""
+    on PATH — the builder falls back to the MIM-stored ontology_label.
+    Raises RuntimeError if OAK is on PATH and exits nonzero (#351)."""
     out: dict[str, str] = {}
     if not chebi_ids:
         return out
@@ -596,6 +597,17 @@ def _load_chebi_labels(chebi_ids: list[str], batch: int = 80) -> dict[str, str]:
                 ["runoak", "-i", "sqlite:obo:chebi", "aliases"] + chunk,
                 capture_output=True, text=True, timeout=300,
             )
+            if proc.returncode != 0:
+                detail = (proc.stderr or proc.stdout or "").strip() or (
+                    f"exit status {proc.returncode}"
+                )
+                print(
+                    f"  ERROR: runoak failed (exit {proc.returncode}): {detail}",
+                    file=sys.stderr,
+                )
+                raise RuntimeError(
+                    f"runoak exited {proc.returncode} while loading CHEBI labels: {detail}"
+                )
             for line in proc.stdout.splitlines()[1:]:
                 parts = line.split("\t")
                 if len(parts) >= 3 and parts[1] == "rdfs:label":

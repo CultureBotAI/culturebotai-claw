@@ -429,6 +429,38 @@ mechs:
     tracking:
     - https://github.com/CultureBotAI/culturebotai-claw/issues/957
 
+  cofactormech:
+    revision: 3cb9d7a6ce527c84277daf6ddfd5cd56decbb4d1
+    native: no_pipeline_in_audited_source
+    evidence:
+    - https://github.com/CultureBotAI/CofactorMech/tree/3cb9d7a6ce527c84277daf6ddfd5cd56decbb4d1 (empty initial tree)
+    sets:
+      record-text:
+        modality: text
+        representation: whole_record
+        entity_type: cofactor
+        state: planned
+        notes: Blocked pending scaffold and evidence-backed seed adoption. No records, encoder, vectors or projection exist on the inspected empty main.
+    actions:
+    - Measure the curated cofactor corpus before designing a versioned text adapter; preserve source and cross-corpus evidence distinctions.
+    tracking:
+    - https://github.com/CultureBotAI/culturebotai-claw/issues/426
+  assaymech:
+    revision: a85aea616168160ec7e5dc08e71f15b361455924
+    native: no_pipeline_in_audited_source
+    evidence:
+    - https://github.com/CultureBotAI/AssayMech/tree/a85aea616168160ec7e5dc08e71f15b361455924 (empty initial tree)
+    sets:
+      record-text:
+        modality: text
+        representation: whole_record
+        entity_type: assay
+        state: planned
+        notes: Blocked pending scaffold and evidence-backed seed adoption. No records, encoder, vectors or projection exist on the inspected empty main.
+    actions:
+    - Measure the curated assay corpus before designing a versioned text adapter; preserve source and cross-corpus evidence distinctions.
+    tracking:
+    - https://github.com/CultureBotAI/culturebotai-claw/issues/426
   scaleupmech:
     revision: 38f8157fc960299f2458f4916dd581ce1b5d0262
     native: no_pipeline_in_audited_source

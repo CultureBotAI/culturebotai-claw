@@ -11,8 +11,9 @@ committed claw's manifest as it was at the pin.
 This reads the committed tree (``origin/main`` by default, never the worktree)
 for the outgoing pin in full or abbreviated to seven or more characters, in
 either case. The pin
-file itself is the change a re-pin makes and is not reported; ``reports/`` holds
-dated records, which quote the commit they were made against. A snapshot of
+file itself is the change a re-pin makes and is not reported. ``reports/``,
+``reviews/`` and ``research/`` hold dated records, which quote the commit they
+were made against; rewriting them would falsify history (#795). A snapshot of
 claw content is not found this way -- it quotes no SHA -- so snapshot files the
 governance manifest does not know are listed separately by name.
 """
@@ -29,7 +30,10 @@ from . import GovernanceError, _validate_ref
 # Seven is git's default `--short`, so `git log --oneline` output names a pin
 # this way (#534).
 MIN_ABBREVIATION = 7
-DATED_RECORD_PREFIXES = ("reports/",)
+# Dated records: review bundles, research runs and reports quote the commit they
+# were made against. For the pin the rollout to 76c1ebee retired (a5d56296),
+# 226 of the 230 hits across the Mechs still pinned to it were such records (#795).
+DATED_RECORD_PREFIXES = ("reports/", "reviews/", "research/")
 _HEX_RUN = re.compile(r"[0-9a-f]{%d,40}" % MIN_ABBREVIATION)
 _SNAPSHOT_NAME = re.compile(r"(^|/)\.?vendored[_-]?manifest[^/]*$", re.IGNORECASE)
 

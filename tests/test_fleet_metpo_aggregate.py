@@ -791,3 +791,53 @@ def test_cross_kind_collision_does_not_print_a_clean_verdict():
                                  for kind, rows in data["rows"].items()})
     assert "CLASS/PROPERTY ID REUSE" in rendered
     assert "none in the rows read" not in rendered
+
+
+def test_canonical_metpo_contract_matches_canonical_skill_and_normalized_templates(
+    tmp_path,
+):
+    """#385, #386: Claw governs the canonical 12-column class and 13-column
+    property ROBOT templates in `scripts/fleet_metpo_aggregate.py` and
+    `src/kg_microbe_skills/canonical/metpo-proposal.md`."""
+    assert fma.CANONICAL_SKILL_PATH.is_file()
+    skill_text = fma.CANONICAL_SKILL_PATH.read_text(encoding="utf-8")
+    assert fma.CANONICAL_IRI_NAMESPACE in skill_text
+    for col, directive in zip(
+        fma.CANONICAL_CLASS_HEADER, fma.CANONICAL_CLASS_TEMPLATE
+    ):
+        assert f"`{col}`" in skill_text
+        assert f"`{directive}`" in skill_text
+    for col, directive in zip(
+        fma.CANONICAL_PROPERTY_HEADER, fma.CANONICAL_PROPERTY_TEMPLATE
+    ):
+        assert f"`{col}`" in skill_text
+        assert f"`{directive}`" in skill_text
+
+    # A legacy 11-column class template normalizes to the canonical 12-column shape.
+    legacy_class_header = [
+        "synonyms" if c == "exact_synonyms" else c
+        for c in fma.CANONICAL_CLASS_HEADER[:-1]
+    ]
+    legacy_class_template = list(fma.CANONICAL_CLASS_TEMPLATE[:-1])
+    class_path = write_cohort(
+        tmp_path,
+        "v1",
+        [["METPO:1007001", "term"] + [""] * 9],
+        kind="classes",
+        header=legacy_class_header,
+        template=legacy_class_template,
+    )
+    header, template, _ = fma.read_template(class_path)
+    assert fma.is_canonical_shape("classes", header, template)
+
+    prop_path = write_cohort(
+        tmp_path,
+        "v1",
+        [["METPO:2007001", "rel"] + [""] * 11],
+        kind="properties",
+        header=list(fma.CANONICAL_PROPERTY_HEADER),
+        template=list(fma.CANONICAL_PROPERTY_TEMPLATE),
+    )
+    p_header, p_template, _ = fma.read_template(prop_path)
+    assert fma.is_canonical_shape("properties", p_header, p_template)
+

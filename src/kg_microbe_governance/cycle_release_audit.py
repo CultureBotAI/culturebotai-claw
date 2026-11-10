@@ -410,7 +410,18 @@ def audit_release(
             row["state"] = "invalid"
         rows.append(row)
     if deferred:
-        rows.extend(deferred_row(deferred[key]) for key in sorted(deferred))
+        for key in sorted(deferred):
+            d_row = deferred_row(deferred[key])
+            if (
+                not isinstance(d_row, Mapping)
+                or d_row.get("key") != key
+                or d_row.get("state") != "private_verification_required"
+                or d_row.get("installation_verified") is not False
+                or d_row.get("checked_artifacts") != 0
+                or type(d_row.get("checked_artifacts")) is not int
+            ):
+                raise GovernanceError("Deferred private obligation row violated unverified-state contract")
+            rows.append(dict(d_row))
     # Re-read metadata after the audit to catch concurrent changes observed
     # during inspection; there is no claim of locking out external writers.
     stable: list[tuple[Path, str, str | None]] = [(trusted, head, origin_main)]

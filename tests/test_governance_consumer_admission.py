@@ -205,14 +205,20 @@ def test_pre_admission_protected_base_cannot_activate_candidate_policy(tmp_path)
     assert result["ok"] and "consumer_admissions" not in result
 
 
-def test_real_scaleup_admission_keeps_all_twenty_two_native_artifacts():
+def test_real_cofactor_assay_and_scaleup_admissions_keep_all_twenty_two_native_artifacts():
     root = Path(__file__).parents[1]
     _, _, additions = composition(root)
-    assert set(additions) == {"scaleupmech"}
-    item = additions["scaleupmech"]
-    assert item.policy["source_ref"] == "88e719d5480d0008d6ce082510dcd066775f232b"
-    assert len(item.policy["required_artifacts"]) == 22
-    assert NATIVE_TESTS <= set(item.policy["required_artifacts"])
+    assert set(additions) == {"cofactormech", "assaymech", "scaleupmech"}
+    expected_refs = {
+        "cofactormech": "5790569efd881bd8bca82a04ea278cc462c0c2c8",
+        "assaymech": "89bfcebaee8a0fcf99055b2acd1709abb64f8666",
+        "scaleupmech": "88e719d5480d0008d6ce082510dcd066775f232b",
+    }
+    for key, ref in expected_refs.items():
+        item = additions[key]
+        assert item.policy["source_ref"] == ref
+        assert len(item.policy["required_artifacts"]) == 22
+        assert NATIVE_TESTS <= set(item.policy["required_artifacts"])
 
 
 def test_selector_cannot_read_skip_worktree_policy_instead_of_committed_bytes(tmp_path):
@@ -245,15 +251,37 @@ def test_resealing_candidate_source_cannot_change_required_native_contract(tmp_p
         composition(claw)
 
 
-def test_resealed_fleet_entry_cannot_enable_scientific_capability():
+@pytest.mark.parametrize("spec", SPECS, ids=lambda s: s.consumer.key)
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        {"status": "enabled", "settings": {"slots": ["taxa[].id"]}},
+        {"status": "disabled", "reason": "No records yet.", "settings": {"slots": ["taxa[].id"]}},
+        {"status": "disabled", "reason": "No records yet.", "reason_claims": {"absent": ["data/records"]}},
+    ],
+)
+def test_post_cutoff_capability_cannot_enable_or_carry_settings_or_claims(spec, mutation):
     root = Path(__file__).parents[1]
     fleet = yaml.safe_load((root / FLEET_PATH).read_bytes())
-    policy = json.loads((root / SPEC.declaration).read_bytes())
-    fleet["mechs"][KEY]["capabilities"]["record_review"] = {"status": "enabled"}
-    policy["fleet_entry_sha256"] = canonical_sha(fleet["mechs"][KEY])
+    fleet["mechs"][spec.consumer.key]["capabilities"]["taxon_links"] = mutation
+    with pytest.raises(GovernanceError, match="cannot enable execution"):
+        compose(
+            lambda path: (root / path).read_bytes(),
+            yaml.safe_dump(fleet).encode(),
+            (root / MANIFEST).read_bytes(),
+        )
+
+
+@pytest.mark.parametrize("spec", SPECS, ids=lambda s: s.consumer.key)
+def test_resealed_fleet_entry_cannot_enable_scientific_capability(spec):
+    root = Path(__file__).parents[1]
+    fleet = yaml.safe_load((root / FLEET_PATH).read_bytes())
+    policy = json.loads((root / spec.declaration).read_bytes())
+    fleet["mechs"][spec.consumer.key]["capabilities"]["record_review"] = {"status": "enabled"}
+    policy["fleet_entry_sha256"] = canonical_sha(fleet["mechs"][spec.consumer.key])
 
     def read(path):
-        return json.dumps(policy).encode() if path == SPEC.declaration else (root / path).read_bytes()
+        return json.dumps(policy).encode() if path == spec.declaration else (root / path).read_bytes()
 
     with pytest.raises(GovernanceError, match="cannot enable execution"):
         compose(read, yaml.safe_dump(fleet).encode(), (root / MANIFEST).read_bytes())
@@ -277,6 +305,7 @@ def test_fully_matching_new_source_does_not_grant_other_consumers_its_pin(tmp_pa
     row = next(r for r in result['repositories'] if r['key'] == victim)
     assert any(i['code'] == 'unexpected_pin' for i in row['issues'])
     assert all(r['checked_artifacts'] == 0 for r in result['repositories'])
+
 
 def multiple_native_admissions(tmp_path, *, include_other=False):
     """Independent source branches need not include another admitted newcomer."""

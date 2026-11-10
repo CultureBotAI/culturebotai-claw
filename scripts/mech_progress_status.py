@@ -13,7 +13,11 @@ from typing import Any
 from mech_progress_publish import read_remote
 
 from kg_microbe_fleet import load_fleet_manifest
-from kg_microbe_progress import ProgressError, read_json, validate_bundle
+from kg_microbe_progress import (
+    ProgressError,
+    project_bundle_to_manifest,
+    read_json,
+)
 
 MAX_AGE_SECONDS = 15 * 60
 FUTURE_TOLERANCE_SECONDS = 60
@@ -114,7 +118,7 @@ def main(argv: list[str] | None = None, *, now: datetime | None = None) -> int:
         history, snapshot = bundle["history"], bundle["snapshot"]
         if not isinstance(history, dict) or not isinstance(snapshot, dict):
             raise ProgressError("bundle must contain history and snapshot objects")
-        validate_bundle(history, snapshot, manifest)
+        snapshot = project_bundle_to_manifest(history, snapshot, manifest)
         warnings = freshness_warnings(snapshot, now or datetime.now(timezone.utc))
         summary = format_summary(snapshot)
         durability = []
