@@ -2998,6 +2998,9 @@ mechs:
       writer_audit:
         status: disabled
         reason: The native writing path and shared writer audit remain to be verified after scaffold adoption.
+      taxon_links:
+        status: disabled
+        reason: The empty admission main has no cofactor records or schema; enable once records or the schema declare organism links.
       site_contract:
         status: disabled
         reason: No built site has been verified against the shared HTML contract.

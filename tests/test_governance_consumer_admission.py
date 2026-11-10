@@ -244,6 +244,26 @@ def test_resealing_candidate_source_cannot_change_required_native_contract(tmp_p
         composition(claw)
 
 
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        {"status": "enabled", "settings": {"slots": ["taxa[].id"]}},
+        {"status": "disabled", "reason": "No records yet.", "settings": {"slots": ["taxa[].id"]}},
+        {"status": "disabled", "reason": "No records yet.", "reason_claims": {"absent": ["data/cofactors"]}},
+    ],
+)
+def test_post_cutoff_capability_cannot_enable_or_carry_settings_or_claims(mutation):
+    root = Path(__file__).parents[1]
+    fleet = yaml.safe_load((root / FLEET_PATH).read_bytes())
+    fleet["mechs"][KEY]["capabilities"]["taxon_links"] = mutation
+    with pytest.raises(GovernanceError, match="cannot enable execution"):
+        compose(
+            lambda path: (root / path).read_bytes(),
+            yaml.safe_dump(fleet).encode(),
+            (root / MANIFEST).read_bytes(),
+        )
+
+
 def test_resealed_fleet_entry_cannot_enable_scientific_capability():
     root = Path(__file__).parents[1]
     fleet = yaml.safe_load((root / FLEET_PATH).read_bytes())
