@@ -1,4 +1,4 @@
-# ScaleupMech private admission and release dependencies
+# ScaleupMech admission and release dependencies
 
 This domain rationale is retained from #1074. See the
 [combined candidate](COMBINED_FLEET_ADMISSION.md) for its composition and current
@@ -6,14 +6,17 @@ release dependencies; statements about an independent proposal below describe
 that original proposal. Public output now follows the reserved
 `exclude-from-public` tag described in [public membership](PUBLIC_FLEET_OUTPUT.md).
 
-ScaleupMech is a private repository at
+ScaleupMech was verified as private on 2026-11-10 at
 [CultureBotAI/ScaleupMech](https://github.com/CultureBotAI/ScaleupMech).
 Its inspected initial main is the empty commit
 `38f8157fc960299f2458f4916dd581ce1b5d0262`. The planned package is
 `src/scaleupmech`, schema `src/scaleupmech/schema/scaleupmech.yaml`, root class
 `ScaleTransferRecord`, and record inventory `data/scale_transfers/*.yaml`.
 Scaffold and seed PRs remain separate from registration. Private visibility is
-required; registration does not authorize publication of scientific content.
+not required: ScaleupMech may have a public repository and its own GitHub Pages
+site. The tag excludes it from X-Mech suite representation and aggregate public
+outputs, not from independent publication. This integration changes neither
+repository visibility nor native Pages configuration.
 
 Configure `SCALEUPMECH_ROOT` to the identity-verified repository root. Durable
 clones, worktrees, review evidence, scripts and retained state belong under
@@ -33,12 +36,12 @@ source pin and manifest, conservative fleet-entry digest and exact empty-main
 boundary. Cofactor and Assay declarations confer no Scaleup authority; existing
 DUF/Edge declarations and allowed pins remain unchanged.
 
-## Private audit boundary
+## Audit boundary while the repository is private
 
 Current public claw CI clones consumers and then executes candidate PR code in
 the same job. Adding a private-read credential there would expose private Git
 objects and files to that candidate. Anonymous cloning cannot establish private
-consumer completeness. This admission therefore requires separately reviewed
+consumer completeness. While the repository remains private, admission requires separately reviewed
 trusted private-audit plumbing, isolated from candidate code and public logs.
 Missing authorization must fail closed; a skipped private consumer is not a
 successful fleet audit. No private data may be uploaded into a public CI artifact.
@@ -46,6 +49,11 @@ A bounded public result may contain only the explicitly approved governance
 status and identity metadata, never private records, blobs, or credentials.
 The credential and protected-workflow prerequisites remain explicit release
 holds, not exceptions to artifact completeness or permission checks.
+
+If the repository becomes public, recheck anonymous access and the ordinary
+fleet audit. The private-audit plumbing is then unnecessary solely for access
+to this repository; protected admission and artifact-completeness requirements
+still apply. Public visibility does not remove its suite-exclusion tag.
 
 Before the onboarding PR opens, scaffold and separate seed PRs must exist.
 Independent adversarial review, issue fixes, exact-head re-review and all checks

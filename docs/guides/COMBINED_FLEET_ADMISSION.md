@@ -53,7 +53,9 @@ to make required-root validation pass.
 ScaleupMech carries `tags: [exclude-from-public]`. The shared public-membership
 projection removes it before serialization and aggregation while ordinary
 inventory, governance and internal commands retain it. This policy changes no
-GitHub repository visibility. See [public outputs](PUBLIC_FLEET_OUTPUT.md).
+GitHub repository visibility. ScaleupMech may have a public repository and its
+own GitHub Pages site while remaining excluded from the suite. See
+[public outputs](PUBLIC_FLEET_OUTPUT.md).
 
 The unpublished candidate entry hashes are resealed for the current catalogue
 and Scaleup's tag. Frozen source manifests and historical declarations are not
@@ -67,11 +69,15 @@ The active scoped cycle lane admits only its exact protected cohort. The new
 declarations cannot activate themselves against an older protected base. The
 combined branch is a reviewable candidate, not a green release shortcut.
 
-Scaleup is private. The existing public governance job cannot anonymously clone
+Scaleup was verified as private on 2026-11-10. This is observed access state,
+not a requirement of the exclusion policy. The existing public governance job cannot anonymously clone
 it; adding a private credential to candidate execution is not an acceptable
 remedy. [Private prerequisite #1077](https://github.com/CultureBotAI/culturebotai-claw/pull/1077)
 and [automatic audit #1082](https://github.com/CultureBotAI/culturebotai-claw/pull/1082)
-remain separate reviewed dependencies. Their protected producer, App environment
+remain separate reviewed dependencies while the repository is private. If it
+becomes public, verify ordinary anonymous access and rerun the fleet audit;
+private-audit plumbing is not required solely for a public repository. Neither
+visibility choice changes the suite-exclusion tag. Their protected producer, App environment
 configuration and live canaries are not installed or activated by this candidate.
 The optional adapter retained from #1074 returns incomplete overall success
 until trusted private verification finishes; it is not a gate waiver.

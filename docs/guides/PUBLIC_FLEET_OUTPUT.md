@@ -6,6 +6,13 @@ mean an empty list. The reserved tag `exclude-from-public` removes a member from
 public fleet outputs. It does not change repository visibility, governance
 membership, root configuration, lock ownership, or internal operations.
 
+This is a suite-representation policy, not a publication restriction on the
+member itself. An excluded member may have a public GitHub repository and its
+own GitHub Pages site. ScaleupMech may publish independently while remaining
+absent from the X-Mech pages, suite indexes, aggregate statistics and shared
+public progress projection. Its own website and native publishing workflows
+must not be disabled solely because of this tag.
+
 Use `load_fleet_manifest().public()` before reading member-specific inputs,
 serializing identities, or computing public totals. The returned manifest has
 the same capability catalogue and governance authority but only public members.
