@@ -35,7 +35,7 @@ uv run python -m kg_microbe_fleet targets --capability record_review
 Before judging any record:
 1. Resolve **exactly one target record** (or one explicitly bounded category/batch) inside the target Mech checkout (`$MECH_ROOT`). If a label, slug, or CURIE matches multiple records, stop and disambiguate.
 2. Read the entire target YAML file, the Mech's `<mech>/docs/record-review-profile.md`, and the shared review contract in `src/kg_microbe_governance/artifacts/docs/record-reviews.md` (`<mech>/docs/record-reviews.md`).
-3. Verify that `$MECH_ROOT/.temp/` is gitignored and use it for all staging files, review targets, and draft bundles—never /tmp, /private/tmp, or `$TMPDIR`.
+3. Verify that `$MECH_ROOT/.temp/` is gitignored and use it for all staging files, review targets, and draft bundles. Never store session state in /tmp, /private/tmp or `$TMPDIR`.
 
 ---
 
