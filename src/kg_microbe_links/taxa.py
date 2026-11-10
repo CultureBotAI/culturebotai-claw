@@ -156,19 +156,19 @@ class TaxonIndex:
             raise TaxonLinksError(f"TaxonMech checkout {self.root} has no {relative}")
         return path
 
-    def _read_tsv(self, relative: str, columns: Sequence[str], *, may_be_empty: bool) -> list[dict[str, str]]:
-        """Rows of one of TaxonMech's TSVs, with the columns the reader needs present; a file with no rows is
-        unusable unless `may_be_empty` (a header-only merge table means no merges)."""
+    def _read_tsv(self, relative: str, columns: Sequence[str], *, may_be_empty: bool) -> list[tuple[int, dict[str, str]]]:
+        """Line-numbered rows of one of TaxonMech's TSVs, with the columns the reader needs present; a file with
+        no rows is unusable unless `may_be_empty` (a header-only merge table means no merges)."""
         with self._require(relative).open(encoding="utf-8") as handle:
             try:
                 reader = csv.DictReader(handle, delimiter="\t")
                 missing = [c for c in columns if c not in (reader.fieldnames or [])]
                 if missing:
                     raise TaxonLinksError(f"{relative} has no {', '.join(missing)} column")
-                rows = list(reader)
+                rows = [(reader.line_num, row) for row in reader]
             except (csv.Error, UnicodeDecodeError) as exc:  # a field over csv's limit, bytes that are not UTF-8
                 raise TaxonLinksError(f"{relative} cannot be read as a TSV: {exc}") from exc
-        for n, row in enumerate(rows, 2):
+        for n, row in rows:
             if None in row or None in row.values():  # extra cells land under the key None; missing ones are None
                 raise TaxonLinksError(f"{relative} row {n} has a different number of cells than the header")
         if not rows and not may_be_empty:
@@ -177,11 +177,11 @@ class TaxonIndex:
 
     def _read_scope(self) -> set[int]:
         return {_curie_id(row["identifier"], f"{SCOPE_PATH} row {n}")
-                for n, row in enumerate(self._read_tsv(SCOPE_PATH, ["identifier"], may_be_empty=False), 2)}
+                for n, row in self._read_tsv(SCOPE_PATH, ["identifier"], may_be_empty=False)}
 
     def _read_merged(self) -> dict[int, int]:
         merged = {_curie_id(row["old_taxon_id"], f"{MERGED_PATH} row {n}"): _curie_id(row["current_taxon_id"], f"{MERGED_PATH} row {n}")
-                  for n, row in enumerate(self._read_tsv(MERGED_PATH, ["old_taxon_id", "current_taxon_id"], may_be_empty=True), 2)}
+                  for n, row in self._read_tsv(MERGED_PATH, ["old_taxon_id", "current_taxon_id"], may_be_empty=True)}
         # A self-map or a cycle would make judge() follow merges forever. Every id on a walked chain
         # is then pointed straight at the chain's end, so a judgement is one lookup and a later walk
         # through it stops at once: a long chain costs linear time however the rows are ordered.
@@ -202,7 +202,7 @@ class TaxonIndex:
     def _read_inventory(self) -> dict[int, tuple[str, int]]:
         inventory: dict[int, tuple[str, int]] = {}
         rows = self._read_tsv(INVENTORY_PATH, ["taxon_id", "label", "rank", "parent_id"], may_be_empty=False)
-        for n, row in enumerate(rows, 2):
+        for n, row in rows:
             taxon = _curie_id(row["taxon_id"], f"{INVENTORY_PATH} row {n}")
             parent = _curie_id(row["parent_id"], f"{INVENTORY_PATH} row {n}") if row["parent_id"] else ROOT_TAXON
             inventory[taxon] = ((row["rank"] or "NO_RANK").lower().replace("_", " "), parent)
