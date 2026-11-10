@@ -77,7 +77,8 @@ the working tree. Before concluding a path or feature is absent, search with
    layout matches the fleet convention (`AGENTS.md` as the real instruction file
    with `CLAUDE.md -> AGENTS.md` as a relative symlink, and `.claude/skills/` as
    the real skill directory with `.agents/skills -> ../.claude/skills` as a
-   relative symlink so `scripts/record_review.py`'s `O_NOFOLLOW` walker succeeds).
+   relative symlink so `src/kg_microbe_governance/artifacts/scripts/record_review.py`'s
+   `O_NOFOLLOW` walker succeeds).
    Record Tier 1 gaps and deferred capability work with evidence; registration
    alone does not implement missing features.
 7. When the companion X-Mech Suite repository (`CultureBotAI/CultureBotAI.github.io`,
