@@ -222,5 +222,10 @@
     ".github/workflows/validate-strict.yaml": [
       "validate-strict"
     ]
+  },
+  "scaleupmech": {
+    ".github/workflows/validate-strict.yaml": [
+      "validate-strict"
+    ]
   }
 }

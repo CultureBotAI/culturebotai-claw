@@ -15,6 +15,7 @@ from kg_microbe_governance.artifacts.scripts.record_review import (
 CASES = {
     "cofactormech": ("evidence", "cofactor-requirement", "Synthetic enzyme-bound cofactor", "claim", "Biochemical requirement, not ingredient role alone"),
     "assaymech": ("scope", "assay-observation", "Synthetic microbial assay", "assay", "Method identity distinguished from organism-specific measured outcome"),
+    "scaleupmech": ("scope", "scale-transfer-observation", "Synthetic strain scale transfer", "scale-transfer", "Source and target scales distinguished with comparable measured outcomes"),
     "edgemech": ("provenance", "source-occurrence", "Synthetic pinned KG row", "occurrence", "Exact row identity and inherited scope, not independent approval"),
     "aimech": ("provenance", "ontology-release", "Synthetic pinned AIO release", "concept", "Imported ontology assertion, not experimental evidence"),
     "culturemech": ("quantity", "medium-variant", "Synthetic variant", "g/L", "Ingredient concentration"),

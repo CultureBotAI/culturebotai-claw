@@ -208,8 +208,8 @@ def test_review_eligibility_is_independent_of_scientific_curation():
     assert canonical["curate-yaml-record"].capability == "curation_history"
     eligible = set(manifest.with_capability("record_review"))
     assert set(applicable_mechs(canonical["review-yaml-record"])) == eligible
-    assert eligible == set(manifest.mechs) - {"edgemech", "cofactormech", "assaymech"}
-    for key in ("edgemech", "cofactormech", "assaymech"):
+    assert eligible == set(manifest.mechs) - {"edgemech", "cofactormech", "assaymech", "scaleupmech"}
+    for key in ("edgemech", "cofactormech", "assaymech", "scaleupmech"):
         assert not manifest.mechs[key].supports("record_review")
         assert key not in eligible
         for name in ("review-yaml-record", "review-yaml-category", "curate-yaml-record"):

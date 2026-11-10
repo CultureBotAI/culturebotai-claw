@@ -652,3 +652,16 @@ and all 22 native artifact obligations. It preserves the historical DUF and
 Edge declarations and permissions. A candidate declaration is data until its
 immutable introduction reaches protected first-parent history through a
 user-approved merge. See [AssayMech admission](ASSAYMECH_ADMISSION.md).
+
+### ScaleupMech pending admission
+
+See [ScaleupMech admission](SCALEUPMECH_ADMISSION.md) for its exact empty-main
+inspection, 22-artifact obligation and published bootstrap procedure. It needs
+its own separately reviewed declaration; existing Edge, Cofactor or Assay policy
+is not authority for Scaleup. Candidate validation is not protected deployment.
+
+The separately sealed ScaleupMech proposal preserves the historical DUF/Edge
+permissions and adds only its independently bound source. Private audit access
+remains an explicit protected-infrastructure dependency; no admission declaration
+permits private checkout data or credentials in an untrusted candidate job.
+See [ScaleupMech admission](SCALEUPMECH_ADMISSION.md).

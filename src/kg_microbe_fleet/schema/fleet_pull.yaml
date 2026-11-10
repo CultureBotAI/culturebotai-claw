@@ -97,6 +97,8 @@ enums:
         description: CofactorMech repository.
       assaymech:
         description: AssayMech repository.
+      scaleupmech:
+        description: ScaleupMech repository.
 
   FleetPullStatusEnum:
     description: Per-repository status returned by fleet_pull.py.

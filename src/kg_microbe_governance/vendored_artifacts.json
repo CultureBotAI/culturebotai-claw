@@ -70,6 +70,10 @@
     "assaymech": {
       "github": "CultureBotAI/AssayMech",
       "package_path": "src/assaymech"
+    },
+    "scaleupmech": {
+      "github": "CultureBotAI/ScaleupMech",
+      "package_path": "src/scaleupmech"
     }
   },
   "artifacts": [
@@ -152,7 +156,8 @@
         "cmmmech",
         "aimech",
         "cofactormech",
-        "assaymech"
+        "assaymech",
+        "scaleupmech"
       ],
       "sha256": "a1252211fbdec1a4a36f8138b9a60617d69e9fa6c5c3f589d15846a783d77569",
       "mode": "0644"
@@ -177,7 +182,8 @@
         "cmmmech",
         "aimech",
         "cofactormech",
-        "assaymech"
+        "assaymech",
+        "scaleupmech"
       ],
       "sha256": "4714184d0ebf50d1d777c02390b214a3491531310811e3be600c730ed175b92f",
       "mode": "0644"
@@ -322,7 +328,8 @@
         "cmmmech",
         "aimech",
         "cofactormech",
-        "assaymech"
+        "assaymech",
+        "scaleupmech"
       ],
       "sha256": "7be08e684dcd235ddeae8f3c6a5d45b0ee74a60d1c1818cc81467e38901e5d56",
       "mode": "0644"

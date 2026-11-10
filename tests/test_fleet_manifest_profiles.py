@@ -27,6 +27,11 @@ EXPECTED_PROFILES = {
         ("src/assaymech/schema/assaymech.yaml",),
         ("data/assays/*.yaml",),
     ),
+    "scaleupmech": (
+        "src/scaleupmech",
+        ("src/scaleupmech/schema/scaleupmech.yaml",),
+        ("data/scale_transfers/*.yaml",),
+    ),
     "aimech": (
         "src/aimech",
         ("src/aimech/schema/aimech.yaml",),

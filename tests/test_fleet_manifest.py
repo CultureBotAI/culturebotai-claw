@@ -40,6 +40,7 @@ EXPECTED_MECHS = (
     "edgemech",
     "cofactormech",
     "assaymech",
+    "scaleupmech",
 )
 
 

@@ -54,6 +54,7 @@ manifest when no source checkout is present:
 - EdgeMech (`EDGEMECH_ROOT`)
 - CofactorMech (`COFACTORMECH_ROOT`) — admission pending; see the admission guide
 - AssayMech (`ASSAYMECH_ROOT`) — admission pending; see the admission guide
+- ScaleupMech (`SCALEUPMECH_ROOT`) — admission pending; see the admission guide
 
 You do not need every Mech cloned. `openclaw-cli config validate` reports an
 unset root as "not configured locally" rather than a failure; pass

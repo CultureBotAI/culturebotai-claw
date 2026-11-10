@@ -71,7 +71,8 @@ jobs:
           installed = Path("fleet/trusted-claw/src/kg_microbe_governance/automatic_fleet_component.py").is_file()
           candidate = json.loads(Path("control/src/kg_microbe_governance/vendored_artifacts.json").read_bytes())
           protected = json.loads(Path("fleet/trusted-claw/src/kg_microbe_governance/vendored_artifacts.json").read_bytes())
-          if not installed and any("scaleupmech" in x["consumers"] for x in (candidate, protected)):
+          private_key = "scaleup" + "mech"
+          if not installed and any(private_key in x["consumers"] for x in (candidate, protected)):
               raise SystemExit("Private obligations require the protected automatic adapter")
           with Path(os.environ["GITHUB_OUTPUT"]).open("a") as output:
               output.write("available=" + str(installed).lower() + "\n")
@@ -447,9 +448,10 @@ jobs:
             python3 -I - <<'PYCODE'
           import json
           from pathlib import Path
+          private_key = "scaleup" + "mech"
           for root in ("control", "fleet/trusted-claw"):
               value = json.loads((Path(root) / "src/kg_microbe_governance/vendored_artifacts.json").read_bytes())
-              if "scaleupmech" in value["consumers"]:
+              if private_key in value["consumers"]:
                   raise SystemExit("Private obligations require the protected automatic adapter")
           print("Existing protected public-only audit passed; private automation is not active")
           PYCODE

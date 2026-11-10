@@ -1,0 +1,38 @@
+{
+  "source_sha256": "6c2f01b45639c644a8ca9909f2afa1e1ebb1c9d4ff19650f27097a7314022334",
+  "isolation": "separate copied package; fresh Python and PYTHONPYCACHEPREFIX per run",
+  "rows": [
+    {
+      "mutation": "unconditional_full_success",
+      "selector": "test_deferred_admission_never_becomes_full_fleet_success",
+      "red_exit": 1,
+      "green_exit": 0,
+      "red_log": "/Users/marcin/agent-work/claw/scaleup-hook-mutations/unconditional_full_success.log",
+      "green_log": "/Users/marcin/agent-work/claw/scaleup-hook-mutations/unconditional_full_success-restored.log"
+    },
+    {
+      "mutation": "skip_binding",
+      "selector": "test_private_helper_binding_failure_is_not_swallowed",
+      "red_exit": 1,
+      "green_exit": 0,
+      "red_log": "/Users/marcin/agent-work/claw/scaleup-hook-mutations/skip_binding.log",
+      "green_log": "/Users/marcin/agent-work/claw/scaleup-hook-mutations/skip_binding-restored.log"
+    },
+    {
+      "mutation": "skip_coverage",
+      "selector": "test_private_hook_delegates_exact_coverage",
+      "red_exit": 1,
+      "green_exit": 0,
+      "red_log": "/Users/marcin/agent-work/claw/scaleup-hook-mutations/skip_coverage.log",
+      "green_log": "/Users/marcin/agent-work/claw/scaleup-hook-mutations/skip_coverage-restored.log"
+    },
+    {
+      "mutation": "require_helper_for_public",
+      "selector": "test_no_helper_needed_for_default_or_explicit_empty_obligations",
+      "red_exit": 1,
+      "green_exit": 0,
+      "red_log": "/Users/marcin/agent-work/claw/scaleup-hook-mutations/require_helper_for_public.log",
+      "green_log": "/Users/marcin/agent-work/claw/scaleup-hook-mutations/require_helper_for_public-restored.log"
+    }
+  ]
+}

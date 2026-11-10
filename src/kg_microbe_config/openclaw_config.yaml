@@ -123,6 +123,13 @@ repositories:
     task_runner: just
     description: "Microbial characterization and CMM assays with sourced method and measurement scope"
 
+  scaleupmech:
+    path: ${SCALEUPMECH_ROOT}
+    type: python
+    package_manager: uv
+    task_runner: just
+    description: "Organism- and strain-level titer, rate, yield and oxygen-transfer evidence across scales"
+
 agents:
   discovery_paths:
     - kg_microbe_agents/definitions

@@ -1,0 +1,42 @@
+[
+  {
+    "capability": "edison_key_discovery",
+    "mutation": "restore Assay-specific reason and correctly reseal candidate digest",
+    "test": "tests/test_scaleupmech_admission.py::test_withheld_capability_reasons_describe_scale_transfer_scope[edison_key_discovery]",
+    "red_exit": 1,
+    "restored_exit": 0,
+    "distinction": true
+  },
+  {
+    "capability": "environment_coverage",
+    "mutation": "restore Assay-specific reason and correctly reseal candidate digest",
+    "test": "tests/test_scaleupmech_admission.py::test_withheld_capability_reasons_describe_scale_transfer_scope[environment_coverage]",
+    "red_exit": 1,
+    "restored_exit": 0,
+    "distinction": true
+  },
+  {
+    "capability": "unmapped_inventory_input",
+    "mutation": "restore Assay-specific reason and correctly reseal candidate digest",
+    "test": "tests/test_scaleupmech_admission.py::test_withheld_capability_reasons_describe_scale_transfer_scope[unmapped_inventory_input]",
+    "red_exit": 1,
+    "restored_exit": 0,
+    "distinction": true
+  },
+  {
+    "capability": "causal_graph_coverage",
+    "mutation": "restore Assay-specific reason and correctly reseal candidate digest",
+    "test": "tests/test_scaleupmech_admission.py::test_withheld_capability_reasons_describe_scale_transfer_scope[causal_graph_coverage]",
+    "red_exit": 1,
+    "restored_exit": 0,
+    "distinction": true
+  },
+  {
+    "capability": "metpo_proposal",
+    "mutation": "restore Assay-specific reason and correctly reseal candidate digest",
+    "test": "tests/test_scaleupmech_admission.py::test_withheld_capability_reasons_describe_scale_transfer_scope[metpo_proposal]",
+    "red_exit": 1,
+    "restored_exit": 0,
+    "distinction": true
+  }
+]

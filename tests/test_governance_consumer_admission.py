@@ -36,7 +36,7 @@ from kg_microbe_governance.infrastructure_admission import (
     validate_packaged_transition,
 )
 
-SPEC = next(spec for spec in SPECS if spec.consumer.key == "assaymech")
+SPEC = next(spec for spec in SPECS if spec.consumer.key == "scaleupmech")
 KEY = SPEC.consumer.key
 
 
@@ -55,8 +55,8 @@ def native_admitted(tmp_path, *, installed=False, bad_ref=False):
             artifact["consumers"].append(KEY)
     put(claw, MANIFEST, json.dumps(manifest))
     fleet = yaml.safe_load((claw / FLEET_PATH).read_bytes())
-    entry = {**manifest["consumers"][KEY], "display_name": "AssayMech",
-             "environment_variable": "ASSAYMECH_ROOT", "schema_paths": ["schema.yaml"],
+    entry = {**manifest["consumers"][KEY], "display_name": "ScaleupMech",
+             "environment_variable": "SCALEUPMECH_ROOT", "schema_paths": ["schema.yaml"],
              "record_globs": ["data/*.yaml"], "vendored_role": "consumer",
              "serialization": {"verified": False, "reason": "No deployed native corpus"},
              "capabilities": {"vendored_sync": {"status": "enabled"}}}
@@ -205,13 +205,14 @@ def test_pre_admission_protected_base_cannot_activate_candidate_policy(tmp_path)
     assert result["ok"] and "consumer_admissions" not in result
 
 
-def test_real_cofactor_and_assay_admissions_keep_all_twenty_two_native_artifacts():
+def test_real_cofactor_assay_and_scaleup_admissions_keep_all_twenty_two_native_artifacts():
     root = Path(__file__).parents[1]
     _, _, additions = composition(root)
-    assert set(additions) == {"cofactormech", "assaymech"}
+    assert set(additions) == {"cofactormech", "assaymech", "scaleupmech"}
     expected_refs = {
         "cofactormech": "5790569efd881bd8bca82a04ea278cc462c0c2c8",
         "assaymech": "89bfcebaee8a0fcf99055b2acd1709abb64f8666",
+        "scaleupmech": "88e719d5480d0008d6ce082510dcd066775f232b",
     }
     for key, ref in expected_refs.items():
         item = additions[key]
@@ -306,7 +307,7 @@ def test_fully_matching_new_source_does_not_grant_other_consumers_its_pin(tmp_pa
     assert all(r['checked_artifacts'] == 0 for r in result['repositories'])
 
 
-def two_native_admissions(tmp_path, *, include_other=False):
+def multiple_native_admissions(tmp_path, *, include_other=False):
     """Independent source branches need not include another admitted newcomer."""
     claw, roots, edge, _, _, edge_anchor = admitted(tmp_path, installed=True)
     edge_manifest = json.loads((claw / MANIFEST).read_bytes())
@@ -384,8 +385,8 @@ def two_native_admissions(tmp_path, *, include_other=False):
     return claw, roots, refs, snapshots, edge
 
 
-def test_two_independent_native_snapshots_compose_without_each_other(tmp_path):
-    claw, roots, refs, snapshots, edge = two_native_admissions(tmp_path)
+def test_three_independent_native_snapshots_compose_without_each_other(tmp_path):
+    claw, roots, refs, snapshots, edge = multiple_native_admissions(tmp_path)
     for key, raw in snapshots.items():
         assert set(parse_manifest(raw).consumers) & set(refs) == {key}
     assert set(source_refs(claw)) == {edge["source_ref"], *refs.values()}
@@ -397,12 +398,11 @@ def test_two_independent_native_snapshots_compose_without_each_other(tmp_path):
         assert rows[key]["installation_verified"]
 
 
-@pytest.mark.parametrize("victim", ["cofactormech", "assaymech"])
+@pytest.mark.parametrize(("victim", "other"), [(a.consumer.key, b.consumer.key) for a in SPECS for b in SPECS if a != b])
 @pytest.mark.parametrize("include_other", [False, True])
-def test_new_consumers_cannot_exchange_independently_bound_pins(tmp_path, victim, include_other):
-    claw, roots, refs, _, _ = two_native_admissions(tmp_path, include_other=include_other)
+def test_new_consumers_cannot_exchange_independently_bound_pins(tmp_path, victim, other, include_other):
+    claw, roots, refs, _, _ = multiple_native_admissions(tmp_path, include_other=include_other)
     assert audit_release(claw, roots)["ok"]
-    other = next(key for key in refs if key != victim)
     put(roots[victim], PIN, refs[other] + "\n")
     commit(roots[victim], "install another newcomer's valid source pin")
     result = audit_release(claw, roots)

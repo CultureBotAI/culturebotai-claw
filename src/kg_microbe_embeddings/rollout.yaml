@@ -461,3 +461,19 @@ mechs:
     - Measure the curated assay corpus before designing a versioned text adapter; preserve source and cross-corpus evidence distinctions.
     tracking:
     - https://github.com/CultureBotAI/culturebotai-claw/issues/426
+  scaleupmech:
+    revision: 38f8157fc960299f2458f4916dd581ce1b5d0262
+    native: no_pipeline_in_audited_source
+    evidence:
+    - https://github.com/CultureBotAI/ScaleupMech/tree/38f8157fc960299f2458f4916dd581ce1b5d0262 (empty initial tree)
+    sets:
+      record-text:
+        modality: text
+        representation: whole_record
+        entity_type: scale-transfer
+        state: planned
+        notes: Blocked pending scaffold and evidence-backed seed adoption. No records, encoder, vectors or projection exist on the inspected empty main.
+    actions:
+    - Measure the curated scale-transfer corpus before designing a versioned text adapter; preserve source and cross-corpus evidence distinctions.
+    tracking:
+    - https://github.com/CultureBotAI/culturebotai-claw/issues/426

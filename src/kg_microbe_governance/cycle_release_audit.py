@@ -192,9 +192,22 @@ def _validate_release_assets(root: Path, ref: str, policy: Mapping[str, Any]) ->
         raise GovernanceError(f"Invalid release parent: {exc}") from exc
 
 
-def audit_release(trusted_root: Path, roots: Mapping[str, Path], *,
-                  private_obligations: Mapping[str, Any] | None = None) -> dict[str, Any]:
-    """Inspect all roots, returning detailed failures; policy errors raise."""
+def audit_release(
+    trusted_root: Path, roots: Mapping[str, Path], *,
+    private_obligations: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Audit exact public coverage; explicit private obligations remain incomplete.
+
+    The optional protected helper is imported only for deferred work. Its absence
+    refuses that mode, while the ordinary all-roots interface stays independent.
+    """
+    deferred = dict(private_obligations or {})
+    if deferred:
+        from .private_audit_coverage import (  # type: ignore[import-not-found]
+            deferred_row,
+            exact_coverage,
+            validate_admission,
+        )
     trusted = _validate_target_repository(
         trusted_root, Consumer("claw", CANONICAL_REPOSITORY, "src/kg_microbe_governance")
     )
@@ -264,11 +277,11 @@ def audit_release(trusted_root: Path, roots: Mapping[str, Path], *,
         }
     _validate_release_assets(trusted, candidate_ref, policy)
     cohort = current.consumers if admission else candidate.consumers
-    from .private_audit_coverage import deferred_row, exact_coverage
-
-    private_obligations = {} if private_obligations is None else dict(private_obligations)
-    exact_coverage(cohort, roots, private_obligations)
-    if set(roots) | set(private_obligations) != set(cohort):
+    if deferred:
+        exact_coverage(cohort, roots, deferred)
+        if not set(deferred) <= set(additional):
+            raise GovernanceError("Private obligations require a protected additional admission")
+    elif set(roots) != set(cohort):
         raise GovernanceError(
             "Release audit requires every exact fleet root "
             f"(missing={sorted(set(cohort) - set(roots))}, "
@@ -306,6 +319,9 @@ def audit_release(trusted_root: Path, roots: Mapping[str, Path], *,
     for key, item in additional.items():
         from .consumer_admission import bootstrap_pending as additional_bootstrap_pending
         consumer = item.spec.consumer
+        if key in deferred:
+            validate_admission(deferred[key], item.policy)
+            continue
         pending = additional_bootstrap_pending(roots[key], item)
         additional_pending[key] = pending
         if pending:
@@ -393,6 +409,19 @@ def audit_release(trusted_root: Path, roots: Mapping[str, Path], *,
         if row["issues"] or not clean:
             row["state"] = "invalid"
         rows.append(row)
+    if deferred:
+        for key in sorted(deferred):
+            d_row = deferred_row(deferred[key])
+            if (
+                not isinstance(d_row, Mapping)
+                or d_row.get("key") != key
+                or d_row.get("state") != "private_verification_required"
+                or d_row.get("installation_verified") is not False
+                or d_row.get("checked_artifacts") != 0
+                or type(d_row.get("checked_artifacts")) is not int
+            ):
+                raise GovernanceError("Deferred private obligation row violated unverified-state contract")
+            rows.append(dict(d_row))
     # Re-read metadata after the audit to catch concurrent changes observed
     # during inspection; there is no claim of locking out external writers.
     stable: list[tuple[Path, str, str | None]] = [(trusted, head, origin_main)]
@@ -402,11 +431,10 @@ def audit_release(trusted_root: Path, roots: Mapping[str, Path], *,
         if (_commit_at(root, "HEAD") != observed
                 or _commit_at(root, "refs/remotes/origin/main") != remote):
             raise GovernanceError("A worktree HEAD or origin/main changed during the release audit")
-    public_ok = clean and not any(row["issues"] for row in rows)
-    rows.extend(deferred_row(item) for item in private_obligations.values())
+    public_component_ok = clean and not any(row["issues"] for row in rows)
     result_document = {
-        "version": 1, "ok": public_ok and not private_obligations,
-        "public_component_ok": public_ok,
+        "version": 1, "ok": public_component_ok and not deferred,
+        "public_component_ok": public_component_ok,
         "expected_consumers": sorted(cohort),
         "release_id": RELEASE_ID,
         "trusted_head": head, "trusted_origin_main": origin_main,
@@ -417,7 +445,8 @@ def audit_release(trusted_root: Path, roots: Mapping[str, Path], *,
         "candidate_manifest_sha256": _sha(candidate_raw),
         "counts": {state: sum(row["state"] == state for row in rows)
                    for state in (("pending", "adopted", "retained", "invalid")
-                                 + (("pending_infrastructure_bootstrap", "installed_infrastructure") if admission else ()))},
+                                 + (("pending_infrastructure_bootstrap", "installed_infrastructure") if admission else ())
+                                 + (("private_verification_required",) if deferred else ()))},
         "repositories": rows,
     }
     if admission_report is not None:

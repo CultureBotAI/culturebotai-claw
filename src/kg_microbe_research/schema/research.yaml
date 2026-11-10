@@ -88,6 +88,7 @@ enums:
       EdgeMech:
       CofactorMech:
       AssayMech:
+      ScaleupMech:
 
   ProviderEnum:
     description: >-

@@ -175,7 +175,7 @@ def test_the_fleet_size_the_prose_describes_is_the_manifest_size():
     """Pins the number the accurate prose uses to the manifest, so a Mech added
     or removed makes the documentation demonstrably wrong rather than quietly
     so."""
-    assert len(load_fleet_manifest().mechs) == 17
+    assert len(load_fleet_manifest().mechs) == 18
 
 
 def test_no_module_hardcodes_the_fleet_size_as_a_constant():
@@ -272,4 +272,3 @@ def test_an_ungrounded_record_or_page_count_in_a_reason_is_caught(reason: str) -
 )
 def test_a_grounded_or_countless_reason_passes(reason: str) -> None:
     assert not _reason_has_ungrounded_record_or_page_count(reason), reason
-

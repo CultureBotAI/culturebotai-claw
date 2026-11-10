@@ -1,4 +1,4 @@
-"""Assay's and Cofactor's independently sealed bootstrap pins never select current bytes."""
+"""Cofactor's, Assay's, and Scaleup's independently sealed bootstrap pins never select current bytes."""
 import hashlib
 import json
 from pathlib import Path
@@ -17,6 +17,7 @@ ROOT = Path(__file__).parents[1]
 REFS = {
     "cofactormech": "5790569efd881bd8bca82a04ea278cc462c0c2c8",
     "assaymech": "89bfcebaee8a0fcf99055b2acd1709abb64f8666",
+    "scaleupmech": "88e719d5480d0008d6ce082510dcd066775f232b",
 }
 
 
