@@ -49,3 +49,4 @@ not in the documentation tree. Versioned goal-review evidence follows the
 repository paths defined by the workflow contract.
 
 - [CofactorMech pending admission](guides/COFACTORMECH_ADMISSION.md): bootstrap provenance, capability gaps and the coordinated release hold.
+- [AssayMech pending admission](guides/ASSAYMECH_ADMISSION.md): bootstrap provenance, conservative capability declarations and release dependencies.

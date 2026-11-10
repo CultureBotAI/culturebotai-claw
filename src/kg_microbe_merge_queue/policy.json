@@ -217,5 +217,10 @@
     ".github/workflows/validate-strict.yaml": [
       "validate-strict"
     ]
+  },
+  "assaymech": {
+    ".github/workflows/validate-strict.yaml": [
+      "validate-strict"
+    ]
   }
 }

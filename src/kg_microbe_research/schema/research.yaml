@@ -87,6 +87,7 @@ enums:
       AIMech:
       EdgeMech:
       CofactorMech:
+      AssayMech:
 
   ProviderEnum:
     description: >-

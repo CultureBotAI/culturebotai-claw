@@ -22,6 +22,11 @@ EXPECTED_PROFILES = {
         ("src/cofactormech/schema/cofactormech.yaml",),
         ("data/cofactors/*.yaml",),
     ),
+    "assaymech": (
+        "src/assaymech",
+        ("src/assaymech/schema/assaymech.yaml",),
+        ("data/assays/*.yaml",),
+    ),
     "aimech": (
         "src/aimech",
         ("src/aimech/schema/aimech.yaml",),

@@ -42,6 +42,11 @@ SPECS = (AdmissionSpec(
     "src/kg_microbe_governance/releases/cofactormech-infrastructure-admission-v1.json",
     "src/kg_microbe_governance/releases/cofactormech-infrastructure-source-manifest.json",
     "cofactormech-post-cutoff-infrastructure-v1",
+), AdmissionSpec(
+    Consumer("assaymech", "CultureBotAI/AssayMech", "src/assaymech"),
+    "src/kg_microbe_governance/releases/assaymech-infrastructure-admission-v1.json",
+    "src/kg_microbe_governance/releases/assaymech-infrastructure-source-manifest.json",
+    "assaymech-post-cutoff-infrastructure-v1",
 ),)
 FIELDS = frozenset({
     "version", "admission_id", "authority", "consumer", "source_ref",

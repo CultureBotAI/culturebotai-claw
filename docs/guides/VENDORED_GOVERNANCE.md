@@ -637,3 +637,18 @@ requires independent review, re-review, green checks and the user's explicit
 merge decision. Only protected approval can activate its bounded admission;
 the existing DUF/Edge policies and consumer pins remain unchanged. It does not
 claim a completed coordinated fleet release.
+
+### AssayMech pending admission
+
+See [AssayMech admission](ASSAYMECH_ADMISSION.md) for its exact empty-main
+inspection, 22-artifact obligation and published bootstrap procedure. It needs
+its own separately reviewed declaration; existing Edge or Cofactor policy is
+not authority for Assay. Candidate validation is not protected deployment.
+
+The AssayMech proposal adds its own sealed native-consumer admission, using the
+bounded mechanism reviewed for CofactorMech. Its declaration binds the exact
+published source manifest and pin, empty-main tip, conservative fleet entry,
+and all 22 native artifact obligations. It preserves the historical DUF and
+Edge declarations and permissions. A candidate declaration is data until its
+immutable introduction reaches protected first-parent history through a
+user-approved merge. See [AssayMech admission](ASSAYMECH_ADMISSION.md).

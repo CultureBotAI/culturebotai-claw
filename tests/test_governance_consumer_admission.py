@@ -36,7 +36,7 @@ from kg_microbe_governance.infrastructure_admission import (
     validate_packaged_transition,
 )
 
-SPEC = SPECS[0]
+SPEC = next(spec for spec in SPECS if spec.consumer.key == "assaymech")
 KEY = SPEC.consumer.key
 
 
@@ -55,8 +55,8 @@ def native_admitted(tmp_path, *, installed=False, bad_ref=False):
             artifact["consumers"].append(KEY)
     put(claw, MANIFEST, json.dumps(manifest))
     fleet = yaml.safe_load((claw / FLEET_PATH).read_bytes())
-    entry = {**manifest["consumers"][KEY], "display_name": "CofactorMech",
-             "environment_variable": "COFACTORMECH_ROOT", "schema_paths": ["schema.yaml"],
+    entry = {**manifest["consumers"][KEY], "display_name": "AssayMech",
+             "environment_variable": "ASSAYMECH_ROOT", "schema_paths": ["schema.yaml"],
              "record_globs": ["data/*.yaml"], "vendored_role": "consumer",
              "serialization": {"verified": False, "reason": "No deployed native corpus"},
              "capabilities": {"vendored_sync": {"status": "enabled"}}}
@@ -205,13 +205,19 @@ def test_pre_admission_protected_base_cannot_activate_candidate_policy(tmp_path)
     assert result["ok"] and "consumer_admissions" not in result
 
 
-def test_real_cofactor_admission_keeps_all_twenty_two_native_artifacts():
+def test_real_cofactor_and_assay_admissions_keep_all_twenty_two_native_artifacts():
     root = Path(__file__).parents[1]
     _, _, additions = composition(root)
-    item = additions[KEY]
-    assert item.policy["source_ref"] == "5790569efd881bd8bca82a04ea278cc462c0c2c8"
-    assert len(item.policy["required_artifacts"]) == 22
-    assert NATIVE_TESTS <= set(item.policy["required_artifacts"])
+    assert set(additions) == {"cofactormech", "assaymech"}
+    expected_refs = {
+        "cofactormech": "5790569efd881bd8bca82a04ea278cc462c0c2c8",
+        "assaymech": "89bfcebaee8a0fcf99055b2acd1709abb64f8666",
+    }
+    for key, ref in expected_refs.items():
+        item = additions[key]
+        assert item.policy["source_ref"] == ref
+        assert len(item.policy["required_artifacts"]) == 22
+        assert NATIVE_TESTS <= set(item.policy["required_artifacts"])
 
 
 def test_selector_cannot_read_skip_worktree_policy_instead_of_committed_bytes(tmp_path):
@@ -244,18 +250,19 @@ def test_resealing_candidate_source_cannot_change_required_native_contract(tmp_p
         composition(claw)
 
 
+@pytest.mark.parametrize("spec", SPECS, ids=lambda s: s.consumer.key)
 @pytest.mark.parametrize(
     "mutation",
     [
         {"status": "enabled", "settings": {"slots": ["taxa[].id"]}},
         {"status": "disabled", "reason": "No records yet.", "settings": {"slots": ["taxa[].id"]}},
-        {"status": "disabled", "reason": "No records yet.", "reason_claims": {"absent": ["data/cofactors"]}},
+        {"status": "disabled", "reason": "No records yet.", "reason_claims": {"absent": ["data/records"]}},
     ],
 )
-def test_post_cutoff_capability_cannot_enable_or_carry_settings_or_claims(mutation):
+def test_post_cutoff_capability_cannot_enable_or_carry_settings_or_claims(spec, mutation):
     root = Path(__file__).parents[1]
     fleet = yaml.safe_load((root / FLEET_PATH).read_bytes())
-    fleet["mechs"][KEY]["capabilities"]["taxon_links"] = mutation
+    fleet["mechs"][spec.consumer.key]["capabilities"]["taxon_links"] = mutation
     with pytest.raises(GovernanceError, match="cannot enable execution"):
         compose(
             lambda path: (root / path).read_bytes(),
@@ -264,15 +271,16 @@ def test_post_cutoff_capability_cannot_enable_or_carry_settings_or_claims(mutati
         )
 
 
-def test_resealed_fleet_entry_cannot_enable_scientific_capability():
+@pytest.mark.parametrize("spec", SPECS, ids=lambda s: s.consumer.key)
+def test_resealed_fleet_entry_cannot_enable_scientific_capability(spec):
     root = Path(__file__).parents[1]
     fleet = yaml.safe_load((root / FLEET_PATH).read_bytes())
-    policy = json.loads((root / SPEC.declaration).read_bytes())
-    fleet["mechs"][KEY]["capabilities"]["record_review"] = {"status": "enabled"}
-    policy["fleet_entry_sha256"] = canonical_sha(fleet["mechs"][KEY])
+    policy = json.loads((root / spec.declaration).read_bytes())
+    fleet["mechs"][spec.consumer.key]["capabilities"]["record_review"] = {"status": "enabled"}
+    policy["fleet_entry_sha256"] = canonical_sha(fleet["mechs"][spec.consumer.key])
 
     def read(path):
-        return json.dumps(policy).encode() if path == SPEC.declaration else (root / path).read_bytes()
+        return json.dumps(policy).encode() if path == spec.declaration else (root / path).read_bytes()
 
     with pytest.raises(GovernanceError, match="cannot enable execution"):
         compose(read, yaml.safe_dump(fleet).encode(), (root / MANIFEST).read_bytes())
@@ -296,3 +304,109 @@ def test_fully_matching_new_source_does_not_grant_other_consumers_its_pin(tmp_pa
     row = next(r for r in result['repositories'] if r['key'] == victim)
     assert any(i['code'] == 'unexpected_pin' for i in row['issues'])
     assert all(r['checked_artifacts'] == 0 for r in result['repositories'])
+
+
+def two_native_admissions(tmp_path, *, include_other=False):
+    """Independent source branches need not include another admitted newcomer."""
+    claw, roots, edge, _, _, edge_anchor = admitted(tmp_path, installed=True)
+    edge_manifest = json.loads((claw / MANIFEST).read_bytes())
+    edge_fleet = yaml.safe_load((claw / FLEET_PATH).read_bytes())
+    bootstrap = {}
+    entries = {}
+    snapshots = {}
+    refs = {}
+    for spec in SPECS:
+        consumer = spec.consumer
+        target = tmp_path / consumer.key
+        init(target, consumer.github)
+        put(target, "README.md", consumer.key + " initial bootstrap\n")
+        bootstrap[consumer.key] = commit(target)
+        roots[consumer.key] = target
+        entries[consumer.key] = {
+            "github": consumer.github, "package_path": consumer.package_path,
+            "display_name": consumer.key, "environment_variable": consumer.key.upper() + "_ROOT",
+            "schema_paths": ["schema.yaml"], "record_globs": ["data/*.yaml"],
+            "vendored_role": "consumer", "serialization": {"verified": False, "reason": "No deployed corpus"},
+            "capabilities": {"vendored_sync": {"status": "enabled"}},
+        }
+    for spec in SPECS:
+        git(claw, "checkout", "-b", "independent-" + spec.consumer.key, edge_anchor)
+        source = deepcopy(edge_manifest)
+        fleet = deepcopy(edge_fleet)
+        members = SPECS if include_other else (spec,)
+        for member in members:
+            key = member.consumer.key
+            source["consumers"][key] = {"github": member.consumer.github, "package_path": member.consumer.package_path}
+            fleet["mechs"][key] = entries[key]
+            for artifact in source["artifacts"]:
+                if artifact["id"] in NATIVE_TESTS:
+                    artifact["consumers"].append(key)
+        raw = json.dumps(source).encode()
+        put(claw, MANIFEST, raw.decode())
+        put(claw, FLEET_PATH, yaml.safe_dump(fleet))
+        put(claw, "source-identity.txt", spec.consumer.key + "\n")
+        refs[spec.consumer.key] = commit(claw, "independent " + spec.consumer.key + " data source")
+        snapshots[spec.consumer.key] = raw
+    git(claw, "checkout", "main")
+    assert git(claw, "rev-parse", "HEAD") == edge_anchor
+    current = deepcopy(edge_manifest)
+    fleet = deepcopy(edge_fleet)
+    historical = parse_manifest((claw / HISTORICAL_MANIFEST_PATH).read_bytes())
+    for spec in SPECS:
+        key = spec.consumer.key
+        current["consumers"][key] = {"github": spec.consumer.github, "package_path": spec.consumer.package_path}
+        fleet["mechs"][key] = entries[key]
+        for artifact in current["artifacts"]:
+            if artifact["id"] in NATIVE_TESTS:
+                artifact["consumers"].append(key)
+        policy = {
+            "version": 1, "admission_id": spec.admission_id, "authority": "infrastructure_only",
+            "consumer": {"key": key, "github": spec.consumer.github, "package_path": spec.consumer.package_path},
+            "source_ref": refs[key], "source_manifest_sha256": sha(snapshots[key]),
+            "bootstrap_main_ref": bootstrap[key], "fleet_entry_sha256": canonical_sha(entries[key]),
+            "historical_declaration_sha256": sha((claw / RELEASE_PATH).read_bytes()),
+            "historical_manifest_sha256": sha((claw / HISTORICAL_MANIFEST_PATH).read_bytes()),
+            "edge_declaration_sha256": sha((claw / ADMISSION_PATH).read_bytes()),
+            "required_artifacts": sorted(a.artifact_id for a in historical.artifacts if not a.consumers),
+        }
+        put(claw, spec.snapshot, snapshots[key].decode())
+        put(claw, spec.declaration, json.dumps(policy))
+        source = parse_manifest(snapshots[key])
+        for artifact in source.artifacts_for(spec.consumer):
+            target = expand_target(artifact, spec.consumer)
+            put(roots[key], target, (claw / artifact.source).read_text())
+            (roots[key] / target).chmod(artifact.mode)
+        put(roots[key], PIN, refs[key] + "\n")
+        commit(roots[key], "install separately bound source")
+    put(claw, MANIFEST, json.dumps(current))
+    put(claw, FLEET_PATH, yaml.safe_dump(fleet))
+    commit(claw, "protected separate declarations with complete composition")
+    return claw, roots, refs, snapshots, edge
+
+
+def test_two_independent_native_snapshots_compose_without_each_other(tmp_path):
+    claw, roots, refs, snapshots, edge = two_native_admissions(tmp_path)
+    for key, raw in snapshots.items():
+        assert set(parse_manifest(raw).consumers) & set(refs) == {key}
+    assert set(source_refs(claw)) == {edge["source_ref"], *refs.values()}
+    result = audit_release(claw, roots)
+    assert result["ok"]
+    rows = {row["key"]: row for row in result["repositories"]}
+    for key, ref in refs.items():
+        assert rows[key]["allowed_refs"] == [ref]
+        assert rows[key]["installation_verified"]
+
+
+@pytest.mark.parametrize("victim", ["cofactormech", "assaymech"])
+@pytest.mark.parametrize("include_other", [False, True])
+def test_new_consumers_cannot_exchange_independently_bound_pins(tmp_path, victim, include_other):
+    claw, roots, refs, _, _ = two_native_admissions(tmp_path, include_other=include_other)
+    assert audit_release(claw, roots)["ok"]
+    other = next(key for key in refs if key != victim)
+    put(roots[victim], PIN, refs[other] + "\n")
+    commit(roots[victim], "install another newcomer's valid source pin")
+    result = audit_release(claw, roots)
+    assert not result["ok"]
+    row = next(row for row in result["repositories"] if row["key"] == victim)
+    assert any(issue["code"] == "unexpected_pin" for issue in row["issues"])
+    assert all(row["checked_artifacts"] == 0 for row in result["repositories"])

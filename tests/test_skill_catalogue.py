@@ -208,8 +208,8 @@ def test_review_eligibility_is_independent_of_scientific_curation():
     assert canonical["curate-yaml-record"].capability == "curation_history"
     eligible = set(manifest.with_capability("record_review"))
     assert set(applicable_mechs(canonical["review-yaml-record"])) == eligible
-    assert set(manifest.with_capability("record_review")) == set(manifest.mechs) - {"edgemech", "cofactormech"}
-    for key in ("edgemech", "cofactormech"):
+    assert eligible == set(manifest.mechs) - {"edgemech", "cofactormech", "assaymech"}
+    for key in ("edgemech", "cofactormech", "assaymech"):
         assert not manifest.mechs[key].supports("record_review")
         assert key not in eligible
         for name in ("review-yaml-record", "review-yaml-category", "curate-yaml-record"):
@@ -775,4 +775,3 @@ def test_metpo_proposal_is_canonical_and_covers_proposing_mechs():
     }
     assert "https://w3id.org/metpo/" in text
     assert "<claw-root>/scripts/fleet_metpo_aggregate.py" in text
-
