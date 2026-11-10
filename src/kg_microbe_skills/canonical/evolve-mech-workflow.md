@@ -57,6 +57,13 @@ from that status to construct the goal_evidence and closure receipt; replace
 placeholders with observed proof. Bind all output to this goal;
 never infer a fresh goal or cycle from an edited candidate profile.
 
+An independently adopted repository-freshness contract additionally gates both
+agy and Codex execution before any new goal freezes inventory/evidence, including
+no-change goals, and after the verified actual merge before closure. Use the
+same released freshness runner, retain its immutable gate and inventory/closure
+artifacts, and stop on an unverified fetched revision. Candidate proposal files
+do not activate this policy or modify the current cycle's parent/profile.
+
 At each goal preflight, verify the active cycle and profile version, native goal
 identity, prerequisites, corpus scope and maintained input owners. Record any
 new repository requirement in INFRA_TASKS.md as work reveals it. A blocked

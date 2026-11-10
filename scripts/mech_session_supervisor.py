@@ -39,6 +39,10 @@ class SupervisorError(RuntimeError):
     """A failed prerequisite; never permission to guess or continue."""
 
 
+class FreshnessHold(SupervisorError):
+    """Freshness uncertainty holds the boundary without spending closure repairs."""
+
+
 def now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -456,6 +460,12 @@ def validate_config(config: dict, *, resolve_repositories: bool = True) -> dict:
                 raise SupervisorError(f"{key}: stage skill_paths missing")
         if not Path(target["root"]).is_absolute():
             raise SupervisorError(f"{key}: repository root must be absolute")
+        adoption = target.get("freshness_adoption")
+        if adoption is not None:
+            if (not isinstance(adoption, dict) or set(adoption) != {"path", "sha256"}
+                    or not isinstance(adoption["path"], str) or not Path(adoption["path"]).is_absolute()
+                    or not isinstance(adoption["sha256"], str) or not DIGEST.fullmatch(adoption["sha256"])):
+                raise SupervisorError(f"{key}: freshness_adoption needs an absolute path and exact SHA-256")
         for field in ("session_state_paths", "session_repository_roots"):
             if field in target:
                 paths = target[field]
@@ -504,7 +514,11 @@ def new_ledger(config: dict, target: dict, *, runner=command) -> dict:
         ledger.update(schema_version=2, cycle=1, workflow=pin_workflow(target["_workflow"]),
                       active_profile_path=target["workflow_profile_path"])
         record_cycle_version(ledger)
-        if workflow_stage_key(ledger) == "infrastructure":
+        if target.get("freshness_adoption") and ledger["stage"] == 1:
+            # A reviewed initial boundary must precede all inventory/baseline work.
+            # Merely configuring a candidate does not authorize an active goal.
+            ledger["freshness_initial_pending"] = True
+        elif workflow_stage_key(ledger) == "infrastructure":
             ledger["infra_scope"] = freeze_infrastructure(target)
         elif workflow_stage_key(ledger) == "open_issue_triage":
             ledger["issue_scope"] = freeze_open_issues(target, runner=runner)
@@ -1869,13 +1883,15 @@ function run(argv) {
 
 
 class Supervisor:
-    def __init__(self, config: dict, *, native=None, notifier=None, runner=command, stop_requested=None):
+    def __init__(self, config: dict, *, native=None, notifier=None, runner=command, stop_requested=None,
+                 freshness_runner=None):
         self.config = config
         self.runtime = Path(config["runtime_dir"])
         self.native = native or import_file(Path(config["native_reader_path"]), "supervisor_native")
         self.notifier = notifier or import_file(Path(config["notifier_path"]), "supervisor_terminal")
         self.runner = runner
         self.stop_requested = stop_requested or (lambda: False)
+        self.freshness_runner = freshness_runner
         self.native_cache: dict[str, tuple[tuple, dict]] = {}
         self._port_pressure_helpers = {
             "read_json": read_json, "atomic_json": atomic_json, "file_lock": file_lock,
@@ -1937,6 +1953,198 @@ class Supervisor:
                     "alert": True, "complete": False, "repository_count": 0,
                     "unpushed_commits": None, "at_risk_files": None, "overdue_files": None,
                     "errors": ["repository_identity_or_observation_unavailable"]}
+
+    def freshness_adoption(self, target: dict, ledger: dict, *, predecessor: str | None = None,
+                           activate: bool = False) -> dict | None:
+        """Validate independent adoption without changing the frozen workflow."""
+        from kg_microbe_workflows.freshness_contract import load_adoption
+        configured = target.get("freshness_adoption")
+        snapshot = ledger.get("repository_freshness")
+        if snapshot is None and not activate:
+            return None
+        if not configured:
+            raise FreshnessHold("adopted freshness contract is missing its immutable operator record")
+        if snapshot is not None:
+            if (not isinstance(snapshot, dict) or snapshot.get("adoption_sha256") != configured["sha256"]
+                    or not isinstance(snapshot.get("adoption"), dict)):
+                raise FreshnessHold("freshness adoption identity changed")
+            old = snapshot["adoption"]
+            boundary = old.get("boundary", {})
+            context = {"workflow_sha256": boundary.get("workflow_sha256"),
+                       "run_id": boundary.get("run_id"), "cycle": boundary.get("cycle"),
+                       "predecessor_receipt_sha256": boundary.get("predecessor_receipt_sha256")}
+        else:
+            if ledger["stage"] != 1:
+                raise FreshnessHold("freshness adoption is only permitted at a reviewed stage-1 boundary")
+            context = {"workflow_sha256": ledger.get("workflow", {}).get("sha256"),
+                       "run_id": ledger["run_id"], "cycle": ledger.get("cycle", 1),
+                       "predecessor_receipt_sha256": predecessor}
+        try:
+            record = load_adoption(Path(configured["path"]), expected_sha256=configured["sha256"],
+                                   repository_key=target["repository_key"], repository_root=Path(target["root"]),
+                                   **context)
+        except (OSError, ValueError, TypeError, KeyError) as error:
+            raise FreshnessHold("freshness adoption refused: " + str(error)) from error
+        if snapshot is not None and record != snapshot["adoption"]:
+            raise FreshnessHold("freshness adoption snapshot differs from its immutable record")
+        if snapshot is None:
+            snapshot = {"schema_version": "1.0.0", "adoption_sha256": configured["sha256"],
+                        "adoption": record, "policy_sha256": record["contract_sha256"]}
+            ledger["repository_freshness"] = snapshot
+        if snapshot.get("policy_sha256") != record["contract_sha256"]:
+            raise FreshnessHold("freshness policy digest changed")
+        return snapshot
+
+    def freshness_boundary_id(self, ledger: dict, phase: str) -> str:
+        return digest([ledger["run_id"], ledger["repository_key"], ledger.get("cycle", 1),
+                       ledger["stage"], ledger.get("workflow", {}).get("sha256"),
+                       ledger["repository_freshness"]["adoption_sha256"], phase])
+
+    def ensure_boundary_freshness(self, target: dict, ledger: dict, *, phase: str,
+                                  apply: bool, merge_commits: tuple[str, ...] = ()) -> dict:
+        from kg_microbe_workflows.freshness import ensure_freshness
+        from plugins.lock_manager import LockManager
+        from plugins.repository_settings import RepositoryTarget
+        snapshot = self.freshness_adoption(target, ledger)
+        if snapshot is None:
+            return {"status": "not_adopted"}
+        if not apply:
+            raise FreshnessHold("freshness boundary needs an authorized apply pass; observation never fetches")
+        expected_goal = copy.deepcopy(ledger.get("adopted_goal"))
+        if not expected_goal:
+            raise FreshnessHold("freshness requires an assessed native predecessor identity")
+
+        def owner_check():
+            observed = self.observe(target, fresh=True, allow_redraw=False)
+            if (self.stopping() or not observed.get("ready") or observed.get("error")
+                    or observed.get("goal_identity") != expected_goal
+                    or observed.get("goal_state") != "completed"):
+                raise FreshnessHold("native goal is not the verified completed idle boundary")
+            return {target["pid"]: " ".join(target["process_identity"].split())}
+
+        frozen_paths = {}
+        root = Path(target["root"]).resolve()
+        for source in ledger.get("workflow", {}).get("effective", {}).get("sources", []):
+            path = Path(source["path"])
+            try:
+                relative = path.relative_to(root).as_posix()
+            except ValueError:
+                continue  # Packaged/runtime snapshots are outside this Git tree.
+            if relative in frozen_paths and frozen_paths[relative] != source["sha256"]:
+                raise FreshnessHold("conflicting frozen workflow input identities")
+            frozen_paths[relative] = source["sha256"]
+        operation = self.freshness_runner or ensure_freshness
+        try:
+            input_lock = Path(self.config["input_lock_dir"]) / (Path(target["tty"]).name + ".lock")
+            with file_lock(input_lock):
+                report = operation(RepositoryTarget(target["repository_key"], Path(target["root"]),
+                                                    target["github_repository"]), phase=phase,
+                                   boundary_id=self.freshness_boundary_id(ledger, phase),
+                                   policy_sha256=snapshot["policy_sha256"],
+                                   locks=LockManager(),
+                                   owner_check=owner_check, protected_roots=(ROOT,), merge_commits=merge_commits,
+                                   frozen_paths=frozen_paths,
+                                   receipt_dir=self.directory(target) / "freshness", apply=True)
+        except (OSError, RuntimeError, ValueError, TypeError) as error:
+            raise FreshnessHold("repository freshness held: " + str(error)) from error
+        if (not isinstance(report, dict) or report.get("status") != "verified"
+                or report.get("boundary_id") != self.freshness_boundary_id(ledger, phase)
+                or report.get("policy_sha256") != snapshot["policy_sha256"]
+                or report.get("phase") != phase or not SHA.fullmatch(report.get("after", ""))
+                or report.get("after") != report.get("fetched")):
+            reason = report.get("reason", "invalid freshness proof") if isinstance(report, dict) else "invalid freshness proof"
+            raise FreshnessHold("repository freshness held: " + str(reason))
+        snapshot[phase] = copy.deepcopy(report)
+        return report
+
+    def verify_goal_freshness_record(self, target: dict, ledger: dict) -> dict | None:
+        from kg_microbe_workflows.freshness import verify_saved_receipt
+        snapshot = self.freshness_adoption(target, ledger)
+        if snapshot is None:
+            return None
+        report = snapshot.get("pre_goal") or {}
+        if (report.get("status") != "verified" or report.get("phase") != "pre_goal"
+                or report.get("boundary_id") != self.freshness_boundary_id(ledger, "pre_goal")
+                or report.get("policy_sha256") != snapshot["policy_sha256"]):
+            raise FreshnessHold("goal lacks its exact successful pre-inventory freshness proof")
+        try:
+            verify_saved_receipt(report)
+        except (OSError, ValueError, TypeError) as error:
+            raise FreshnessHold("pre-goal immutable freshness receipt rejected: " + str(error)) from error
+        return report
+
+    def verify_pre_goal_freshness(self, target: dict, ledger: dict, *, check_remote: bool = False) -> None:
+        from kg_microbe_workflows.freshness import verify_inventory_head
+        from plugins.repository_settings import RepositoryTarget
+        report = self.verify_goal_freshness_record(target, ledger)
+        if report is None:
+            return
+        # The packaged verifier always re-observes the default ref. A remote
+        # change after freeze is a hold, never permission to overwrite its scope.
+        try:
+            verify_inventory_head(RepositoryTarget(target["repository_key"], Path(target["root"]),
+                                                    target["github_repository"]), report,
+                                  boundary_id=self.freshness_boundary_id(ledger, "pre_goal"),
+                                  policy_sha256=ledger["repository_freshness"]["policy_sha256"])
+        except (OSError, ValueError, TypeError) as error:
+            raise FreshnessHold("pre-goal inventory freshness held: " + str(error)) from error
+
+    def initialize_freshness(self, target: dict, ledger: dict, observation: dict, *, apply: bool) -> dict:
+        if not ledger.get("freshness_initial_pending"):
+            return ledger
+        if (ledger.get("stage") != 1 or ledger.get("adopted_goal") or ledger.get("actions")
+                or ledger.get("completed_stages") or any(key in ledger for key in ("infra_scope", "issue_scope", "baseline_head"))
+                or not observation.get("ready") or observation.get("goal_state") != "completed"
+                or observation.get("goal_identity") != target["initial_goal_identity"]):
+            raise FreshnessHold("initial freshness adoption requires a pristine assessed completed native boundary")
+        candidate = copy.deepcopy(ledger)
+        self.freshness_adoption(target, candidate, activate=True)
+        candidate.update(adopted_goal=copy.deepcopy(target["initial_goal_identity"]), awaiting_goal=True)
+        self.ensure_boundary_freshness(target, candidate, phase="pre_goal", apply=apply)
+        self.verify_pre_goal_freshness(target, candidate)
+        candidate.pop("freshness_initial_pending")
+        self.freeze_stage_scope(target, candidate)
+        self.baseline(target, candidate)
+        return candidate
+
+    def freeze_stage_scope(self, target: dict, ledger: dict) -> None:
+        """Called only after the opted-in pre-goal gate, before native dispatch."""
+        if workflow_stage_key(ledger) == "infrastructure":
+            path = self.directory(target) / "cycles" / f"cycle-{ledger['cycle']:06d}" / "infra-scope.json"
+            if ledger.get("repository_freshness") and path.exists():
+                raise FreshnessHold("fresh stage already has an archived infrastructure scope; approved reconciliation required")
+            ledger["infra_scope"] = freeze_infrastructure(target)
+            self.write(path, ledger["infra_scope"])
+        else:
+            ledger.pop("infra_scope", None)
+        if workflow_stage_key(ledger) == "open_issue_triage":
+            path = self.directory(target) / "cycles" / f"cycle-{ledger['cycle']:06d}" / "issue-scope.json"
+            if ledger.get("repository_freshness") and path.exists():
+                raise FreshnessHold("fresh stage already has an archived inventory; approved reconciliation required")
+            ledger["issue_scope"] = read_json(path) if path.exists() else freeze_open_issues(target, runner=self.runner)
+            validate_frozen_issue_scope(ledger["issue_scope"], target)
+            self.write(path, ledger["issue_scope"])
+        else:
+            ledger.pop("issue_scope", None)
+
+    def freshness_merged_commits(self, target: dict, receipt: dict) -> tuple[str, ...]:
+        """Verify actual merge identity before any synchronization; full gates follow."""
+        from kg_microbe_workflows.closure import multi_pr_members
+        members = multi_pr_members(receipt) if "prs" in receipt else [receipt["pr"]]
+        merged = []
+        for member in members:
+            live = json.loads(self.runner(["gh", "api", f"repos/{target['github_repository']}/pulls/{member['number']}"]).stdout)
+            if (live.get("merged") is not True or not live.get("merged_at")
+                    or live.get("base", {}).get("ref") != member["base"]
+                    or live.get("base", {}).get("repo", {}).get("full_name", "").casefold() != target["github_repository"].casefold()
+                    or live.get("head", {}).get("ref") != member["branch"]
+                    or live.get("head", {}).get("sha") != member["head_sha"]
+                    or (live.get("head", {}).get("repo") or {}).get("full_name", "").casefold() != target["github_repository"].casefold()
+                    or not isinstance(live.get("merge_commit_sha"), str)
+                    or not SHA.fullmatch(live["merge_commit_sha"])):
+                raise FreshnessHold("post-merge freshness requires the actually merged exact repository/base/head")
+            merged.append(live["merge_commit_sha"])
+        return tuple(merged)
 
     def redraw_tab(self, target: dict, tab: dict, *, lock_held: bool = False) -> dict:
         payload = {**tab, "pid": target["pid"], "identity": target["process_identity"], "cwd": target["root"]}
@@ -2044,7 +2252,11 @@ class Supervisor:
             if proof is None:
                 continue
             if adopting and ledger.get("historical_goal_boundary") is not None:
-                from kg_microbe_workflows.reconciliation import ReconciliationError, boundary_goal, timestamp
+                from kg_microbe_workflows.reconciliation import (
+                    ReconciliationError,
+                    boundary_goal,
+                    timestamp,
+                )
                 try:
                     previous = boundary_goal(ledger)
                     if (not native_id or native_id["conversation_id"] != previous["conversation_id"]
@@ -2064,7 +2276,10 @@ class Supervisor:
                 ledger.pop("historical_goal_boundary", None)
 
     def baseline(self, target: dict, ledger: dict) -> None:
+        if ledger.get("freshness_initial_pending"):
+            return
         if "baseline_head" not in ledger:
+            self.verify_pre_goal_freshness(target, ledger)
             ledger["baseline_head"] = self.runner(["git", "-C", target["root"], "rev-parse", "HEAD"]).stdout.strip()
             ledger["baseline_status"] = self.runner(["git", "-C", target["root"], "status", "--porcelain=v1", "--untracked-files=all"]).stdout
 
@@ -2221,6 +2436,8 @@ class Supervisor:
                 return {"state": "not-sent", "reason": "; ".join(errors)}
             if ledger.get("schema_version") == 2:
                 self.check_workflow(target, ledger)
+            if decision["action"] == "start_goal":
+                self.verify_pre_goal_freshness(target, ledger, check_remote=True)
             prompt = (self.directory(target) / "effective-workflow.json" if ledger.get("workflow")
                       else Path(target["workflow_prompt_path"]))
             if not prompt.is_file():
@@ -2312,7 +2529,7 @@ class Supervisor:
         if archive.exists() and read_json(archive) != snapshot:
             raise SupervisorError("archived cycle instruction snapshot changed")
         self.write(archive, snapshot)
-        if workflow_stage_key(ledger) == "open_issue_triage":
+        if workflow_stage_key(ledger) == "open_issue_triage" and not ledger.get("freshness_initial_pending"):
             scope = ledger.get("issue_scope") or {}
             validate_frozen_issue_scope(scope, target)
             scope_path = archive.parent / "issue-scope.json"
@@ -2320,7 +2537,7 @@ class Supervisor:
                 raise SupervisorError("archived issue inventory changed")
             self.write(scope_path, scope)
 
-    def advance(self, target: dict, ledger: dict, receipt: dict, verification: dict, authority: str) -> dict:
+    def advance(self, target: dict, ledger: dict, receipt: dict, verification: dict, authority: str, *, apply: bool = False) -> dict:
         closed_stage = ledger["stage"]
         advanced = copy.deepcopy(ledger)
         record = {"stage": closed_stage, "cycle": ledger.get("cycle", 1), "goal_identity": ledger["adopted_goal"],
@@ -2333,6 +2550,8 @@ class Supervisor:
             if evidence:
                 record["goal_evidence"] = copy.deepcopy(receipt["goal_outputs"]["goal_evidence"])
                 record["goal_evidence_snapshot"] = evidence
+        if ledger.get("repository_freshness"):
+            record["repository_freshness"] = copy.deepcopy(ledger["repository_freshness"])
         advanced["completed_stages"].append(record)
         record_cycle_version(advanced)
         if ledger.get("schema_version") == 2 and closed_stage == last_stage(ledger):
@@ -2351,18 +2570,13 @@ class Supervisor:
             record_cycle_version(advanced)
         else:
             advanced.update(stage=closed_stage + 1, awaiting_goal=closed_stage < last_stage(ledger))
-        if workflow_stage_key(advanced) == "infrastructure":
-            advanced["infra_scope"] = freeze_infrastructure(target)
-            self.write(self.directory(target) / "cycles" / f"cycle-{advanced['cycle']:06d}" / "infra-scope.json", advanced["infra_scope"])
-        else:
-            advanced.pop("infra_scope", None)
-        if workflow_stage_key(advanced) == "open_issue_triage":
-            path = self.directory(target) / "cycles" / f"cycle-{advanced['cycle']:06d}" / "issue-scope.json"
-            advanced["issue_scope"] = read_json(path) if path.exists() else freeze_open_issues(target, runner=self.runner)
-            validate_frozen_issue_scope(advanced["issue_scope"], target)
-            self.write(path, advanced["issue_scope"])
-        else:
-            advanced.pop("issue_scope", None)
+        if (target.get("freshness_adoption") and not advanced.get("repository_freshness")
+                and closed_stage == last_stage(ledger)):
+            self.freshness_adoption(target, advanced, predecessor=digest(receipt), activate=True)
+        if advanced.get("repository_freshness"):
+            self.ensure_boundary_freshness(target, advanced, phase="pre_goal", apply=apply)
+            self.verify_pre_goal_freshness(target, advanced)
+        self.freeze_stage_scope(target, advanced)
         for key in ("baseline_head", "baseline_status", "legacy_receipt_stage"):
             advanced.pop(key, None)
         self.baseline(target, advanced)
@@ -2466,7 +2680,14 @@ class Supervisor:
                 observation.update(error=workflow_error, ready=False)
             if self.stopping():
                 break
-            self.reconcile(target, ledger, observation)
+            freshness_error = None
+            try:
+                ledger = self.initialize_freshness(target, ledger, observation, apply=apply)
+                self.freshness_adoption(target, ledger)
+            except FreshnessHold as error:
+                freshness_error = str(error)
+            if not freshness_error:
+                self.reconcile(target, ledger, observation)
             try:
                 self.baseline(target, ledger)
             except Exception as error:
@@ -2475,7 +2696,7 @@ class Supervisor:
             receipt_path = directory / "completion.json"
             verification = None
             receipt_errors = []
-            if receipt_path.exists() and ledger["stage"] <= last_stage(ledger) and not ledger.get("awaiting_goal") and not ledger.get("policy_notification_required") and not workflow_error:
+            if receipt_path.exists() and ledger["stage"] <= last_stage(ledger) and not ledger.get("awaiting_goal") and not ledger.get("policy_notification_required") and not workflow_error and not freshness_error:
                 try:
                     if receipt_path.is_symlink() or receipt_path.resolve().parent != directory.resolve() or not receipt_path.is_file():
                         raise SupervisorError("completion receipt is not a regular file inside this repository runtime")
@@ -2485,14 +2706,24 @@ class Supervisor:
                     receipt_errors = [] if archived else validate_receipt(receipt, ledger, target, directory)
                     if not archived and not receipt_errors and observation.get("ready"):
                         authority = completion_authority(target, ledger, observation)
+                        self.verify_goal_freshness_record(target, ledger)
+                        if ledger.get("repository_freshness") and receipt["status"] == "completed":
+                            merges = self.freshness_merged_commits(target, receipt)
+                            self.ensure_boundary_freshness(target, ledger, phase="post_merge", apply=apply, merge_commits=merges)
                         verification = verify_remote_receipt(receipt, ledger, target, self.runner, runtime=self.directory(target))
-                        ledger = self.advance(target, ledger, receipt, verification, authority)
+                        if ledger.get("repository_freshness"):
+                            verification["repository_freshness"] = copy.deepcopy(ledger["repository_freshness"])
+                        ledger = self.advance(target, ledger, receipt, verification, authority, apply=apply)
                         # Do not delete the producer's file; mismatched old receipts
                         # are ignored only while a new goal is awaiting acceptance.
+                except FreshnessHold as error:
+                    freshness_error = str(error)
                 except Exception as error:
                     receipt_errors.append(str(error)[:700])
             decision = decide(ledger, observation)
-            if receipt_errors:
+            if freshness_error:
+                decision = {"phase": "blocked", "blocker": "repository_freshness", "reason": freshness_error}
+            elif receipt_errors:
                 receipt_hash = hashlib.sha256(receipt_path.read_bytes()).hexdigest() if receipt_path.is_file() and not receipt_path.is_symlink() and receipt_path.resolve().parent == directory.resolve() else None
                 decision = repair_decision(ledger, observation, "; ".join(receipt_errors), receipt_hash)
             elif decision.get("action") == "repair_closure" and receipt_path.is_file():
@@ -2526,6 +2757,9 @@ class Supervisor:
                       "effective_workflow_path": str(directory / "effective-workflow.json"),
                       "goal_evidence_schema_path": next((source["path"] for source in ledger.get("workflow", {}).get("effective", {}).get("sources", []) if source["kind"] == "schema"), None),
                       "agent_progress": self.progress(target, ledger),
+                      "repository_freshness": (copy.deepcopy(ledger["repository_freshness"])
+                          if ledger.get("repository_freshness") else {"status": "not_adopted",
+                              "proposal_configured": bool(target.get("freshness_adoption"))}),
                       "active_profile_path": ledger.get("active_profile_path"),
                       "next_profile_path": target.get("workflow_next_profile_path"),
                       "infra_scope": ledger.get("infra_scope"),
