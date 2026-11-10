@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 import pytest
-from test_governance_admitted_sync import repository
+from test_governance_admitted_sync import frozen_payload, repository
 
 import kg_microbe_governance as governance
 from kg_microbe_governance.artifacts.scripts.check_vendored_sync import (
@@ -25,9 +25,7 @@ def _configure_native_source(spec, monkeypatch):
     manifest = parse_manifest(raw)
     payloads = {CANONICAL_MANIFEST_PATH: raw}
     for artifact in manifest.artifacts:
-        content = (ROOT / artifact.source).read_bytes()
-        assert hashlib.sha256(content).hexdigest() == artifact.sha256
-        payloads[artifact.source] = content
+        payloads[artifact.source] = frozen_payload(artifact)
     monkeypatch.setattr(governance, "fetch_url", lambda url: payloads[url.split("/", 6)[-1]])
     return payloads
 

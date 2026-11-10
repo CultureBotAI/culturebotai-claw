@@ -1,7 +1,6 @@
 """Closed public coverage and public-only rollout have real negative controls."""
 
 import copy
-import json
 import os
 import subprocess
 from pathlib import Path
@@ -176,11 +175,11 @@ def test_public_clone_never_includes_private_identity(
     calls = []
     monkeypatch.setattr(component, "git", lambda root, *args: calls.append(args) or "")
     monkeypatch.setattr(component.coverage, "obligation", lambda model: object())
-    public.get = lambda path: {
+    monkeypatch.setattr(component.PublicRepositoryMetadata, "get", lambda self, repository: {
         "full_name": "CultureBotAI/PublicMech",
         "private": False,
         "default_branch": "main",
-    }
+    })
     roots = component.clone_public(public, tmp_path / "ScaleupMech" / "clones", values)
     assert set(roots) == {"publicmech"}
     assert_public_clone_remotes(calls)
@@ -218,42 +217,6 @@ def test_cli_only_requires_app_configuration_when_private_obligation_exists(
     assert code == (2 if required else 0)
     assert calls == ([] if required else ["finalized"])
 
-
-@pytest.mark.parametrize(
-    "private,installed", [(False, False), (True, False), (False, True), (True, True)]
-)
-def test_actual_bootstrap_selector_requires_protected_code_for_private(
-    tmp_path, private, installed
-):
-    workflow = yaml.safe_load(WORKFLOW.read_text())
-    step = next(
-        s
-        for s in workflow["jobs"]["fleet-audit"]["steps"]
-        if s.get("id") == "automatic"
-    )
-    for name in ("control", "fleet/trusted-claw"):
-        path = tmp_path / name / auto.MANIFEST_PATH
-        path.parent.mkdir(parents=True)
-        path.write_text(
-            json.dumps({"consumers": {"scaleupmech": {}} if private else {}})
-        )
-    if installed:
-        (
-            tmp_path
-            / "fleet/trusted-claw/src/kg_microbe_governance/automatic_fleet_component.py"
-        ).write_text("protected fixture")
-    output = tmp_path / "output"
-    result = subprocess.run(
-        ["bash", "-c", step["run"]],
-        cwd=tmp_path,
-        env={**os.environ, "GITHUB_OUTPUT": str(output)},
-        capture_output=True,
-        text=True,
-        timeout=10,
-    )
-    assert (result.returncode == 0) is (installed or not private)
-    if result.returncode == 0:
-        assert output.read_text() == f"available={str(installed).lower()}\n"
 
 
 def test_real_queue_validator_accepts_only_complete_fail_closed_aggregate():

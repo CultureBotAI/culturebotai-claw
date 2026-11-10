@@ -174,6 +174,7 @@ uv run --extra dev mypy \
   src/kg_microbe_governance/automatic_private_audit.py \
   src/kg_microbe_governance/automatic_private_audit_cli.py \
   src/kg_microbe_governance/automatic_fleet_component.py \
+  src/kg_microbe_governance/public_repository_metadata.py \
   src/kg_microbe_governance/private_audit_coverage.py \
   src/kg_microbe_governance/cycle_release_audit.py \
   src/kg_microbe_governance/infrastructure_admission.py \
@@ -596,6 +597,23 @@ because they carry literal data the path rules would misread.
   Node; locally it skips without it, in CI it fails.
 - `.claude/commands/curate.md` coordinates the curation stages and must stop for
   confirmation before downstream mutations.
+
+## Repository freshness at goal boundaries
+
+After explicit boundary adoption, new agy and Codex goals must pass the packaged
+repository-freshness gate **before** inventory or evidence freeze, including
+no-change goals. Actual merges require a second gate before closure/next goal:
+fetch the canonical default branch, inspect divergence and ownership, safely
+fast-forward an eligible default checkout, and verify HEAD against the observed
+revision plus actual merge ancestry. Consume immutable gate artifacts; do not
+replace active goal evidence when a later revision appears. A candidate PR is
+not release, installation or adoption. Already-running unadopted goals retain
+their existing contract. See `docs/guides/REPOSITORY_FRESHNESS.md` and the separate
+adoption guide for executable batch requests and approval boundaries.
+
+The live claw monitor checkout is a deployment, never an automatic freshness
+pull target. Use an owned isolated default base for claw tasks. Updating live
+control code requires reviewed deployment, pin, restart and heartbeat checks.
 
 ## Mech progress accounting
 

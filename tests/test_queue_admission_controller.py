@@ -294,6 +294,19 @@ def test_cache_rename_reserves_both_names():
         "references_cache/new.md", "references_cache/old.md"}
 
 
+def test_absent_optional_previous_name_keeps_current_cache_reservation():
+    row = cache_file(previous_filename=None)
+    assert queue.cache_claims([row], queue.DEFAULT_CACHE_GLOBS) == {row["filename"]}
+
+
+@pytest.mark.parametrize("field", ["filename", "previous_filename"])
+@pytest.mark.parametrize("value", [0, False, 12, [], {}])
+def test_nontext_cache_paths_fail_closed_instead_of_being_filtered(field, value):
+    row = cache_file(**{field: value})
+    with pytest.raises(queue.AdmissionError, match="invalid changed-file path"):
+        queue.cache_claims([row], queue.DEFAULT_CACHE_GLOBS)
+
+
 @pytest.mark.parametrize("row", [cache_file(patch=None), cache_file(patch=""),
                                   cache_file(additions=2), cache_file(patch="+bad")])
 def test_missing_or_truncated_cache_patch_blocks(row):
