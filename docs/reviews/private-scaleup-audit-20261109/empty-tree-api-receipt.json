@@ -1,0 +1,23 @@
+{
+  "checked_at": "2026-11-09T03:56:09.630600+00:00",
+  "reviewed_pr": 1077,
+  "reviewed_head": "3441faa23aa2f2360121ac6a30d0b396ec84c0a4",
+  "repository": "CultureBotAI/ScaleupMech",
+  "main_sha": "38f8157fc960299f2458f4916dd581ce1b5d0262",
+  "commit_tree_sha": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+  "commit_metadata_response": "HTTP200; exact commit and tree identity verified",
+  "git_tree_requests": [
+    {
+      "ref_kind": "commit",
+      "gh_exit_code": 1,
+      "http_status": 404
+    },
+    {
+      "ref_kind": "empty_tree",
+      "gh_exit_code": 1,
+      "http_status": 404
+    }
+  ],
+  "body_retention": "No private response body or object listing retained; only allowlisted identity, SHA and status fields.",
+  "consequence": "PrivateSnapshot.tree expects tree JSON; actual exact bootstrap main cannot reach pending_bootstrap receipt."
+}

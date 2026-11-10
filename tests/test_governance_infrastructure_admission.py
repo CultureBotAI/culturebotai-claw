@@ -348,7 +348,9 @@ def test_post_admission_catalogue_addition_permits_withheld_capability_and_rejec
     historical = (root / RELEASE_PATH).read_bytes()
     historical_manifest = (root / HISTORICAL_MANIFEST_PATH).read_bytes()
     admitted_manifest = (root / ADMITTED_MANIFEST_PATH).read_bytes()
+    admitted_consumers = set(json.loads(admitted_manifest)["consumers"])
     fleet = yaml.safe_load((root / FLEET_PATH).read_bytes())
+    fleet["mechs"] = {k: v for k, v in fleet["mechs"].items() if k in admitted_consumers}
 
     expanded = deepcopy(fleet)
     expanded["capability_catalogue"]["taxon_links"] = {

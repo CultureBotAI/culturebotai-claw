@@ -1121,7 +1121,8 @@ def output_artifacts(receipt: dict, evidence: dict | None) -> list[dict]:
     return artifacts
 
 
-def verify_versioned_artifacts(receipt: dict, ledger: dict, target: dict, runner, head: str) -> None:
+def verify_versioned_artifacts(receipt: dict, ledger: dict, target: dict, runner, head: str,
+                               *, historical_infra_notebook: tuple[str, str] | None = None) -> None:
     if ledger.get("schema_version") != 2:
         return
     if receipt.get("schema_version") == 1 and ledger.get("legacy_receipt_stage") == ledger["stage"] and ledger["stage"] < 4:
@@ -1139,6 +1140,30 @@ def verify_versioned_artifacts(receipt: dict, ledger: dict, target: dict, runner
         if identity in seen:
             continue
         seen.add(identity)
+        if historical_infra_notebook is not None and artifact["path"] == "INFRA_TASKS.md":
+            historical_sha256, current_sha256 = historical_infra_notebook
+            if artifact["sha256"] != historical_sha256:
+                raise SupervisorError("historical infrastructure notebook digest mismatch")
+            errors = artifact_errors({"artifact": "INFRA_TASKS.md", "sha256": current_sha256},
+                                     [Path(target["root"])], "versioned workflow evidence")
+            if errors:
+                raise SupervisorError("; ".join(errors))
+            root = Path(target["root"]).resolve()
+            head_res = runner(["git", "-C", str(root), "rev-parse", f"{head}:INFRA_TASKS.md"], check=False)
+            actual_res = runner(["git", "-C", str(root), "hash-object", "--no-filters", "--", "INFRA_TASKS.md"], check=False)
+            head_blob = head_res.stdout.strip() if head_res.returncode == 0 else ""
+            actual = actual_res.stdout.strip() if actual_res.returncode == 0 else ""
+            if not SHA.fullmatch(head_blob) or not SHA.fullmatch(actual) or head_blob == actual:
+                raise SupervisorError("workflow evidence is not versioned at the exact reviewed final head: INFRA_TASKS.md")
+            show_res = runner(["git", "-C", str(root), "show", f"{head}:INFRA_TASKS.md"], check=False)
+            if show_res.returncode != 0:
+                raise SupervisorError("historical infrastructure notebook unavailable at reviewed final head")
+            historical_raw = show_res.stdout.encode()
+            if hashlib.sha256(historical_raw).hexdigest() != historical_sha256:
+                raise SupervisorError("historical infrastructure notebook bytes at reviewed final head differ from receipt")
+            from kg_microbe_workflows import validate_infra_notebook
+            validate_infra_notebook(historical_raw, target["github_repository"])
+            continue
         errors = artifact_errors({"artifact": artifact["path"], "sha256": artifact["sha256"]}, [Path(target["root"])], "versioned workflow evidence")
         if errors:
             raise SupervisorError("; ".join(errors))
@@ -1154,7 +1179,8 @@ def verify_versioned_artifacts(receipt: dict, ledger: dict, target: dict, runner
             raise SupervisorError("workflow evidence is not versioned at the exact reviewed final head: " + relative)
 
 
-def validate_receipt(receipt: dict, ledger: dict, target: dict, runtime: Path) -> list[str]:
+def validate_receipt(receipt: dict, ledger: dict, target: dict, runtime: Path,
+                     *, historical_infra_notebook: tuple[str, str] | None = None) -> list[str]:
     """Validate claims and bound evidence before any remote verification."""
     errors = []
     for key in ("run_id", "repository_key", "stage"):
@@ -1248,7 +1274,13 @@ def validate_receipt(receipt: dict, ledger: dict, target: dict, runtime: Path) -
         infra = outputs.get("infra_tasks") or {}
         if infra.get("path") != "INFRA_TASKS.md":
             errors.append("goal output must bind the repository INFRA_TASKS.md")
-        errors += artifact_errors({"artifact": infra.get("path"), "sha256": infra.get("sha256")},
+        expected_infra_sha = infra.get("sha256")
+        if historical_infra_notebook is not None:
+            historical_sha256, current_sha256 = historical_infra_notebook
+            if infra.get("sha256") != historical_sha256:
+                errors.append("historical infrastructure notebook digest mismatch")
+            expected_infra_sha = current_sha256
+        errors += artifact_errors({"artifact": infra.get("path"), "sha256": expected_infra_sha},
                                   [Path(target["root"])], "infrastructure notes")
         try:
             from kg_microbe_workflows import read_infra_notebook
@@ -1443,7 +1475,8 @@ def verify_remote_issue_triage(evidence: dict, github: str, runner=command) -> d
 
 
 def verify_remote_receipt(receipt: dict, ledger: dict, target: dict, runner=command,
-                          *, runtime: Path | None = None) -> dict:
+                          *, runtime: Path | None = None,
+                          historical_infra_notebook: tuple[str, str] | None = None) -> dict:
     """Read-only independent checks. Query failure is never branch absence."""
     root, github = target["root"], target["github_repository"]
 
@@ -1460,16 +1493,23 @@ def verify_remote_receipt(receipt: dict, ledger: dict, target: dict, runner=comm
     if git("symbolic-ref", "--quiet", "--short", "HEAD").stdout.strip() != target["default_branch"]:
         raise SupervisorError("checkout is not on the configured default branch")
     head = receipt["no_changes"]["head_sha"] if receipt["status"] == "no_changes" else receipt["pr"]["head_sha"]
-    verify_versioned_artifacts(receipt, ledger, target, runner, head)
+    verify_versioned_artifacts(receipt, ledger, target, runner, head,
+                               historical_infra_notebook=historical_infra_notebook)
     if ledger.get("schema_version") == 2 and receipt.get("schema_version") == 2:
-        from kg_microbe_workflows import read_infra_notebook
-        notebook = read_infra_notebook(Path(root) / "INFRA_TASKS.md", github, Path(root))
-        for task in notebook["tasks"]:
-            if task.get("issue_url"):
-                number = task["issue_url"].rsplit("/", 1)[-1]
-                issue = gh_json("api", f"repos/{github}/issues/{number}")
-                if issue.get("state") not in {"open", "closed"} or "pull_request" in issue:
-                    raise SupervisorError("infrastructure notebook must reference real GitHub issues")
+        from kg_microbe_workflows import read_infra_notebook, validate_infra_notebook
+        notebooks = [read_infra_notebook(Path(root) / "INFRA_TASKS.md", github, Path(root))]
+        if historical_infra_notebook is not None:
+            hist_res = git("show", f"{head}:INFRA_TASKS.md", check=False)
+            if hist_res.returncode != 0:
+                raise SupervisorError("historical infrastructure notebook unavailable at reviewed final head")
+            notebooks.append(validate_infra_notebook(hist_res.stdout.encode(), github))
+        for notebook in notebooks:
+            for task in notebook["tasks"]:
+                if task.get("issue_url"):
+                    number = task["issue_url"].rsplit("/", 1)[-1]
+                    issue = gh_json("api", f"repos/{github}/issues/{number}")
+                    if issue.get("state") not in {"open", "closed"} or "pull_request" in issue:
+                        raise SupervisorError("infrastructure notebook must reference real GitHub issues")
     evidence = goal_output_data(receipt, ledger, target)
     triage_verification = (verify_remote_issue_triage(evidence, github, runner)
                           if evidence and evidence.get("stage_key") == "open_issue_triage" else None)
@@ -1501,7 +1541,8 @@ def verify_remote_receipt(receipt: dict, ledger: dict, target: dict, runner=comm
         return {"verified_at": now(), "status": "no_changes", "head_sha": head,
                 **({"issue_triage": triage_verification} if triage_verification is not None else {})}
     if "prs" in receipt:
-        proof = verify_ordered_prs(receipt, ledger, target, runtime, evidence, runner)
+        proof = verify_ordered_prs(receipt, ledger, target, runtime, evidence, runner,
+                                   historical_infra_notebook=historical_infra_notebook)
     else:
         current_issues = [item for item in receipt["issues"] if "historical_resolution" not in item]
         proof, live, commits = verify_pr_member(receipt["pr"], current_issues, target, runner)
@@ -1664,7 +1705,8 @@ def tree_entry(root: str, head: str, path: str, runner) -> GitEntry:
 
 
 def verify_ordered_prs(receipt: dict, ledger: dict, target: dict, runtime: Path | None,
-                       evidence: dict | None, runner=command) -> dict:
+                       evidence: dict | None, runner=command,
+                       *, historical_infra_notebook: tuple[str, str] | None = None) -> dict:
     """Corroborated same-goal membership plus independent remote and Git proof."""
     from kg_microbe_progress.prs import AssociationError, require_current_pr_associations
     from kg_microbe_workflows.closure import multi_pr_members
@@ -1672,7 +1714,8 @@ def verify_ordered_prs(receipt: dict, ledger: dict, target: dict, runtime: Path 
         members = multi_pr_members(receipt)
         if runtime is None:
             raise ValueError("ordered closure requires the supervisor's session directory")
-        errors = validate_receipt(receipt, ledger, target, runtime)
+        errors = validate_receipt(receipt, ledger, target, runtime,
+                                  historical_infra_notebook=historical_infra_notebook)
         if errors:
             raise ValueError("; ".join(errors))
         require_current_pr_associations(runtime, ledger, {item["number"] for item in members})

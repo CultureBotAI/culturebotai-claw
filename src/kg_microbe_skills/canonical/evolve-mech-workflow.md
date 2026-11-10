@@ -212,7 +212,15 @@ next-cycle profile, and dispatches the next /goal; never start it yourself.
 <!-- canonical:begin closure -->
 Validate and commit only goal-owned changes, push the feature branch and open or
 update its PR, independently review the exact head, file actual deduplicated
-findings as issues, fix them and re-review. Follow current native merge-queue and
+findings as issues, fix them and re-review. Write every PR and issue body to an
+owned file first and pass `--body-file <path>` to `gh pr create`, `gh pr edit`,
+`gh pr comment`, `gh issue create`, `gh issue edit` and `gh issue comment`; do
+not embed Markdown bodies in double-quoted `--body "..."` shell strings where
+backticks, `$`, quotes or newlines invoke command substitution. Retain the body
+artifact and verify the published text with `gh pr view <n> --json body` or
+`gh issue view <n> --json body`. Existing running background tasks remain
+operator-owned; an idle or recycle guard reports and holds them, never kills
+them. Follow current native merge-queue and
 protection rules; verify actual merge, required checks and landed content before
 deleting only the owned feature branch. Retain the PR, issue, reviewed head,
 merge commit and cleanup receipt. A genuine no-diff goal needs an evidence-backed

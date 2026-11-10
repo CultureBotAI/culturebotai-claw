@@ -291,15 +291,10 @@ def _sync_inputs(
     repository: str, canonical_ref: str,
 ) -> tuple[GovernanceManifest, Consumer, tuple[tuple[str, str, bytes, int], ...]]:
     """Bind one immutable source bundle before planning or opening a transaction."""
-    from .cycle_release_audit import RELEASE_PATH
     from .infrastructure_admission import (
-        ADMISSION_PATH,
         ADMITTED,
         ADMITTED_MANIFEST_PATH,
-        HISTORICAL_MANIFEST_PATH,
-        parse_admission,
         validate_current_layout,
-        validate_transition,
     )
 
     manifest = load_governance_manifest()  # Current package/fleet/checksums remain mandatory.
@@ -309,29 +304,34 @@ def _sync_inputs(
     def resource(path: str) -> bytes:
         return package.joinpath(path.removeprefix(f"src/{PACKAGE_NAME}/")).read_bytes()
 
-    if consumer == ADMITTED:
-        policy = parse_admission(resource(ADMISSION_PATH))
-        if canonical_ref == policy["source_ref"]:
-            admitted_raw = resource(ADMITTED_MANIFEST_PATH)
-            admitted = validate_transition(
-                policy, resource(RELEASE_PATH), resource(HISTORICAL_MANIFEST_PATH),
-                admitted_raw, files("kg_microbe_fleet").joinpath("fleet.yaml").read_bytes(),
-            )
-            if validate_current_layout(admitted, _manifest_resource().read_bytes()) != manifest:
-                raise GovernanceError("Installed governance changed during source selection")
-            remote = fetch_url(raw_url(canonical_ref, CANONICAL_MANIFEST_PATH))
-            parse_manifest(remote)
-            if remote != admitted_raw:
-                raise GovernanceError("Pinned infrastructure manifest differs from admitted snapshot")
-            payloads = {}
-            for artifact in admitted.artifacts:
-                payload = fetch_url(raw_url(canonical_ref, artifact.source))
-                if hashlib.sha256(payload).hexdigest() != artifact.sha256:
-                    raise GovernanceError(f"Pinned infrastructure artifact checksum drift: {artifact.source}")
-                payloads[artifact.source] = payload
-            return admitted, consumer, _desired_files(
-                admitted, consumer, canonical_ref, source_payloads=payloads,
-            )
+    from .consumer_admission import compose
+
+    edge_policy, expected, additions = compose(
+        resource, files("kg_microbe_fleet").joinpath("fleet.yaml").read_bytes(),
+        _manifest_resource().read_bytes(),
+    )
+    if validate_current_layout(expected, _manifest_resource().read_bytes()) != manifest:
+        raise GovernanceError("Installed governance changed during source selection")
+    policy = edge_policy if consumer == ADMITTED else (
+        additions[consumer.key].policy if consumer.key in additions else None
+    )
+    if policy is not None and canonical_ref == policy["source_ref"]:
+        admitted_raw = (resource(ADMITTED_MANIFEST_PATH) if consumer == ADMITTED
+                        else additions[consumer.key].source_content)
+        admitted = parse_manifest(admitted_raw)
+        remote = fetch_url(raw_url(canonical_ref, CANONICAL_MANIFEST_PATH))
+        parse_manifest(remote)
+        if remote != admitted_raw:
+            raise GovernanceError("Pinned infrastructure manifest differs from admitted snapshot")
+        payloads = {}
+        for artifact in admitted.artifacts:
+            payload = fetch_url(raw_url(canonical_ref, artifact.source))
+            if hashlib.sha256(payload).hexdigest() != artifact.sha256:
+                raise GovernanceError(f"Pinned infrastructure artifact checksum drift: {artifact.source}")
+            payloads[artifact.source] = payload
+        return admitted, consumer, _desired_files(
+            admitted, consumer, canonical_ref, source_payloads=payloads,
+        )
     # No generic fallback accepts old manifests or a ref selected by the target.
     _verify_canonical_ref(canonical_ref, manifest)
     return manifest, consumer, _desired_files(manifest, consumer, canonical_ref)

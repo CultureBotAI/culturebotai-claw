@@ -38,6 +38,8 @@ EXPECTED_MECHS = (
     "cmmmech",
     "aimech",
     "edgemech",
+    "cofactormech",
+    "assaymech",
 )
 
 

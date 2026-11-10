@@ -10,13 +10,21 @@ The separately versioned stage-3 protocol is documented in
 [historical protein-example boundary](HISTORICAL_STAGE3_RECONCILIATION.md).
 Its multi-PR external-work list does not broaden this version-1 contract.
 
-**DUFMech is not yet eligible.** Its historical ordered #365/#367 receipt and its
-later #455 infrastructure intake cannot currently satisfy the same final-head
-notebook gate. [Claw #1005](https://github.com/CultureBotAI/culturebotai-claw/issues/1005)
-tracks that distinct prerequisite. The negative regression reproduces this
-chronology; the positive fixture is explicitly synthetic and has its required
-intake already present in the verified closure head. Do not register #455 under
-the old goal, or claim this identity reconciliation resolves that artifact gap.
+**Later infrastructure intake (`schema_version: "1.1.0"`).** When a historical
+ordered receipt (such as DUFMech `#365`/`#367`) closed before a later
+infrastructure intake commit (`#455`) added the required stage-6 adoption task to
+`INFRA_TASKS.md`, an ordinary `1.0.0` record is refused because the historical
+closure head and current `HEAD` have different `INFRA_TASKS.md` bytes. The
+separately reviewed `1.1.0` contract (`LATER_INTAKE_KEYS`) adds an explicit
+`later_intake` block containing `historical_infra_notebook_sha256` (verified
+against the historical closure head's `INFRA_TASKS.md` blob and the receipt's
+`goal_outputs.infra_tasks.sha256`), `current_infra_notebook_sha256` (matching
+`fingerprints.infra_notebook_sha256` at `HEAD`), and `intake_pr` (`number`,
+`head_sha`, `merge_commit_sha` of the merged intake PR that descended from the
+historical closure merge and produced the current `HEAD:INFRA_TASKS.md` without
+modifying other paths). Neither `external_pr` (`#387`) nor `intake_pr` (`#455`)
+receives old-goal stage credit, while stage 6 freezes the current committed
+`INFRA_TASKS.md` containing `required_infra_tasks`.
 
 ## Authority and scope
 
@@ -27,7 +35,7 @@ artifact digests prevent substitution; they do not establish that a person
 actually approved the record. Never publish native identities, repository paths,
 or raw native evidence in GitHub issues, PRs, or public progress data.
 
-The closed version `1.0.0` record has these fields:
+The closed version `1.0.0` record has these fields (`1.1.0` adds `later_intake`):
 
 | Fields | Meaning |
 |---|---|
@@ -39,6 +47,7 @@ The closed version `1.0.0` record has these fields:
 | `fingerprints` | SHA-256 of configuration, ledger, completion, PR registry, actual infrastructure notebook, and canonical native evidence |
 | `required_infra_tasks` | Nonempty task IDs required in the current committed notebook before its scope freezes |
 | `external_pr` | Number, head SHA, merge SHA of the separately directed merged PR; receives no historical stage credit |
+| `later_intake` (`1.1.0` only) | `historical_infra_notebook_sha256`, `current_infra_notebook_sha256`, and `intake_pr` (`number`, `head_sha`, `merge_commit_sha`); receives no historical stage credit |
 | `review` | Different reviewer, relative artifact path, artifact SHA-256 |
 | `prerequisites` | Explicit unmet requirements, allowed only on a draft |
 | `reconciliation_sha256` | Null for closure; exact prior canonical assessment digest for release |

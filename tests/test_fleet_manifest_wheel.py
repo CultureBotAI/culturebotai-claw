@@ -69,6 +69,8 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path, review)
     assert "src/kg_microbe_governance/releases/mech-cycle-v2-canary.json" in source_names
     admitted_snapshot = "kg_microbe_governance/releases/edgemech-infrastructure-source-manifest.json"
     assert "src/" + admitted_snapshot in source_names
+    private_policy = "kg_microbe_governance/private_audit/scaleup-v1.json"
+    assert "src/" + private_policy in source_names
     for artifact in governance_document["artifacts"]:
         assert artifact["source"] in source_names
     assert "src/kg_microbe_config/openclaw_config.yaml" in source_names
@@ -130,6 +132,7 @@ def test_wheel_packages_canonical_manifests_and_payloads(tmp_path: Path, review)
         )
         assert "kg_microbe_governance/vendored_artifacts.json" in names
         assert wheel.read(admitted_snapshot) == (REPOSITORY_ROOT / "src" / admitted_snapshot).read_bytes()
+        assert wheel.read(private_policy) == (REPOSITORY_ROOT / "src" / private_policy).read_bytes()
         assert "kg_microbe_evidence/__init__.py" in names
         assert "kg_microbe_evidence/__main__.py" in names
         assert "kg_microbe_evidence/fetch.py" in names
@@ -195,6 +198,8 @@ import kg_microbe_config
 import kg_microbe_fleet
 import kg_microbe_governance
 import kg_microbe_governance.fleet_audit
+import kg_microbe_governance.private_scaleup_audit
+assert kg_microbe_governance.private_scaleup_audit.load_policy()["repository"] == "CultureBotAI/ScaleupMech"
 import kg_microbe_history
 import kg_microbe_merge_queue
 import kg_microbe_merge_queue.__main__
@@ -229,6 +234,9 @@ from kg_microbe_research import (
 )
 
 unpacked = Path(sys.argv[1]).resolve()
+private_help = subprocess.run([sys.executable, "-m", "kg_microbe_governance.private_scaleup_audit", "--help"], capture_output=True, text=True)
+assert private_help.returncode == 0, private_help.stderr
+assert "preflight" in private_help.stdout and "verify" in private_help.stdout
 runtime_modules = (
     cli_package,
     kg_microbe_agents,

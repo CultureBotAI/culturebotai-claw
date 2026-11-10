@@ -139,3 +139,171 @@ def test_known_announcement_cannot_substitute_for_runtime_model_footer():
     assert terminal.composer_reason(EMPTY + announcement) is None
     assert terminal.composer_reason(EMPTY.replace('? for shortcuts Gemini model\n', '') + announcement) is not None
     assert terminal.composer_reason(EMPTY + 'Unrecognized announcement\nesc to dismiss\n') is not None
+
+
+@pytest.mark.parametrize(
+    ("indicator", "expected_reason"),
+    [
+        ("⇧← to answer", "queued-question"),
+        ("Queued follow-up (1)", "queued-question"),
+        ("QUESTION: Which target branch should be used?", "queued-question"),
+        ("request_user_input waiting for response", "queued-question"),
+        ("Sign in with Google to continue", "sign-in-prompt"),
+        ("Trust this folder and its contents?", "trust-prompt"),
+        ("Update available — Skip until next version", "update-prompt"),
+        ("Allow command in terminal?", "approval-menu"),
+    ],
+)
+def test_queued_questions_and_blocked_prompts_rejected_by_canonical_guard(
+    indicator, expected_reason
+):
+    screen = EMPTY + indicator + "\n"
+    assert terminal.composer_reason(screen) == expected_reason
+    assert terminal.verify_paste_ready(screen) == expected_reason
+    draft_screen = EMPTY.replace("\n>\n", "\n> Review shard 04\n") + indicator + "\n"
+    assert terminal.composer_draft_reason(draft_screen, "Review shard 04") == expected_reason
+
+
+def test_guarded_paste_and_submit_succeeds_on_valid_idle_then_current_draft(tmp_path):
+    draft = "Review shard 04 and write structured receipt"
+    screens = iter(
+        [
+            EMPTY,
+            EMPTY.replace("\n>\n", f"\n> {draft}\n"),
+        ]
+    )
+    pasted = []
+    submitted = []
+    evidence = tmp_path / "paste-evidence.txt"
+
+    result = terminal.guarded_paste_and_submit(
+        read_screen=lambda: next(screens),
+        send_paste=pasted.append,
+        send_submit=lambda: submitted.append("Enter"),
+        draft=draft,
+        paste_evidence_path=evidence,
+    )
+
+    assert result == {
+        "status": "submitted",
+        "reason": None,
+        "pasted": True,
+        "submitted": True,
+    }
+    assert pasted == [draft]
+    assert submitted == ["Enter"]
+    assert evidence.read_text(encoding="utf-8") == draft
+
+
+@pytest.mark.parametrize(
+    "question_banner",
+    [
+        "Queued follow-up · ⇧← to answer",
+        "QUESTION\nType your answer · Enter to submit answer",
+        "request_user_input: waiting for human selection",
+    ],
+)
+def test_guarded_paste_and_submit_blocks_when_question_arrives_after_paste(
+    tmp_path, question_banner
+):
+    draft = "Review shard 04 and write structured receipt"
+    # Even though the draft remains visible in the composer AND the paste-evidence
+    # file was written, a question arriving between paste and submit must abort
+    # before sending Enter (#677).
+    screens = iter(
+        [
+            EMPTY,
+            EMPTY.replace("\n>\n", f"\n> {draft}\n") + question_banner + "\n",
+        ]
+    )
+    pasted = []
+    submitted = []
+    evidence = tmp_path / "paste-evidence.txt"
+
+    result = terminal.guarded_paste_and_submit(
+        read_screen=lambda: next(screens),
+        send_paste=pasted.append,
+        send_submit=lambda: submitted.append("Enter"),
+        draft=draft,
+        paste_evidence_path=evidence,
+    )
+
+    assert result == {
+        "status": "blocked-before-submit",
+        "reason": "queued-question",
+        "pasted": True,
+        "submitted": False,
+    }
+    assert pasted == [draft]
+    assert submitted == []
+    assert evidence.is_file()
+
+
+def test_guarded_paste_and_submit_rejects_historical_text_when_current_composer_is_empty(
+    tmp_path,
+):
+    draft = "Review shard 04 and write structured receipt"
+    # Historical text above the current empty composer plus a paste-evidence file
+    # on disk must not pass the pre-submit check (#677).
+    screens = iter(
+        [
+            EMPTY,
+            f"Earlier output: {draft}\n" + EMPTY,
+        ]
+    )
+    pasted = []
+    submitted = []
+    evidence = tmp_path / "paste-evidence.txt"
+
+    result = terminal.guarded_paste_and_submit(
+        read_screen=lambda: next(screens),
+        send_paste=pasted.append,
+        send_submit=lambda: submitted.append("Enter"),
+        draft=draft,
+        paste_evidence_path=evidence,
+    )
+
+    assert result["status"] == "blocked-before-submit"
+    assert result["submitted"] is False
+    assert pasted == [draft]
+    assert submitted == []
+
+
+def test_guarded_paste_and_submit_refuses_symlink_evidence_and_failed_paste(tmp_path):
+    """#1136: symlinked paste_evidence_path and failed send_paste abort before submit."""
+    draft = "Review shard 04 and write structured receipt"
+    target_file = tmp_path / "real.txt"
+    target_file.write_text("original", encoding="utf-8")
+    symlink_evidence = tmp_path / "symlink.txt"
+    symlink_evidence.symlink_to(target_file)
+
+    symlink_result = terminal.guarded_paste_and_submit(
+        read_screen=lambda: EMPTY,
+        send_paste=lambda _: True,
+        send_submit=lambda: None,
+        draft=draft,
+        paste_evidence_path=symlink_evidence,
+    )
+    assert symlink_result == {
+        "status": "blocked-before-paste",
+        "reason": "symlink-paste-evidence-path",
+        "pasted": False,
+        "submitted": False,
+    }
+    assert target_file.read_text(encoding="utf-8") == "original"
+
+    failed_paste = terminal.guarded_paste_and_submit(
+        read_screen=lambda: EMPTY,
+        send_paste=lambda _: False,
+        send_submit=lambda: None,
+        draft=draft,
+        paste_evidence_path=tmp_path / "evidence.txt",
+    )
+    assert failed_paste == {
+        "status": "paste-failed",
+        "reason": "paste-transport-failed",
+        "pasted": False,
+        "submitted": False,
+    }
+    assert not (tmp_path / "evidence.txt").exists()
+

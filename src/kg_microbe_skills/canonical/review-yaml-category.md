@@ -165,7 +165,7 @@ search, call the miss provisional.
 
 <!-- canonical:begin workflow -->
 1. Read the local guidance that names exact validators and write boundaries:
-   `CLAUDE.md`, `justfile`, `docs/record-review-profile.md`, its local rubrics,
+   `AGENTS.md` (`CLAUDE.md`), `justfile`, `docs/record-review-profile.md`, its local rubrics,
    and `docs/record-reviews.md` for the shared output contract.
 2. Resolve the requested category into one or more bounded cohorts under the
    curated record globs named above. Record the selection rule for each cohort,
