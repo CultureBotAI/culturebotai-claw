@@ -29,8 +29,18 @@ def integer(name: str) -> int:
 
 
 def event_parent() -> tuple[int, int]:
-    auto.check(os.environ.get("GITHUB_EVENT_NAME") == "workflow_run")
-    event = manual.parse_json(Path(os.environ["GITHUB_EVENT_PATH"]).read_bytes())
+    auto.check(
+        os.environ.get("GITHUB_EVENT_NAME") == "workflow_run",
+        "configuration_missing",
+    )
+    raw_path = os.environ.get("GITHUB_EVENT_PATH", "").strip()
+    auto.check(bool(raw_path), "configuration_missing")
+    path = Path(raw_path)
+    auto.check(path.is_file(), "configuration_missing")
+    with path.open("rb") as stream:
+        raw = stream.read(manual.MAX_RESPONSE + 1)
+    auto.check(len(raw) <= manual.MAX_RESPONSE, "configuration_missing")
+    event = manual.parse_json(raw)
     auto.check(isinstance(event, dict) and event.get("action") == "in_progress")
     run = event.get("workflow_run", {})
     auto.check(
@@ -170,6 +180,37 @@ def main(argv=None) -> int:
         parser.add_argument("--checkout-sha")
         parser.add_argument("--require-protected-environment", action="store_true")
         args = parser.parse_args(argv)
+        if args.command == "producer-preflight":
+            auto.check(
+                bool(os.environ.get("GITHUB_OUTPUT", "").strip()),
+                "configuration_missing",
+            )
+            if (
+                args.require_protected_environment
+                or args.expected_binding_sha256 is not None
+            ):
+                auto.check(
+                    manual.is_sha(args.expected_binding_sha256, 64),
+                    "invalid_arguments",
+                )
+        elif args.command == "produce":
+            auto.check(
+                args.output is not None
+                and not args.output.exists()
+                and manual.is_sha(args.expected_binding_sha256, 64),
+                "invalid_arguments",
+            )
+            auto.check(
+                bool(os.environ.get("GITHUB_OUTPUT", "").strip())
+                and bool(os.environ.get("SCALEUP_PRIVATE_READ_TOKEN", "").strip()),
+                "configuration_missing",
+            )
+            integer("SCALEUP_AUDIT_APP_ID")
+            integer("GITHUB_RUN_ID")
+            integer("GITHUB_RUN_ATTEMPT")
+        else:
+            parent, attempt = integer("GITHUB_RUN_ID"), integer("GITHUB_RUN_ATTEMPT")
+            auto.check(manual.is_sha(args.checkout_sha), "invalid_arguments")
         public = manual.GitHubRead(os.environ.get("GH_PUBLIC_READ_TOKEN", ""))
         main_sha = protected_runtime(public, args.trusted_root)
         policy = manual.load_policy()
@@ -181,6 +222,8 @@ def main(argv=None) -> int:
             obligation = auto.private_obligation(public, binding, policy)
             binding_sha = manual.digest(auto.canonical(binding))
             if args.command == "producer-preflight":
+                if args.expected_binding_sha256 is not None:
+                    auto.check(args.expected_binding_sha256 == binding_sha)
                 if obligation["required"]:
                     # Refuse before scheduling the environment-bound job. GitHub
                     # can create a missing referenced environment automatically.
@@ -232,20 +275,24 @@ def main(argv=None) -> int:
             )
             print("automatic_private_receipt_created")
             return 0
-        parent, attempt = integer("GITHUB_RUN_ID"), integer("GITHUB_RUN_ATTEMPT")
-        auto.check(manual.is_sha(args.checkout_sha))
         binding = auto.parent_binding(
             public, parent, attempt, checkout_sha=args.checkout_sha
         )
         auto.check(binding["protected_main_sha"] == main_sha)
         obligation = auto.private_obligation(public, binding, policy)
+        app_id = (
+            integer("SCALEUP_AUDIT_EXPECTED_APP_ID")
+            if obligation["required"]
+            else None
+        )
         auto.check(auto.component_state(public, binding))
         from .automatic_fleet_component import authenticate_report, finalize
 
         report = authenticate_report(public, args.trusted_root, binding)
         if obligation["required"]:
+            assert app_id is not None
             evidence = discover_receipt(
-                public, binding, policy, integer("SCALEUP_AUDIT_EXPECTED_APP_ID")
+                public, binding, policy, app_id
             )
             # The full-fleet adapter consumes this typed object in-process.
             finalize(public, args.trusted_root, binding, evidence, report=report)

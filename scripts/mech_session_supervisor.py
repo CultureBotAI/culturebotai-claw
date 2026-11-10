@@ -538,7 +538,12 @@ def decide(ledger: dict, observation: dict) -> dict:
             return {"phase": "awaiting_native_acceptance", "reason": "workflow policy handoff requires native acceptance"}
         return {"phase": "ready_to_dispatch", "action": "policy_update", "action_id": identifier}
     if ledger.get("awaiting_goal"):
-        if observation.get("goal_identity") != ledger["adopted_goal"]:
+        from kg_microbe_workflows.reconciliation import ReconciliationError, boundary_goal
+        try:
+            expected_goal = boundary_goal(ledger) or ledger["adopted_goal"]
+        except (ReconciliationError, KeyError, TypeError, ValueError) as error:
+            return {"phase": "blocked", "reason": "historical dispatch boundary: " + str(error)}
+        if observation.get("goal_identity") != expected_goal:
             return {"phase": "blocked", "reason": "a different native goal appeared before next-goal dispatch"}
         prior = ledger["completed_stages"][-1] if ledger["completed_stages"] else {}
         override = (prior.get("completion_authority") == "verified_receipt_override"
@@ -1077,7 +1082,8 @@ def output_artifacts(receipt: dict, evidence: dict | None) -> list[dict]:
     return artifacts
 
 
-def verify_versioned_artifacts(receipt: dict, ledger: dict, target: dict, runner, head: str) -> None:
+def verify_versioned_artifacts(receipt: dict, ledger: dict, target: dict, runner, head: str,
+                               *, historical_infra_notebook: tuple[str, str] | None = None) -> None:
     if ledger.get("schema_version") != 2:
         return
     if receipt.get("schema_version") == 1 and ledger.get("legacy_receipt_stage") == ledger["stage"] and ledger["stage"] < 4:
@@ -1095,6 +1101,30 @@ def verify_versioned_artifacts(receipt: dict, ledger: dict, target: dict, runner
         if identity in seen:
             continue
         seen.add(identity)
+        if historical_infra_notebook is not None and artifact["path"] == "INFRA_TASKS.md":
+            historical_sha256, current_sha256 = historical_infra_notebook
+            if artifact["sha256"] != historical_sha256:
+                raise SupervisorError("historical infrastructure notebook digest mismatch")
+            errors = artifact_errors({"artifact": "INFRA_TASKS.md", "sha256": current_sha256},
+                                     [Path(target["root"])], "versioned workflow evidence")
+            if errors:
+                raise SupervisorError("; ".join(errors))
+            root = Path(target["root"]).resolve()
+            head_res = runner(["git", "-C", str(root), "rev-parse", f"{head}:INFRA_TASKS.md"], check=False)
+            actual_res = runner(["git", "-C", str(root), "hash-object", "--no-filters", "--", "INFRA_TASKS.md"], check=False)
+            head_blob = head_res.stdout.strip() if head_res.returncode == 0 else ""
+            actual = actual_res.stdout.strip() if actual_res.returncode == 0 else ""
+            if not SHA.fullmatch(head_blob) or not SHA.fullmatch(actual) or head_blob == actual:
+                raise SupervisorError("workflow evidence is not versioned at the exact reviewed final head: INFRA_TASKS.md")
+            show_res = runner(["git", "-C", str(root), "show", f"{head}:INFRA_TASKS.md"], check=False)
+            if show_res.returncode != 0:
+                raise SupervisorError("historical infrastructure notebook unavailable at reviewed final head")
+            historical_raw = show_res.stdout.encode()
+            if hashlib.sha256(historical_raw).hexdigest() != historical_sha256:
+                raise SupervisorError("historical infrastructure notebook bytes at reviewed final head differ from receipt")
+            from kg_microbe_workflows import validate_infra_notebook
+            validate_infra_notebook(historical_raw, target["github_repository"])
+            continue
         errors = artifact_errors({"artifact": artifact["path"], "sha256": artifact["sha256"]}, [Path(target["root"])], "versioned workflow evidence")
         if errors:
             raise SupervisorError("; ".join(errors))
@@ -1110,7 +1140,8 @@ def verify_versioned_artifacts(receipt: dict, ledger: dict, target: dict, runner
             raise SupervisorError("workflow evidence is not versioned at the exact reviewed final head: " + relative)
 
 
-def validate_receipt(receipt: dict, ledger: dict, target: dict, runtime: Path) -> list[str]:
+def validate_receipt(receipt: dict, ledger: dict, target: dict, runtime: Path,
+                     *, historical_infra_notebook: tuple[str, str] | None = None) -> list[str]:
     """Validate claims and bound evidence before any remote verification."""
     errors = []
     for key in ("run_id", "repository_key", "stage"):
@@ -1204,7 +1235,13 @@ def validate_receipt(receipt: dict, ledger: dict, target: dict, runtime: Path) -
         infra = outputs.get("infra_tasks") or {}
         if infra.get("path") != "INFRA_TASKS.md":
             errors.append("goal output must bind the repository INFRA_TASKS.md")
-        errors += artifact_errors({"artifact": infra.get("path"), "sha256": infra.get("sha256")},
+        expected_infra_sha = infra.get("sha256")
+        if historical_infra_notebook is not None:
+            historical_sha256, current_sha256 = historical_infra_notebook
+            if infra.get("sha256") != historical_sha256:
+                errors.append("historical infrastructure notebook digest mismatch")
+            expected_infra_sha = current_sha256
+        errors += artifact_errors({"artifact": infra.get("path"), "sha256": expected_infra_sha},
                                   [Path(target["root"])], "infrastructure notes")
         try:
             from kg_microbe_workflows import read_infra_notebook
@@ -1399,7 +1436,8 @@ def verify_remote_issue_triage(evidence: dict, github: str, runner=command) -> d
 
 
 def verify_remote_receipt(receipt: dict, ledger: dict, target: dict, runner=command,
-                          *, runtime: Path | None = None) -> dict:
+                          *, runtime: Path | None = None,
+                          historical_infra_notebook: tuple[str, str] | None = None) -> dict:
     """Read-only independent checks. Query failure is never branch absence."""
     root, github = target["root"], target["github_repository"]
 
@@ -1416,16 +1454,23 @@ def verify_remote_receipt(receipt: dict, ledger: dict, target: dict, runner=comm
     if git("symbolic-ref", "--quiet", "--short", "HEAD").stdout.strip() != target["default_branch"]:
         raise SupervisorError("checkout is not on the configured default branch")
     head = receipt["no_changes"]["head_sha"] if receipt["status"] == "no_changes" else receipt["pr"]["head_sha"]
-    verify_versioned_artifacts(receipt, ledger, target, runner, head)
+    verify_versioned_artifacts(receipt, ledger, target, runner, head,
+                               historical_infra_notebook=historical_infra_notebook)
     if ledger.get("schema_version") == 2 and receipt.get("schema_version") == 2:
-        from kg_microbe_workflows import read_infra_notebook
-        notebook = read_infra_notebook(Path(root) / "INFRA_TASKS.md", github, Path(root))
-        for task in notebook["tasks"]:
-            if task.get("issue_url"):
-                number = task["issue_url"].rsplit("/", 1)[-1]
-                issue = gh_json("api", f"repos/{github}/issues/{number}")
-                if issue.get("state") not in {"open", "closed"} or "pull_request" in issue:
-                    raise SupervisorError("infrastructure notebook must reference real GitHub issues")
+        from kg_microbe_workflows import read_infra_notebook, validate_infra_notebook
+        notebooks = [read_infra_notebook(Path(root) / "INFRA_TASKS.md", github, Path(root))]
+        if historical_infra_notebook is not None:
+            hist_res = git("show", f"{head}:INFRA_TASKS.md", check=False)
+            if hist_res.returncode != 0:
+                raise SupervisorError("historical infrastructure notebook unavailable at reviewed final head")
+            notebooks.append(validate_infra_notebook(hist_res.stdout.encode(), github))
+        for notebook in notebooks:
+            for task in notebook["tasks"]:
+                if task.get("issue_url"):
+                    number = task["issue_url"].rsplit("/", 1)[-1]
+                    issue = gh_json("api", f"repos/{github}/issues/{number}")
+                    if issue.get("state") not in {"open", "closed"} or "pull_request" in issue:
+                        raise SupervisorError("infrastructure notebook must reference real GitHub issues")
     evidence = goal_output_data(receipt, ledger, target)
     triage_verification = (verify_remote_issue_triage(evidence, github, runner)
                           if evidence and evidence.get("stage_key") == "open_issue_triage" else None)
@@ -1457,7 +1502,8 @@ def verify_remote_receipt(receipt: dict, ledger: dict, target: dict, runner=comm
         return {"verified_at": now(), "status": "no_changes", "head_sha": head,
                 **({"issue_triage": triage_verification} if triage_verification is not None else {})}
     if "prs" in receipt:
-        proof = verify_ordered_prs(receipt, ledger, target, runtime, evidence, runner)
+        proof = verify_ordered_prs(receipt, ledger, target, runtime, evidence, runner,
+                                   historical_infra_notebook=historical_infra_notebook)
     else:
         current_issues = [item for item in receipt["issues"] if "historical_resolution" not in item]
         proof, live, commits = verify_pr_member(receipt["pr"], current_issues, target, runner)
@@ -1620,7 +1666,8 @@ def tree_entry(root: str, head: str, path: str, runner) -> GitEntry:
 
 
 def verify_ordered_prs(receipt: dict, ledger: dict, target: dict, runtime: Path | None,
-                       evidence: dict | None, runner=command) -> dict:
+                       evidence: dict | None, runner=command,
+                       *, historical_infra_notebook: tuple[str, str] | None = None) -> dict:
     """Corroborated same-goal membership plus independent remote and Git proof."""
     from kg_microbe_progress.prs import AssociationError, require_current_pr_associations
     from kg_microbe_workflows.closure import multi_pr_members
@@ -1628,7 +1675,8 @@ def verify_ordered_prs(receipt: dict, ledger: dict, target: dict, runtime: Path 
         members = multi_pr_members(receipt)
         if runtime is None:
             raise ValueError("ordered closure requires the supervisor's session directory")
-        errors = validate_receipt(receipt, ledger, target, runtime)
+        errors = validate_receipt(receipt, ledger, target, runtime,
+                                  historical_infra_notebook=historical_infra_notebook)
         if errors:
             raise ValueError("; ".join(errors))
         require_current_pr_associations(runtime, ledger, {item["number"] for item in members})
@@ -2038,6 +2086,16 @@ class Supervisor:
             proof = native_delivery_proof(action, target, observation)
             if proof is None:
                 continue
+            if adopting and ledger.get("historical_goal_boundary") is not None:
+                from kg_microbe_workflows.reconciliation import ReconciliationError, boundary_goal, timestamp
+                try:
+                    previous = boundary_goal(ledger)
+                    if (not native_id or native_id["conversation_id"] != previous["conversation_id"]
+                            or native_id["start_step_index"] <= previous["start_step_index"]
+                            or timestamp(native_id["started_at"]) <= timestamp(previous["started_at"])):
+                        continue
+                except (ReconciliationError, KeyError, TypeError, ValueError):
+                    continue
             if action["state"] != "accepted":
                 action.update(state="accepted", accepted_at=now(), acceptance="native_exact_user_input")
             action.update(delivery_proof=proof, delivery_verified_at=now())
@@ -2046,6 +2104,7 @@ class Supervisor:
             if adopting and native_id and native_id != ledger["adopted_goal"]:
                 action["accepted_goal_identity"] = native_id
                 ledger.update(adopted_goal=native_id, awaiting_goal=False)
+                ledger.pop("historical_goal_boundary", None)
 
     def baseline(self, target: dict, ledger: dict) -> None:
         if "baseline_head" not in ledger:
@@ -2210,22 +2269,48 @@ class Supervisor:
             if not prompt.is_file():
                 return {"state": "not-sent", "reason": "workflow instruction file missing"}
             identifier = decision["action_id"]
-            message = message_for(target, ledger, decision, self.directory(target))
+            from kg_microbe_workflows.instructions import (
+                InstructionError,
+                prepare_instruction,
+                verify_instruction,
+            )
+
+            instruction = message_for(target, ledger, decision, self.directory(target))
+            instruction_hash = hashlib.sha256(prompt.read_bytes()).hexdigest()
+            context = {"action_id": identifier, "kind": decision["action"],
+                       "run_id": ledger["run_id"], "repository_key": target["repository_key"],
+                       "cycle": ledger.get("cycle", 1), "stage": ledger["stage"],
+                       "stage_key": workflow_stage_key(ledger),
+                       "native_session_id": target["native_session_id"],
+                       "reservation_goal_identity": copy.deepcopy(ledger["adopted_goal"]),
+                       "instruction_sha256": instruction_hash,
+                       "workflow_sha256": ledger.get("workflow", {}).get("sha256")}
+            try:
+                delivery = prepare_instruction(self.directory(target), context, instruction)
+            except (InstructionError, OSError) as error:
+                # Definite preparation failure precedes reservation and input.
+                return {"state": "not-sent", "reason": "instruction preparation refused: " + str(error)}
             action = {"id": identifier, "kind": decision["action"], "stage": ledger["stage"], "cycle": ledger.get("cycle", 1),
                       "marker": "MECH-WORKFLOW-" + identifier, "state": "reserved", "reserved_at": now(),
                       "reserved_epoch_ms": int(time.time() * 1000), "native_session_id": target["native_session_id"],
-                      "goal_identity": ledger["adopted_goal"], "message": message,
-                      "message_sha256": hashlib.sha256(message.encode("utf-8")).hexdigest(),
+                      "goal_identity": ledger["adopted_goal"], **delivery,
                       "native_step_index": ((observation.get("native") or {}).get("last_step") or {}).get("index"),
-                      "instruction_sha256": hashlib.sha256(prompt.read_bytes()).hexdigest()}
+                      "instruction_sha256": instruction_hash}
             ledger["actions"][identifier] = action
             self.save(target, ledger)  # durable intent before any terminal input
             try:
                 if self.stopping():
                     action.update(state="not-sent", outcome="stop-requested", updated_at=now())
                 else:
+                    try:
+                        verify_instruction(self.directory(target), action["instruction_artifact"])
+                    except (InstructionError, OSError) as error:
+                        action.update(state="not-sent", outcome="instruction-artifact-rejected",
+                                      error=str(error), updated_at=now())
+                        self.save(target, ledger)
+                        return action
                     result = self.notifier.jxa(SEND_JS, {**observation["tab"], "pid": target["pid"],
-                        "identity": target["process_identity"], "cwd": target["root"], "message": message})
+                        "identity": target["process_identity"], "cwd": target["root"], "message": action["message"]})
                     # Terminal returning proves only that the transport was
                     # invoked: it may leave a partial unsent composer. Keep a
                     # blocking uncertain reservation until native exact-input

@@ -427,3 +427,111 @@ def test_parent_jobs_use_only_the_permissions_and_candidate_tests_they_need():
         "test_governance_consumer_admission.py",
     ):
         assert "control/tests/" + filename in step["run"]
+
+
+def test_event_parent_requires_configured_bounded_event_file(monkeypatch, tmp_path):
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "workflow_run")
+    monkeypatch.delenv("GITHUB_EVENT_PATH", raising=False)
+    with pytest.raises(manual.AuditError) as exc:
+        cli.event_parent()
+    assert exc.value.code == "configuration_missing"
+
+    oversized = tmp_path / "event.json"
+    oversized.write_bytes(b"{" + b" " * (manual.MAX_RESPONSE + 1) + b"}")
+    monkeypatch.setenv("GITHUB_EVENT_PATH", str(oversized))
+    with pytest.raises(manual.AuditError) as exc:
+        cli.event_parent()
+    assert exc.value.code == "configuration_missing"
+
+
+def test_cli_validates_arguments_and_env_before_protected_runtime(
+    monkeypatch, tmp_path, capsys
+):
+    called = []
+    monkeypatch.setattr(
+        cli, "protected_runtime", lambda *a: called.append("runtime") or "a" * 40
+    )
+    output_file = tmp_path / "existing.json"
+    output_file.write_text("{}")
+    gh_output = tmp_path / "gh-output"
+    monkeypatch.setenv("GITHUB_OUTPUT", str(gh_output))
+    monkeypatch.setenv("SCALEUP_PRIVATE_READ_TOKEN", "token")
+    monkeypatch.setenv("SCALEUP_AUDIT_APP_ID", "123")
+    monkeypatch.setenv("GITHUB_RUN_ID", "10")
+    monkeypatch.setenv("GITHUB_RUN_ATTEMPT", "1")
+
+    assert (
+        cli.main(
+            [
+                "produce",
+                "--trusted-root",
+                str(tmp_path),
+                "--output",
+                str(output_file),
+                "--expected-binding-sha256",
+                "b" * 64,
+            ]
+        )
+        == 2
+    )
+    assert capsys.readouterr().err.strip() == "invalid_arguments"
+    assert called == []
+
+    assert (
+        cli.main(
+            [
+                "producer-preflight",
+                "--trusted-root",
+                str(tmp_path),
+                "--expected-binding-sha256",
+                "not-a-sha256",
+            ]
+        )
+        == 2
+    )
+    assert capsys.readouterr().err.strip() == "invalid_arguments"
+    assert called == []
+
+    assert (
+        cli.main(
+            [
+                "verify",
+                "--trusted-root",
+                str(tmp_path),
+                "--checkout-sha",
+                "not-a-sha",
+            ]
+        )
+        == 2
+    )
+    assert capsys.readouterr().err.strip() == "invalid_arguments"
+    assert called == []
+
+
+def test_fleet_component_cli_validates_output_and_checkout_sha_before_runtime(
+    monkeypatch, tmp_path
+):
+    called = []
+    monkeypatch.setattr(
+        cli, "protected_runtime", lambda *a: called.append("runtime") or "a" * 40
+    )
+    existing = tmp_path / "report.json"
+    existing.write_text("{}")
+    monkeypatch.setenv("GITHUB_RUN_ID", "10")
+    monkeypatch.setenv("GITHUB_RUN_ATTEMPT", "1")
+    assert (
+        component.main(
+            [
+                "--trusted-root",
+                str(tmp_path),
+                "--workspace",
+                str(tmp_path / "ws"),
+                "--output",
+                str(existing),
+                "--checkout-sha",
+                "a" * 40,
+            ]
+        )
+        == 2
+    )
+    assert called == []

@@ -1,0 +1,93 @@
+[
+  {
+    "mutation": "committed-source-selection",
+    "test": "tests/test_governance_consumer_admission.py::test_selector_cannot_read_skip_worktree_policy_instead_of_committed_bytes",
+    "red_exit": 1,
+    "green_exit": 0,
+    "red_is_assertion_failure": true
+  },
+  {
+    "mutation": "complete-cohort",
+    "test": "tests/test_governance_consumer_admission.py::test_composition_cannot_filter_away_unapproved_changes[unknown_member]",
+    "red_exit": 1,
+    "green_exit": 0,
+    "red_is_assertion_failure": true
+  },
+  {
+    "mutation": "immutable-introduction",
+    "test": "tests/test_governance_consumer_admission.py::test_declaration_requires_immutable_protected_introduction[edit]",
+    "red_exit": 1,
+    "green_exit": 0,
+    "red_is_assertion_failure": true
+  },
+  {
+    "mutation": "source-object-binding",
+    "test": "tests/test_governance_consumer_admission.py::test_source_objects_are_required_even_for_first_pending_bootstrap[wrong_content]",
+    "red_exit": 1,
+    "green_exit": 0,
+    "red_is_assertion_failure": true
+  },
+  {
+    "mutation": "exact-bootstrap-tip",
+    "test": "tests/test_governance_consumer_admission.py::test_bootstrap_is_exact_tip_and_never_partial_installation[changed_empty_tip]",
+    "red_exit": 1,
+    "green_exit": 0,
+    "red_is_assertion_failure": true
+  },
+  {
+    "mutation": "native-contract-obligation",
+    "test": "tests/test_governance_consumer_admission.py::test_resealing_candidate_source_cannot_change_required_native_contract[native_omission]",
+    "red_exit": 1,
+    "green_exit": 0,
+    "red_is_assertion_failure": true
+  },
+  {
+    "mutation": "exact-sync-ref",
+    "test": "tests/test_governance_consumer_sync.py::test_native_source_is_exact_and_never_a_generic_exception[wrong_ref]",
+    "red_exit": 1,
+    "green_exit": 0,
+    "red_is_assertion_failure": true
+  },
+  {
+    "mutation": "frozen-sync-payload",
+    "test": "tests/test_governance_consumer_sync.py::test_native_sync_uses_frozen_payload_when_current_package_differs",
+    "red_exit": 1,
+    "green_exit": 0,
+    "red_is_assertion_failure": true
+  },
+  {
+    "mutation": "legacy-single-ref",
+    "test": "tests/test_governance_cycle_release_workflow.py::test_only_protected_preparation_selects_one_immutable_data_fetch",
+    "red_exit": 1,
+    "green_exit": 0,
+    "red_is_assertion_failure": true
+  },
+  {
+    "mutation": "all-refs-before-fetch",
+    "test": "tests/test_governance_cycle_release_workflow.py::test_plural_selector_is_protected_and_validates_every_ref_before_fetch",
+    "red_exit": 1,
+    "green_exit": 0,
+    "red_is_assertion_failure": true
+  },
+  {
+    "mutation": "readme-mypy-parity",
+    "test": "tests/test_fleet_manifest.py::test_documented_and_ci_mypy_targets_agree",
+    "red_exit": 1,
+    "green_exit": 0,
+    "red_is_assertion_failure": true
+  },
+  {
+    "mutation": "agents-mypy-parity",
+    "test": "tests/test_fleet_manifest.py::test_documented_and_ci_mypy_targets_agree",
+    "red_exit": 1,
+    "green_exit": 0,
+    "red_is_assertion_failure": true
+  },
+  {
+    "mutation": "capability-withholding",
+    "test": "tests/test_governance_consumer_admission.py::test_resealed_fleet_entry_cannot_enable_scientific_capability",
+    "red_exit": 1,
+    "green_exit": 0,
+    "red_is_assertion_failure": true
+  }
+]

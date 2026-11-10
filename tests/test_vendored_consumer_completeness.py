@@ -71,7 +71,73 @@ class IncompleteConsumer:
 # Consumers known to be mid-adoption, with the exact gaps and reason. A new
 # missing path fails rather than inheriting the waiver. When the repository
 # finishes vendoring, this test says so and the entry comes out.
-INCOMPLETE_CONSUMERS: dict[str, IncompleteConsumer] = {}
+INCOMPLETE_CONSUMERS: dict[str, IncompleteConsumer] = {
+    "cofactormech": IncompleteConsumer(
+        expected_missing=frozenset({
+            '.github/workflows/merge-queue-admission.yaml',
+            '.github/workflows/pr-shepherd.yml',
+            '.github/workflows/verify-merge-integrity.yaml',
+            'docs/record-reviews.md',
+            'prompts/backlog-loop-goal.md',
+            'schema/record_review.yaml',
+            'scripts/auto_merge_ready_prs.py',
+            'scripts/check_vendored_sync.py',
+            'scripts/check_vendored_sync.sh',
+            'scripts/chem_formula.py',
+            'scripts/deep_research_contract.py',
+            'scripts/record_review.py',
+            'scripts/validate_id_label_correspondence.py',
+            'scripts/verify_merge_integrity.py',
+            'src/cofactormech/schema/history.yaml',
+            'src/cofactormech/schema/mech_shared.yaml',
+            'tests/test_curation_timestamp_schema.py',
+            'tests/test_id_label_empty_adapter.py',
+            'tests/test_id_label_plausibility.py',
+            'tests/test_id_label_unknown_prefix.py',
+            'tests/test_record_review_contract.py',
+            'tests/test_skill_frontmatter.py',
+        }),
+        reason=(
+            "Admission inspected empty main 3cb9d7a6ce527c84277daf6ddfd5cd56decbb4d1; "
+            "the separately reviewed scaffold adopts these exact governed artifacts. "
+            "Remove this ledger only after that scaffold reaches main. "
+            "Admission does not complete the coordinated governance release."
+        ),
+    ),
+    "assaymech": IncompleteConsumer(
+        expected_missing=frozenset({
+            '.github/workflows/merge-queue-admission.yaml',
+            '.github/workflows/pr-shepherd.yml',
+            '.github/workflows/verify-merge-integrity.yaml',
+            'docs/record-reviews.md',
+            'prompts/backlog-loop-goal.md',
+            'schema/record_review.yaml',
+            'scripts/auto_merge_ready_prs.py',
+            'scripts/check_vendored_sync.py',
+            'scripts/check_vendored_sync.sh',
+            'scripts/chem_formula.py',
+            'scripts/deep_research_contract.py',
+            'scripts/record_review.py',
+            'scripts/validate_id_label_correspondence.py',
+            'scripts/verify_merge_integrity.py',
+            'src/assaymech/schema/history.yaml',
+            'src/assaymech/schema/mech_shared.yaml',
+            'tests/test_curation_timestamp_schema.py',
+            'tests/test_id_label_empty_adapter.py',
+            'tests/test_id_label_plausibility.py',
+            'tests/test_id_label_unknown_prefix.py',
+            'tests/test_record_review_contract.py',
+            'tests/test_skill_frontmatter.py',
+        }),
+        reason=(
+            "Admission inspected empty main a85aea616168160ec7e5dc08e71f15b361455924; "
+            "the separately reviewed scaffold adopts these exact governed artifacts. "
+            "Remove this ledger only after that scaffold reaches main. "
+            "Admission does not complete the coordinated governance release."
+        ),
+    ),
+}
+
 
 
 def _applicable(consumer: str) -> list[str]:
@@ -218,6 +284,21 @@ def test_the_scope_rule_catches_what_it_is_for(scope, expected):
 @pytest.mark.parametrize("consumer", CONSUMERS)
 def test_a_declared_consumer_carries_every_artifact_that_applies_to_it(consumer):
     missing = _missing(consumer)
+    from kg_microbe_governance.consumer_admission import SPECS, compose
+    from kg_microbe_governance.consumer_admission import (
+        bootstrap_pending as native_bootstrap_pending,
+    )
+    if consumer in {spec.consumer.key for spec in SPECS} and missing:
+        _, _, additions = compose(lambda p: (ROOT / p).read_bytes(),
+                                  (ROOT / "src/kg_microbe_fleet/fleet.yaml").read_bytes(),
+                                  json.dumps(MANIFEST).encode())
+        if consumer in additions:
+            root = resolve_mech_root(consumer, claw_root=ROOT)
+            if native_bootstrap_pending(root, additions[consumer], committed_only=True):
+                _assert_exact_admission_gap(consumer, missing)
+                return
+            # An unrelated new empty tip cannot inherit the temporary ledger.
+            assert not missing, "Declared native bootstrap expired without complete artifacts"
     if consumer == ADMITTED.key and missing:
         policy = validate_packaged_transition(ROOT)
         root = resolve_mech_root(consumer, claw_root=ROOT)

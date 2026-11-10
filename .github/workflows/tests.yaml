@@ -79,6 +79,7 @@ jobs:
           src/kg_microbe_curation
           src/kg_microbe_health
           src/kg_microbe_kgx
+          src/kg_microbe_links
           src/kg_microbe_pages
           src/kg_microbe_site
           src/kg_microbe_skills
@@ -97,6 +98,8 @@ jobs:
           src/kg_microbe_governance/automatic_fleet_component.py
           src/kg_microbe_governance/private_audit_coverage.py
           src/kg_microbe_governance/cycle_release_audit.py
+          src/kg_microbe_governance/infrastructure_admission.py
+          src/kg_microbe_governance/consumer_admission.py
           src/kg_microbe_governance/artifacts/scripts/run_shared_evidence_validator.py
           src/kg_microbe_governance/artifacts/scripts/check_vendored_sync.py
 

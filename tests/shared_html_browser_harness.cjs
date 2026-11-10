@@ -3,7 +3,9 @@ const fs = require('fs');
 const vm = require('vm');
 const assert = require('node:assert/strict');
 const html = fs.readFileSync(process.argv[2], 'utf8');
+// The theme scripts are exercised by shared_html_theme_harness.cjs.
 const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)]
+  .filter(match => !match[0].startsWith('<script data-mech-theme='))
   .map(match => match[1]).filter(script => script.trim());
 assert.equal(scripts.length, 1);
 

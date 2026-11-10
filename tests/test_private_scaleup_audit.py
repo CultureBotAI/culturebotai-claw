@@ -440,6 +440,35 @@ def test_cli_masks_unexpected_private_errors_and_refuses_missing_configuration(m
     assert not (tmp_path / "out.json").exists()
     assert audit.main([SECRET]) == 2
     assert SECRET not in capsys.readouterr().err
+    called = []
+    monkeypatch.setattr(audit, "trusted_producer_shas", lambda *a: called.append(a) or {PRODUCER})
+    for bad_app in (None, "", "not-an-int", "0", "-5"):
+        if bad_app is None:
+            monkeypatch.delenv("SCALEUP_AUDIT_APP_ID", raising=False)
+        else:
+            monkeypatch.setenv("SCALEUP_AUDIT_APP_ID", bad_app)
+        assert audit.main([
+            "verify", "--trusted-root", str(tmp_path), "--subject-head", SUBJECT,
+            "--run-id", "101", "--attempt", "2",
+        ]) == 2
+        assert capsys.readouterr().err.strip() == "configuration_missing"
+        assert not called
+    monkeypatch.setenv("SCALEUP_AUDIT_APP_ID", str(APP_ID))
+    for bad_args in (
+        ["verify", "--trusted-root", str(tmp_path), "--subject-head", "not-a-sha", "--run-id", "101", "--attempt", "2"],
+        ["verify", "--trusted-root", str(tmp_path), "--subject-head", SUBJECT, "--run-id", "0", "--attempt", "2"],
+        ["verify", "--trusted-root", str(tmp_path), "--subject-head", SUBJECT, "--attempt", "2"],
+    ):
+        assert audit.main(bad_args) == 2
+        assert capsys.readouterr().err.strip() == "producer_untrusted"
+        assert not called
+    for bad_path in (
+        "src/kg_microbe_governance/artifacts//scripts/check_vendored_sync.py",
+        "src/kg_microbe_governance/artifacts/./scripts/check_vendored_sync.py",
+        "src/kg_microbe_governance/artifacts/scripts/check_vendored_sync.py?raw=1",
+    ):
+        with pytest.raises(audit.AuditError, match="source_unverified"):
+            audit.public_source(bad_path, SUBJECT)
 
 
 def test_transport_follows_only_bounded_artifact_redirect_without_authorization():

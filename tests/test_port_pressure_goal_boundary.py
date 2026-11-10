@@ -1,5 +1,8 @@
 """Verified goal-boundary recycling is ordered before one new goal, offline (#802)."""
 import copy
+import hashlib
+import json
+from pathlib import Path
 
 import pytest
 from test_mech_session_supervisor import (
@@ -10,6 +13,38 @@ from test_mech_session_supervisor import (
 )
 from test_mech_session_supervisor import cycle_setup as cycle_setup
 from test_mech_session_supervisor import setup as setup
+
+
+def assert_bounded_goal_instruction(instance, fixture, ledger, wire):
+    actions = [action for action in ledger['actions'].values() if action['kind'] == 'start_goal']
+    assert len(actions) == 1
+    action = actions[0]
+    assert action['state'] == 'uncertain'  # Sending the reference is not native acceptance.
+    assert 'action' not in supervisor.decide(ledger, fixture.observation)
+    assert wire == action['message'] and len(wire.encode('utf-8')) <= 512
+    assert wire.startswith(f"/goal [MECH-WORKFLOW-{action['id']}] Read ")
+    assert hashlib.sha256(wire.encode()).hexdigest() == action['message_sha256']
+    reference = action['instruction_artifact']
+    path = Path(reference['path'])
+    assert path == instance.directory(fixture.target) / 'instructions' / (action['id'] + '.json')
+    assert json.dumps(str(path)) in wire and reference['sha256'] in wire
+    raw = path.read_bytes()
+    assert len(raw) == reference['bytes']
+    assert hashlib.sha256(raw).hexdigest() == reference['sha256']
+    artifact = json.loads(raw)
+    decision = {'action': 'start_goal', 'action_id': action['id']}
+    expected = supervisor.message_for(fixture.target, ledger, decision, instance.directory(fixture.target))
+    assert artifact['instruction'] == expected and expected not in wire
+    for key in ('cycle', 'stage', 'run_id', 'repository_key'):
+        assert artifact[key] == ledger[key]
+    assert artifact['action_id'] == action['id'] and artifact['kind'] == 'start_goal'
+    assert artifact['stage_key'] == supervisor.workflow_stage_key(ledger)
+    assert artifact['native_session_id'] == fixture.target['native_session_id']
+    assert artifact['reservation_goal_identity'] == ledger['adopted_goal']
+    assert artifact['workflow_sha256'] == ledger['workflow']['sha256']
+    workflow = instance.directory(fixture.target) / 'effective-workflow.json'
+    assert artifact['instruction_sha256'] == hashlib.sha256(workflow.read_bytes()).hexdigest()
+    return artifact
 
 
 def prepare(cycle_setup, monkeypatch, *, phase='restarted', mode='restart', send=None):
@@ -53,11 +88,13 @@ def test_verified_completion_recycles_target_then_dispatches_one_new_goal(cycle_
     boundary = events[2][2]
     assert boundary['next_stage_key'] == 'causal_graphs'
     assert boundary['pid'] == 1234 and events[3][1] == 5678
-    assert events[3][2].startswith('/goal ') and 'stage 2' in events[3][2]
     ledger = supervisor.read_json(instance.directory(fixture.target) / 'ledger.json')
     assert ledger['port_pressure_boundary']['phase'] == 'restarted'
     assert ledger['port_pressure_boundary']['new_pid'] == 5678
-    assert len([action for action in ledger['actions'].values() if action['kind'] == 'start_goal']) == 1
+    artifact = assert_bounded_goal_instruction(instance, fixture, ledger, events[3][2])
+    assert artifact['stage'] == 2 and artifact['stage_key'] == 'causal_graphs'
+    assert artifact['instruction'].startswith('/goal Use the canonical skill for stage 2')
+    assert 'stage 2' in artifact['instruction']
     assert dashboard['port_pressure']['phase'] == 'restarted'
 
 

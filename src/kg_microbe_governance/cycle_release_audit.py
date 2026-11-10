@@ -51,8 +51,6 @@ from .infrastructure_admission import (
     bind_source_snapshot,
     bootstrap_pending,
     parse_admission,
-    validate_current_layout,
-    validate_transition,
 )
 
 RELEASE_ID = "mech-cycle-v2-dufmech"
@@ -229,6 +227,8 @@ def audit_release(trusted_root: Path, roots: Mapping[str, Path], *,
     current, _, current_raw = _snapshot(trusted, head)
     admission: dict[str, Any] | None = None
     admission_report = None
+    additional: dict[str, Any] = {}
+    additional_anchors: dict[str, str] = {}
     admission_entry = _head_blob(trusted, head, ADMISSION_PATH)
     if admission_entry is None:
         if _run_git(trusted, ("log", "-1", "--format=%H", head, "--", ADMISSION_PATH)):
@@ -245,9 +245,15 @@ def audit_release(trusted_root: Path, roots: Mapping[str, Path], *,
         if _blob(trusted, head, HISTORICAL_MANIFEST_PATH) != candidate_raw:
             raise GovernanceError("Packaged historical governance snapshot differs from its frozen release")
         admitted_raw = _blob(trusted, head, ADMITTED_MANIFEST_PATH)
-        admitted = validate_transition(admission, content, candidate_raw, admitted_raw,
-                                      _blob(trusted, head, FLEET_PATH))
-        validate_current_layout(admitted, current_raw)
+        from .consumer_admission import compose, protected_additions
+
+        def read_admission(path: str) -> bytes:
+            if _head_blob(trusted, head, path) is None:
+                raise FileNotFoundError(path)
+            return _blob(trusted, head, path)
+
+        _, _, additional = compose(read_admission, _blob(trusted, head, FLEET_PATH), current_raw)
+        additional_anchors = protected_additions(trusted, head, protected_history, lane_ref, additional)
         admission_report = {
             "admission_id": admission["admission_id"], "authority": admission["authority"],
             "activation": "protected_first_parent_introduction", "anchor": admitted_at,
@@ -296,6 +302,22 @@ def audit_release(trusted_root: Path, roots: Mapping[str, Path], *,
                 ADMITTED, roots[ADMITTED.key], admission["source_ref"], current.pin_path,
                 len(current.artifacts_for(ADMITTED)),
             ))
+    additional_pending: dict[str, bool] = {}
+    for key, item in additional.items():
+        from .consumer_admission import bootstrap_pending as additional_bootstrap_pending
+        consumer = item.spec.consumer
+        pending = additional_bootstrap_pending(roots[key], item)
+        additional_pending[key] = pending
+        if pending:
+            preflight.append(RepositoryAuditResult(
+                key, consumer.github, roots[key].resolve(), item.policy["bootstrap_main_ref"],
+                item.policy["bootstrap_main_ref"], None, 0, 0, (),
+            ))
+        else:
+            preflight.append(_preflight_repository(
+                consumer, roots[key], item.policy["source_ref"], item.source.pin_path,
+                len(item.source.artifacts_for(consumer)),
+            ))
     resolved = [result.root for result in preflight]
     if len(set(resolved)) != len(resolved) or trusted in resolved:
         raise GovernanceError("Every consumer and trusted Claw root must be distinct")
@@ -307,6 +329,9 @@ def audit_release(trusted_root: Path, roots: Mapping[str, Path], *,
         historical[admission["source_ref"]] = bind_source_snapshot(
             trusted, admission["source_ref"], admitted_raw, candidate_payloads,
         )
+    for item in additional.values():
+        from .consumer_admission import bind_source
+        historical[item.policy["source_ref"]] = bind_source(trusted, item)
     canonical = {
         raw_url(ref, path): payload
         for ref, (_, payloads) in historical.items() for path, payload in payloads.items()
@@ -330,13 +355,16 @@ def audit_release(trusted_root: Path, roots: Mapping[str, Path], *,
             "adopted" if result.key == CANARY and result.pin == candidate_ref
             else "pending" if result.key == CANARY else "retained"
         )
-        is_infrastructure = bool(admission and result.key == ADMITTED.key)
+        is_edge = bool(admission and result.key == ADMITTED.key)
+        is_infrastructure = is_edge or result.key in additional
+        pending_row = pending_infrastructure if is_edge else additional_pending.get(result.key, False)
         if is_infrastructure:
-            assert admission is not None
-            row["allowed_refs"] = [admission["source_ref"]]
-            row["state"] = "pending_infrastructure_bootstrap" if pending_infrastructure else "installed_infrastructure"
+            row_policy = admission if is_edge else additional[result.key].policy
+            assert row_policy is not None
+            row["allowed_refs"] = [row_policy["source_ref"]]
+            row["state"] = "pending_infrastructure_bootstrap" if pending_row else "installed_infrastructure"
             row["installation_verified"] = False
-        if clean and not (is_infrastructure and pending_infrastructure):
+        if clean and not (is_infrastructure and pending_row):
             assert result.pin is not None and result.head is not None
             manifest, payloads = historical[result.pin]
             consumer = manifest.consumers[result.key]
@@ -394,6 +422,15 @@ def audit_release(trusted_root: Path, roots: Mapping[str, Path], *,
     }
     if admission_report is not None:
         result_document["infrastructure_admission"] = admission_report
+    if additional:
+        result_document["consumer_admissions"] = [{
+            "admission_id": item.policy["admission_id"], "consumer": key,
+            "authority": "infrastructure_only", "activation": "protected_first_parent_introduction",
+            "anchor": additional_anchors[key], "declaration_sha256": _sha(item.content),
+            "source_ref": item.policy["source_ref"],
+            "source_manifest_sha256": item.policy["source_manifest_sha256"],
+            "historical_cohort_policy_retained": True, "scientific_capabilities_enabled": False,
+        } for key, item in additional.items()]
     return result_document
 
 

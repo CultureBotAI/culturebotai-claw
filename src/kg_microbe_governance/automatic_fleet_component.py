@@ -519,12 +519,17 @@ def main(argv=None) -> int:
             protected_runtime,
         )
 
+        auto.check(
+            not args.output.exists() and manual.is_sha(args.checkout_sha),
+            "invalid_arguments",
+        )
+        run_id, run_attempt = integer("GITHUB_RUN_ID"), integer("GITHUB_RUN_ATTEMPT")
         public = manual.GitHubRead(os.environ.get("GH_PUBLIC_READ_TOKEN", ""))
         trusted_sha = protected_runtime(public, args.trusted_root)
         binding = auto.parent_binding(
             public,
-            integer("GITHUB_RUN_ID"),
-            integer("GITHUB_RUN_ATTEMPT"),
+            run_id,
+            run_attempt,
             checkout_sha=args.checkout_sha,
         )
         auto.check(binding["protected_main_sha"] == trusted_sha)

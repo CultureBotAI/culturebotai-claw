@@ -171,7 +171,9 @@ class GitHubRead:
 
 def public_source(path: str, ref: str) -> bytes:
     require(is_sha(ref) and (path == CANONICAL_MANIFEST_PATH or path.startswith(
-        "src/kg_microbe_governance/artifacts/")) and ".." not in path.split("/"), "source_unverified")
+        "src/kg_microbe_governance/artifacts/"))
+        and all(part not in {"", ".", ".."} for part in path.split("/"))
+        and not any(char in path for char in "\r\n#?"), "source_unverified")
     try:
         url = f"https://raw.githubusercontent.com/{CONTROL}/{ref}/{path}"
         with urllib.request.build_opener(NoRedirect()).open(url, timeout=30) as response:
@@ -480,11 +482,17 @@ def main(argv=None) -> int:
                 stream.write(raw)
             print("scaleup_governance_receipt_" + receipt["state"])
             return 0 if receipt["state"] != "invalid" else 1
-        require(args.trusted_root is not None, "producer_untrusted")
-        app_id = int(os.environ.get("SCALEUP_AUDIT_APP_ID", ""))
+        require(args.trusted_root is not None and is_sha(args.subject_head)
+                and positive(args.run_id) and positive(args.attempt), "producer_untrusted")
+        try:
+            app_id = int(os.environ.get("SCALEUP_AUDIT_APP_ID", ""))
+        except ValueError:
+            raise AuditError("configuration_missing") from None
+        require(positive(app_id), "configuration_missing")
+        protected_shas = trusted_producer_shas(args.trusted_root, public)
         receipt = verified_receipt(public, policy, run_id=args.run_id, attempt=args.attempt,
             subject_head=args.subject_head, app_id=app_id,
-            protected_shas=trusted_producer_shas(args.trusted_root, public), now=now)
+            protected_shas=protected_shas, now=now)
         print("verified_scaleup_governance_receipt_" + receipt["state"])
         return 0
     except AuditError as exc:

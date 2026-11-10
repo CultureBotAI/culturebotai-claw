@@ -144,6 +144,7 @@ def test_the_reasons_that_make_checkable_claims_are_the_ones_declared():
         "communitymech.page_budgets",
         "communitymech.source_catalogue",
         "communitymech.source_queue",
+        "communitymech.sssom_export",
         "culturemech.kgx_export",
         "culturemech.metpo_proposal",
         "culturemech.page_budgets",
@@ -153,6 +154,7 @@ def test_the_reasons_that_make_checkable_claims_are_the_ones_declared():
         "dufmech.id_label_validation",
         "dufmech.knowledge_gap_scan",
         "dufmech.metpo_proposal",
+        "edgemech.taxon_links",
         "habitatmech.deep_research",
         "habitatmech.environment_coverage",
         "habitatmech.kgx_export",
@@ -165,6 +167,7 @@ def test_the_reasons_that_make_checkable_claims_are_the_ones_declared():
         "habitatmech.unmapped_inventory_input",
         "habitatmech.writer_audit",
         "mediaingredientmech.causal_graph_coverage",
+        "mediaingredientmech.kgx_export",
         "mediaingredientmech.page_budgets",
         "mediaingredientmech.source_catalogue",
         "mediaingredientmech.source_queue",
@@ -186,6 +189,7 @@ def test_the_reasons_that_make_checkable_claims_are_the_ones_declared():
         "pathwaymech.writer_audit",
         "proteintraitsmech.metpo_proposal",
         "proteintraitsmech.source_queue",
+        "proteintraitsmech.sssom_export",
         "proteintraitsmech.unmapped_inventory_input",
         "proteintraitsmech.writer_audit",
         "taxonmech.deep_research",
@@ -539,11 +543,12 @@ def test_a_directory_claim_is_matched_against_its_declaration():
 
 
 def test_the_widened_scanner_found_a_real_undeclared_claim():
-    """CellStructureMech's deep_research reason says its research is "written by
-    hand under research/". True, and undeclared until #246 -- the scanner could
-    not see a path without an extension, so the forward guarantee did not reach
-    it. This pins the declaration that closed it."""
+    """CellStructureMech's deep_research reason names its research/ tree. That
+    was undeclared until #246 -- the scanner could not see a path without an
+    extension, so the forward guarantee did not reach it. This pins the
+    declaration that closed it; the reason was re-measured for #848 and now
+    claims its justfile recipes and the absent provider profile too."""
     claims = (
         MANIFEST.mechs["cellstructuremech"].capabilities["deep_research"].reason_claims
     )
-    assert claims.present == ("research",)
+    assert "research" in claims.present

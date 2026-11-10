@@ -303,3 +303,13 @@ def test_culturemechs_unmapped_export_is_clean():
         mapping.rows
     )
     assert check_file(path) == []
+
+
+def test_check_cli_reports_disabled_sssom_export_status_and_reason(capsys):
+    from kg_microbe_sssom.__main__ import main
+
+    assert main(["check", "--mech", "communitymech"]) == 0
+    out = capsys.readouterr().out
+    assert "communitymech: sssom_export is disabled, so there is nothing to check:" in out
+    assert "CommunityMech#1137" in out
+

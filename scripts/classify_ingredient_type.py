@@ -147,7 +147,10 @@ def medium_granularity_token() -> str:
         f"a stale spelling be written into the corpus."
     )
 
-OUT_DIR = REPO_ROOT / "workspace" / "reports"
+WORKSPACE_ROOT = Path(
+    os.environ.get("OPENCLAW_WORKSPACE", REPO_ROOT / "workspace")
+)
+OUT_DIR = WORKSPACE_ROOT / "reports"
 OUT_TSV = OUT_DIR / "ingredient_type_classification.tsv"
 OUT_MD = OUT_DIR / "ingredient_type_classification.md"
 
@@ -439,8 +442,18 @@ def main() -> int:
     print("Distribution:")
     for k, v in sorted(counts.items(), key=lambda x: -x[1]):
         print(f"  {k:25s} {v}")
-    print(f"\nReports: {OUT_TSV.relative_to(REPO_ROOT)}")
-    print(f"         {OUT_MD.relative_to(REPO_ROOT)}")
+    tsv_display = (
+        OUT_TSV.relative_to(REPO_ROOT)
+        if OUT_TSV.is_relative_to(REPO_ROOT)
+        else OUT_TSV
+    )
+    md_display = (
+        OUT_MD.relative_to(REPO_ROOT)
+        if OUT_MD.is_relative_to(REPO_ROOT)
+        else OUT_MD
+    )
+    print(f"\nReports: {tsv_display}")
+    print(f"         {md_display}")
     return 0
 
 
