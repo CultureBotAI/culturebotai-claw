@@ -414,23 +414,43 @@ def check_release_bundle(
     findings.extend(check_edges(edges, identifiers, profile))
 
     stats = manifest.get("statistics")
-    if isinstance(stats, dict):
+    if not isinstance(stats, dict):
+        findings.append(
+            Finding(
+                "MISSING_MANIFEST_STATISTICS",
+                "manifest.json has no statistics object with nodes and edges counts",
+            )
+        )
+    else:
         expected_nodes = stats.get("nodes")
         expected_edges = stats.get("edges")
-        if isinstance(expected_nodes, int) and expected_nodes != len(nodes.rows):
+        if (
+            type(expected_nodes) is not int
+            or expected_nodes < 0
+            or type(expected_edges) is not int
+            or expected_edges < 0
+        ):
             findings.append(
                 Finding(
-                    "MANIFEST_ROW_COUNT_MISMATCH",
-                    f"nodes.tsv.gz has {len(nodes.rows)} row(s), manifest says {expected_nodes}",
+                    "MISSING_MANIFEST_STATISTICS",
+                    "manifest.json statistics.nodes and statistics.edges must be non-negative integers",
                 )
             )
-        if isinstance(expected_edges, int) and expected_edges != len(edges.rows):
-            findings.append(
-                Finding(
-                    "MANIFEST_ROW_COUNT_MISMATCH",
-                    f"edges.tsv.gz has {len(edges.rows)} row(s), manifest says {expected_edges}",
+        else:
+            if expected_nodes != len(nodes.rows):
+                findings.append(
+                    Finding(
+                        "MANIFEST_ROW_COUNT_MISMATCH",
+                        f"nodes.tsv.gz has {len(nodes.rows)} row(s), manifest says {expected_nodes}",
+                    )
                 )
-            )
+            if expected_edges != len(edges.rows):
+                findings.append(
+                    Finding(
+                        "MANIFEST_ROW_COUNT_MISMATCH",
+                        f"edges.tsv.gz has {len(edges.rows)} row(s), manifest says {expected_edges}",
+                    )
+                )
     return findings
 
 

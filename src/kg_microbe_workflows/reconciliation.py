@@ -399,9 +399,12 @@ def prepare(supervisor: Any, helpers: Any, config_path: Path, record_path: Path,
                 "later intake commit must produce the current committed INFRA_TASKS.md",
             )
             from kg_microbe_workflows import validate_infra_notebook
-            historical_raw = supervisor.runner(
-                ["git", "-C", target["root"], "show", f"{receipt['pr']['head_sha']}:INFRA_TASKS.md"]
-            ).stdout.encode()
+            historical_res = supervisor.runner(
+                ["git", "-C", target["root"], "show", f"{receipt['pr']['head_sha']}:INFRA_TASKS.md"],
+                check=False,
+            )
+            require(historical_res.returncode == 0, "historical closure notebook unavailable at reviewed final head")
+            historical_raw = historical_res.stdout.encode()
             require(
                 sha(historical_raw) == later["historical_infra_notebook_sha256"],
                 "historical closure notebook bytes differ from approved digest",

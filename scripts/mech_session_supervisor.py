@@ -1110,11 +1110,16 @@ def verify_versioned_artifacts(receipt: dict, ledger: dict, target: dict, runner
             if errors:
                 raise SupervisorError("; ".join(errors))
             root = Path(target["root"]).resolve()
-            head_blob = runner(["git", "-C", str(root), "rev-parse", f"{head}:INFRA_TASKS.md"]).stdout.strip()
-            actual = runner(["git", "-C", str(root), "hash-object", "--no-filters", "--", "INFRA_TASKS.md"]).stdout.strip()
+            head_res = runner(["git", "-C", str(root), "rev-parse", f"{head}:INFRA_TASKS.md"], check=False)
+            actual_res = runner(["git", "-C", str(root), "hash-object", "--no-filters", "--", "INFRA_TASKS.md"], check=False)
+            head_blob = head_res.stdout.strip() if head_res.returncode == 0 else ""
+            actual = actual_res.stdout.strip() if actual_res.returncode == 0 else ""
             if not SHA.fullmatch(head_blob) or not SHA.fullmatch(actual) or head_blob == actual:
                 raise SupervisorError("workflow evidence is not versioned at the exact reviewed final head: INFRA_TASKS.md")
-            historical_raw = runner(["git", "-C", str(root), "show", f"{head}:INFRA_TASKS.md"]).stdout.encode()
+            show_res = runner(["git", "-C", str(root), "show", f"{head}:INFRA_TASKS.md"], check=False)
+            if show_res.returncode != 0:
+                raise SupervisorError("historical infrastructure notebook unavailable at reviewed final head")
+            historical_raw = show_res.stdout.encode()
             if hashlib.sha256(historical_raw).hexdigest() != historical_sha256:
                 raise SupervisorError("historical infrastructure notebook bytes at reviewed final head differ from receipt")
             from kg_microbe_workflows import validate_infra_notebook
@@ -1452,14 +1457,20 @@ def verify_remote_receipt(receipt: dict, ledger: dict, target: dict, runner=comm
     verify_versioned_artifacts(receipt, ledger, target, runner, head,
                                historical_infra_notebook=historical_infra_notebook)
     if ledger.get("schema_version") == 2 and receipt.get("schema_version") == 2:
-        from kg_microbe_workflows import read_infra_notebook
-        notebook = read_infra_notebook(Path(root) / "INFRA_TASKS.md", github, Path(root))
-        for task in notebook["tasks"]:
-            if task.get("issue_url"):
-                number = task["issue_url"].rsplit("/", 1)[-1]
-                issue = gh_json("api", f"repos/{github}/issues/{number}")
-                if issue.get("state") not in {"open", "closed"} or "pull_request" in issue:
-                    raise SupervisorError("infrastructure notebook must reference real GitHub issues")
+        from kg_microbe_workflows import read_infra_notebook, validate_infra_notebook
+        notebooks = [read_infra_notebook(Path(root) / "INFRA_TASKS.md", github, Path(root))]
+        if historical_infra_notebook is not None:
+            hist_res = git("show", f"{head}:INFRA_TASKS.md", check=False)
+            if hist_res.returncode != 0:
+                raise SupervisorError("historical infrastructure notebook unavailable at reviewed final head")
+            notebooks.append(validate_infra_notebook(hist_res.stdout.encode(), github))
+        for notebook in notebooks:
+            for task in notebook["tasks"]:
+                if task.get("issue_url"):
+                    number = task["issue_url"].rsplit("/", 1)[-1]
+                    issue = gh_json("api", f"repos/{github}/issues/{number}")
+                    if issue.get("state") not in {"open", "closed"} or "pull_request" in issue:
+                        raise SupervisorError("infrastructure notebook must reference real GitHub issues")
     evidence = goal_output_data(receipt, ledger, target)
     triage_verification = (verify_remote_issue_triage(evidence, github, runner)
                           if evidence and evidence.get("stage_key") == "open_issue_triage" else None)

@@ -268,3 +268,42 @@ def test_guarded_paste_and_submit_rejects_historical_text_when_current_composer_
     assert pasted == [draft]
     assert submitted == []
 
+
+def test_guarded_paste_and_submit_refuses_symlink_evidence_and_failed_paste(tmp_path):
+    """#1136: symlinked paste_evidence_path and failed send_paste abort before submit."""
+    draft = "Review shard 04 and write structured receipt"
+    target_file = tmp_path / "real.txt"
+    target_file.write_text("original", encoding="utf-8")
+    symlink_evidence = tmp_path / "symlink.txt"
+    symlink_evidence.symlink_to(target_file)
+
+    symlink_result = terminal.guarded_paste_and_submit(
+        read_screen=lambda: EMPTY,
+        send_paste=lambda _: True,
+        send_submit=lambda: None,
+        draft=draft,
+        paste_evidence_path=symlink_evidence,
+    )
+    assert symlink_result == {
+        "status": "blocked-before-paste",
+        "reason": "symlink-paste-evidence-path",
+        "pasted": False,
+        "submitted": False,
+    }
+    assert target_file.read_text(encoding="utf-8") == "original"
+
+    failed_paste = terminal.guarded_paste_and_submit(
+        read_screen=lambda: EMPTY,
+        send_paste=lambda _: False,
+        send_submit=lambda: None,
+        draft=draft,
+        paste_evidence_path=tmp_path / "evidence.txt",
+    )
+    assert failed_paste == {
+        "status": "paste-failed",
+        "reason": "paste-transport-failed",
+        "pasted": False,
+        "submitted": False,
+    }
+    assert not (tmp_path / "evidence.txt").exists()
+

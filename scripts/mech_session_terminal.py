@@ -305,7 +305,23 @@ def guarded_paste_and_submit(
             "pasted": False,
             "submitted": False,
         }
-    send_paste(draft)
+    if paste_evidence_path is not None:
+        evidence_path = Path(paste_evidence_path)
+        if any(p.is_symlink() for p in (evidence_path, *evidence_path.parents)):
+            return {
+                "status": "blocked-before-paste",
+                "reason": "symlink-paste-evidence-path",
+                "pasted": False,
+                "submitted": False,
+            }
+    paste_outcome = send_paste(draft)
+    if paste_outcome is False:
+        return {
+            "status": "paste-failed",
+            "reason": "paste-transport-failed",
+            "pasted": False,
+            "submitted": False,
+        }
     if paste_evidence_path is not None:
         Path(paste_evidence_path).write_text(draft, encoding="utf-8")
     pre_submit_screen = read_screen()

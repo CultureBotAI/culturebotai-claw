@@ -322,3 +322,30 @@ def test_fetch_release_bundle_and_check_cli_release_tag(tmp_path: Path, monkeypa
     )
 
 
+def test_check_release_bundle_rejects_boolean_or_missing_statistics(tmp_path: Path):
+    """#1136: `check_release_bundle` rejects boolean or missing row counts in `manifest.json`."""
+    import json
+
+    from kg_microbe_kgx.contract import check_release_bundle, write_release_bundle
+
+    write(
+        tmp_path,
+        "nodes.tsv",
+        NODE_HEADER + "\nX:1\tbiolink:Thing\tn\td\tinfores:x\n",
+    )
+    write(
+        tmp_path,
+        "edges.tsv",
+        EDGE_HEADER + "\ne1\tX:1\tbiolink:related_to\tX:1\n",
+    )
+    release_assets = write_release_bundle(tmp_path)
+    for bad_stats in (None, {"nodes": True, "edges": 1}, {"nodes": 1}):
+        manifest = {"mech": "culturemech", "release_assets": release_assets}
+        if bad_stats is not None:
+            manifest["statistics"] = bad_stats
+        (tmp_path / "manifest.json").write_text(
+            json.dumps(manifest, indent=2), encoding="utf-8"
+        )
+        assert "MISSING_MANIFEST_STATISTICS" in codes(check_release_bundle(tmp_path))
+
+
