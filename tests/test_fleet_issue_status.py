@@ -460,3 +460,53 @@ def test_tsv_path_is_pure(tmp_path):
     assert not p.exists() and p.parent == tmp_path
 
 
+def test_snapshot_transition_is_serialized_under_one_persistent_lock(
+    tmp_path, monkeypatch
+):
+    """#416, #417: `fleet_issue_status.write_tsv` uses the same persistent
+    per-date snapshot lock and counterpart cleanup as `fleet_pr_status`."""
+    complete = tsv_path(tmp_path, SNAP, complete=True)
+    partial = tsv_path(tmp_path, SNAP, complete=False)
+    partial.write_text("stale partial snapshot", encoding="utf-8")
+    lock_path = fis._snapshot_lock_path(tmp_path, SNAP)
+    events = []
+    lock_held = False
+    real_flock = fis.fcntl.flock
+    real_replace = fis.os.replace
+    real_unlink = fis.Path.unlink
+
+    def tracking_flock(fd, operation):
+        nonlocal lock_held
+        if operation == fis.fcntl.LOCK_EX:
+            assert not lock_held
+            lock_held = True
+            events.append("lock")
+        elif operation == fis.fcntl.LOCK_UN:
+            assert lock_held
+            events.append("unlock")
+            lock_held = False
+        return real_flock(fd, operation)
+
+    def tracking_replace(source, destination):
+        assert lock_held
+        events.append("replace")
+        return real_replace(source, destination)
+
+    def tracking_unlink(path, *args, **kwargs):
+        assert path != lock_path, "the stable lock file must never be unlinked"
+        if path in {complete, partial}:
+            assert lock_held
+            events.append("delete-counterpart")
+        return real_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(fis.fcntl, "flock", tracking_flock)
+    monkeypatch.setattr(fis.os, "replace", tracking_replace)
+    monkeypatch.setattr(fis.Path, "unlink", tracking_unlink)
+
+    assert write_tsv(_data(), tmp_path, SNAP) == complete
+    assert events == ["lock", "replace", "delete-counterpart", "unlock"]
+    assert lock_path.exists()
+    assert lock_path.stat().st_mode & 0o777 == 0o600
+
+
+

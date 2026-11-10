@@ -73,8 +73,14 @@ the working tree. Before concluding a path or feature is absent, search with
    the queue. Membership alone does not enable the remote queue.
 6. Reconcile `MechEnum` in
    `src/kg_microbe_research/schema/research.yaml`, required fleet contract tests,
-   and maintained setup documentation. Record Tier 1 gaps and deferred capability
-   work with evidence; registration alone does not implement missing features.
+   and maintained setup documentation. Verify the Mech's instruction and skill
+   layout matches the fleet convention (`AGENTS.md` as the real instruction file
+   with `CLAUDE.md -> AGENTS.md` as a relative symlink, and `.claude/skills/` as
+   the real skill directory with `.agents/skills -> ../.claude/skills` as a
+   relative symlink so `src/kg_microbe_governance/artifacts/scripts/record_review.py`'s
+   `O_NOFOLLOW` walker succeeds).
+   Record Tier 1 gaps and deferred capability work with evidence; registration
+   alone does not implement missing features.
 7. When the companion X-Mech Suite repository (`CultureBotAI/CultureBotAI.github.io`,
    `CULTUREBOTAI_SITE_ROOT`) is in scope, refresh `CultureBotAI.github.io/_fleet/data/manifest.json`,
    card copy (`CultureBotAI.github.io/_fleet/mechs_template.md` and

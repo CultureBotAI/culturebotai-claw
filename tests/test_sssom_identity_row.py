@@ -535,6 +535,49 @@ def test_the_outcome_counts_sum_to_the_rows_considered():
     assert sum(outcomes.values()) == 2, "the pre-stamped row is skipped, not counted"
 
 
+def test_demoting_exact_match_and_minting_b1_registry_row_leave_both_unstamped_for_review(
+    tmp_path,
+):
+    """#350: `MIM:Air-dried_Garden_Soil` demoted its `ENVO:00002263` parent row
+    from `skos:exactMatch` to an asymmetric predicate and synthesized a new B1
+    registry row (`kgmicrobe.ingredient:air-dried_garden_soil`).
+
+    Per #126, carry-over is restricted to strengthening predicate changes, so
+    weakening the parent row resets its prior stamp (`outcome == "reset"`), while
+    the newly minted B1 registry row has no prior history (`outcome == "absent"`).
+    Both rows deliberately enter the review queue with `validation_method == ""`.
+    """
+    rows = rows_for(
+        tmp_path,
+        stem="Air-dried_Garden_Soil",
+        identifier="ENVO:00002263",
+        ontology_id="ENVO:00002263",
+        quality="NARROW_MATCH",
+    )
+    # Simulate a parent row demoted from exactMatch to narrowMatch/broadMatch
+    # alongside its newly minted B1 registry row.
+    demoted_rows = [
+        _row("MIM:Air-dried_Garden_Soil", "skos:narrowMatch", "ENVO:00002263"),
+        _row(
+            "MIM:Air-dried_Garden_Soil",
+            "skos:exactMatch",
+            "kgmicrobe.ingredient:air-dried_garden_soil",
+        ),
+    ]
+    prior = {
+        ("MIM:Air-dried_Garden_Soil", "skos:exactMatch", "ENVO:00002263"):
+            "OLS:envo|SYNONYM_ENRICH|2026-07-07",
+    }
+
+    outcomes = builder.apply_replayed_stamps(demoted_rows, prior)
+
+    assert outcomes == {"replayed": 0, "carried": 0, "reset": 1, "absent": 1}
+    assert demoted_rows[0]["validation_method"] == ""
+    assert demoted_rows[1]["validation_method"] == ""
+    assert rows[0]["validation_method"] == ""
+
+
+
 def test_the_header_declares_skos_predicate_semantics():
     """kg-microbe reads the direction of every asymmetric row from this one
     header line and treats its absence as the legacy inverted convention
