@@ -215,7 +215,7 @@ def test_the_governance_manifest_covers_exactly_the_declared_fleet():
 # --------------------------------------------------------------------------
 
 _REASON_RECORD_OR_PAGE_COUNT = re.compile(
-    rf"\b\d{{1,3}}(?:,\d{{3}})+\b|\b(?:\d[\d,]*|{_NUMBER})\s+(?:records?|pages?)\b",
+    rf"\b\d{{1,3}}(?:,\d{{3}})+\b|\b{_NUMBER}\s+(?:records?|pages?)\b",
     re.IGNORECASE,
 )
 _REASON_COUNT_BASIS = re.compile(
@@ -266,6 +266,8 @@ def test_an_ungrounded_record_or_page_count_in_a_reason_is_caught(reason: str) -
         "Measured 2026-11-04 (claw#729): the corpus holds 38,580 items.",
         "Serves tracked pages from main -- 2,956 files and 30.1 MB measured at admission (#230).",
         "Every curated record carries an ENVO term.",
+        "Each file holds 1 record.",
+        "Each file holds one record.",
     ],
 )
 def test_a_grounded_or_countless_reason_passes(reason: str) -> None:
