@@ -154,6 +154,16 @@ skills:
       Combines CBORG MCP servers (valency, tavily, context7), anonymous public
       literature APIs, local Zotero PDFs, and LBNL-licensed databases and TDM
       APIs for evidence-backed curation across manifest-resolved Mechs.
+  lbnl-mech-record-review:
+    scope: fleet
+    reason: >-
+      Performs content-triaged structured record reviews across manifest-resolved
+      Mechs that enable record_review, routing citations by DOI prefix and
+      journal family to LBNL publisher TDM APIs or open ACS Supporting
+      Information and routing chemical, crystallographic, and biological claims
+      to CAS Common Chemistry (with CC BY 4.0 ChEBI crosswalk and polysalt
+      SMILES stoichiometry guards), SciFinder-n, Reaxys, CHEMnetBASE, WebCSD,
+      ICSD, BioCyc, and iModulonDB.
   map-ingredients:
     scope: domain
     reason: Runs the unified ingredient-mapping pipeline over MIM.
@@ -455,3 +465,15 @@ canonical:
       counts at run time through kg-microbe-corpus report and pair them with
       native validation and commit provenance, while keeping repository-specific
       recipes and domain strata outside the managed regions.
+  metpo-proposal:
+    capability: metpo_proposal
+    reason: >-
+      TraitMech and CommunityMech both publish METPO proposal cohorts under
+      proposals/<cohort>/ and their local metpo-proposal skills drifted (#385,
+      #386): TraitMech carried four reference documents (including
+      updating-proposals.md) and a prose-only ID reservation that CommunityMech
+      never saw, leading to the eight ID collisions in CommunityMech#756, while
+      the upstream contract lived only in kg-microbe outside the fleet manifest.
+      This canonical template governs the five-file cohort bundle, the 12-column
+      class and 13-column property ROBOT templates, fleet-wide ID coordination
+      via <claw-root>/scripts/fleet_metpo_aggregate.py, and additive cohort update rules.

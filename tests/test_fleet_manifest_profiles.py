@@ -101,11 +101,12 @@ EXPECTED_CAPABILITIES = {
     "site_contract",
     # Where each Mech names taxa, for kg-microbe-links taxa (#881 plan, Phase 1).
     "taxon_links",
-    # Whose term mappings are checked against the shared SSSOM contract, and
-    # why the two that publish none have decided rather than forgotten.
+    # Whose term mappings are checked against the shared SSSOM contract. It
+    # applies to every Mech (#503), so the rest are disabled, pending adoption.
     "sssom_export",
-    # Whose exported graph is checked against the shared KGX contract; only
-    # CommunityMech emits one today, and the rest say why not.
+    # Whose exported graph is checked against the shared KGX contract;
+    # CommunityMech, PathwayMech and DUFMech declare one today. It applies to
+    # every Mech (#503), so the rest are disabled, pending adoption.
     "kgx_export",
     # Who mints METPO terms. Two Mechs propose into one shared numeric ID
     # space from separate repositories, and the aggregate that finally reads

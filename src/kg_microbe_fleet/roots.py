@@ -52,6 +52,55 @@ def sibling_default(mech_display_name: str, claw_root: Path) -> Path:
     return Path(claw_root).resolve().parent / mech_display_name
 
 
+def _primary_worktree_root(claw_root: Path) -> Path:
+    """Resolve the primary repository root when ``claw_root`` is a linked Git worktree (#965)."""
+    root = Path(claw_root)
+    dot_git = root / ".git"
+    try:
+        if dot_git.is_symlink() or not dot_git.is_file():
+            return root
+        raw = dot_git.read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeError):
+        return root
+    if not raw.startswith("gitdir:"):
+        return root
+    gitdir_text = raw.partition(":")[2].strip()
+    if not gitdir_text:
+        return root
+    gitdir = Path(gitdir_text)
+    if not gitdir.is_absolute():
+        gitdir = (root / gitdir).resolve()
+    commondir_file = gitdir / "commondir"
+    try:
+        if commondir_file.is_file():
+            rel = commondir_file.read_text(encoding="utf-8").strip()
+            common_git = (gitdir / rel).resolve()
+            if common_git.name == ".git" and common_git.parent.is_dir():
+                return common_git.parent
+    except (OSError, UnicodeError):
+        return root
+    if gitdir.parent.name == "worktrees" and gitdir.parent.parent.name == ".git":
+        return gitdir.parent.parent.parent
+    return root
+
+
+def _preferred_sibling_checkout(
+    guess: Path, mech_display_name: str, package_path: str | None
+) -> Path:
+    """Prefer ``<ontology>/Mechs/<DisplayName>`` over a legacy ``KG-Hub/KG-Microbe/<DisplayName>`` sibling (#965)."""
+    if (
+        guess.parent.name == "KG-Microbe"
+        and len(guess.parents) >= 3
+        and guess.parents[1].name == "KG-Hub"
+    ):
+        mechs_sibling = guess.parents[2] / "Mechs" / mech_display_name
+        if mechs_sibling.is_dir() and (
+            not package_path or looks_like(mechs_sibling, package_path)
+        ):
+            return mechs_sibling
+    return guess
+
+
 def dotenv_value(claw_root: Path, variable: str) -> str:
     """One named variable from claw's own `.env`, or "".
 
@@ -75,6 +124,10 @@ def dotenv_value(claw_root: Path, variable: str) -> str:
     """
     path = Path(claw_root) / ".env"
     try:
+        if path.is_symlink() or not path.is_file():
+            primary = _primary_worktree_root(Path(claw_root))
+            if primary != Path(claw_root):
+                path = primary / ".env"
         if path.is_symlink() or not path.is_file():
             return ""
         text = path.read_text(encoding="utf-8")
@@ -295,10 +348,17 @@ def resolve_mech_root(
     guess = sibling_default(mech.display_name, claw_root)
     package_path = getattr(mech, "package_path", None)
     if not guess.is_dir():
+        primary = _primary_worktree_root(Path(claw_root))
+        if primary != Path(claw_root):
+            primary_guess = sibling_default(mech.display_name, primary)
+            if primary_guess.is_dir():
+                guess = primary_guess
+    if not guess.is_dir():
         raise MechRootError(
             f"{mech.environment_variable} is not set and no checkout is at the "
             f"conventional path {guess}. Set {mech.environment_variable}."
         )
+    guess = _preferred_sibling_checkout(guess, mech.display_name, package_path)
     if package_path and not looks_like(guess, package_path):
         raise MechRootError(
             f"{mech.environment_variable} is not set and {guess} does not look "

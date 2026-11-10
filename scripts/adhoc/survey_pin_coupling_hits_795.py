@@ -18,15 +18,17 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from kg_microbe_fleet import load_fleet_manifest  # noqa: E402
+from kg_microbe_governance import load_governance_manifest  # noqa: E402
 from kg_microbe_governance.pin_coupling import find_pin_couplings  # noqa: E402
 from plugins.repository_settings import RepositorySettings  # noqa: E402
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--old-ref", required=True)
     parser.add_argument("--treeish", default="origin/main")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
+    pin_path = load_governance_manifest().pin_path
     settings = RepositorySettings.from_environment()  # roots exported from claw's .env by the caller
     groups: collections.Counter = collections.Counter()
     for key in load_fleet_manifest().mechs:
@@ -34,7 +36,7 @@ def main() -> int:
         if root is None:  # unconfigured or invalid: report, keep going
             print(f"SKIP {key}: {settings.errors.get(key, 'not configured')}")
             continue
-        for coupling in find_pin_couplings(root, args.old_ref, pin_path="scripts/.vendored_canon_ref",
+        for coupling in find_pin_couplings(root, args.old_ref, pin_path=pin_path,
                                            treeish=args.treeish):
             print(f"{key}\t{coupling.kind}\t{coupling.path}:{coupling.line}")
             top = coupling.path.split("/", 1)[0] if "/" in coupling.path else "(root)"

@@ -565,6 +565,235 @@ def inspect(repo, cid):
         return row
 
 
+def external_pr_statement(text, github_repository, item):
+    """Bind a reviewed attribution to one actual completion-summary line.
+
+    This is corroboration of the operator's reviewed attribution, not scientific
+    acceptance. Bare numbers, tool output and a copied hash without the PR and
+    exact branch on that same line are insufficient.
+    """
+    number = item["number"]
+    url = rf"https://github\.com/{re.escape(github_repository)}/pull/{number}(?![0-9A-Za-z])"
+    label = rf"\bPR\s*#{number}(?![0-9A-Za-z])"
+    merge = rf"(?<![0-9a-f]){re.escape(item['merge_commit_sha'])}(?![0-9a-f])"
+    branch = rf"(?<![\w./-]){re.escape(item['branch'])}(?![\w./-])"
+    for line in text.splitlines():
+        labels = {int(n) for n in re.findall(r"\bPR\s*#(\d+)(?![0-9A-Za-z])", line)}
+        commits = set(re.findall(r"(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])", line))
+        if (labels and labels != {number}) or commits != {item["merge_commit_sha"]}:
+            continue
+        references = re.findall(r"https://github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/(pull|issues)/(\d+)", line)
+        if {int(n) for _, kind, n in references if kind == "pull"} - {number}:
+            continue
+        if any(int(n) == number and (repo.casefold() != github_repository.casefold() or kind != "pull")
+               for repo, kind, n in references):
+            continue
+        if ((re.search(url, line, re.I) or re.search(label, line))
+                and re.search(merge, line) and re.search(branch, line)):
+            return True
+    return False
+
+
+def reconciliation_evidence(repo, cid, historical, current, *, external_prs=None,
+                            github_repository=None, native_proof_mode="checkpoint_before_external"):
+    if native_proof_mode == "retained_public_attestation" and external_prs is not None:
+        return retained_public_attestation(repo, cid, historical, current, external_prs, github_repository)
+    if native_proof_mode != "checkpoint_before_external":
+        raise ValueError("unsupported explicit native proof mode")
+    return checkpoint_reconciliation_evidence(repo, cid, historical, current,
+                                              external_prs=external_prs, github_repository=github_repository)
+
+
+def checkpoint_reconciliation_evidence(repo, cid, historical, current, *, external_prs=None, github_repository=None):
+    """Fresh native proof for one completed goal followed by one external goal.
+
+    Reads stable copies only. Public markers alone do not grant PR closure or
+    permission to send input. An active/cancelled/resumed or intervening goal
+    makes this deliberately narrow operation unavailable.
+    """
+    observed = inspect(repo, cid)
+    def identity(g):
+        return {"conversation_id": cid, "start_step_index": g["start_step_index"],
+                "started_at": g["started_at"]}
+    if (not observed.get("current_goal") or identity(observed["current_goal"]) != current
+            or observed["current_goal"]["state"] != "completed"
+            or observed["native_execution_state"] != "idle_candidate"):
+        raise ValueError("current native goal is not the exact completed idle goal")
+    old_step, new_step = historical["start_step_index"], current["start_step_index"]
+    if historical["conversation_id"] != cid or current["conversation_id"] != cid or old_step >= new_step:
+        raise ValueError("historical and current native identities are not ordered")
+    checkpoints, events, declarations = [], [], []
+    external_statements = {}
+    with snapshot(ROOT / "conversations" / f"{cid}.db") as (connection, source):
+        if source["native_files"] != observed["snapshot"]["native_files"]:
+            raise ValueError("native source changed during reconciliation proof")
+        for index, kind, status, payload in connection.execute(
+                "select idx,step_type,status,step_payload from steps where idx>? order by idx", (old_step,)):
+            if status != 3:
+                continue
+            if kind == 14 and native_goal_declaration(payload):
+                declarations.append(index)
+            if kind == 23 and ANY_TYPE in payload:
+                matches = [g for g in find_goals(payload) if g["start_step_index"] == old_step]
+                if matches:
+                    if any(identity(g) != historical or g["state"] != matches[0]["state"] for g in matches):
+                        raise ValueError("conflicting historical native identity/state")
+                    checkpoints.append({"step_index": index, "state": matches[0]["state"],
+                        "payload_sha256": hashlib.sha256(payload).hexdigest()})
+            if kind == 15:
+                visible = public_response(payload)
+                marker = terminal_marker(visible)
+                if external_prs is not None and index > new_step and marker == COMPLETE:
+                    external_statements[index] = visible
+                if marker:
+                    events.append({"step_index": index, "state": "completed" if marker == COMPLETE else "cancelled",
+                                   "text_sha256": hashlib.sha256(visible.encode()).hexdigest()})
+    if declarations != [new_step]:
+        raise ValueError("expected exactly one later native goal declaration")
+    completed = [c for c in checkpoints if c["state"] == "completed" and c["step_index"] < new_step]
+    if not completed:
+        raise ValueError("historical completion lacks a checkpoint before the external goal")
+    if any(c["state"] != "completed" for c in checkpoints if c["step_index"] >= completed[0]["step_index"]):
+        raise ValueError("historical goal was resumed or cancelled after completion")
+    before = [e for e in events if e["step_index"] < new_step]
+    after = [e for e in events if e["step_index"] > new_step]
+    if (not before or not after or any(e["state"] != "completed" for e in before + after)):
+        raise ValueError("completed public native evidence is missing or ambiguous")
+    latest = observed.get("latest_goal_snapshot") or {}
+    retained = [g for g in latest.get("goals", []) if g["start_step_index"] == old_step]
+    if not retained or any(identity(g) != historical or g["state"] != "completed" for g in retained):
+        raise ValueError("latest native checkpoint does not retain historical completion")
+    bindings = []
+    if external_prs is not None:
+        if not isinstance(github_repository, str) or not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", github_repository):
+            raise ValueError("external proof needs an exact GitHub repository")
+        if not isinstance(external_prs, list) or not 2 <= len(external_prs) <= 16:
+            raise ValueError("external proof needs a bounded PR list")
+        for item in external_prs:
+            statement = item["native_statement"]
+            visible = external_statements.get(statement["step_index"])
+            if (item["goal_identity"] != current or visible is None
+                    or hashlib.sha256(visible.encode()).hexdigest() != statement["text_sha256"]
+                    or not external_pr_statement(visible, github_repository, item)):
+                raise ValueError("external PR lacks its exact native completion statement")
+            bindings.append({"number": item["number"], "goal_identity": current, "native_statement": statement,
+                             "branch": item["branch"], "merge_commit_sha": item["merge_commit_sha"]})
+    return {"schema_version": "1.0.0", "repository_root": str(Path(repo).resolve()),
+            **({"external_pr_bindings": bindings} if external_prs is not None else {}),
+            "historical_goal_identity": historical, "current_goal_identity": current,
+            "historical_checkpoints": checkpoints, "historical_completions": before,
+            "current_completions": after, "latest_checkpoint_step": latest["step_index"],
+            "last_step": observed["last_step"], "native_execution_state": "idle_candidate"}
+
+
+def retained_public_attestation(repo, cid, historical, current, external_prs, github_repository):
+    """Corroborate a reviewed attestation from retained original native bytes.
+
+    A later checkpoint proves retained state, NOT the earlier completion time.
+    The time comes only from original public-terminal metadata. Cleared is not
+    reclassified as done. This explicit mode cannot restore discarded fields or
+    establish task acceptance, and is never a fallback from the strict proof.
+    """
+    def fail(ok, message):
+        if not ok:
+            raise ValueError(message)
+
+    def instant(value):
+        fail(isinstance(value, str), "retained history lacks a native timestamp")
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        fail(parsed.tzinfo is not None, "retained native timestamp has no timezone")
+        return parsed
+
+    def identity(goal):
+        return {"conversation_id": cid, "start_step_index": goal["start_step_index"], "started_at": goal["started_at"]}
+
+    observed = inspect(repo, cid)
+    old_step, new_step = historical["start_step_index"], current["start_step_index"]
+    old_time, new_time = instant(historical["started_at"]), instant(current["started_at"])
+    fail(historical["conversation_id"] == current["conversation_id"] == cid and old_step < new_step and old_time < new_time,
+         "retained native identities are not ordered")
+    fail(observed.get("current_goal") and identity(observed["current_goal"]) == current
+         and observed["current_goal"]["state"] == "completed" and observed["native_execution_state"] == "idle_candidate",
+         "current native goal is not the exact completed idle goal")
+    last_step = observed["last_step"]["index"]
+    fail(isinstance(github_repository, str) and re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", github_repository),
+         "retained attestation needs an exact GitHub repository")
+    fail(isinstance(external_prs, list) and 2 <= len(external_prs) <= 16,
+         "retained attestation needs a bounded external PR list")
+    declarations, checkpoints, before, after, public = [], [], [], [], {}
+    inventory = hashlib.sha256()
+    expected_index = old_step
+    with snapshot(ROOT / "conversations" / f"{cid}.db") as (connection, source):
+        fail(source["native_files"] == observed["snapshot"]["native_files"], "native source changed during retained attestation")
+        for index, kind, status, payload in connection.execute(
+                "select idx,step_type,status,step_payload from steps where idx>=? order by idx", (old_step,)):
+            fail(index == expected_index, "retained native history has a missing or duplicate row")
+            expected_index += 1
+            fail(status in STATUS_NAMES and one(payload, 1) == kind and one(payload, 4) == status,
+                 "retained native row has an unknown or conflicting shape/status")
+            digest = hashlib.sha256(payload).hexdigest()
+            inventory.update(json.dumps([index, kind, status, digest], separators=(",", ":")).encode() + b"\n")
+            if kind == 14 and native_goal_declaration(payload):
+                fail(index in {old_step, new_step} and status in {3, 5}, "intervening or invalid native goal declaration")
+                expected = historical if index == old_step else current
+                times = metadata_times(payload)
+                fail(instant(times["created_at"]) == instant(expected["started_at"]), "native declaration timestamp differs")
+                declarations.append({"step_index": index, "status": STATUS_NAMES[status], "payload_sha256": digest,
+                                     "created_at": times["created_at"]})
+            if kind == 23 and ANY_TYPE in payload:
+                matches = [goal for goal in find_goals(payload) if goal["start_step_index"] == old_step]
+                if matches:
+                    fail(status in {3, 5} and all(identity(goal) == historical and goal["state"] == matches[0]["state"] for goal in matches),
+                         "retained historical checkpoint conflicts")
+                    checkpoints.append({"step_index": index, "state": matches[0]["state"],
+                                        "status": STATUS_NAMES[status], "payload_sha256": digest})
+            if kind == 15:
+                visible = public_response(payload)
+                marker = terminal_marker(visible)
+                if marker:
+                    fail(marker == COMPLETE and status in {3, 5}, "retained history has cancellation or invalid terminal evidence")
+                    times = metadata_times(payload)
+                    created, completed = instant(times["created_at"]), instant(times["completed_at"])
+                    fail(created <= completed <= datetime.now(timezone.utc), "native terminal timestamps are invalid")
+                    event = {"step_index": index, "state": "completed", "status": STATUS_NAMES[status],
+                             "payload_sha256": digest, "text_sha256": hashlib.sha256(visible.encode()).hexdigest(), **times}
+                    if index < new_step:
+                        fail(old_time <= created <= completed < new_time, "historical native completion is not before the external declaration")
+                        before.append(event)
+                    else:
+                        fail(index > new_step and status == 3 and new_time <= created, "current native completion is not a done public event")
+                        after.append(event)
+                        public[index] = visible
+    fail(expected_index == last_step + 1, "native row boundary changed or is incomplete")
+    fail([item["step_index"] for item in declarations] == [old_step, new_step], "both original SYSTEM goal declarations are required")
+    fail(before and after, "retained attestation needs original terminal completion on both sides")
+    first_completion = before[0]["step_index"]
+    fail(checkpoints and all(item["state"] == "completed" for item in checkpoints if item["step_index"] >= first_completion),
+         "historical goal has retained resumption or cancellation evidence")
+    latest = observed.get("latest_goal_snapshot") or {}
+    retained = [goal for goal in latest.get("goals", []) if goal["start_step_index"] == old_step]
+    fail(retained and all(identity(goal) == historical and goal["state"] == "completed" for goal in retained),
+         "latest done checkpoint does not retain historical completion")
+    bindings = []
+    for item in external_prs:
+        statement = item["native_statement"]
+        visible = public.get(statement["step_index"])
+        fail(item["goal_identity"] == current and visible is not None
+             and hashlib.sha256(visible.encode()).hexdigest() == statement["text_sha256"]
+             and external_pr_statement(visible, github_repository, item),
+             "external PR lacks its exact native completion statement")
+        bindings.append({"number": item["number"], "goal_identity": current, "native_statement": statement,
+                         "branch": item["branch"], "merge_commit_sha": item["merge_commit_sha"]})
+    return {"schema_version": "2.0.0", "native_proof_mode": "retained_public_attestation",
+            "authority": "corroboration_for_reviewed_operator_attestation_not_task_acceptance",
+            "limitation": "Retained contiguous rows do not restore discarded checkpoint fields or unretained intermediate state.",
+            "repository_root": str(Path(repo).resolve()), "historical_goal_identity": historical,
+            "current_goal_identity": current, "declarations": declarations, "historical_checkpoints": checkpoints,
+            "historical_completions": before, "current_completions": after, "external_pr_bindings": bindings,
+            "retained_row_count": expected_index - old_step, "retained_rows_sha256": inventory.hexdigest(),
+            "latest_checkpoint_step": latest["step_index"], "last_step": observed["last_step"], "native_execution_state": "idle_candidate"}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(

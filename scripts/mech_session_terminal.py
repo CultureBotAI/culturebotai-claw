@@ -12,6 +12,33 @@ from pathlib import Path
 
 TAIL_CHARS = 64000
 
+# Canonical blocked-state vocabulary shared across Terminal/agy/Codex input
+# guards (#677, #725): rejects sign-in, trust, update, approval, and queued
+# human question / request_user_input states before any paste or submit.
+BLOCKED_PROMPT_RE = re.compile(
+    r"Sign in with|authentication required|Log in to continue|Select (?:a )?login|not signed in|"
+    r"Trust this folder|Do you trust|trust the (?:files|contents)|"
+    r"Update available|Skip until next version|Update now|"
+    r"approval request|Allow command|Requesting permission|Do you want to|"
+    r"Allow sandbox bypass|Confirm the command is safe|Would you like to|"
+    r"Allow access to this file\?|Run this command\?|Accept changes\?|"
+    r"ctrl\+k\s+approve|needs approval for|↑/↓\s*Navigate|"
+    r"Queued follow-up|⇧← to answer|request_user_input|"
+    r"^\s*(?:Question|Questions|QUESTION)\b|Type your answer|to submit answer|"
+    r"to navigate questions|Select Model|Select Reasoning|"
+    r"How['’]s the CLI experience|^\s*\[0\]\s+Skip\b|^\s*\?\s+(?:Which|.*question)|"
+    r"^\s*(?:Select|Choose) (?:an? option|one of the following)|"
+    r"^\s*[›❯>]?\s*\d+[.)]\s+(?:Yes|No|Allow|Deny|Approve|Reject|Cancel)\b",
+    re.I | re.M,
+)
+
+QUEUED_QUESTION_RE = re.compile(
+    r"Queued follow-up|⇧← to answer|request_user_input|"
+    r"^\s*(?:Question|Questions|QUESTION)\b|Type your answer|to submit answer|"
+    r"to navigate questions",
+    re.I | re.M,
+)
+
 SNAPSHOT_JS = r'''
 function run(argv) {
     const TAIL_CHARS = 64000;
@@ -112,7 +139,7 @@ def composer_reason(screen):
     # This documented startup announcement needs no response. Accept its one
     # known two-line shape without broadening generic prompt/menu recognition
     # and without sending Escape (or any other input) to dismiss it.
-    announcement_lines = set()
+    announcement_lines: set[int] = set()
     for i in range(len(lines) - 1, 0, -1):
         if (lines[i].strip(" │┃").lower() == "esc to dismiss"
                 and re.fullmatch(r"Meet Gemini 4 Argon[^?\n]{0,300}", lines[i - 1].strip(" │┃"))):
@@ -133,8 +160,9 @@ def composer_reason(screen):
     if (not re.fullmatch(border, lines[index - 1]) or index + 1 >= len(lines)
             or not re.fullmatch(border, lines[index + 1])):
         return "missing-composer-borders"
-    if re.search(r"↑/↓\s*Navigate|(?:Accept|Allow|Run)[^\n]*\?", tail, re.I):
-        return "approval-menu"
+    prompt = active_prompt_reason(tail)
+    if prompt is not None:
+        return prompt
     if not re.search(r"Gemini\s+\S", tail):
         return "unrecognized-footer"
     for line in lines[index + 1:]:
@@ -150,3 +178,166 @@ def composer_reason(screen):
             continue
         return "unrecognized-composer-tail"
     return None
+
+
+def active_prompt_reason(text):
+    """Return a blocked-state reason when an active prompt or queued question is visible (#677)."""
+    if QUEUED_QUESTION_RE.search(text):
+        return "queued-question"
+    if re.search(
+        r"Sign in with|authentication required|Log in to continue|Select (?:a )?login|not signed in",
+        text,
+        re.I,
+    ):
+        return "sign-in-prompt"
+    if re.search(r"Trust this folder|Do you trust|trust the (?:files|contents)", text, re.I):
+        return "trust-prompt"
+    if re.search(r"Update available|Skip until next version|Update now", text, re.I):
+        return "update-prompt"
+    if BLOCKED_PROMPT_RE.search(text):
+        return "approval-menu"
+    return None
+
+
+def _active_composer_window(screen):
+    lines = [line.rstrip() for line in (screen or "").replace("\r", "").splitlines()]
+    while lines and not lines[-1].strip():
+        lines.pop()
+    return lines
+
+
+def verify_paste_ready(screen):
+    """Verify a fresh screen has an idle empty composer and no active prompt/question (#677)."""
+    lines = _active_composer_window(screen)
+    if not lines:
+        return "empty-screen"
+    window = "\n".join(lines[-16:])
+    prompt = active_prompt_reason(window)
+    if prompt is not None:
+        return prompt
+    border = r"[─━═\-┌┐└┘│┃╭╮╰╯ ]+"
+    candidates = [
+        i for i, line in enumerate(lines)
+        if line.strip() in {">", "›"} and len(lines) - i <= 9
+    ]
+    if not candidates:
+        return "no-empty-composer"
+    index = candidates[-1]
+    if index < 1 or index + 1 >= len(lines):
+        return "missing-composer-borders"
+    if not re.fullmatch(border, lines[index - 1]) or not re.fullmatch(border, lines[index + 1]):
+        return "missing-composer-borders"
+    return None
+
+
+def composer_draft_reason(screen, expected_draft):
+    """Verify the current bottom composer holds ``expected_draft`` with no active prompt (#677).
+
+    Historical viewport text above the active composer borders or a paste-evidence
+    file on disk is never sufficient proof that the current composer still holds
+    the intended draft.
+    """
+    expected = "\n".join(
+        line.rstrip() for line in (expected_draft or "").replace("\r", "").splitlines()
+    ).strip()
+    if not expected:
+        return "empty-expected-draft"
+    lines = _active_composer_window(screen)
+    if not lines:
+        return "empty-screen"
+    window = "\n".join(lines[-16:])
+    prompt = active_prompt_reason(window)
+    if prompt is not None:
+        return prompt
+    border = r"[─━═\-┌┐└┘│┃╭╮╰╯ ]+"
+    border_indices = [i for i, line in enumerate(lines) if re.fullmatch(border, line) and line.strip()]
+    if len(border_indices) < 2:
+        return "missing-composer-borders"
+    top_border, bottom_border = border_indices[-2], border_indices[-1]
+    if bottom_border <= top_border + 1 or len(lines) - bottom_border > 9:
+        return "composer-too-far-from-footer"
+    tail = "\n".join(lines[bottom_border:])
+    prompt_after = active_prompt_reason(tail)
+    if prompt_after is not None:
+        return prompt_after
+    raw_composer = lines[top_border + 1 : bottom_border]
+    normalized_lines = []
+    for idx, line in enumerate(raw_composer):
+        stripped = line.strip()
+        if idx == 0:
+            if stripped in {">", "›"}:
+                continue
+            for prefix in ("> ", "› ", ">", "›"):
+                if stripped.startswith(prefix):
+                    stripped = stripped[len(prefix) :].strip()
+                    break
+            else:
+                return "no-composer-prompt-prefix"
+        normalized_lines.append(stripped)
+    current_draft = "\n".join(normalized_lines).strip()
+    if current_draft != expected:
+        return "composer-draft-mismatch"
+    return None
+
+
+def guarded_paste_and_submit(
+    *,
+    read_screen,
+    send_paste,
+    send_submit,
+    draft,
+    paste_evidence_path=None,
+):
+    """Canonical two-phase terminal input guard (#677).
+
+    Reads a fresh screen immediately before paste and a second fresh screen
+    immediately before submit. Fails closed without sending Enter if a queued
+    human question (`⇧← to answer`, `Queued follow-up`, `QUESTION`,
+    `request_user_input`) or any other blocked state arrives between paste and
+    submit, or if the current bottom composer does not hold ``draft``.
+    """
+    pre_paste_screen = read_screen()
+    paste_reason = verify_paste_ready(pre_paste_screen)
+    if paste_reason is not None:
+        return {
+            "status": "blocked-before-paste",
+            "reason": paste_reason,
+            "pasted": False,
+            "submitted": False,
+        }
+    if paste_evidence_path is not None:
+        evidence_path = Path(paste_evidence_path)
+        if any(p.is_symlink() for p in (evidence_path, *evidence_path.parents)):
+            return {
+                "status": "blocked-before-paste",
+                "reason": "symlink-paste-evidence-path",
+                "pasted": False,
+                "submitted": False,
+            }
+    paste_outcome = send_paste(draft)
+    if paste_outcome is False:
+        return {
+            "status": "paste-failed",
+            "reason": "paste-transport-failed",
+            "pasted": False,
+            "submitted": False,
+        }
+    if paste_evidence_path is not None:
+        Path(paste_evidence_path).write_text(draft, encoding="utf-8")
+    pre_submit_screen = read_screen()
+    submit_reason = composer_draft_reason(pre_submit_screen, draft)
+    if submit_reason is not None:
+        return {
+            "status": "blocked-before-submit",
+            "reason": submit_reason,
+            "pasted": True,
+            "submitted": False,
+        }
+    send_submit()
+    return {
+        "status": "submitted",
+        "reason": None,
+        "pasted": True,
+        "submitted": True,
+    }
+

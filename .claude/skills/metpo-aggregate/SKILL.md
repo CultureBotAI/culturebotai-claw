@@ -13,8 +13,10 @@ metadata:
 
 Use the shared merger in `scripts/fleet_metpo_aggregate.py`. It gathers all
 cohorts declared by the `metpo_proposal` capability in
-`src/kg_microbe_fleet/fleet.yaml`. Local cohort authoring remains in each
-proposer's `metpo-proposal` skill; this skill owns the combined review bundle.
+`src/kg_microbe_fleet/fleet.yaml`. Local cohort authoring follows the canonical
+contract in `src/kg_microbe_skills/canonical/metpo-proposal.md` and each
+proposer's rendered `metpo-proposal` adapter; this skill owns the combined
+review bundle.
 
 ## Survey before calling the result fleet-wide
 

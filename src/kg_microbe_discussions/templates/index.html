@@ -4,10 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Knowledge gaps & discussions</title>
+<!--slot:theme-head-->
 <style>
-  :root { --fg:#1a1a1a; --muted:#666; --line:#e2e2e2; --accent:#2a6; --bg:#fff; }
+<!--slot:theme-css-->
   * { box-sizing: border-box; }
-  body { font-family: -apple-system, system-ui, sans-serif; color: var(--fg); margin: 0; background: var(--bg); }
+  /* --bg was this page's only name for its ground, and TraitMech's discussions
+     shell still sets it; without that shell it is unset and --page applies. */
+  body { font-family: -apple-system, system-ui, sans-serif; color: var(--fg); margin: 0; background: var(--bg, var(--page)); }
   header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--line); }
   h1 { font-size: 1.25rem; margin: 0 0 .25rem; }
   .metrics { color: var(--muted); font-size: .85rem; }
@@ -18,26 +21,30 @@
   .facet label { display: block; font-size: .85rem; padding: .1rem 0; cursor: pointer; }
   #q { width: 100%; padding: .5rem .6rem; font-size: .95rem; border: 1px solid var(--line); border-radius: 6px; margin-bottom: .5rem; }
   .count { color: var(--muted); font-size: .85rem; margin-bottom: .5rem; }
-  .card { border: 1px solid var(--line); border-radius: 8px; padding: .75rem .9rem; margin-bottom: .7rem; }
+  .card { border: 1px solid var(--line); border-radius: 8px; padding: .75rem .9rem; margin-bottom: .7rem; background: var(--card); }
   .card h2 { font-size: .98rem; margin: 0 0 .35rem; font-weight: 600; }
-  .badge { display: inline-block; font-size: .7rem; padding: .05rem .4rem; border-radius: 4px; background: #eef; color: #225; margin-right: .3rem; }
-  .badge.gap { background: #fee; color: #922; }
+  .badge { display: inline-block; font-size: .7rem; padding: .05rem .4rem; border-radius: 4px; background: var(--badge); color: var(--badge-fg); margin-right: .3rem; }
+  .badge.gap { background: var(--gap); color: var(--gap-fg); }
   .src { color: var(--muted); font-size: .82rem; margin: .25rem 0; }
-  .rationale { font-size: .85rem; color: #333; margin: .35rem 0; white-space: pre-wrap; }
+  .rationale { font-size: .85rem; color: var(--fg-soft); margin: .35rem 0; white-space: pre-wrap; }
   .refs { font-size: .8rem; color: var(--muted); }
   a { color: var(--accent); text-decoration: none; }
   a:hover { text-decoration: underline; }
   .empty { color: var(--muted); padding: 2rem; text-align: center; }
   button { font: inherit; padding: .4rem .6rem; cursor: pointer; }
-  a:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid #0969da; outline-offset: 3px; }
-  .skip-link { position: absolute; top: -5rem; left: 1rem; background: var(--bg); padding: .6rem; }
+  a:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+  .skip-link { position: absolute; top: -5rem; left: 1rem; background: var(--bg, var(--page)); padding: .6rem; }
   .skip-link:focus { top: .5rem; }
+  .site-footer { max-width: 1200px; margin: 1.5rem auto 0; padding: .75rem 1.25rem 1.25rem; }
 </style>
 </head>
 <body>
 <a class="skip-link" href="#main-content">Skip to discussions</a>
 <header>
-  <nav aria-label="Project navigation"><a href="https://culturebotai.github.io/mechs/">All Mech projects</a></nav>
+  <div class="topbar">
+    <nav aria-label="Project navigation"><a href="https://culturebotai.github.io/mechs/">All Mech projects</a></nav>
+<!--slot:theme-toggle-->
+  </div>
   <h1 id="title">Knowledge gaps &amp; discussions</h1>
   <div class="metrics" id="metrics"></div>
 </header>
@@ -54,6 +61,7 @@
     <div id="results"></div>
   </main>
 </div>
+<!--slot:footer-->
 <script src="data.js"></script>
 <script>
 (function () {

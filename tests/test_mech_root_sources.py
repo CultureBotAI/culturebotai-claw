@@ -378,3 +378,45 @@ def test_the_env_template_declares_exactly_the_root_variables_that_are_read():
         f".env.example declares {stale}, which no resolver reads; a value put "
         f"there looks configured and is not"
     )
+
+
+def test_linked_worktree_reads_primary_worktree_dotenv_when_local_dotenv_is_absent(
+    tmp_path,
+):
+    """#965: A linked Git worktree has a `.git` file and no `.env` copy of its own."""
+    primary = tmp_path / "primary-claw"
+    gitdir = primary / ".git" / "worktrees" / "feature-branch"
+    gitdir.mkdir(parents=True)
+    (gitdir / "commondir").write_text("../..\n", encoding="utf-8")
+    target = make_checkout(tmp_path / "mechs", "CultureMech")
+    write_dotenv(primary, f"{VARIABLE}={target}\n")
+
+    worktree = tmp_path / "worktree-claw"
+    worktree.mkdir()
+    (worktree / ".git").write_text(f"gitdir: {gitdir}\n", encoding="utf-8")
+
+    assert not (worktree / ".env").exists()
+    assert dotenv_value(worktree, VARIABLE) == str(target)
+    assert resolve_mech_root(MECH, claw_root=worktree, environ={}) == target.resolve()
+
+
+def test_legacy_kg_microbe_sibling_defers_to_mechs_directory_checkout(tmp_path):
+    """#965: When both a legacy `KG-Hub/KG-Microbe/<Mech>` sibling and the active
+    `Mechs/<Mech>` checkout exist, prefer `Mechs/<Mech>` without mutating the old
+    sibling."""
+    kg_microbe_dir = tmp_path / "KG-Hub" / "KG-Microbe"
+    claw = kg_microbe_dir / "culturebotai-claw"
+    claw.mkdir(parents=True)
+    ptm_pkg = MANIFEST.mechs["proteintraitsmech"].package_path
+
+    legacy = kg_microbe_dir / "ProteinTraitsMech"
+    (legacy / ptm_pkg).mkdir(parents=True)
+    (legacy / "LEGACY_MARKER").write_text("9095167e14\n", encoding="utf-8")
+
+    active = tmp_path / "Mechs" / "ProteinTraitsMech"
+    (active / ptm_pkg).mkdir(parents=True)
+
+    resolved = resolve_mech_root("proteintraitsmech", claw_root=claw, environ={})
+    assert resolved == active.resolve()
+    assert (legacy / "LEGACY_MARKER").read_text(encoding="utf-8") == "9095167e14\n"
+

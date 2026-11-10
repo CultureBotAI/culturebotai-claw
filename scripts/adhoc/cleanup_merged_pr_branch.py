@@ -87,8 +87,8 @@ class Refused(RuntimeError):
 class PartialFailure(RuntimeError):
     """A deletion failed after an earlier one succeeded; `done` lists what had completed."""
 
-    def __init__(self, done: list[str], error: Exception, recovery: str):
-        super().__init__(str(error))
+    def __init__(self, done: list[str], error: BaseException, recovery: str):
+        super().__init__(str(error) or type(error).__name__)
         self.done, self.error, self.recovery = done, error, recovery
 
 
@@ -353,7 +353,7 @@ def cleanup(repo: str, number: int, checkout: Path, worktree: Path | None, *, ap
                 except BaseException as exc:  # an interrupt here must leave the record too
                     # The delete was accepted; the recovery must still name the push that puts the branch back.
                     done.append(f"deleted remote {branch} (was {head[:10]}; accepted, not confirmed)")
-                    raise RuntimeError(f"origin accepted the delete but could not be asked again: {exc}") from exc
+                    raise RuntimeError(f"origin accepted the delete but could not be asked again: {str(exc) or type(exc).__name__}") from exc
                 if still:
                     raise RuntimeError(f"origin still has {branch} at {still[:10]} after the delete was accepted; "
                                        "the push went elsewhere")
@@ -395,7 +395,7 @@ def main() -> int:
     except PartialFailure as exc:
         for step in exc.done:
             print(step)
-        print(f"failed after the steps above: {exc.error}", file=sys.stderr)
+        print(f"failed after the steps above: {exc}", file=sys.stderr)
         print(f"recovery: {exc.recovery}", file=sys.stderr)
         return 1
     except Exception as exc:  # raised before the first deletion
