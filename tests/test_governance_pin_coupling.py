@@ -190,6 +190,6 @@ def test_survey_pin_coupling_hits_reads_pin_path_from_governance_manifest(
 
     assert module.main(["--old-ref", OLD]) == 0
     out = capsys.readouterr().out
-    assert f"culturemech\tpin-reference\t.github/workflows/qc.yaml:1" in out
+    assert "culturemech\tpin-reference\t.github/workflows/qc.yaml:1" in out
     assert custom_pin not in out
 
