@@ -9,11 +9,14 @@ from pathlib import Path
 
 from mech_progress_publish import read_remote
 
+from kg_microbe_progress import project_bundle_to_manifest
+
 
 def build(source: Path, destination: Path) -> str:
     head, bundle = read_remote()
     if head is None or bundle is None:
         raise ValueError("No public progress snapshot has been published")
+    snapshot = project_bundle_to_manifest(bundle["history"], bundle["snapshot"])
     if destination.exists():
         raise ValueError("Build destination already exists")
     if not source.is_dir():
@@ -24,7 +27,7 @@ def build(source: Path, destination: Path) -> str:
     shutil.copytree(source, destination)
     data = destination / "data"
     data.mkdir(exist_ok=True)
-    for name, value in (("progress.json", bundle["snapshot"]), ("history.json", bundle["history"])):
+    for name, value in (("progress.json", snapshot), ("history.json", bundle["history"])):
         (data / name).write_text(json.dumps(value, indent=2, sort_keys=True, allow_nan=False) + "\n")
     (data / "publication.json").write_text(json.dumps({"data_commit": head}, indent=2) + "\n")
     (destination / ".nojekyll").touch()

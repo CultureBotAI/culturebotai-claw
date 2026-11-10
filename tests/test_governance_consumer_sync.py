@@ -1,4 +1,4 @@
-"""Assay's independently sealed bootstrap pin never selects current bytes."""
+"""Assay's and Cofactor's independently sealed bootstrap pins never select current bytes."""
 import hashlib
 import json
 from pathlib import Path
@@ -14,12 +14,14 @@ from kg_microbe_governance.artifacts.scripts.check_vendored_sync import (
 from kg_microbe_governance.consumer_admission import SPECS
 
 ROOT = Path(__file__).parents[1]
-REF = "89bfcebaee8a0fcf99055b2acd1709abb64f8666"
+REFS = {
+    "cofactormech": "5790569efd881bd8bca82a04ea278cc462c0c2c8",
+    "assaymech": "89bfcebaee8a0fcf99055b2acd1709abb64f8666",
+}
 
 
-@pytest.fixture
-def native_source(monkeypatch):
-    raw = (ROOT / next(spec for spec in SPECS if spec.consumer.key == "assaymech").snapshot).read_bytes()
+def _configure_native_source(spec, monkeypatch):
+    raw = (ROOT / spec.snapshot).read_bytes()
     manifest = parse_manifest(raw)
     payloads = {CANONICAL_MANIFEST_PATH: raw}
     for artifact in manifest.artifacts:
@@ -46,30 +48,38 @@ def different_current_package(tmp_path, native_source, monkeypatch):
     return old
 
 
-def test_native_sync_uses_frozen_payload_when_current_package_differs(tmp_path, native_source, monkeypatch):
+@pytest.mark.parametrize("spec", SPECS, ids=lambda s: s.consumer.key)
+def test_native_sync_uses_frozen_payload_when_current_package_differs(tmp_path, monkeypatch, spec):
+    native_source = _configure_native_source(spec, monkeypatch)
     old = different_current_package(tmp_path, native_source, monkeypatch)
-    root = repository(tmp_path, "CultureBotAI/AssayMech")
-    plan = governance.plan_sync("assaymech", root, REF)
+    ref = REFS[spec.consumer.key]
+    root = repository(tmp_path, spec.consumer.github)
+    plan = governance.plan_sync(spec.consumer.key, root, ref)
     assert len(plan) == 23 and not (root / "scripts").exists()
-    assert governance.sync_repository("assaymech", root, REF, apply=True) == plan
+    assert governance.sync_repository(spec.consumer.key, root, ref, apply=True) == plan
     assert (root / "docs/record-reviews.md").read_bytes() == old
-    assert (root / "scripts/.vendored_canon_ref").read_text() == REF + "\n"
+    assert (root / "scripts/.vendored_canon_ref").read_text() == ref + "\n"
 
 
-@pytest.mark.parametrize("case", ["wrong_identity", "wrong_ref", "generic_verifier", "manifest_corrupt", "payload_corrupt"])
-def test_native_source_is_exact_and_never_a_generic_exception(tmp_path, native_source, monkeypatch, case):
+@pytest.mark.parametrize("spec", SPECS, ids=lambda s: s.consumer.key)
+@pytest.mark.parametrize("case", ["wrong_identity", "cross_consumer_pin", "wrong_ref", "generic_verifier", "manifest_corrupt", "payload_corrupt"])
+def test_native_source_is_exact_and_never_a_generic_exception(tmp_path, monkeypatch, spec, case):
+    other_spec = next(s for s in SPECS if s.consumer.key != spec.consumer.key)
+    source_spec = other_spec if case == "cross_consumer_pin" else spec
+    native_source = _configure_native_source(source_spec, monkeypatch)
     different_current_package(tmp_path, native_source, monkeypatch)
-    root = repository(tmp_path, "CultureBotAI/TraitMech" if case == "wrong_identity" else "CultureBotAI/AssayMech")
+    ref = REFS[source_spec.consumer.key]
+    root = repository(tmp_path, "CultureBotAI/TraitMech" if case == "wrong_identity" else spec.consumer.github)
     if case == "manifest_corrupt":
         native_source[CANONICAL_MANIFEST_PATH] += b"\n"
     if case == "payload_corrupt":
         native_source["src/kg_microbe_governance/artifacts/docs/record-reviews.md"] += b"\n"
     with pytest.raises(governance.GovernanceError):
         if case == "generic_verifier":
-            governance.verify_canonical_ref(REF)
+            governance.verify_canonical_ref(ref)
         else:
-            governance.sync_repository("traitmech" if case == "wrong_identity" else "assaymech", root,
-                                       "a" * 40 if case == "wrong_ref" else REF, apply=True)
+            governance.sync_repository("traitmech" if case == "wrong_identity" else spec.consumer.key, root,
+                                       "a" * 40 if case == "wrong_ref" else ref, apply=True)
     assert not (root / "scripts").exists()
 
 

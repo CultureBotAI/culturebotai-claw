@@ -45,7 +45,7 @@ repository that resembles one.
 | 1.8 | Strict closed-schema validation, run in CI on every PR | 5/5 — `validate-strict.yaml` is the **only** workflow filename common to all five |
 | 1.9 | A `tests/` suite run in CI | 5/5 (PTM reaches it through `just test`, not a literal `pytest` line) |
 | 1.10 | `ruff` lint in CI | 5/5 |
-| 1.11 | A `.claude/` directory carrying at least the repository's own skills | 5/5, 14–27 skill files each |
+| 1.11 | `AGENTS.md` as the tracked instruction file with `CLAUDE.md -> AGENTS.md` as a tracked relative symlink; `.claude/skills/` as the real skill directory with `.agents/skills -> ../.claude/skills` as a tracked relative symlink (`src/kg_microbe_governance/artifacts/scripts/record_review.py` opens every ancestor directory and leaf file with `O_NOFOLLOW`, so any skill tree walked by `record_review.py` must be a real directory, not a symlink) | 5/5, 14–27 skill files each |
 | 1.12 | Membership in claw's `src/kg_microbe_fleet/fleet.yaml`, and registration as a consumer in `vendored_artifacts.json` | 5/5 |
 
 **1.12 is the one that makes the rest enforceable.** A Mech absent from the
@@ -102,6 +102,13 @@ new Mech should not adopt any of them without its own reason.
 - CommunityMech — KGX release, network quality, docs-currency
 - TraitMech — canonical example taxonomy, PR-checks-present, in-CI Claude review (PR shepherd was piloted here and is now vendored fleet-wide)
 - ProteinTraitsMech — page-size audit, reproducibility audit
+
+KGX and SSSOM export are the exception to "not gaps". Both apply to every
+Mech (#503): each is a declared capability, `kgx_export` and `sssom_export`,
+judged by a shared contract (`kg_microbe_kgx`, `kg_microbe_sssom`), and a Mech
+without one declares it `disabled`, a backlog item under the absence rule. The
+workflows listed above, MediaIngredientMech's SSSOM QC and CommunityMech's KGX
+release, remain each repository's own.
 
 The lesson from claw's Phase 6 is that a shared implementation is worth building
 when two or more Mechs already have one to consolidate — and is a trap when

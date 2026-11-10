@@ -25,6 +25,8 @@ import re
 import tomllib
 from pathlib import Path
 
+import pytest
+
 REPO = Path(__file__).resolve().parent.parent
 
 # 0.7.2 introduced the CDN default, but declares `requires_python <3.14` while
@@ -79,3 +81,59 @@ def test_the_resolved_default_is_not_the_retired_bucket():
         "bucket INCATools/semantic-sql retired (semantic-sql#112)"
     )
     assert SEMSQL_SQLITE_URL_BASE.startswith("https://"), SEMSQL_SQLITE_URL_BASE
+
+
+def test_load_chebi_labels_stops_and_raises_when_runoak_exits_nonzero(
+    monkeypatch, capsys
+):
+    """#351: `runoak` installed and failing (nonzero exit) must not silently
+    continue across every chunk and degrade to stored labels like an absent
+    `runoak` (`FileNotFoundError`)."""
+    import importlib.util
+    import subprocess
+    import sys
+
+    spec = importlib.util.spec_from_file_location(
+        "_sssom_chebi_labels_test", REPO / "scripts" / "build_mim_ingredient_sssom.py"
+    )
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod
+    spec.loader.exec_module(mod)
+
+    calls: list[list[str]] = []
+
+    def fake_run(cmd, **_kwargs):
+        calls.append(cmd)
+        return subprocess.CompletedProcess(
+            cmd, returncode=1, stdout="", stderr="HTTP Error 403: Forbidden\n"
+        )
+
+    monkeypatch.setattr(mod.subprocess, "run", fake_run)
+
+    with pytest.raises(RuntimeError, match="HTTP Error 403: Forbidden"):
+        mod._load_chebi_labels(["CHEBI:1", "CHEBI:2", "CHEBI:3"], batch=1)
+
+    assert len(calls) == 1, "must stop on the first failing chunk"
+    err = capsys.readouterr().err
+    assert err.count("HTTP Error 403: Forbidden") == 1
+
+
+def test_load_chebi_labels_falls_back_cleanly_when_runoak_is_absent(monkeypatch):
+    """#351: `FileNotFoundError` (runoak not on PATH) remains a clean empty
+    return so environments without OAK fall back to stored ontology_label."""
+    import importlib.util
+    import sys
+
+    spec = importlib.util.spec_from_file_location(
+        "_sssom_chebi_absent_test", REPO / "scripts" / "build_mim_ingredient_sssom.py"
+    )
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod
+    spec.loader.exec_module(mod)
+
+    def missing_run(*_args, **_kwargs):
+        raise FileNotFoundError("runoak")
+
+    monkeypatch.setattr(mod.subprocess, "run", missing_run)
+    assert mod._load_chebi_labels(["CHEBI:1", "CHEBI:2"], batch=1) == {}
+

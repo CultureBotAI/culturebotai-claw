@@ -1,0 +1,29 @@
+{
+  "checked_at": "2026-11-09T02:35:07.341139+00:00",
+  "reviewed_head": "903f263cc6c4fb462b1675af7b6e15fd1ec023b1",
+  "scope": "Separate native consumer admission, protected activation, frozen-source sync, workflow data-ref selection, Cofactor registration",
+  "independent_test_results": {
+    "authority_legacy_sync_workflow": 45,
+    "native_sync_registration": 10,
+    "fully_matching_unauthorized_pin": 3
+  },
+  "mutation_results": {
+    "original_worktree_source_selector": "1 failed at substituted ref; corrected selector1passed",
+    "accept_actual_pin_in_preflight": "3 tests failed because unauthorized installs became accepted; unchanged gate3passed"
+  },
+  "preserved_predecessor_files": 4,
+  "source_snapshot_matches_published_579": true,
+  "findings": [
+    {
+      "issue": "https://github.com/CultureBotAI/culturebotai-claw/issues/1062",
+      "status": "fixed and independently re-reviewed"
+    }
+  ],
+  "unresolved_findings": [],
+  "remaining_gates": [
+    "full local suite",
+    "all hosted checks",
+    "user merge decision"
+  ],
+  "activation": "No proposal has been merged or activated"
+}

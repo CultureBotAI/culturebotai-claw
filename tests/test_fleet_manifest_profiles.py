@@ -17,6 +17,11 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = REPOSITORY_ROOT / "src" / "kg_microbe_fleet" / "fleet.yaml"
 
 EXPECTED_PROFILES = {
+    "cofactormech": (
+        "src/cofactormech",
+        ("src/cofactormech/schema/cofactormech.yaml",),
+        ("data/cofactors/*.yaml",),
+    ),
     "assaymech": (
         "src/assaymech",
         ("src/assaymech/schema/assaymech.yaml",),
@@ -104,11 +109,14 @@ EXPECTED_CAPABILITIES = {
     # language, alt text, heading order and references that resolve -- and
     # which third-party host each of them has deliberately taken on.
     "site_contract",
-    # Whose term mappings are checked against the shared SSSOM contract, and
-    # why the two that publish none have decided rather than forgotten.
+    # Where each Mech names taxa, for kg-microbe-links taxa (#881 plan, Phase 1).
+    "taxon_links",
+    # Whose term mappings are checked against the shared SSSOM contract. It
+    # applies to every Mech (#503), so the rest are disabled, pending adoption.
     "sssom_export",
-    # Whose exported graph is checked against the shared KGX contract; only
-    # CommunityMech emits one today, and the rest say why not.
+    # Whose exported graph is checked against the shared KGX contract;
+    # CommunityMech, PathwayMech and DUFMech declare one today. It applies to
+    # every Mech (#503), so the rest are disabled, pending adoption.
     "kgx_export",
     # Who mints METPO terms. Two Mechs propose into one shared numeric ID
     # space from separate repositories, and the aggregate that finally reads
@@ -226,12 +234,13 @@ def test_cmmmech_admission_preserves_records_and_defers_unverified_adapters() ->
     assert "does not enable curation" in history.reason
     assert "append-only" in history.reason
     assert mech.supports("record_review")
-    assert set(history.reason_claims.absent) == {
-        ".claude/skills/curate-yaml-record/SKILL.md",
-        ".claude/skills/curate-yaml-record/references/review-checklist.md",
-    }
+    # The curate-yaml-record skill landed after admission (CMMMech#513), so
+    # its files are now claimed present; enabling curation awaits review (#785).
+    assert not history.reason_claims.absent
     assert set(history.reason_claims.present) == {
         "justfile", "src/cmmmech/history.py", "history",
+        ".claude/skills/curate-yaml-record/SKILL.md",
+        ".claude/skills/curate-yaml-record/references/review-checklist.md",
     }
 
 

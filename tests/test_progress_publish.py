@@ -339,3 +339,78 @@ def test_unadopted_target_does_not_block_healthy_fleet_publication(tmp_path, mon
     else:
         assert api.calls == []
     assert {p: p.read_bytes() for p in root.rglob("*") if p.is_file()} == before
+
+
+def test_fleet_expansion_projects_prefix_remote_bundle_and_publishes_full_fleet(tmp_path, monkeypatch):
+    from kg_microbe_fleet import FleetManifest, load_fleet_manifest
+    from kg_microbe_progress import ProgressError, project_bundle_to_manifest, validate_bundle
+
+    fleet = load_fleet_manifest()
+    prefix_keys = list(fleet.keys[:-1])
+    added_key = fleet.keys[-1]
+    prefix_manifest = FleetManifest(
+        {key: fleet.mechs[key] for key in prefix_keys},
+        fleet.capability_catalogue,
+        fleet.vendored_governance,
+        fleet.source,
+    )
+    prefix_history, prefix_snapshot = collect_progress(
+        [], generated_at="2026-10-20T10:00:00Z", manifest=prefix_manifest,
+    )
+    prefix_bundle = {"history": prefix_history, "snapshot": prefix_snapshot}
+
+    api = GitHub()
+    monkeypatch.setattr(publisher, "validate_bundle", lambda h, s, m=None: validate_bundle(h, s, m or prefix_manifest))
+    initial_head = publisher.publish(prefix_bundle, None, None, initialize=True, api=api)
+    monkeypatch.setattr(publisher, "validate_bundle", validate_bundle)
+
+    observed_head, projected_bundle = publisher.read_remote(api)
+    assert observed_head == initial_head
+    assert [row["key"] for row in projected_bundle["snapshot"]["repositories"]] == list(fleet.keys)
+    added_row = projected_bundle["snapshot"]["repositories"][-1]
+    assert added_row["key"] == added_key
+    assert added_row["history_coverage"] == "unobserved"
+    assert "current" not in added_row
+    assert added_row["counters"]["completed_goals"] == 0
+
+    _, unprojected_bundle = publisher.read_remote(api, project_expanded=False)
+    assert [row["key"] for row in unprojected_bundle["snapshot"]["repositories"]] == prefix_keys
+
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "index.html").write_text("<!doctype html><title>Progress</title>")
+    monkeypatch.setattr(builder, "read_remote", lambda: (initial_head, prefix_bundle))
+    built = tmp_path / "built"
+    assert builder.build(source, built) == initial_head
+    built_progress = json.loads((built / "data/progress.json").read_text())
+    assert [row["key"] for row in built_progress["repositories"]] == list(fleet.keys)
+
+    # Even if generated_at matches the pre-expansion snapshot, collect_once must publish the expanded snapshot.
+    full_history, full_snapshot = collect_progress(
+        [], generated_at="2026-10-20T10:00:00Z", manifest=fleet,
+    )
+    monkeypatch.setattr(publisher, "collect_associations", lambda _: AssociationCollection([], {}))
+    monkeypatch.setattr(publisher, "fetch_pr_observations", lambda _: [])
+    monkeypatch.setattr(publisher, "collect_progress", lambda *a, **kw: (full_history, full_snapshot))
+    result = publisher.collect_once([], tmp_path / "state", apply=True, api=api)
+    assert result["status"] == "published"
+    assert result["data_commit"] != initial_head
+    _, after_publish = publisher.read_remote(api, project_expanded=False)
+    assert [row["key"] for row in after_publish["snapshot"]["repositories"]] == list(fleet.keys)
+
+    # Reject a prefix snapshot if history already contains evidence for the omitted suffix Mech.
+    bad_history = copy.deepcopy(prefix_history)
+    bad_history["cursors"].append({
+        "repository_key": added_key,
+        "run_key": publisher.run_key("run"),
+        "cycle": 1,
+        "stage_number": 1,
+        "stage_id": "add_new_records",
+        "phase": "waiting",
+        "blocker_code": None,
+        "observed_at": "2026-10-20T09:59:00Z",
+        "started_at": "2026-10-20T09:00:00Z",
+    })
+    with pytest.raises(ProgressError, match="complete manifest fleet"):
+        project_bundle_to_manifest(bad_history, prefix_snapshot, fleet)
+
