@@ -12,6 +12,7 @@ requiring a browser session, API key, or institutional VPN.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import urllib.error
@@ -21,7 +22,13 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from kg_microbe_sources.fetch import FetchPlan, FetchResult, Transport, fetch
+from kg_microbe_sources.fetch import (
+    FetchPlan,
+    FetchResult,
+    Transport,
+    ValidationFailed,
+    fetch,
+)
 
 __all__ = [
     "ACS_DOI_PREFIX",
@@ -31,7 +38,9 @@ __all__ = [
     "AcsSupportingFile",
     "AcsSupportingInformation",
     "derive_acs_si_doi",
+    "md5_of",
     "normalize_acs_doi",
+    "sanitize_supporting_filename",
     "stage_acs_supporting_file",
     "try_acs_figshare_si",
 ]
@@ -254,18 +263,54 @@ def try_acs_figshare_si(
     return client.probe_supporting_info(raw_doi, index=index)
 
 
+def sanitize_supporting_filename(raw_name: str) -> str:
+    """Return a single-component filename stripped of path separators.
+
+    Raises :class:`AcsFigshareError` if the resulting name is empty or a dot traversal.
+    """
+    cleaned = (raw_name or "").replace("\\", "/").strip()
+    basename = Path(cleaned).name.strip()
+    if not basename or basename in {".", ".."}:
+        raise AcsFigshareError(f"Invalid Figshare supporting filename: {raw_name!r}")
+    return basename
+
+
+def md5_of(path_or_bytes: Path | bytes) -> str:
+    """Compute the lowercase hexadecimal MD5 digest of a file path or raw bytes."""
+    digest = hashlib.md5()
+    if isinstance(path_or_bytes, (bytes, bytearray, memoryview)):
+        digest.update(path_or_bytes)
+        return digest.hexdigest()
+    with Path(path_or_bytes).open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
 def stage_acs_supporting_file(
     si_file: AcsSupportingFile,
     dest_dir: Path,
     *,
     transport: Transport | None = None,
     attempts: int = 4,
+    verify_md5: bool = True,
 ) -> FetchResult:
     """Download an :class:`AcsSupportingFile` into ``dest_dir`` with SHA-256 provenance sidecar."""
-    dest_path = Path(dest_dir) / si_file.name
+    safe_name = sanitize_supporting_filename(si_file.name)
+    dest_path = Path(dest_dir) / safe_name
     plan = FetchPlan(
         url=si_file.download_url,
         destination=dest_path,
         min_bytes=max(1, si_file.size),
     )
-    return fetch(plan, transport=transport, attempts=attempts)
+    result = fetch(plan, transport=transport, attempts=attempts)
+    expected_md5 = (si_file.supplied_md5 or "").strip().lower()
+    if verify_md5 and expected_md5:
+        actual_md5 = md5_of(dest_path).lower()
+        if actual_md5 != expected_md5:
+            dest_path.unlink(missing_ok=True)
+            plan.sidecar.unlink(missing_ok=True)
+            raise ValidationFailed(
+                f"MD5 mismatch for {safe_name}: got {actual_md5}, expected {expected_md5}"
+            )
+    return result

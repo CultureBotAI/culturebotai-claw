@@ -114,6 +114,23 @@ def normalize_doi(raw: str) -> str:
     return cleaned.lower()
 
 
+def is_valid_cas_rn(cas_rn: str) -> bool:
+    """Return ``True`` if ``cas_rn`` has valid ``<d1>-<d2>-<check>`` syntax and CAS check digit."""
+    parts = (cas_rn or "").strip().split("-")
+    if len(parts) != 3:
+        return False
+    first, second, check = parts
+    if not (2 <= len(first) <= 7 and len(second) == 2 and len(check) == 1):
+        return False
+    if not (first.isdigit() and second.isdigit() and check.isdigit()):
+        return False
+    body_digits = first + second
+    weighted_sum = sum(
+        (idx + 1) * int(digit) for idx, digit in enumerate(reversed(body_digits))
+    )
+    return (weighted_sum % 10) == int(check)
+
+
 def extract_citations_from_text(text: str) -> list[str]:
     """Extract normalized DOIs, PMIDs, CAS-RNs, ChEBI IDs, and Standard InChIKeys from text."""
     seen: dict[str, None] = {}
@@ -133,7 +150,9 @@ def extract_citations_from_text(text: str) -> list[str]:
         seen.setdefault(match.group(1), None)
 
     for match in _CAS_FIND_RE.finditer(text):
-        seen.setdefault(match.group(1), None)
+        candidate_cas = match.group(1)
+        if is_valid_cas_rn(candidate_cas):
+            seen.setdefault(candidate_cas, None)
 
     return list(seen.keys())
 

@@ -15,11 +15,15 @@ from kg_microbe_sources import (
     AcsSupportingFile,
     AcsSupportingInformation,
     TransportResult,
+    ValidationFailed,
     classify_provenance_path,
     derive_acs_si_doi,
     extract_citations_from_text,
+    is_valid_cas_rn,
+    md5_of,
     normalize_acs_doi,
     normalize_doi,
+    sanitize_supporting_filename,
     search_local_provenance,
     stage_acs_supporting_file,
     try_acs_figshare_si,
@@ -106,16 +110,17 @@ def test_acs_figshare_client_probes_supporting_info() -> None:
 
 
 def test_stage_acs_supporting_file_writes_payload_and_sidecar(tmp_path: Path) -> None:
+    payload_bytes = b"%PDF-1.4\n"
     si_file = AcsSupportingFile(
         file_id=13470296,
         name="cb8b00793_si_001.pdf",
-        size=8,
+        size=len(payload_bytes),
         download_url="https://ndownloader.figshare.com/files/13470296",
-        supplied_md5="deadbeef",
+        supplied_md5=md5_of(payload_bytes),
     )
 
     def fake_fetch_transport(plan: Any, target: Path) -> TransportResult:
-        target.write_bytes(b"%PDF-1.4\n")
+        target.write_bytes(payload_bytes)
         return TransportResult(resolved_url=plan.url, headers={"content-type": "application/pdf"})
 
     result = stage_acs_supporting_file(
@@ -128,6 +133,33 @@ def test_stage_acs_supporting_file_writes_payload_and_sidecar(tmp_path: Path) ->
     assert staged.is_file()
     assert sidecar.is_file()
     assert result.bytes == 9
+
+
+def test_stage_acs_supporting_file_sanitizes_name_and_verifies_md5(tmp_path: Path) -> None:
+    assert sanitize_supporting_filename("../nested/cb8b00793_si_001.pdf") == "cb8b00793_si_001.pdf"
+    with pytest.raises(AcsFigshareError, match="Invalid Figshare supporting filename"):
+        sanitize_supporting_filename("..")
+
+    bad_si_file = AcsSupportingFile(
+        file_id=13470296,
+        name="../evil/cb8b00793_si_001.pdf",
+        size=9,
+        download_url="https://ndownloader.figshare.com/files/13470296",
+        supplied_md5="deadbeef",
+    )
+
+    def fake_fetch_transport(plan: Any, target: Path) -> TransportResult:
+        target.write_bytes(b"%PDF-1.4\n")
+        return TransportResult(resolved_url=plan.url, headers={"content-type": "application/pdf"})
+
+    with pytest.raises(ValidationFailed, match="MD5 mismatch"):
+        stage_acs_supporting_file(
+            bad_si_file,
+            tmp_path / "acs-si-bad",
+            transport=fake_fetch_transport,
+        )
+    assert not (tmp_path / "acs-si-bad" / "cb8b00793_si_001.pdf").exists()
+    assert not (tmp_path / "acs-si-bad" / "cb8b00793_si_001.pdf.fetch.json").exists()
 
 
 def test_extract_citations_and_search_local_provenance(tmp_path: Path) -> None:
@@ -161,12 +193,18 @@ def test_extract_citations_and_search_local_provenance(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    tokens = extract_citations_from_text(record_path.read_text(encoding="utf-8"))
+    tokens = extract_citations_from_text(
+        record_path.read_text(encoding="utf-8") + "\n# date-like token: 2026-04-1\n"
+    )
     assert "10.1021/acschembio.8b00793" in tokens
     assert "PMID:30303030" in tokens
     assert "CHEBI:5530" in tokens
     assert "BLRBXZWBHXWECJ-XFFZJAGNSA-N" in tokens
     assert "113-73-5" in tokens
+    assert "2026-04-1" not in tokens
+    assert is_valid_cas_rn("113-73-5") is True
+    assert is_valid_cas_rn("68399-81-5") is True
+    assert is_valid_cas_rn("2026-04-1") is False
     assert normalize_doi("https://doi.org/10.1021/ACSChemBio.8b00793.") == (
         "10.1021/acschembio.8b00793"
     )
