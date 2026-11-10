@@ -6,6 +6,7 @@ import shlex
 import sys
 from pathlib import Path
 
+import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -222,10 +223,10 @@ def test_fleet_audit_builds_cli_roots_from_every_manifest_row() -> None:
 def test_fleet_audit_separately_validates_candidate_authority_contract() -> None:
     candidate = next(
         run
-        for run in _run_steps(FLEET_AUDIT_WORKFLOW, "fleet-audit")
+        for run in _run_steps(FLEET_AUDIT_WORKFLOW, "candidate-contracts")
         if "uv sync --project control --locked --extra dev" in run
     )
-    assert "uv run --project control --extra dev python -m pytest" in candidate
+    assert "uv run --project control --locked --extra dev python -m pytest" in candidate
     assert "control/tests/test_fleet_manifest.py" in candidate
     assert "control/tests/test_kg_microbe_governance.py" in candidate
     assert "control/tests/test_id_label_workflow.py" in candidate
@@ -264,3 +265,17 @@ def test_workflow_has_no_legacy_hub_or_compatibility_path() -> None:
     assert legacy_script not in text
     assert "--require-vendored-hub" not in text
     assert all(path not in text for path in retired_shared_paths)
+
+
+
+def test_candidate_authority_guard_rejects_a_step_moved_into_the_public_job(tmp_path, monkeypatch):
+    document = yaml.safe_load(FLEET_AUDIT_WORKFLOW.read_text())
+    candidate_steps = document["jobs"]["candidate-contracts"]["steps"]
+    authority = next(step for step in candidate_steps if step.get("name") == "Validate candidate authority contract")
+    candidate_steps.remove(authority)
+    document["jobs"]["fleet-audit"]["steps"].append(authority)
+    path = tmp_path / "moved-authority-workflow.yaml"
+    path.write_text(yaml.safe_dump(document))
+    monkeypatch.setitem(globals(), "FLEET_AUDIT_WORKFLOW", path)
+    with pytest.raises(StopIteration):
+        test_fleet_audit_separately_validates_candidate_authority_contract()
