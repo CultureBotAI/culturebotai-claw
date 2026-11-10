@@ -1,0 +1,16 @@
+{
+  "checked_at_utc": "2026-11-10T07:28:56.319516+00:00",
+  "repository": "CultureBotAI/ScaleupMech",
+  "visibility": "public",
+  "has_pages": true,
+  "pages": {
+    "html_url": "https://culturebotai.github.io/ScaleupMech/",
+    "build_type": "workflow",
+    "source": {
+      "branch": "main",
+      "path": "/"
+    },
+    "status": null,
+    "public": true
+  }
+}

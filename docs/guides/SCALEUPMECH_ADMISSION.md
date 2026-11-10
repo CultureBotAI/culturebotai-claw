@@ -6,8 +6,13 @@ release dependencies; statements about an independent proposal below describe
 that original proposal. Public output now follows the reserved
 `exclude-from-public` tag described in [public membership](PUBLIC_FLEET_OUTPUT.md).
 
-ScaleupMech was verified as private on 2026-11-10 at
+ScaleupMech is now public, following the user's explicit settings change on
+2026-11-10 at 07:28 UTC, at
 [CultureBotAI/ScaleupMech](https://github.com/CultureBotAI/ScaleupMech).
+Its own GitHub Pages is enabled in Actions mode; no deployment is claimed.
+The private-audit discussion below describes the former visibility and applies
+only if the repository is private again. See the combined candidate's current
+release holds and settings receipts.
 Its inspected initial main is the empty commit
 `38f8157fc960299f2458f4916dd581ce1b5d0262`. The planned package is
 `src/scaleupmech`, schema `src/scaleupmech/schema/scaleupmech.yaml`, root class

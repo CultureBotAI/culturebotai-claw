@@ -69,25 +69,25 @@ The active scoped cycle lane admits only its exact protected cohort. The new
 declarations cannot activate themselves against an older protected base. The
 combined branch is a reviewable candidate, not a green release shortcut.
 
-Scaleup was verified as private on 2026-11-10. This is observed access state,
-not a requirement of the exclusion policy. The existing public governance job cannot anonymously clone
-it; adding a private credential to candidate execution is not an acceptable
-remedy. [Private prerequisite #1077](https://github.com/CultureBotAI/culturebotai-claw/pull/1077)
-and [automatic audit #1082](https://github.com/CultureBotAI/culturebotai-claw/pull/1082)
-remain separate reviewed dependencies while the repository is private. If it
-becomes public, verify ordinary anonymous access and rerun the fleet audit;
-private-audit plumbing is not required solely for a public repository. Neither
-visibility choice changes the suite-exclusion tag. Their protected producer, App environment
-configuration and live canaries are not installed or activated by this candidate.
-The optional adapter retained from #1074 returns incomplete overall success
-until trusted private verification finishes; it is not a gate waiver.
+At the user's explicit request, ScaleupMech became public on 2026-11-10 at
+07:28 UTC. GitHub confirmed public visibility and native Pages enabled with
+`build_type: workflow`; an anonymous repository API request returned HTTP 200.
+The Pages URL is `https://culturebotai.github.io/ScaleupMech/`, but enabling
+settings is not a deployment: the empty default branch has no publishing
+workflow or site content. The `exclude-from-public` suite tag remains intact.
+Before/after receipts are in `reports/scaleup_public_pages_20261110/`.
+
+The earlier hosted anonymous-clone failure described the former private state.
+Private-audit proposals #1077 and #1082 are no longer prerequisites solely for
+access to ScaleupMech. No private credential or audit exception was installed.
+Rerun normal governance checks against the public repository; successful access
+alone does not establish artifact completeness or protected admission.
 
 The previously proposed staged order was #1056, #1072, #1077, #1082, then #1074,
-with exact-head refreshes between user-approved merges. Consolidating admissions
-does not make that trust ordering disappear. A separately reviewed release
-plan must reconcile these overlapping PRs and establish protected audit support
-before admitting the private consumer. Do not merge this combined candidate
-while private access or trusted activation remains unresolved.
+with exact-head refreshes between user-approved merges. That sequence assumed
+private visibility. A separately reviewed release plan must reconcile the
+overlapping admission PRs and protected activation for the now-public consumer.
+The settings change authorizes neither merges nor a fleet-wide release.
 
 After scaffold adoption, verify default-branch artifacts and remove only the
 completed admission-ledger entries. Capability promotion, any coordinated
