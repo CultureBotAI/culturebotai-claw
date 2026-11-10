@@ -1,0 +1,133 @@
+{
+  "version": 1,
+  "fresh_process": true,
+  "fresh_pycache_each_mutation": true,
+  "controls": [
+    {
+      "name": "1080-fork-source-repository",
+      "source": "src/kg_microbe_governance/automatic_private_audit.py",
+      "source_sha256": "53b360b1ae671640201e974481bf13f87c0da7b7e7d3c4bdd12a176ba5ea4be8",
+      "mutant_sha256": "1d860c7d1350e8f30a7cc003a3833b09a5b0a7250886101e5cff45482284d53e",
+      "test": "tests/test_automatic_private_audit.py::test_fork_association_requires_the_actual_run_source_repository[701]",
+      "mutant_exit": 1,
+      "log": "/Users/marcin/agent-work/claw/automatic-mutations/1080-fork-source-repository.log"
+    },
+    {
+      "name": "1081-private-observation-clock",
+      "source": "src/kg_microbe_governance/automatic_private_audit.py",
+      "source_sha256": "53b360b1ae671640201e974481bf13f87c0da7b7e7d3c4bdd12a176ba5ea4be8",
+      "mutant_sha256": "eba19809a93fddc2002b725f53ea3955359cae6ad0c0c382874879d39590718a",
+      "test": "tests/test_automatic_private_audit.py::test_private_observation_time_precedes_slow_public_revalidation",
+      "mutant_exit": 1,
+      "log": "/Users/marcin/agent-work/claw/automatic-mutations/1081-private-observation-clock.log"
+    },
+    {
+      "name": "final-private-age",
+      "source": "src/kg_microbe_governance/automatic_private_audit.py",
+      "source_sha256": "53b360b1ae671640201e974481bf13f87c0da7b7e7d3c4bdd12a176ba5ea4be8",
+      "mutant_sha256": "cac773e3a7c14e99686ecd3528ab1a20a5c271f73a3e31ac2abc3fd5a84e57ce",
+      "test": "tests/test_automatic_private_audit.py::test_verification_rechecks_age_after_slow_artifact_and_parent_metadata",
+      "mutant_exit": 1,
+      "log": "/Users/marcin/agent-work/claw/automatic-mutations/final-private-age.log"
+    },
+    {
+      "name": "current-parent-refresh",
+      "source": "src/kg_microbe_governance/automatic_private_audit.py",
+      "source_sha256": "53b360b1ae671640201e974481bf13f87c0da7b7e7d3c4bdd12a176ba5ea4be8",
+      "mutant_sha256": "18125120ee98e5f9976d13ef6a849c462b46d2f6795ad1f1cb9e9c4512ec585e",
+      "test": "tests/test_automatic_private_audit.py::test_verifier_refreshes_parent_before_and_after_artifact",
+      "mutant_exit": 1,
+      "log": "/Users/marcin/agent-work/claw/automatic-mutations/current-parent-refresh.log"
+    },
+    {
+      "name": "public-artifact-count",
+      "source": "src/kg_microbe_governance/automatic_fleet_component.py",
+      "source_sha256": "2799d93dfc8fcb77d4cec73e5313459c3a7023f62896f18dad33b48aaf1924e2",
+      "mutant_sha256": "093bc27b24ed03419483fb6d4f0878f9e9f8134571a39cab12ca7c2174fc3e68",
+      "test": "tests/test_automatic_fleet_component.py::test_real_download_boundary_refuses_malformed_success[short_count]",
+      "mutant_exit": 1,
+      "log": "/Users/marcin/agent-work/claw/automatic-mutations/public-artifact-count.log"
+    },
+    {
+      "name": "fixed-private-artifacts",
+      "source": "src/kg_microbe_governance/private_audit_coverage.py",
+      "source_sha256": "8c121531ae907c01987305713edfbb46ce1bc21828c6263708c7420a19f2feb7",
+      "mutant_sha256": "86f4d47671edf3cf522c040f564168a551cb150f3302f0d0a130fd316ea92598",
+      "test": "tests/test_private_audit_coverage.py::test_admission_binds_the_entire_fixed_obligation_not_only_three_refs",
+      "mutant_exit": 1,
+      "log": "/Users/marcin/agent-work/claw/automatic-mutations/fixed-private-artifacts.log"
+    },
+    {
+      "name": "bootstrap-private-refusal",
+      "source": ".github/workflows/governance-fleet-audit.yaml",
+      "source_sha256": "c614a395f351e8374cbe15856749373c93bc4defbea2ee5dc42371632cf1bf84",
+      "mutant_sha256": "01d73afee2aa5f33f42f63f4cdb520aad80217254c5f73321ee24a572fba9c0a",
+      "test": "tests/test_automatic_fleet_component.py::test_actual_bootstrap_selector_requires_protected_code_for_private[True-False]",
+      "mutant_exit": 1,
+      "log": "/Users/marcin/agent-work/claw/automatic-mutations/bootstrap-private-refusal.log"
+    },
+    {
+      "name": "aggregate-exact-guard",
+      "source": "src/kg_microbe_merge_queue/__init__.py",
+      "source_sha256": "c61376e55fc8f4978b30d5ee354b575a6044e5ec78c76f3711bf3543df5e6ec5",
+      "mutant_sha256": "125a8c5de5febb3d3f720dfa44f4aaa17e9fd1fa174dce82d19a5698a03b3a03",
+      "test": "tests/test_automatic_fleet_component.py::test_real_queue_validator_accepts_only_complete_fail_closed_aggregate",
+      "mutant_exit": 1,
+      "log": "/Users/marcin/agent-work/claw/automatic-mutations/aggregate-exact-guard.log"
+    },
+    {
+      "name": "verifier-setup-freshness",
+      "source": "src/kg_microbe_governance/automatic_private_audit.py",
+      "source_sha256": "53b360b1ae671640201e974481bf13f87c0da7b7e7d3c4bdd12a176ba5ea4be8",
+      "mutant_sha256": "3d19c6761eeb69f6ba61a42b8073246779de846e21a448cc55f4c370901e0f86",
+      "test": "tests/test_automatic_private_audit.py::test_private_mint_waits_until_final_verifier_has_finished_setup[setup]",
+      "mutant_exit": 1,
+      "log": "/Users/marcin/agent-work/claw/automatic-mutations/verifier-setup-freshness.log"
+    },
+    {
+      "name": "1083-destination-is-not-remote",
+      "source": "tests/test_automatic_fleet_component.py",
+      "source_sha256": "418296cb5acd4e1d5d67a97eafc53a29180b4448803a646b170c69c866401dd3",
+      "mutant_sha256": "6f66f203c3b6c7ec03edb526c4e4dedf7c982569ba8683da92ab640d217da9d3",
+      "test": "tests/test_automatic_fleet_component.py::test_public_clone_never_includes_private_identity",
+      "mutant_exit": 1,
+      "log": "/Users/marcin/agent-work/claw/automatic-mutations/1083-destination-is-not-remote.log"
+    },
+    {
+      "name": "1083-private-remote-contrast",
+      "source": "tests/test_automatic_fleet_component.py",
+      "source_sha256": "418296cb5acd4e1d5d67a97eafc53a29180b4448803a646b170c69c866401dd3",
+      "mutant_sha256": "437920645062acbf2404298d1d53e8d57e6617247be7e6ec0e486e3dd0b8a816",
+      "test": "tests/test_automatic_fleet_component.py::test_remote_assertion_rejects_private_url_with_ordinary_destination",
+      "mutant_exit": 1,
+      "log": "/Users/marcin/agent-work/claw/automatic-mutations/1083-private-remote-contrast.log"
+    },
+    {
+      "name": "1084-before-environment-allocation",
+      "source": "src/kg_microbe_governance/automatic_private_audit_cli.py",
+      "source_sha256": "bc39651997b0d3bcf58cb41fbaeee6f1a4200f908a521b3350dea9c57592fa7e",
+      "mutant_sha256": "3b5b124161eb3bec4f71f21e1b0e64856d9c5741c4e1cb478b45a0ed92386d2b",
+      "test": "tests/test_automatic_fleet_component.py::test_first_preflight_checks_environment_before_scheduling_private_job",
+      "mutant_exit": 1,
+      "log": "/Users/marcin/agent-work/claw/automatic-mutations/1084-before-environment-allocation.log"
+    },
+    {
+      "name": "1085-candidate-job-selection",
+      "source": "tests/test_id_label_workflow.py",
+      "source_sha256": "ef0a28d38e1ebb2b4258506a96db32535a00d94650a54a817716a3dc38ebb255",
+      "mutant_sha256": "b5c1d9586b4d17ca0390443854b9615912705fefe12275ee56309a42739d3a7d",
+      "test": "tests/test_id_label_workflow.py::test_candidate_authority_guard_rejects_a_step_moved_into_the_public_job",
+      "mutant_exit": 1,
+      "log": "/Users/marcin/agent-work/claw/automatic-mutations/1085-candidate-job-selection.log"
+    },
+    {
+      "name": "1085-validation-before-clone",
+      "source": ".github/workflows/governance-fleet-audit.yaml",
+      "source_sha256": "c614a395f351e8374cbe15856749373c93bc4defbea2ee5dc42371632cf1bf84",
+      "mutant_sha256": "751863c8146ae9ef9bdd8fb296e434aa5ad27941d0eebd5c1c67050f50a7edac",
+      "test": "tests/test_governance_candidate_consumers.py::test_candidate_roots_are_prepared_after_authority_validation",
+      "mutant_exit": 1,
+      "log": "/Users/marcin/agent-work/claw/automatic-mutations/1085-validation-before-clone.log"
+    }
+  ]
+}

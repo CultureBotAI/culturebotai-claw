@@ -183,10 +183,11 @@ def test_candidate_preconditions_fail_before_mandatory_completeness(admission, f
 
 
 def test_candidate_roots_are_prepared_after_authority_validation():
-    steps = _steps()
-    validation = next(
-        index for index, step in enumerate(steps)
-        if step.get("name") == "Validate candidate authority contract"
-    )
-    assert validation < steps.index(_candidate_step())
+    jobs = yaml.safe_load(WORKFLOW.read_text())["jobs"]
+    assert jobs["fleet-audit"]["needs"] == "candidate-contracts"
+    candidate = jobs["candidate-contracts"]
+    assert "needs" not in candidate and "if" not in candidate
+    assert not candidate.get("continue-on-error")
+    assert any(step.get("name") == "Validate candidate authority contract"
+               for step in candidate["steps"])
     assert "--project control" in _candidate_step()["run"]

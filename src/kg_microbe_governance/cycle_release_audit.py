@@ -192,7 +192,8 @@ def _validate_release_assets(root: Path, ref: str, policy: Mapping[str, Any]) ->
         raise GovernanceError(f"Invalid release parent: {exc}") from exc
 
 
-def audit_release(trusted_root: Path, roots: Mapping[str, Path]) -> dict[str, Any]:
+def audit_release(trusted_root: Path, roots: Mapping[str, Path], *,
+                  private_obligations: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """Inspect all roots, returning detailed failures; policy errors raise."""
     trusted = _validate_target_repository(
         trusted_root, Consumer("claw", CANONICAL_REPOSITORY, "src/kg_microbe_governance")
@@ -263,7 +264,11 @@ def audit_release(trusted_root: Path, roots: Mapping[str, Path]) -> dict[str, An
         }
     _validate_release_assets(trusted, candidate_ref, policy)
     cohort = current.consumers if admission else candidate.consumers
-    if set(roots) != set(cohort):
+    from .private_audit_coverage import deferred_row, exact_coverage
+
+    private_obligations = {} if private_obligations is None else dict(private_obligations)
+    exact_coverage(cohort, roots, private_obligations)
+    if set(roots) | set(private_obligations) != set(cohort):
         raise GovernanceError(
             "Release audit requires every exact fleet root "
             f"(missing={sorted(set(cohort) - set(roots))}, "
@@ -397,8 +402,12 @@ def audit_release(trusted_root: Path, roots: Mapping[str, Path]) -> dict[str, An
         if (_commit_at(root, "HEAD") != observed
                 or _commit_at(root, "refs/remotes/origin/main") != remote):
             raise GovernanceError("A worktree HEAD or origin/main changed during the release audit")
+    public_ok = clean and not any(row["issues"] for row in rows)
+    rows.extend(deferred_row(item) for item in private_obligations.values())
     result_document = {
-        "version": 1, "ok": clean and not any(row["issues"] for row in rows),
+        "version": 1, "ok": public_ok and not private_obligations,
+        "public_component_ok": public_ok,
+        "expected_consumers": sorted(cohort),
         "release_id": RELEASE_ID,
         "trusted_head": head, "trusted_origin_main": origin_main,
         "declaration_sha256": _sha(content), "declaration_path": RELEASE_PATH,

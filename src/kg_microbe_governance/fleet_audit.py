@@ -344,6 +344,7 @@ def audit_fleet_pins(
     expected_ref: str,
     *,
     fetch: Optional[Callable[[str], bytes]] = None,
+    private_obligations: Mapping | None = None,
 ) -> FleetAuditResult:
     """Audit exactly the Mech roots the manifest declares, without mutating them.
 
@@ -378,8 +379,13 @@ def audit_fleet_pins(
         )
         return FleetAuditResult(expected_ref, (), (issue,))
 
+    from .private_audit_coverage import exact_coverage
+
+    deferred = {} if private_obligations is None else dict(private_obligations)
+    if deferred:
+        exact_coverage(consumers, roots, deferred)
     expected_keys = set(consumers)
-    actual_keys = set(roots)
+    actual_keys = set(roots) | set(deferred)
     if actual_keys != expected_keys:
         missing = sorted(expected_keys - actual_keys)
         unknown = sorted(actual_keys - expected_keys)
@@ -400,7 +406,7 @@ def audit_fleet_pins(
             manifest.pin_path,
             len(manifest.artifacts_for(consumer)),
         )
-        for key, consumer in consumers.items()
+        for key, consumer in consumers.items() if key not in deferred
     )
 
     resolved_roots = [repository.root for repository in results if repository.head]
@@ -509,4 +515,6 @@ def audit_fleet_pins(
             )
         )
 
-    return FleetAuditResult(expected_ref, tuple(checked_results))
+    unresolved = tuple(FleetAuditIssue("private_verification_required",
+        "Private obligation remains unresolved in the public component", key) for key in deferred)
+    return FleetAuditResult(expected_ref, tuple(checked_results), unresolved)
