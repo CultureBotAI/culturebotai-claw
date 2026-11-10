@@ -184,31 +184,31 @@ def test_incoming_untracked_or_ignored_collision_holds(repo: LocalRepository, ig
     repo.publish(name, "published replacement\n", force=ignored)
     result = repo.run()
     assert result["status"] == "hold"
-    assert result["reason"] == "untracked_or_ignored_overwrite_collision"
-    assert name in result["overwrite_collisions"]
+    if ignored:
+        assert result["reason"] == "untracked_or_ignored_overwrite_collision"
+        assert name in result["overwrite_collisions"]
+    else:
+        assert result["reason"].startswith("dirty_or_staged_checkout")
     assert destination.read_text() == "unique local evidence\n"
     assert repo.head() == repo.initial
 
 
-def test_noncolliding_ignored_and_untracked_evidence_survives(repo: LocalRepository) -> None:
+def test_noncolliding_ignored_evidence_survives(repo: LocalRepository) -> None:
     evidence = repo.checkout / ".scratch" / "evidence.json"
     evidence.parent.mkdir()
     evidence.write_text('{"unique": true}\n')
-    (repo.checkout / "untracked-evidence.txt").write_text("unique\n")
     wanted = repo.publish()
     result = repo.run()
     assert result["status"] == "verified"
     assert repo.head() == wanted
     assert evidence.read_text() == '{"unique": true}\n'
-    assert (repo.checkout / "untracked-evidence.txt").read_text() == "unique\n"
 
 
 def test_incoming_directory_parent_collision_is_preserved(repo: LocalRepository) -> None:
     (repo.checkout / "new-directory").write_text("local file at incoming parent\n")
     repo.publish("new-directory/record.txt", "remote\n")
     result = repo.run()
-    assert result["reason"] == "untracked_or_ignored_overwrite_collision"
-    assert "new-directory" in result["overwrite_collisions"]
+    assert result["reason"].startswith("dirty_or_staged_checkout")
     assert (repo.checkout / "new-directory").is_file()
 
 
@@ -663,3 +663,15 @@ def test_failed_merge_transport_reports_actual_persisted_head(repo: LocalReposit
     assert report['after'] == wanted == repo.head()
     assert report['before'] != report['after']
     repo.assert_receipt(report)
+
+
+def test_noncolliding_untracked_work_holds_before_fetch(repo: LocalRepository) -> None:
+    path = repo.checkout / "unique-evidence.txt"
+    path.write_text("preserve exactly\n")
+    repo.publish()
+    result = repo.run()
+    assert result["status"] == "hold"
+    assert result["reason"].startswith("dirty_or_staged_checkout")
+    assert result["fetched"] is None
+    assert repo.head() == repo.initial
+    assert path.read_text() == "preserve exactly\n"

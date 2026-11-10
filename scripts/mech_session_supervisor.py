@@ -742,19 +742,44 @@ def artifact_errors(item: dict, allowed_roots: list[Path], label: str) -> list[s
     return [] if actual == expected else [f"{label}: artifact hash mismatch"]
 
 
-def freeze_infrastructure(target: dict) -> dict:
+def freeze_infrastructure(target: dict, *, fetched_head: str | None = None) -> dict:
     """Capture the input scope before infrastructure can change the notebook."""
     from kg_microbe_workflows import validate_infra_notebook
 
     path = Path(target["root"]) / "INFRA_TASKS.md"
     flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0)
-    with os.fdopen(os.open(path, flags), "rb") as stream:
-        if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
-            raise SupervisorError("infrastructure notebook must be a regular file")
-        raw = stream.read()
+    try:
+        with os.fdopen(os.open(path, flags), "rb") as stream:
+            if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+                raise SupervisorError("infrastructure notebook must be a regular file")
+            raw = stream.read()
+    except (OSError, SupervisorError) as error:
+        if fetched_head is not None:
+            raise FreshnessHold("infrastructure fetched notebook is absent or not a regular file") from error
+        raise
+    if fetched_head is not None:
+        verify_fetched_infrastructure(target, fetched_head, raw)
     notebook = validate_infra_notebook(raw, target["github_repository"])
     return {"sha256": hashlib.sha256(raw).hexdigest(), "content": raw.decode("utf-8"),
             "tasks": notebook["tasks"], "frozen_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
+
+
+
+def verify_fetched_infrastructure(target: dict, fetched_head: str, raw: bytes) -> None:
+    """An adopted scope must be the exact regular blob in its fetched tree."""
+    from kg_microbe_workflows.freshness import FreshnessError, Git
+
+    if not isinstance(fetched_head, str) or not SHA.fullmatch(fetched_head):
+        raise FreshnessHold("infrastructure scope lacks a verified fetched revision")
+    try:
+        entry = Git(Path(target["root"])).run(
+            "ls-tree", "-z", fetched_head, "--", "INFRA_TASKS.md")
+    except FreshnessError as error:
+        raise FreshnessHold("infrastructure fetched blob cannot be verified") from error
+    actual_blob = hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\0" + raw).hexdigest()
+    if entry not in {f"100644 blob {actual_blob}\tINFRA_TASKS.md\0",
+                     f"100755 blob {actual_blob}\tINFRA_TASKS.md\0"}:
+        raise FreshnessHold("infrastructure scope must match the regular INFRA_TASKS.md blob at fetched HEAD")
 
 
 def freeze_open_issues(target: dict, *, runner=command) -> dict:
@@ -2113,7 +2138,12 @@ class Supervisor:
             path = self.directory(target) / "cycles" / f"cycle-{ledger['cycle']:06d}" / "infra-scope.json"
             if ledger.get("repository_freshness") and path.exists():
                 raise FreshnessHold("fresh stage already has an archived infrastructure scope; approved reconciliation required")
-            ledger["infra_scope"] = freeze_infrastructure(target)
+            fetched_head = None
+            if ledger.get("repository_freshness"):
+                fetched_head = ledger["repository_freshness"].get("pre_goal", {}).get("after")
+                if fetched_head is None:
+                    raise FreshnessHold("infrastructure scope lacks a verified fetched revision")
+            ledger["infra_scope"] = freeze_infrastructure(target, fetched_head=fetched_head)
             self.write(path, ledger["infra_scope"])
         else:
             ledger.pop("infra_scope", None)

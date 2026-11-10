@@ -65,6 +65,10 @@ def engine_fixture(instance, fixture, monkeypatch, *, new_head=NEW, before=None)
         assert kwargs["boundary_id"] == report["boundary_id"]
         return fixture.remote.head
     monkeypatch.setattr("kg_microbe_workflows.freshness.verify_inventory_head", inventory)
+    # This fixture models Git through a fake remote; real-blob controls below
+    # exercise the production reader against an actual isolated repository.
+    monkeypatch.setattr(supervisor, "verify_fetched_infrastructure",
+                        lambda target, revision, raw: events.append(("infra_blob", revision)))
     return events
 
 

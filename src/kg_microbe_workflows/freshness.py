@@ -111,7 +111,7 @@ def state(git: Git) -> dict[str, str]:
     for option in ("core.sparseCheckout", "index.sparse"):
         if git.run("config", "--bool", "--get", option, allowed=(0, 1)) == "true":
             raise FreshnessError("sparse_checkout_requires_owned_full_base")
-    tracked = git.run("status", "--porcelain=v1", "-z", "--untracked-files=no",
+    tracked = git.run("status", "--porcelain=v1", "-z", "--untracked-files=all",
                       "--ignore-submodules=none")
     return {"branch": branch, "head": head, "tracked_status": tracked}
 
