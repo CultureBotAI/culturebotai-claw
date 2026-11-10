@@ -675,3 +675,23 @@ def test_noncolliding_untracked_work_holds_before_fetch(repo: LocalRepository) -
     assert result["fetched"] is None
     assert repo.head() == repo.initial
     assert path.read_text() == "preserve exactly\n"
+
+
+@pytest.mark.parametrize("size,accepted", [(6_408_149, True), (32_000_001, False)])
+def test_git_output_allows_measured_fleet_inventory_with_a_finite_bound(tmp_path, monkeypatch, size, accepted):
+    payload = "x" * size
+    monkeypatch.setattr(fresh.subprocess, "run", lambda *a, **k:
+                        subprocess.CompletedProcess(a, 0, stdout=payload, stderr=""))
+    if accepted:
+        assert fresh.Git(tmp_path).run("ls-files", "-v", "-z") == payload
+    else:
+        with pytest.raises(fresh.FreshnessError, match="git_output_bound"):
+            fresh.Git(tmp_path).run("ls-files", "-v", "-z")
+
+
+def test_git_inventory_bound_counts_utf8_bytes(tmp_path, monkeypatch):
+    payload = "é" * 16_000_001
+    monkeypatch.setattr(fresh.subprocess, "run", lambda *a, **k:
+                        subprocess.CompletedProcess(a, 0, stdout=payload, stderr=""))
+    with pytest.raises(fresh.FreshnessError, match="git_output_bound"):
+        fresh.Git(tmp_path).run("ls-tree", "-r", "-z", "HEAD")

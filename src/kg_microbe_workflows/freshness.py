@@ -27,6 +27,9 @@ SHA = re.compile(r"[0-9a-f]{40}\Z")
 DIGEST = re.compile(r"[0-9a-f]{64}\Z")
 OPERATIONS = ("MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "rebase-merge",
               "rebase-apply", "sequencer", "BISECT_START", "index.lock")
+# CultureMech's measured 64,872-file tree is 9.7 MB; keep a finite fleet-sized
+# allowance separate from request and process-probe bounds.
+MAX_GIT_OUTPUT_BYTES = 32_000_000
 OwnerCheck = Callable[[], Mapping[int, str]]
 
 
@@ -71,7 +74,7 @@ class Git:
         if result.returncode not in allowed:
             # URLs and Git stderr can contain credentials. Neither belongs in evidence.
             raise FreshnessError(f"git_{args[0]}_failed")
-        if len(result.stdout) > 4_000_000:
+        if len(result.stdout.encode("utf-8")) > MAX_GIT_OUTPUT_BYTES:
             raise FreshnessError("git_output_bound")
         return result.stdout.rstrip("\n")
 
