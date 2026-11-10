@@ -31,7 +31,8 @@ from .freshness import (
 )
 from .freshness_contract import load_adoption, repository_identity
 
-ARTIFACT_LIMIT = 32_000_000
+# Measured TaxonMech inventory is 138.5 MB; requests remain capped at 1 MB.
+ARTIFACT_LIMIT = 256_000_000
 
 _FIELDS = {"schema_version", "repository_key", "repository_root", "lock_directory",
            "receipt_directory", "protected_roots", "adoption", "boundary_id", "phase",

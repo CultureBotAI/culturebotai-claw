@@ -143,17 +143,28 @@ def test_frozen_inventory_repeat_is_idempotent(repo, gate_request):
     assert second['reused_frozen_inventory'] is True
 
 
-def test_large_successful_inventory_round_trips_and_remains_usable(repo, gate_request, monkeypatch):
+@pytest.mark.parametrize("records", [12000, 170000])
+def test_large_successful_inventory_round_trips_and_remains_usable(repo, gate_request, monkeypatch, records):
     original = cli.Git.run
     def large_tree(self, *args, **kwargs):
         if args[:3] == ('ls-tree', '-r', '-z'):
-            return ''.join(f'100644 blob {"a" * 40}\tdata/record-{i:05d}-long-record-name.yaml\0'
-                           for i in range(12000))
+            # Valid path components keep the Git listing below its 128 MB
+            # bound while JSON framing exceeds the insufficient 128 MB reader.
+            padding = ("p" * 199 + "/") * 3 if records == 170000 else ""
+            tree = ''.join(f'100644 blob {"a" * 40}\tdata/{padding}record-{i:05d}-long-record-name.yaml\0'
+                           for i in range(records))
+            if records == 170000:
+                assert 32_000_000 < len(tree.encode()) < 128_000_000
+            return tree
         return original(self, *args, **kwargs)
     monkeypatch.setattr(cli.Git, 'run', large_tree)
     first = cli.execute(gate_request, apply=True)
     assert Path(first['artifact']['path']).stat().st_size > 1_000_000
-    assert len(cli.read_artifact(first['artifact'])['files']) == 12000
+    assert len(cli.read_artifact(first['artifact'])['files']) == records
+    if records == 170000:
+        assert 128_000_000 < Path(first['artifact']['path']).stat().st_size < 256_000_000
+    with pytest.raises(cli.FreshnessError, match='request_path_unsafe_or_unbounded'):
+        cli._load(Path(first['artifact']['path']))
     assert cli.execute(gate_request, apply=True)['artifact'] == first['artifact']
     gate_request.update(phase='no_change', prior_inventory=first['artifact'])
     assert cli.execute(gate_request, apply=True)['status'] == 'verified'
@@ -167,3 +178,11 @@ def test_batch_retains_actionable_remote_after_freeze_hold(repo, gate_request):
     assert report['status'] == 'hold'
     assert report['results'][0]['reason'] == 'remote_moved_since_inventory_freshness'
     assert repo.head() == old
+
+
+def test_inventory_reader_retains_finite_size_limit_before_loading(tmp_path):
+    path = tmp_path / "oversized-artifact.json"
+    with path.open("wb") as stream:
+        stream.truncate(256_000_001)
+    with pytest.raises(cli.FreshnessError, match="request_path_unsafe_or_unbounded"):
+        cli.read_artifact({"path": str(path), "sha256": "a" * 64})

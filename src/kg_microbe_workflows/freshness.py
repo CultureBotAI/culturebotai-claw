@@ -27,9 +27,9 @@ SHA = re.compile(r"[0-9a-f]{40}\Z")
 DIGEST = re.compile(r"[0-9a-f]{64}\Z")
 OPERATIONS = ("MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "rebase-merge",
               "rebase-apply", "sequencer", "BISECT_START", "index.lock")
-# CultureMech's measured 64,872-file tree is 9.7 MB; keep a finite fleet-sized
-# allowance separate from request and process-probe bounds.
-MAX_GIT_OUTPUT_BYTES = 32_000_000
+# The measured fleet reaches a 724,453-file / 76.2 MB TaxonMech tree. Keep
+# a finite fleet-sized allowance separate from request/process-probe bounds.
+MAX_GIT_OUTPUT_BYTES = 128_000_000
 OwnerCheck = Callable[[], Mapping[int, str]]
 
 
