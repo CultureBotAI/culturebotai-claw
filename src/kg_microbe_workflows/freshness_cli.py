@@ -19,7 +19,7 @@ from typing import Any, Callable
 from plugins.lock_manager import LockManager
 from plugins.repository_settings import RepositoryTarget
 
-from . import WorkflowError
+from . import WorkflowError, load_effective_workflow
 from .freshness import (
     FreshnessError,
     Git,
@@ -36,7 +36,7 @@ ARTIFACT_LIMIT = 256_000_000
 
 _FIELDS = {"schema_version", "repository_key", "repository_root", "lock_directory",
            "receipt_directory", "protected_roots", "adoption", "boundary_id", "phase",
-           "workflow_sha256", "prior_inventory", "pull_requests"}
+           "workflow_sha256", "effective_workflow", "prior_inventory", "pull_requests"}
 
 
 def _load(path: Path, *, limit: int = 1_000_000) -> Any:
@@ -83,6 +83,52 @@ def github_pr(repository: str, number: int) -> dict[str, Any]:
         raise FreshnessError("actual_merge_observation_unavailable") from exc
 
 
+def frozen_workflow_sources(reference: Any, *, root: Path, key: str,
+                            repository: str, workflow_sha256: str) -> dict[str, str]:
+    """Revalidate the complete approved loader output, never a caller's partial map."""
+    effective = read_artifact(reference)
+    if _path(reference['path']).is_relative_to(root):
+        raise FreshnessError('effective_workflow_snapshot_must_live_outside_checkout')
+    # Existing supervisor workflow identities use default JSON separators.
+    # Receipt digest() is deliberately compact and is a different namespace.
+    if hashlib.sha256(json.dumps(effective, sort_keys=True).encode()).hexdigest() != workflow_sha256:
+        raise FreshnessError('effective_workflow_snapshot_identity_differs')
+    sources = effective.get('sources')
+    if not isinstance(sources, list) or not 3 <= len(sources) <= 32:
+        raise FreshnessError('effective_workflow_sources_missing_or_malformed')
+    primary: dict[str, Path] = {}
+    seen: set[Path] = set()
+    frozen: dict[str, str] = {}
+    for source in sources:
+        if (not isinstance(source, dict) or set(source) != {'path', 'sha256', 'kind'}
+                or source['kind'] not in {'parent', 'profile', 'schema', 'extension'}):
+            raise FreshnessError('effective_workflow_source_shape_differs')
+        path = _path(source['path'])
+        if path in seen:
+            raise FreshnessError('effective_workflow_source_repeated')
+        seen.add(path)
+        if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != source['sha256']:
+            raise FreshnessError('effective_workflow_source_bytes_differ')
+        if source['kind'] != 'extension':
+            if source['kind'] in primary:
+                raise FreshnessError('effective_workflow_primary_source_repeated')
+            primary[source['kind']] = path
+        if path.is_relative_to(root):
+            frozen[path.relative_to(root).as_posix()] = source['sha256']
+    if set(primary) != {'parent', 'profile', 'schema'} or not primary['profile'].is_relative_to(root):
+        raise FreshnessError('effective_workflow_primary_sources_or_root_differ')
+    # Re-running the native loader catches omitted extensions, modified pins and
+    # invented effective fields even if a malformed snapshot was approved.
+    try:
+        actual = load_effective_workflow(primary['parent'], primary['profile'], key,
+                                         schema_path=primary['schema'])
+    except WorkflowError as exc:
+        raise FreshnessError('effective_workflow_profile_or_pins_invalid') from exc
+    if actual != effective or actual.get('github_repository') != repository:
+        raise FreshnessError('effective_workflow_snapshot_or_repository_differs')
+    return frozen
+
+
 def execute(request: dict[str, Any], *, apply: bool = False,
             observe_pr: Callable[[str, int], dict[str, Any]] = github_pr) -> dict[str, Any]:
     """One batch member; neither starts a native goal nor edits a runtime ledger."""
@@ -105,6 +151,11 @@ def execute(request: dict[str, Any], *, apply: bool = False,
         repository_root=root, workflow_sha256=request['workflow_sha256'],
         run_id=boundary['run_id'], cycle=boundary['cycle'],
         predecessor_receipt_sha256=boundary.get('predecessor_receipt_sha256'),
+    )
+    workflow_reference = request['effective_workflow']
+    frozen_paths = frozen_workflow_sources(
+        workflow_reference, root=root, key=key, repository=target.expected_repository,
+        workflow_sha256=request['workflow_sha256'],
     )
     if not isinstance(request['protected_roots'], list):
         raise FreshnessError('protected_roots_requires_list')
@@ -129,7 +180,8 @@ def execute(request: dict[str, Any], *, apply: bool = False,
         retained = _load(slot)
         previous = read_artifact(retained)
         if (previous.get('adoption') != reference or previous.get('boundary_id') != request['boundary_id']
-                or previous.get('workflow_sha256') != request['workflow_sha256']):
+                or previous.get('workflow_sha256') != request['workflow_sha256']
+                or previous.get('effective_workflow') != workflow_reference):
             raise FreshnessError('existing_goal_inventory_context_differs')
         verify_inventory_head(target, previous['freshness'], boundary_id=request['boundary_id'],
                               policy_sha256=adoption['contract_sha256'])
@@ -142,7 +194,9 @@ def execute(request: dict[str, Any], *, apply: bool = False,
         prior = read_artifact(request['prior_inventory'])
         if (prior.get('kind') != 'verified_goal_inventory'
                 or prior.get('boundary_id') != request['boundary_id']
-                or prior.get('repository_key') != key or prior.get('adoption') != reference):
+                or prior.get('repository_key') != key or prior.get('adoption') != reference
+                or prior.get('workflow_sha256') != request['workflow_sha256']
+                or prior.get('effective_workflow') != workflow_reference):
             raise FreshnessError('post_merge_inventory_context_differs')
         verify_saved_receipt(prior.get('freshness', {}))
         if not slot.exists() or _load(slot) != request['prior_inventory']:
@@ -156,6 +210,8 @@ def execute(request: dict[str, Any], *, apply: bool = False,
                 return {'status': 'preview', 'reason': 'no_execution_authority'}
             artifact = {'schema_version': '1.0.0', 'kind': 'verified_no_change_freshness',
                         'boundary_id': request['boundary_id'], 'repository_key': key,
+                        'effective_workflow': workflow_reference,
+                        'workflow_sha256': request['workflow_sha256'],
                         'prior_inventory': request['prior_inventory'], 'head': head,
                         'completion_authority': False}
             return {'status': 'verified', 'kind': artifact['kind'],
@@ -187,12 +243,13 @@ def execute(request: dict[str, Any], *, apply: bool = False,
     report = ensure_freshness(
         target, phase=phase, boundary_id=request['boundary_id'],
         policy_sha256=adoption['contract_sha256'], locks=locks, receipt_dir=receipts / 'observations',
-        protected_roots=protected, merge_commits=merged, apply=apply,
+        protected_roots=protected, merge_commits=merged, frozen_paths=frozen_paths, apply=apply,
     )
     if report['status'] != 'verified':
         return report
     artifact = {'schema_version': '1.0.0', 'repository_key': key,
                 'boundary_id': request['boundary_id'], 'adoption': reference,
+                'effective_workflow': workflow_reference,
                 'workflow_sha256': request['workflow_sha256'], 'freshness': report,
                 'completion_authority': False}
     if phase == 'pre_goal':

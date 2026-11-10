@@ -1,5 +1,9 @@
 # Preparing repository freshness without changing a running cycle
 
+The canonical publication procedure is
+[Repository freshness 1.0.0 release](REPOSITORY_FRESHNESS_RELEASE.md). A source
+PR, proposal-only adapter or release tag alone does not adopt a running session.
+
 The independent repository-freshness contract is version 1.0.0. Its packaged
 LinkML schema and canonical YAML live in `src/kg_microbe_workflows/schema/` and
 `src/kg_microbe_workflows/templates/`. Existing six- and seven-goal parents,

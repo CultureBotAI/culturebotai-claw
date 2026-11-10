@@ -30,6 +30,7 @@ exactly these fields (placeholders below must be replaced with verified facts):
   "boundary_id": "UNIQUE_NATIVE_GOAL_OR_STAGE_BOUNDARY",
   "phase": "pre_goal",
   "workflow_sha256": "UNCHANGED_FROZEN_WORKFLOW_SHA256",
+  "effective_workflow": {"path": "/absolute/frozen-effective-workflow.json", "sha256": "EXACT_FILE_SHA256"},
   "prior_inventory": null,
   "pull_requests": []
 }]
@@ -44,6 +45,17 @@ accepts no exception for another live cwd owner; the supervisor can permit only
 its freshly verified idle native session identity. Unavailable or incomplete
 ownership observations hold. An isolated independent Git base is the normal
 choice when another checkout is owned. A feature branch is never auto-switched.
+
+`effective_workflow` references the complete immutable output of the workflow
+loader, stored outside the curated checkout. Its canonical digest must equal
+the approved `workflow_sha256`; its file hash binds the exact snapshot bytes.
+The CLI reloads the pinned parent, schema, profile and local extension sources
+and requires the entire effective result to match. It passes every source in
+the checkout to the shared frozen-source guard, including local extension data
+and schemas. A partial source map, missing snapshot, changed pin or different
+repository holds before mutation. Keep the same reference at verification,
+post-merge and no-change closure. Earlier unadopted candidate requests without
+this evidence fail closed; they are not implicitly migrated or re-frozen.
 
 ```bash
 python -m kg_microbe_workflows.freshness_cli run --request /absolute/request.json
@@ -90,7 +102,8 @@ active Git operations, ignored/untracked overwrite collisions, unknown/shared
 owners, wrong remotes and failed fetches hold with a diagnosis. Noncolliding
 ignored evidence stays in place. The gate never resets, stashes, cleans,
 rebases, force-updates a branch or switches an active branch. Incoming active
-workflow profile/parent changes require separate adoption, not code freshness.
+workflow profile, parent or extension changes require separate adoption, not
+code freshness.
 
 The engine reuses the fleet updater's identity and shared lease primitives,
 with stricter default-only and ownership rules. It is packaged in the wheel;

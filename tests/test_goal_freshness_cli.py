@@ -7,29 +7,54 @@ import json
 from pathlib import Path
 
 import pytest
+import yaml
 from test_goal_freshness import REPOSITORY, git, isolated_git  # noqa: F401
 from test_goal_freshness import repo as _repo
+from test_workflow_contract import profile as _profile
 
+from kg_microbe_workflows import PARENT_PATH, load_effective_workflow
 from kg_microbe_workflows import freshness_cli as cli
+from kg_microbe_workflows import freshness_contract as contract
 from kg_microbe_workflows.freshness import FreshnessError
+from scripts.mech_session_supervisor import digest as workflow_digest
 
 repo = _repo
+profile = _profile
 
 
 @pytest.fixture
-def gate_request(repo, monkeypatch):
+def gate_request(repo, profile, monkeypatch):
+    _, model = profile
+    model.update(repository_key='fixturemech', github_repository=REPOSITORY,
+                 profile_id='fixturemech-workflow')
+    repo.publish('workflow/mech-workflow.yaml', yaml.safe_dump(model, sort_keys=False))
+    git(repo.checkout, 'fetch', 'origin')
+    git(repo.checkout, 'merge', '--ff-only', 'origin/main')
+    repo.initial = repo.head()
+    effective = load_effective_workflow(PARENT_PATH, repo.checkout / 'workflow/mech-workflow.yaml')
+    workflow_path = repo.root / 'effective-workflow.json'
+    workflow_path.write_text(json.dumps(effective))
+    workflow_ref = {'path': str(workflow_path), 'sha256': hashlib.sha256(workflow_path.read_bytes()).hexdigest()}
+    workflow_sha = workflow_digest(effective)
     path = repo.root / 'adoption.json'
-    record = {'boundary': {'run_id': 'test', 'cycle': 1, 'predecessor_receipt_sha256': None},
-              'contract_sha256': 'b' * 64}
+    record = {'schema_version': '1.0.0', 'authority': 'approved_boundary_adoption',
+              'repository_key': 'fixturemech', 'github_repository': REPOSITORY,
+              'repository_root': str(repo.checkout), 'canonical_release_commit': 'a' * 40,
+              'contract_sha256': contract.contract_sha256(),
+              'boundary': {'run_id': 'test', 'cycle': 1, 'stage': 1,
+                           'workflow_sha256': workflow_sha, 'predecessor_receipt_sha256': None},
+              'approval': {'record_id': 'offline-fixture', 'approved_at': '2026-01-01T00:00:00Z',
+                           'approved_by': 'offline fixture'}}
     path.write_text(json.dumps(record))
     ref = {'path': str(path), 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
     monkeypatch.setattr(cli, 'repository_identity', lambda key: REPOSITORY)
-    monkeypatch.setattr(cli, 'load_adoption', lambda *args, **kwargs: record)
+    monkeypatch.setattr(contract, 'repository_identity', lambda key: REPOSITORY)
     return {'schema_version': '1.0.0', 'repository_key': 'fixturemech',
             'repository_root': str(repo.checkout), 'lock_directory': str(repo.root / 'locks'),
             'receipt_directory': str(repo.root / 'portable'), 'protected_roots': [],
             'adoption': ref, 'boundary_id': 'cycle2-stage1', 'phase': 'pre_goal',
-            'workflow_sha256': 'a' * 64, 'prior_inventory': None, 'pull_requests': []}
+            'workflow_sha256': workflow_sha, 'effective_workflow': workflow_ref,
+            'prior_inventory': None, 'pull_requests': []}
 
 
 def test_batch_inventory_reads_fetched_tree_after_persisted_head(repo, gate_request):
