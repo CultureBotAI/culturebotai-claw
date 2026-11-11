@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import re
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -19,6 +21,14 @@ from kg_microbe_sources.acs_figshare import (
 )
 from kg_microbe_sources.catalogue import CatalogueError, load_blocks, validate
 from kg_microbe_sources.fetch import FetchError
+from kg_microbe_sources.fulltext_access import (
+    FulltextResolution,
+    access_ladder,
+    author_request_draft,
+    crossref_meta,
+    epmc_core,
+    fetch_to_staging,
+)
 from kg_microbe_sources.imodulondb import (
     DEFAULT_BASE_URL,
     ImodulonDBClient,
@@ -112,6 +122,9 @@ def main(
 
     if args.command == "local-provenance":
         return _run_local_provenance(args)
+
+    if args.command == "fulltext":
+        return _run_fulltext(args, acs_figshare_client=acs_figshare_client)
 
     return _check_catalogue(args)
 
@@ -275,6 +288,37 @@ def _parser() -> argparse.ArgumentParser:
         "--json",
         action="store_true",
         help="emit JSON instead of Markdown",
+    )
+
+    fulltext = subparsers.add_parser(
+        "fulltext",
+        help="run the legal full-text discovery ladder for a DOI or PMID",
+        description=(
+            "Check local Zotero PDFs, Europe PMC OA, OpenAlex OA, bioRxiv/medRxiv, "
+            "DOE OSTI.gov, LBNL publisher TDM APIs (Elsevier, Springer Nature, Wiley), "
+            "CORE, and ACS Figshare Supporting Information (.s001) without disclosing "
+            "personal email addresses."
+        ),
+    )
+    ft_group = fulltext.add_mutually_exclusive_group(required=True)
+    ft_group.add_argument("--pmid", help="PubMed ID to resolve")
+    ft_group.add_argument("--doi", help="Article DOI to resolve")
+    fulltext.add_argument("--title", default=None, help="fallback title for CORE search")
+    fulltext.add_argument(
+        "--fetch-to",
+        type=Path,
+        default=None,
+        help="stage the resolved payload to this path (outside references_cache/)",
+    )
+    fulltext.add_argument(
+        "--no-acs-si",
+        action="store_true",
+        help="skip ACS Figshare (.s001) Supporting Information fallback",
+    )
+    fulltext.add_argument(
+        "--json",
+        action="store_true",
+        help="emit JSON instead of tab-delimited output",
     )
 
     return parser
@@ -542,6 +586,92 @@ def _run_local_provenance(args: argparse.Namespace) -> int:
                 f"`{_md(hit.matched_token)}` | {_md(hit.snippet)} |"
             )
     return 0
+
+
+def _run_fulltext(
+    args: argparse.Namespace,
+    *,
+    acs_figshare_client: AcsFigshare | None = None,
+) -> int:
+    rec = epmc_core(args.pmid, args.doi)
+    doi = args.doi or rec.get("doi")
+    if not rec.get("title"):
+        rec = {**crossref_meta(doi), **rec}
+    title = args.title or re.sub(r"<[^>]+>", "", str(rec.get("title", "") or ""))
+
+    acs_client = (
+        acs_figshare_client
+        if isinstance(acs_figshare_client, AcsFigshareClient)
+        else None
+    )
+    method, url = access_ladder(
+        rec,
+        doi,
+        title,
+        pmid=args.pmid,
+        include_acs_si=not args.no_acs_si,
+        acs_client=acs_client,
+    )
+    staged_str: str | None = None
+    if url:
+        if args.fetch_to is not None:
+            try:
+                saved = fetch_to_staging(method, url, args.fetch_to)
+                staged_str = str(saved)
+            except Exception as exc:
+                print(str(exc), file=sys.stderr)
+                return 2
+        if args.json:
+            res = FulltextResolution(
+                method=method,
+                url=url,
+                doi=doi,
+                pmid=args.pmid or rec.get("pmid"),
+                title=title,
+                staged_path=staged_str,
+            )
+            print(json.dumps(res.to_dict(), indent=2))
+        else:
+            print(f"ACCESS\t{method}\t{url}")
+            if staged_str:
+                print(f"SAVED\t{method}\t{staged_str}")
+        return 0
+
+    if args.json:
+        res = FulltextResolution(
+            method="none",
+            url=None,
+            doi=doi,
+            pmid=args.pmid or rec.get("pmid"),
+            title=title,
+            staged_path=None,
+        )
+        print(json.dumps(res.to_dict(), indent=2))
+        return 2
+
+    print(
+        "NO_LEGAL_OA\t(paywalled; no full text via Zotero / Europe PMC / OpenAlex / OSTI / TDM / CORE / ACS SI)",
+        file=sys.stderr,
+    )
+    missing_keys = [
+        k
+        for k in (
+            "ZOTERO_DATA_DIR",
+            "ELSEVIER_API_KEY",
+            "SPRINGER_API_KEY",
+            "WILEY_TDM_TOKEN",
+            "CORE_API_KEY",
+        )
+        if not os.environ.get(k)
+    ]
+    if missing_keys:
+        print(
+            f"  (optional API keys not set: {', '.join(missing_keys)})",
+            file=sys.stderr,
+        )
+    print("\n--- author-request draft ---")
+    print(author_request_draft(rec, doi))
+    return 2
 
 
 if __name__ == "__main__":  # pragma: no cover - console entry point
