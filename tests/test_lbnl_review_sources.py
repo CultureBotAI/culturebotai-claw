@@ -338,12 +338,19 @@ def test_fulltext_access_ladder_and_cli(
             "url_public_html": "https://figshare.com/articles/dataset/303",
             "files": [
                 {
+                    "id": 908,
+                    "name": "cb3002058_si_001.xlsx",
+                    "size": 1024,
+                    "download_url": "https://ndownloader.figshare.com/files/908",
+                    "supplied_md5": "",
+                },
+                {
                     "id": 909,
                     "name": "cb3002058_si_001.pdf",
                     "size": 2048,
                     "download_url": "https://ndownloader.figshare.com/files/909",
                     "supplied_md5": "",
-                }
+                },
             ],
         }
 
@@ -352,6 +359,24 @@ def test_fulltext_access_ladder_and_cli(
         try_acs_figshare_si_url("10.1021/cb3002058", client=si_client)
         == "https://ndownloader.figshare.com/files/909"
     )
+    assert (
+        try_acs_figshare_si_url("10.1021/cb3002058.s001", client=si_client)
+        == "https://ndownloader.figshare.com/files/909"
+    )
+
+    def empty_files_transport(url: str, body: Mapping[str, Any] | None = None) -> Any:
+        if url.endswith("/articles/search"):
+            return [{"id": 304, "doi": "10.1021/cb3002058.s001", "title": "SI"}]
+        return {
+            "id": 304,
+            "doi": "10.1021/cb3002058.s001",
+            "title": "Empty SI",
+            "url_public_html": "https://figshare.com/articles/dataset/304",
+            "files": [],
+        }
+
+    empty_si_client = AcsFigshareClient(transport=empty_files_transport)
+    assert try_acs_figshare_si_url("10.1021/cb3002058", client=empty_si_client) is None
 
     import kg_microbe_sources.fulltext_access as ft_mod
 
