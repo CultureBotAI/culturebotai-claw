@@ -12,6 +12,8 @@ for provenance; they do not describe the supported interface.
 
 Other maintained references:
 
+- [`proposals/MECH_EMBEDDING_MAP_CONTRACT.md`](proposals/MECH_EMBEDDING_MAP_CONTRACT.md) —
+  shared pinned BGE text maps, retained specialty views, cache provenance and PaCMAP rollout.
 - [`guides/EMBEDDING_SETS.md`](guides/EMBEDDING_SETS.md) — PaCMAP projections,
   applicable text, chemical, protein, graph and future sets, and the fleet adoption plan.
 - [`guides/PYTHON_RUNTIME.md`](guides/PYTHON_RUNTIME.md) — the shared Python 3.13
@@ -24,6 +26,10 @@ Other maintained references:
   domain-specific work; what a new Mech adopts, and in what order
 - [`guides/VENDORED_GOVERNANCE.md`](guides/VENDORED_GOVERNANCE.md) — canonical
   shared-artifact manifest, synchronization, rollout, and rollback.
+- [`guides/PRIVATE_SCALEUP_AUDIT.md`](guides/PRIVATE_SCALEUP_AUDIT.md) — dormant
+  private governance receipt prerequisite, protected setup and remaining gate integration.
+- [`guides/AUTOMATIC_PRIVATE_FLEET_AUDIT.md`](guides/AUTOMATIC_PRIVATE_FLEET_AUDIT.md) —
+  automatic private receipt integration, protected rollout order and configuration.
 - [`guides/EVIDENCE_REFERENCE_VALIDATION.md`](guides/EVIDENCE_REFERENCE_VALIDATION.md) —
   offline quote validation, explicit native evidence scope, graph coverage, the known-findings
   ledger, cache fetching, and the fleet rollout.
@@ -45,3 +51,6 @@ Other maintained references:
 Operational scratch reports belong under the gitignored `workspace/reports/`,
 not in the documentation tree. Versioned goal-review evidence follows the
 repository paths defined by the workflow contract.
+
+- [CofactorMech pending admission](guides/COFACTORMECH_ADMISSION.md): bootstrap provenance, capability gaps and the coordinated release hold.
+- [AssayMech pending admission](guides/ASSAYMECH_ADMISSION.md): bootstrap provenance, conservative capability declarations and release dependencies.

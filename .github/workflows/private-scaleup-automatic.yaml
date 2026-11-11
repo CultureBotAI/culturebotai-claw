@@ -1,0 +1,91 @@
+name: protected automatic Scaleup governance receipt
+run-name: Scaleup parent ${{ github.event.workflow_run.id }} attempt ${{ github.event.workflow_run.run_attempt }}
+
+# GitHub executes workflow_run at default-branch SHA/ref. No candidate checkout,
+# candidate artifact, shared cache or untrusted executable enters either job.
+on:
+  workflow_run:
+    workflows: [authoritative governance fleet audit]
+    types: [in_progress]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      required_private: ${{ steps.plan.outputs.required_private }}
+      binding_sha256: ${{ steps.plan.outputs.parent_binding_sha256 }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          python-version: "3.13"
+          enable-cache: false
+      - name: Authenticate parent and wait for public components
+        id: plan
+        env:
+          GH_PUBLIC_READ_TOKEN: ${{ github.token }}
+        run: >-
+          uv run --locked --no-dev python -m kg_microbe_governance.automatic_private_audit_cli
+          producer-preflight --trusted-root "$GITHUB_WORKSPACE"
+
+  produce:
+    needs: preflight
+    if: needs.preflight.outputs.required_private == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: scaleup-private-audit
+    env:
+      SCALEUP_AUDIT_APP_ID: ${{ vars.SCALEUP_AUDIT_APP_ID }}
+      BINDING_SHA: ${{ needs.preflight.outputs.binding_sha256 }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          python-version: "3.13"
+          enable-cache: false
+      - name: Recheck protected environment before private access
+        env:
+          GH_PUBLIC_READ_TOKEN: ${{ github.token }}
+        run: >-
+          uv run --locked --no-dev python -m kg_microbe_governance.automatic_private_audit_cli
+          producer-preflight --trusted-root "$GITHUB_WORKSPACE"
+          --require-protected-environment --expected-binding-sha256 "$BINDING_SHA"
+      - name: Mint Scaleup-only contents-read token
+        id: private-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ vars.SCALEUP_AUDIT_APP_ID }}
+          private-key: ${{ secrets.SCALEUP_AUDIT_APP_PRIVATE_KEY }}
+          owner: CultureBotAI
+          repositories: ScaleupMech
+          permission-contents: read
+      - name: Inspect and recheck private main using protected code only
+        id: receipt
+        env:
+          GH_PUBLIC_READ_TOKEN: ${{ github.token }}
+          SCALEUP_PRIVATE_READ_TOKEN: ${{ steps.private-token.outputs.token }}
+        run: >-
+          uv run --locked --no-dev python -m kg_microbe_governance.automatic_private_audit_cli
+          produce --trusted-root "$GITHUB_WORKSPACE"
+          --expected-binding-sha256 "$BINDING_SHA" --output .temp/automatic-private/receipt.json
+      - name: Publish only the closed public receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ steps.receipt.outputs.artifact_name }}
+          path: .temp/automatic-private/receipt.json
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 1

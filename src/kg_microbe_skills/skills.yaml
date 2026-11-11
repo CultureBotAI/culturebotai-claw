@@ -232,6 +232,12 @@ skills:
 # Mechs those are -- from the manifest, so the set cannot drift the way a list
 # written here would the moment a Mech gained or lost the capability.
 canonical:
+  repository-freshness:
+    capability: testing
+    reason: >-
+      Prepares an inert, versioned freshness adapter for every manifest Mech.
+      Testing is the same workflow-participation stand-in as evolve-mech-workflow;
+      candidate rendering grants no runtime adoption or released-pin authority.
   triage-and-resolve-issues:
     capability: testing
     reason: >-

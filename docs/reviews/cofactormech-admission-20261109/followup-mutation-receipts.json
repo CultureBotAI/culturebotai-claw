@@ -1,0 +1,28 @@
+[
+  {
+    "mutation": "readme-mypy-parity",
+    "test": "tests/test_fleet_manifest.py::test_documented_and_ci_mypy_targets_agree",
+    "red_exit": 1,
+    "restored_exit": 0,
+    "assertion_failure": true
+  },
+  {
+    "mutation": "agents-mypy-parity",
+    "test": "tests/test_fleet_manifest.py::test_documented_and_ci_mypy_targets_agree",
+    "red_exit": 1,
+    "restored_exit": 0,
+    "assertion_failure": true
+  },
+  {
+    "mutation": "accept-any-consumer-actual-pin",
+    "test": "tests/test_governance_consumer_admission.py::test_fully_matching_new_source_does_not_grant_other_consumers_its_pin",
+    "victims": [
+      "traitmech",
+      "dufmech",
+      "edgemech"
+    ],
+    "red_exit": 1,
+    "restored_exit": 0,
+    "three_assertion_failures": true
+  }
+]

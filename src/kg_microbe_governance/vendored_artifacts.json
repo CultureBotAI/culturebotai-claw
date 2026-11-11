@@ -62,6 +62,14 @@
     "edgemech": {
       "github": "CultureBotAI/EdgeMech",
       "package_path": "src/edgemech"
+    },
+    "cofactormech": {
+      "github": "CultureBotAI/CofactorMech",
+      "package_path": "src/cofactormech"
+    },
+    "assaymech": {
+      "github": "CultureBotAI/AssayMech",
+      "package_path": "src/assaymech"
     }
   },
   "artifacts": [
@@ -128,7 +136,24 @@
       "id": "skill_frontmatter_contract",
       "source": "src/kg_microbe_governance/artifacts/tests/test_skill_frontmatter.py",
       "target": "tests/test_skill_frontmatter.py",
-      "consumers": ["culturemech", "mediaingredientmech", "communitymech", "traitmech", "proteintraitsmech", "cellstructuremech", "antibioticmech", "habitatmech", "naturalproductmech", "taxonmech", "pathwaymech", "dufmech", "cmmmech", "aimech"],
+      "consumers": [
+        "culturemech",
+        "mediaingredientmech",
+        "communitymech",
+        "traitmech",
+        "proteintraitsmech",
+        "cellstructuremech",
+        "antibioticmech",
+        "habitatmech",
+        "naturalproductmech",
+        "taxonmech",
+        "pathwaymech",
+        "dufmech",
+        "cmmmech",
+        "aimech",
+        "cofactormech",
+        "assaymech"
+      ],
       "sha256": "a1252211fbdec1a4a36f8138b9a60617d69e9fa6c5c3f589d15846a783d77569",
       "mode": "0644"
     },
@@ -136,7 +161,24 @@
       "id": "curation_timestamp_contract",
       "source": "src/kg_microbe_governance/artifacts/tests/test_curation_timestamp_schema.py",
       "target": "tests/test_curation_timestamp_schema.py",
-      "consumers": ["culturemech", "mediaingredientmech", "communitymech", "traitmech", "proteintraitsmech", "cellstructuremech", "antibioticmech", "habitatmech", "naturalproductmech", "taxonmech", "pathwaymech", "dufmech", "cmmmech", "aimech"],
+      "consumers": [
+        "culturemech",
+        "mediaingredientmech",
+        "communitymech",
+        "traitmech",
+        "proteintraitsmech",
+        "cellstructuremech",
+        "antibioticmech",
+        "habitatmech",
+        "naturalproductmech",
+        "taxonmech",
+        "pathwaymech",
+        "dufmech",
+        "cmmmech",
+        "aimech",
+        "cofactormech",
+        "assaymech"
+      ],
       "sha256": "4714184d0ebf50d1d777c02390b214a3491531310811e3be600c730ed175b92f",
       "mode": "0644"
     },
@@ -169,7 +211,7 @@
       "source": "src/kg_microbe_governance/artifacts/prompts/backlog-loop-goal.md",
       "target": "prompts/backlog-loop-goal.md",
       "consumers": "all",
-      "sha256": "0b75a1976f71ad8595ec9d1f293afcddafed4287ae0e67fc8bb348a6467df610",
+      "sha256": "d7786562ab5081a9f2ede8927fc4329632ccde79341284b43d972fca7cccf926",
       "mode": "0644"
     },
     {
@@ -209,7 +251,7 @@
       "source": "src/kg_microbe_governance/artifacts/scripts/auto_merge_ready_prs.py",
       "target": "scripts/auto_merge_ready_prs.py",
       "consumers": "all",
-      "sha256": "b8d77dc73422c3fa84b6636d32533d21d5ed11aa3e9bcc42d1c9aa6cf60f49f1",
+      "sha256": "1011cac5fb1c3c66ea3dc2c528339b4ea019189b5716f52fdd088cabbfed5c38",
       "mode": "0644"
     },
     {
@@ -264,7 +306,24 @@
       "id": "record_review_contract",
       "source": "src/kg_microbe_governance/artifacts/tests/test_record_review_contract.py",
       "target": "tests/test_record_review_contract.py",
-      "consumers": ["culturemech", "mediaingredientmech", "communitymech", "traitmech", "proteintraitsmech", "cellstructuremech", "antibioticmech", "habitatmech", "naturalproductmech", "taxonmech", "pathwaymech", "dufmech", "cmmmech", "aimech"],
+      "consumers": [
+        "culturemech",
+        "mediaingredientmech",
+        "communitymech",
+        "traitmech",
+        "proteintraitsmech",
+        "cellstructuremech",
+        "antibioticmech",
+        "habitatmech",
+        "naturalproductmech",
+        "taxonmech",
+        "pathwaymech",
+        "dufmech",
+        "cmmmech",
+        "aimech",
+        "cofactormech",
+        "assaymech"
+      ],
       "sha256": "7be08e684dcd235ddeae8f3c6a5d45b0ee74a60d1c1818cc81467e38901e5d56",
       "mode": "0644"
     },

@@ -44,16 +44,18 @@ def test_exactly_one_audit_lane_runs_and_release_uses_trusted_code():
     }
     legacy = [s for s in entries if s["name"] in legacy_names]
     assert len(legacy) == 3
-    assert all(s["if"] == "steps.release-contract.outputs.active != 'true'" for s in legacy)
+    assert all(s["if"] == "steps.automatic.outputs.available != 'true' && steps.release-contract.outputs.active != 'true'" for s in legacy)
     release = next(s for s in entries if s["name"] == "Audit the trusted bounded canary release")
-    assert release["if"] == "steps.release-contract.outputs.active == 'true'"
+    assert release["if"] == "steps.automatic.outputs.available != 'true' && steps.release-contract.outputs.active == 'true'"
     assert "uv run --project fleet/trusted-claw python -m kg_microbe_governance.cycle_release_audit" in release["run"]
     assert '--trusted-root "$GITHUB_WORKSPACE/fleet/trusted-claw"' in release["run"]
     assert '--target-root "$key=$GITHUB_WORKSPACE/fleet/$key"' in release["run"]
     assert "done < fleet/governance-consumers.tsv" in release["run"]
     assert "continue-on-error" not in release
     assert "|| true" not in release["run"]
-    candidate = next(s for s in entries if s["name"] == "Validate candidate authority contract")
+    workflow = yaml.load(WORKFLOW.read_text(), Loader=yaml.BaseLoader)
+    candidate = next(s for s in workflow["jobs"]["candidate-contracts"]["steps"]
+                     if s.get("name") == "Validate candidate authority contract")
     assert "control/tests/test_governance_cycle_release_audit.py" in candidate["run"]
     assert "control/tests/test_governance_infrastructure_admission.py" in candidate["run"]
     assert "control/tests/test_governance_cycle_release_workflow.py" in candidate["run"]
@@ -68,6 +70,7 @@ def test_only_protected_preparation_selects_one_immutable_data_fetch(tmp_path, t
     candidate.parent.mkdir(parents=True)
     candidate.write_text("candidate policy cannot select data fetch")
     (tmp_path / "control" / selector).write_text("candidate code cannot select data fetch")
+    (tmp_path / "control/src/kg_microbe_governance/consumer_admission.py").write_text("candidate plural selector cannot activate")
     protected = tmp_path / "fleet/trusted-claw"
     if trusted:
         path = protected / selector
@@ -99,3 +102,37 @@ def test_only_protected_preparation_selects_one_immutable_data_fetch(tmp_path, t
             assert lines[1] == f"-C {protected} -c core.hooksPath=/dev/null fetch --no-tags --no-prune --no-write-fetch-head origin {emitted}"
         else:
             assert result.returncode != 0 and len(lines) == 1
+
+
+@pytest.mark.parametrize("emitted,valid", [("a" * 40 + "\n" + "b" * 40, True),
+                                           ("a" * 40 + "\nmain", False)])
+def test_plural_selector_is_protected_and_validates_every_ref_before_fetch(tmp_path, emitted, valid):
+    protected = tmp_path / "fleet/trusted-claw"
+    for name in ("infrastructure_admission.py", "consumer_admission.py"):
+        path = protected / "src/kg_microbe_governance" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("protected fixture selector")
+    bins = tmp_path / "bin"
+    bins.mkdir()
+    trace = tmp_path / "trace"
+    for name, content in {
+        "uv": '#!/bin/bash\nprintf "%s\\n" "$*" >> "$TRACE"\nprintf "%s\\n" "$EMITTED"\n',
+        "git": '#!/bin/bash\nprintf "%s\\n" "$*" >> "$TRACE"\n',
+    }.items():
+        target = bins / name
+        target.write_text(content)
+        target.chmod(0o755)
+    step = next(s for s in steps() if s["name"] == "Prepare protected infrastructure data snapshot")
+    result = subprocess.run(["bash", "-c", step["run"]], cwd=tmp_path,
+                            env={**os.environ, "GITHUB_WORKSPACE": str(tmp_path), "TRACE": str(trace),
+                                 "EMITTED": emitted, "PATH": str(bins) + os.pathsep + os.environ["PATH"]},
+                            capture_output=True, text=True, timeout=15)
+    lines = trace.read_text().splitlines()
+    assert "python -m kg_microbe_governance.consumer_admission" in lines[0]
+    assert (result.returncode == 0) is valid
+    if valid:
+        assert len(lines) == 3
+        assert lines[1].endswith("origin " + "a" * 40)
+        assert lines[2].endswith("origin " + "b" * 40)
+    else:
+        assert len(lines) == 1  # No partial fetch before rejecting a later line.

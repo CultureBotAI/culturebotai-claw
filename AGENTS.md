@@ -52,6 +52,8 @@ manifest when no source checkout is present:
 - CMMMech (`CMMMECH_ROOT`)
 - AIMech (`AIMECH_ROOT`)
 - EdgeMech (`EDGEMECH_ROOT`)
+- CofactorMech (`COFACTORMECH_ROOT`) — admission pending; see the admission guide
+- AssayMech (`ASSAYMECH_ROOT`) — admission pending; see the admission guide
 
 You do not need every Mech cloned. `openclaw-cli config validate` reports an
 unset root as "not configured locally" rather than a failure; pass
@@ -168,7 +170,15 @@ uv run --extra dev mypy \
   src/kg_microbe_governance/__init__.py \
   src/kg_microbe_governance/__main__.py \
   src/kg_microbe_governance/fleet_audit.py \
+  src/kg_microbe_governance/private_scaleup_audit.py \
+  src/kg_microbe_governance/automatic_private_audit.py \
+  src/kg_microbe_governance/automatic_private_audit_cli.py \
+  src/kg_microbe_governance/automatic_fleet_component.py \
+  src/kg_microbe_governance/public_repository_metadata.py \
+  src/kg_microbe_governance/private_audit_coverage.py \
   src/kg_microbe_governance/cycle_release_audit.py \
+  src/kg_microbe_governance/infrastructure_admission.py \
+  src/kg_microbe_governance/consumer_admission.py \
   src/kg_microbe_governance/artifacts/scripts/run_shared_evidence_validator.py \
   src/kg_microbe_governance/artifacts/scripts/check_vendored_sync.py
 uv run --extra dev python -m pytest -q \
@@ -587,6 +597,23 @@ because they carry literal data the path rules would misread.
   Node; locally it skips without it, in CI it fails.
 - `.claude/commands/curate.md` coordinates the curation stages and must stop for
   confirmation before downstream mutations.
+
+## Repository freshness at goal boundaries
+
+After explicit boundary adoption, new agy and Codex goals must pass the packaged
+repository-freshness gate **before** inventory or evidence freeze, including
+no-change goals. Actual merges require a second gate before closure/next goal:
+fetch the canonical default branch, inspect divergence and ownership, safely
+fast-forward an eligible default checkout, and verify HEAD against the observed
+revision plus actual merge ancestry. Consume immutable gate artifacts; do not
+replace active goal evidence when a later revision appears. A candidate PR is
+not release, installation or adoption. Already-running unadopted goals retain
+their existing contract. See `docs/guides/REPOSITORY_FRESHNESS.md` and the separate
+adoption guide for executable batch requests and approval boundaries.
+
+The live claw monitor checkout is a deployment, never an automatic freshness
+pull target. Use an owned isolated default base for claw tasks. Updating live
+control code requires reviewed deployment, pin, restart and heartbeat checks.
 
 ## Mech progress accounting
 
