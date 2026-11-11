@@ -18,6 +18,7 @@ from kg_microbe_sources.acs_figshare import (
     stage_acs_supporting_file,
 )
 from kg_microbe_sources.catalogue import CatalogueError, load_blocks, validate
+from kg_microbe_sources.fetch import FetchError
 from kg_microbe_sources.imodulondb import (
     DEFAULT_BASE_URL,
     ImodulonDBClient,
@@ -94,15 +95,15 @@ def main(
         acs_client = acs_figshare_client or AcsFigshareClient(timeout=args.timeout)
         try:
             info = acs_client.probe_supporting_info(args.doi, index=args.index)
-        except AcsFigshareError as exc:
+            if info is None:
+                print(f"No ACS Figshare Supporting Information found for {args.doi}")
+                return 1
+            if args.dest_dir is not None:
+                for si_file in info.files:
+                    stage_acs_supporting_file(si_file, args.dest_dir)
+        except (AcsFigshareError, FetchError) as exc:
             print(str(exc), file=sys.stderr)
             return 2
-        if info is None:
-            print(f"No ACS Figshare Supporting Information found for {args.doi}")
-            return 1
-        if args.dest_dir is not None:
-            for si_file in info.files:
-                stage_acs_supporting_file(si_file, args.dest_dir)
         if args.json:
             print(json.dumps(info.to_dict(), indent=2))
         else:

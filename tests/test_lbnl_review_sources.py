@@ -260,3 +260,31 @@ def test_cli_acs_si_and_local_provenance(
     prov_payload = json.loads(capsys.readouterr().out)
     assert prov_payload["acs_dois"] == ["10.1021/np070366v"]
     assert prov_payload["hit_count"] == 1
+
+    # Unsafe filename during --dest-dir staging returns exit code 2 and prints to stderr (#1182)
+    def bad_name_transport(url: str, body: Mapping[str, Any] | None = None) -> Any:
+        if url.endswith("/articles/search"):
+            return [{"id": 102, "doi": "10.1021/np070366v.s001", "title": "SI"}]
+        return {
+            "id": 102,
+            "doi": "10.1021/np070366v.s001",
+            "title": "SI",
+            "url_public_html": "https://figshare.com/articles/dataset/102",
+            "files": [
+                {
+                    "id": 556,
+                    "name": "..",
+                    "size": 8,
+                    "download_url": "https://ndownloader.figshare.com/files/556",
+                    "supplied_md5": "",
+                }
+            ],
+        }
+
+    bad_client = AcsFigshareClient(transport=bad_name_transport)
+    rc_bad = main(
+        ["acs-si", "--doi", "10.1021/np070366v", "--dest-dir", str(tmp_path / "stage")],
+        acs_figshare_client=bad_client,
+    )
+    assert rc_bad == 2
+    assert "Invalid Figshare supporting filename" in capsys.readouterr().err
