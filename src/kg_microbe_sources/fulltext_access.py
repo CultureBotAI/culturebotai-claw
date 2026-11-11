@@ -417,7 +417,7 @@ def try_acs_figshare_si_url(
     *,
     client: AcsFigshareClient | None = None,
 ) -> str | None:
-    """Probe ACS Figshare API v2 for <doi>.s001 open Supporting Information."""
+    """Probe ACS Figshare API v2 for <doi>.s001 open Supporting Information (preferring PDF)."""
     cleaned_doi = clean_doi(doi)
     if not cleaned_doi or not cleaned_doi.lower().startswith(ACS_DOI_PREFIX):
         return None
@@ -426,11 +426,15 @@ def try_acs_figshare_si_url(
         info = acs_client.probe_supporting_info(cleaned_doi)
     except (AcsFigshareError, Exception):
         return None
-    if info is None:
+    if info is None or not info.files:
         return None
-    if info.files and info.files[0].download_url:
-        return info.files[0].download_url
-    return info.url_public_html or None
+    for f in info.files:
+        if f.download_url and f.name.lower().endswith(".pdf"):
+            return f.download_url
+    for f in info.files:
+        if f.download_url:
+            return f.download_url
+    return None
 
 
 def access_ladder(
