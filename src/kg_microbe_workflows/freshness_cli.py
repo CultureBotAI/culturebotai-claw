@@ -132,7 +132,11 @@ def frozen_workflow_sources(reference: Any, *, root: Path, key: str,
 def execute(request: dict[str, Any], *, apply: bool = False,
             observe_pr: Callable[[str, int], dict[str, Any]] = github_pr) -> dict[str, Any]:
     """One batch member; neither starts a native goal nor edits a runtime ledger."""
-    if not isinstance(request, dict) or set(request) != _FIELDS or request['schema_version'] != '1.0.0':
+    if not isinstance(request, dict):
+        raise FreshnessError("request_unknown_or_missing_fields")
+    native = request.get('schema_version') == '1.1.0'
+    expected_fields = _FIELDS | {'execution_context'} if native else _FIELDS
+    if set(request) != expected_fields or request['schema_version'] not in {'1.0.0', '1.1.0'}:
         raise FreshnessError("request_unknown_or_missing_fields")
     key = request['repository_key']
     root = _path(request['repository_root'])
@@ -140,20 +144,26 @@ def execute(request: dict[str, Any], *, apply: bool = False,
     reference = request['adoption']
     if not isinstance(reference, dict) or set(reference) != {'path', 'sha256'}:
         raise FreshnessError('invalid_adoption_reference')
-    candidate = read_artifact(reference)
-    boundary = candidate.get('boundary', {})
-    if not isinstance(boundary, dict):
-        raise FreshnessError('invalid_adoption_boundary')
-    if not isinstance(boundary.get('run_id'), str) or type(boundary.get('cycle')) is not int:
-        raise FreshnessError('invalid_adoption_boundary_types')
-    adoption = load_adoption(
-        _path(reference['path']), expected_sha256=reference['sha256'], repository_key=key,
-        repository_root=root, workflow_sha256=request['workflow_sha256'],
-        run_id=boundary['run_id'], cycle=boundary['cycle'],
-        predecessor_receipt_sha256=boundary.get('predecessor_receipt_sha256'),
-    )
+    source_loader = frozen_workflow_sources
+    if native:
+        from . import native_freshness
+        adoption = native_freshness.request_adoption(request)
+        source_loader = native_freshness.frozen_workflow_sources
+    else:
+        candidate = read_artifact(reference)
+        boundary = candidate.get('boundary', {})
+        if not isinstance(boundary, dict):
+            raise FreshnessError('invalid_adoption_boundary')
+        if not isinstance(boundary.get('run_id'), str) or type(boundary.get('cycle')) is not int:
+            raise FreshnessError('invalid_adoption_boundary_types')
+        adoption = load_adoption(
+            _path(reference['path']), expected_sha256=reference['sha256'], repository_key=key,
+            repository_root=root, workflow_sha256=request['workflow_sha256'],
+            run_id=boundary['run_id'], cycle=boundary['cycle'],
+            predecessor_receipt_sha256=boundary.get('predecessor_receipt_sha256'),
+        )
     workflow_reference = request['effective_workflow']
-    frozen_paths = frozen_workflow_sources(
+    frozen_paths = source_loader(
         workflow_reference, root=root, key=key, repository=target.expected_repository,
         workflow_sha256=request['workflow_sha256'],
     )
@@ -181,7 +191,8 @@ def execute(request: dict[str, Any], *, apply: bool = False,
         previous = read_artifact(retained)
         if (previous.get('adoption') != reference or previous.get('boundary_id') != request['boundary_id']
                 or previous.get('workflow_sha256') != request['workflow_sha256']
-                or previous.get('effective_workflow') != workflow_reference):
+                or previous.get('effective_workflow') != workflow_reference
+                or previous.get('execution_context') != request.get('execution_context')):
             raise FreshnessError('existing_goal_inventory_context_differs')
         verify_inventory_head(target, previous['freshness'], boundary_id=request['boundary_id'],
                               policy_sha256=adoption['contract_sha256'])
@@ -196,7 +207,8 @@ def execute(request: dict[str, Any], *, apply: bool = False,
                 or prior.get('boundary_id') != request['boundary_id']
                 or prior.get('repository_key') != key or prior.get('adoption') != reference
                 or prior.get('workflow_sha256') != request['workflow_sha256']
-                or prior.get('effective_workflow') != workflow_reference):
+                or prior.get('effective_workflow') != workflow_reference
+                or prior.get('execution_context') != request.get('execution_context')):
             raise FreshnessError('post_merge_inventory_context_differs')
         verify_saved_receipt(prior.get('freshness', {}))
         if not slot.exists() or _load(slot) != request['prior_inventory']:
@@ -208,12 +220,16 @@ def execute(request: dict[str, Any], *, apply: bool = False,
                                          policy_sha256=adoption['contract_sha256'])
             if not apply:
                 return {'status': 'preview', 'reason': 'no_execution_authority'}
-            artifact = {'schema_version': '1.0.0', 'kind': 'verified_no_change_freshness',
+            artifact = {'schema_version': request['schema_version'], 'kind': 'verified_no_change_freshness',
                         'boundary_id': request['boundary_id'], 'repository_key': key,
                         'effective_workflow': workflow_reference,
                         'workflow_sha256': request['workflow_sha256'],
                         'prior_inventory': request['prior_inventory'], 'head': head,
                         'completion_authority': False}
+            if native:
+                source_loader(workflow_reference, root=root, key=key, repository=target.expected_repository,
+                              workflow_sha256=request['workflow_sha256'])
+                artifact.update(adoption=reference, execution_context=request['execution_context'])
             return {'status': 'verified', 'kind': artifact['kind'],
                     'artifact': save_receipt(receipts / 'boundaries', artifact), 'head': head,
                     'completion_authority': False}
@@ -247,11 +263,15 @@ def execute(request: dict[str, Any], *, apply: bool = False,
     )
     if report['status'] != 'verified':
         return report
-    artifact = {'schema_version': '1.0.0', 'repository_key': key,
+    artifact = {'schema_version': request['schema_version'], 'repository_key': key,
                 'boundary_id': request['boundary_id'], 'adoption': reference,
                 'effective_workflow': workflow_reference,
                 'workflow_sha256': request['workflow_sha256'], 'freshness': report,
                 'completion_authority': False}
+    if native:
+        source_loader(workflow_reference, root=root, key=key, repository=target.expected_repository,
+                      workflow_sha256=request['workflow_sha256'])
+        artifact['execution_context'] = request['execution_context']
     if phase == 'pre_goal':
         # Executable ordering: no inventory read occurs before the gate succeeds.
         head = verify_inventory_head(target, report, boundary_id=request['boundary_id'],

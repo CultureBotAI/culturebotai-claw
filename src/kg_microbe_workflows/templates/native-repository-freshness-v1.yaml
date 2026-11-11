@@ -1,0 +1,9 @@
+schema_version: 1.1.0
+id: native-repository-freshness
+version: 1.0.0
+base_contract_sha256: 1066a37a7d6cb3511ebe24403b61478f55c03a33f3a1d83b9131b0d20f11c54c
+activation_boundary: verified_native_goal_boundary
+reuse_inventory_within_goal: true
+require_predecessor_closure: true
+completion_authority: false
+candidate_authority: proposal_only

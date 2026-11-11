@@ -1,0 +1,72 @@
+id: https://w3id.org/culturebotai/native-repository-freshness
+name: native_repository_freshness
+version: 1.1.0
+title: Native standalone freshness boundary compatibility
+prefixes:
+  linkml: https://w3id.org/linkml/
+  xsd: http://www.w3.org/2001/XMLSchema#
+default_prefix: https://w3id.org/culturebotai/native-repository-freshness/
+default_range: string
+types:
+  string: {uri: xsd:string, base: str}
+  boolean: {uri: xsd:boolean, base: Bool}
+classes:
+  NativeIdentity:
+    attributes:
+      client: {required: true, pattern: '^codex$'}
+      session_id: {required: true}
+      goal_id: {required: true}
+      binary_sha256: {required: true, pattern: '^[0-9a-f]{64}$'}
+  ArtifactReference:
+    attributes:
+      path: {required: true}
+      sha256: {required: true, pattern: '^[0-9a-f]{64}$'}
+  NativeApproval:
+    attributes:
+      record_id: {required: true}
+      approved_at: {required: true}
+      approved_by: {required: true}
+  NativePredecessor:
+    attributes:
+      kind: {required: true, pattern: '^(initial_assessment|verified_closure)$'}
+      reference: {required: true, range: ArtifactReference, inlined: true}
+  NativeBoundary:
+    attributes:
+      id: {required: true}
+      workflow_sha256: {required: true, pattern: '^[0-9a-f]{64}$'}
+      predecessor: {required: true, range: NativePredecessor, inlined: true}
+  NativeFreshnessAdoption:
+    tree_root: true
+    attributes:
+      schema_version: {required: true, pattern: '^1\.1\.0$'}
+      authority: {required: true, pattern: '^approved_native_boundary_adoption$'}
+      repository_key: {required: true}
+      github_repository: {required: true}
+      repository_root: {required: true}
+      canonical_release_commit: {required: true, pattern: '^[0-9a-f]{40}$'}
+      contract_sha256: {required: true, pattern: '^[0-9a-f]{64}$'}
+      native_contract_sha256: {required: true, pattern: '^[0-9a-f]{64}$'}
+      native_identity: {required: true, range: NativeIdentity, inlined: true}
+      boundary: {required: true, range: NativeBoundary, inlined: true}
+      approval: {required: true, range: NativeApproval, inlined: true}
+  NativeClosureRequirements:
+    attributes:
+      exact_head_review: {required: true, range: boolean}
+      evidence_verification: {required: true, range: boolean}
+      issue_resolution: {required: true, range: boolean}
+      cleanup_verification: {required: true, range: boolean}
+      publication_verification: {required: true, range: boolean}
+      no_change_verification: {required: true, range: boolean}
+  NativeGoalExecution:
+    attributes:
+      schema_version: {required: true, pattern: '^1\.1\.0$'}
+      kind: {required: true, pattern: '^native_goal_execution$'}
+      repository_key: {required: true}
+      github_repository: {required: true}
+      closure_requirements: {required: true, range: NativeClosureRequirements, inlined: true}
+      instructions:
+        required: true
+        range: ArtifactReference
+        multivalued: true
+        inlined: true
+        inlined_as_list: true
