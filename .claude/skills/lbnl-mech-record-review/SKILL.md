@@ -68,13 +68,13 @@ Always search `<mech>/data/raw/` and `<mech>/research/` for the record's identif
 
 ### C. Executing the Legal Full-Text Ladder
 
-Load the LBNL TDM credentials (stored in `~/.config/lbnl-tdm.env`, never printed or echoed) and run `CommunityMech/scripts/fulltext_access.py`, staging any downloaded full text into `$MECH_ROOT/.temp/fulltext/` (never directly into `<mech>/references_cache/`):
+Load the LBNL TDM credentials (stored in `~/.config/lbnl-tdm.env`, never printed or echoed) and run `kg-microbe-sources fulltext` (or `CommunityMech/scripts/fulltext_access.py`), staging any downloaded full text into `$MECH_ROOT/.temp/fulltext/` (never directly into `<mech>/references_cache/`):
 
 ```bash
 uv run kg-microbe-sources local-provenance --record <record.yaml> --root "$MECH_ROOT"
 uv run kg-microbe-sources acs-si --doi 10.1021/<suffix> --dest-dir "$MECH_ROOT/.temp/acs-si"
-uv run python CommunityMech/scripts/fulltext_access.py --doi <doi> --fetch-to "$MECH_ROOT/.temp/fulltext/article.xml"
-uv run python CommunityMech/scripts/fulltext_access.py --pmid <pmid> --fetch-to "$MECH_ROOT/.temp/fulltext/article.xml"
+uv run kg-microbe-sources fulltext --doi <doi> --fetch-to "$MECH_ROOT/.temp/fulltext/article.xml"
+uv run kg-microbe-sources fulltext --pmid <pmid> --fetch-to "$MECH_ROOT/.temp/fulltext/article.xml"
 ```
 
 - **Copyright & Cache Rule:** Never commit `.pdf` files or copyright-asserted publisher XML/text (`All rights reserved`, `© YYYY Elsevier`, `© YYYY American Chemical Society`) into `<mech>/references_cache/` or git history. Use staged TDM full text to verify claims, record `snapshot_sha256` in the structured review's `evidence[]` list, and extract only short verbatim `quote` / `snippet` strings.

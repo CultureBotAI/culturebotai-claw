@@ -9,6 +9,7 @@ from typing import Any
 
 import pytest
 
+import kg_microbe_sources.__main__ as sources_cli
 from kg_microbe_sources import (
     AcsFigshareClient,
     AcsFigshareError,
@@ -16,9 +17,13 @@ from kg_microbe_sources import (
     AcsSupportingInformation,
     TransportResult,
     ValidationFailed,
+    access_ladder,
+    author_request_draft,
     classify_provenance_path,
+    clean_doi,
     derive_acs_si_doi,
     extract_citations_from_text,
+    fetch_to_staging,
     is_valid_cas_rn,
     md5_of,
     normalize_acs_doi,
@@ -27,6 +32,8 @@ from kg_microbe_sources import (
     search_local_provenance,
     stage_acs_supporting_file,
     try_acs_figshare_si,
+    try_acs_figshare_si_url,
+    try_europepmc,
 )
 from kg_microbe_sources.__main__ import main
 
@@ -288,3 +295,115 @@ def test_cli_acs_si_and_local_provenance(
     )
     assert rc_bad == 2
     assert "Invalid Figshare supporting filename" in capsys.readouterr().err
+
+
+def test_fulltext_access_ladder_and_cli(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert clean_doi("https://doi.org/10.1021/acschembio.8b00793") == "10.1021/acschembio.8b00793"
+    assert (
+        try_europepmc({"pmcid": "PMC12345", "isOpenAccess": "Y"})
+        == "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC12345/fullTextXML"
+    )
+    assert try_europepmc({"pmcid": "PMC12345", "isOpenAccess": "N"}) is None
+
+    # Refuse staging directly into references_cache/
+    with pytest.raises(ValueError, match="Refusing to stage fulltext_access output"):
+        fetch_to_staging(
+            "zotero_local",
+            "file:///tmp/paper.pdf",
+            tmp_path / "references_cache" / "paper.pdf",
+        )
+
+    # Stage from local file:// URL
+    local_pdf = tmp_path / "zotero_paper.pdf"
+    local_pdf.write_bytes(b"%PDF-1.4\n")
+    staged_pdf = fetch_to_staging(
+        "zotero_local",
+        f"file://{local_pdf.resolve()}",
+        tmp_path / ".temp" / "staged.pdf",
+    )
+    assert staged_pdf.read_bytes() == b"%PDF-1.4\n"
+
+    # ACS Figshare SI fallback in access_ladder when main article OA channels return None
+    def fake_si_transport(url: str, body: Mapping[str, Any] | None = None) -> Any:
+        if url.endswith("/articles/search"):
+            return [{"id": 303, "doi": "10.1021/cb3002058.s001", "title": "SI"}]
+        return {
+            "id": 303,
+            "doi": "10.1021/cb3002058.s001",
+            "title": "SI for DesA",
+            "url_public_html": "https://figshare.com/articles/dataset/303",
+            "files": [
+                {
+                    "id": 909,
+                    "name": "cb3002058_si_001.pdf",
+                    "size": 2048,
+                    "download_url": "https://ndownloader.figshare.com/files/909",
+                    "supplied_md5": "",
+                }
+            ],
+        }
+
+    si_client = AcsFigshareClient(transport=fake_si_transport)
+    assert (
+        try_acs_figshare_si_url("10.1021/cb3002058", client=si_client)
+        == "https://ndownloader.figshare.com/files/909"
+    )
+
+    import kg_microbe_sources.fulltext_access as ft_mod
+
+    monkeypatch.setattr(ft_mod, "try_zotero_local", lambda pmid=None, doi=None: None)
+    monkeypatch.setattr(ft_mod, "try_europepmc", lambda rec: None)
+    monkeypatch.setattr(ft_mod, "try_openalex_oa", lambda doi, pmid=None: None)
+    monkeypatch.setattr(ft_mod, "try_biorxiv", lambda doi: None)
+    monkeypatch.setattr(ft_mod, "try_osti", lambda doi, title=None: None)
+    monkeypatch.setattr(ft_mod, "try_elsevier_tdm", lambda doi: None)
+    monkeypatch.setattr(ft_mod, "try_springer_tdm", lambda doi: None)
+    monkeypatch.setattr(ft_mod, "try_wiley_tdm", lambda doi: None)
+    monkeypatch.setattr(ft_mod, "try_core", lambda doi, title: None)
+    monkeypatch.setattr(
+        sources_cli,
+        "epmc_core",
+        lambda pmid, doi: {
+            "doi": doi,
+            "pmid": "22906379",
+            "title": "Desferrioxamine B Biosynthesis",
+            "authorString": "Smith J",
+        },
+    )
+
+    method, url = access_ladder(
+        {"doi": "10.1021/cb3002058"},
+        "10.1021/cb3002058",
+        "Desferrioxamine B Biosynthesis",
+        acs_client=si_client,
+    )
+    assert method == "acs_figshare_si"
+    assert url == "https://ndownloader.figshare.com/files/909"
+
+    rc = main(
+        ["fulltext", "--doi", "10.1021/cb3002058", "--json"],
+        acs_figshare_client=si_client,
+    )
+    assert rc == 0
+    out_json = json.loads(capsys.readouterr().out)
+    assert out_json["method"] == "acs_figshare_si"
+    assert out_json["url"] == "https://ndownloader.figshare.com/files/909"
+
+    # With --no-acs-si, falls through to none / author_request_draft (exit code 2)
+    rc_none = main(
+        ["fulltext", "--doi", "10.1021/cb3002058", "--no-acs-si"],
+        acs_figshare_client=si_client,
+    )
+    assert rc_none == 2
+    captured = capsys.readouterr()
+    assert "NO_LEGAL_OA" in captured.err
+    assert "author-request draft" in captured.out
+    assert "Desferrioxamine B Biosynthesis" in author_request_draft(
+        {"title": "Desferrioxamine B Biosynthesis", "authorString": "Smith J"},
+        "10.1021/cb3002058",
+    )
+
