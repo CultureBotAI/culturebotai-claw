@@ -3,13 +3,22 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 from typing import Protocol
 
 from kg_microbe_fleet import load_fleet_manifest
 from kg_microbe_fleet.roots import MechRootError, claw_root, resolve_mech_root
+from kg_microbe_sources.acs_figshare import (
+    AcsFigshareClient,
+    AcsFigshareError,
+    AcsSupportingInformation,
+    stage_acs_supporting_file,
+)
 from kg_microbe_sources.catalogue import CatalogueError, load_blocks, validate
+from kg_microbe_sources.fetch import FetchError
 from kg_microbe_sources.imodulondb import (
     DEFAULT_BASE_URL,
     ImodulonDBClient,
@@ -21,6 +30,10 @@ from kg_microbe_sources.imodulondb import (
     dataset_key,
     gene_key,
     imodulon_key,
+)
+from kg_microbe_sources.local_provenance import (
+    extract_citations_from_text,
+    search_local_provenance,
 )
 
 CLAW_ROOT = claw_root()
@@ -36,10 +49,17 @@ class ImodulonDB(Protocol):
     ) -> ImodulonGeneTable: ...
 
 
+class AcsFigshare(Protocol):
+    def probe_supporting_info(
+        self, raw_doi: str, *, index: int = 1
+    ) -> AcsSupportingInformation | None: ...
+
+
 def main(
     argv: list[str] | None = None,
     *,
     imodulondb_client: ImodulonDB | None = None,
+    acs_figshare_client: AcsFigshare | None = None,
 ) -> int:
     args = _parser().parse_args(argv)
     if args.command == "imodulondb":
@@ -70,6 +90,28 @@ def main(
         except ImodulonDBError as exc:
             print(str(exc), file=sys.stderr)
             return 2
+
+    if args.command == "acs-si":
+        acs_client = acs_figshare_client or AcsFigshareClient(timeout=args.timeout)
+        try:
+            info = acs_client.probe_supporting_info(args.doi, index=args.index)
+            if info is None:
+                print(f"No ACS Figshare Supporting Information found for {args.doi}")
+                return 1
+            if args.dest_dir is not None:
+                for si_file in info.files:
+                    stage_acs_supporting_file(si_file, args.dest_dir)
+        except (AcsFigshareError, FetchError) as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+        if args.json:
+            print(json.dumps(info.to_dict(), indent=2))
+        else:
+            _print_acs_si(info)
+        return 0
+
+    if args.command == "local-provenance":
+        return _run_local_provenance(args)
 
     return _check_catalogue(args)
 
@@ -155,6 +197,84 @@ def _parser() -> argparse.ArgumentParser:
         type=_positive_int,
         default=20,
         help="maximum in-iModulon genes to list by absolute weight",
+    )
+
+    acs_si = subparsers.add_parser(
+        "acs-si",
+        help="probe ACS Publications Figshare API v2 for <doi>.s001 Supporting Information",
+        description=(
+            "Query the public Figshare API v2 for an ACS article's child "
+            "Supporting Information DOI (<doi>.s001) and optionally stage its "
+            "files with SHA-256 provenance sidecars."
+        ),
+    )
+    acs_si.add_argument(
+        "--doi",
+        required=True,
+        help="ACS article DOI (e.g. 10.1021/acschembio.8b00793)",
+    )
+    acs_si.add_argument(
+        "--index",
+        type=_positive_int,
+        default=1,
+        help="SI suffix index (.s001 -> 1, default: %(default)s)",
+    )
+    acs_si.add_argument(
+        "--timeout",
+        type=_positive_int,
+        default=30,
+        help="HTTP timeout in seconds (default: %(default)s)",
+    )
+    acs_si.add_argument(
+        "--dest-dir",
+        type=Path,
+        default=None,
+        help="optional gitignored directory (e.g. .temp/acs-si/) to download SI files into",
+    )
+    acs_si.add_argument(
+        "--json",
+        action="store_true",
+        help="emit JSON instead of Markdown",
+    )
+
+    local_prov = subparsers.add_parser(
+        "local-provenance",
+        help="search gitignore-independently across local Mech caches/raw tables for citations",
+        description=(
+            "Extract DOIs, PMIDs, CAS-RNs, ChEBI IDs, and Standard InChIKeys "
+            "from a record file or explicit tokens and search local Mech "
+            "research_notes/, references_cache/, data/raw/, and harvest TSVs."
+        ),
+    )
+    local_prov.add_argument(
+        "--record",
+        type=Path,
+        default=None,
+        help="path to a Mech YAML/Markdown record to extract citations and chemical IDs from",
+    )
+    local_prov.add_argument(
+        "--token",
+        action="append",
+        default=[],
+        help="explicit DOI, PMID, CAS-RN, CHEBI ID, or InChIKey to search (repeatable)",
+    )
+    local_prov.add_argument(
+        "--root",
+        type=Path,
+        action="append",
+        default=[],
+        help="directory or TSV file to search (repeatable; defaults to record repo root if omitted)",
+    )
+    local_prov.add_argument(
+        "--max-hits-per-root",
+        type=_positive_int,
+        default=200,
+        help="maximum hits to collect per root (default: %(default)s)",
+    )
+    local_prov.add_argument(
+        "--json",
+        action="store_true",
+        help="emit JSON instead of Markdown",
     )
 
     return parser
@@ -355,6 +475,73 @@ def _md(value: object) -> str:
     if value is None or value == "":
         return ""
     return str(value).replace("\n", " ").replace("|", r"\|")
+
+
+def _print_acs_si(info: AcsSupportingInformation) -> None:
+    print(f"# ACS Supporting Information: `{info.si_doi}`")
+    print()
+    print(f"- parent DOI: `{info.parent_doi}`")
+    print(f"- Figshare article ID: `{info.article_id}`")
+    print(f"- title: {_md(info.title)}")
+    print(f"- public URL: {info.url_public_html}")
+    print(f"- files: {len(info.files)}")
+    print()
+    print("| file_id | name | size (bytes) | md5 | download_url |")
+    print("|---:|---|---:|---|---|")
+    for f in info.files:
+        print(
+            f"| `{f.file_id}` | `{_md(f.name)}` | {f.size} | "
+            f"`{_md(f.supplied_md5)}` | {f.download_url} |"
+        )
+
+
+def _run_local_provenance(args: argparse.Namespace) -> int:
+    tokens: list[str] = list(args.token or [])
+    if args.record is not None:
+        if not args.record.is_file():
+            print(f"record file does not exist: {args.record}", file=sys.stderr)
+            return 2
+        text = args.record.read_text(encoding="utf-8", errors="replace")
+        tokens.extend(extract_citations_from_text(text))
+
+    if not tokens:
+        print("provide at least one --token or a --record with citations", file=sys.stderr)
+        return 2
+
+    roots: list[Path] = list(args.root or [])
+    if not roots:
+        if args.record is not None:
+            roots.append(args.record.resolve().parent)
+        else:
+            roots.append(Path.cwd())
+
+    report = search_local_provenance(
+        tokens,
+        roots,
+        max_hits_per_root=args.max_hits_per_root,
+    )
+    if args.json:
+        print(json.dumps(report.to_dict(), indent=2))
+        return 0
+
+    print("# Local Provenance Lookup")
+    print()
+    print(f"- tokens queried: {len(report.tokens)} ({', '.join(f'`{t}`' for t in report.tokens)})")
+    print(f"- ACS DOIs eligible for `.s001` Figshare SI probe: {len(report.acs_dois)}")
+    for acs_doi in report.acs_dois:
+        print(f"  - `{acs_doi}` -> `kg-microbe-sources acs-si --doi {acs_doi}`")
+    print(f"- total hits: {len(report.hits)}")
+    print()
+    if report.hits:
+        print("| root | category | path:line | token | snippet |")
+        print("|---|---|---|---|---|")
+        for hit in report.hits:
+            print(
+                f"| `{_md(hit.root)}` | `{hit.category}` | "
+                f"`{_md(hit.relative_path)}:{hit.line_number}` | "
+                f"`{_md(hit.matched_token)}` | {_md(hit.snippet)} |"
+            )
+    return 0
 
 
 if __name__ == "__main__":  # pragma: no cover - console entry point

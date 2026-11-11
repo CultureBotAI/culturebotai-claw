@@ -51,7 +51,7 @@ Many Mech records were seeded from curated upstream tables or deep-research harv
 - **`AntibioticMech` (`<mech>/data/raw/bindingdb_target_measurements.tsv`, `<mech>/research/*card*`, `<mech>/research/*resistance*`):** Contains quantitative BindingDB target affinities ($K_i$, $IC_{50}$, $K_d$ in *J. Med. Chem.* / *ACS Infect. Dis.*) and CARD citation concordance mappings ready to ground target and resistance claims.
 - **`MediaIngredientMech` (`<mech>/research/ingredients/*-edison-literature*.json`), `CultureMech` (`<mech>/research/media/`), `PathwayMech` (`<mech>/research/pathway_additions/`), `CMMMech` (`<mech>/research/sources/`, `<mech>/research/ingests/`), `TraitMech` (`<mech>/research/traits/`), `HabitatMech` (`<mech>/research/habitats/`):** Contains pre-retrieved literature dossiers and candidate citations that can resolve missing role, stability, bioavailability, or pathway-step evidence without spending new provider credits.
 
-Always search `<mech>/data/raw/` and `<mech>/research/` for the record's identifier, label, CAS-RN, UniProt ID, or ChEBI CURIE (`rg --no-ignore --hidden`) before declaring literature support absent.
+Always search `<mech>/data/raw/` and `<mech>/research/` for the record's identifier, label, CAS-RN, UniProt ID, or ChEBI CURIE (`rg --no-ignore --hidden` or `uv run kg-microbe-sources local-provenance --record <record.yaml> --root <mech>`) before declaring literature support absent.
 
 ### B. Triage Matrix by DOI Prefix, Publisher & Journal Family
 
@@ -71,6 +71,8 @@ Always search `<mech>/data/raw/` and `<mech>/research/` for the record's identif
 Load the LBNL TDM credentials (stored in `~/.config/lbnl-tdm.env`, never printed or echoed) and run `CommunityMech/scripts/fulltext_access.py`, staging any downloaded full text into `$MECH_ROOT/.temp/fulltext/` (never directly into `<mech>/references_cache/`):
 
 ```bash
+uv run kg-microbe-sources local-provenance --record <record.yaml> --root "$MECH_ROOT"
+uv run kg-microbe-sources acs-si --doi 10.1021/<suffix> --dest-dir "$MECH_ROOT/.temp/acs-si"
 uv run python CommunityMech/scripts/fulltext_access.py --doi <doi> --fetch-to "$MECH_ROOT/.temp/fulltext/article.xml"
 uv run python CommunityMech/scripts/fulltext_access.py --pmid <pmid> --fetch-to "$MECH_ROOT/.temp/fulltext/article.xml"
 ```

@@ -49,6 +49,8 @@ Use `context7-resolve-library-id` followed by `context7-query-docs` when writing
 When abstract text is insufficient (for example, when curating `growth_media`, `cultivation_setup`, medium variants, or assay conditions), run `CommunityMech/scripts/fulltext_access.py`:
 
 ```bash
+uv run kg-microbe-sources local-provenance --record <record.yaml> --root "$MECH_ROOT"
+uv run kg-microbe-sources acs-si --doi 10.1021/<suffix> --dest-dir "$MECH_ROOT/.temp/acs-si"
 uv run python CommunityMech/scripts/fulltext_access.py --pmid <pmid>
 uv run python CommunityMech/scripts/fulltext_access.py --doi <doi>
 ```
