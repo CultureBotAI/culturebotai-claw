@@ -10,6 +10,7 @@ import json
 import re
 import subprocess
 import sys
+import tempfile
 import threading
 from contextlib import contextmanager
 from pathlib import Path
@@ -199,7 +200,569 @@ def _retained_cas_identity(record, obj, subject):
         raise ValueError(f"Canonical CAS identity owner requires mapping review: {subject} {obj}")
 
 
-def compatibility_registry_objects(records, subjects, index, canonical, *, retirement=None, root=None):
+CAS_DISPOSITION = "reviewed-invalid-cas-dispositions-v1"
+CAS_RETIRE = "RETIRE_INVALID_CAS"
+CAS_HOLD = "RETAIN_INVALID_CAS_WITHHOLD"
+
+
+def _cas_require(condition, message):
+    if not condition:
+        raise ValueError("CAS disposition: " + message)
+
+
+def _cas_keys(value, names):
+    _cas_require(
+        isinstance(value, dict) and set(value) == set(names), "closed fields differ"
+    )
+
+
+def _cas_json(raw):
+    def unique(pairs):
+        value = {}
+        for key, item in pairs:
+            _cas_require(key not in value, "duplicate JSON key")
+            value[key] = item
+        return value
+
+    return json.loads(raw, object_pairs_hook=unique)
+
+
+def _cas_encoded(value):
+    return (
+        json.dumps(value, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+    ).encode()
+
+
+def _cas_digest(value):
+    return hashlib.sha256(
+        json.dumps(
+            value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        ).encode()
+    ).hexdigest()
+
+
+def _cas_path(root, name):
+    _cas_require(
+        isinstance(name, str)
+        and name
+        and not Path(name).is_absolute()
+        and ".." not in Path(name).parts
+        and Path(name).as_posix() == name,
+        "unsafe relative input",
+    )
+    return root / name
+
+
+def _cas_pin(value):
+    _cas_require(
+        isinstance(value, str) and re.fullmatch(r"[a-f0-9]{64}", value),
+        "invalid digest",
+    )
+
+
+def _cas_documents(root, path, raw, expected, read):
+    """Discover an exact closed request and its native scientific input closure."""
+    _cas_pin(expected)
+    _cas_require(
+        isinstance(raw, bytes) and hashlib.sha256(raw).hexdigest() == expected,
+        "request digest differs",
+    )
+    path.relative_to(root)
+    request = _cas_json(raw)
+    _cas_keys(
+        request, {"schema_version", "capability", "claims", "reviews", "review_inputs"}
+    )
+    _cas_require(
+        type(request["schema_version"]) is int
+        and request["schema_version"] == 1
+        and request["capability"] == CAS_DISPOSITION,
+        "unsupported request",
+    )
+    _cas_keys(request["claims"], {"path", "sha256"})
+    pins = {path: expected}
+
+    def bind(name, digest):
+        item = _cas_path(root, name)
+        _cas_pin(digest)
+        _cas_require(item not in pins or pins[item] == digest, "conflicting input pins")
+        pins[item] = digest
+        return item
+
+    claim_path = bind(request["claims"]["path"], request["claims"]["sha256"])
+    claim_raw = read(claim_path)
+    _cas_require(
+        hashlib.sha256(claim_raw).hexdigest() == request["claims"]["sha256"],
+        "claims changed",
+    )
+    claims = _cas_json(claim_raw)
+    _cas_keys(
+        claims,
+        {
+            "schema_version",
+            "capability",
+            "scope",
+            "scientific_approval",
+            "author",
+            "head",
+            "canonical",
+            "source_correction",
+            "evidence_inputs",
+            "entries",
+        },
+    )
+    _cas_require(
+        type(claims["schema_version"]) is int
+        and claims["schema_version"] == 1
+        and claims["capability"] == CAS_DISPOSITION
+        and claims["scope"] == "diagnostic_candidate_only"
+        and claims["scientific_approval"] is False
+        and isinstance(claims["author"], str)
+        and claims["author"].strip()
+        and isinstance(claims["head"], str)
+        and re.fullmatch(r"[a-f0-9]{40,64}", claims["head"]),
+        "explicit diagnostic scope and acquisition head required",
+    )
+    _cas_keys(claims["canonical"], {"path", "sha256"})
+    _cas_require(
+        claims["canonical"]["path"] == "mappings/ingredient_mappings.sssom.tsv",
+        "original complete canonical table required",
+    )
+    bind(claims["canonical"]["path"], claims["canonical"]["sha256"])
+    if claims["source_correction"] is not None:
+        _cas_keys(claims["source_correction"], {"path", "sha256"})
+        bind(claims["source_correction"]["path"], claims["source_correction"]["sha256"])
+    _cas_require(
+        isinstance(claims["evidence_inputs"], dict) and claims["evidence_inputs"],
+        "captured issue/source evidence required",
+    )
+    for name, digest in claims["evidence_inputs"].items():
+        bind(name, digest)
+    _cas_require(
+        isinstance(claims["entries"], list) and claims["entries"], "entries required"
+    )
+    positions, identifiers = set(), set()
+    for entry in claims["entries"]:
+        _cas_keys(
+            entry,
+            {
+                "entry_id",
+                "row_position",
+                "row",
+                "owner",
+                "action",
+                "reason",
+                "hold",
+                "evidence",
+                "invalid_tokens",
+            },
+        )
+        position, eid = entry["row_position"], entry["entry_id"]
+        _cas_require(
+            type(position) is int
+            and position > 0
+            and position not in positions
+            and isinstance(eid, str)
+            and eid.strip()
+            and eid not in identifiers,
+            "duplicate/invalid entry position or identity",
+        )
+        positions.add(position)
+        identifiers.add(eid)
+        _cas_require(
+            isinstance(entry["row"], dict)
+            and entry["row"]
+            and all(
+                isinstance(k, str) and isinstance(v, str)
+                for k, v in entry["row"].items()
+            )
+            and isinstance(entry["reason"], str)
+            and entry["reason"].strip(),
+            "full row and reason required",
+        )
+        _cas_require(
+            isinstance(entry["invalid_tokens"], list)
+            and entry["invalid_tokens"]
+            and all(
+                isinstance(t, dict)
+                and set(t) == {"field", "token"}
+                and isinstance(t["field"], str)
+                and isinstance(t["token"], str)
+                for t in entry["invalid_tokens"]
+            )
+            and len({(t["field"], t["token"]) for t in entry["invalid_tokens"]})
+            == len(entry["invalid_tokens"])
+            and entry["invalid_tokens"] == _cas_invalid_tokens(entry["row"]),
+            "exact exhaustive invalid token selection required",
+        )
+        _cas_keys(entry["owner"], {"path", "sha256", "mim_id"})
+        bind(entry["owner"]["path"], entry["owner"]["sha256"])
+        _cas_require(
+            isinstance(entry["evidence"], list)
+            and entry["evidence"]
+            and all(
+                isinstance(n, str) and n in claims["evidence_inputs"]
+                for n in entry["evidence"]
+            )
+            and len(entry["evidence"]) == len(set(entry["evidence"])),
+            "entry evidence differs",
+        )
+        _cas_require(entry["action"] in {CAS_RETIRE, CAS_HOLD}, "unknown action")
+        if entry["action"] == CAS_RETIRE:
+            _cas_require(
+                entry["hold"] is None and claims["source_correction"] is not None,
+                "retirement requires source-correction proof, not a held exception",
+            )
+        else:
+            _cas_keys(entry["hold"], {"issue", "reason"})
+            _cas_require(
+                isinstance(entry["hold"]["issue"], str)
+                and re.fullmatch(
+                    r"https://github.com/CultureBotAI/MediaIngredientMech/issues/[1-9][0-9]*",
+                    entry["hold"]["issue"],
+                )
+                and isinstance(entry["hold"]["reason"], str)
+                and entry["hold"]["reason"].strip(),
+                "explicit retained issue/negative-evidence hold required",
+            )
+    _cas_require(
+        isinstance(request["review_inputs"], dict) and request["review_inputs"],
+        "review input pins required",
+    )
+    for name, digest in request["review_inputs"].items():
+        bind(name, digest)
+    _cas_require(
+        isinstance(request["reviews"], list) and len(request["reviews"]) == 2,
+        "two native scientific reviews required",
+    )
+    report_paths = set()
+    for ref in request["reviews"]:
+        _cas_keys(ref, {"path", "sha256"})
+        _cas_require(ref["path"] not in report_paths, "duplicate native review")
+        report_paths.add(ref["path"])
+        review_path = bind(ref["path"], ref["sha256"])
+        document = load_owner_record(
+            read(review_path)
+        )  # Discovery only; native validation follows.
+        _cas_require(
+            isinstance(document, dict)
+            and isinstance(document.get("source"), dict)
+            and isinstance(document["source"].get("inputs"), list),
+            "native review source missing",
+        )
+        for item in document["source"]["inputs"]:
+            _cas_require(
+                isinstance(item, dict)
+                and isinstance(item.get("path"), str)
+                and request["review_inputs"].get(item["path"]) == item.get("sha256"),
+                "review source input omitted",
+            )
+        markdown = str(Path(ref["path"]).with_name("review.md"))
+        _cas_require(
+            markdown in request["review_inputs"], "native Markdown pin required"
+        )
+    for name in (
+        "scripts/record_review.py",
+        "schema/record_review.yaml",
+        "MAPPING_SEMANTICS.md",
+    ):
+        _cas_require(
+            name in request["review_inputs"],
+            "native parser/schema/policy must be pinned",
+        )
+    return request, claims, pins
+
+
+def cas_disposition_inputs(root, path, raw, expected_sha256):
+    """Enumerate every input before immutable capture; add no scientific judgment."""
+    request, _, pins = _cas_documents(
+        root, path, raw, expected_sha256, lambda p: p.read_bytes()
+    )
+    return set(pins), request
+
+
+def cas_disposition_evidence(root, path, raw, expected_sha256, snapshot, head):
+    """Validate genuine native pair semantics against the captured complete claims."""
+    request, claims, pins = _cas_documents(
+        root, path, raw, expected_sha256, snapshot.__getitem__
+    )
+    _cas_require(claims["head"] == head, "selected acquisition head differs")
+    for item, pin in pins.items():
+        _cas_require(
+            snapshot.get(item) is not None
+            and hashlib.sha256(snapshot[item]).hexdigest() == pin,
+            "captured input changed: " + str(item),
+        )
+    # Both reviewers bind the common semantic object. Each report's additional
+    # input closure is captured too, without requiring a circular cross-review
+    # citation or replacing native provenance with an asserted pass boolean.
+    core = {
+        request["claims"]["path"]: request["claims"]["sha256"],
+        claims["canonical"]["path"]: claims["canonical"]["sha256"],
+        **claims["evidence_inputs"],
+    }
+    if claims["source_correction"] is not None:
+        core[claims["source_correction"]["path"]] = claims["source_correction"][
+            "sha256"
+        ]
+    for entry in claims["entries"]:
+        core[entry["owner"]["path"]] = entry["owner"]["sha256"]
+    for name in (
+        "scripts/record_review.py",
+        "schema/record_review.yaml",
+        "MAPPING_SEMANTICS.md",
+    ):
+        core[name] = request["review_inputs"][name]
+    script = root / "scripts/record_review.py"
+    native = ModuleType("_captured_cas_disposition_native_reviews")
+    native.__file__ = str(script)
+    exec(
+        compile(snapshot[script], str(script), "exec", dont_inherit=True),
+        native.__dict__,
+    )
+    reports = []
+    for ref in request["reviews"]:
+        md = str(Path(ref["path"]).with_name("review.md"))
+        # The native parser consumes the exact captured schema, not a later
+        # disk read. This temporary file is a disposable parsing input only.
+        with tempfile.TemporaryDirectory(prefix="mim-cas-review-schema-") as directory:
+            schema = Path(directory) / "record_review.yaml"
+            schema.write_bytes(snapshot[root / "schema/record_review.yaml"])
+            report = native.parse_review_bundle(
+                ref["path"], snapshot[root / ref["path"]], snapshot[root / md], schema
+            )
+        _cas_require(
+            native.source_provenance(root, report)["status"]
+            not in {"invalid", "unverified"},
+            "native Git provenance invalid",
+        )
+        _cas_require(
+            report["source"]["git_revision"] == head
+            and report["repository"] == "CultureBotAI/MediaIngredientMech"
+            and report["completion"] == "completed"
+            and report["scientific_review"] is True
+            and report["verdict"] in {"pass", "pass_with_limitations"},
+            "current completed scientific native review required",
+        )
+        source = {i["path"]: i["sha256"] for i in report["source"]["inputs"]}
+        _cas_require(
+            all(source.get(n) == pin for n, pin in core.items()),
+            "review lacks complete claims/evidence closure",
+        )
+        targets = {
+            t.get("selector"): t
+            for t in report["targets"]
+            if t.get("path") == request["claims"]["path"]
+        }
+        _cas_require(
+            len(report["targets"]) == len(claims["entries"])
+            and set(targets) == {e["entry_id"] for e in claims["entries"]},
+            "review target scope differs",
+        )
+        for entry in claims["entries"]:
+            target = targets[entry["entry_id"]]
+            _cas_require(
+                target["kind"] == "snapshot_row"
+                and target.get("semantic_digest")
+                == {
+                    "algorithm": "sha256-canonical-json-v1",
+                    "sha256": _cas_digest(entry),
+                    "description": "Complete diagnostic CAS disposition",
+                },
+                "native reviewed claim differs",
+            )
+            tid = target["target_id"]
+            checks = [
+                c for c in report["checks"] if c["required"] and tid in c["target_ids"]
+            ]
+            _cas_require(
+                tid in report["scope"]["reviewed_target_ids"]
+                and checks
+                and all(c["status"] == "passed" for c in checks),
+                "required review checks incomplete",
+            )
+            assessments = [
+                a
+                for a in report["assessments"]
+                if a["target_ids"] == [tid] and a["outcome"] == "supported"
+            ]
+            _cas_require(
+                len(assessments) == 1,
+                "one supported diagnostic-action assessment required",
+            )
+            assessment = assessments[0]
+            dimensions = {
+                d["name"]: d["value"] for d in assessment.get("dimensions", [])
+            }
+            _cas_require(
+                dimensions.get("cas_disposition") == entry["action"]
+                and dimensions.get("diagnostic_scope") == "diagnostic_candidate_only"
+                and dimensions.get("hold_disposition")
+                == (
+                    "WITHHOLD"
+                    if entry["action"] == CAS_HOLD
+                    else "RETIRED_WITH_HISTORY"
+                ),
+                "explicit diagnostic action/hold scope differs",
+            )
+            evidence = {e["evidence_id"]: e for e in report["evidence"]}
+            _cas_require(
+                any(
+                    evidence[eid]["reference"] in entry["evidence"]
+                    and evidence[eid].get("snapshot_sha256")
+                    == source.get(evidence[eid]["reference"])
+                    for eid in assessment["evidence_ids"]
+                ),
+                "captured per-entry evidence required",
+            )
+        reports.append(report)
+    _cas_require(
+        request["reviews"][0]["path"] != request["reviews"][1]["path"]
+        and reports[0]["reviewer"]["identity"] != reports[1]["reviewer"]["identity"]
+        and reports[1]["reviewer"].get("independence") == "independent"
+        and reports[1]["reviewer"].get("independence_basis"),
+        "distinct independent skeptical review required",
+    )
+    return {
+        "path": str(path),
+        "relative_path": str(path.relative_to(root)),
+        "sha256": expected_sha256,
+        "request": request,
+        "content": claims,
+        "reviewer_identities": [r["reviewer"]["identity"] for r in reports],
+        "scientific_approval_added": False,
+    }
+
+
+def _cas_invalid_tokens(row):
+    """Return exact invalid-check-digit literals, never normalize their spelling."""
+    tokens = []
+    for field in ("object_id", "other", "xref"):
+        for token in row.get(field, "").split("|"):
+            if not token.strip().casefold().startswith("cas:"):
+                continue
+            rn = token.strip()[4:]
+            _cas_require(
+                re.fullmatch(r"[1-9][0-9]{1,6}-[0-9]{2}-[0-9]", rn),
+                "malformed CAS syntax is not a diagnostic check-digit disposition",
+            )
+            digits = rn.replace("-", "")
+            if sum(
+                i * int(d) for i, d in enumerate(reversed(digits[:-1]), 1)
+            ) % 10 != int(digits[-1]):
+                tokens.append({"field": field, "token": token})
+    return tokens
+
+
+def _cas_selected(entry, row, subject, record):
+    """Authorize only the exact reviewed diagnostic distinction; no checksum repair."""
+    _cas_require(
+        row == entry["row"] and row["predicate_id"] == "skos:exactMatch",
+        "full canonical row differs",
+    )
+    _cas_require(
+        entry["invalid_tokens"] == _cas_invalid_tokens(row) and entry["invalid_tokens"],
+        "exact exhaustive invalid tokens differ",
+    )
+    _cas_require(entry["owner"]["mim_id"] == subject, "wrong stable owner")
+    obj = row["object_id"]
+    primary = record.get("identifier")
+    ont = record.get("ontology_mapping") or {}
+    chemistry = record.get("chemical_properties") or {}
+    object_invalid = {"field": "object_id", "token": obj} in entry["invalid_tokens"]
+    if entry["action"] == CAS_RETIRE:
+        _cas_require(
+            object_invalid and obj.startswith("cas:"),
+            "only invalid CAS objects can be retired",
+        )
+        active = [
+            primary,
+            ont.get("ontology_id"),
+            *record.get("legacy_identifiers", []),
+        ]
+        _cas_require(
+            not any(
+                isinstance(value, str) and value.strip().casefold() == obj
+                for value in active
+            )
+            and chemistry.get("cas_rn") != obj[4:],
+            "retired CAS remains an active owner assertion",
+        )
+    else:
+        _cas_require(
+            record.get("mapping_status") == "MAPPED"
+            and (primary == obj or ont.get("ontology_id") == obj),
+            "held assertion does not match unchanged current owner",
+        )
+        if object_invalid:
+            _cas_require(
+                (not str(primary).startswith("cas:") or primary == obj)
+                and chemistry.get("cas_rn") in {None, obj[4:]},
+                "held CAS identity contradicts current owner",
+            )
+
+
+def finalize_cas_dispositions(proof, rows):
+    """Bind whole held candidate rows and reject leakage via ordinary emission."""
+    if proof is None:
+        return None
+    held, retired = [], []
+    for entry in proof["content"]["entries"]:
+        mid, obj = entry["owner"]["mim_id"], entry["row"]["object_id"]
+        matches = [
+            (i, row)
+            for i, row in enumerate(rows, 1)
+            if row["subject_id"] == mid and row["object_id"] == obj
+        ]
+        if entry["action"] == CAS_RETIRE:
+            _cas_require(
+                not matches, "retired assertion was emitted by an ordinary route"
+            )
+            retired.append(entry["entry_id"])
+        else:
+            _cas_require(
+                len(matches) == 1
+                and matches[0][1]["predicate_id"] == entry["row"]["predicate_id"]
+                and matches[0][1].get("validation_method", "") == "",
+                "held candidate row missing/duplicated/approved",
+            )
+            _cas_require(
+                _cas_invalid_tokens(matches[0][1]) == entry["invalid_tokens"],
+                "held candidate invalid tokens changed or disappeared",
+            )
+            held.append(
+                {
+                    "entry_id": entry["entry_id"],
+                    "candidate_position": matches[0][0],
+                    "candidate_row": matches[0][1],
+                    "mandatory_disposition": "WITHHOLD",
+                    "hold": entry["hold"],
+                    "historical_row": entry["row"],
+                    "invalid_tokens": entry["invalid_tokens"],
+                }
+            )
+    held_positions = {item["candidate_position"] for item in held}
+    for position, row in enumerate(rows, 1):
+        _cas_require(
+            not _cas_invalid_tokens(row) or position in held_positions,
+            "unselected invalid CAS assertion or annotation in candidate",
+        )
+        _cas_require(
+            not row.get("subject_id", "").strip().casefold().startswith("cas:"),
+            "stable candidate cannot have a CAS subject",
+        )
+    return {**proof, "held_rows": held, "retired_entries": retired}
+
+
+def compatibility_registry_objects(
+    records,
+    subjects,
+    index,
+    canonical,
+    *,
+    retirement=None,
+    root=None,
+    cas_dispositions=None,
+):
     """Retain literal local objects and corroborated existing exact CAS objects.
 
     Current curated local primaries and the captured canonical registry rows are
@@ -229,15 +792,35 @@ def compatibility_registry_objects(records, subjects, index, canonical, *, retir
     if retirement is not None and hashlib.sha256(canonical).hexdigest() != retirement["content"]["canonical"]["sha256"]:
         raise ValueError("Registry retirement canonical bytes differ")
     visited = set()
+    cas_entries = (
+        {}
+        if cas_dispositions is None
+        else {e["row_position"]: e for e in cas_dispositions["content"]["entries"]}
+    )
+    cas_visited = set()
+    if cas_dispositions is not None:
+        _cas_require(
+            hashlib.sha256(canonical).hexdigest()
+            == cas_dispositions["content"]["canonical"]["sha256"],
+            "complete canonical bytes differ",
+        )
     for position, row in enumerate(rows, 1):
         if None in row or None in row.values():
             raise ValueError("Malformed canonical compatibility row")
         old, obj = row["subject_id"], row["object_id"]
         selected = entries.get(position)
+        cas_entry = cas_entries.get(position)
+        _cas_require(
+            not (selected is not None and cas_entry is not None),
+            "conflicting disposition selectors",
+        )
         if selected is not None and selected["row"] != row:
             raise ValueError("Registry retirement full canonical row differs")
         is_cas = obj.startswith("cas:")
-        if row["predicate_id"] != "skos:exactMatch" or not (obj.startswith(prefixes) or is_cas):
+        if row["predicate_id"] != "skos:exactMatch" or not (
+            obj.startswith(prefixes) or is_cas or cas_entry is not None
+        ):
+            _cas_require(cas_entry is None, "selected row is not an exact assertion")
             if selected is not None:
                 raise ValueError("Only exact registry compatibility rows can be proposed")
             continue
@@ -249,7 +832,7 @@ def compatibility_registry_objects(records, subjects, index, canonical, *, retir
         elif old.startswith("MIM:"):
             raise ValueError(f"Canonical registry alias has no current stable owner: {old}")
         else:
-            if selected is not None or is_cas:
+            if selected is not None or is_cas or cas_entry is not None:
                 raise ValueError("Registry retirement row has no stable MIM owner")
             continue
         if selected is not None:
@@ -267,11 +850,22 @@ def compatibility_registry_objects(records, subjects, index, canonical, *, retir
                 raise ValueError(f"Numeric MIM suffix is not a registry identity: {subject}")
             visited.add(position)
             continue
-        if is_cas:
+        if cas_entry is not None:
+            owner_path = root / cas_entry["owner"]["path"]
+            _cas_require(
+                owner_path in records and subjects[owner_path] == subject,
+                "wrong owner path",
+            )
+            _cas_selected(cas_entry, row, subject, owner_by_subject[subject])
+            cas_visited.add(position)
+            if cas_entry["action"] == CAS_RETIRE or not is_cas:
+                continue
+        elif is_cas:
             _retained_cas_identity(owner_by_subject[subject], obj, subject)
         result[subject].add(obj)
     if visited != set(entries):
         raise ValueError("Registry retirement row position is absent")
+    _cas_require(cas_visited == set(cas_entries), "CAS disposition row position absent")
     for subject, objects in result.items():
         local_objects = {obj for obj in objects if obj.startswith(prefixes)}
         if len({obj.split(":", 1)[0] for obj in local_objects}) > 1:

@@ -1,0 +1,58 @@
+identifier: CHEBI:16995
+preferred_term: Oxalic Acid
+ontology_mapping:
+  ontology_id: CHEBI:16995
+  ontology_label: oxalic acid
+  ontology_source: CHEBI
+  mapping_quality: EXACT_MATCH
+  evidence:
+  - evidence_type: DATABASE_MATCH
+    source: CultureBotHT
+    notes: Imported from CultureBotHT.
+synonyms: []
+mapping_status: MAPPED
+occurrence_statistics:
+  total_occurrences: 0
+  media_count: 0
+curation_history:
+- timestamp: '2026-04-29T06:04:17.380972+00:00'
+  curator: audit_integrate_culturebotht
+  action: CREATED_FROM_CULTUREBOTHT
+  changes: Created from CultureBotHT compounds_to_cas.csv (CAS=144-62-1); Imported
+    from CultureBotHT.
+  new_status: MAPPED
+  llm_assisted: false
+- timestamp: '2026-05-01T07:35:35.644664+00:00'
+  curator: auto_classify_ingredient_type
+  action: AUTO_CLASSIFY_INGREDIENT_TYPE
+  changes: set ingredient_type=SINGLE_INGREDIENT (CHEBI primary)
+  llm_assisted: false
+- timestamp: '2026-05-01T08:08:31.752128+00:00'
+  curator: auto_classify_ingredient_type
+  action: AUTO_BACKFILL_CHEBI_CHEMISTRY
+  changes: molecular_formula=C2H2O4; inchi=InChI=1S/C2H2O4/c3-1(4)2(5)6/h(H,3,4)(H,5,6);
+    smiles=O=C(O)C(=O)O
+  llm_assisted: false
+- timestamp: '2026-05-02T03:12:17.558065+00:00'
+  curator: auto_classify_ingredient_type
+  action: AUTO_CLASSIFY_INGREDIENT_TYPE
+  changes: set ingredient_type=SINGLE_INGREDIENT (chemical structure populated (molecular_formula))
+  llm_assisted: false
+- timestamp: '2026-11-08T22:01:42+00:00'
+  curator: codex
+  action: ASSIGNED_MIM_ID
+  changes: '#1265: assigned permanent MIM:0001956; retained mapping identifier and
+    legacy aliases.'
+  llm_assisted: true
+chemical_properties:
+  cas_rn: 144-62-1
+  data_source: CultureBotHT compounds_to_cas.csv
+  retrieval_date: '2026-04-29T06:04:17.380972+00:00'
+  molecular_formula: C2H2O4
+  inchi: InChI=1S/C2H2O4/c3-1(4)2(5)6/h(H,3,4)(H,5,6)
+  smiles: O=C(O)C(=O)O
+ingredient_type: SINGLE_INGREDIENT
+mim_id: MIM:0001956
+legacy_identifiers:
+- MIM:Oxalic_Acid
+- CHEBI:16995

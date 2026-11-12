@@ -1315,13 +1315,31 @@ def _mapping_set_version(rows: list[dict]) -> str:
     return max(dates).isoformat()
 
 
-def _write_sssom(rows: list[dict], out_path: Path, *, mim_prefix: str | None = None,
-                 empty_version: str | None = None) -> None:
+def _write_sssom(
+    rows: list[dict],
+    out_path: Path,
+    *,
+    mim_prefix: str | None = None,
+    empty_version: str | None = None,
+    cas_dispositions=None,
+) -> None:
     version = empty_version if not rows and empty_version else _mapping_set_version(rows)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     header = HEADER_YAML.format(version=version)
     if mim_prefix is not None:
         header = header.replace("https://github.com/CultureBotAI/MediaIngredientMech/blob/main/data/ingredients/mapped/", mim_prefix)
+    if cas_dispositions is not None:
+        metadata = {
+            "cas_disposition_capability": "reviewed-invalid-cas-dispositions-v1",
+            "cas_disposition_request": {
+                "path": cas_dispositions["relative_path"],
+                "sha256": cas_dispositions["sha256"],
+            },
+        }
+        header += "".join(
+            "# " + line + "\n"
+            for line in yaml.safe_dump(metadata, sort_keys=True).splitlines()
+        )
     with out_path.open("w") as f:
         f.write(header)
         f.write("\t".join(COLUMNS) + "\n")
@@ -1364,6 +1382,12 @@ def main():
     ap.add_argument("--registry-retirement-proposal", type=Path,
                     help="explicit candidate-only retirement proposal; never canonical approval")
     ap.add_argument("--registry-retirement-proposal-sha256")
+    ap.add_argument(
+        "--cas-dispositions",
+        type=Path,
+        help="paired-reviewed invalid-CAS diagnostic disposition request",
+    )
+    ap.add_argument("--cas-dispositions-sha256")
     ap.add_argument("--source-bindings-bundle", type=Path)
     ap.add_argument("--source-bindings-review", type=Path)
     ap.add_argument("--source-bindings-manifest-sha256")
@@ -1400,6 +1424,9 @@ def main():
                           args.registry_retirement_proposal_sha256)
     if any(retirement_options) and (not stable or not all(retirement_options)):
         ap.error("registry retirement proposal and digest require stable mode together")
+    cas_options = (args.cas_dispositions, args.cas_dispositions_sha256)
+    if any(cas_options) and (not stable or not all(cas_options)):
+        ap.error("CAS dispositions and digest require stable mode together")
     source_options = (args.source_bindings_bundle, args.source_bindings_review,
                       args.source_bindings_manifest_sha256, args.source_bindings_producer_sha256)
     if any(source_options) and (not stable or not all(source_options)):
@@ -1408,7 +1435,6 @@ def main():
     require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
     initial_revisions = {"claw": _revision(REPO_ROOT), "mim": _revision(MIM_ROOT),
                          "kg_microbe": _revision(KGM_ROOT)}
-
 
     paths = artifact_paths(args.output, args.suppressed_aliases_output,
                            args.generation_manifest_output)
@@ -1419,8 +1445,10 @@ def main():
                                              [args.output, MIM_PUBLISHED_SSSOM])])
     directories = ((MIM_ROOT / "data/ingredients/mapped", MIM_ROOT / "data/ingredients/unmapped")
                    if stable else (MIM_INGREDIENTS_DIR,))
+
     def owner_paths():
         return tuple(sorted(p for directory in directories for p in directory.glob("*.yaml")))
+
     yamls = owner_paths()
     identity_inputs = ({MIM_ROOT / "data/ids/mim_id_registry.tsv",
                         MIM_ROOT / "data/ids/mim_id_lifecycle.tsv",
@@ -1448,8 +1476,16 @@ def main():
         retirement_inputs, _ = _STABLE_PRODUCER.registry_retirement_inputs(
             MIM_ROOT, args.registry_retirement_proposal, retirement_bytes,
             args.registry_retirement_proposal_sha256)
+    cas_inputs, cas_bytes = set(), None
+    args.cas_disposition_proof = None
+    if args.cas_dispositions:
+        args.cas_dispositions = checked_path(args.cas_dispositions)
+        cas_bytes = capture_beforeimages([args.cas_dispositions])[args.cas_dispositions]
+        cas_inputs, _ = _STABLE_PRODUCER.cas_disposition_inputs(
+            MIM_ROOT, args.cas_dispositions, cas_bytes, args.cas_dispositions_sha256
+        )
     producers = _producer_paths()
-    inputs = retirement_inputs | set(yamls) | set(producers) | set(stamp_sources) | identity_inputs | source_inputs | {
+    inputs = cas_inputs | retirement_inputs | set(yamls) | set(producers) | set(stamp_sources) | identity_inputs | source_inputs | {
         RESIDUAL_JSON, KGM_UNIFIED_TSV, MIM_PUBLISHED_SSSOM,
     }
     snapshot = capture_beforeimages(inputs)
@@ -1457,13 +1493,22 @@ def main():
         args.registry_retirement = _STABLE_PRODUCER.registry_retirement_evidence(
             MIM_ROOT, args.registry_retirement_proposal, retirement_bytes,
             args.registry_retirement_proposal_sha256, snapshot)
+    if args.cas_dispositions:
+        args.cas_disposition_proof = _STABLE_PRODUCER.cas_disposition_evidence(
+            MIM_ROOT,
+            args.cas_dispositions,
+            cas_bytes,
+            args.cas_dispositions_sha256,
+            snapshot,
+            initial_revisions["mim"],
+        )
     if args.source_bindings_bundle and snapshot[manifest_path] != manifest_bytes:
         raise ValueError("Source-binding manifest changed during capture")
     # The working copy is an allowed stamp input, never a loophole for writing
     # the published canonical input or an ingredient/code/source path.
     working_copy_input = args.output in stamp_sources
     immutable = {p: b for p, b in snapshot.items() if p != args.output}
-    protected = {checked_path(p) for p in (set(yamls) | set(producers) | identity_inputs | source_inputs | retirement_inputs | {
+    protected = {checked_path(p) for p in (set(yamls) | set(producers) | identity_inputs | source_inputs | retirement_inputs | cas_inputs | {
         RESIDUAL_JSON, KGM_UNIFIED_TSV, MIM_PUBLISHED_SSSOM,
     })}
     if args.output in protected:
@@ -1483,8 +1528,14 @@ def main():
             contract, args.mim_stable_id_contract_sha256)
         args.stable_subjects = subjects
         args.registry_objects = _STABLE_PRODUCER.compatibility_registry_objects(
-            records, subjects, index, snapshot[MIM_PUBLISHED_SSSOM] or b"",
-            retirement=args.registry_retirement, root=MIM_ROOT)
+            records,
+            subjects,
+            index,
+            snapshot[MIM_PUBLISHED_SSSOM] or b"",
+            retirement=args.registry_retirement,
+            root=MIM_ROOT,
+            cas_dispositions=args.cas_disposition_proof,
+        )
     owners = build_owner_index({args.stable_subjects.get(p, _mim_curie(p.name)): data
                                 for p, data in records.items()})
 
@@ -1676,6 +1727,9 @@ def _build_candidate(args, paths, before, stamp_sources, snapshot, frozen_paths,
                     file=sys.stderr,
                 )
 
+    cas_proof = getattr(args, "cas_disposition_proof", None)
+    if args.identity_mode == "stable":
+        cas_proof = _STABLE_PRODUCER.finalize_cas_dispositions(cas_proof, final)
     staged = stage / "candidate.sssom.tsv"
     empty_version = None
     if not final and args.identity_mode == "stable":
@@ -1685,7 +1739,13 @@ def _build_candidate(args, paths, before, stamp_sources, snapshot, frozen_paths,
             {"subject_id": args.stable_subjects[p],
              "mapping_date": _mapping_date(p, records[p].get("curation_history") or [])}
             for p in records])
-    _write_sssom(final, staged, mim_prefix=args.mim_prefix, empty_version=empty_version)
+    _write_sssom(
+        final,
+        staged,
+        mim_prefix=args.mim_prefix,
+        empty_version=empty_version,
+        cas_dispositions=cas_proof,
+    )
     proposed = staged.read_bytes()
     if not args.no_validate:
         if not final and args.identity_mode == "stable":
@@ -1717,6 +1777,7 @@ def _build_candidate(args, paths, before, stamp_sources, snapshot, frozen_paths,
                 for p, subject in args.stable_subjects.items()],
             "registry_compatibility_objects": args.registry_objects,
             "registry_retirement_proposal": args.registry_retirement,
+            "cas_dispositions": cas_proof,
             "validation_replay": ("legacy triple/strength policy" if args.identity_mode == "legacy"
                                   else "disabled: fresh science requires fresh review; prior artifacts remain inputs"),
             "external_sssom_validation": "skipped_explicitly" if args.no_validate else "passed",
@@ -1765,7 +1826,6 @@ def _build_candidate(args, paths, before, stamp_sources, snapshot, frozen_paths,
     print("Object-prefix breakdown:", file=sys.stderr)
     for pref, n in sorted(pref_counts.items(), key=lambda kv: -kv[1]):
         print(f"  {pref:10s} {n}", file=sys.stderr)
-
 
 
 if __name__ == "__main__":
