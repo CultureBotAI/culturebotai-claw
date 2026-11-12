@@ -1361,6 +1361,9 @@ def main():
                     help="explicit historical filename subjects or registered permanent MIM identities")
     ap.add_argument("--mim-stable-id-contract-sha256",
                     help="required stable-mode digest of MIM src/mediaingredientmech/stable_ids.py")
+    ap.add_argument("--registry-retirement-proposal", type=Path,
+                    help="explicit candidate-only retirement proposal; never canonical approval")
+    ap.add_argument("--registry-retirement-proposal-sha256")
     ap.add_argument("--source-bindings-bundle", type=Path)
     ap.add_argument("--source-bindings-review", type=Path)
     ap.add_argument("--source-bindings-manifest-sha256")
@@ -1393,6 +1396,10 @@ def main():
     stable = args.identity_mode == "stable"
     if stable != bool(args.mim_stable_id_contract_sha256):
         ap.error("stable mode requires --mim-stable-id-contract-sha256; legacy mode forbids it")
+    retirement_options = (args.registry_retirement_proposal,
+                          args.registry_retirement_proposal_sha256)
+    if any(retirement_options) and (not stable or not all(retirement_options)):
+        ap.error("registry retirement proposal and digest require stable mode together")
     source_options = (args.source_bindings_bundle, args.source_bindings_review,
                       args.source_bindings_manifest_sha256, args.source_bindings_producer_sha256)
     if any(source_options) and (not stable or not all(source_options)):
@@ -1432,18 +1439,31 @@ def main():
             manifest_bytes, args.source_bindings_manifest_sha256)
         source_producers = _STABLE_PRODUCER.native_source_paths(MIM_ROOT)
         source_inputs.update(source_producers)
+    retirement_inputs, retirement_bytes = set(), None
+    args.registry_retirement = None
+    if args.registry_retirement_proposal:
+        args.registry_retirement_proposal = checked_path(args.registry_retirement_proposal)
+        retirement_bytes = capture_beforeimages([args.registry_retirement_proposal])[
+            args.registry_retirement_proposal]
+        retirement_inputs, _ = _STABLE_PRODUCER.registry_retirement_inputs(
+            MIM_ROOT, args.registry_retirement_proposal, retirement_bytes,
+            args.registry_retirement_proposal_sha256)
     producers = _producer_paths()
-    inputs = set(yamls) | set(producers) | set(stamp_sources) | identity_inputs | source_inputs | {
+    inputs = retirement_inputs | set(yamls) | set(producers) | set(stamp_sources) | identity_inputs | source_inputs | {
         RESIDUAL_JSON, KGM_UNIFIED_TSV, MIM_PUBLISHED_SSSOM,
     }
     snapshot = capture_beforeimages(inputs)
+    if args.registry_retirement_proposal:
+        args.registry_retirement = _STABLE_PRODUCER.registry_retirement_evidence(
+            MIM_ROOT, args.registry_retirement_proposal, retirement_bytes,
+            args.registry_retirement_proposal_sha256, snapshot)
     if args.source_bindings_bundle and snapshot[manifest_path] != manifest_bytes:
         raise ValueError("Source-binding manifest changed during capture")
     # The working copy is an allowed stamp input, never a loophole for writing
     # the published canonical input or an ingredient/code/source path.
     working_copy_input = args.output in stamp_sources
     immutable = {p: b for p, b in snapshot.items() if p != args.output}
-    protected = {checked_path(p) for p in (set(yamls) | set(producers) | identity_inputs | source_inputs | {
+    protected = {checked_path(p) for p in (set(yamls) | set(producers) | identity_inputs | source_inputs | retirement_inputs | {
         RESIDUAL_JSON, KGM_UNIFIED_TSV, MIM_PUBLISHED_SSSOM,
     })}
     if args.output in protected:
@@ -1463,7 +1483,8 @@ def main():
             contract, args.mim_stable_id_contract_sha256)
         args.stable_subjects = subjects
         args.registry_objects = _STABLE_PRODUCER.compatibility_registry_objects(
-            records, subjects, index, snapshot[MIM_PUBLISHED_SSSOM] or b"")
+            records, subjects, index, snapshot[MIM_PUBLISHED_SSSOM] or b"",
+            retirement=args.registry_retirement, root=MIM_ROOT)
     owners = build_owner_index({args.stable_subjects.get(p, _mim_curie(p.name)): data
                                 for p, data in records.items()})
 
@@ -1692,6 +1713,7 @@ def _build_candidate(args, paths, before, stamp_sources, snapshot, frozen_paths,
                  "scientific_approval_added": False}
                 for p, subject in args.stable_subjects.items()],
             "registry_compatibility_objects": args.registry_objects,
+            "registry_retirement_proposal": args.registry_retirement,
             "validation_replay": ("legacy triple/strength policy" if args.identity_mode == "legacy"
                                   else "disabled: fresh science requires fresh review; prior artifacts remain inputs"),
             "external_sssom_validation": "skipped_explicitly" if args.no_validate else "passed",

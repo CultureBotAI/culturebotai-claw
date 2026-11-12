@@ -72,7 +72,109 @@ def identity_snapshot(root, records, mint, lifecycle, source, source_path, sourc
             sys.modules[name] = previous
 
 
-def compatibility_registry_objects(records, subjects, index, canonical):
+def registry_retirement_inputs(root, path, raw, expected_sha256):
+    """Bind an authored diagnostic proposal and all evidence, never approve removal.
+
+    #1189: an obsolete canonical compatibility row may prevent generating the
+    candidate that the separate whole-table publication review needs. This input
+    proposes only an exact exclusion from that diagnostic compatibility view.
+    """
+    def keys(value, expected):
+        if not isinstance(value, dict) or set(value) != set(expected):
+            raise ValueError("Malformed registry retirement proposal")
+
+    def pin(value):
+        if not isinstance(value, str) or not re.fullmatch(r"[a-f0-9]{64}", value):
+            raise ValueError("Invalid registry retirement input digest")
+
+    def relative(value):
+        if (not isinstance(value, str) or not value or Path(value).is_absolute()
+                or ".." in Path(value).parts or Path(value).as_posix() != value):
+            raise ValueError("Invalid registry retirement input path")
+        return root / value
+
+    def unique(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("Duplicate registry retirement proposal key")
+            result[key] = value
+        return result
+
+    pin(expected_sha256)
+    if not isinstance(raw, bytes) or hashlib.sha256(raw).hexdigest() != expected_sha256:
+        raise ValueError("Registry retirement proposal digest differs")
+    path.relative_to(root)
+    proposal = json.loads(raw, object_pairs_hook=unique)
+    keys(proposal, {"schema_version", "capability", "scope", "author", "canonical",
+                    "evidence_inputs", "entries", "scientific_approval"})
+    if (type(proposal["schema_version"]) is not int or proposal["schema_version"] != 1
+            or proposal["capability"] != "stable-registry-retirement-proposal-v1"
+            or proposal["scope"] != "diagnostic_candidate_only"
+            or proposal["scientific_approval"] is not False
+            or not isinstance(proposal["author"], str) or not proposal["author"].strip()):
+        raise ValueError("Registry retirement is an authored diagnostic proposal only")
+    keys(proposal["canonical"], {"path", "sha256"})
+    if proposal["canonical"]["path"] != "mappings/ingredient_mappings.sssom.tsv":
+        raise ValueError("Registry retirement requires the original canonical table")
+    pin(proposal["canonical"]["sha256"])
+    paths = {path, relative(proposal["canonical"]["path"])}
+    evidence = proposal["evidence_inputs"]
+    if not isinstance(evidence, dict) or not evidence:
+        raise ValueError("Registry retirement requires exact evidence inputs")
+    for name, digest in evidence.items():
+        paths.add(relative(name))
+        pin(digest)
+    if not isinstance(proposal["entries"], list) or not proposal["entries"]:
+        raise ValueError("Registry retirement requires explicit row proposals")
+    positions = set()
+    for entry in proposal["entries"]:
+        keys(entry, {"row_position", "row", "owner", "reason", "evidence"})
+        position = entry["row_position"]
+        if type(position) is not int or position < 1 or position in positions:
+            raise ValueError("Registry retirement row position is invalid or duplicated")
+        positions.add(position)
+        if (not isinstance(entry["row"], dict) or not entry["row"]
+                or not all(isinstance(k, str) and isinstance(v, str)
+                           for k, v in entry["row"].items())
+                or not isinstance(entry["reason"], str) or not entry["reason"].strip()
+                or not isinstance(entry["evidence"], list) or not entry["evidence"]
+                or not all(isinstance(name, str) and name in evidence
+                           for name in entry["evidence"])
+                or len(set(entry["evidence"])) != len(entry["evidence"])):
+            raise ValueError("Registry retirement requires full row, reason and pinned evidence")
+        keys(entry["owner"], {"path", "sha256", "mim_id"})
+        paths.add(relative(entry["owner"]["path"]))
+        pin(entry["owner"]["sha256"])
+        if not isinstance(entry["owner"]["mim_id"], str):
+            raise ValueError("Registry retirement owner ID is invalid")
+    return paths, proposal
+
+
+def registry_retirement_evidence(root, path, raw, expected_sha256, snapshot):
+    """Verify the complete captured proposal closure and retain its exact content."""
+    paths, proposal = registry_retirement_inputs(root, path, raw, expected_sha256)
+    required = dict(proposal["evidence_inputs"])
+    canonical_name, canonical_digest = proposal["canonical"]["path"], proposal["canonical"]["sha256"]
+    if canonical_name in required and required[canonical_name] != canonical_digest:
+        raise ValueError("Registry retirement input pins conflict")
+    required[canonical_name] = canonical_digest
+    for entry in proposal["entries"]:
+        name, digest = entry["owner"]["path"], entry["owner"]["sha256"]
+        if name in required and required[name] != digest:
+            raise ValueError("Registry retirement input pins conflict")
+        required[name] = digest
+    for name, digest in required.items():
+        content = snapshot.get(root / name)
+        if content is None or hashlib.sha256(content).hexdigest() != digest:
+            raise ValueError("Registry retirement evidence changed: " + name)
+    if snapshot.get(path) != raw or not paths <= set(snapshot):
+        raise ValueError("Registry retirement capture is incomplete")
+    return {"path": str(path), "sha256": expected_sha256, "content": proposal,
+            "scientific_approval_added": False}
+
+
+def compatibility_registry_objects(records, subjects, index, canonical, *, retirement=None, root=None):
     """Retain literal existing local objects, never derive one from a numeric ID.
 
     Current curated local primaries and the captured canonical registry rows are
@@ -94,11 +196,21 @@ def compatibility_registry_objects(records, subjects, index, canonical):
         raise ValueError("Stable mode requires a complete canonical compatibility table")
     if len(rows.fieldnames) != len(set(rows.fieldnames)):
         raise ValueError("Duplicate canonical compatibility column name")
-    for row in rows:
+    entries = {} if retirement is None else {
+        entry["row_position"]: entry for entry in retirement["content"]["entries"]}
+    if retirement is not None and hashlib.sha256(canonical).hexdigest() != retirement["content"]["canonical"]["sha256"]:
+        raise ValueError("Registry retirement canonical bytes differ")
+    visited = set()
+    for position, row in enumerate(rows, 1):
         if None in row or None in row.values():
             raise ValueError("Malformed canonical compatibility row")
         old, obj = row["subject_id"], row["object_id"]
+        selected = entries.get(position)
+        if selected is not None and selected["row"] != row:
+            raise ValueError("Registry retirement full canonical row differs")
         if row["predicate_id"] != "skos:exactMatch" or not obj.startswith(prefixes):
+            if selected is not None:
+                raise ValueError("Only exact registry compatibility rows can be proposed")
             continue
         if old in result:
             subject = old
@@ -108,8 +220,25 @@ def compatibility_registry_objects(records, subjects, index, canonical):
         elif old.startswith("MIM:"):
             raise ValueError(f"Canonical registry alias has no current stable owner: {old}")
         else:
+            if selected is not None:
+                raise ValueError("Registry retirement row has no stable MIM owner")
+            continue
+        if selected is not None:
+            owner = selected["owner"]
+            path = root / owner["path"]
+            if path not in records or subjects[path] != subject or owner["mim_id"] != subject:
+                raise ValueError("Registry retirement owner differs")
+            primary = records[path].get("identifier", "")
+            if (not isinstance(primary, str) or not primary.startswith(prefixes)
+                    or obj.split(":", 1)[0] == primary.split(":", 1)[0]):
+                raise ValueError("Registry retirement requires a competing curated primary")
+            if obj.split(":", 1)[1] == subject.split(":", 1)[1]:
+                raise ValueError(f"Numeric MIM suffix is not a registry identity: {subject}")
+            visited.add(position)
             continue
         result[subject].add(obj)
+    if visited != set(entries):
+        raise ValueError("Registry retirement row position is absent")
     for subject, objects in result.items():
         if len({obj.split(":", 1)[0] for obj in objects}) > 1:
             raise ValueError(f"Competing registry namespaces for {subject}")
