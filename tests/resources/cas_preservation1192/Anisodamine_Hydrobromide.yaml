@@ -1,0 +1,104 @@
+identifier: NCIT:C221850
+preferred_term: Anisodamine Hydrobromide
+ontology_mapping:
+  ontology_id: NCIT:C221850
+  ontology_label: Anisodamine Hydrobromide
+  ontology_source: NCIT
+  mapping_quality: EXACT_MATCH
+  evidence:
+  - evidence_type: DATABASE_MATCH
+    source: CultureBotHT
+    notes: Imported from CultureBotHT. CAS-RN 17659-49-3 present, but no CHEBI entry
+      exists (checked OAK CHEBI sqlite + PubChem CID synonyms). Curator can promote
+      to a CHEBI primary if/when CHEBI adds the term.
+  - evidence_type: DATABASE_MATCH
+    source: NCIT via OLS (stem-substring)
+    notes: 'SUPERSEDED (#312): Parent class identified via stem-substring; matched_via=''Anisodamine
+      Hydrobromide ()'''
+  - evidence_type: MANUAL_CURATION
+    source: MIM curation (#312); chebi.db
+    notes: 'identifier cas:17659-49-3 -> NCIT:C221850; ontology NCIT:C221850 (''Anisodamine
+      Hydrobromide'') -> NCIT:C221850 (''Anisodamine Hydrobromide''); mapping_quality
+      NARROW_MATCH -> EXACT_MATCH. The label is the hydrobromide; the identifier cas:17659-49-3
+      is the free base (PubChem CID 2198, C17H23NO4, no bromine), so the published
+      exactMatch asserted identity between a salt and its free base. NCIT:C221850
+      has the label ''Anisodamine Hydrobromide'' exactly, once the empty ''()'' ingest
+      artefact is stripped from the record''s label (kept as RAW_TEXT). Section 3
+      step 1: the NCIT term is the identifier, EXACT_MATCH. The salt''s CAS is 55449-49-5
+      (PubChem CID 118856046, C17H24BrNO4); the free-base InChI/SMILES are dropped
+      and 17659-49-3 is recorded in the note as the upstream free-base CAS, not as
+      identity.'
+synonyms:
+- synonym_text: Anisodamine Hydrobromide ()
+  synonym_type: RAW_TEXT
+  source: CultureBotHT
+mapping_status: MAPPED
+occurrence_statistics:
+  total_occurrences: 0
+  media_count: 0
+curation_history:
+- timestamp: '2026-04-29T06:51:33.117170+00:00'
+  curator: audit_add_remaining_culturebotht
+  action: CREATED_FROM_CAS_FALLBACK
+  changes: Created with cas:17659-49-3 as primary identifier; no CHEBI entry exists
+    for this compound.
+  new_status: MAPPED
+  llm_assisted: false
+- timestamp: '2026-05-01T07:35:32.206263+00:00'
+  curator: auto_classify_ingredient_type
+  action: AUTO_CLASSIFY_INGREDIENT_TYPE
+  changes: 'set ingredient_type=SINGLE_INGREDIENT (cas: primary (defined chemical))'
+  llm_assisted: false
+- timestamp: '2026-05-02T02:51:53.151451+00:00'
+  curator: auto_classify_ingredient_type
+  action: AUTO_BACKFILL_PUBCHEM_CHEMISTRY
+  changes: molecular_formula=C17H23NO4; smiles=CN1C2CC(CC1C(C2)O)OC(=O)C(CO)C3=CC=CC=C3;
+    inchi=InChI=1S/C17H23NO4/c1-18-12-7-13(9-15(18)16(20)8-1
+  llm_assisted: false
+- timestamp: '2026-05-02T03:12:12.511800+00:00'
+  curator: auto_classify_ingredient_type
+  action: AUTO_CLASSIFY_INGREDIENT_TYPE
+  changes: set ingredient_type=SINGLE_INGREDIENT (chemical structure populated (molecular_formula))
+  llm_assisted: false
+- timestamp: '2026-05-02T04:40:29.665007+00:00'
+  curator: backfill_parent_terms
+  action: BACKFILL_PARENT_NCIT
+  changes: set ontology_mapping parent=NCIT:C221850 (stem-substring)
+  llm_assisted: false
+- timestamp: '2026-09-23T00:44:54.439691+00:00'
+  curator: claude
+  action: REGRADED_PARENT_TO_IDENTITY
+  changes: 'identifier cas:17659-49-3 -> NCIT:C221850; ontology NCIT:C221850 (''Anisodamine
+    Hydrobromide'') -> NCIT:C221850 (''Anisodamine Hydrobromide''); mapping_quality
+    NARROW_MATCH -> EXACT_MATCH. The label is the hydrobromide; the identifier cas:17659-49-3
+    is the free base (PubChem CID 2198, C17H23NO4, no bromine), so the published exactMatch
+    asserted identity between a salt and its free base. NCIT:C221850 has the label
+    ''Anisodamine Hydrobromide'' exactly, once the empty ''()'' ingest artefact is
+    stripped from the record''s label (kept as RAW_TEXT). Section 3 step 1: the NCIT
+    term is the identifier, EXACT_MATCH. The salt''s CAS is 55449-49-5 (PubChem CID
+    118856046, C17H24BrNO4); the free-base InChI/SMILES are dropped and 17659-49-3
+    is recorded in the note as the upstream free-base CAS, not as identity. (#312)
+    preferred_term ''Anisodamine Hydrobromide ()'' -> ''Anisodamine Hydrobromide'';
+    the raw string is kept as RAW_TEXT.'
+  previous_status: MAPPED
+  new_status: MAPPED
+  llm_assisted: true
+  llm_model: claude-fable-5-1
+- timestamp: '2026-11-08T22:01:42+00:00'
+  curator: codex
+  action: ASSIGNED_MIM_ID
+  changes: '#1265: assigned permanent MIM:0000349; retained mapping identifier and
+    legacy aliases.'
+  llm_assisted: true
+chemical_properties:
+  cas_rn: 55449-49-5
+  data_source: PubChem CID 118856046 (anisodamine hydrobromide) via CAS 55449-49-5;
+    upstream CultureBotHT row carried the free-base CAS 17659-49-3
+  retrieval_date: '2026-04-29T06:51:33.117170+00:00'
+  molecular_formula: C17H24BrNO4
+  pubchem_cid: 118856046
+ingredient_type: SINGLE_INGREDIENT
+mim_id: MIM:0000349
+legacy_identifiers:
+- MIM:Anisodamine_Hydrobromide
+- NCIT:C221850

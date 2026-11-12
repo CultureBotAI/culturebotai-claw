@@ -167,7 +167,7 @@ def cli(tmp_path, monkeypatch):
     monkeypatch.setattr(sssom_artifacts, "_load_lock_manager", lambda root: FixtureLock)
 
     def run(*flags, destination=output):
-        monkeypatch.setattr(sys, "argv", ["builder", "--output", str(destination), *flags])
+        monkeypatch.setattr(sys, "argv", ["builder", "--identity-mode", "legacy", "--output", str(destination), *flags])
         builder.main()
         return builder.artifact_paths(destination)
 
@@ -472,7 +472,7 @@ try:
         artifacts._load_lock_manager=lambda root:FixtureLock
     else:
         os.environ['OPENCLAW_WORKSPACE']=str(root.parent/'native-workspace')
-    sys.argv=['builder','--no-validate','--output',str(output)]
+    sys.argv=['builder','--identity-mode','legacy','--no-validate','--output',str(output)]
     b.main()
     manifest=json.loads(output.with_suffix('.tsv.manifest.json').read_bytes())
     result={'status':'published','bound_policy_hash':manifest.get('producer_import_snapshot', {x['path']:x['sha256'] for x in manifest['source_inputs']})[str(policy)],

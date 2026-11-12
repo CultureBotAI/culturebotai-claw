@@ -50,7 +50,7 @@ def run_builder(tmp_path, monkeypatch, rows, output):
     monkeypatch.setattr(builder, '_load_kgm_source_index', lambda: {})
     monkeypatch.setattr(builder, '_load_kgm_labels', lambda: {})
     monkeypatch.setattr(builder, '_row_from_yaml', lambda *a, **kw: emitted)
-    monkeypatch.setattr(sys, 'argv', ['builder', '--no-validate', '--no-preserve-validation',
+    monkeypatch.setattr(sys, 'argv', ['builder', '--identity-mode', 'legacy', '--no-validate', '--no-preserve-validation',
                                    '--output', str(output)])
     builder.main()
 
@@ -143,7 +143,7 @@ def test_non_ascii_history_date_cannot_replace_output(tmp_path, monkeypatch, his
     monkeypatch.setattr(builder, '_load_kgm_source_index', lambda: {})
     monkeypatch.setattr(builder, '_load_kgm_labels', lambda: {})
     monkeypatch.setattr(builder, '_load_chebi_labels', lambda *a: {'CHEBI:15377': 'water'})
-    monkeypatch.setattr(sys, 'argv', ['builder', '--no-validate', '--no-preserve-validation',
+    monkeypatch.setattr(sys, 'argv', ['builder', '--identity-mode', 'legacy', '--no-validate', '--no-preserve-validation',
                                    '--output', str(output)])
     with pytest.raises(ValueError, match='mapping_date'):
         builder.main()
@@ -172,7 +172,7 @@ def test_dateless_record_reaches_rule_f_as_an_empty_cell(tmp_path, monkeypatch, 
     monkeypatch.setattr(builder, '_load_kgm_source_index', lambda: {})
     monkeypatch.setattr(builder, '_load_kgm_labels', lambda: {})
     monkeypatch.setattr(builder, '_load_chebi_labels', lambda *a: {'CHEBI:15377': 'water'})
-    monkeypatch.setattr(sys, 'argv', ['builder', '--no-validate', '--no-preserve-validation',
+    monkeypatch.setattr(sys, 'argv', ['builder', '--identity-mode', 'legacy', '--no-validate', '--no-preserve-validation',
                                    '--output', str(output)])
     builder.main()
     dates = {row['subject_id']: row['mapping_date'] for row in read_rows(output)}
