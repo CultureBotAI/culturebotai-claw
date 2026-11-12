@@ -1,0 +1,198 @@
+identifier: CHEBI:86244
+preferred_term: ammonium molybdate tetrahydrate
+ontology_mapping:
+  ontology_id: CHEBI:86244
+  ontology_label: hexaammonium heptamolybdate tetrahydrate
+  ontology_source: CHEBI
+  mapping_quality: SYNONYM_MATCH
+  evidence:
+  - evidence_type: DATABASE_MATCH
+    source: CultureBotHT
+    notes: 'Imported from CultureBotHT. CAS-RN 12054-85-2 present, but no CHEBI entry
+      exists (checked OAK CHEBI sqlite + PubChem CID synonyms). Used in 11 CultureBot
+      media; samples: PM acetate, PM N2O, CAAc…. Curator can promote to a CHEBI primary
+      if/when CHEBI adds the term.'
+  - evidence_type: DATABASE_MATCH
+    source: CHEBI via OLS (stem-substring)
+    notes: Parent class identified via stem-substring; matched_via='ammonium molybdate
+      tetrahydrate'
+  - evidence_type: DATABASE_MATCH
+    source: MIM curation (#342)
+    notes: 'mapping_quality NARROW_MATCH -> CLOSE_MATCH, predicate skos:narrowMatch
+      -> skos:closeMatch. narrowMatch asserts this record is *narrower in meaning*
+      than CHEBI:91249 (''ammonium molybdate'') — a subsumption ChEBI itself denies:
+      it files hydrates under CHEBI:35505 ''hydrate'', never under the anhydrous compound,
+      which is not an ancestor even transitively. A hydrate is a distinct substance
+      containing the anhydrous form, not a specialization of it. closeMatch claims
+      similarity without subsumption. The ontology_id and the record''s own identifier
+      are unchanged.'
+  - evidence_type: MANUAL_CURATION
+    source: MIM curation (#312); chebi.db
+    notes: 'identifier cas:12054-85-2 -> CHEBI:86244; ontology CHEBI:91249 (''ammonium
+      molybdate'') -> CHEBI:86244 (''hexaammonium heptamolybdate tetrahydrate'');
+      mapping_quality CLOSE_MATCH -> SYNONYM_MATCH. The record (H32Mo7N6O28, CAS 12054-85-2)
+      is the heptamolybdate; CHEBI:91249 ''ammonium molybdate'' is the diammonium
+      orthomolybdate (2H4N.MoO4, one Mo), a different polyanion, not the anhydrous
+      parent of this hydrate. ChEBI has the substance: CHEBI:86244 ''hexaammonium
+      heptamolybdate tetrahydrate'' (4H2O.6H4N.Mo7O24) carries the related synonym
+      ''ammonium molybdate tetrahydrate'', the record''s exact label, on no other
+      term. Section 3 step 1 with a unique synonym: SYNONYM_MATCH. The CAS stays on
+      its registry row.'
+synonyms:
+- synonym_text: bisammonium dioxido(dioxo)molybdenum
+  synonym_type: REJECTED_LABEL
+  source: chebi_synonym_review
+- synonym_text: (NH4)6Mo7O4
+  synonym_type: RAW_TEXT
+  source: sssom_other_backfill
+- synonym_text: (NH4)6Mo7O4 x 24 H2O
+  synonym_type: REJECTED_LABEL
+  source: sssom_other_backfill
+- synonym_text: (NH4)6MoO24·4H2O
+  synonym_type: RAW_TEXT
+  source: sssom_other_backfill
+- synonym_text: (NH4)6MoO7O24
+  synonym_type: RAW_TEXT
+  source: sssom_other_backfill
+- synonym_text: (NH4)6MoO7O24 x 4 H2O
+  synonym_type: RAW_TEXT
+  source: sssom_other_backfill
+- synonym_text: (NH4)Mo7O24·4H2O
+  synonym_type: RAW_TEXT
+  source: sssom_other_backfill
+- synonym_text: (NH4)MoO7O24
+  synonym_type: RAW_TEXT
+  source: sssom_other_backfill
+- synonym_text: (NH4)MoO7O24 x 4 H2O
+  synonym_type: RAW_TEXT
+  source: sssom_other_backfill
+- synonym_text: ammonium heptamolybdate tetrahydrate
+  synonym_type: RELATED_SYNONYM
+  source: CHEBI:86244
+- synonym_text: ammonium paramolybdate tetrahydrate
+  synonym_type: RELATED_SYNONYM
+  source: CHEBI:86244
+mapping_status: MAPPED
+occurrence_statistics:
+  total_occurrences: 12
+  media_count: 12
+curation_history:
+- timestamp: '2026-04-29T06:51:33.117170+00:00'
+  curator: audit_add_remaining_culturebotht
+  action: CREATED_FROM_CAS_FALLBACK
+  changes: Created with cas:12054-85-2 as primary identifier; no CHEBI entry exists
+    for this compound.
+  new_status: MAPPED
+  llm_assisted: false
+- timestamp: '2026-05-01T07:35:32.157060+00:00'
+  curator: auto_classify_ingredient_type
+  action: AUTO_CLASSIFY_INGREDIENT_TYPE
+  changes: 'set ingredient_type=SINGLE_INGREDIENT (cas: primary (defined chemical))'
+  llm_assisted: false
+- timestamp: '2026-05-02T02:51:46.884925+00:00'
+  curator: auto_classify_ingredient_type
+  action: AUTO_BACKFILL_PUBCHEM_CHEMISTRY
+  changes: molecular_formula=H32Mo7N6O28; smiles=N.N.N.N.N.N.O.O.O.O.O[Mo](=O)(=O)O.O[Mo](=O)(=O)O.;
+    inchi=InChI=1S/7Mo.6H3N.10H2O.18O/h;;;;;;;6*1H3;10*1H2;;
+  llm_assisted: false
+- timestamp: '2026-05-02T03:12:12.447070+00:00'
+  curator: auto_classify_ingredient_type
+  action: AUTO_CLASSIFY_INGREDIENT_TYPE
+  changes: set ingredient_type=SINGLE_INGREDIENT (chemical structure populated (molecular_formula))
+  llm_assisted: false
+- timestamp: '2026-05-02T04:39:54.900201+00:00'
+  curator: backfill_parent_terms
+  action: BACKFILL_PARENT_CHEBI
+  changes: set ontology_mapping parent=CHEBI:91249 (stem-substring)
+  llm_assisted: false
+- timestamp: '2026-06-09T04:56:30.247767+00:00'
+  curator: claude_in_session_curation
+  action: ANNOTATED
+  changes: 'Added media role: TRACE_ELEMENT (confidence: 0.60)'
+- timestamp: '2026-07-20T00:00:00+00:00'
+  curator: migrate_media_roles_to_facets
+  action: ANNOTATED
+  changes: 'Migrated legacy media_roles to role facets (#128): TRACE_ELEMENT -> nutritional_roles.TRACE_ELEMENT'
+- timestamp: '2026-08-13T00:00:00+00:00'
+  curator: regrade_hydrate_to_close_match
+  action: REGRADED_HYDRATE_TO_CLOSE_MATCH
+  changes: mapping_quality NARROW_MATCH -> CLOSE_MATCH (#342); a hydrate is not subsumed
+    by its anhydrous form, and ChEBI does not model it as such.
+  llm_assisted: false
+- timestamp: '2026-08-27T03:16:39.518346+00:00'
+  curator: refresh_occurrence_statistics
+  action: CORRECTED
+  changes: 'occurrence_statistics 11/11 -> 12/12 (media_count/total_occurrences),
+    derived from distinct CultureMech recipe ids in the #337 occurrence table. The
+    prior values came from the importer retired in #453, whose media_count counted
+    a list truncated to 50 examples (#449). [source=ingredient_occurrences.tsv culturemech_rev=15a4da5c08
+    rows=194137 distinct_recipes=15257]'
+- timestamp: '2026-09-02T22:41:49.137449+00:00'
+  curator: claude_sssom_surface_form_backfill
+  action: ADDED_SYNONYMS
+  changes: 'Recovered 8 surface form(s) that the published SSSOM `other` carried but
+    no curated record did, so a rebuild would have dropped them from KGX: ''(NH4)6Mo7O4'';
+    ''(NH4)6Mo7O4 x 24 H2O''; ''(NH4)6MoO24·4H2O''; ''(NH4)6MoO7O24''; ''(NH4)6MoO7O24
+    x 4 H2O''; ''(NH4)Mo7O24·4H2O''; ''(NH4)MoO7O24''; ''(NH4)MoO7O24 x 4 H2O''. Tokens
+    already present on the kg-microbe ontology node were left out as redundant (#520).'
+  llm_assisted: false
+- timestamp: '2026-09-12T00:00:00+00:00'
+  curator: reject_hidden_hydrate_synonym_collapses
+  action: REJECTED_HIDDEN_HYDRATE_SYNONYMS
+  changes: 'Marked hidden hydrate synonym(s) as REJECTED_LABEL so this record no longer
+    resolves sibling hydrate identities (#251): ''(NH4)6Mo7O4 x 24 H2O''.'
+  previous_status: MAPPED
+  new_status: MAPPED
+  llm_assisted: false
+- timestamp: '2026-09-22T20:41:14.285965+00:00'
+  curator: claude
+  action: REJECTED_PARENT_NAME_SYNONYMS
+  changes: 'Retyped names of the parent compound or of a different hydrate as provenance-only
+    REJECTED_LABEL, because this record is a distinct salt, hydrate or tombstone form
+    and the label index resolved the parent''s name here (#232): ''bisammonium dioxido(dioxo)molybdenum''.
+    Preserved original text and source metadata. No identity, mapping, role, or remaining-synonym
+    claim was adjudicated.'
+  llm_assisted: true
+- timestamp: '2026-09-23T00:44:54.421176+00:00'
+  curator: claude
+  action: REGROUNDED_IDENTITY
+  changes: 'identifier cas:12054-85-2 -> CHEBI:86244; ontology CHEBI:91249 (''ammonium
+    molybdate'') -> CHEBI:86244 (''hexaammonium heptamolybdate tetrahydrate''); mapping_quality
+    CLOSE_MATCH -> SYNONYM_MATCH. The record (H32Mo7N6O28, CAS 12054-85-2) is the
+    heptamolybdate; CHEBI:91249 ''ammonium molybdate'' is the diammonium orthomolybdate
+    (2H4N.MoO4, one Mo), a different polyanion, not the anhydrous parent of this hydrate.
+    ChEBI has the substance: CHEBI:86244 ''hexaammonium heptamolybdate tetrahydrate''
+    (4H2O.6H4N.Mo7O24) carries the related synonym ''ammonium molybdate tetrahydrate'',
+    the record''s exact label, on no other term. Section 3 step 1 with a unique synonym:
+    SYNONYM_MATCH. The CAS stays on its registry row. (#312) Synonyms added: ammonium
+    heptamolybdate tetrahydrate, ammonium paramolybdate tetrahydrate.'
+  previous_status: MAPPED
+  new_status: MAPPED
+  llm_assisted: true
+  llm_model: claude-fable-5-1
+- timestamp: '2026-11-08T22:01:42+00:00'
+  curator: codex
+  action: ASSIGNED_MIM_ID
+  changes: '#1265: assigned permanent MIM:0000327; retained mapping identifier and
+    legacy aliases.'
+  llm_assisted: true
+chemical_properties:
+  cas_rn: 12054-85-2
+  data_source: CultureBotHT compounds_to_cas.csv
+  retrieval_date: '2026-04-29T06:51:33.117170+00:00'
+  molecular_formula: H32Mo7N6O28
+  smiles: N.N.N.N.N.N.O.O.O.O.O[Mo](=O)(=O)O.O[Mo](=O)(=O)O.O[Mo](=O)(=O)O.O=[Mo](=O)=O.O=[Mo](=O)=O.O=[Mo](=O)=O.O=[Mo](=O)=O
+  inchi: InChI=1S/7Mo.6H3N.10H2O.18O/h;;;;;;;6*1H3;10*1H2;;;;;;;;;;;;;;;;;;/q;;;;3*+2;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;/p-6
+  pubchem_cid: 16211167
+ingredient_type: SINGLE_INGREDIENT
+nutritional_roles:
+- role: TRACE_ELEMENT
+  confidence: 0.6
+  evidence:
+  - reference_type: COMPUTATIONAL_PREDICTION
+    reference_text: Assigned by in-session Claude reasoning (no external API)
+    curator_note: Provisional in-session LLM role assignment; review recommended.
+mim_id: MIM:0000327
+legacy_identifiers:
+- MIM:Ammonium_Molybdate_Tetrahydrate
+- CHEBI:86244

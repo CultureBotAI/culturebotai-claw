@@ -1588,12 +1588,15 @@ def _build_candidate(args, paths, before, stamp_sources, snapshot, frozen_paths,
     suppressions: list[Suppression] = []
     skipped_unsupported = 0
     for p in yamls:
+        compatibility_objects = args.registry_objects.get(args.stable_subjects.get(p), ())
         record_rows = _row_from_yaml(
             p, residual, kgm_sources, kgm_labels, canonical_labels,
             record=records[p], owners=owners, suppressions=suppressions,
             stable_subject=args.stable_subjects.get(p),
-            registry_objects=args.registry_objects.get(args.stable_subjects.get(p), ()))
+            registry_objects=compatibility_objects)
         if not record_rows:
+            if any(obj.startswith("cas:") for obj in compatibility_objects):
+                raise ValueError(f"Canonical CAS identity has no eligible current mapping: {p}")
             skipped_unsupported += 1
             continue
         rows.extend(record_rows)

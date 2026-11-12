@@ -174,16 +174,44 @@ def registry_retirement_evidence(root, path, raw, expected_sha256, snapshot):
             "scientific_approval_added": False}
 
 
+def _retained_cas_identity(record, obj, subject):
+    """Check one existing exact CAS assertion against its current owner (#1192).
+
+    This retains candidate content only. Supplied-form procurement metadata,
+    synonyms and cross-references cannot create or justify an identity row.
+    """
+    rn = obj.removeprefix("cas:")
+    if not re.fullmatch(r"[1-9][0-9]{1,6}-[0-9]{2}-[0-9]", rn):
+        raise ValueError(f"Malformed canonical CAS identity for {subject}: {obj}")
+    digits = rn.replace("-", "")
+    checksum = sum(i * int(digit) for i, digit in enumerate(reversed(digits[:-1]), 1)) % 10
+    if checksum != int(digits[-1]):
+        raise ValueError(f"Invalid canonical CAS check digit for {subject}: {obj}")
+    primary = record.get("identifier")
+    chemistry = record.get("chemical_properties") or {}
+    current = chemistry.get("cas_rn") if isinstance(chemistry, dict) else None
+    if (not isinstance(primary, str)
+            or (primary.startswith("cas:") and primary != obj)
+            or (current is not None and current != rn)
+            or not (primary == obj or current == rn)):
+        raise ValueError(f"Canonical CAS identity lacks matching current owner evidence: {subject} {obj}")
+    if record.get("mapping_status") != "MAPPED":
+        raise ValueError(f"Canonical CAS identity owner requires mapping review: {subject} {obj}")
+
+
 def compatibility_registry_objects(records, subjects, index, canonical, *, retirement=None, root=None):
-    """Retain literal existing local objects, never derive one from a numeric ID.
+    """Retain literal local objects and corroborated existing exact CAS objects.
 
     Current curated local primaries and the captured canonical registry rows are
     the authority for object spellings. Historical MIM aliases must identify one
     actual owner. Shared external aliases never choose an owner. This preserves
     candidate mapping content, not prior scientific stamps or release approval.
+    Canonical CAS rows must agree with current identity-bearing chemistry; never
+    add a CAS row merely because a number occurs in the owner's metadata (#1192).
     """
     prefixes = ("kgmicrobe.compound:", "kgmicrobe.ingredient:")
     result = {subject: set() for subject in subjects.values()}
+    owner_by_subject = {subject: records[path] for path, subject in subjects.items()}
     for path, record in records.items():
         primary = record.get("identifier", "")
         if isinstance(primary, str) and primary.startswith(prefixes):
@@ -208,7 +236,8 @@ def compatibility_registry_objects(records, subjects, index, canonical, *, retir
         selected = entries.get(position)
         if selected is not None and selected["row"] != row:
             raise ValueError("Registry retirement full canonical row differs")
-        if row["predicate_id"] != "skos:exactMatch" or not obj.startswith(prefixes):
+        is_cas = obj.startswith("cas:")
+        if row["predicate_id"] != "skos:exactMatch" or not (obj.startswith(prefixes) or is_cas):
             if selected is not None:
                 raise ValueError("Only exact registry compatibility rows can be proposed")
             continue
@@ -220,10 +249,12 @@ def compatibility_registry_objects(records, subjects, index, canonical, *, retir
         elif old.startswith("MIM:"):
             raise ValueError(f"Canonical registry alias has no current stable owner: {old}")
         else:
-            if selected is not None:
+            if selected is not None or is_cas:
                 raise ValueError("Registry retirement row has no stable MIM owner")
             continue
         if selected is not None:
+            if is_cas:
+                raise ValueError("CAS retention is not a local registry retirement proposal")
             owner = selected["owner"]
             path = root / owner["path"]
             if path not in records or subjects[path] != subject or owner["mim_id"] != subject:
@@ -236,13 +267,16 @@ def compatibility_registry_objects(records, subjects, index, canonical, *, retir
                 raise ValueError(f"Numeric MIM suffix is not a registry identity: {subject}")
             visited.add(position)
             continue
+        if is_cas:
+            _retained_cas_identity(owner_by_subject[subject], obj, subject)
         result[subject].add(obj)
     if visited != set(entries):
         raise ValueError("Registry retirement row position is absent")
     for subject, objects in result.items():
-        if len({obj.split(":", 1)[0] for obj in objects}) > 1:
+        local_objects = {obj for obj in objects if obj.startswith(prefixes)}
+        if len({obj.split(":", 1)[0] for obj in local_objects}) > 1:
             raise ValueError(f"Competing registry namespaces for {subject}")
-        if any(obj.split(":", 1)[1] == subject.split(":", 1)[1] for obj in objects):
+        if any(obj.split(":", 1)[1] == subject.split(":", 1)[1] for obj in local_objects):
             raise ValueError(f"Numeric MIM suffix is not a registry identity: {subject}")
     return {subject: tuple(sorted(objects)) for subject, objects in result.items()}
 
