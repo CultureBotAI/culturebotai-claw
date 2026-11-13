@@ -235,7 +235,8 @@ RESIDUAL_JSON = REPORT_DIR / "kg_microbe_residual_p25_categorized.json"
 OUT_TSV = REPORT_DIR / "mim_ingredient_mappings.sssom.tsv"
 
 MAPPING_SET_ID = "https://w3id.org/sssom/mappings/culturebotai_mim_ingredient"
-LICENSE = "https://creativecommons.org/publicdomain/zero/1.0/"
+# MIM project-authored mappings follow its data-license decision (MIM #788).
+LICENSE = "https://creativecommons.org/licenses/by/4.0/"
 SSSOM_BIN = "sssom"
 
 # Ontologies we emit mappings for. Add a new prefix here and to
