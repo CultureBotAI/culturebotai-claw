@@ -1,6 +1,11 @@
 """
 Build a diagnostic MIM → ingredient-ontology SSSOM candidate artifact set.
 
+Choose --identity-mode legacy for the historical filename subjects described
+below, or stable for captured native registry validation and permanent mim_id
+subjects. Source-to-MIM candidates are a separate native MIM product; no
+ontology target, mapping status or self-loop is invented for a concept-only owner.
+
 This candidate is not canonical promotion or scientific approval. Every
 MediaIngredientMech record whose `ontology_mapping.ontology_id` starts
 with a supported ingredient ontology prefix (CHEBI / FOODON; UBERON /
@@ -131,6 +136,7 @@ _PRODUCER_MODULE_PATHS = {
     **{name: REPO_ROOT / "src" / filename for name, filename in {
         "kg_microbe_utils": "kg_microbe_utils/__init__.py",
         "kg_microbe_utils.owned_name_policy": "kg_microbe_utils/owned_name_policy.py",
+        "kg_microbe_utils.stable_mim": "kg_microbe_utils/stable_mim.py",
         "kg_microbe_utils.sssom_artifacts": "kg_microbe_utils/sssom_artifacts.py",
         "kg_microbe_fleet": "kg_microbe_fleet/__init__.py",
         "kg_microbe_fleet.roots": "kg_microbe_fleet/roots.py",
@@ -210,6 +216,8 @@ def _snapshot_lock_manager(claw_root: Path):
 _ARTIFACT_PRODUCER._load_lock_manager = _snapshot_lock_manager
 _check_producer_bindings()
 
+_STABLE_PRODUCER = _load_producer("kg_microbe_utils.stable_mim")
+
 OWNED_NAME_EVIDENCE = (
     "https://github.com/CultureBotAI/MediaIngredientMech/issues/669#issuecomment-6558035777",
     "https://github.com/CultureBotAI/culturebotai-claw/issues/701",
@@ -227,7 +235,8 @@ RESIDUAL_JSON = REPORT_DIR / "kg_microbe_residual_p25_categorized.json"
 OUT_TSV = REPORT_DIR / "mim_ingredient_mappings.sssom.tsv"
 
 MAPPING_SET_ID = "https://w3id.org/sssom/mappings/culturebotai_mim_ingredient"
-LICENSE = "https://creativecommons.org/publicdomain/zero/1.0/"
+# MIM project-authored mappings follow its data-license decision (MIM #788).
+LICENSE = "https://creativecommons.org/licenses/by/4.0/"
 SSSOM_BIN = "sssom"
 
 # Ontologies we emit mappings for. Add a new prefix here and to
@@ -754,7 +763,8 @@ def _join_sources(mim_ev: list[str], last_curator: str, kgm_src: str) -> str:
     return "|".join(parts)
 
 
-def _read_mapped_records(directory: Path, snapshot: dict[Path, bytes | None] | None = None) -> dict[Path, dict]:
+def _read_mapped_records(directory: Path, snapshot: dict[Path, bytes | None] | None = None,
+                         *, strict_identity: bool = False) -> dict[Path, dict]:
     """Parse the complete direct mapped-directory population, including ignored files."""
     paths = sorted(directory.glob("*.yaml"))
     contents = capture_beforeimages(paths) if snapshot is None else snapshot
@@ -764,7 +774,8 @@ def _read_mapped_records(directory: Path, snapshot: dict[Path, bytes | None] | N
         content = contents[checked_path(path)]
         if content is None:
             raise ValueError(f"Mapped record disappeared: {path}")
-        data = yaml.safe_load(content)
+        data = (_STABLE_PRODUCER.load_owner_record(content) if strict_identity
+                else yaml.safe_load(content))
         if not isinstance(data, dict):
             raise ValueError(f"Mapped record is not a mapping: {path}")
         subject = _mim_curie(path.name)
@@ -795,6 +806,8 @@ def _row_from_yaml(
     record: dict | None = None,
     owners: dict[str, frozenset[str]] | None = None,
     suppressions: list[Suppression] | None = None,
+    stable_subject: str | None = None,
+    registry_objects: tuple[str, ...] = (),
 ) -> list[dict]:
     """Returns a list of SSSOM rows for one MIM YAML.
 
@@ -810,6 +823,8 @@ def _row_from_yaml(
 
     Returns [] for records with no supported ontology_id prefix.
     """
+    if stable_subject is not None and (record is None or owners is None):
+        raise ValueError("Stable rows require the validated complete inventory")
     # Direct callers receive the same complete-directory policy as main().
     # main supplies its once-parsed snapshot, avoiding a second corpus read.
     if record is None or owners is None:
@@ -819,13 +834,14 @@ def _row_from_yaml(
         if owners is None:
             owners = build_owner_index({_mim_curie(p.name): d for p, d in records.items()})
     data = record
+    subject = stable_subject or _mim_curie(path.name)
 
     def owned_tokens(text: str, surface: str, reference: str) -> list[AliasCandidate]:
         return [AliasCandidate(token, surface, (reference,), OWNED_NAME_EVIDENCE)
                 for token in text.split("|") if token.strip()]
 
     def keep_owned(candidates: list[AliasCandidate]) -> list[str]:
-        kept, events = filter_owned_aliases(_mim_curie(path.name), candidates, owners)
+        kept, events = filter_owned_aliases(subject, candidates, owners)
         if suppressions is not None:
             suppressions.extend(events)
         return [candidate.text for candidate in kept]
@@ -841,6 +857,8 @@ def _row_from_yaml(
 
     ont = data.get("ontology_mapping") or {}
     obj_id = (ont.get("ontology_id") or "").strip()
+    if stable_subject is not None and data.get("mapping_status") != "MAPPED":
+        return []  # Concept/source eligibility belongs to the distinct native MIM product.
     if not any(obj_id.startswith(p) for p in SUPPORTED_OBJECT_PREFIXES):
         return []
     is_chebi = obj_id.startswith("CHEBI:")
@@ -1067,7 +1085,7 @@ def _row_from_yaml(
     object_source = _OBJECT_SOURCE_BY_PREFIX.get(prefix, "")
 
     parent_row = {
-        "subject_id": _mim_curie(src_file),
+        "subject_id": subject,
         "subject_label": preferred,
         "predicate_id": predicate,
         "object_id": obj_id,
@@ -1134,7 +1152,7 @@ def _row_from_yaml(
     # chemistry registries -> compound, complex/biological -> ingredient.
     # Slug is the lowercased subject slug — matches Rule B1's
     # `subject_id[4:].lower()` regex anchor exactly.
-    if parent_row["predicate_id"] in ("skos:narrowMatch", "skos:broadMatch"):
+    if stable_subject is None and parent_row["predicate_id"] in ("skos:narrowMatch", "skos:broadMatch"):
         slug_lc = _registry_slug_for_curie(parent_row["subject_id"])
         kgm_namespace = next(
             (prefix for prefix in ("kgmicrobe.ingredient:", "kgmicrobe.compound:")
@@ -1181,6 +1199,21 @@ def _row_from_yaml(
                 # The parent row is asymmetric, so this registry row is the
                 # only place the subject's CAS can reach a KG synonym.
                 "other": cas_token,
+                "validation_method": "",
+            })
+    if stable_subject is not None:
+        # Preserve each captured old alias object exactly. Never derive a new
+        # kgmicrobe slug from the permanent MIM suffix or current filename.
+        for obj in registry_objects:
+            if any(row["object_id"] == obj for row in rows):
+                continue
+            prefix = obj.split(":", 1)[0] + ":"
+            rows.append({
+                **parent_row, "object_id": obj, "object_label": preferred,
+                "object_source": _OBJECT_SOURCE_BY_PREFIX[prefix],
+                "predicate_id": "skos:exactMatch", "confidence": "0.99",
+                "mapping_justification": JUST_MANUAL, "other": cas_token,
+                "comment": f"Preserved registry/identity object {obj}; stable MIM subject.",
                 "validation_method": "",
             })
     return rows
@@ -1283,10 +1316,31 @@ def _mapping_set_version(rows: list[dict]) -> str:
     return max(dates).isoformat()
 
 
-def _write_sssom(rows: list[dict], out_path: Path) -> None:
-    version = _mapping_set_version(rows)
+def _write_sssom(
+    rows: list[dict],
+    out_path: Path,
+    *,
+    mim_prefix: str | None = None,
+    empty_version: str | None = None,
+    cas_dispositions=None,
+) -> None:
+    version = empty_version if not rows and empty_version else _mapping_set_version(rows)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     header = HEADER_YAML.format(version=version)
+    if mim_prefix is not None:
+        header = header.replace("https://github.com/CultureBotAI/MediaIngredientMech/blob/main/data/ingredients/mapped/", mim_prefix)
+    if cas_dispositions is not None:
+        metadata = {
+            "cas_disposition_capability": "reviewed-invalid-cas-dispositions-v1",
+            "cas_disposition_request": {
+                "path": cas_dispositions["relative_path"],
+                "sha256": cas_dispositions["sha256"],
+            },
+        }
+        header += "".join(
+            "# " + line + "\n"
+            for line in yaml.safe_dump(metadata, sort_keys=True).splitlines()
+        )
     with out_path.open("w") as f:
         f.write(header)
         f.write("\t".join(COLUMNS) + "\n")
@@ -1322,6 +1376,23 @@ def _sssom_validate(path: Path) -> list[str]:
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--identity-mode", choices=("legacy", "stable"), required=True,
+                    help="explicit historical filename subjects or registered permanent MIM identities")
+    ap.add_argument("--mim-stable-id-contract-sha256",
+                    help="required stable-mode digest of MIM src/mediaingredientmech/stable_ids.py")
+    ap.add_argument("--registry-retirement-proposal", type=Path,
+                    help="explicit candidate-only retirement proposal; never canonical approval")
+    ap.add_argument("--registry-retirement-proposal-sha256")
+    ap.add_argument(
+        "--cas-dispositions",
+        type=Path,
+        help="paired-reviewed invalid-CAS diagnostic disposition request",
+    )
+    ap.add_argument("--cas-dispositions-sha256")
+    ap.add_argument("--source-bindings-bundle", type=Path)
+    ap.add_argument("--source-bindings-review", type=Path)
+    ap.add_argument("--source-bindings-manifest-sha256")
+    ap.add_argument("--source-bindings-producer-sha256")
     ap.add_argument("--output", type=Path, default=OUT_TSV)
     ap.add_argument("--suppressed-aliases-output", type=Path)
     ap.add_argument("--generation-manifest-output", type=Path)
@@ -1347,9 +1418,24 @@ def main():
              "checkout).",
     )
     args = ap.parse_args()
+    stable = args.identity_mode == "stable"
+    if stable != bool(args.mim_stable_id_contract_sha256):
+        ap.error("stable mode requires --mim-stable-id-contract-sha256; legacy mode forbids it")
+    retirement_options = (args.registry_retirement_proposal,
+                          args.registry_retirement_proposal_sha256)
+    if any(retirement_options) and (not stable or not all(retirement_options)):
+        ap.error("registry retirement proposal and digest require stable mode together")
+    cas_options = (args.cas_dispositions, args.cas_dispositions_sha256)
+    if any(cas_options) and (not stable or not all(cas_options)):
+        ap.error("CAS dispositions and digest require stable mode together")
+    source_options = (args.source_bindings_bundle, args.source_bindings_review,
+                      args.source_bindings_manifest_sha256, args.source_bindings_producer_sha256)
+    if any(source_options) and (not stable or not all(source_options)):
+        ap.error("source-binding bundle/review/manifest/producer pins require stable mode together")
     _check_producer_bindings()
     require_mech_roots("mediaingredientmech", claw_root=REPO_ROOT)
-
+    initial_revisions = {"claw": _revision(REPO_ROOT), "mim": _revision(MIM_ROOT),
+                         "kg_microbe": _revision(KGM_ROOT)}
 
     paths = artifact_paths(args.output, args.suppressed_aliases_output,
                            args.generation_manifest_output)
@@ -1358,30 +1444,115 @@ def main():
     stamp_sources = ([] if args.no_preserve_validation else
                      [checked_path(p) for p in (args.prior_stamps_from or
                                              [args.output, MIM_PUBLISHED_SSSOM])])
-    yamls = tuple(sorted(MIM_INGREDIENTS_DIR.glob("*.yaml")))
+    directories = ((MIM_ROOT / "data/ingredients/mapped", MIM_ROOT / "data/ingredients/unmapped")
+                   if stable else (MIM_INGREDIENTS_DIR,))
+
+    def owner_paths():
+        return tuple(sorted(p for directory in directories for p in directory.glob("*.yaml")))
+
+    yamls = owner_paths()
+    identity_inputs = ({MIM_ROOT / "data/ids/mim_id_registry.tsv",
+                        MIM_ROOT / "data/ids/mim_id_lifecycle.tsv",
+                        MIM_ROOT / "src/mediaingredientmech/stable_ids.py"} if stable else set())
+    source_inputs, source_producers, args.source_manifest = set(), (), None
+    if args.source_bindings_bundle:
+        args.source_bindings_bundle = checked_path(args.source_bindings_bundle)
+        args.source_bindings_review = checked_path(args.source_bindings_review)
+        args.source_bindings_review.relative_to(MIM_ROOT)
+        manifest_path = args.source_bindings_bundle / "manifest.json"
+        manifest_bytes = capture_beforeimages([manifest_path])[manifest_path]
+        if manifest_bytes is None:
+            raise ValueError("Source-binding manifest is missing")
+        source_inputs, args.source_manifest = _STABLE_PRODUCER.source_binding_inputs(
+            MIM_ROOT, args.source_bindings_bundle, args.source_bindings_review,
+            manifest_bytes, args.source_bindings_manifest_sha256)
+        source_producers = _STABLE_PRODUCER.native_source_paths(MIM_ROOT)
+        source_inputs.update(source_producers)
+    retirement_inputs, retirement_bytes = set(), None
+    args.registry_retirement = None
+    if args.registry_retirement_proposal:
+        args.registry_retirement_proposal = checked_path(args.registry_retirement_proposal)
+        retirement_bytes = capture_beforeimages([args.registry_retirement_proposal])[
+            args.registry_retirement_proposal]
+        retirement_inputs, _ = _STABLE_PRODUCER.registry_retirement_inputs(
+            MIM_ROOT, args.registry_retirement_proposal, retirement_bytes,
+            args.registry_retirement_proposal_sha256)
+    cas_inputs, cas_bytes = set(), None
+    args.cas_disposition_proof = None
+    if args.cas_dispositions:
+        args.cas_dispositions = checked_path(args.cas_dispositions)
+        cas_bytes = capture_beforeimages([args.cas_dispositions])[args.cas_dispositions]
+        cas_inputs, _ = _STABLE_PRODUCER.cas_disposition_inputs(
+            MIM_ROOT, args.cas_dispositions, cas_bytes, args.cas_dispositions_sha256
+        )
     producers = _producer_paths()
-    inputs = set(yamls) | set(producers) | set(stamp_sources) | {
+    inputs = cas_inputs | retirement_inputs | set(yamls) | set(producers) | set(stamp_sources) | identity_inputs | source_inputs | {
         RESIDUAL_JSON, KGM_UNIFIED_TSV, MIM_PUBLISHED_SSSOM,
     }
     snapshot = capture_beforeimages(inputs)
+    if args.registry_retirement_proposal:
+        args.registry_retirement = _STABLE_PRODUCER.registry_retirement_evidence(
+            MIM_ROOT, args.registry_retirement_proposal, retirement_bytes,
+            args.registry_retirement_proposal_sha256, snapshot)
+    if args.cas_dispositions:
+        args.cas_disposition_proof = _STABLE_PRODUCER.cas_disposition_evidence(
+            MIM_ROOT,
+            args.cas_dispositions,
+            cas_bytes,
+            args.cas_dispositions_sha256,
+            snapshot,
+            initial_revisions["mim"],
+        )
+    if args.source_bindings_bundle and snapshot[manifest_path] != manifest_bytes:
+        raise ValueError("Source-binding manifest changed during capture")
     # The working copy is an allowed stamp input, never a loophole for writing
     # the published canonical input or an ingredient/code/source path.
     working_copy_input = args.output in stamp_sources
     immutable = {p: b for p, b in snapshot.items() if p != args.output}
-    protected = {checked_path(p) for p in (set(yamls) | set(producers) | {
+    protected = {checked_path(p) for p in (set(yamls) | set(producers) | identity_inputs | source_inputs | retirement_inputs | cas_inputs | {
         RESIDUAL_JSON, KGM_UNIFIED_TSV, MIM_PUBLISHED_SSSOM,
     })}
     if args.output in protected:
         raise ValueError("Candidate output overlaps a protected source input")
     if working_copy_input and snapshot[args.output] != before[args.output]:
         raise ValueError("Working-copy stamp beforeimage changed during capture")
-    records = _read_mapped_records(MIM_INGREDIENTS_DIR, snapshot)
-    owners = build_owner_index({_mim_curie(p.name): data for p, data in records.items()})
+    records = {p: record for directory in directories
+               for p, record in _read_mapped_records(directory, snapshot, strict_identity=stable).items()}
+    args.stable_subjects, args.registry_objects, args.mim_prefix = {}, {}, None
+    if stable:
+        if any(snapshot[checked_path(p)] is None for p in identity_inputs):
+            raise ValueError("Stable MIM identity inputs are missing")
+        contract = MIM_ROOT / "src/mediaingredientmech/stable_ids.py"
+        subjects, index, args.mim_prefix = _STABLE_PRODUCER.identity_snapshot(
+            MIM_ROOT, records, snapshot[MIM_ROOT / "data/ids/mim_id_registry.tsv"],
+            snapshot[MIM_ROOT / "data/ids/mim_id_lifecycle.tsv"], snapshot[contract],
+            contract, args.mim_stable_id_contract_sha256)
+        args.stable_subjects = subjects
+        args.registry_objects = _STABLE_PRODUCER.compatibility_registry_objects(
+            records,
+            subjects,
+            index,
+            snapshot[MIM_PUBLISHED_SSSOM] or b"",
+            retirement=args.registry_retirement,
+            root=MIM_ROOT,
+            cas_dispositions=args.cas_disposition_proof,
+        )
+    owners = build_owner_index({args.stable_subjects.get(p, _mim_curie(p.name)): data
+                                for p, data in records.items()})
 
     def check_inputs():
         _check_producer_bindings()
-        if tuple(sorted(MIM_INGREDIENTS_DIR.glob("*.yaml"))) != yamls:
+        if stable and initial_revisions != {"claw": _revision(REPO_ROOT), "mim": _revision(MIM_ROOT),
+                                            "kg_microbe": _revision(KGM_ROOT)}:
+            raise ValueError("Repository revisions changed during stable generation")
+        if owner_paths() != yamls:
             raise ValueError("Mapped-record path set changed during generation")
+        if args.source_bindings_bundle:
+            if _STABLE_PRODUCER.native_source_paths(MIM_ROOT) != source_producers:
+                raise ValueError("Native source-binding producer path set changed")
+            if set(args.source_bindings_bundle.iterdir()) != {
+                    args.source_bindings_bundle / name for name in (*args.source_manifest["files"], "manifest.json")}:
+                raise ValueError("Source-binding output inventory changed")
         if _producer_paths() != producers:
             raise ValueError("Producer path set changed during generation")
         if capture_beforeimages(immutable) != immutable:
@@ -1405,6 +1576,13 @@ def main():
         kgm_labels = load_kgm_labels(kgm_frozen) if kgm_frozen else {}
         if kgm_frozen is None:
             _warn_if_kgm_missing()
+        args.source_binding_result = None
+        if args.source_bindings_bundle:
+            check_inputs()
+            args.source_binding_result = _STABLE_PRODUCER.validate_source_bindings(
+                MIM_ROOT, args.source_bindings_bundle, args.source_bindings_review,
+                args.source_manifest, args.source_bindings_producer_sha256, snapshot, stage)
+            check_inputs()
         _build_candidate(args, paths, before, stamp_sources, snapshot, frozen_paths,
                          records, owners, residual, kgm_sources, kgm_labels,
                          stage, check_inputs, working_copy_input)
@@ -1462,10 +1640,15 @@ def _build_candidate(args, paths, before, stamp_sources, snapshot, frozen_paths,
     suppressions: list[Suppression] = []
     skipped_unsupported = 0
     for p in yamls:
+        compatibility_objects = args.registry_objects.get(args.stable_subjects.get(p), ())
         record_rows = _row_from_yaml(
             p, residual, kgm_sources, kgm_labels, canonical_labels,
-            record=records[p], owners=owners, suppressions=suppressions)
+            record=records[p], owners=owners, suppressions=suppressions,
+            stable_subject=args.stable_subjects.get(p),
+            registry_objects=compatibility_objects)
         if not record_rows:
+            if any(obj.startswith("cas:") for obj in compatibility_objects):
+                raise ValueError(f"Canonical CAS identity has no eligible current mapping: {p}")
             skipped_unsupported += 1
             continue
         rows.extend(record_rows)
@@ -1494,7 +1677,7 @@ def _build_candidate(args, paths, before, stamp_sources, snapshot, frozen_paths,
     #      it ensures `just publish-sssom` from a clean workspace
     #      doesn't clobber audit history.
     # Pass ``--prior-stamps-from PATH`` (repeatable) to override.
-    if not args.no_preserve_validation:
+    if not args.no_preserve_validation and args.identity_mode == "legacy":
         prior_stamps: dict[tuple[str, str, str], str] = {}
         per_source: list[tuple[Path, int]] = []
         for src in stamp_sources:
@@ -1545,11 +1728,32 @@ def _build_candidate(args, paths, before, stamp_sources, snapshot, frozen_paths,
                     file=sys.stderr,
                 )
 
+    cas_proof = getattr(args, "cas_disposition_proof", None)
+    if args.identity_mode == "stable":
+        cas_proof = _STABLE_PRODUCER.finalize_cas_dispositions(cas_proof, final)
     staged = stage / "candidate.sssom.tsv"
-    _write_sssom(final, staged)
+    empty_version = None
+    if not final and args.identity_mode == "stable":
+        if not args.source_binding_result:
+            raise ValueError("No external rows; a genuine native source-binding candidate is required")
+        empty_version = _mapping_set_version([
+            {"subject_id": args.stable_subjects[p],
+             "mapping_date": _mapping_date(p, records[p].get("curation_history") or [])}
+            for p in records])
+    _write_sssom(
+        final,
+        staged,
+        mim_prefix=args.mim_prefix,
+        empty_version=empty_version,
+        cas_dispositions=cas_proof,
+    )
     proposed = staged.read_bytes()
     if not args.no_validate:
-        errors = _sssom_validate(staged)
+        if not final and args.identity_mode == "stable":
+            _STABLE_PRODUCER.validate_empty_candidate(staged, COLUMNS, args.mim_prefix)
+            errors = []
+        else:
+            errors = _sssom_validate(staged)
         if errors:
             raise ValueError("SSSOM validation FAILED: " + "; ".join(errors[:20]))
     if staged.read_bytes() != proposed:
@@ -1560,6 +1764,23 @@ def _build_candidate(args, paths, before, stamp_sources, snapshot, frozen_paths,
         args.output, proposed, sidecar,
         {
             "scope": "diagnostic candidate; not canonical promotion or scientific approval",
+            "identity_mode": args.identity_mode,
+            "stable_id_contract_sha256": args.mim_stable_id_contract_sha256,
+            "source_binding_candidate": args.source_binding_result,
+            "source_binding_native_producers": [str(p) for p in
+                (_STABLE_PRODUCER.native_source_paths(MIM_ROOT) if args.source_bindings_bundle else ())],
+            "owner_subjects": {str(p): subject for p, subject in args.stable_subjects.items()},
+            "owner_candidate_accounting": [
+                {"path": str(p), "subject_id": subject,
+                 "mapping_status": records[p].get("mapping_status"),
+                 "external_candidate_rows": sum(row["subject_id"] == subject for row in final),
+                 "scientific_approval_added": False}
+                for p, subject in args.stable_subjects.items()],
+            "registry_compatibility_objects": args.registry_objects,
+            "registry_retirement_proposal": args.registry_retirement,
+            "cas_dispositions": cas_proof,
+            "validation_replay": ("legacy triple/strength policy" if args.identity_mode == "legacy"
+                                  else "disabled: fresh science requires fresh review; prior artifacts remain inputs"),
             "external_sssom_validation": "skipped_explicitly" if args.no_validate else "passed",
             "prior_stamp_sources": [str(p) for p in stamp_sources],
             "source_inputs": [{"path": str(p), "sha256": _digest(content)}
@@ -1606,7 +1827,6 @@ def _build_candidate(args, paths, before, stamp_sources, snapshot, frozen_paths,
     print("Object-prefix breakdown:", file=sys.stderr)
     for pref, n in sorted(pref_counts.items(), key=lambda kv: -kv[1]):
         print(f"  {pref:10s} {n}", file=sys.stderr)
-
 
 
 if __name__ == "__main__":

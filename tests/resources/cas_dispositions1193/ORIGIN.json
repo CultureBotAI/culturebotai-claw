@@ -1,0 +1,181 @@
+{
+  "canonical_sha256": "3d9f1ac412209266034319542f225918b78b4e6a8e0658b53ee0689b4fb4dafe",
+  "native": [
+    {
+      "file": "scripts__record_review.py.txt",
+      "head": "7552b591277f0d0e2f3be206e4f51238ff966c77",
+      "path": "scripts/record_review.py",
+      "sha256": "95a4ec41e38ec47ba3578e76838c46a0adbf47e49ad3636524735d08cfcb1c4d"
+    },
+    {
+      "file": "schema__record_review.yaml.txt",
+      "head": "7552b591277f0d0e2f3be206e4f51238ff966c77",
+      "path": "schema/record_review.yaml",
+      "sha256": "229baf9b69118a1fe318e4c31085c0820e4e3d1365e7b04d6ace451b7c35f9bb"
+    },
+    {
+      "file": "MAPPING_SEMANTICS.md.txt",
+      "head": "7552b591277f0d0e2f3be206e4f51238ff966c77",
+      "path": "MAPPING_SEMANTICS.md",
+      "sha256": "ba63481d6d61e011cdc1ae02885c3cf239de5d5932162003165126c0141926d3"
+    },
+    {
+      "file": "LICENSE.txt",
+      "head": "7552b591277f0d0e2f3be206e4f51238ff966c77",
+      "path": "LICENSE",
+      "sha256": "a970da11ab082b80c07834961b408d679d9bf82b45e2d6436fd49c6e0a9249e5"
+    }
+  ],
+  "owner_source_head": "8df4a67b9e6bb1a5afa9e666fc99a34b844a01aa",
+  "owners": [
+    {
+      "canonical_data_position": 953,
+      "file": "D-limonene.yaml",
+      "path": "data/ingredients/mapped/D-limonene.yaml",
+      "row": {
+        "comment": "",
+        "confidence": "0.9",
+        "mapping_date": "2026-05-02",
+        "mapping_justification": "semapv:ManualMappingCuration",
+        "object_id": "cas:138-86-7",
+        "object_label": "d-limonene",
+        "object_source": "registry:cas",
+        "other": "CAS:138-86-7",
+        "predicate_id": "skos:exactMatch",
+        "source": "MIM:CultureBotHT|MIM:curator=auto_classify_ingredient_type",
+        "subject_id": "MIM:0000862",
+        "subject_label": "d-limonene",
+        "validation_method": "none|UNKNOWN_TERM|2026-07-07"
+      },
+      "sha256": "3e587ecd29cfb9e4bd2567a03d27c0fd75aa6f5344b2178e6bdfc2aebb7a4978"
+    },
+    {
+      "canonical_data_position": 1841,
+      "file": "Methyl-2-Hydroxy-Phenylproprionate.yaml",
+      "path": "data/ingredients/mapped/Methyl-2-Hydroxy-Phenylproprionate.yaml",
+      "row": {
+        "comment": "",
+        "confidence": "0.9",
+        "mapping_date": "2026-05-02",
+        "mapping_justification": "semapv:ManualMappingCuration",
+        "object_id": "cas:89471-28-0",
+        "object_label": "Methyl-2-Hydroxy-Phenylproprionate",
+        "object_source": "registry:cas",
+        "other": "CAS:89471-28-0",
+        "predicate_id": "skos:exactMatch",
+        "source": "MIM:CultureBotHT|MIM:curator=auto_classify_ingredient_type",
+        "subject_id": "MIM:0001639",
+        "subject_label": "Methyl-2-Hydroxy-Phenylproprionate",
+        "validation_method": "none|UNKNOWN_TERM|2026-07-07"
+      },
+      "sha256": "25cbb95675ee8660b42cafbc1bfc8759e77c4e1444e78726f08e9e4aa8946d2e"
+    },
+    {
+      "canonical_data_position": 2487,
+      "file": "S-adenosyl_Homocysteine.yaml",
+      "path": "data/ingredients/mapped/S-adenosyl_Homocysteine.yaml",
+      "row": {
+        "comment": "",
+        "confidence": "0.9",
+        "mapping_date": "2026-05-02",
+        "mapping_justification": "semapv:ManualMappingCuration",
+        "object_id": "cas:9789-92-0",
+        "object_label": "S-adenosyl Homocysteine",
+        "object_source": "registry:cas",
+        "other": "S-(5\u2032-Adenosyl)-L-homocysteine|CAS:9789-92-0",
+        "predicate_id": "skos:exactMatch",
+        "source": "MIM:CultureBotHT|MIM:curator=auto_classify_ingredient_type",
+        "subject_id": "MIM:0002227",
+        "subject_label": "S-adenosyl Homocysteine",
+        "validation_method": "none|UNKNOWN_TERM|2026-07-07"
+      },
+      "sha256": "e804bc8fb9cf73c0c182b5b70ace0c719a760dd72743c8c99b7d1e0d633c805f"
+    },
+    {
+      "canonical_data_position": 1266,
+      "file": "Furaltadone_Hydrochloride.yaml",
+      "path": "data/ingredients/mapped/Furaltadone_Hydrochloride.yaml",
+      "row": {
+        "comment": "",
+        "confidence": "0.99",
+        "mapping_date": "2026-10-03",
+        "mapping_justification": "semapv:ManualMappingCuration",
+        "object_id": "NCIT:C217928",
+        "object_label": "Furaltadone Hydrochloride",
+        "object_source": "obo:ncit.owl",
+        "other": "CAS:3759-92-1",
+        "predicate_id": "skos:exactMatch",
+        "source": "MIM:CultureBotHT|MIM:NCIT via OLS (label-exact)|MIM:curator=backfill_parent_terms|MIM:curator=yaml_record_review",
+        "subject_id": "MIM:0001139",
+        "subject_label": "Furaltadone hydrochloride",
+        "validation_method": "manual:yaml_record_review|EXACT_NCIT|2026-10-03"
+      },
+      "sha256": "7be5ca1c837dc8003680e81d72df056fbf2e69bf8c44e0208c682abef747d0e1"
+    },
+    {
+      "canonical_data_position": 1548,
+      "file": "Kanamycin_Sulfate.yaml",
+      "path": "data/ingredients/mapped/Kanamycin_Sulfate.yaml",
+      "row": {
+        "comment": "",
+        "confidence": "0.99",
+        "mapping_date": "2026-08-27",
+        "mapping_justification": "semapv:LexicalMatching",
+        "object_id": "CHEBI:6109",
+        "object_label": "kanamycin A sulfate",
+        "object_source": "obo:chebi.owl",
+        "other": "Kanamycin acid sulfate|Kanamycin monosulfate|CAS:25839-94-0",
+        "predicate_id": "skos:exactMatch",
+        "source": "MIM:CultureMech|MIM:curator=refresh_occurrence_statistics|kgm:chebi_xrefs|kgm:culturebotai_reviewed|kgm:mediaingredientmech_reviewed|kgm:mediaingredientmech_reviewed[curator=auto_classify_ingredient_type]|kgm:mediaingredientmech_reviewed[curator=cbclaw_kg_microbe_sweep]|kgm:mediaingredientmech_reviewed[curator=correct_stale_ontology_labels.py]|kgm:mediaingredientmech_reviewed[curator=migrate_media_roles_to_facets]|kgm:primary_mappings[kegg_compound]",
+        "subject_id": "MIM:0001389",
+        "subject_label": "Kanamycin sulfate",
+        "validation_method": "OAK+OLS:chebi|CONFIRMED|2026-07-07"
+      },
+      "sha256": "445218d5336935d0186a08073985d850b2864dfe36d0ac0a334fbe0fbe089351"
+    },
+    {
+      "canonical_data_position": 1868,
+      "file": "Methylglyoxal.yaml",
+      "path": "data/ingredients/mapped/Methylglyoxal.yaml",
+      "row": {
+        "comment": "",
+        "confidence": "0.99",
+        "mapping_date": "2026-05-02",
+        "mapping_justification": "semapv:LexicalMatching",
+        "object_id": "CHEBI:17158",
+        "object_label": "methylglyoxal",
+        "object_source": "obo:chebi.owl",
+        "other": "2-Oxopropanal|CAS:79-98-8",
+        "predicate_id": "skos:exactMatch",
+        "source": "MIM:CultureBotHT|MIM:curator=auto_classify_ingredient_type|kgm:chebi_xrefs|kgm:mediaingredientmech_reviewed|kgm:mediaingredientmech_reviewed[curator=audit_integrate_culturebotht]|kgm:mediaingredientmech_reviewed[curator=auto_classify_ingredient_type]|kgm:primary_mappings[kegg_compound]",
+        "subject_id": "MIM:0001663",
+        "subject_label": "methylglyoxal",
+        "validation_method": "OAK+OLS:chebi|CONFIRMED|2026-07-07"
+      },
+      "sha256": "500cc73f11811daf04ee8b806bb3b5f23ac2ad078f9f44705dc36bbe2ab4723f"
+    },
+    {
+      "canonical_data_position": 2173,
+      "file": "Oxalic_Acid.yaml",
+      "path": "data/ingredients/mapped/Oxalic_Acid.yaml",
+      "row": {
+        "comment": "",
+        "confidence": "0.99",
+        "mapping_date": "2026-05-02",
+        "mapping_justification": "semapv:LexicalMatching",
+        "object_id": "CHEBI:16995",
+        "object_label": "oxalic acid",
+        "object_source": "obo:chebi.owl",
+        "other": "CAS:144-62-1",
+        "predicate_id": "skos:exactMatch",
+        "source": "MIM:CultureBotHT|MIM:curator=auto_classify_ingredient_type|kgm:chebi_xrefs|kgm:mediaingredientmech_reviewed|kgm:mediaingredientmech_reviewed[curator=audit_integrate_culturebotht]|kgm:mediaingredientmech_reviewed[curator=auto_classify_ingredient_type]|kgm:primary_mappings[kegg_compound]",
+        "subject_id": "MIM:0001956",
+        "subject_label": "Oxalic Acid",
+        "validation_method": "OAK+OLS:chebi|CONFIRMED|2026-07-07"
+      },
+      "sha256": "427316df263ab014e9caa79523272728d39884dcb7ac5e842acd87cb42b34f25"
+    }
+  ],
+  "repository": "CultureBotAI/MediaIngredientMech",
+  "scope": "Exact seven historical row/current-owner captures; synthetic disposition tests are not campaign approval."
+}

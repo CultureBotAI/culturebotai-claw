@@ -1,0 +1,68 @@
+identifier: NCIT:C217928
+preferred_term: Furaltadone hydrochloride
+ontology_mapping:
+  ontology_id: NCIT:C217928
+  ontology_label: Furaltadone Hydrochloride
+  ontology_source: NCIT
+  mapping_quality: EXACT_MATCH
+  evidence:
+  - evidence_type: DATABASE_MATCH
+    source: CultureBotHT
+    notes: 'Imported from CultureBotHT. CAS-RN 3759-92-1 present, but no CHEBI entry
+      exists (checked OAK CHEBI sqlite + PubChem CID synonyms). FEBA/Hans80 panels:
+      Hans80Anti. Curator can promote to a CHEBI primary if/when CHEBI adds the term.'
+  - evidence_type: DATABASE_MATCH
+    source: NCIT via OLS (label-exact)
+    notes: Parent class identified via label-exact; matched_via='Furaltadone hydrochloride'
+synonyms: []
+mapping_status: MAPPED
+occurrence_statistics:
+  total_occurrences: 0
+  media_count: 0
+curation_history:
+- timestamp: '2026-04-29T06:51:33.117170+00:00'
+  curator: audit_add_remaining_culturebotht
+  action: CREATED_FROM_CAS_FALLBACK
+  changes: Created with cas:3759-92-1 as primary identifier; no CHEBI entry exists
+    for this compound.
+  new_status: MAPPED
+  llm_assisted: false
+- timestamp: '2026-05-01T07:35:33.711965+00:00'
+  curator: auto_classify_ingredient_type
+  action: AUTO_CLASSIFY_INGREDIENT_TYPE
+  changes: 'set ingredient_type=SINGLE_INGREDIENT (cas: primary (defined chemical))'
+  llm_assisted: false
+- timestamp: '2026-05-02T03:12:14.599581+00:00'
+  curator: auto_classify_ingredient_type
+  action: AUTO_CLASSIFY_INGREDIENT_TYPE
+  changes: 'set ingredient_type=SINGLE_INGREDIENT (cas: primary (defined chemical))'
+  llm_assisted: false
+- timestamp: '2026-05-02T04:47:47.724637+00:00'
+  curator: backfill_parent_terms
+  action: BACKFILL_PARENT_NCIT
+  changes: set ontology_mapping parent=NCIT:C217928 (label-exact)
+  llm_assisted: false
+- timestamp: '2026-10-03T07:30:00+00:00'
+  curator: yaml_record_review
+  action: PROMOTED_TO_EXACT_NCIT
+  changes: Promoted NCIT:C217928 to the exact primary identifier because its label
+    exactly matches furaltadone hydrochloride; the unverified CAS registry CURIE should
+    no longer be emitted as the SSSOM identity row.
+  previous_status: MAPPED
+  new_status: MAPPED
+  llm_assisted: false
+- timestamp: '2026-11-08T22:01:42+00:00'
+  curator: codex
+  action: ASSIGNED_MIM_ID
+  changes: '#1265: assigned permanent MIM:0001139; retained mapping identifier and
+    legacy aliases.'
+  llm_assisted: true
+chemical_properties:
+  cas_rn: 3759-92-1
+  data_source: CultureBotHT compounds_to_cas.csv
+  retrieval_date: '2026-04-29T06:51:33.117170+00:00'
+ingredient_type: SINGLE_INGREDIENT
+mim_id: MIM:0001139
+legacy_identifiers:
+- MIM:Furaltadone_Hydrochloride
+- NCIT:C217928

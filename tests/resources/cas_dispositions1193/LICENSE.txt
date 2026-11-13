@@ -1,0 +1,22 @@
+MediaIngredientMech license scope
+=================================
+
+Project-authored data, including curated records, annotations, mappings and data
+exports, are licensed under Creative Commons Attribution 4.0 International
+(CC-BY-4.0). See LICENSE-DATA.
+
+Project-authored code, including software, scripts, tests, schemas and website
+templates, is licensed under BSD-3-Clause. See LICENSE-CODE.
+
+Project-authored narrative documentation is licensed under CC-BY-4.0. For
+attribution, identify MediaIngredientMech and its contributors, link to
+https://github.com/CultureBotAI/MediaIngredientMech, retain applicable source attributions
+and indicate changes.
+
+Third-party data, images, text, vendored code and other redistributed material
+retain their own licenses and notices. The project licenses apply only to
+material for which the project has licensing rights; they do not replace
+upstream terms.
+
+Previously released material remains available under the licenses offered with
+those releases.

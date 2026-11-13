@@ -1,5 +1,11 @@
 # MIM owned-name export
 
+The CLI requires an explicit `--identity-mode legacy` or `stable` selection.
+The historical recipe selects legacy. Stable mode uses the complete registered
+mapped/unmapped corpus and a separate native source-binding product when needed;
+see [stable MIM candidates](MIM_STABLE_ID_CANDIDATES.md). The ownership and
+transaction protections below remain required in both modes.
+
 The MIM builder applies the export policy adopted in
 [MIM #669](https://github.com/CultureBotAI/MediaIngredientMech/issues/669#issuecomment-6558035777):
 a preferred name owned by a different record is suppressed from a subject's
