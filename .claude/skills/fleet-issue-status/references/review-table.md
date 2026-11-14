@@ -13,6 +13,12 @@ the greatest consequence. Within the evidence review, retain the separate
 priority/theme/readiness ranking. Failed and truncated queues make count ranking
 provisional; zero-issue queues remain visible.
 
+For recent throughput, use `--closed-days 7`. The repository summary adds a
+closed-in-window count, with a shared UTC window and counted issue evidence in
+JSON. It counts currently closed issues by their latest closure timestamp and
+excludes PRs; reopened issues are not a historical closure-event count. This
+aggregate belongs to the repository summary, not repeated per-issue TSV rows.
+
 ## Portable fields
 
 The per-issue TSV appends these fields after its original 13 columns; JSON and

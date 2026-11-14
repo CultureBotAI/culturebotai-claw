@@ -35,6 +35,9 @@ uv run python scripts/fleet_issue_status.py --all-issues --no-prs --markdown
 # Machine-readable metadata, summary and issue rows.
 uv run python scripts/fleet_issue_status.py --all-issues --no-prs --json
 
+# Add the count of issues closed in the last seven days.
+uv run python scripts/fleet_issue_status.py --all-issues --no-prs --closed-days 7 --markdown
+
 # A named subset, also useful for the one-repository canary.
 uv run python scripts/fleet_issue_status.py --all-issues --no-prs --repo CultureBotAI/culturebotai-claw
 ```
@@ -63,6 +66,13 @@ The repository table is sorted by decreasing issue count, with manifest order
 breaking ties and failed queues last. It retains the unassigned, stale, oldest,
 and optional PR columns and adds review-progress/action counts. Issue counts
 exclude pull requests, unlike GitHub's repository `open_issues_count`.
+
+When requested, add `--closed-days 7` for a rolling seven-day closure count.
+The window is fixed in UTC for the whole acquisition and saved in the output.
+This counts currently closed issues whose latest closure falls in the window,
+not every close event for reopened issues. PRs are excluded. A failed closure
+query remains unknown and marks coverage partial without dropping the known
+open-issue count. JSON retains the counted issue identities and closure times.
 
 The full issue table starts at priority `Unranked` and action `unreviewed`.
 It carries source labels separately. Read the shared

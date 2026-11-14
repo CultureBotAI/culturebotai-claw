@@ -720,4 +720,105 @@ def test_markdown_file_and_json_share_one_acquisition(monkeypatch, capsys, tmp_p
     assert list(tmp_path.glob("*.tsv"))
 
 
+def _closed_issue(number, closed_at, **overrides):
+    return {"number": number, "html_url": f"https://github.com/Org/repo/issues/{number}",
+            "state": "closed", "closed_at": closed_at, **overrides}
+
+
+def test_closed_window_includes_both_boundaries_excludes_prs_and_reopened(monkeypatch):
+    pages = [[
+        _closed_issue(1, "2026-09-06T10:00:00Z"),
+        _closed_issue(2, "2026-09-13T10:00:00Z"),
+        _closed_issue(3, "2026-09-10T12:00:00Z"),
+        _closed_issue(4, "2026-09-06T09:59:59Z"),
+    ], [
+        _closed_issue(5, "2026-09-13T10:00:01Z"),
+        _closed_issue(6, "2026-09-10T12:00:00Z", pull_request={}),
+        _closed_issue(7, None, state="open"),
+    ]]
+    calls = []
+    def fake(args, timeout=60):
+        calls.append(args)
+        return _json.dumps(pages)
+    monkeypatch.setattr(fis, "_gh", fake)
+    data = _data()
+    fis.enrich_closed_issues(data, 7, SNAP)
+    assert data["closed_window"] == {
+        "days": 7, "start_utc": "2026-09-06T10:00:00Z", "end_utc": "2026-09-13T10:00:00Z",
+        "inclusive": True, "semantics": "currently_closed_latest_closure",
+    }
+    assert len(calls) == 2
+    for args in calls:
+        assert "--paginate" in args and "--slurp" in args
+        assert "state=closed" in args[-1] and "since=2026-09-06T09:59:59Z" in args[-1]
+    for repo in data["repos_queried"]:
+        assert [item["number"] for item in data["closed_issues"][repo]] == [3, 2, 1]
+    assert data["closed_errors"] == {}
+    assert snapshot_is_complete(data)
+    summary = fis.repository_summary(data, SNAP, 60)
+    assert all(row["closed_in_window"] == 3 and row["closed_status"] == "complete" for row in summary)
+    markdown = fis.render_markdown(data, SNAP, 60)
+    assert _markdown_summary_row(markdown, "TraitMech")["Closed in last 7 days"] == "3"
+    assert "latest closure" in markdown and "currently closed" in markdown
+    text = render(data, SNAP, 60)
+    assert "CLOSED 7d" in text
+
+
+def test_closed_failure_preserves_open_ranking_and_marks_unknown(monkeypatch):
+    def fake(args, timeout=60):
+        if "TraitMech" in args[-1]:
+            raise fis.GhError("HTTP 503")
+        return "[[]]"
+    monkeypatch.setattr(fis, "_gh", fake)
+    data = _data(issues={"culturebotai-claw": [_issue(1)], "TraitMech": [_issue(2), _issue(1)]})
+    fis.enrich_closed_issues(data, 7, SNAP)
+    summary = fis.repository_summary(data, SNAP, 60)
+    assert summary[0]["repo"] == "TraitMech" and summary[0]["open"] == 2
+    assert summary[0]["closed_in_window"] is None
+    assert summary[0]["closed_status"] == "error" and summary[0]["status"] == "partial"
+    assert summary[1]["closed_in_window"] == 0
+    assert data["errors"] == {} and data["closed_errors"] == {"TraitMech": "HTTP 503"}
+    assert "TraitMech" not in data["closed_issues"]
+    assert not snapshot_is_complete(data)
+    markdown = fis.render_markdown(data, SNAP, 60)
+    row = _markdown_summary_row(markdown, "TraitMech")
+    assert row["Open issues"] == "2" and row["Closed in last 7 days"] == "?"
+    assert "closed count unavailable" in markdown and "HTTP 503" in markdown
+
+
+@pytest.mark.parametrize("pages", [
+    [[_closed_issue(1, "2026-09-10T12:00:00Z")], [_closed_issue(1, "2026-09-10T12:00:00Z")]],
+    [[_closed_issue(1, None)]],
+    [[_closed_issue(1, "2026-09-10T12:00:00")]],
+])
+def test_malformed_or_duplicate_closed_results_are_unknown(monkeypatch, pages):
+    monkeypatch.setattr(fis, "_gh", lambda *args, **kwargs: _json.dumps(pages))
+    data = _data()
+    fis.enrich_closed_issues(data, 7, SNAP)
+    assert set(data["closed_errors"]) == set(data["repos_queried"])
+    assert data["closed_issues"] == {}
+    assert not snapshot_is_complete(data)
+
+
+def test_closed_failures_exit_nonzero_but_retain_json_open_counts(monkeypatch, capsys):
+    monkeypatch.setattr(fis.shutil, "which", lambda command: "/usr/bin/gh")
+    monkeypatch.setattr(fis, "collect", lambda *args, **kwargs: _data())
+    def unavailable(*args, **kwargs):
+        raise fis.GhError("offline")
+    monkeypatch.setattr(fis, "_gh", unavailable)
+    assert main(["--closed-days", "7", "--json", "--no-tsv"]) == 1
+    payload = _json.loads(capsys.readouterr().out)
+    assert payload["repository_summary"][0]["open"] == 1
+    assert payload["repository_summary"][0]["closed_in_window"] is None
+    assert payload["closed_window"]["end_utc"] == payload["snapshot_utc"].replace("+00:00", "Z")
+
+
+def test_nonpositive_closed_days_rejected_before_network(monkeypatch, capsys):
+    def never(*args, **kwargs):
+        raise AssertionError("must reject before network")
+    monkeypatch.setattr(fis, "collect", never)
+    assert main(["--closed-days", "0", "--no-tsv"]) == 2
+    assert main(["--closed-days", "-1", "--no-tsv"]) == 2
+
+
 

@@ -198,11 +198,59 @@ def snapshot_is_complete(data: dict) -> bool:
         data["errors"]
         or data["issue_listing_truncated"]
         or data["pr_listing_truncated"]
+        or data.get("closed_errors")
     )
 
 
 def _parse_time(value: str) -> _dt.datetime:
     return _dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def enrich_closed_issues(data: dict, days: int, snapshot_utc: str) -> None:
+    """Count currently closed issues by latest closure in one shared UTC window.
+
+    REST's since filters update time, a superset of the closure window. A
+    one-second lookback preserves the inclusive start boundary; filter the
+    returned closed_at timestamps exactly. Reopened issues and PRs do not count.
+    """
+    end = _parse_time(snapshot_utc).astimezone(_dt.timezone.utc)
+    start = end - _dt.timedelta(days=days)
+    since = (start - _dt.timedelta(seconds=1)).isoformat().replace("+00:00", "Z")
+    data["closed_window"] = {
+        "days": days, "start_utc": start.isoformat().replace("+00:00", "Z"),
+        "end_utc": end.isoformat().replace("+00:00", "Z"), "inclusive": True,
+        "semantics": "currently_closed_latest_closure",
+    }
+    data["closed_issues"], data["closed_errors"] = {}, {}
+    failures = (GhError, subprocess.TimeoutExpired, ValueError, KeyError, TypeError, AttributeError)
+    for repo in data["repos_queried"]:
+        identity = data["repository_identities"][repo]
+        try:
+            pages = json.loads(_gh([
+                "api", "--method", "GET", "--paginate", "--slurp",
+                f"repos/{identity}/issues?state=closed&since={since}&per_page=100",
+            ], timeout=180))
+            if not isinstance(pages, list) or any(not isinstance(page, list) for page in pages):
+                raise GhError("invalid paginated closed-issue response")
+            evidence = []
+            seen = set()
+            for page in pages:
+                for item in page:
+                    if "pull_request" in item or item["state"] != "closed":
+                        continue
+                    number = item["number"]
+                    if number in seen:
+                        raise GhError("duplicate issue in closed-issue pages")
+                    seen.add(number)
+                    closed_at = _parse_time(item["closed_at"])
+                    if closed_at.tzinfo is None:
+                        raise GhError("closed_at lacks timezone")
+                    if start <= closed_at <= end:
+                        evidence.append({"number": number, "url": item["html_url"],
+                                         "closed_at": item["closed_at"]})
+            data["closed_issues"][repo] = sorted(evidence, key=lambda item: -item["number"])
+        except failures as exc:
+            data["closed_errors"][repo] = str(exc)[:200]
 
 
 def _days_between(earlier: str, now: _dt.datetime) -> int:
@@ -312,6 +360,14 @@ def repository_summary(data: dict, snapshot_utc: str, stale_days: int) -> list[d
             row["status"] = "partial" if repo in data["issue_listing_truncated"] or repo in data["pr_listing_truncated"] else "complete"
             if data.get("include_prs", True):
                 row["prs"] = _pr_summary(data["prs"][repo])
+        if "closed_window" in data:
+            closed_error = data["closed_errors"].get(repo)
+            row["closed_in_window"] = None if closed_error else len(data["closed_issues"][repo])
+            row["closed_status"] = "error" if closed_error else "complete"
+            if closed_error:
+                row["closed_error"] = closed_error
+                if row["status"] == "complete":
+                    row["status"] = "partial"
         rows.append(row)
     return rows
 
@@ -392,6 +448,8 @@ def render(data: dict, snapshot_utc: str, stale_days: int) -> str:
     )
     if include_prs:
         header += f" {'PRs':>4} {'CONFLICTS':>9} {'DRAFTS':>6}"
+    if "closed_window" in data:
+        header += f" {'CLOSED ' + str(data['closed_window']['days']) + 'd':>12}"
     header += " REVIEWED UNREVIEWED KEEP CLOSE DEFER"
     rows: list[str] = []
     summaries = {row["repo"]: row for row in repository_summary(data, snapshot_utc, stale_days)}
@@ -400,6 +458,9 @@ def render(data: dict, snapshot_utc: str, stale_days: int) -> str:
             row = f"{repo:<21} {'?':>6} {'?':>10} {'?':>10} {'?':>7}"
             if include_prs:
                 row += f" {'?':>4} {'?':>9} {'?':>6}"
+            if "closed_window" in data:
+                count = summaries[repo]["closed_in_window"]
+                row += f" {str(count) if count is not None else '?':>12}"
             rows.append(row + "        ?          ?    ?     ?     ?  NOT QUERIED")
             continue
         issues = summarize(data["issues"].get(repo, []), now, stale_days)
@@ -414,6 +475,9 @@ def render(data: dict, snapshot_utc: str, stale_days: int) -> str:
             total_prs += prs["open"]
             row += f" {prs['open']:>4} {prs['conflicts']:>9} {prs['drafts']:>6}"
         summary = summaries[repo]
+        if "closed_window" in data:
+            count = summary["closed_in_window"]
+            row += f" {str(count) if count is not None else '?':>12}"
         row += (f" {summary['reviewed']:>8} {summary['unreviewed']:>10}"
                 f" {summary['keep']:>4} {summary['close']:>5} {summary['defer']:>5}")
         rows.append(row)
@@ -439,6 +503,15 @@ def render(data: dict, snapshot_utc: str, stale_days: int) -> str:
         "issue counts exclude pull requests"
     )
     lines.append("  review actions are recommendations only; counts do not assign priority")
+    if "closed_window" in data:
+        window = data["closed_window"]
+        lines.append(
+            f"  closed window: [{window['start_utc']}, {window['end_utc']}] inclusive; "
+            "currently closed issues whose latest closure falls in this window; "
+            "excludes PRs and reopened issues, not a count of all historical closure events"
+        )
+        for repo, error in data["closed_errors"].items():
+            lines.append(f"  ERROR {repo}: closed count unavailable — {error}; open counts retained")
     if data["issue_listing_truncated"]:
         lines.append(
             f"  WARNING: issue listing reached --issue-limit ({data['issue_limit']}) in "
@@ -476,6 +549,9 @@ def render_markdown(data: dict, snapshot_utc: str, stale_days: int) -> str:
     if data.get("include_prs", True):
         fields.extend(["pr_open", "pr_conflicts", "pr_drafts"])
         headings.extend(["PRs", "Conflicts", "Drafts"])
+    if "closed_window" in data:
+        fields.append("closed_in_window")
+        headings.append(f"Closed in last {data['closed_window']['days']} days")
     fields.extend(["reviewed", "unreviewed", "keep", "close", "defer", "status"])
     headings.extend(["Reviewed", "Unreviewed", "Keep", "Close", "Defer", "Coverage"])
     lines = ["# Fleet issue review intake", "", f"Snapshot: {snapshot_utc}", "",
@@ -528,6 +604,7 @@ def main(argv: list[str] | None = None) -> int:
                     help="cap on open PRs counted per repo")
     ap.add_argument("--stale-days", type=int, default=60,
                     help="an issue with no update in this many days is stale")
+    ap.add_argument("--closed-days", type=int, help="also count currently closed issues with a latest closure in this many days")
     ap.add_argument("--no-prs", action="store_false", dest="include_prs",
                     help="issues only; skip the PR columns and queries")
     output = ap.add_mutually_exclusive_group()
@@ -549,6 +626,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.stale_days < 0:
         print("--stale-days must not be negative", file=sys.stderr)
         return 2
+    if args.closed_days is not None and args.closed_days <= 0:
+        print("--closed-days must be a positive integer", file=sys.stderr)
+        return 2
     if shutil.which("gh") is None:
         print("gh not found on PATH", file=sys.stderr)
         return 2
@@ -566,6 +646,12 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     snapshot_utc = _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds")
+    if args.closed_days is not None:
+        try:
+            enrich_closed_issues(data, args.closed_days, snapshot_utc)
+        except (ValueError, OverflowError) as exc:
+            print(f"closed-window input failed validation: {exc}", file=sys.stderr)
+            return 2
 
     if args.markdown_file:
         try:
