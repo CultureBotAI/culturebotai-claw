@@ -4,8 +4,9 @@ The session supervisor can report leaked loopback listeners and, after an
 operator-approved canary, recycle one verified-idle agy session by exact ID.
 Its preferred opportunity is a verified goal boundary: after accepting the
 completed goal's closure and before dispatching the next goal, it checks that
-session against the configurable 500-listener threshold. An idle scan remains
-available when host or per-process pressure exceeds its fallback thresholds.
+session against the configurable 500-listener threshold. The explicit `goal_boundary_only` policy excludes idle fallback even under critical
+host pressure. The compatible `goal_boundary_or_idle` default also permits an idle
+scan when host or per-process pressure exceeds its fallback thresholds.
 This is a workaround for #725, not a change to the enterprise sandbox policy.
 It never sends signals to an agent, changes the port range, or answers prompts.
 The restart transaction never submits goal text. After a successful boundary
@@ -27,12 +28,14 @@ and input lock directory. Add this object to that supervisor configuration:
 {
   "port_pressure": {
     "mode": "report",
+    "restart_policy": "goal_boundary_only",
+    "controller_config_path": "/absolute/path/to/monitoring/config.json",
     "host_ratio": 0.5,
     "per_pid_limit": 1000,
     "goal_boundary_limit": 500,
     "cooldown_seconds": 3600,
-    "hourly_cap": 2,
-    "restart_repository_keys": null,
+    "hourly_cap": 1,
+    "restart_repository_keys": ["communitymech"],
     "binding_files": [
       {"role": "monitor", "path": "/absolute/path/to/monitor-targets.json"},
       {"role": "approval", "path": "/absolute/path/to/approval-targets.json"}
@@ -50,47 +53,89 @@ single repository key and set `hourly_cap` to `1`. Keep the full supervisor
 target list and the original binding files; do not remove other monitored sessions.
 
 Both binding files must use the native target-list format: either a list or an
-object containing `targets`. Their exact old PID, start identity, TTY and cwd
-must match. They may name the same file. The supervisor's own `--config` file is
-the third binding. Other targets and settings are preserved. All three bindings
-are preflighted before `/quit`, checked for concurrent edits, atomically replaced
-one file at a time and read back. The supervisor also replaces its in-memory
-identity, drops its native cache, and records old/new PIDs in session status.
-A partial update stops the guard and leaves a recovery journal; it is not retried.
+object containing `targets`. Their exact old PID, start identity, TTY, cwd and
+native conversation must match. They may name the same file. The supervisor's
+own `--config` file is the third binding. Other targets and settings are
+preserved. A stable `recovery_identity` is required in the approval registry.
 
-The approval monitor must acquire the same per-TTY input lock and reload its
-target file before acting. File rebinding does not prove an external monitor
-reloads cached settings: verifying effective live monitor behavior is a required
-part of the approved canary. Do not enable automatic recycling with an adapter
-whose reload/input-lock contract has not been checked.
+The old static-PID approval monitor cannot safely participate. Restart preflight
+requires the existing resident monitor's fresh `binding_reload` acknowledgment,
+the pinned shared adapter and the actual shared input-lock directory. It checks
+all source pins under the lifecycle lease immediately before quit. The guard
+retains the target input lease while the existing monitor performs data-only
+reload; reload does not acquire that lease. Every approval, redraw and recovery
+input rechecks the generation after acquiring its input lock.
 
-Each eligible target also needs an explicitly reviewed restart identity:
+Before the first quit input, `port-pressure-attempts/<unique-id>/` retains exact
+binding/controller bytes, registered identity evidence, boundary and native
+observation, with checksums and fsync. Phase evidence is created exclusively;
+failed/unfinished attempts are never reused. Binding installation retains its
+own immutable before/after files and manifests under
+`binding-reload-evidence/<unique-id>/`. Each replacement is atomic; the set of
+files is not one atomic filesystem transaction. A prepared/partial transaction
+blocks input. Only the changed target-file integrity pin is refreshed by CAS
+under the existing `lifecycle.lock`; code pins and unrelated settings stay fixed.
+
+Success requires a fresh acknowledgment from the same resident PID/start,
+configured argv and cwd, proving exact effective approval **and recovery** maps,
+source/config/target hashes and generation. Disk-only readback is insufficient.
+Only then does the supervisor update its in-memory identity/cache and status.
+Any missing acknowledgment, concurrent edit, partial write or uncertain outcome
+latches the guard. There is no automatic retry, budget reset or rollback.
+
+Each eligible target needs a reviewed closed registration. This example is
+illustrative, not a usable deployment record:
 
 ```json
 {
   "port_pressure_identity": {
+    "schema_version": 1,
+    "repository_key": "communitymech",
+    "native_session_id": "11111111-2222-3333-4444-555555555555",
+    "tty": "/dev/ttys001",
+    "cwd": "/absolute/path/to/CommunityMech",
     "agy_executable": "/absolute/path/to/agy",
-    "model": "gemini-3-pro",
+    "executable_sha256": "<64 lowercase hex characters from actual bytes>",
+    "model": "<explicit-cli-selector>",
     "effort": "high",
-    "model_label": "Gemini 3 Pro",
-    "effort_label": "high"
+    "model_label": "<complete actual model footer field>",
+    "effort_label": "high",
+    "evidence": {
+      "path": "/absolute/durable/path/restart-identity-evidence.json",
+      "sha256": "<SHA-256 of the exact retained evidence bytes>"
+    }
   }
 }
 ```
 
-These are illustrative values, not deployment defaults. Record the actual
-executable, CLI model/effort and current UI labels. The adapter currently accepts
-complete model/effort fields separated by `|` or `·`, or the native
-`Gemini 3.1 Pro (High)` shape, on the current Gemini footer after the empty
-composer. The shortcut legend preceding the model is excluded. Historical,
-partial, mixed-line or unfamiliar labels
-refuse maintenance. The running executable must match the configured executable.
-An agy UI/log format change requires review and fixtures before use.
+The closed evidence contract is defined by
+`kg_microbe_workflows.port_pressure_identity.EVIDENCE_KEYS`: schema version 1,
+source kind `process_argv`, UTC-aware `observed_at`, PID/full process-start
+identity, native conversation, tty/cwd, executable path/digest, footer labels
+and exact argv `[executable, --conversation=ID, --model=SELECTOR, --effort=EFFORT]`.
+The collector must obtain these values from the actual process, not construct
+missing flags from a model's display name. Its hash binds the retained capture;
+it does not authenticate the person who observed it. Operator review remains a
+trust boundary. The adapter accepts only that exact, whitespace-free CLI form
+before quit and after resume. Legacy `agy -c` and conversation-only invocations
+remain held until a separately reviewed effective-model evidence source exists.
+A correct model label alone cannot establish the CLI selector.
+
+Read the executable/version from loaded-process metadata without executing agy
+or an updater. A missing loaded image or changed binary digest refuses restart;
+the current installed pathname may refer to a different release. The adapter
+rehashes the canonical executable before quit, immediately before resume and on
+the resumed process. UI model/effort proof accepts complete fields separated by
+`|` or `·`, or the native `Gemini 3.1 Pro (High)` footer shape. Historical,
+partial, mixed or unfamiliar labels refuse maintenance.
 
 The native index, this run's `status.json` goal conversation ID and the PID's
 own open `cli-*.log` must agree with the configured exact conversation ID.
 Missing/ambiguous IDs stop the guard. The current log adapter recognizes keyed
-`conversation_id`, `conversationId` or `Conversation ID` UUID fields. It never
+`conversation_id`, `conversationId` or `Conversation ID` UUID fields, and the
+anchored native `I<date> <time> <thread> server.go:<line>] GetConversationDetail:
+found conversation <UUID> (active=<boolean>)` form. Multiple owned log files or
+conflicting IDs remain a hold; filename age is not authority. It never
 substitutes the most recent thread or an ID found only in screen history.
 
 ## Report-only command on the approved Intel deployment
@@ -236,3 +281,66 @@ verifying exactly two listeners and rebinding the assessed runtime. Those are
 stricter checks than the shell reference's optional supervisor-ID comparison
 and model-drift warning. The supplied November 4 and November 6 restart logs
 are historical corroboration, not a live acceptance test of this implementation.
+
+
+## Preparing the resident reload migration
+
+This is a separate reviewed deployment, not a side effect of opening or merging
+code. Do not edit a running monitor to enable the canary. The preparation command
+requires exact reviewed input hashes and an absent durable output directory:
+
+```bash
+python scripts/prepare_mech_approval_binding_reload.py \
+  --monitor "$APPROVAL_MONITOR_SOURCE" --monitor-sha256 "$MONITOR_SHA256" \
+  --recovery "$RECOVERY_SOURCE" --recovery-sha256 "$RECOVERY_SHA256" \
+  --controller-config "$MONITOR_CONTROLLER_CONFIG" \
+  --output "$OWNED_DURABLE_PROPOSAL_DIRECTORY"
+```
+
+It creates proposed `monitor.py`, `token_limit_recovery.py`, the adapter and a
+manifest. It never installs or starts them. Exact structural anchors fail closed
+if the installation differs; inspect the complete diff. The selection policy,
+flags, native-inline IDs, task recovery limits, counters and existing attempt
+history must remain unchanged. The hooks replace only static session bindings,
+attach the existing Recovery instance and guard all three input paths. The
+actual monitor `INPUT_LOCK_DIR` must be `ROOT / 'input-locks'`, matching Recovery
+and the supervisor, not merely a different valid directory.
+
+The separately reviewed controller proposal adds:
+
+```json
+{
+  "binding_reload": {
+    "version": 1,
+    "journal": "/absolute/monitor-control/binding-reload.json",
+    "adapter": "/absolute/approval-runtime/mech_approval_bindings.py",
+    "input_lock_dir": "/absolute/approval-runtime/input-locks"
+  }
+}
+```
+
+Place it in `services.approvals`; retain the target-file integrity pin, add the
+adapter pin and refresh only the reviewed modified monitor/recovery source pins.
+No approval rules, other identities or budgets change. Stop/start the affected
+monitor only through the documented lifecycle controller, with separate user
+approval. Require a fresh baseline effective-generation acknowledgment, matching
+sources and all expected bindings before considering restart mode. Approval
+counts and recovery history must survive. Existing status consumers show disk
+binding counts; the `binding_reload` acknowledgment supplies effective-consumer
+proof and must be examined as well.
+
+For the first separately approved canary, keep only Community eligible, use
+`restart_policy: goal_boundary_only`, `hourly_cap: 1`,
+`goal_boundary_limit: 500` and the existing 3600-second cooldown. All other targets
+remain excluded. Require fresh identity registration, a legitimate completed-goal
+closure, no prompt/tool/timer, exact conversation/model/effort, native acceptance
+of the explicit resume, two listeners and effective controller readback. High
+host pressure does not waive any check or authorize idle fallback. Retain a
+complete attempt and binding receipt, then seek separate rollout approval.
+
+Before any agent PID changes, an approved failed adapter deployment can restore
+its exact backed-up sources/config through the same stopped lifecycle. After an
+agent PID changes, never restore stale binding files blindly. Keep the guard
+held; retain the current process evidence and immutable transaction, and prepare
+an exact reviewed reconciliation. Do not restore counters, reset budgets, replay
+goals or advance stages as part of recovery.

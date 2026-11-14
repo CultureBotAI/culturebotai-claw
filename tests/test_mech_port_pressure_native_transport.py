@@ -5,6 +5,7 @@ process/socket/native/Terminal dependency is injected; the JS guard runs in Node
 with an Application stub, never against Terminal or a live session.
 """
 import copy
+import hashlib
 import importlib.util
 import json
 import shutil
@@ -43,6 +44,7 @@ class Evidence:
         self.calls = []
         self.inputs = []
         self.before_send = None
+        self.publish_bindings = None
         self.on_input = None
         self.screen = IDLE
         self.tab = {"window": 7, "tab": 1, "tty": "/dev/ttys001"}
@@ -101,9 +103,28 @@ class Evidence:
         supervisor_module.atomic_json(self.config_path, config)
         common = {"pid": 100, "tty": self.target["tty"], "cwd": str(self.root),
                   "identity": self.identity(100), "started": self.records[100]["started"],
-                  "native_session_id": CID, "unrelated_setting": "preserve"}
+                  "native_session_id": CID, "recovery_identity": "stable-before-restart", "unrelated_setting": "preserve"}
         supervisor_module.atomic_json(self.monitor_path, {"targets": [common], "policy": "preserve"})
         supervisor_module.atomic_json(self.approval_path, [common])
+        registration = self.target["port_pressure_identity"]
+        capture = {"schema_version": 1, "source_kind": "process_argv", "observed_at": START.isoformat(),
+                   "pid": 100, "process_identity": self.identity(100), "native_session_id": CID,
+                   "tty": self.target["tty"], "cwd": str(self.root), "agy_executable": str(self.executable),
+                   "executable_sha256": hashlib.sha256(self.executable.read_bytes()).hexdigest(),
+                   "argv": [str(self.executable), "--conversation=" + CID, "--model=gemini-3-pro", "--effort=high"],
+                   "model_label": "Gemini 3 Pro", "effort_label": "high"}
+        evidence_path = tmp_path / "registration-evidence.json"
+        evidence_path.write_text(json.dumps(capture))
+        registration.update(schema_version=1, repository_key="traitmech", native_session_id=CID,
+                            tty=self.target["tty"], cwd=str(self.root),
+                            executable_sha256=capture["executable_sha256"],
+                            evidence={"path": str(evidence_path),
+                                      "sha256": hashlib.sha256(evidence_path.read_bytes()).hexdigest()})
+        helper = load("reload_fixture_helper", "tests/test_mech_session_port_pressure.py")
+        adapter, self.publish_bindings, self.resident, self.recovery, self.controller = helper.reload_fixture(
+            self.supervisor, [self.monitor_path, self.approval_path, self.config_path], self.target,
+            guard.bindings, lambda: self.now)
+        self.transport.binding_adapter = adapter
 
     def add_process(self, pid, ppid, comm, *, tty="/dev/ttys001", cwd=None, cid=CID, started=START):
         self.records[pid] = {"pid": pid, "ppid": ppid, "tty": tty, "comm": comm,
@@ -122,6 +143,8 @@ class Evidence:
 
     def sleep(self, seconds):
         self.now += seconds
+        if self.publish_bindings:
+            self.publish_bindings()
 
     def inspect(self, root, cid):
         assert Path(root) == self.root and cid == CID
@@ -145,6 +168,8 @@ class Evidence:
             return self.response("\n".join(
                 f"{r['pid']} {r['ppid']} {Path(r['tty']).name} {r['started']} {r['comm']}"
                 for r in self.records.values()) + "\n")
+        if args[:2] == ["/bin/ps", "-ww"]:
+            return self.response(str(self.executable) + " --conversation=" + CID + " --model=gemini-3-pro --effort=high\n")
         if args[:2] == ["/bin/ps", "-t"]:
             return self.response("".join(f"{p} {r['comm']}\n" for p, r in self.records.items()
                                          if Path(r["tty"]).name == args[2]))
@@ -275,8 +300,10 @@ def test_closed_git_proxy_connection_and_older_active_tool_remain_excluded(evide
 
 def test_question_arriving_after_preflight_is_refused_by_actual_send_js(evidence):
     evidence.before_send = lambda: setattr(evidence, "screen", IDLE + "\n⇧← to answer\nQUESTION: choose one\n")
-    with pytest.raises(guard.GuardError, match="guarded /quit was not confirmed"):
-        evidence.transport.quit(evidence.target)
+    evidence.transport.preflight(evidence.target)
+    with evidence.transport.transaction_lease():
+        with pytest.raises(guard.GuardError, match="guarded /quit was not confirmed"):
+            evidence.transport.quit(evidence.target)
     assert evidence.inputs == []
 
 
@@ -538,3 +565,43 @@ def test_feedback_survey_is_reported_as_prompt_and_never_idle(evidence, survey):
     row = evidence.transport.observe(evidence.target)
     assert row['prompt'] is True and row['idle'] is False
     assert evidence.inputs == []
+
+
+@pytest.mark.parametrize("failure", ["wait_exit", "resume", "wait_resumed", "rebind"])
+def test_failed_restart_keeps_exact_immutable_prequit_evidence(evidence, failure):
+    evidence.socket_rows[100] = [(f"127.0.0.1:{54000 + i}", "LISTEN") for i in range(1001)]
+    before = {str(path): path.read_bytes() for path in
+              (evidence.monitor_path, evidence.approval_path, evidence.config_path, evidence.controller)}
+    def fail(*_args):
+        raise guard.GuardError("injected failure at " + failure)
+    setattr(evidence.transport, failure, fail)
+    def react(message):
+        if message == "/quit":
+            # The evidence must already exist when the external send happens.
+            prepared = list((evidence.supervisor.runtime / "port-pressure-attempts").glob("*/prepared.json"))
+            assert len(prepared) == 1
+            assert json.loads(prepared[0].read_text())["identity"]["pid"] == 100
+            evidence.exited()
+        else:
+            evidence.resumed()
+    evidence.on_input = react
+    report = guard.PortPressureGuard(evidence.supervisor, transport=evidence.transport,
+                                     clock=lambda: evidence.now).tick(apply=True)
+    assert report["phase"] == "disabled" and failure in report["disable_reason"]
+    attempts = list((evidence.supervisor.runtime / "port-pressure-attempts").iterdir())
+    assert len(attempts) == 1
+    directory = attempts[0]
+    prepared = json.loads((directory / "prepared.json").read_text())
+    for path, raw in before.items():
+        retained = directory / prepared["bindings"][path]["file"]
+        assert retained.read_bytes() == raw
+        assert hashlib.sha256(raw).hexdigest() == prepared["bindings"][path]["sha256"]
+    assert (directory / "quit-confirmed.json").exists()
+    assert (directory / "failed.json").exists() and not (directory / "finished.json").exists()
+    assert {path: Path(path).read_bytes() for path in before} == before
+    state = json.loads((evidence.supervisor.runtime / "port-pressure-state.json").read_text())
+    assert state["inflight"]["pid"] == 100
+    inputs = list(evidence.inputs)
+    guard.PortPressureGuard(evidence.supervisor, transport=evidence.transport,
+                            clock=lambda: evidence.now).tick(apply=True)
+    assert evidence.inputs == inputs and len(list(directory.parent.iterdir())) == 1

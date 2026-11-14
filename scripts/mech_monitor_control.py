@@ -147,6 +147,20 @@ def load_manifest(path: Path) -> dict:
         if spec.get("session_targets_file"):
             safe_path(spec["session_targets_file"])
             protected_paths.add(Path(spec["session_targets_file"]))
+        capability = spec.get("binding_reload")
+        if capability is not None:
+            if (name != "approvals" or not isinstance(capability, dict)
+                    or set(capability) != {"version", "journal", "adapter", "input_lock_dir"}
+                    or capability.get("version") != 1):
+                raise ControlError("Invalid approvals binding_reload capability")
+            for field in ("journal", "adapter", "input_lock_dir"):
+                safe_path(capability[field], directory=field == "input_lock_dir")
+            journal = Path(capability["journal"])
+            if journal in paths or journal in protected_paths or journal == Path(capability["adapter"]):
+                raise ControlError("Binding reload journal overlaps protected files")
+            paths.add(journal)
+            write_paths.add(journal)
+            protected_paths.add(Path(capability["adapter"]))
         hashes = spec.get("source_sha256", {})
         if not isinstance(hashes, dict):
             raise ControlError(f"{name}: source_sha256 must map absolute paths to SHA-256 hashes")
@@ -155,6 +169,9 @@ def load_manifest(path: Path) -> dict:
             protected_paths.add(Path(source))
             if not isinstance(digest, str) or len(digest) != 64 or any(char not in "0123456789abcdef" for char in digest):
                 raise ControlError(f"{name}: invalid SHA-256 digest for {source}")
+        if capability is not None and (capability["adapter"] not in hashes
+                                       or spec.get("session_targets_file") not in hashes):
+            raise ControlError("Binding reload requires adapter and target source pins")
         age = spec.get("heartbeat_max_age_seconds", 300)
         if isinstance(age, bool) or not isinstance(age, (int, float)) or not 1 <= age <= 3600:
             raise ControlError(f"{name}: heartbeat_max_age_seconds must be 1..3600")
