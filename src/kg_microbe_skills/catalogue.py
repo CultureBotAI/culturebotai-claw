@@ -269,6 +269,23 @@ def render_adapter(
         "record_globs": ", ".join(f"`{p}`" for p in mech.record_globs),
     }
 
+    return render_identity_adapter(text, values, existing=existing)
+
+
+def render_identity_adapter(
+    text: str, values: dict[str, str], *, existing: str | None = None,
+) -> str:
+    """Render a caller-validated consumer identity without changing fleet membership.
+
+    This pure renderer conveys no repository access or mutation authority. The
+    template adoption caller validates private identities against their separate
+    policy; normal ``render_adapter`` retains its manifest membership check.
+    """
+    required = {"mech_key", "display_name", "github", "environment_variable",
+                "package_path", "schema_paths", "record_globs"}
+    if set(values) != required or not all(isinstance(value, str) and value for value in values.values()):
+        raise CatalogueError("rendering requires a complete consumer identity")
+    mech_key = values["mech_key"]
     unknown = skill_placeholders(text) - set(values)
     if unknown:
         raise CatalogueError(

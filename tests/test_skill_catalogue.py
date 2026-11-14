@@ -538,6 +538,7 @@ def test_the_catalogue_and_templates_are_declared_as_package_data():
     assert set(package_data["kg_microbe_skills"]) == {
         "skills.yaml",
         "canonical/*.md",
+        "template_baseline.json",
     }
 
 # --------------------------------------------------------------------------

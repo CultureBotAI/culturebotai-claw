@@ -35,6 +35,7 @@ Orchestrate the fleet's development and repository maintenance checks in a singl
    - Tabulates test files, AST test function counts, skip/xfail markers, coverage floors, `mypy`/`ruff` configuration, and untyped `src/kg_microbe_*` packages.
 4. **Governance & Skill Drift Checks**:
    - Runs `scripts/apply_cron_profile.py --check-active`, `scripts/update_governed_workflow_pins.py --check`, and `kg_microbe_skills check`.
+   - Checks the reusable Mech baseline source inventory and reports consumer adoption/drift; use `onboard-mech` and the [baseline guide](../../../docs/guides/MECH_TEMPLATE.md) for scoped update PRs.
 5. **Local Pages Budgets & Site Contract Audits**:
    - Runs `kg_microbe_pages.budgets.audit` and `kg_microbe_site.contract.check_site` across locally built Mech sites (`scripts/fleet_pages_status.py --with-local-audits`).
 

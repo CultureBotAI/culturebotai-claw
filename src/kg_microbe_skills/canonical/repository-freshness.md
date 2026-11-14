@@ -60,8 +60,8 @@ it still needs the pre-goal check and the adopted no-change closure check.
 Use `python -m kg_microbe_workflows.freshness_cli run --request REQUEST.json --apply`
 from the adopted canonical release, then `python -m
 kg_microbe_workflows.freshness_cli verify --request REQUEST.json`
-before inventory consumption. The exact release's
-`docs/guides/REPOSITORY_FRESHNESS.md` defines the strict request and receipt shapes.
+before inventory consumption. Read the [CLAW repository freshness guide](https://github.com/CultureBotAI/culturebotai-claw/blob/main/docs/guides/REPOSITORY_FRESHNESS.md)
+at the adopted release revision for the strict request and receipt shapes.
 A candidate package does not authorize these commands against a live checkout. The supervisor owns its guarded hooks;
 standalone Codex uses that same runner with the approved adoption record and
 explicit owned checkout. Do not substitute `git pull`, a remembered origin SHA,
