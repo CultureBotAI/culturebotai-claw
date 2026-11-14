@@ -5759,6 +5759,14 @@
       "repository_key": "communitymech",
       "run_key": "691d144c1e172ba586e72c5b",
       "stage_number": 5
+    },
+    {
+      "cycle": 9,
+      "id": "7aba7d30ce3ac6d10e42dc6fbb32e9f0d95f41e6b37148520890acd85715f2f3",
+      "pr_id": "613930f4afcd6ff29cb9d1db954737ce6b16d231bcac25a4136133dc0b0aa87f",
+      "repository_key": "habitatmech",
+      "run_key": "691d144c1e172ba586e72c5b",
+      "stage_number": 4
     }
   ],
   "closures": [
@@ -34303,6 +34311,18 @@
       "source": "github",
       "state": "merged",
       "url": "https://github.com/CultureBotAI/MediaIngredientMech/pull/1366"
+    },
+    {
+      "head_sha": "adc966c2f97f69866e115b98570e0a356f8634aa",
+      "id": "5ecb1ea685fe58e6a623d13b28d9d11de6d6a1d44e4d34bc23efe55809199952",
+      "number": 2347,
+      "observed_at": "2026-11-14T10:02:46.614653+00:00",
+      "pr_id": "613930f4afcd6ff29cb9d1db954737ce6b16d231bcac25a4136133dc0b0aa87f",
+      "repository_key": "habitatmech",
+      "sequence": 1,
+      "source": "github",
+      "state": "open",
+      "url": "https://github.com/CultureBotAI/HabitatMech/pull/2347"
     }
   ],
   "schema_version": "1.0.0"

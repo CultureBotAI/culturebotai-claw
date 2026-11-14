@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-14T09:57:30.590314+00:00",
+  "generated_at": "2026-11-14T10:02:48.320829+00:00",
   "repositories": [
     {
       "closures": [
@@ -13997,8 +13997,8 @@
         "completed_goals": 51,
         "merged_prs": 52,
         "no_change_goals": 0,
-        "open_prs": 0,
-        "unique_prs": 52
+        "open_prs": 1,
+        "unique_prs": 53
       },
       "current": {
         "blocker_code": "none",
@@ -14016,6 +14016,23 @@
       "last_observed_at": "2026-11-14T02:03:27.444800+00:00",
       "name": "HabitatMech",
       "pull_requests": [
+        {
+          "associations": [
+            {
+              "cycle": 9,
+              "run_key": "691d144c1e172ba586e72c5b",
+              "stage_number": 4
+            }
+          ],
+          "head_sha": "adc966c2f97f69866e115b98570e0a356f8634aa",
+          "id": "613930f4afcd6ff29cb9d1db954737ce6b16d231bcac25a4136133dc0b0aa87f",
+          "number": 2347,
+          "observed_at": "2026-11-14T10:02:46.614653+00:00",
+          "repository_key": "habitatmech",
+          "source": "github",
+          "state": "open",
+          "url": "https://github.com/CultureBotAI/HabitatMech/pull/2347"
+        },
         {
           "associations": [
             {
@@ -24231,8 +24248,8 @@
     "completed_goals": 692,
     "merged_prs": 719,
     "no_change_goals": 0,
-    "open_prs": 0,
-    "unique_prs": 719
+    "open_prs": 1,
+    "unique_prs": 720
   },
   "tracking": {
     "counts_are_lower_bounds": true,
