@@ -5,7 +5,7 @@ metadata:
   category: cross-repo
   requires_database: false
   requires_internet: true
-  version: 2.0.0
+  version: 2.1.0
   tags: [fleet, onboarding, governance, cross-repo]
 ---
 
@@ -65,6 +65,17 @@ workflows, research profiles, generated artifacts, and vendored pin. Capability
 claims must describe committed default-branch behavior; report differences in
 the working tree. Before concluding a path or feature is absent, search with
 `rg --no-ignore --hidden` (or equivalent), including ignored files.
+
+## Prepare before fleet admission
+
+When a new Mech is private or cannot yet meet protected admission prerequisites,
+use [the preparation-candidate guide](../../../docs/guides/PREPARATION_CANDIDATES.md).
+Register its exact identity in the closed packaged candidate registry, declare
+every capability disabled or inapplicable, and use the explicit candidate
+resolver and governance mode. Publish an immutable canonical candidate before
+its native canary. Template identity comes from that declaration, never another
+Mech's private policy or a downstream override. Preserve existing public fleet
+membership and protected audit authority; later admission is a separate change.
 
 ## Register the local integration
 

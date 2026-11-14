@@ -32,7 +32,9 @@ candidate records this difference without changing that admission authority.
 The older [Mech standard](MECH_STANDARD.md) records historical measurements. Its
 counts are not today's applicability evidence. Inventory the current published
 consumer revision, installed native commands, checks and extensions first.
-Private consumers use their separately declared identity/policy; their inclusion
+New repositories can use the [preparation registry](PREPARATION_CANDIDATES.md)
+before fleet admission. Their native paths come from the sealed declaration;
+`native_identity` is refused. Legacy private consumers use their separately declared identity/policy; their inclusion
 in an adoption plan does not add them to the public fleet.
 
 ## Refresh and adoption
