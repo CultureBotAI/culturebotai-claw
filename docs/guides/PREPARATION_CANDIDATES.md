@@ -15,7 +15,8 @@ validation still authenticates the owner/repository identity, not a live GitHub
 ID lookup. Recheck live metadata before publication and before a later admission.
 Paths describe the proposed native layout, while capability reasons describe
 committed main. Implementations on a pending native PR are reported separately.
-No candidate may overlap a fleet or separately governed private identity.
+No candidate may overlap a fleet or separately governed private identity. The
+control-plane key `claw` and canonical CLAW GitHub identity are reserved.
 
 Use `RepositorySettings.get_candidate_target(key, root=exact_root)` for a
 preparation checkout. Omitting `root` resolves only its declared environment

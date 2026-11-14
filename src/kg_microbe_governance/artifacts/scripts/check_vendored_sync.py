@@ -581,15 +581,15 @@ def parse_candidate_registry(data: bytes, manifest: GovernanceManifest) -> dict[
         raise GovernanceError("candidate registry version must be integer 1")
     candidates = _mapping(document["candidates"], "candidates")
     seen = {
-        "github": {c.github.casefold() for c in manifest.consumers.values()},
+        "github": {manifest.canonical_repository.casefold(), *(c.github.casefold() for c in manifest.consumers.values())},
         "package_path": {c.package_path.casefold() for c in manifest.consumers.values()},
         "environment_variable": set(), "repository_id": set(),
     }
     required = {"state", "display_name", "github", "repository_id", "environment_variable",
                 "package_path", "schema_paths", "record_globs", "bootstrap_main_ref", "capabilities"}
     for key, item in candidates.items():
-        if not _KEY_PATTERN.fullmatch(key) or key in manifest.consumers:
-            raise GovernanceError(f"Invalid or already admitted candidate key: {key}")
+        if not _KEY_PATTERN.fullmatch(key) or key in manifest.consumers or key == "claw":
+            raise GovernanceError(f"Invalid, reserved or already admitted candidate key: {key}")
         item = _mapping(item, f"candidate {key}")
         _strict_keys(item, required, required, f"candidate {key}")
         if item["state"] != "preparation":

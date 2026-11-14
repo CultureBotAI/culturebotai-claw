@@ -174,3 +174,15 @@ def test_packaged_candidate_completeness_and_reserved_identity_checks(change, mo
     monkeypatch.setattr(candidates_module, "registry_bytes", lambda: json.dumps(doc).encode())
     with pytest.raises(checker.GovernanceError):
         load_candidates()
+
+
+@pytest.mark.parametrize("reserved", ["key", "github", "github_case"])
+def test_control_plane_cannot_be_prepared_as_downstream_candidate(reserved):
+    doc = document()
+    if reserved == "key":
+        doc["candidates"]["claw"] = doc["candidates"].pop(KEY)
+    else:
+        identity = manifest().canonical_repository
+        doc["candidates"][KEY]["github"] = identity.swapcase() if reserved == "github_case" else identity
+    with pytest.raises(checker.GovernanceError, match="reserved|collision"):
+        parse(doc)
