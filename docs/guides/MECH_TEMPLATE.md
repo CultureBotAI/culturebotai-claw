@@ -37,9 +37,16 @@ in an adoption plan does not add them to the public fleet.
 
 ## Refresh and adoption
 
-From the isolated CLAW checkout, validate or refresh the canonical composition:
+From the isolated CLAW checkout, validate or refresh the canonical composition.
+A fresh or squash-merged checkout may lack the recorded canonical input commit;
+first run the explicit source-object preparation command. It verifies the exact
+canonical origin, fetches only that immutable commit when absent, and changes no
+branch, worktree file, or executable code. Keep published source commits available
+through their retained PR history; a missing remote object is a release blocker.
+The check and fleet maintenance remain offline.
 
 ```bash
+uv run python scripts/ensure_mech_template_source.py --source-root .
 uv run python -m kg_microbe_skills.template_cli check-baseline --source-root .
 uv run python -m kg_microbe_skills.template_cli refresh --source-root . --apply
 ```
@@ -112,6 +119,12 @@ uv run python -m kg_microbe_skills.template_cli check \
   --source-root . --target-root "$MECH_WORKTREE" \
   --config workflow/mech-template.json
 ```
+
+When running an installed package outside CLAW, set
+`OPENCLAW_ORCHESTRATION_ROOT` to the validated orchestration checkout (or
+`OPENCLAW_WORKSPACE` to its existing absolute shared workspace) before applying.
+The lock namespace must be the same one other coordinating processes use. Do
+not create a second runtime or relocate an existing workspace to satisfy a check.
 
 Run these only after resolving the exact consumer identity and inspecting its
 staged, unstaged and untracked changes. Use an owned isolated worktree. The tool

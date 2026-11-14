@@ -68,6 +68,7 @@ def fixture(tmp_path, monkeypatch):
     monkeypatch.setattr(mod, "_implementation_root", lambda: source)
     monkeypatch.setattr(mod, "LockManager", Locks)
     baseline = mod.refresh_baseline(source, apply=True)
+    implementation_ref = commit(source)
     target = tmp_path / "AssayMech"
     init(target, "CultureBotAI/AssayMech")
     (target / "AGENTS.md").write_text("Native agent instructions\n")
@@ -77,7 +78,7 @@ def fixture(tmp_path, monkeypatch):
     (target / ".agents/skills").symlink_to("../.claude/skills")
     commit(target)
     config = {
-        "schema_version": 1, "repository": "assaymech", "source_ref": baseline["source_ref"],
+        "schema_version": 1, "repository": "assaymech", "source_ref": implementation_ref,
         "components": {name: {"action": "adopt", "reason": "Fixture native support inspected",
                                "evidence": ["README.md at fixture HEAD"]}
                        for name in mod.component_names(baseline)},
@@ -113,7 +114,7 @@ def test_real_adoption_dry_run_idempotence_and_governance_preservation(fixture):
     assert not (target / "workflow/mech-workflow.yaml").exists()
     receipt = json.loads((target / mod.RECEIPT_PATH).read_text())
     assert receipt["status"] == "candidate"
-    assert receipt["canonical_source_ref"] == git(source, "rev-parse", "HEAD")
+    assert receipt["canonical_source_ref"] == mod.baseline_document(source)["source_ref"]
 
 
 def test_first_adoption_preserves_unmanaged_content(fixture):
@@ -137,8 +138,9 @@ def test_upgrade_changes_managed_region_and_preserves_native_text(fixture):
     region = next(iter(canonical_regions(content)))
     marker = f"<!-- canonical:begin {region} -->"
     canonical.write_text(content.replace(marker, marker + "\nNew canonical invariant.\n"))
-    config["source_ref"] = commit(source)
+    commit(source)
     mod.refresh_baseline(source, version="1.1.0", apply=True)
+    config["source_ref"] = commit(source)
     (target / mod.CONFIG_PATH).write_text(mod.encode(config))
     mod.apply_plan(plan(fixture), apply=True)
     assert "New canonical invariant." in target_skill.read_text()
@@ -187,7 +189,18 @@ def test_dirty_authority_and_rehashed_lock_cannot_claim_old_source_ref(fixture):
     baseline["sources"] = mod.source_inventory(source)
     (source / mod.BASELINE_PATH).write_text(mod.encode(baseline))
     with pytest.raises(mod.TemplateError, match="source revision does not authenticate"):
-        plan(fixture)
+        mod.check_baseline(source)
+
+
+def test_refresh_after_lock_commit_preserves_bytes_and_existing_version(fixture):
+    source, _, _ = fixture
+    mod.refresh_baseline(source, version="1.2.3", apply=True)
+    commit(source)
+    before = (source / mod.BASELINE_PATH).read_bytes()
+    returned = mod.refresh_baseline(source, apply=True)
+    assert returned["baseline_version"] == "1.2.3"
+    assert (source / mod.BASELINE_PATH).read_bytes() == before
+    assert git(source, "status", "--porcelain") == ""
 
 
 def test_deleted_authority_and_removed_inventory_entry_cannot_claim_old_ref(fixture):
@@ -212,6 +225,35 @@ def test_dirty_executing_code_is_not_attributed_to_committed_ref(fixture):
     path = source / "src/kg_microbe_skills/template.py"
     path.write_text(path.read_text() + "\n# uncommitted implementation\n")
     with pytest.raises(mod.TemplateError, match="source revision does not authenticate"):
+        plan(fixture)
+
+
+def test_docs_only_source_advance_preserves_adoption_and_receipt(fixture):
+    source, target, config = fixture
+    mod.apply_plan(plan(fixture), apply=True)
+    receipt = (target / mod.RECEIPT_PATH).read_bytes()
+    (source / "README.md").write_text("Unrelated documentation advance.\n")
+    assert commit(source) != config["source_ref"]
+    assert plan(fixture).report["status"] == "current"
+    assert (target / mod.RECEIPT_PATH).read_bytes() == receipt
+
+
+@pytest.mark.parametrize("kind", ["changed", "new", "deleted", "baseline"])
+def test_source_advance_cannot_change_pinned_implementation_bundle(fixture, kind):
+    source, _, _ = fixture
+    if kind == "changed":
+        path = source / "src/kg_microbe_skills/template.py"
+        path.write_text(path.read_text() + "\n# committed change\n")
+    elif kind == "new":
+        (source / "src/kg_microbe_skills/new_component.py").write_text("# new component\n")
+    elif kind == "deleted":
+        (source / "src/kg_microbe_skills/catalogue.py").unlink()
+    else:
+        lock = mod.baseline_document(source)
+        lock["baseline_version"] = "1.0.1"
+        (source / mod.BASELINE_PATH).write_text(mod.encode(lock))
+    commit(source)
+    with pytest.raises(mod.TemplateError, match="(source revision does not authenticate|implementation revision inventory)"):
         plan(fixture)
 
 

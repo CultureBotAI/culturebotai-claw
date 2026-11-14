@@ -25,7 +25,7 @@ def main(argv: list[str] | None = None) -> int:
         command = sub.add_parser(name)
         command.add_argument("--source-root", type=Path, required=name == "refresh")
         if name == "refresh":
-            command.add_argument("--version", default="1.0.0")
+            command.add_argument("--version", help="baseline version; defaults to the existing version or 1.0.0")
             command.add_argument("--apply", action="store_true")
         if name in {"plan", "apply", "check"}:
             command.add_argument("--target-root", type=Path, required=True)

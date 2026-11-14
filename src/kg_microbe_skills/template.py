@@ -185,9 +185,11 @@ def _verify_source_objects(root: Path, ref: str, sources: dict[str, str], *, inv
             raise TemplateError(f"source revision does not authenticate bytes: {path}")
 
 
-def refresh_baseline(source_root: Path, *, version: str = "1.0.0", apply: bool = False) -> dict[str, Any]:
+def refresh_baseline(source_root: Path, *, version: str | None = None, apply: bool = False) -> dict[str, Any]:
     source_root = source_root.resolve(strict=True)
     RepositoryTarget("claw", source_root, "CultureBotAI/culturebotai-claw").open()
+    previous = baseline_document(source_root) if _read(source_root, BASELINE_PATH) is not None else None
+    version = version or (previous["baseline_version"] if previous else "1.0.0")
     if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
         raise TemplateError("invalid baseline version")
     ref = _git(source_root, "rev-parse", "HEAD")
@@ -195,6 +197,9 @@ def refresh_baseline(source_root: Path, *, version: str = "1.0.0", apply: bool =
     # Only authority bytes must match the named commit; other development edits
     # are allowed. A newly added ignored authority is also checked here.
     _verify_source_objects(source_root, ref, sources, inventory=True)
+    if previous and previous["baseline_version"] == version and previous["sources"] == sources:
+        _verify_source_objects(source_root, previous["source_ref"], sources, inventory=True)
+        return previous
     baseline = {"schema_version": 1, "baseline_version": version, "source_ref": ref, "sources": sources}
     tx = ValidatedWriteTransaction(source_root)
     tx.stage(BASELINE_PATH, encode(baseline))
@@ -241,9 +246,27 @@ def _verify_implementation(ref: str, source_root: Path | None) -> None:
     if source_root:
         if source_root != _implementation_root():
             raise TemplateError("source-root is not the executing implementation checkout")
-        observed = _git(source_root, "rev-parse", "HEAD")
+        payloads = {}
         for path in sorted((source_root / "src/kg_microbe_skills").glob("*.py")):
-            _verify_source_objects(source_root, ref, {path.relative_to(source_root).as_posix(): digest(path.read_bytes())})
+            relative = path.relative_to(source_root).as_posix()
+            _safe_path(source_root, relative)
+            payloads[relative] = digest(path.read_bytes())
+        baseline = _read(source_root, BASELINE_PATH)
+        if baseline is None:
+            raise TemplateError("implementation baseline lock is absent")
+        payloads[BASELINE_PATH] = digest(baseline)
+        pinned = {
+            path for path in _git(source_root, "ls-tree", "-r", "--name-only", ref, "--", "src/kg_microbe_skills").splitlines()
+            if path == BASELINE_PATH or (
+                PurePosixPath(path).parent == PurePosixPath("src/kg_microbe_skills") and path.endswith(".py")
+            )
+        }
+        if pinned != set(payloads):
+            raise TemplateError("implementation revision inventory differs from configured source_ref")
+        _verify_source_objects(source_root, ref, payloads)
+        # An unrelated commit or squash merge does not change the pinned bundle.
+        # Dirty, added and deleted implementation files or a changed baseline do.
+        return
     else:
         direct = distribution("kg-microbe-orchestration").read_text("direct_url.json")
         metadata = _json(direct) if direct else {}

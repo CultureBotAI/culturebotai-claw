@@ -113,6 +113,9 @@ jobs:
       - name: Verify governed action and runtime pins
         run: uv run python scripts/update_governed_workflow_pins.py --check
 
+      - name: Fetch immutable baseline source object when absent from squash history
+        run: uv run python scripts/ensure_mech_template_source.py --source-root .
+
       - name: Verify reusable Mech baseline source inventory
         run: uv run python -m kg_microbe_skills.template_cli check-baseline --source-root .
 
