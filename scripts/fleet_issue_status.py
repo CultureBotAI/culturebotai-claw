@@ -471,13 +471,22 @@ def _markdown_cell(value: object) -> str:
 
 def render_markdown(data: dict, snapshot_utc: str, stale_days: int) -> str:
     summaries = repository_summary(data, snapshot_utc, stale_days)
-    fields = ["repo", "open", "reviewed", "unreviewed", "keep", "close", "defer", "status"]
+    fields = ["repo", "open", "unassigned", "stale", "oldest_age_days"]
+    headings = ["Repository", "Open issues", "Unassigned", f"Stale {stale_days}d+", "Oldest (days)"]
+    if data.get("include_prs", True):
+        fields.extend(["pr_open", "pr_conflicts", "pr_drafts"])
+        headings.extend(["PRs", "Conflicts", "Drafts"])
+    fields.extend(["reviewed", "unreviewed", "keep", "close", "defer", "status"])
+    headings.extend(["Reviewed", "Unreviewed", "Keep", "Close", "Defer", "Coverage"])
     lines = ["# Fleet issue review intake", "", f"Snapshot: {snapshot_utc}", "",
              "Repositories sorted by open-issue count, most to least. Review actions are recommendations.", "",
-             "| Repository | Open issues | Reviewed | Unreviewed | Keep | Close | Defer | Coverage |",
-             "|---|---:|---:|---:|---:|---:|---:|---|"]
+             "| " + " | ".join(headings) + " |",
+             "|" + "|".join("---" if field in {"repo", "status"} else "---:" for field in fields) + "|"]
     for row in summaries:
-        lines.append("| " + " | ".join(_markdown_cell(row.get(field)) for field in fields) + " |")
+        values = {**row, **{f"pr_{key}": value for key, value in row.get("prs", {}).items()}}
+        if row["status"] != "error" and row["oldest_age_days"] is None:
+            values["oldest_age_days"] = ""
+        lines.append("| " + " | ".join(_markdown_cell(values.get(field)) for field in fields) + " |")
     lines.extend(["", "## Issue ledger", "",
                   "| Issue | Title | Labels | Priority | Action | Reason | Evidence | Revisit date / trigger |",
                   "|---|---|---|---|---|---|---|---|"])

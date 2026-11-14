@@ -90,7 +90,7 @@ just to review. Record local changes separately from published behavior.
 
 ## Inventory every issue and its corrections
 
-Start with `scripts/fleet_issue_status.py --all-issues --no-prs --markdown`
+Start with `uv run python scripts/fleet_issue_status.py --all-issues --no-prs --markdown`
 from the pinned checkout, saving stdout into a fresh review directory. This
 produces the descending-count repository table and a full issue ledger with
 unreviewed priority/action columns. It fetches issue metadata, not the evidence

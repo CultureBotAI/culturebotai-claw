@@ -556,7 +556,11 @@ def test_review_overlay_is_consistent_in_json_rows_tsv_markdown_and_summary(tmp_
     assert saved[0]["defer_until"] == "Dependency releases"
     assert saved[-1]["issue_key"] == "CultureBotAI/TraitMech#1"
     markdown = fis.render_markdown(data, SNAP, 60)
-    assert "| culturebotai-claw | 3 | 3 | 0 | 1 | 1 | 1 | complete |" in markdown
+    row = _markdown_summary_row(markdown, "culturebotai-claw")
+    assert {key: row[key] for key in ("Open issues", "Reviewed", "Unreviewed", "Keep", "Close", "Defer", "Coverage")} == {
+        "Open issues": "3", "Reviewed": "3", "Unreviewed": "0", "Keep": "1",
+        "Close": "1", "Defer": "1", "Coverage": "complete",
+    }
     assert "| P3 | defer |" in markdown
 
 
@@ -597,8 +601,48 @@ def test_markdown_escapes_untrusted_cells_and_preserves_coverage():
     assert "https://github.com/CultureBotAI/culturebotai-claw/issues/1" in row
     assert "issue counts exclude pull requests" in out
     partial = fis.render_markdown(_data(errors={"TraitMech": "HTTP 502"}), SNAP, 60)
-    assert "| TraitMech | ? | ? | ? | ? | ? | ? | error |" in partial
+    summary = _markdown_summary_row(partial, "TraitMech")
+    assert summary["Coverage"] == "error"
+    assert all(value == "?" for key, value in summary.items() if key not in {"Repository", "Coverage"})
     assert "NOT QUERIED" in partial and "lower bounds" in partial
+
+
+def _markdown_summary_row(markdown, repo):
+    lines = markdown.splitlines()
+    header = next(line for line in lines if line.startswith("| Repository |"))
+    row = next(line for line in lines if line.startswith(f"| {repo} |"))
+    headings = [value.strip() for value in header.strip("|").split("|")]
+    values = [value.strip() for value in row.strip("|").split("|")]
+    assert len(headings) == len(values)
+    return dict(zip(headings, values))
+
+
+def test_markdown_preserves_backlog_and_optional_pr_metrics():
+    """#1198: review columns must add to the existing inventory metrics."""
+    data = _data(
+        issues={"culturebotai-claw": [
+            _issue(1, createdAt="2026-01-01T00:00:00Z", updatedAt="2026-01-02T00:00:00Z"),
+            _issue(2, assignees=[{"login": "assigned"}]), _issue(3),
+        ], "TraitMech": []},
+        prs={"culturebotai-claw": [
+            _pr(1, isDraft=True, mergeable="CONFLICTING"),
+            _pr(2, isDraft=True, mergeable="CONFLICTING"),
+            _pr(3, isDraft=True), _pr(4),
+        ], "TraitMech": []},
+    )
+    markdown = fis.render_markdown(data, SNAP, 60)
+    row = _markdown_summary_row(markdown, "culturebotai-claw")
+    assert {key: row[key] for key in ("Open issues", "Unassigned", "Stale 60d+", "Oldest (days)",
+                                     "PRs", "Conflicts", "Drafts")} == {
+        "Open issues": "3", "Unassigned": "2", "Stale 60d+": "1", "Oldest (days)": "255",
+        "PRs": "4", "Conflicts": "2", "Drafts": "3",
+    }
+    assert row["Unreviewed"] == "3"
+    assert _markdown_summary_row(markdown, "TraitMech")["Oldest (days)"] == ""
+    no_prs = fis.render_markdown({**data, "include_prs": False}, SNAP, 60)
+    no_pr_row = _markdown_summary_row(no_prs, "culturebotai-claw")
+    assert not {"PRs", "Conflicts", "Drafts"} & no_pr_row.keys()
+    assert no_pr_row["Stale 60d+"] == "1"
 
 
 def _rest_issue(number):
