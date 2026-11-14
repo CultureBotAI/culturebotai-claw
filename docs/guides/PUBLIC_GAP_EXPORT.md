@@ -34,25 +34,39 @@ control characters; file paths must be relative and normalized.
 
 ## Classification and public content
 
-| Current record evidence | Origin | Review state | Lane |
-|---|---|---|---|
-| `posed_by: kg-microbe-kgscan`, with review requirement in rationale | scanner | required | candidate |
-| Same attribution without explicit review requirement | scanner | unspecified | candidate |
-| Any other attribution with `curator review required` in rationale | other | required | candidate |
-| Other attribution without that requirement | other | unspecified | recorded |
-| No attribution or review requirement | unspecified | unspecified | recorded |
+| Record evidence | Origin / basis | Current attribution | Review state | Lane |
+|---|---|---|---|---|
+| `posed_by: kg-microbe-kgscan`, with review requirement in rationale | scanner / current attribution | scanner | required | candidate |
+| Same attribution without explicit review requirement | scanner / current attribution | scanner | unspecified | candidate |
+| Other attribution and documented scan provenance, without current review requirement | scanner / documented scan provenance | other | unspecified | recorded |
+| Other attribution and no documented scan provenance or review requirement | other / current attribution | other | unspecified | recorded |
+| Documented scan provenance without current attribution or review requirement | scanner / documented scan provenance | unspecified | unspecified | recorded |
+| No attribution, scan provenance or review requirement | unspecified / unspecified | unspecified | unspecified | recorded |
+
+An explicit `curator review required` phrase in current rationale always selects
+the candidate lane and required review state, independently of origin. Otherwise,
+current scanner attribution selects the candidate lane; historical origin does not.
 
 A scanner-shaped discussion ID does not establish current origin or review.
 `storage_mode` is always `native_record` for this adapter, independently of the
 item's scanner origin or candidate lane. Scanner artifacts need a separate
 versioned adapter and are outside this module's input contract.
-TraitMech's corrected `animal_pathogen` discussion retains its `kgscan-` ID but
-has current `posed_by: claude`; it is recorded with unspecified review. Conversely,
+TraitMech's corrected `animal_pathogen` discussion retains its `kgscan-` ID and
+documents its scanner origin, but has current `posed_by: claude`. It keeps scanner
+origin with `origin_basis: documented_scan_provenance`, `current_attribution: other`,
+a recorded lane and unspecified review. Conversely,
 native MIM discussions retaining scanner attribution and an explicit review
 requirement remain candidates even though they are committed. Recorded does
 not mean reviewed or scientifically established. No state asserts review passed.
 The explicit requirement test ignores letter case and whitespace within the
 phrase; this is an observable provenance rule, not a natural-language review.
+Historical scanner origin requires both an initial `Scan provenance` marker and
+the explicit `kg-microbe-kgscan pass raised this discussion` clause in native notes.
+Neither a scanner-shaped ID nor an incidental mention establishes that history.
+The notes remain omitted; the pinned source locator exposes their provenance for
+inspection. `current_attribution` preserves only the scanner/other/unspecified
+category, never the author name or email address. Current scanner attribution is
+the preferred basis if both current and historical scanner evidence exist.
 
 The projection retains prompts, rationale, kind/status, attachments, evidence
 references/support/explanations, every current shared ProposedExperiment field,
@@ -78,7 +92,10 @@ unsafe sources and duplicate identities raise `PublicExportError`. Callers must
 record extraction failures and may not report a failed corpus as zero items.
 
 `validate_item` enforces the closed JSON Schema and also checks stable identity,
-source URL consistency, evidence-reference aggregation and classification.
+source URL consistency, evidence-reference aggregation, valid origin/basis/current
+attribution combinations and classification. Historical evidence is read from the
+native record during normalization; public validation cannot independently verify
+the omitted notes without reacquiring the pinned source.
 `validate_items` adds cross-record collision checks. The schema alone cannot
 prove those relationships; consumers should call the Python validator before
 publication. A site's coverage/build manifest is a separate contract, since a

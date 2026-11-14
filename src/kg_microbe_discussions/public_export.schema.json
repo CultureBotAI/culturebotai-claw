@@ -4,7 +4,7 @@
   "title": "Public Mech discussion projection, version 1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["id", "mech", "record_id", "record_label", "aliases", "discussion_id", "prompt", "rationale", "kind", "status", "storage_mode", "origin", "review_state", "lane", "evidence_refs", "attaches_to", "evidence", "proposed_experiments", "posed_date", "resolved_date", "resolution_note", "source", "classification_reason"],
+  "required": ["id", "mech", "record_id", "record_label", "aliases", "discussion_id", "prompt", "rationale", "kind", "status", "storage_mode", "origin", "current_attribution", "origin_basis", "review_state", "lane", "evidence_refs", "attaches_to", "evidence", "proposed_experiments", "posed_date", "resolved_date", "resolution_note", "source", "classification_reason"],
   "properties": {
     "id": {"type": "string", "pattern": "^gap-[0-9a-f]{64}$"},
     "mech": {"$ref": "#/$defs/nonempty"},
@@ -18,6 +18,8 @@
     "status": {"enum": ["UNSPECIFIED", "OPEN", "UNDER_DISCUSSION", "RESOLVED", "ARCHIVED"]},
     "storage_mode": {"const": "native_record"},
     "origin": {"enum": ["scanner", "other", "unspecified"]},
+    "current_attribution": {"enum": ["scanner", "other", "unspecified"]},
+    "origin_basis": {"enum": ["current_attribution", "documented_scan_provenance", "unspecified"]},
     "review_state": {"enum": ["required", "unspecified"]},
     "lane": {"enum": ["recorded", "candidate"]},
     "evidence_refs": {"$ref": "#/$defs/strings"},
@@ -28,7 +30,7 @@
     "resolved_date": {"$ref": "#/$defs/optionalDate"},
     "resolution_note": {"type": "string"},
     "source": {"$ref": "#/$defs/source"},
-    "classification_reason": {"enum": ["explicit_review_requirement", "current_scanner_attribution", "current_other_attribution", "no_review_or_origin_assertion"]}
+    "classification_reason": {"enum": ["explicit_review_requirement", "current_scanner_attribution", "current_other_attribution", "documented_scanner_history_without_current_attribution", "no_review_or_origin_assertion"]}
   },
   "$defs": {
     "nonempty": {"type": "string", "minLength": 1, "pattern": "\\S"},

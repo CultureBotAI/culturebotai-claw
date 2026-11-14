@@ -20,6 +20,8 @@ SCHEMA_PATH = Path(__file__).with_name("public_export.schema.json")
 SCHEMA = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
 _VALIDATOR = Draft202012Validator(SCHEMA, format_checker=FormatChecker())
 _REVIEW = re.compile(r"\bcurator\s+review\s+required\b", re.I)
+_SCAN_PROVENANCE = re.compile(r"^\s*Scan provenance\b", re.I)
+_SCAN_ATTRIBUTION = re.compile(r"\bkg-microbe-kgscan\s+pass\s+raised\s+this\s+discussion\b", re.I)
 _EMAIL = re.compile(r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 _EXPERIMENT_FIELDS = frozenset(SCHEMA["$defs"]["experiment"]["properties"])
 
@@ -110,6 +112,18 @@ def _public_text(value):
             _public_text(child)
 
 
+def _classification_reason(required, current_attribution, origin_basis):
+    if required:
+        return "explicit_review_requirement"
+    if current_attribution == "scanner":
+        return "current_scanner_attribution"
+    if current_attribution == "other":
+        return "current_other_attribution"
+    if origin_basis == "documented_scan_provenance":
+        return "documented_scanner_history_without_current_attribution"
+    return "no_review_or_origin_assertion"
+
+
 def validate_item(item):
     """Fail closed on shape, identity, source links and classification consistency."""
     errors = sorted(_VALIDATOR.iter_errors(item), key=lambda error: str(error.path))
@@ -133,11 +147,18 @@ def validate_item(item):
             raise PublicExportError("Unsafe evidence reference")
     required = bool(_REVIEW.search(item["rationale"]))
     expected_review = "required" if required else "unspecified"
-    candidate = required or item["origin"] == "scanner"
-    expected_reason = ("explicit_review_requirement" if required else
-                       "current_scanner_attribution" if item["origin"] == "scanner" else
-                       "current_other_attribution" if item["origin"] == "other" else
-                       "no_review_or_origin_assertion")
+    current = item["current_attribution"]
+    basis = item["origin_basis"]
+    if basis == "current_attribution":
+        valid_origin = current != "unspecified" and item["origin"] == current
+    elif basis == "documented_scan_provenance":
+        valid_origin = item["origin"] == "scanner" and current != "scanner"
+    else:
+        valid_origin = item["origin"] == current == "unspecified"
+    if not valid_origin:
+        raise PublicExportError("Origin, basis and current attribution disagree")
+    candidate = required or current == "scanner"
+    expected_reason = _classification_reason(required, current, basis)
     if (item["review_state"] != expected_review or
             item["lane"] != ("candidate" if candidate else "recorded") or
             item["classification_reason"] != expected_reason):
@@ -201,7 +222,16 @@ def normalize_record(doc, *, mech, repository, revision, path, source_sha256,
         prompt = _text(discussion.get("prompt", ""), "prompt", required=True)
         rationale = _text(discussion.get("rationale", ""), "rationale")
         posed_by = _text(discussion.get("posed_by", ""), "posed_by").strip()
-        origin = "scanner" if posed_by.casefold() == "kg-microbe-kgscan" else "other" if posed_by else "unspecified"
+        current = "scanner" if posed_by.casefold() == "kg-microbe-kgscan" else "other" if posed_by else "unspecified"
+        notes = discussion.get("notes", "")
+        documented_scan = (isinstance(notes, str) and bool(_SCAN_PROVENANCE.search(notes))
+                           and bool(_SCAN_ATTRIBUTION.search(notes)))
+        if current == "scanner":
+            origin, basis = "scanner", "current_attribution"
+        elif documented_scan:
+            origin, basis = "scanner", "documented_scan_provenance"
+        else:
+            origin, basis = current, "current_attribution" if current == "other" else "unspecified"
         required = bool(_REVIEW.search(rationale))
         evidence = []
         for entry in _list(discussion.get("evidence", []), "evidence"):
@@ -223,8 +253,9 @@ def normalize_record(doc, *, mech, repository, revision, path, source_sha256,
             "kind": discussion.get("kind", "UNSPECIFIED"),
             "status": discussion.get("status", "UNSPECIFIED"),
             "storage_mode": "native_record", "origin": origin,
+            "current_attribution": current, "origin_basis": basis,
             "review_state": "required" if required else "unspecified",
-            "lane": "candidate" if required or origin == "scanner" else "recorded",
+            "lane": "candidate" if required or current == "scanner" else "recorded",
             "evidence_refs": list(dict.fromkeys(e["reference"] for e in evidence)),
             "attaches_to": deepcopy(discussion.get("attaches_to", [])), "evidence": evidence,
             "proposed_experiments": experiments,
@@ -232,10 +263,7 @@ def normalize_record(doc, *, mech, repository, revision, path, source_sha256,
             "resolved_date": _date(discussion.get("resolved_date", ""), "resolved_date"),
             "resolution_note": discussion.get("resolution_note", ""),
             "source": {**deepcopy(source), "locator": "discussions#" + discussion_id},
-            "classification_reason": ("explicit_review_requirement" if required else
-                                      "current_scanner_attribution" if origin == "scanner" else
-                                      "current_other_attribution" if origin == "other" else
-                                      "no_review_or_origin_assertion"),
+            "classification_reason": _classification_reason(required, current, basis),
         }
         validate_item(item)
         items.append(item)

@@ -22,14 +22,15 @@ from kg_microbe_discussions.public_export import (
 # data/traits/ecology/animal_pathogen.yaml, kgscan-30bcdf4a32b0.
 # MIM: 24d76baa823d7fd07e8ea2596f0cca50e66392e2,
 # data/ingredients/mapped/1-Kestose.yaml, kgscan-f77a72b7ddb7.
-# Prompts are shortened synthetic stand-ins; classification inputs are retained.
+# Prompts are shortened synthetic stand-ins. The exact leading provenance marker
+# and attribution clause from the Trait notes are retained without its excerpts.
 TRAIT = {
     "id": "trait:animal_pathogen", "name": "Animal pathogen",
     "discussions": [{
         "discussion_id": "kgscan-30bcdf4a32b0", "prompt": "Are the two immune-evasion routes redundant?",
         "kind": "KNOWLEDGE_GAP", "status": "OPEN", "posed_by": "claude",
         "rationale": "The graph does not say whether the routes are alternatives or partners.",
-        "notes": "Historical scanner provenance; discarded evidence is not current support.",
+        "notes": "Scan provenance (#409). The kg-microbe-kgscan pass raised this discussion with the prompt",
         "posed_date": "2026-08-17",
     }],
 }
@@ -54,7 +55,9 @@ def project(doc=None, **overrides):
 
 def test_corrected_scanner_id_is_not_current_scanner_attribution():
     item = project()[0]
-    assert (item["origin"], item["review_state"], item["lane"]) == ("other", "unspecified", "recorded")
+    assert (item["origin"], item["review_state"], item["lane"]) == ("scanner", "unspecified", "recorded")
+    assert item["current_attribution"] == "other"
+    assert item["origin_basis"] == "documented_scan_provenance"
     assert item["classification_reason"] == "current_other_attribution"
     assert "posed_by" not in item and "notes" not in item
     assert item["source"]["locator"] == "discussions#kgscan-30bcdf4a32b0"
@@ -65,6 +68,43 @@ def test_native_scanner_discussion_is_a_candidate_before_artifact_ingestion():
     assert (item["origin"], item["review_state"], item["lane"]) == ("scanner", "required", "candidate")
     assert item["classification_reason"] == "explicit_review_requirement"
     assert item["storage_mode"] == "native_record"
+    assert item["current_attribution"] == "scanner"
+    assert item["origin_basis"] == "current_attribution"
+
+
+@pytest.mark.parametrize("notes", [
+    "", "Scan provenance (#409).", "The kg-microbe-kgscan pass raised this discussion.",
+    "Other history. Scan provenance (#409). The kg-microbe-kgscan pass raised this discussion.",
+])
+def test_scanner_id_or_incomplete_provenance_does_not_establish_origin(notes):
+    doc = deepcopy(TRAIT)
+    doc["discussions"][0]["notes"] = notes
+    item = project(doc)[0]
+    assert (item["origin"], item["current_attribution"], item["origin_basis"]) == (
+        "other", "other", "current_attribution")
+    assert item["lane"] == "recorded"
+
+
+def test_documented_history_without_current_attribution_does_not_invent_review():
+    doc = deepcopy(TRAIT)
+    del doc["discussions"][0]["posed_by"]
+    item = project(doc)[0]
+    assert (item["origin"], item["current_attribution"], item["origin_basis"]) == (
+        "scanner", "unspecified", "documented_scan_provenance")
+    assert (item["lane"], item["review_state"]) == ("recorded", "unspecified")
+    assert item["classification_reason"] == "documented_scanner_history_without_current_attribution"
+
+
+@pytest.mark.parametrize("changes", [
+    {"origin": "other"}, {"current_attribution": "scanner"},
+    {"origin_basis": "current_attribution"}, {"origin_basis": "unspecified"},
+    {"classification_reason": "current_scanner_attribution"},
+])
+def test_inconsistent_historical_origin_and_current_attribution_fail(changes):
+    item = project()[0]
+    item.update(changes)
+    with pytest.raises(PublicExportError):
+        validate_item(item)
 
 
 def test_scanner_attribution_without_phrase_stays_candidate_without_invented_review():
