@@ -1,5 +1,9 @@
 # The Mech standard
 
+For executable current baseline composition, explicit consumer decisions and
+maintained update checks, use [the reusable Mech baseline](MECH_TEMPLATE.md).
+The measurements below are historical evidence, not current deployment status.
+
 What a repository must hold to in order to be a Mech, what it may reuse, and
 what is nobody's business but its own.
 

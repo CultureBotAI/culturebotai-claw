@@ -175,6 +175,14 @@ checkout is a downstream mutation: it goes through the cross-repository
 checklist — resolve through `RepositorySettings`, confirm the worktree and its
 GitHub origin, take the lock, dry-run, and get approval — as its own change.
 
+## Baseline maintenance
+
+When a canonical skill changes, refresh and validate the reusable composition
+through `onboard-mech` and the [baseline guide](../../../docs/guides/MECH_TEMPLATE.md).
+Keep rendering and consumer installation separate. Review the target decisions
+explicitly when an admission policy seals capability declarations; do not enable
+an unrelated capability merely to select a skill.
+
 ## Related
 
 - `kg-microbe-skills inventory` measures the duplication this acts on;

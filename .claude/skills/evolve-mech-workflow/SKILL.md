@@ -131,6 +131,15 @@ operator-owned; an idle or recycle guard reports and holds them, never kills
 them. This rule grants no Git mutation, merge, cleanup or provider
 authorization beyond the task and the skill's existing boundaries.
 
+## Reusable baseline integration
+
+The [baseline guide](../../../docs/guides/MECH_TEMPLATE.md) binds parent, schema
+and skill source hashes and records consumer adoption decisions. Refresh it when
+these sources change. Baseline installation is a candidate infrastructure update;
+it never activates a profile, rewrites running-cycle state or releases a pin.
+Use `onboard-mech` for compare/plan/adopt/drift and this skill for native workflow
+bindings, applicability and boundary migration.
+
 ## Prepare and activate a change
 
 For each target, capture hashes of the installed profile, parent snapshots,
