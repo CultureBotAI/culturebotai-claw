@@ -78,11 +78,11 @@ skills:
   fleet-issue-status:
     scope: fleet
     reason: >-
-      One row per repository of open issues and open PRs across claw and the
-      manifest-defined Mechs, reading membership from the manifest.
+      Count-ranked open-issue inventory across claw and the manifest-defined
+      Mechs, with Markdown and structured per-issue review-decision tables.
   fleet-issue-review:
     scope: fleet
-    reason: Reviews the complete manifest-defined Mech backlog with thematic prioritization and dependency-aware parallel planning.
+    reason: Enriches the shared issue inventory with evidence-backed priority and keep/close/defer recommendations, thematic prioritization, and dependency-aware parallel planning.
   fleet-maintenance-cycle:
     scope: fleet
     reason: >-

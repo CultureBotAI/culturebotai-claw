@@ -1,136 +1,111 @@
 ---
 name: fleet-issue-status
-description: "Answer \"where does the fleet stand?\" as one table: per repository, the open-issue count, how many are unassigned, how many have gone quiet, the age of the oldest, and the open-PR count beside it, across claw and the manifest-defined Mech fleet. Runs scripts/fleet_issue_status.py, which queries the canonical fleet with explicit limits and always reports its coverage — which repos were checked, which failed, and whether any listing truncated. Read-only inventory: it does not triage, edit, close, or comment on anything."
-category: cross-repo
-requires_database: false
-requires_internet: true
-version: 1.0.0
-tags: [issues, pr, status, cross-repo, fleet, inventory, read-only, reporting]
+description: "Find all open issues across Claw and the manifest-defined Mech repositories and rank repositories from most to least open issues. Produce console, Markdown, TSV, and JSON tables with per-issue priority and keep/close/defer review columns. Use for backlog counts and review intake; evidence-based decisions come from fleet-issue-review. Read-only on GitHub."
+metadata:
+  category: cross-repo
+  requires_database: false
+  requires_internet: true
+  version: 1.1.0
+  tags: [issues, pr, status, cross-repo, fleet, inventory, read-only, reporting]
 ---
 
 # Fleet issue status
 
-## Purpose
+Use `scripts/fleet_issue_status.py` as the shared inventory for status and review.
+It includes Claw plus the canonical manifest's Mechs, even repositories with no
+local clone or no open issues. It does not enumerate every repository in a
+GitHub organization or on the machine. State that scope in the report; use
+explicit identities when a subset is requested.
 
-Answer **how much is open, where, and how long has it sat?** in one table.
-
-`fleet-pr-status` lists every open PR. This is the issue side, and because the
-fleet carries hundreds of open issues at a time, the table is one row per
-repository rather than one per issue. The per-issue record is the datestamped
-TSV. The PR count sits in the same row so one run answers "PRs and issues
-across the Mechs" without reconciling two reports.
-
-Use it when picking a repository to work in, before a triage round, or when
-someone asks "how big is the backlog?".
+Run from an identity-verified Claw checkout at the current published default
+revision so the script and packaged manifest agree. Follow
+[fleet-issue-review](../fleet-issue-review/SKILL.md)'s baseline procedure when
+this inventory feeds a review. A development branch must disclose its base and
+any inventory changes; do not describe it as released tooling.
 
 ## Run it
 
 ```bash
-uv run python scripts/fleet_issue_status.py                 # table + datestamped TSV
-uv run python scripts/fleet_issue_status.py --json          # machine-readable
-uv run python scripts/fleet_issue_status.py --no-prs        # issues only
-uv run python scripts/fleet_issue_status.py --stale-days 30
-uv run python scripts/fleet_issue_status.py --issue-limit 1000   # a repo has >500 open
-uv run python scripts/fleet_issue_status.py --no-tsv
-uv run python scripts/fleet_issue_status.py --tsv-dir DIR
+# Full inventory, descending repository counts, with a per-issue TSV.
+uv run python scripts/fleet_issue_status.py --all-issues --no-prs
+
+# Markdown repository summary plus every issue and its review fields.
+uv run python scripts/fleet_issue_status.py --all-issues --no-prs --markdown
+
+# Machine-readable metadata, summary and issue rows.
+uv run python scripts/fleet_issue_status.py --all-issues --no-prs --json
+
+# Add the count of issues closed in the last seven days.
+uv run python scripts/fleet_issue_status.py --all-issues --no-prs --closed-days 7 --markdown
+
+# A named subset, also useful for the one-repository canary.
+uv run python scripts/fleet_issue_status.py --all-issues --no-prs --repo CultureBotAI/culturebotai-claw
 ```
 
-`--issue-limit` (default 500) and `--pr-limit` (default 200) cap what is
-listed per repository. Reaching a cap undercounts that repository, so the
-report names it and the flag to raise. Membership has no limit: it comes from
-the canonical fleet manifest.
+Before a fleet run, run one selected repository end to end through the same
+command and environment, then verify the saved report and TSV are nonempty and
+match the fetched count. Use a fresh report directory under `workspace/reports/`
+for each acquisition; `--tsv-dir` selects that directory. Capture stdout to a
+Markdown or JSON file as appropriate and preserve stderr and exit status.
 
-Exit codes: `0` report produced, `1` at least one repository could not be
-queried or a listing truncated, `2` bad usage or `gh` missing. **A non-zero
-exit means the report is incomplete** — do not quote its totals as the answer.
+Use `--all-issues` for "all open issues": it paginates and checks an independent
+issue count. Without it, the existing `--issue-limit` (default 500) uses a cap
+plus one probe row to detect truncation. PR counts remain optional and capped
+by `--pr-limit` (default 200); `--no-prs` avoids that query for issue-only work.
+`--stale-days` defaults to 60. `--no-tsv` suppresses TSV output.
 
-## Reading the table
+Exit codes are `0` for a complete inventory, `1` for failed or truncated queues,
+and `2` for invalid input or unavailable tooling. An incomplete report is still
+useful, but its counts are lower bounds and its ranking provisional. Never
+turn an inaccessible queue into zero. Inventory completeness is not evidence
+review completeness or an atomic GitHub snapshot.
 
-```
-Open issues across the CultureBotAI fleet: 504; open PRs: 1
+## Tables and decisions
 
-REPO                  ISSUES UNASSIGNED STALE 60d+  OLDEST  PRs CONFLICTS DRAFTS
-culturebotai-claw         51         51         12    240d    0         0      0
-CultureMech               46         46          9    310d    0         0      0
-…
+The repository table is sorted by decreasing issue count, with manifest order
+breaking ties and failed queues last. It retains the unassigned, stale, oldest,
+and optional PR columns and adds review-progress/action counts. Issue counts
+exclude pull requests, unlike GitHub's repository `open_issues_count`.
 
-Coverage
-  queried 11 repos: culturebotai-claw=51, CultureMech=46, …
-  stale = no update in 60+ days as of 2026-09-13T10:00:00+00:00; issue counts exclude pull requests
-```
+When requested, add `--closed-days 7` for a rolling seven-day closure count.
+The window is fixed in UTC for the whole acquisition and saved in the output.
+This counts currently closed issues whose latest closure falls in the window,
+not every close event for reopened issues. PRs are excluded. A failed closure
+query remains unknown and marks coverage partial without dropping the known
+open-issue count. JSON retains the counted issue identities and closure times.
 
-- **ISSUES** — open issues from `gh issue list`. This is *smaller* than the
-  `open_issues_count` badge on the repository page, which counts pull
-  requests too. The report's number is the one that means "issues".
-- **UNASSIGNED** — open issues with no assignee. In this fleet that is usually
-  all of them; the column exists so the exceptions are visible.
-- **STALE Nd+** — no update (comment, label, edit) in `--stale-days` or more,
-  measured from the snapshot timestamp, never the wall clock. A snapshot
-  summarises the same way whenever it is read.
-- **OLDEST** — age of the oldest open issue.
-- **PRs / CONFLICTS / DRAFTS** — open PRs, how many GitHub reports as
-  CONFLICTING, how many are drafts. `UNKNOWN` mergeability is not counted as a
-  conflict; see `fleet-pr-status` for why.
-- A row reading `?  ?  ?  NOT QUERIED` is a repository the query failed for.
-  It is deliberately not a row of zeros.
+The full issue table starts at priority `Unranked` and action `unreviewed`.
+It carries source labels separately. Read the shared
+[report contract](references/review-table.md) to populate reviewed priority,
+keep/close/defer recommendations, reasons, evidence, and deferral triggers using
+`--triage-file`. Counts and age alone do not establish urgency or justify closure.
 
-## The datestamped TSV
+Use [fleet-issue-review](../fleet-issue-review/SKILL.md) for the evidence pass
+across Mechs and [review-open-issues](../review-open-issues/SKILL.md) for Claw's
+queue. Both feed this inventory format. A request for the table alone leaves
+unassessed issues explicitly unreviewed. Read source bodies, all comments,
+linked PRs, and current published code before filling recommendations.
 
-Every run writes a snapshot to `workspace/reports/` (gitignored):
+Return the repository table and a link to the complete Markdown and structured
+artifacts, preserving the coverage section. Include zero-issue repositories and
+errors. The Markdown ledger is full-length even when the session summary is short.
+Use `--markdown-file` with an output path to save the Markdown from the same
+acquisition as console or JSON output, rather than querying the fleet twice.
 
-```
-workspace/reports/fleet_issue_status_2026-09-13.tsv
-```
+## Boundaries and persistence
 
-13 fixed columns — `snapshot_utc, repo, number, url, title, labels, assignees,
-author, milestone, created_at, updated_at, age_days, days_since_update` —
-one row per open issue, in manifest order. Append new columns at the end.
+This script reads GitHub and writes local reports. The review overlay records
+recommendations; it does not label, close, comment, assign, or defer issues on
+GitHub. Applying decisions is a separate authorized action. Preserve pending
+human review and other standing permission requirements.
 
-It is written **unquoted** with every field whitespace-flattened, so `cut -f5`
-and `awk -F'\t'` work directly, and cells beginning with `=`, `+`, `-` or `@`
-are prefixed with an apostrophe so a spreadsheet does not execute them. An
-incomplete snapshot is named `.partial.tsv`, because the console warning does
-not survive and a month later the file is all anyone has. Re-running on the
-same date overwrites.
+The TSV retains its original 13 columns and appends review fields. It flattens
+whitespace and neutralizes spreadsheet formulas. Partial snapshots carry
+`.partial.tsv`; rerunning on the same date in the same output directory replaces
+the prior TSV. Keep a separate decisions file and use fresh acquisition directories
+so refreshes do not erase review history. Markdown and JSON emitted on stdout
+carry coverage warnings themselves.
 
-## Report the output as-is
-
-The script's format *is* the standard. Do not re-summarise it into prose that
-drops the coverage section. If the reader needs a narrative — which
-repositories to triage first, say — put it *after* the report, not instead.
-
-## Why a script and not `gh issue list` in a loop
-
-The same denominator traps that justify `fleet-pr-status`:
-
-- **`gh issue list` truncates silently** at 30 by default. The script asks for
-  one row more than its cap and names any repository where that probe row
-  came back.
-- **A failed repository query vanishes from a hand-rolled loop**, and reads as
-  "nothing open there". The script names it and marks the totals lower bounds.
-  A repository whose issue query succeeded but whose PR query failed is an
-  error too; half a row would read as a whole one.
-- **Membership is declared, not discovered.** The manifest defines the fleet;
-  a repository with zero open issues still appears in coverage, so "checked,
-  nothing there" is distinguishable from "not checked".
-
-## Boundaries
-
-- **Read-only.** It never edits, closes, labels, or comments.
-- **It reports state, not judgement.** Which issue to work is a separate step.
-  For claw's own queue with prioritisation, use `review-open-issues`.
-- **It does not review PRs.** `fleet-pr-review` is the deep pass.
-
-## Tests
-
-`tests/test_fleet_issue_status.py` covers the failure paths, and each guard is
-mutation-checked — removing it fails at least one test:
-
-| mutation | caught by |
-|---|---|
-| drop a failed repository from `errors` | `collect` error tests |
-| stop detecting issue or PR truncation | `collect` truncation tests |
-| count the probe row | probe-row test |
-| render an unqueried repo as zeros | render error test |
-| measure staleness from the wall clock | passed-`now` test |
-| write the TSV quoted, or let a tab shift a column | TSV tests |
+`tests/test_fleet_issue_status.py` verifies collection, ordering, review overlays,
+rendering, and output safety. The canonical code, skills, and tests all live in
+Claw; installed skill links and `.agents/skills` reuse that source.

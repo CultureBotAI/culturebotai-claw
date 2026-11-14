@@ -575,6 +575,10 @@ because they carry literal data the path rules would misread.
 - [Fleet repository cleanup](.claude/skills/fleet-repo-crud-cleanup/SKILL.md)
   inventories ignored/untracked clutter across current Mechs, preserves research
   and recovery state, and separates review from authorized file/Git actions.
+- [Fleet issue status](.claude/skills/fleet-issue-status/SKILL.md) inventories
+  Claw and the manifest's Mechs in descending open-issue-count order, with
+  Markdown, TSV, and JSON review columns. It is the common intake for issue
+  reviews; unreviewed rows are not automatically prioritized or closed.
 - [Fleet issue review](.claude/skills/fleet-issue-review/SKILL.md) reviews the
   published manifest's Mech issue queues, prioritizes shared themes, and plans
   parallel work around dependencies and ownership.
