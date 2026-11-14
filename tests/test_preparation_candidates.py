@@ -127,6 +127,8 @@ def fetcher(url):
 
 def test_sync_and_standalone_check_require_explicit_candidate_and_exact_bytes(tmp_path, monkeypatch):
     root = repository(tmp_path)
+    # This synthetic consumer runs inside controller CI, not its own workflow.
+    monkeypatch.setenv("GITHUB_REPOSITORY", "CultureBotAI/culturebotai-claw")
     monkeypatch.setattr(governance, "fetch_url", fetcher)
     with pytest.raises(checker.GovernanceError, match="Unknown Mech"):
         governance.plan_sync(KEY, root, PIN)
@@ -136,6 +138,11 @@ def test_sync_and_standalone_check_require_explicit_candidate_and_exact_bytes(tm
     assert governance.sync_repository(KEY, root, PIN, candidate=True, apply=True) == changes
     assert governance.plan_sync(KEY, root, PIN, candidate=True) == ()
     target = root / checker.expand_target(prepared.artifacts[-1], prepared.consumer_for(KEY))
+    assert checker.check_repository(root, repository=KEY, fetch=fetcher, candidate=True) == (len(prepared.artifacts), ())
+    with pytest.raises(checker.GovernanceError, match="Unknown Mech"):
+        checker.check_repository(root, fetch=fetcher, candidate=True)
+    # Native CI supplies its own matching assertion; that ordinary path passes.
+    monkeypatch.setenv("GITHUB_REPOSITORY", "CultureBotAI/StressResponseMech")
     assert checker.check_repository(root, fetch=fetcher, candidate=True) == (len(prepared.artifacts), ())
     with pytest.raises(checker.GovernanceError, match="Unknown Mech"):
         checker.check_repository(root, fetch=fetcher)
