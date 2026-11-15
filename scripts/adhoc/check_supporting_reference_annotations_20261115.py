@@ -13,6 +13,7 @@ import hashlib
 import json
 import socket
 import subprocess
+import traceback
 from contextlib import ExitStack
 from datetime import datetime, timezone
 from importlib.metadata import version
@@ -41,6 +42,19 @@ REFERENCE = (
 
 def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def exception_diagnostic(exception: BaseException | None) -> dict | None:
+    """#1222: retain type/frames, never exception text, locals or source lines."""
+    if exception is None or isinstance(exception, SystemExit):
+        return None
+    return {
+        "type": f"{type(exception).__module__}.{type(exception).__qualname__}",
+        "frames": [
+            {"file": Path(frame.filename).name, "line": frame.lineno, "function": frame.name}
+            for frame in traceback.extract_tb(exception.__traceback__)
+        ],
+    }
 
 
 def run_probe(
@@ -175,6 +189,7 @@ def run_probe(
                 "case": name,
                 "native_exit_code": result.exit_code,
                 "expected_exit_code": expected_exit,
+                "exception": exception_diagnostic(result.exception),
                 "events": list(events),
                 "record_sha256": before_record,
                 "log_sha256": digest(log),

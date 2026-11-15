@@ -51,6 +51,28 @@ and exactly the two changed schema/manifest digests. `check-baseline` now passes
 matcher canary and consumer pins were not changed by this refresh. The original
 failed hosted run remains retained; no baseline check was bypassed.
 
+The next hosted run exposed missing historical shared-schema fixtures (#1221)
+and three native CLI failures with hidden exceptions (#1222). The exact old
+schema is now retained from each consumer's sealed Git source, with three
+additional provenance rows; immutable admission pins/manifests are unchanged.
+Focused admission tests reproduced 14 failures and eight setup errors before
+the fixture repair. Admission, consumer, installed-wheel and native CLI tests
+then passed all 33 cases locally. The new CLI diagnostic retains exception
+type and basename/function/line frames, excluding exception text, source lines
+and local variables. A controlled native-construction failure verifies that
+these diagnostics remain visible without publishing private values.
+
+The Linux CLI cause is not yet established. Local full collection with the
+new tests selected passed nine cases; the broader local diagnostic was
+interrupted after 414 passing cases and two subtests (pytest exit 2), before
+the native CLI cases, and is not a full-suite pass. No parser workaround or
+coverage waiver is applied. The existing Linux CSafeLoader issues #233/#263
+are investigative leads, not a confirmed explanation for this failure.
+Raw logs remain at `.temp/admitted-before-001.log` (SHA-256
+`4619281b7c0dc0e714e85bd914e1583f18812f258c674d64c6e83b60398d0c4d`),
+`.temp/admitted-and-native-after-001.log` (`af5653993425e741100b098cd59edcbc5ca7de3a8dd539d4819f8a3ca17d0741`),
+and `.temp/ci-full-repro-001.log` (`877ce99f09c92e444da6ed3a22934fd2068bab73158322674b1896951cfd743d`).
+
 Private raw inputs/logs/exits remain in this checkout under
 `.temp/supporting-reference-annotations-20261115/{before-001,discussion-002,dataset-001}/`.
 The public receipts retain their input/log hashes and measured counts. Raw native
