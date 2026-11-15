@@ -62,16 +62,45 @@ type and basename/function/line frames, excluding exception text, source lines
 and local variables. A controlled native-construction failure verifies that
 these diagnostics remain visible without publishing private values.
 
-The Linux CLI cause is not yet established. Local full collection with the
+At that diagnostic checkpoint the Linux CLI cause was not yet established. Local full collection with the
 new tests selected passed nine cases; the broader local diagnostic was
 interrupted after 414 passing cases and two subtests (pytest exit 2), before
 the native CLI cases, and is not a full-suite pass. No parser workaround or
-coverage waiver is applied. The existing Linux CSafeLoader issues #233/#263
-are investigative leads, not a confirmed explanation for this failure.
+coverage waiver was applied. The existing Linux CSafeLoader issues #233/#263
+were investigative leads rather than a confirmed explanation at that point.
 Raw logs remain at `.temp/admitted-before-001.log` (SHA-256
 `4619281b7c0dc0e714e85bd914e1583f18812f258c674d64c6e83b60398d0c4d`),
 `.temp/admitted-and-native-after-001.log` (`af5653993425e741100b098cd59edcbc5ca7de3a8dd539d4819f8a3ca17d0741`),
 and `.temp/ci-full-repro-001.log` (`877ce99f09c92e444da6ed3a22934fd2068bab73158322674b1896951cfd743d`).
+
+The subsequent Linux run at `9254ad48efbed6751da12e985250caf220cb11be`
+exposed the actual `yaml.constructor.ConstructorError` through native
+`Validator` construction and `yaml_loader.load_as_dict`, before any excerpt
+comparison. [#1224](https://github.com/CultureBotAI/culturebotai-claw/issues/1224)
+reuses the existing `kg_microbe_workflows._pure_linkml_loader` context for that
+schema-loading boundary. It uses the repository's locked, isolated loader with
+duplicate-key rejection and restores the previous loader afterward. Native
+reference traversal, excerpt validation and matching remain in use.
+
+Two damaged-loader controls reproduced construction failure before the fix.
+Afterward, 104 focused canary, shared-schema and workflow tests passed, including
+restoration of the damaged parent loader. Real persisted Discussion and Dataset
+canaries then ran at `e70a97d9ca` through the same helper and environment:
+each control/mutation/restoration compared one snippet and returned exits
+0/1/0. The Discussion artifacts were verified before the Dataset call.
+Inputs stayed unchanged and no acquisition guard fired.
+The new [Discussion receipt](discussion-loader-001.json) and
+[Dataset receipt](dataset-loader-001.json) disclose the loader context and bind
+its implementation hash; original receipts remain unchanged. Canonical schema,
+manifest, composition baseline, dependencies and downstream pins did not change.
+The post-fix hosted run remains pending at this checkpoint.
+
+Retained logs: `.temp/ci-pytest-9254ad48-001.log`, SHA-256
+`184ad0878834629b23f03377ca7aa3003375775934bcd5b924fa03405eb5dadc`;
+`.temp/linkml-loader-regression-before-001.log`,
+`c7bf239266dc5eb76ce7a8e75692d08ac62d25d7f6e85ce7ca15a8309bd4a8e1`;
+`.temp/linkml-loader-controls-after-001.log`,
+`f056b19574a4833cac21a6faf544f4f02ac1d82bc924284e8ccd3f53b589e5f3`.
 
 Private raw inputs/logs/exits remain in this checkout under
 `.temp/supporting-reference-annotations-20261115/{before-001,discussion-002,dataset-001}/`.
