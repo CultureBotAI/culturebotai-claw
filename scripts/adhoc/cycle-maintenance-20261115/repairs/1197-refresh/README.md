@@ -13,11 +13,25 @@ and refresh preview both equal the existing baseline lock. Its actual source
 no forced source pin or baseline-only commit was made. The unchanged baseline
 SHA256 is67b52e3880438c827458241c366bdf8005efacbbdaec8664180b9bb7d746c424.
 
-integrate_current_main.py records the exact bounded procedure: read-only preview,
-then explicit --apply fetch and ordinary merge with short shared metadata leases.
-It never pushes. Hooks and long checks do not run inside the leases. The helper
-requires explicit paths and immutable expected heads. verify_refreshed_tree.py is
-read-only and authenticates the full tree and retained maintained-tool outputs.
+`integrate_current_main.executed.py.txt` preserves the exact executed helper
+bytes as a historical archive. It is not an operational integration entry point.
+Issue #1270 records the procedural defect: this execution created its merge
+commit **inside** the metadata lease while explicitly setting
+`core.hooksPath=/dev/null` and `commit.gpgsign=false`. Hook suppression did not
+satisfy the instruction to prepare metadata under the lease and run the normal
+commit, including configured hooks/signing, after releasing it. No normal-hook
+execution is claimed for that historical merge.
+
+The archive preserves what actually ran; the already-verified source tree,
+parents, test results and original hash ledgers remain unchanged. No live integration was
+rerun, and the merge was not recreated. `ARCHIVAL-PACKAGING.json` maps the
+original executed pathname/hash to the byte-identical archive and records the
+unchanged ledgers. Their original helper pathname remains a historical input
+identity. A future supported utility must be reviewed separately and keep only
+metadata preparation inside the lease, with commit/hooks outside and configured
+hook/signing behavior preserved. `verify_refreshed_tree.py` remains read-only and
+authenticates the full tree and retained maintained-tool outputs.
+
 The raw baseline check/preview and earlier event failure log remain in private
 durable evidence; their authority is the committed public source object, not a
 copied status claim. Public integration/verification/validation receipts and the

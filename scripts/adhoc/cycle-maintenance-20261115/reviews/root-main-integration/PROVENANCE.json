@@ -1,0 +1,78 @@
+{
+  "source_reviewed": "2597b50f1cf9ee630316c880b43030e04cfac664",
+  "issues": [
+    1270,
+    1271
+  ],
+  "files": [
+    {
+      "original_relative_path": "REVIEW-2597.md",
+      "published_path": "REVIEW-2597.md",
+      "sha256": "2708d62a7ea31c6e1a80b1bbc8c7b3fc242a6871df3a0c592d64df05a679a329",
+      "byte_edits": false
+    },
+    {
+      "original_relative_path": "review-2597.json",
+      "published_path": "review-2597.json",
+      "sha256": "14918bcde57ca0ce004d0d365e2f85dc8ca73f7c75d6263fa7af46e193ff695f",
+      "byte_edits": false
+    },
+    {
+      "original_relative_path": "composition/verification.json",
+      "published_path": "composition-verification.json",
+      "sha256": "1de35b5e9742bb4cd5fce8e784250b010f1dc45513c8ffc2ffbabcc8f12a9ce9",
+      "byte_edits": false
+    },
+    {
+      "original_relative_path": "review_composition.py.txt",
+      "published_path": "review_composition.py.txt",
+      "sha256": "a812f9985bcd8daf053fe13b991914dcded6a4afdecfabe8ea49bded03ac3309",
+      "byte_edits": false
+    },
+    {
+      "original_relative_path": "ISSUE-1197-LEASE.md",
+      "published_path": "ISSUE-1197-LEASE.md",
+      "sha256": "a740f477b79f7b8defa5bf54f4ad2efe9fd9064f9fa0ff6fbbd6b0dccc3fbd1f",
+      "byte_edits": false
+    },
+    {
+      "original_relative_path": "verify_1270_archive.py.txt",
+      "published_path": "verify_1270_archive.py.txt",
+      "sha256": "8cb76e0796cbf957f342ca7ff3e39f276bfde6767339a02ad1cd684c7af6cebf",
+      "byte_edits": false
+    },
+    {
+      "original_relative_path": "1270-archive-readback.json",
+      "published_path": "1270-archive-readback.json",
+      "sha256": "dd1654ba4f75fecd7fd5224ac680a9183ad97558e9245da910146f86020f4904",
+      "byte_edits": false
+    },
+    {
+      "original_relative_path": "verify_1271_staged.py.txt",
+      "published_path": "verify_1271_staged.py.txt",
+      "sha256": "b3b739fb3b1f679ec06f4547956bb9644d3c2aa414eedda3c787c7d813241159",
+      "byte_edits": false
+    },
+    {
+      "original_relative_path": "1271-staged-readback.json",
+      "published_path": "1271-staged-readback.json",
+      "sha256": "fa174a0fd2176647833294a0d4bc5387007974cb2df2e0e31cae1be9dab17d4f",
+      "byte_edits": false
+    },
+    {
+      "original_relative_path": "REREVIEW-1270-1271.md",
+      "published_path": "REREVIEW-1270-1271.md",
+      "sha256": "b838d2cd5676534a7ee0cddc332526e9c2fded0c14d0deb7e4c5dfa8e782af85",
+      "byte_edits": false
+    },
+    {
+      "original_relative_path": "focused.log",
+      "published_path": "focused-pytest.txt",
+      "sha256": "f78ed353ed500d97e41f7eab2b5a7449e5250bca7026baa65a1b41b5899ee5ab",
+      "byte_edits": false
+    }
+  ],
+  "originals_retained": true,
+  "one_time_helpers_archived": true,
+  "root_source_or_git_mutated_by_reviewer": false
+}

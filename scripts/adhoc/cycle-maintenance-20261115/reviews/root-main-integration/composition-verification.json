@@ -1,0 +1,77 @@
+{
+  "reviewed_head": "2597b50f1cf9ee630316c880b43030e04cfac664",
+  "merge_commit": "8db30dad3d818d166b5ee23d64e1bcb22605fd94",
+  "prior": "4970c9c83a8cb1cc2ee06a85ccdbad08589c55e5",
+  "main": "bd2b07480afd3b3984491a7fc729c64220d4dd81",
+  "common_base": "99fb0ac11e2e6aeabedc8d08f29a5f08aac0892d",
+  "incoming_paths": 31,
+  "overlap": [
+    "scripts/mech_session_supervisor.py"
+  ],
+  "entire_merge_tree_verified": true,
+  "post_merge_paths": [
+    "scripts/adhoc/cycle-maintenance-20261115/repairs/1138-refresh/README.md",
+    "scripts/adhoc/cycle-maintenance-20261115/repairs/1138-refresh/merge-prepared.json",
+    "scripts/adhoc/cycle-maintenance-20261115/repairs/1138-refresh/metadata_refresh.py.txt",
+    "scripts/adhoc/cycle-maintenance-20261115/repairs/1138-refresh/proof.json",
+    "scripts/adhoc/cycle-maintenance-20261115/repairs/1197-refresh/PROVENANCE.json",
+    "scripts/adhoc/cycle-maintenance-20261115/repairs/1197-refresh/README.md",
+    "scripts/adhoc/cycle-maintenance-20261115/repairs/1197-refresh/VALIDATION.json",
+    "scripts/adhoc/cycle-maintenance-20261115/repairs/1197-refresh/integrate_current_main.py",
+    "scripts/adhoc/cycle-maintenance-20261115/repairs/1197-refresh/integration.json",
+    "scripts/adhoc/cycle-maintenance-20261115/repairs/1197-refresh/verification.json",
+    "scripts/adhoc/cycle-maintenance-20261115/repairs/1197-refresh/verify_refreshed_tree.py",
+    "scripts/adhoc/cycle-maintenance-20261115/reviews/dirty-snapshot-independent/MANIFEST.json",
+    "scripts/adhoc/cycle-maintenance-20261115/reviews/dirty-snapshot-independent/REVIEW.md",
+    "scripts/adhoc/cycle-maintenance-20261115/reviews/dirty-snapshot-independent/controls.json",
+    "scripts/adhoc/cycle-maintenance-20261115/reviews/dirty-snapshot-independent/verification.json",
+    "scripts/adhoc/cycle-maintenance-20261115/reviews/dirty-snapshot-independent/verify_capture_boundaries.py",
+    "scripts/adhoc/cycle-maintenance-20261115/reviews/dirty-snapshot-independent/verify_dirty_snapshots.py",
+    "scripts/adhoc/cycle-maintenance-20261115/reviews/dirty-snapshot-plans/PREPARATION.json",
+    "scripts/adhoc/cycle-maintenance-20261115/reviews/dirty-snapshot-plans/PROVENANCE.json",
+    "scripts/adhoc/cycle-maintenance-20261115/reviews/dirty-snapshot-plans/README.md",
+    "scripts/adhoc/cycle-maintenance-20261115/reviews/dirty-snapshot-plans/capture_dirty_snapshot.executed.py.txt",
+    "scripts/adhoc/cycle-maintenance-20261115/reviews/dirty-snapshot-plans/capture_dirty_snapshot.py",
+    "scripts/adhoc/cycle-maintenance-20261115/reviews/dirty-snapshot-plans/probe_index_stability.py",
+    "scripts/adhoc/cycle-maintenance-20261115/reviews/main-refresh/1138-review.json",
+    "scripts/adhoc/cycle-maintenance-20261115/reviews/main-refresh/1197-review.json",
+    "scripts/adhoc/cycle-maintenance-20261115/reviews/main-refresh/PROVENANCE.json",
+    "scripts/adhoc/cycle-maintenance-20261115/reviews/main-refresh/README.md",
+    "scripts/adhoc/cycle-maintenance-20261115/reviews/main-refresh/verify_refreshed_heads.py",
+    "scripts/adhoc/cycle-maintenance-20261115/reviews/public-provenance-readback/REVIEW.md",
+    "scripts/adhoc/cycle-maintenance-20261115/reviews/public-provenance-readback/verification.json",
+    "scripts/adhoc/cycle-maintenance-20261115/reviews/public-provenance-readback/verify_public_packages.py"
+  ],
+  "post_merge_changes_are_additions_only": true,
+  "final_tree_verified": true,
+  "integrator_sha256": "fcb8613130d42921f38ae6d74a0073d7375abdbe4c9c7bf36af511fe8cbc97ea",
+  "offline_command_record": [
+    {
+      "subcommand": "merge",
+      "arguments": [
+        "--no-ff",
+        "bd2b07480afd3b3984491a7fc729c64220d4dd81",
+        "-m",
+        "Merge published main after port-pressure integration (#1262)"
+      ],
+      "lease_active": true,
+      "hooks_disabled": true,
+      "signing_disabled": true,
+      "no_commit_requested": false
+    }
+  ],
+  "offline_integrator_result": {
+    "status": "integrated-local-only",
+    "head": "748cfaf510e96ffa6f8b4b08c877742cf8a492d8",
+    "tree": "f8d88d90cc6fb1c63b8adf8696cea978104b6c56",
+    "parents": [
+      "98345116994d17eaee050efb13f5414f5faaf3d4",
+      "bd2b07480afd3b3984491a7fc729c64220d4dd81"
+    ],
+    "push_performed": false,
+    "runtime_actions": false
+  },
+  "review_helper_sha256": "a812f9985bcd8daf053fe13b991914dcded6a4afdecfabe8ea49bded03ac3309",
+  "real_git_writes": false,
+  "remote_or_runtime_actions": false
+}

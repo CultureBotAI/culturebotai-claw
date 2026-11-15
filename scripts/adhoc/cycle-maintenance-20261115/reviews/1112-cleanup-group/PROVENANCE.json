@@ -1,0 +1,17 @@
+{
+  "date": "2026-11-15",
+  "purpose": "Independent read-only readback of four completed owned PR1112 retirements, including sequential registrations and preserved staged-snapshot evidence.",
+  "inputs": "Explicit task root, four quarantine before/preserved/completed/recovery manifests, matching dry/apply/operator proofs, exact root-head advancement chain, retained original snapshot payloads, accepted restoration plan/receipt, and fresh public PR/ref reads.",
+  "outputs": "Full detailed JSON on stdout retained privately; public verification removes only private_detail. No source, Git, GitHub or cleanup mutation.",
+  "helper": "verify_cleanup_group.py",
+  "helper_sha256": "34d2ff30571e5a54a5c5c493a0418980de9bc154825194b1a65a459f55f4e33f",
+  "reused_reader": "../cleanup-canary/verify_cleanup_canary.py",
+  "reused_reader_sha256": "ac422830ec1719f2acdc6a1a9be52a8428277dc0b8112656bf826856d7bed348",
+  "reused_reader_unchanged": true,
+  "adaptation": "New bounded read-only wrapper reuses the retained reader's exact hashing, safe Git and public API functions. It compares sequential removals as one accounted group and authenticates retained restoration evidence instead of assuming each historical registration set equals the final set.",
+  "private_result_sha256": "d2e1598175c21c51519248167c078846af0d150d4ad54aafb16be16d36259dd5",
+  "public_result_sha256": "2340b81491a420bad9cc39f07b5f0d7c3f43bdbd211abbb24be594f987f55f0a",
+  "public_projection": "jq 'del(.private_detail)' applied to the completed private receipt; verification rows, counts, evidence hashes and limitations preserved.",
+  "original_helpers_manifests_indexes_patches_and_results_preserved": true,
+  "stale_tracking_ref_deleted": false
+}

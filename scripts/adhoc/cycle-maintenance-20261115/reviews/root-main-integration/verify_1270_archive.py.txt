@@ -1,0 +1,32 @@
+"""Historical read-only issue1270 archival rereview, 2026-11-15.
+Inputs: --repository and --output new receipt. No Git writes, remote operations,
+source edits or historical integration rerun. One-time review source archive.
+"""
+import argparse,hashlib,json,os,subprocess
+from pathlib import Path
+p=argparse.ArgumentParser(description=__doc__);p.add_argument('--repository',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
+root=a.repository;folder=Path('scripts/adhoc/cycle-maintenance-20261115/repairs/1197-refresh');source='2597b50f1cf9ee630316c880b43030e04cfac664'
+def digest(raw):return hashlib.sha256(raw).hexdigest()
+def original(path):return subprocess.check_output(['git','-C',str(root),'show',source+':'+str(path)])
+manifest_path=folder/'ARCHIVAL-PACKAGING.json';manifest_raw=(root/manifest_path).read_bytes();manifest=json.loads(manifest_raw)
+old=Path(manifest['original_path']);archive=Path(manifest['archive_path']);old_bytes=original(old);archived=(root/archive).read_bytes()
+assert archived==old_bytes and digest(archived)==manifest['original_and_archive_sha256']
+assert not os.path.lexists(root/old)
+# Path.rglob includes hidden and ignored entries: no operational alias in scope.
+assert not list((root/folder).rglob('integrate_current_main.py'))
+assert manifest['operational_entrypoint_retained'] is False and manifest['helper_byte_edits'] is False
+ledgers={}
+for name,expected in manifest['original_ledgers_unchanged'].items():
+ raw=(root/folder/name).read_bytes();assert raw==original(folder/name) and digest(raw)==expected;ledgers[name]=expected
+readme=(root/folder/'README.md').read_bytes();docs=manifest['documentation_edits']
+assert digest(readme)==docs['README.md']['after_sha256'] and digest(original(folder/'README.md'))==docs['README.md']['before_sha256']
+text=readme.decode()
+for required in ('**inside**','core.hooksPath=/dev/null','commit.gpgsign=false','No normal-hook','No live integration was','merge was not recreated'):assert required in text
+review=Path('scripts/adhoc/cycle-maintenance-20261115/reviews/public-provenance-readback/REVIEW.md')
+assert (root/review).read_bytes()==original(review)
+assert digest((root/review).read_bytes())==docs['public_readback_original_review_preserved_sha256']
+note=Path(docs['separate_packaging_note']);assert note.name=='PACKAGING-NOTE-1270.md';note_raw=(root/note).read_bytes()
+log=folder/'focused-pytest.log';local_log=(root/log).read_bytes();committed_log=subprocess.check_output(['git','-C',str(root),'ls-tree','-r','--name-only',source,'--',str(log)]).decode().strip()
+result={'issue':1270,'source_before_packaging':source,'archive_bytes_exact':True,'archived_helper_sha256':digest(archived),'operational_entrypoint_absent_ignored_inclusive':True,'historical_ledgers_exact':ledgers,'current_archival_manifest_sha256':digest(manifest_raw),'corrected_readme_sha256':digest(readme),'prior_independent_review_preserved':True,'packaging_note_sha256':digest(note_raw),'related_log_publication_observation':{'local_log_sha256':digest(local_log),'tracked_at_reviewed_source':bool(committed_log),'original_manifest_names_this_log':True},'helper_sha256':digest(Path(__file__).read_bytes()),'real_git_writes':False,'remote_or_runtime_actions':False}
+with a.output.open('x') as stream:json.dump(result,stream,indent=2);stream.write('\n')
+print(json.dumps(result,indent=2))

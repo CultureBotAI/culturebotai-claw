@@ -1,0 +1,16 @@
+{
+  "issues": [
+    1270,
+    1271
+  ],
+  "verdict": "pass_bounded_archival_and_publication_correction",
+  "source_before_packaging": "2597b50f1cf9ee630316c880b43030e04cfac664",
+  "staged_log_path": "scripts/adhoc/cycle-maintenance-20261115/repairs/1197-refresh/focused-pytest.log",
+  "staged_blob_sha256": "d35a1ba33a5e6872d4fb0060dc2e16b8ef9375e51ead894a4bda8c9246c25dcd",
+  "staged_blob_identical_to_original_recorded_log": true,
+  "original_ledgers_and_global_ignore_unchanged": true,
+  "log_lines": 4,
+  "test_or_integration_rerun": false,
+  "helper_sha256": "b3b739fb3b1f679ec06f4547956bb9644d3c2aa414eedda3c787c7d813241159",
+  "git_writes": false
+}

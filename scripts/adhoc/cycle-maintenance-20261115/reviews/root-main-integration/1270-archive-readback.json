@@ -1,0 +1,25 @@
+{
+  "issue": 1270,
+  "source_before_packaging": "2597b50f1cf9ee630316c880b43030e04cfac664",
+  "archive_bytes_exact": true,
+  "archived_helper_sha256": "fcb8613130d42921f38ae6d74a0073d7375abdbe4c9c7bf36af511fe8cbc97ea",
+  "operational_entrypoint_absent_ignored_inclusive": true,
+  "historical_ledgers_exact": {
+    "PROVENANCE.json": "7f829503f1c98fa9e0dd3300e1b8de2f3895677cbfdfaa287ccaf390968e557d",
+    "VALIDATION.json": "38a1cc5f0f5e75432cd32818e4d9ba243046d28d9590933ad1861b1e22988c40",
+    "integration.json": "87b41804876c562f6c84c54fca9aa2585d6ce3fc06f623f34436e8cafbace009",
+    "verification.json": "16420c65ddc99b13023ab42bcb83148db5fbaec2d975b5b6a9d9518bbf3399f4"
+  },
+  "current_archival_manifest_sha256": "a8e6cb89786b9dc8f2245e8a1fc6349d160e23b33862387eca565e0abe8b8d95",
+  "corrected_readme_sha256": "81a13f9f8ef400f5956b2ce463b7ed562a8653d5bfb527ee48149b0784cb2261",
+  "prior_independent_review_preserved": true,
+  "packaging_note_sha256": "889895199d5f88f70b590d993072df4340c5038f315641b820c792338ae784b7",
+  "related_log_publication_observation": {
+    "local_log_sha256": "d35a1ba33a5e6872d4fb0060dc2e16b8ef9375e51ead894a4bda8c9246c25dcd",
+    "tracked_at_reviewed_source": false,
+    "original_manifest_names_this_log": true
+  },
+  "helper_sha256": "8cb76e0796cbf957f342ca7ff3e39f276bfde6767339a02ad1cd684c7af6cebf",
+  "real_git_writes": false,
+  "remote_or_runtime_actions": false
+}
