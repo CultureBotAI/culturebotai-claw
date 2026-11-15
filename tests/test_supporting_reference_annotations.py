@@ -16,6 +16,19 @@ canary = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(canary)
 
 
+def fail_with_native_diagnostics(report):
+    """#1222: do not let pytest abbreviate the sanitized construction traceback."""
+    pytest.fail(
+        json.dumps(
+            [
+                {key: case.get(key) for key in ("case", "native_exit_code", "exception")}
+                for case in report["cases"]
+            ],
+            indent=2,
+        )
+    )
+
+
 def test_canonical_reference_and_excerpt_annotations_preserve_optional_snippet():
     schema = yaml.safe_load(canary.SCHEMA.read_text())
     fields = schema["classes"]["SupportingReference"]["attributes"]
@@ -30,7 +43,8 @@ def test_canonical_reference_and_excerpt_annotations_preserve_optional_snippet()
 def test_real_cli_compares_supporting_reference_and_rejects_mutation(tmp_path, target):
     output = tmp_path / target
     report = canary.run_probe(output, target)
-    assert report["passed"], report
+    if not report["passed"]:
+        fail_with_native_diagnostics(report)
     assert [case["native_exit_code"] for case in report["cases"]] == [0, 1, 0]
     assert report["inputs_unchanged"] and not report["refused_operations"]
     assert json.loads((output / "receipt.json").read_text()) == report
@@ -48,7 +62,8 @@ def test_removing_excerpt_annotation_cannot_claim_a_zero_issue_pass(tmp_path):
     report = canary.run_probe(tmp_path / "negative", schema=path)
     assert not report["passed"]
     assert all(case["events"] == [] for case in report["cases"])
-    assert all(case["native_exit_code"] == 0 for case in report["cases"])
+    if not all(case["native_exit_code"] == 0 for case in report["cases"]):
+        fail_with_native_diagnostics(report)
 
 
 def test_native_construction_exception_is_visible_without_private_text(tmp_path, monkeypatch):
