@@ -1,7 +1,7 @@
 {
   "baseline_version": "1.1.0",
   "schema_version": 1,
-  "source_ref": "1bd8373750be51e37c3e689175c3a986b1a1e30c",
+  "source_ref": "1b419415a738c4d68c79c0dba6c838db77acc98d",
   "sources": {
     "src/kg_microbe_fleet/fleet.yaml": "1cf926eb16d70bfc81e120eb622b16063c4511e9c3d9cb534765a1f67621a91f",
     "src/kg_microbe_governance/artifacts/__init__.py": "4e47389554e9e8d6e05a90ecf7dc6ad5708f08e56d012d9129970d58b9c6d069",
@@ -11,7 +11,7 @@
     "src/kg_microbe_governance/artifacts/embedding-runtime/uv.lock": "c11077011f263fe174de5ae7a2cf176cf3fc6028e22c5c03847d4f9ae803edc5",
     "src/kg_microbe_governance/artifacts/prompts/backlog-loop-goal.md": "d7786562ab5081a9f2ede8927fc4329632ccde79341284b43d972fca7cccf926",
     "src/kg_microbe_governance/artifacts/schema/history.yaml": "b01b06f1b9a37db205c26c31ec0fd910690848507c7e1bfb73b424ac0829c52d",
-    "src/kg_microbe_governance/artifacts/schema/mech_shared.yaml": "c2e7054fd32635e380c698282bd886a9105861009b9f0474f02bb1b80865e895",
+    "src/kg_microbe_governance/artifacts/schema/mech_shared.yaml": "cf32864df1626201128e9311054b075bfc4ad3d8345491ac144122a5d5e67d11",
     "src/kg_microbe_governance/artifacts/schema/record_review.yaml": "229baf9b69118a1fe318e4c31085c0820e4e3d1365e7b04d6ace451b7c35f9bb",
     "src/kg_microbe_governance/artifacts/scripts/__init__.py": "f04a7a4160750e47ff2bee761c610ed7f4d12f6f50b914dd3527ec672ebc1af2",
     "src/kg_microbe_governance/artifacts/scripts/_edison_capture.py": "c9bc66bde1ec534c310a1139066e0d6e4d69c2505c4de283c32d536f4da291ed",
@@ -40,7 +40,7 @@
     "src/kg_microbe_governance/candidates.json": "cdda071dad55aed5c86d3fd7365b80945e27f0ed5e689c360d0375c53037cd03",
     "src/kg_microbe_governance/candidates.py": "f7a5e79f7f754cded6cf7f604a88ff8b703aaa313e6c759d60341b0a62d57b32",
     "src/kg_microbe_governance/private_audit/scaleup-v1.json": "372d0b12ad54dab4ac4616b6c35acedb5231246a0d90e5a59decdf4f3ed25529",
-    "src/kg_microbe_governance/vendored_artifacts.json": "428cca75be382f886904dc21159f6fd4c7ab77370e6a28a5ce73cba12d4f68a2",
+    "src/kg_microbe_governance/vendored_artifacts.json": "2c5999efb159707a046ff0f482322f84d65c115b1516f61a7bd64e5b92b5d5f9",
     "src/kg_microbe_skills/canonical/curate-yaml-record.md": "156d1794af0e7a1775d68e5321874f9fab4fef3be5dc6fadd46a8db7bc7053d5",
     "src/kg_microbe_skills/canonical/evolve-mech-workflow.md": "223e7799763859d28b7c1d16f92c2da63e1f300b57e6f17c9d458478e061490d",
     "src/kg_microbe_skills/canonical/fetch-source.md": "8955d52c2a6bf16d6eaa28dabe27af29af7c16a3073d17a8363acc4458f9f01e",
