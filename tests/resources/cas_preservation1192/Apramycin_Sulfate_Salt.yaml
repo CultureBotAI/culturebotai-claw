@@ -1,0 +1,116 @@
+identifier: CHEBI:190734
+preferred_term: Apramycin sulfate salt
+ontology_mapping:
+  ontology_id: CHEBI:190734
+  ontology_label: Apramycin sulfate
+  ontology_source: CHEBI
+  mapping_quality: CAS_RN_LOOKUP
+  evidence:
+  - evidence_type: DATABASE_MATCH
+    source: CultureBotHT
+    notes: Imported from CultureBotHT. CAS-RN 65710-07-8 present, but no CHEBI entry
+      exists (checked OAK CHEBI sqlite + PubChem CID synonyms). Curator can promote
+      to a CHEBI primary if/when CHEBI adds the term.
+  - evidence_type: DATABASE_MATCH
+    source: CHEBI via PubChem (pubchem-xref)
+    notes: Parent class identified via pubchem-xref; matched_via='pubchem CID 3081544'
+  - evidence_type: MANUAL_CURATION
+    source: MIM curation (#312); chebi.db
+    notes: 'identifier cas:65710-07-8 -> CHEBI:190734; ontology CHEBI:190734 (''Apramycin
+      sulfate'') -> CHEBI:190734 (''Apramycin sulfate''); mapping_quality NARROW_MATCH
+      -> CAS_RN_LOOKUP. The ''no CHEBI entry exists'' note was wrong: CHEBI:190734
+      ''Apramycin sulfate'' (C21H41N5O11.H2O4S = the record''s C21H43N5O15S) has InChIKey
+      WGLYHYWDYPSNPF-RQFIXDHTSA-N, and the record''s CAS 65710-07-8 resolves on PubChem
+      (CID 3081544) to the same InChIKey. The broadMatch parent is the substance itself;
+      Section 3 step 1 promotes it to the identifier (#326 precedent), graded CAS_RN_LOOKUP
+      because the CAS, not the label, established it. The CAS stays on its registry
+      row; the kgmicrobe.compound row is dropped.'
+synonyms:
+- synonym_text: (2R,3R,4S,5S,6S)-2-[[(2R,3S,4R,4aR,6S,7R,8aS)-7-amino-6-[(1R,2R,3S,4R,6S)-4,6-diamino-2,3-dihydroxycyclohexyl]oxy-4-hydroxy-3-(methylamino)-2,3,4,4a,6,7,8,8a-octahydropyrano[3,2-b]pyran-2-yl]oxy]-5-amino-6-(hydroxymethyl)oxane-3,4-diol;suluric
+    acid
+  synonym_type: EXACT_SYNONYM
+  source: chebi_synonym_review
+mapping_status: MAPPED
+occurrence_statistics:
+  total_occurrences: 0
+  media_count: 0
+curation_history:
+- timestamp: '2026-04-29T06:51:33.117170+00:00'
+  curator: audit_add_remaining_culturebotht
+  action: CREATED_FROM_CAS_FALLBACK
+  changes: Created with cas:65710-07-8 as primary identifier; no CHEBI entry exists
+    for this compound.
+  new_status: MAPPED
+  llm_assisted: false
+- timestamp: '2026-05-01T07:35:32.224615+00:00'
+  curator: auto_classify_ingredient_type
+  action: AUTO_CLASSIFY_INGREDIENT_TYPE
+  changes: 'set ingredient_type=SINGLE_INGREDIENT (cas: primary (defined chemical))'
+  llm_assisted: false
+- timestamp: '2026-05-02T02:51:55.942540+00:00'
+  curator: auto_classify_ingredient_type
+  action: AUTO_BACKFILL_PUBCHEM_CHEMISTRY
+  changes: molecular_formula=C21H43N5O15S; smiles=CNC1C(C2C(CC(C(O2)OC3C(CC(C(C3O)O)N)N)N)OC1OC4C(C(;
+    inchi=InChI=1S/C21H41N5O11.H2O4S/c1-26-11-14(30)18-8(33-
+  llm_assisted: false
+- timestamp: '2026-05-02T03:12:12.537383+00:00'
+  curator: auto_classify_ingredient_type
+  action: AUTO_CLASSIFY_INGREDIENT_TYPE
+  changes: set ingredient_type=SINGLE_INGREDIENT (chemical structure populated (molecular_formula))
+  llm_assisted: false
+- timestamp: '2026-05-02T04:40:34.191234+00:00'
+  curator: backfill_parent_terms
+  action: BACKFILL_PARENT_CHEBI
+  changes: set ontology_mapping parent=CHEBI:190734 (pubchem-xref)
+  llm_assisted: false
+- timestamp: '2026-06-02T07:05:13.386285+00:00'
+  curator: infer_roles_from_name_lists
+  action: ANNOTATED
+  changes: 'Added media role: SELECTIVE_AGENT (confidence: 0.80)'
+- timestamp: '2026-07-20T00:00:00+00:00'
+  curator: migrate_media_roles_to_facets
+  action: ANNOTATED
+  changes: 'Migrated legacy media_roles to role facets (#128): SELECTIVE_AGENT ->
+    physicochemical_roles.SELECTIVE_AGENT'
+- timestamp: '2026-09-23T00:44:54.453584+00:00'
+  curator: claude
+  action: REGRADED_PARENT_TO_IDENTITY
+  changes: 'identifier cas:65710-07-8 -> CHEBI:190734; ontology CHEBI:190734 (''Apramycin
+    sulfate'') -> CHEBI:190734 (''Apramycin sulfate''); mapping_quality NARROW_MATCH
+    -> CAS_RN_LOOKUP. The ''no CHEBI entry exists'' note was wrong: CHEBI:190734 ''Apramycin
+    sulfate'' (C21H41N5O11.H2O4S = the record''s C21H43N5O15S) has InChIKey WGLYHYWDYPSNPF-RQFIXDHTSA-N,
+    and the record''s CAS 65710-07-8 resolves on PubChem (CID 3081544) to the same
+    InChIKey. The broadMatch parent is the substance itself; Section 3 step 1 promotes
+    it to the identifier (#326 precedent), graded CAS_RN_LOOKUP because the CAS, not
+    the label, established it. The CAS stays on its registry row; the kgmicrobe.compound
+    row is dropped. (#312)'
+  previous_status: MAPPED
+  new_status: MAPPED
+  llm_assisted: true
+  llm_model: claude-fable-5-1
+- timestamp: '2026-11-08T22:01:42+00:00'
+  curator: codex
+  action: ASSIGNED_MIM_ID
+  changes: '#1265: assigned permanent MIM:0000365; retained mapping identifier and
+    legacy aliases.'
+  llm_assisted: true
+chemical_properties:
+  cas_rn: 65710-07-8
+  data_source: CultureBotHT compounds_to_cas.csv
+  retrieval_date: '2026-04-29T06:51:33.117170+00:00'
+  molecular_formula: C21H43N5O15S
+  smiles: CNC1C(C2C(CC(C(O2)OC3C(CC(C(C3O)O)N)N)N)OC1OC4C(C(C(C(O4)CO)N)O)O)O.OS(=O)(=O)O
+  inchi: InChI=1S/C21H41N5O11.H2O4S/c1-26-11-14(30)18-8(33-20(11)37-21-16(32)13(29)10(25)9(4-27)34-21)3-7(24)19(36-18)35-17-6(23)2-5(22)12(28)15(17)31;1-5(2,3)4/h5-21,26-32H,2-4,22-25H2,1H3;(H2,1,2,3,4)/t5-,6+,7-,8+,9-,10-,11+,12+,13+,14-,15-,16-,17-,18+,19+,20-,21-;/m1./s1
+  pubchem_cid: 3081544
+ingredient_type: SINGLE_INGREDIENT
+physicochemical_roles:
+- role: SELECTIVE_AGENT
+  confidence: 0.8
+  evidence:
+  - reference_type: COMPUTATIONAL_PREDICTION
+    reference_text: Inferred from curated media-role name pattern
+    curator_note: Provisional role from a curated name-pattern rule; review recommended.
+mim_id: MIM:0000365
+legacy_identifiers:
+- MIM:Apramycin_Sulfate_Salt
+- CHEBI:190734

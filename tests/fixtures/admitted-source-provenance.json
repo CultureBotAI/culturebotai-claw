@@ -85,6 +85,42 @@
       "fixture": "tests/fixtures/edgemech-admitted-source/auto_merge_ready_prs.py",
       "snapshot": "src/kg_microbe_governance/releases/assaymech-infrastructure-source-manifest.json",
       "snapshot_sha256": "a2d2308fe27c81ac6cf74ca5d456ff9309b4ea18965a8bec750ffa0a5fde8a93"
+    },
+    {
+      "consumer": "edgemech",
+      "source_repository": "CultureBotAI/culturebotai-claw",
+      "source_ref": "7e672227fb246a8359ad57b6d3975ce5ed329007",
+      "source_path": "src/kg_microbe_governance/artifacts/schema/mech_shared.yaml",
+      "source_blob": "fa1f7956c6a83e04ffa96d02bdf911461d09705a",
+      "sha256": "c2e7054fd32635e380c698282bd886a9105861009b9f0474f02bb1b80865e895",
+      "bytes": 16106,
+      "fixture": "tests/fixtures/edgemech-admitted-source/mech_shared.yaml",
+      "snapshot": "src/kg_microbe_governance/releases/edgemech-infrastructure-source-manifest.json",
+      "snapshot_sha256": "bfd4b703f46ce748487253d6fe093e79fe00ba7a9a88293f5cc6df176f11b519"
+    },
+    {
+      "consumer": "cofactormech",
+      "source_repository": "CultureBotAI/culturebotai-claw",
+      "source_ref": "5790569efd881bd8bca82a04ea278cc462c0c2c8",
+      "source_path": "src/kg_microbe_governance/artifacts/schema/mech_shared.yaml",
+      "source_blob": "fa1f7956c6a83e04ffa96d02bdf911461d09705a",
+      "sha256": "c2e7054fd32635e380c698282bd886a9105861009b9f0474f02bb1b80865e895",
+      "bytes": 16106,
+      "fixture": "tests/fixtures/edgemech-admitted-source/mech_shared.yaml",
+      "snapshot": "src/kg_microbe_governance/releases/cofactormech-infrastructure-source-manifest.json",
+      "snapshot_sha256": "ae2cfdc4372e0054bca595281b2b88a10d672b9a70d8664c99c94105ef3b64b1"
+    },
+    {
+      "consumer": "assaymech",
+      "source_repository": "CultureBotAI/culturebotai-claw",
+      "source_ref": "89bfcebaee8a0fcf99055b2acd1709abb64f8666",
+      "source_path": "src/kg_microbe_governance/artifacts/schema/mech_shared.yaml",
+      "source_blob": "fa1f7956c6a83e04ffa96d02bdf911461d09705a",
+      "sha256": "c2e7054fd32635e380c698282bd886a9105861009b9f0474f02bb1b80865e895",
+      "bytes": 16106,
+      "fixture": "tests/fixtures/edgemech-admitted-source/mech_shared.yaml",
+      "snapshot": "src/kg_microbe_governance/releases/assaymech-infrastructure-source-manifest.json",
+      "snapshot_sha256": "a2d2308fe27c81ac6cf74ca5d456ff9309b4ea18965a8bec750ffa0a5fde8a93"
     }
   ]
 }

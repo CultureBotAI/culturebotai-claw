@@ -22,3 +22,5 @@ This directory contains longer-lived domain and cross-repository guidance:
 When a guide conflicts with the root `README.md`, `CLAUDE.md`, tests, or
 current code, the current code and its tests are authoritative. Files under
 `docs/archive/` and guides explicitly labelled retired are historical only.
+
+- [Reusable Mech baseline](MECH_TEMPLATE.md): composed canonical sources, explicit adoption, drift checks, and update PRs.

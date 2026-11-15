@@ -89,6 +89,14 @@ prepared offline, but it is not a completed cross-Mech sync.
    complete any final claw state change. Never edit a consumer copy or invent a
    per-repository pin outside that release rail.
 
+## Reusable baseline updates
+
+For a composed skills/workflow baseline update, use `onboard-mech` and the
+[baseline guide](../../../docs/guides/MECH_TEMPLATE.md) to inventory and plan first.
+Preserve native extensions and governed pins, complete one full canary before
+multiplying the change, and retain source/adoption receipts in dependent PRs.
+A baseline candidate does not authorize the merge/release steps below.
+
 ## Workflow
 
 ### A. Prepare the validated scope

@@ -74,6 +74,14 @@ def run_governance_checks(claw_root: Path) -> dict[str, Any]:
             "kg_microbe_skills",
             "check",
         ],
+        "template_baseline": [
+            python_exe, "-m", "kg_microbe_skills.template_cli",
+            "check-baseline", "--source-root", str(claw_root),
+        ],
+        "template_consumers": [
+            python_exe, "-m", "kg_microbe_skills.template_fleet",
+            "--claw-root", str(claw_root),
+        ],
     }
     for name, cmd in commands.items():
         try:
@@ -89,6 +97,7 @@ def run_governance_checks(claw_root: Path) -> dict[str, Any]:
             checks[name] = {
                 "ok": proc.returncode == 0,
                 "exit_code": proc.returncode,
+                "details": proc.stdout.strip() if name == "template_consumers" else "",
                 "summary": (proc.stdout or proc.stderr or "").strip().splitlines()[-1]
                 if (proc.stdout or proc.stderr or "").strip()
                 else "",
@@ -243,6 +252,8 @@ def render_cycle_report(report: dict[str, Any]) -> str:
     for name, res in report["governance"].items():
         verdict = "PASS" if res["ok"] else "FAIL"
         lines.append(f"  {name:<18} {verdict:<6} {res['summary']}")
+        if res.get("details"):
+            lines.append(res["details"])
 
     pages = report.get("pages") or {}
     local_audits = pages.get("local_audits") or []

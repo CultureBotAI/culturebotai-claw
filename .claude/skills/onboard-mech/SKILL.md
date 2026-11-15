@@ -1,11 +1,11 @@
 ---
 name: onboard-mech
-description: "Register a Mech repository in CLAW's fleet, configure its local root, and reconcile its capabilities and vendored governance. Use when adding a new Mech or completing an existing repository's fleet onboarding."
+description: "Inventory, generate, adopt and update the reusable Mech baseline, or register a Mech in CLAW. Use for new-repository infrastructure, existing-consumer skills and workflow updates, and template maintenance."
 metadata:
   category: cross-repo
   requires_database: false
   requires_internet: true
-  version: 1.0.0
+  version: 2.0.0
   tags: [fleet, onboarding, governance, cross-repo]
 ---
 
@@ -15,6 +15,38 @@ Run from CLAW. Read `docs/guides/MECH_STANDARD.md` for adoption requirements and
 `docs/guides/VENDORED_GOVERNANCE.md` for the release contract. Re-derive current
 membership and capabilities from `src/kg_microbe_fleet/fleet.yaml`; historical
 counts and neighboring repositories are not a registration specification.
+
+## Reusable baseline lifecycle
+
+Read [the baseline guide](../../../docs/guides/MECH_TEMPLATE.md) for the current
+composition, commands, ownership, migration and rollback process. Use the
+existing authorities; do not copy a mature corpus's scientific policy.
+
+1. Inventory published heads and pending dependency PRs, then compare native
+   commands, skills, schema/writer/review contracts and instruction symlinks.
+   Resolve public targets through `load_fleet_manifest` and `RepositorySettings`;
+   keep private consumers on their separately declared identity/policy path.
+2. Run `python -m kg_microbe_skills.template_cli check-baseline --source-root .`.
+   Canonical changes use `unify-skills` and `evolve-mech-workflow`, followed by
+   the reviewed baseline refresh. The baseline references those authorities;
+   it never becomes a competing payload source.
+3. Record every component's adoption/defer/inapplicability decision and evidence
+   in the consumer configuration, including native checks and release holds.
+   Do not enable a sealed admission capability to make a template selector work.
+4. Plan in an isolated worktree, review conflicts and unmanaged regions, then
+   apply the authorized scope through the deterministic template tool. Existing
+   local scientific extensions and active cycles remain authoritative.
+5. Complete one full canary: native checks, hosted checks, repeat-run no-op and
+   preservation proof. Only then update additional consumers by the same path.
+6. Independently review the changes, file and fix actual findings, and publish
+   dependency-ordered PRs. Report candidate installation separately from merged
+   adoption, release and runtime activation.
+
+Fleet maintenance and ordinary CI check canonical currentness; consumer drift
+checks drive subsequent update PRs through `cross-mech-sync`. This process does
+not install a scheduler or grant merge/release permission. Registration below
+is needed only when the reviewed scope changes fleet membership; ordinary
+baseline adoption must not re-register an existing or private consumer.
 
 ## Establish the candidate
 

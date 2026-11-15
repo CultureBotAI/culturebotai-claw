@@ -123,7 +123,7 @@ skills:
     reason: Controls explicitly configured local approval and goal-monitor processes while preserving their session bindings and progress.
   onboard-mech:
     scope: fleet
-    reason: Registers a verified Mech with complete capability decisions and coordinated governance.
+    reason: Inventories, adopts and maintains the reusable baseline for manifest-resolved Mechs, with explicit capability decisions and separate governance admission.
   fleet-pull:
     scope: fleet
     reason: Previews or fast-forwards current origin-tracking branches in manifest-resolved Mechs.
@@ -266,9 +266,13 @@ canonical:
       kgmicrobe.ingredient -- with 270 UNMAPPED_ placeholders. Three schemes,
       each right for its corpus.
 
+      The 2026-11-13 consumer inventory additionally found stable slug identifiers
+      in AssayMech and CofactorMech; #1201 removes the exhaustive taxonomy and
+      adds that shape without changing their native identifiers.
+
       So this template deliberately does NOT unify the policy. What is shared
       is the layer underneath: the invariants that hold whatever the scheme,
-      the three shapes and how to pick one, and the hygiene checks. Each Mech
+      illustrative shapes and how to choose a native policy, and the hygiene checks. Each Mech
       keeps its own scheme, prefixes, minting command and worked example.
 
       It also carries a rule the fleet paid for. Three of the four copies
