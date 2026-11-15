@@ -75,14 +75,16 @@ jobs:
           trusted = Path("fleet/trusted-claw")
           manifest_path = "src/kg_microbe_governance/vendored_artifacts.json"
           manifests = [parse_manifest((root / manifest_path).read_bytes()) for root in (Path("control"), trusted)]
+          private_repository = "CultureBotAI/ScaleupMech"
+          private_key = private_repository.rsplit("/", 1)[-1].casefold()
           for manifest in manifests:
               for key, consumer in manifest.consumers.items():
-                  reserved_identity = consumer.github.casefold() == "culturebotai/scaleupmech"
-                  if reserved_identity and key != "scaleupmech":
+                  reserved_identity = consumer.github.casefold() == private_repository.casefold()
+                  if reserved_identity and key != private_key:
                       raise SystemExit("Reserved audit identity has an unsupported declaration")
-                  if key == "scaleupmech" and consumer.github != "CultureBotAI/ScaleupMech":
+                  if key == private_key and consumer.github != private_repository:
                       raise SystemExit("Reserved audit declaration has an unsupported identity")
-          private_required = any("scaleupmech" in manifest.consumers for manifest in manifests)
+          private_required = any(private_key in manifest.consumers for manifest in manifests)
           adapter = trusted / "src/kg_microbe_governance/automatic_fleet_component.py"
           installed = adapter.is_file()
           # Exact known defective protected adapters: 3cf transport and e43 materialization.
@@ -487,14 +489,16 @@ jobs:
           trusted = Path("fleet/trusted-claw")
           manifest_path = "src/kg_microbe_governance/vendored_artifacts.json"
           manifests = [parse_manifest((root / manifest_path).read_bytes()) for root in (Path("control"), trusted)]
+          private_repository = "CultureBotAI/ScaleupMech"
+          private_key = private_repository.rsplit("/", 1)[-1].casefold()
           for manifest in manifests:
               for key, consumer in manifest.consumers.items():
-                  reserved_identity = consumer.github.casefold() == "culturebotai/scaleupmech"
-                  if reserved_identity and key != "scaleupmech":
+                  reserved_identity = consumer.github.casefold() == private_repository.casefold()
+                  if reserved_identity and key != private_key:
                       raise SystemExit("Reserved audit identity has an unsupported declaration")
-                  if key == "scaleupmech" and consumer.github != "CultureBotAI/ScaleupMech":
+                  if key == private_key and consumer.github != private_repository:
                       raise SystemExit("Reserved audit declaration has an unsupported identity")
-          private_required = any("scaleupmech" in manifest.consumers for manifest in manifests)
+          private_required = any(private_key in manifest.consumers for manifest in manifests)
           adapter = trusted / "src/kg_microbe_governance/automatic_fleet_component.py"
           installed = adapter.is_file()
           # Exact known defective protected adapters: 3cf transport and e43 materialization.

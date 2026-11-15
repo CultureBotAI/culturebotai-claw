@@ -40,6 +40,14 @@ CANONICAL_ID_LABEL_TESTS = {
 }
 
 
+def test_reserved_audit_key_will_not_break_a_later_fleet_admission() -> None:
+    """Exercise the future key before membership makes the existing guard fail."""
+    from kg_microbe_governance.private_scaleup_audit import PRIVATE
+
+    reserved_key = PRIVATE.rsplit("/", 1)[-1].casefold()
+    assert reserved_key not in FLEET_AUDIT_WORKFLOW.read_text(encoding="utf-8")
+
+
 def _workflow(path: Path) -> dict:
     return yaml.safe_load(path.read_text(encoding="utf-8"))
 

@@ -1,0 +1,136 @@
+version: 1
+authority: review_only
+issue: https://github.com/CultureBotAI/culturebotai-claw/issues/1254
+evidence_revision: 3a512d53e9b9d797cace768fea896a196ec24588
+manifest_key: scaleupmech
+public_projection_tags:
+- exclude-from-public
+manifest_entry:
+  display_name: ScaleupMech
+  github: CultureBotAI/ScaleupMech
+  environment_variable: SCALEUPMECH_ROOT
+  package_path: src/scaleupmech
+  schema_paths:
+  - src/scaleupmech/schema/scaleupmech.yaml
+  record_globs:
+  - data/scale_transfers/*.yaml
+  vendored_role: consumer
+  serialization:
+    verified: false
+    reason: The inspected scaffold has no tracked scale-transfer YAML records. Measure
+      native round trips after separately reviewed seed adoption.
+  capabilities:
+    id_label_validation:
+      status: disabled
+      reason: Native validator files are present; a scale-transfer ontology adapter
+        remains unverified.
+    curation_history:
+      status: disabled
+      reason: Native history schema is present; the append-only scale-transfer write
+        workflow remains unverified.
+    record_review:
+      status: disabled
+      reason: Native review profile and helpers are present; generic record-review
+        capability promotion needs separate review.
+    strict_validation:
+      status: disabled
+      reason: Native scale-transfer validation is present; shared general-agent recipe
+        compatibility remains unverified.
+    schema_sync:
+      status: disabled
+      reason: The native scale-transfer schema is present; shared generation adapter
+        compatibility remains unverified.
+    release_management:
+      status: disabled
+      reason: Native infrastructure is present; shared release recipe compatibility
+        remains unverified.
+    build_coordination:
+      status: disabled
+      reason: Native infrastructure is present; shared build recipe compatibility
+        remains unverified.
+    documentation:
+      status: disabled
+      reason: Native documentation is present; shared documentation recipe compatibility
+        remains unverified.
+    testing:
+      status: disabled
+      reason: Native tests are present; shared general-agent test recipe compatibility
+        remains unverified.
+    refactoring:
+      status: disabled
+      reason: Native development infrastructure is present; shared refactoring adapter
+        compatibility remains unverified.
+    coordination_hooks:
+      status: disabled
+      reason: Local coordination hooks have not been adopted or verified.
+    deep_research:
+      status: disabled
+      reason: No shared research-provider adapter has been adopted.
+    edison_key_discovery:
+      status: not_applicable
+      reason: The reviewed scale-transfer admission does not adopt an Edison provider
+        integration.
+    environment_coverage:
+      status: not_applicable
+      reason: Scale-transfer evidence is not a microbial environment inventory.
+    knowledge_gap_scan:
+      status: disabled
+      reason: No shared knowledge-gap scanner adapter has been adopted.
+    vendored_sync:
+      status: enabled
+    unmapped_inventory_input:
+      status: not_applicable
+      reason: Scale-transfer records are not a culture-medium ingredient inventory.
+    source_catalogue:
+      status: disabled
+      reason: Scale-transfer source-catalogue capability promotion awaits a reviewed
+        native adapter.
+    evidence_reference_validation:
+      status: disabled
+      reason: Domain source and quote-validation adapters require separate validation
+        after seed curation.
+    corpus_statistics:
+      status: disabled
+      reason: The inspected scaffold has no tracked scale-transfer YAML records; populated
+        census fields remain unmeasured.
+    causal_graph_coverage:
+      status: disabled
+      reason: Observed changes across scales do not themselves establish causal mechanisms.
+    page_budgets:
+      status: disabled
+      reason: No generated site is deployed or measured for the new repository.
+    kgx_export:
+      status: disabled
+      reason: No reviewed KGX export adapter has been adopted.
+    source_queue:
+      status: disabled
+      reason: The shared source-queue contract has not been adopted.
+    metpo_proposal:
+      status: not_applicable
+      reason: Scale-transfer evidence curation does not itself propose microbial phenotype
+        ontology terms.
+    sssom_export:
+      status: disabled
+      reason: No reviewed SSSOM export adapter has been adopted.
+    writer_audit:
+      status: disabled
+      reason: Scale-transfer writer behavior and shared writer-audit compatibility
+        remain unverified.
+    taxon_links:
+      status: disabled
+      reason: The native scale-transfer schema is present; exact organism-link slots
+        and TaxonMech coverage remain unverified.
+    site_contract:
+      status: disabled
+      reason: No built site has been verified against the shared HTML contract.
+merge_queue_candidate:
+  .github/workflows/validate-strict.yaml:
+  - validate-strict
+admission_holds:
+- Protected framework must distinguish public governance access from suite exclusion.
+- Protected admission must handle existing governed scaffold bytes without claiming
+  an empty bootstrap.
+- Publish and authenticate a new immutable source and sealed admission; preserve historical
+  policies.
+- Adopt the ordinary governed source through a reviewed native PR and prove full protected
+  fleet coverage.

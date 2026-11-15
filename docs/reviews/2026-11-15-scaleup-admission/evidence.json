@@ -1,0 +1,962 @@
+{
+  "version": 1,
+  "captured_at": "2026-11-15T23:08:47.574291+00:00",
+  "authority": "review_only",
+  "claw_source_head": "271fbbdb7f63e60b3771d5e28d398395da1d13cc",
+  "repository": "CultureBotAI/ScaleupMech",
+  "repository_id": 1450887724,
+  "private": false,
+  "default_branch": "main",
+  "revision": "3a512d53e9b9d797cace768fea896a196ec24588",
+  "git_tree": {
+    "sha": "854adb7275dc1c18938440e1ff46393977dc8335",
+    "truncated": false,
+    "entries": [
+      {
+        "path": ".agents",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "db97ca74a08f1490534f662a2663d66e3e2f808d",
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/trees/db97ca74a08f1490534f662a2663d66e3e2f808d"
+      },
+      {
+        "path": ".agents/skills",
+        "mode": "120000",
+        "type": "blob",
+        "sha": "454b8427cd757f30dc7fdb9a325d19c399770417",
+        "size": 17,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/454b8427cd757f30dc7fdb9a325d19c399770417"
+      },
+      {
+        "path": ".claude",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "00dd8443c25eed18f75de90ee158de860eaa2cd1",
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/trees/00dd8443c25eed18f75de90ee158de860eaa2cd1"
+      },
+      {
+        "path": ".claude/skills",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "a242c8ab6e228942e4f0297f10fc6e60e55a80d0",
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/trees/a242c8ab6e228942e4f0297f10fc6e60e55a80d0"
+      },
+      {
+        "path": ".claude/skills/curate-scale-transfer",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "56a7fe429c246e47bd6c69fa513df6fd3fe98b27",
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/trees/56a7fe429c246e47bd6c69fa513df6fd3fe98b27"
+      },
+      {
+        "path": ".claude/skills/curate-scale-transfer/SKILL.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6718551a1bce38a11a92faca099bb18c29eadf4c",
+        "size": 1112,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/6718551a1bce38a11a92faca099bb18c29eadf4c"
+      },
+      {
+        "path": ".claude/skills/evolve-mech-workflow",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "c0a2ae35fb1d4b751e558cd2082e3fec76363c9f",
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/trees/c0a2ae35fb1d4b751e558cd2082e3fec76363c9f"
+      },
+      {
+        "path": ".claude/skills/evolve-mech-workflow/SKILL.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "13338b079cda3fe5f7e508431974485011a943df",
+        "size": 16619,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/13338b079cda3fe5f7e508431974485011a943df"
+      },
+      {
+        "path": ".claude/skills/manage-identifiers",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "92c56d25f6f7d8602ac78b4bb1f75207f407433e",
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/trees/92c56d25f6f7d8602ac78b4bb1f75207f407433e"
+      },
+      {
+        "path": ".claude/skills/manage-identifiers/SKILL.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "20f94969ec8547a7b0c33c5a1b28417dbf3985a5",
+        "size": 9647,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/20f94969ec8547a7b0c33c5a1b28417dbf3985a5"
+      },
+      {
+        "path": ".claude/skills/review-open-issues",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "0bcddeb4b5c4fcf96f4de70fbd1e9afb705e8cbb",
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/trees/0bcddeb4b5c4fcf96f4de70fbd1e9afb705e8cbb"
+      },
+      {
+        "path": ".claude/skills/review-open-issues/SKILL.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7f8b4b22d90f2561f0139182bf3e89730d0562c7",
+        "size": 4347,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/7f8b4b22d90f2561f0139182bf3e89730d0562c7"
+      },
+      {
+        "path": ".claude/skills/review-yaml-category",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "da9087884eb8d635170c5cfcc53ca9ac95b9e993",
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/trees/da9087884eb8d635170c5cfcc53ca9ac95b9e993"
+      },
+      {
+        "path": ".claude/skills/review-yaml-category/SKILL.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "533bd81b8378bfc536c76f55fd954487216b1396",
+        "size": 15136,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/533bd81b8378bfc536c76f55fd954487216b1396"
+      },
+      {
+        "path": ".claude/skills/review-yaml-record",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "a26cf2c073f9b1b982e261ca391b1675a231e0e2",
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/trees/a26cf2c073f9b1b982e261ca391b1675a231e0e2"
+      },
+      {
+        "path": ".claude/skills/review-yaml-record/SKILL.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "29e4891576194fc66da9405d7e4e6fecf0dbd043",
+        "size": 13098,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/29e4891576194fc66da9405d7e4e6fecf0dbd043"
+      },
+      {
+        "path": ".claude/skills/template-infrastructure",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "8220b16e5b82ed342bf764160b0cc8bc4e5e2998",
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/trees/8220b16e5b82ed342bf764160b0cc8bc4e5e2998"
+      },
+      {
+        "path": ".claude/skills/template-infrastructure/SKILL.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "48d8dfff8c18ece2e445ac0bc656d234345fb86f",
+        "size": 1228,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/48d8dfff8c18ece2e445ac0bc656d234345fb86f"
+      },
+      {
+        "path": ".claude/skills/triage-and-resolve-issues",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "17a144b55907c27bac961d4b240385a96f865223",
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/trees/17a144b55907c27bac961d4b240385a96f865223"
+      },
+      {
+        "path": ".claude/skills/triage-and-resolve-issues/SKILL.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e09827ee61b1d57ef36400904c932e928b4f4e75",
+        "size": 12466,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/e09827ee61b1d57ef36400904c932e928b4f4e75"
+      },
+      {
+        "path": ".github",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "6567f602b22eb18b5ed77c3e5397efdfb26da624",
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/trees/6567f602b22eb18b5ed77c3e5397efdfb26da624"
+      },
+      {
+        "path": ".github/workflows",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "fc5b0cda75bc0cf8a57f72ba1ce11381cdff6fd7",
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/trees/fc5b0cda75bc0cf8a57f72ba1ce11381cdff6fd7"
+      },
+      {
+        "path": ".github/workflows/mech-template.yaml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2f52f16cd9e35258316547c9e7d43df13fe42179",
+        "size": 704,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/2f52f16cd9e35258316547c9e7d43df13fe42179"
+      },
+      {
+        "path": ".github/workflows/merge-queue-admission.yaml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "62d3a63888fcfd45fb27434fccda7fb722759388",
+        "size": 3508,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/62d3a63888fcfd45fb27434fccda7fb722759388"
+      },
+      {
+        "path": ".github/workflows/pr-shepherd.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9739e537365a11e14c08888b68d463b276ef9066",
+        "size": 10956,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/9739e537365a11e14c08888b68d463b276ef9066"
+      },
+      {
+        "path": ".github/workflows/validate-strict.yaml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "84c93062cc3e260c28f30629858ac856059f0544",
+        "size": 1073,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/84c93062cc3e260c28f30629858ac856059f0544"
+      },
+      {
+        "path": ".github/workflows/verify-merge-integrity.yaml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7c66af1eef383d4520f8bd5bae4f0e47c87f7c46",
+        "size": 2932,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/7c66af1eef383d4520f8bd5bae4f0e47c87f7c46"
+      },
+      {
+        "path": ".gitignore",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7a1f5ea467c355a75e674488017a1e3ae46ced3f",
+        "size": 102,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/7a1f5ea467c355a75e674488017a1e3ae46ced3f"
+      },
+      {
+        "path": "AGENTS.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b2790673a7a41378f2b728abc4d558c017893fa8",
+        "size": 3534,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/b2790673a7a41378f2b728abc4d558c017893fa8"
+      },
+      {
+        "path": "CLAUDE.md",
+        "mode": "120000",
+        "type": "blob",
+        "sha": "47dc3e3d863cfb5727b87d785d09abf9743c0a72",
+        "size": 9,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/47dc3e3d863cfb5727b87d785d09abf9743c0a72"
+      },
+      {
+        "path": "INFRA_TASKS.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1e41c825093105221b21685644eec5abfc6b42b6",
+        "size": 367,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/1e41c825093105221b21685644eec5abfc6b42b6"
+      },
+      {
+        "path": "LICENSE",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "42de20d2234f62ca64c2cbf78e8b4c1fac50e788",
+        "size": 569,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/42de20d2234f62ca64c2cbf78e8b4c1fac50e788"
+      },
+      {
+        "path": "README.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "33e819fff8bb6d2297c737d3a6a9e19a30db2e29",
+        "size": 4320,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/33e819fff8bb6d2297c737d3a6a9e19a30db2e29"
+      },
+      {
+        "path": "conf",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "320ebe1ae5e6082c7f43602fc87b06fbb4c01e29",
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/trees/320ebe1ae5e6082c7f43602fc87b06fbb4c01e29"
+      },
+      {
+        "path": "conf/record_review.yaml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ba87ed257f88f44ddf8479b23d69b41937b023dc",
+        "size": 149,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/ba87ed257f88f44ddf8479b23d69b41937b023dc"
+      },
+      {
+        "path": "data",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "dbff3c7336d07380f357c773fb06504824b20e3d",
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/trees/dbff3c7336d07380f357c773fb06504824b20e3d"
+      },
+      {
+        "path": "data/scale_transfers",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "d564d0bc3dd917926892c55e3706cc116d5b165e",
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/trees/d564d0bc3dd917926892c55e3706cc116d5b165e"
+      },
+      {
+        "path": "data/scale_transfers/.gitkeep",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+        "size": 0,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      },
+      {
+        "path": "docs",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "aab159ced189bee276055a440943abf7e647c0cf",
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/trees/aab159ced189bee276055a440943abf7e647c0cf"
+      },
+      {
+        "path": "docs/mech-template-adoption.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "044dda45a80195910a98197cffd2f4852f32874c",
+        "size": 2525,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/044dda45a80195910a98197cffd2f4852f32874c"
+      },
+      {
+        "path": "docs/record-review-profile.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b64310e903759188ba827bc5f66bbcda9947667a",
+        "size": 1736,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/b64310e903759188ba827bc5f66bbcda9947667a"
+      },
+      {
+        "path": "docs/record-reviews.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f86815ac5d84eecbd59c006f56e1a6f4f75c7c47",
+        "size": 11447,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/f86815ac5d84eecbd59c006f56e1a6f4f75c7c47"
+      },
+      {
+        "path": "docs/scaffold-validation.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "98b6023feda5cefdbb0162b68698b4a3a7a950cb",
+        "size": 1429,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/98b6023feda5cefdbb0162b68698b4a3a7a950cb"
+      },
+      {
+        "path": "history",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "d564d0bc3dd917926892c55e3706cc116d5b165e",
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/trees/d564d0bc3dd917926892c55e3706cc116d5b165e"
+      },
+      {
+        "path": "history/.gitkeep",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+        "size": 0,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      },
+      {
+        "path": "justfile",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "fb61e0b23f7f35f9149cdff08f018f027ca425d6",
+        "size": 1448,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/fb61e0b23f7f35f9149cdff08f018f027ca425d6"
+      },
+      {
+        "path": "prompts",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "a92335c3b06440b2bc313d89c8d6bd6b56cf5e86",
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/trees/a92335c3b06440b2bc313d89c8d6bd6b56cf5e86"
+      },
+      {
+        "path": "prompts/backlog-loop-goal.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4a44c05730ce8fc76e294cc857c8d0622eb47b35",
+        "size": 3992,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/4a44c05730ce8fc76e294cc857c8d0622eb47b35"
+      },
+      {
+        "path": "pyproject.toml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "acb1f2fb6f9b0ffb4229da9a97c6ee4db9f3e576",
+        "size": 973,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/acb1f2fb6f9b0ffb4229da9a97c6ee4db9f3e576"
+      },
+      {
+        "path": "schema",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "e4a6a9f172080b7118cc1b6b73014a29e58e044a",
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/trees/e4a6a9f172080b7118cc1b6b73014a29e58e044a"
+      },
+      {
+        "path": "schema/record_review.yaml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "630d95bda4773785a2cdfe42d32561a9f1591c0f",
+        "size": 13541,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/630d95bda4773785a2cdfe42d32561a9f1591c0f"
+      },
+      {
+        "path": "scripts",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "b03ffc2e1e0b91eb0119b030611a1951445bf7fb",
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/trees/b03ffc2e1e0b91eb0119b030611a1951445bf7fb"
+      },
+      {
+        "path": "scripts/.vendored_canon_ref",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d57f29ad8acc9f95f01c7d3b6c57df00da82473e",
+        "size": 41,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/d57f29ad8acc9f95f01c7d3b6c57df00da82473e"
+      },
+      {
+        "path": "scripts/auto_merge_ready_prs.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "17d154e735b7132677779637c3faa7b527a966f0",
+        "size": 32347,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/17d154e735b7132677779637c3faa7b527a966f0"
+      },
+      {
+        "path": "scripts/check_review_event_base.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "74eb99249d2feff0ae0e170a56ce036f0e427a30",
+        "size": 6295,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/74eb99249d2feff0ae0e170a56ce036f0e427a30"
+      },
+      {
+        "path": "scripts/check_vendored_sync.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "fe1cbde95e6c91e462908726e621a82513a36772",
+        "size": 26087,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/fe1cbde95e6c91e462908726e621a82513a36772"
+      },
+      {
+        "path": "scripts/check_vendored_sync.sh",
+        "mode": "100755",
+        "type": "blob",
+        "sha": "18b2f8040a9cbf995a1f8eddda1e11f06e0f98ae",
+        "size": 228,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/18b2f8040a9cbf995a1f8eddda1e11f06e0f98ae"
+      },
+      {
+        "path": "scripts/chem_formula.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b2a5573042418b5fcae4d0b50febddf21080551e",
+        "size": 12337,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/b2a5573042418b5fcae4d0b50febddf21080551e"
+      },
+      {
+        "path": "scripts/deep_research_contract.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cf3f9903257ee9553a906b0b4fdd09f153e4e92a",
+        "size": 12875,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/cf3f9903257ee9553a906b0b4fdd09f153e4e92a"
+      },
+      {
+        "path": "scripts/record_review.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a7d0c238840d78e3328649819c4e589ff780015e",
+        "size": 41900,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/a7d0c238840d78e3328649819c4e589ff780015e"
+      },
+      {
+        "path": "scripts/validate_id_label_correspondence.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "52244ece5ea66a331cdaae51e086ecc75bc30bbd",
+        "size": 52224,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/52244ece5ea66a331cdaae51e086ecc75bc30bbd"
+      },
+      {
+        "path": "scripts/verify_merge_integrity.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "80ad0ee0d12051422f36aacd15b1b6d0415ae3e8",
+        "size": 17683,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/80ad0ee0d12051422f36aacd15b1b6d0415ae3e8"
+      },
+      {
+        "path": "src",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "dfa091117e65acf60a1a2f83ddbb41f585899697",
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/trees/dfa091117e65acf60a1a2f83ddbb41f585899697"
+      },
+      {
+        "path": "src/scaleupmech",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "44dfb0a556f1fa6074c32e393645dfa4621edc07",
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/trees/44dfb0a556f1fa6074c32e393645dfa4621edc07"
+      },
+      {
+        "path": "src/scaleupmech/__init__.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ba780d0fed8f0defe202ddeb699c67fdddacc700",
+        "size": 79,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/ba780d0fed8f0defe202ddeb699c67fdddacc700"
+      },
+      {
+        "path": "src/scaleupmech/cli.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6fdf0ca325c9497275a5f290aa47252dfaf4e506",
+        "size": 6107,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/6fdf0ca325c9497275a5f290aa47252dfaf4e506"
+      },
+      {
+        "path": "src/scaleupmech/schema",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "710b2f1e988513bed5f7d118a59b435ae087fcca",
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/trees/710b2f1e988513bed5f7d118a59b435ae087fcca"
+      },
+      {
+        "path": "src/scaleupmech/schema/history.yaml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "dfccc06e60ffafff603be4e51439ed085034dc85",
+        "size": 9649,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/dfccc06e60ffafff603be4e51439ed085034dc85"
+      },
+      {
+        "path": "src/scaleupmech/schema/mech_shared.yaml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "fa1f7956c6a83e04ffa96d02bdf911461d09705a",
+        "size": 16106,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/fa1f7956c6a83e04ffa96d02bdf911461d09705a"
+      },
+      {
+        "path": "src/scaleupmech/schema/scaleupmech.yaml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6842f9a84a889876565820021742c14f1cf433d2",
+        "size": 8756,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/6842f9a84a889876565820021742c14f1cf433d2"
+      },
+      {
+        "path": "src/scaleupmech/validate.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ce5daabb10aa05c938997ac11057f7110cbb3113",
+        "size": 15502,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/ce5daabb10aa05c938997ac11057f7110cbb3113"
+      },
+      {
+        "path": "tests",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "ca080470caf43664303bb0b599e4be6436bfdad1",
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/trees/ca080470caf43664303bb0b599e4be6436bfdad1"
+      },
+      {
+        "path": "tests/test_curation_timestamp_schema.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ffdd71730224b2c9b20104672aa98d5daa34b4ee",
+        "size": 1005,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/ffdd71730224b2c9b20104672aa98d5daa34b4ee"
+      },
+      {
+        "path": "tests/test_id_label_empty_adapter.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c06638cda5607be83bbe676d57a6c1ee695b9739",
+        "size": 5486,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/c06638cda5607be83bbe676d57a6c1ee695b9739"
+      },
+      {
+        "path": "tests/test_id_label_plausibility.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8c94d45069d6942ca379271d7d7335eedb15f78f",
+        "size": 11129,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/8c94d45069d6942ca379271d7d7335eedb15f78f"
+      },
+      {
+        "path": "tests/test_id_label_unknown_prefix.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "42a92101cb9632e07f1225c9138eee5f27b0c07c",
+        "size": 2521,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/42a92101cb9632e07f1225c9138eee5f27b0c07c"
+      },
+      {
+        "path": "tests/test_native.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c5493fbaa02b1709a96962fe2aed99cc64f7a136",
+        "size": 23616,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/c5493fbaa02b1709a96962fe2aed99cc64f7a136"
+      },
+      {
+        "path": "tests/test_record_review_contract.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e735ee0c8e71a793364ee10f62b6ec70327b48a3",
+        "size": 5959,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/e735ee0c8e71a793364ee10f62b6ec70327b48a3"
+      },
+      {
+        "path": "tests/test_review_event_base.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7c43f7786c1cf203168a52a32ab7c8d09ec97c2d",
+        "size": 7575,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/7c43f7786c1cf203168a52a32ab7c8d09ec97c2d"
+      },
+      {
+        "path": "tests/test_skill_frontmatter.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d66ed85ed1f56ece830dae09bb084555d8b7adba",
+        "size": 8744,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/d66ed85ed1f56ece830dae09bb084555d8b7adba"
+      },
+      {
+        "path": "uv.lock",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3572283ddf2e94eeef921ccc8c78e9f14957d255",
+        "size": 619046,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/3572283ddf2e94eeef921ccc8c78e9f14957d255"
+      },
+      {
+        "path": "workflow",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "03a97ef0f699fadc389c5fb4dd117798512ac19c",
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/trees/03a97ef0f699fadc389c5fb4dd117798512ac19c"
+      },
+      {
+        "path": "workflow/mech-template-lock.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9720076254180aa3277547b482f074b4e64c96e7",
+        "size": 4279,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/9720076254180aa3277547b482f074b4e64c96e7"
+      },
+      {
+        "path": "workflow/mech-template.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "014bcae28cc45c914d69f3a125b8ef2323ea9fe5",
+        "size": 6849,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/014bcae28cc45c914d69f3a125b8ef2323ea9fe5"
+      },
+      {
+        "path": "workflow/mech-workflow.yaml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3a7d545a90182d480420b37d52be03e9a284ed21",
+        "size": 3709,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/3a7d545a90182d480420b37d52be03e9a284ed21"
+      },
+      {
+        "path": "workflow/parent",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "ab3f4fec543769498dbd73b607a9f484d7f4256b",
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/trees/ab3f4fec543769498dbd73b607a9f484d7f4256b"
+      },
+      {
+        "path": "workflow/parent/mech-cycle.yaml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c8a527082662e0a9ecfa2b07d73786d1536fd8c9",
+        "size": 4737,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/c8a527082662e0a9ecfa2b07d73786d1536fd8c9"
+      },
+      {
+        "path": "workflow/parent/workflow.yaml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f325a47da60268072bf4a8fc2c3d8f7d8e425a62",
+        "size": 18857,
+        "url": "https://api.github.com/repos/CultureBotAI/ScaleupMech/git/blobs/f325a47da60268072bf4a8fc2c3d8f7d8e425a62"
+      }
+    ]
+  },
+  "canonical_manifest_sha256": "2c5999efb159707a046ff0f482322f84d65c115b1516f61a7bd64e5b92b5d5f9",
+  "native_files": {
+    "scripts/.vendored_canon_ref": {
+      "git_blob": "d57f29ad8acc9f95f01c7d3b6c57df00da82473e",
+      "mode": "100644",
+      "sha256": "8e48289d61ed8cc42fe6e19eb3e083aa21359928898e3d09c0f7e33751aa7465",
+      "content": "88e719d5480d0008d6ce082510dcd066775f232b\n"
+    },
+    ".github/workflows/validate-strict.yaml": {
+      "git_blob": "84c93062cc3e260c28f30629858ac856059f0544",
+      "mode": "100644",
+      "sha256": "d87bf2e502c5b44aba12beb892d4f2c2126e3464aff581a39137da0556da4f36",
+      "content": "name: Strict validation\non:\n  pull_request: {}\n  push: {}\n  merge_group:\n    types: [checks_requested]\npermissions:\n  contents: read\nconcurrency:\n  group: validate-${{ github.workflow }}-${{ github.ref }}\n  cancel-in-progress: true\njobs:\n  validate-strict:\n    runs-on: ubuntu-latest\n    timeout-minutes: 15\n    steps:\n      - name: Checkout\n        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n        with:\n          fetch-depth: 0\n          persist-credentials: false\n      - name: Install uv\n        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0\n        with:\n          version: \"0.12.5\"\n          python-version: \"3.13\"\n          enable-cache: true\n      - name: Install just\n        run: uv tool install rust-just==1.46.0\n      - name: Install locked dependencies\n        run: uv sync --locked\n      - name: Verify immutable review event boundary\n        run: just check-review-event-base\n      - name: Native checks\n        run: just check\n      - name: Canonical governance\n        run: just check-vendored\n"
+    },
+    "workflow/mech-template.json": {
+      "git_blob": "014bcae28cc45c914d69f3a125b8ef2323ea9fe5",
+      "mode": "100644",
+      "sha256": "1c5567d3a5eb08cc8d191c0f21070d8cfe32675c473f2b3b999b3b23c225ebda",
+      "content": "{\n  \"schema_version\": 1,\n  \"repository\": \"scaleupmech\",\n  \"source_ref\": \"f6a00874ed153154feb26918933f2cd8110c5ec8\",\n  \"components\": {\n    \"skill:repository-freshness\": {\n      \"action\": \"defer\",\n      \"reason\": \"Existing freshness candidate is independently governed; template adoption does not install or activate a freshness runtime.\",\n      \"evidence\": [\n        \"AGENTS.md\",\n        \"justfile\",\n        \".claude/skills/curate-scale-transfer/SKILL.md\",\n        \"conf/record_review.yaml\"\n      ]\n    },\n    \"skill:triage-and-resolve-issues\": {\n      \"action\": \"adopt\",\n      \"reason\": \"Native tests, structured review and scientific skill provide the inspected infrastructure prerequisites; this installs a candidate, not runtime authority.\",\n      \"evidence\": [\n        \"AGENTS.md\",\n        \"justfile\",\n        \".claude/skills/curate-scale-transfer/SKILL.md\",\n        \"conf/record_review.yaml\"\n      ]\n    },\n    \"skill:evolve-mech-workflow\": {\n      \"action\": \"adopt\",\n      \"reason\": \"Native tests, structured review and scientific skill provide the inspected infrastructure prerequisites; this installs a candidate, not runtime authority.\",\n      \"evidence\": [\n        \"AGENTS.md\",\n        \"justfile\",\n        \".claude/skills/curate-scale-transfer/SKILL.md\",\n        \"conf/record_review.yaml\"\n      ]\n    },\n    \"skill:manage-identifiers\": {\n      \"action\": \"adopt\",\n      \"reason\": \"Native tests, structured review and scientific skill provide the inspected infrastructure prerequisites; this installs a candidate, not runtime authority.\",\n      \"evidence\": [\n        \"AGENTS.md\",\n        \"justfile\",\n        \".claude/skills/curate-scale-transfer/SKILL.md\",\n        \"conf/record_review.yaml\"\n      ]\n    },\n    \"skill:next-tasks\": {\n      \"action\": \"defer\",\n      \"reason\": \"This repository uses GitHub issues and the infrastructure intake ledger; it has no maintained NEXT_TASKS.md contract.\",\n      \"evidence\": [\n        \"AGENTS.md\",\n        \"justfile\",\n        \".claude/skills/curate-scale-transfer/SKILL.md\",\n        \"conf/record_review.yaml\"\n      ]\n    },\n    \"skill:curate-yaml-record\": {\n      \"action\": \"defer\",\n      \"reason\": \"The native curate-scale-transfer skill and new-history writer own scientific curation; generic history/identifier assumptions require a separate domain adaptation.\",\n      \"evidence\": [\n        \"AGENTS.md\",\n        \"justfile\",\n        \".claude/skills/curate-scale-transfer/SKILL.md\",\n        \"conf/record_review.yaml\"\n      ]\n    },\n    \"skill:fetch-source\": {\n      \"action\": \"defer\",\n      \"reason\": \"No maintained fixed-URL fetch recipe and source validation contract is adopted; preserve existing source provenance and native seed audit.\",\n      \"evidence\": [\n        \"AGENTS.md\",\n        \"justfile\",\n        \".claude/skills/curate-scale-transfer/SKILL.md\",\n        \"conf/record_review.yaml\"\n      ]\n    },\n    \"skill:id-label-correspondence\": {\n      \"action\": \"defer\",\n      \"reason\": \"Governed validator payload is present but a reviewed native ontology correspondence adapter is not adopted.\",\n      \"evidence\": [\n        \"AGENTS.md\",\n        \"justfile\",\n        \".claude/skills/curate-scale-transfer/SKILL.md\",\n        \"conf/record_review.yaml\"\n      ]\n    },\n    \"skill:schema-gap-analysis\": {\n      \"action\": \"defer\",\n      \"reason\": \"Native closed-schema validation exists, but schema synchronization and generator drift adapters are deferred pending a measured domain integration.\",\n      \"evidence\": [\n        \"AGENTS.md\",\n        \"justfile\",\n        \".claude/skills/curate-scale-transfer/SKILL.md\",\n        \"conf/record_review.yaml\"\n      ]\n    },\n    \"skill:review-open-issues\": {\n      \"action\": \"adopt\",\n      \"reason\": \"Native tests, structured review and scientific skill provide the inspected infrastructure prerequisites; this installs a candidate, not runtime authority.\",\n      \"evidence\": [\n        \"AGENTS.md\",\n        \"justfile\",\n        \".claude/skills/curate-scale-transfer/SKILL.md\",\n        \"conf/record_review.yaml\"\n      ]\n    },\n    \"skill:review-yaml-category\": {\n      \"action\": \"adopt\",\n      \"reason\": \"Native tests, structured review and scientific skill provide the inspected infrastructure prerequisites; this installs a candidate, not runtime authority.\",\n      \"evidence\": [\n        \"AGENTS.md\",\n        \"justfile\",\n        \".claude/skills/curate-scale-transfer/SKILL.md\",\n        \"conf/record_review.yaml\"\n      ]\n    },\n    \"skill:review-yaml-record\": {\n      \"action\": \"adopt\",\n      \"reason\": \"Native tests, structured review and scientific skill provide the inspected infrastructure prerequisites; this installs a candidate, not runtime authority.\",\n      \"evidence\": [\n        \"AGENTS.md\",\n        \"justfile\",\n        \".claude/skills/curate-scale-transfer/SKILL.md\",\n        \"conf/record_review.yaml\"\n      ]\n    },\n    \"skill:scalability-and-health\": {\n      \"action\": \"defer\",\n      \"reason\": \"Shared page budget and site contract configuration is not adopted; preserve existing native site checks where present.\",\n      \"evidence\": [\n        \"AGENTS.md\",\n        \"justfile\",\n        \".claude/skills/curate-scale-transfer/SKILL.md\",\n        \"conf/record_review.yaml\"\n      ]\n    },\n    \"skill:stats-report\": {\n      \"action\": \"defer\",\n      \"reason\": \"Shared corpus statistics fields have not been measured and declared; native validation remains the authoritative record check.\",\n      \"evidence\": [\n        \"AGENTS.md\",\n        \"justfile\",\n        \".claude/skills/curate-scale-transfer/SKILL.md\",\n        \"conf/record_review.yaml\"\n      ]\n    },\n    \"skill:metpo-proposal\": {\n      \"action\": \"defer\",\n      \"reason\": \"No native ontology proposal production contract is adopted; record identity/grounding does not authorize upstream ontology proposals.\",\n      \"evidence\": [\n        \"AGENTS.md\",\n        \"justfile\",\n        \".claude/skills/curate-scale-transfer/SKILL.md\",\n        \"conf/record_review.yaml\"\n      ]\n    },\n    \"workflow:parent\": {\n      \"action\": \"adopt\",\n      \"reason\": \"Inert pinned parent/schema snapshots support validation of the native candidate profile; no runtime adoption or cycle activation.\",\n      \"evidence\": [\n        \"workflow/mech-workflow.yaml\",\n        \"docs/mech-template-adoption.md\"\n      ]\n    }\n  },\n  \"native_checks\": [\n    [\n      \"just\",\n      \"check\"\n    ],\n    [\n      \"just\",\n      \"check-vendored\"\n    ]\n  ],\n  \"extensions\": [\n    \"AGENTS.md\",\n    \"justfile\",\n    \".claude/skills/curate-scale-transfer/SKILL.md\",\n    \"conf/record_review.yaml\",\n    \"docs/record-review-profile.md\",\n    \"workflow/mech-workflow.yaml\",\n    \"INFRA_TASKS.md\",\n    \".claude/skills/template-infrastructure/SKILL.md\",\n    \"docs/mech-template-adoption.md\"\n  ],\n  \"native_identity\": {\n    \"schema_paths\": [\n      \"src/scaleupmech/schema/scaleupmech.yaml\"\n    ],\n    \"record_globs\": [\n      \"data/scale_transfers/*.yaml\"\n    ]\n  }\n}\n"
+    },
+    "justfile": {
+      "git_blob": "fb61e0b23f7f35f9149cdff08f018f027ca425d6",
+      "mode": "100644",
+      "sha256": "32dbaefb92028101a0f0cf33abc3be0d7fe6ea125ea055f056519045210c25d8",
+      "content": "set shell := [\"bash\", \"-euo\", \"pipefail\", \"-c\"]\n\ndefault:\n    @just --list\n\ncheck: lint validate test\n\nlint:\n    uv run --locked ruff check src tests/test_native.py scripts/check_review_event_base.py tests/test_review_event_base.py\n\nvalidate:\n    uv run --locked scaleupmech validate\n\nvalidate-schema:\n    uv run --locked scaleupmech validate-schema\n\nvalidate-data: validate\n\nvalidate-all: validate\n\ntest:\n    uv run --locked pytest -q\n\ncheck-vendored:\n    bash scripts/check_vendored_sync.sh\n\nnew-history *args:\n    uv run --locked scaleupmech new-history {{args}}\n\nvalidate-history:\n    uv run --locked scaleupmech validate\n\ncheck-review-event-base:\n    uv run --locked python scripts/check_review_event_base.py\n\n# Template tooling is independently pinned; the governed project dependency is unchanged.\ncheck-template:\n    uv run --isolated --no-project --with \"kg-microbe-orchestration @ git+https://github.com/CultureBotAI/culturebotai-claw.git@f6a00874ed153154feb26918933f2cd8110c5ec8\" python -m kg_microbe_skills.template_cli check --target-root . --config workflow/mech-template.json\n    uv run --isolated --no-project --with \"kg-microbe-orchestration @ git+https://github.com/CultureBotAI/culturebotai-claw.git@f6a00874ed153154feb26918933f2cd8110c5ec8\" python -m kg_microbe_workflows validate --profile workflow/mech-workflow.yaml --parent workflow/parent/mech-cycle.yaml --schema workflow/parent/workflow.yaml --repository-key scaleupmech\n"
+    },
+    "CLAUDE.md": {
+      "git_blob": "47dc3e3d863cfb5727b87d785d09abf9743c0a72",
+      "mode": "120000",
+      "sha256": "a54ff182c7e8acf56acfd6e4b9c3ff41e2c41a31c9b211b2deb9df75d9a478f9",
+      "content": "AGENTS.md"
+    },
+    ".agents/skills": {
+      "git_blob": "454b8427cd757f30dc7fdb9a325d19c399770417",
+      "mode": "120000",
+      "sha256": "722a918d6dee037f575ef1bf214371f14f77047e71bd75cff39f182b2ba9f6b0",
+      "content": "../.claude/skills"
+    }
+  },
+  "required_artifacts": [
+    {
+      "id": "vendored_checker",
+      "path": "scripts/check_vendored_sync.py",
+      "present": true,
+      "observed_git_blob": "fe1cbde95e6c91e462908726e621a82513a36772",
+      "observed_mode": "100644",
+      "current_canonical_sha256": "fa527882d9a50ec3f49148afe0032ecc65a2a3c3eb31d62bdfc14fa7104e7bfb",
+      "matches_current_canonical_content": false,
+      "matches_current_canonical_mode": true
+    },
+    {
+      "id": "vendored_checker_launcher",
+      "path": "scripts/check_vendored_sync.sh",
+      "present": true,
+      "observed_git_blob": "18b2f8040a9cbf995a1f8eddda1e11f06e0f98ae",
+      "observed_mode": "100755",
+      "current_canonical_sha256": "3d7a1bf99d21a3315df1abf50908c36f456e67d589228c9bf74d3f70f52d4b74",
+      "matches_current_canonical_content": true,
+      "matches_current_canonical_mode": true
+    },
+    {
+      "id": "id_label_validator",
+      "path": "scripts/validate_id_label_correspondence.py",
+      "present": true,
+      "observed_git_blob": "52244ece5ea66a331cdaae51e086ecc75bc30bbd",
+      "observed_mode": "100644",
+      "current_canonical_sha256": "b5ff41bb52d24f5d7819fb12769e216440f75ec3fb3df3e3cb2c5082fffb40e0",
+      "matches_current_canonical_content": true,
+      "matches_current_canonical_mode": true
+    },
+    {
+      "id": "chemical_formula_helper",
+      "path": "scripts/chem_formula.py",
+      "present": true,
+      "observed_git_blob": "b2a5573042418b5fcae4d0b50febddf21080551e",
+      "observed_mode": "100644",
+      "current_canonical_sha256": "34b61195206591ec4f96a3bbd80f2b12e5b66b72ca64b8ed65f0a61d7d75df12",
+      "matches_current_canonical_content": true,
+      "matches_current_canonical_mode": true
+    },
+    {
+      "id": "skill_frontmatter_contract",
+      "path": "tests/test_skill_frontmatter.py",
+      "present": true,
+      "observed_git_blob": "d66ed85ed1f56ece830dae09bb084555d8b7adba",
+      "observed_mode": "100644",
+      "current_canonical_sha256": "a1252211fbdec1a4a36f8138b9a60617d69e9fa6c5c3f589d15846a783d77569",
+      "matches_current_canonical_content": true,
+      "matches_current_canonical_mode": true
+    },
+    {
+      "id": "curation_timestamp_contract",
+      "path": "tests/test_curation_timestamp_schema.py",
+      "present": true,
+      "observed_git_blob": "ffdd71730224b2c9b20104672aa98d5daa34b4ee",
+      "observed_mode": "100644",
+      "current_canonical_sha256": "4714184d0ebf50d1d777c02390b214a3491531310811e3be600c730ed175b92f",
+      "matches_current_canonical_content": true,
+      "matches_current_canonical_mode": true
+    },
+    {
+      "id": "id_label_empty_adapter_contract",
+      "path": "tests/test_id_label_empty_adapter.py",
+      "present": true,
+      "observed_git_blob": "c06638cda5607be83bbe676d57a6c1ee695b9739",
+      "observed_mode": "100644",
+      "current_canonical_sha256": "070b741cd0ee036a66e0ce1dc1b22ee34aa8e1869bda1c5a8fd209c0cc19d991",
+      "matches_current_canonical_content": true,
+      "matches_current_canonical_mode": true
+    },
+    {
+      "id": "id_label_unknown_prefix_contract",
+      "path": "tests/test_id_label_unknown_prefix.py",
+      "present": true,
+      "observed_git_blob": "42a92101cb9632e07f1225c9138eee5f27b0c07c",
+      "observed_mode": "100644",
+      "current_canonical_sha256": "f01d2264a4728285c521b0c3edc084f97504e8ff3bc1eaf90531d7479c04786d",
+      "matches_current_canonical_content": true,
+      "matches_current_canonical_mode": true
+    },
+    {
+      "id": "id_label_plausibility_contract",
+      "path": "tests/test_id_label_plausibility.py",
+      "present": true,
+      "observed_git_blob": "8c94d45069d6942ca379271d7d7335eedb15f78f",
+      "observed_mode": "100644",
+      "current_canonical_sha256": "87fe6b129d59d1ea91c053779c44d7437415ca6c095c6d05e0e75c5f56508892",
+      "matches_current_canonical_content": true,
+      "matches_current_canonical_mode": true
+    },
+    {
+      "id": "backlog_loop_contract",
+      "path": "prompts/backlog-loop-goal.md",
+      "present": true,
+      "observed_git_blob": "4a44c05730ce8fc76e294cc857c8d0622eb47b35",
+      "observed_mode": "100644",
+      "current_canonical_sha256": "d7786562ab5081a9f2ede8927fc4329632ccde79341284b43d972fca7cccf926",
+      "matches_current_canonical_content": false,
+      "matches_current_canonical_mode": true
+    },
+    {
+      "id": "shared_mech_schema",
+      "path": "src/scaleupmech/schema/mech_shared.yaml",
+      "present": true,
+      "observed_git_blob": "fa1f7956c6a83e04ffa96d02bdf911461d09705a",
+      "observed_mode": "100644",
+      "current_canonical_sha256": "cf32864df1626201128e9311054b075bfc4ad3d8345491ac144122a5d5e67d11",
+      "matches_current_canonical_content": false,
+      "matches_current_canonical_mode": true
+    },
+    {
+      "id": "curation_history_schema",
+      "path": "src/scaleupmech/schema/history.yaml",
+      "present": true,
+      "observed_git_blob": "dfccc06e60ffafff603be4e51439ed085034dc85",
+      "observed_mode": "100644",
+      "current_canonical_sha256": "b01b06f1b9a37db205c26c31ec0fd910690848507c7e1bfb73b424ac0829c52d",
+      "matches_current_canonical_content": true,
+      "matches_current_canonical_mode": true
+    },
+    {
+      "id": "deep_research_contract",
+      "path": "scripts/deep_research_contract.py",
+      "present": true,
+      "observed_git_blob": "cf3f9903257ee9553a906b0b4fdd09f153e4e92a",
+      "observed_mode": "100644",
+      "current_canonical_sha256": "256e5058613d41b34d573041e8b386b593b21f625cfc18603230568294a500d8",
+      "matches_current_canonical_content": true,
+      "matches_current_canonical_mode": true
+    },
+    {
+      "id": "pr_shepherd_workflow",
+      "path": ".github/workflows/pr-shepherd.yml",
+      "present": true,
+      "observed_git_blob": "9739e537365a11e14c08888b68d463b276ef9066",
+      "observed_mode": "100644",
+      "current_canonical_sha256": "3230756053abfa76afb6f65c3615106617273246a00598758d1b37ded82d687b",
+      "matches_current_canonical_content": true,
+      "matches_current_canonical_mode": true
+    },
+    {
+      "id": "merge_queue_admission_controller",
+      "path": "scripts/auto_merge_ready_prs.py",
+      "present": true,
+      "observed_git_blob": "17d154e735b7132677779637c3faa7b527a966f0",
+      "observed_mode": "100644",
+      "current_canonical_sha256": "1011cac5fb1c3c66ea3dc2c528339b4ea019189b5716f52fdd088cabbfed5c38",
+      "matches_current_canonical_content": false,
+      "matches_current_canonical_mode": true
+    },
+    {
+      "id": "merge_integrity_verifier",
+      "path": "scripts/verify_merge_integrity.py",
+      "present": true,
+      "observed_git_blob": "80ad0ee0d12051422f36aacd15b1b6d0415ae3e8",
+      "observed_mode": "100644",
+      "current_canonical_sha256": "2aaa757523d4400288dd1657c13ed4e0d123a252c30ea59c69c9d353e6efebae",
+      "matches_current_canonical_content": true,
+      "matches_current_canonical_mode": true
+    },
+    {
+      "id": "merge_queue_admission_workflow",
+      "path": ".github/workflows/merge-queue-admission.yaml",
+      "present": true,
+      "observed_git_blob": "62d3a63888fcfd45fb27434fccda7fb722759388",
+      "observed_mode": "100644",
+      "current_canonical_sha256": "3a1fd0320ccb4e056b9733edaf107fd9c3c3e9728291ac7095601bfbb6e0f598",
+      "matches_current_canonical_content": true,
+      "matches_current_canonical_mode": true
+    },
+    {
+      "id": "merge_integrity_workflow",
+      "path": ".github/workflows/verify-merge-integrity.yaml",
+      "present": true,
+      "observed_git_blob": "7c66af1eef383d4520f8bd5bae4f0e47c87f7c46",
+      "observed_mode": "100644",
+      "current_canonical_sha256": "eace81f16c9e29aa2139ac4b750620fea6d33ab97182dc502c3dc52d0a3e3b50",
+      "matches_current_canonical_content": true,
+      "matches_current_canonical_mode": true
+    },
+    {
+      "id": "record_review_schema",
+      "path": "schema/record_review.yaml",
+      "present": true,
+      "observed_git_blob": "630d95bda4773785a2cdfe42d32561a9f1591c0f",
+      "observed_mode": "100644",
+      "current_canonical_sha256": "229baf9b69118a1fe318e4c31085c0820e4e3d1365e7b04d6ace451b7c35f9bb",
+      "matches_current_canonical_content": true,
+      "matches_current_canonical_mode": true
+    },
+    {
+      "id": "record_review_helper",
+      "path": "scripts/record_review.py",
+      "present": true,
+      "observed_git_blob": "a7d0c238840d78e3328649819c4e589ff780015e",
+      "observed_mode": "100644",
+      "current_canonical_sha256": "95a4ec41e38ec47ba3578e76838c46a0adbf47e49ad3636524735d08cfcb1c4d",
+      "matches_current_canonical_content": true,
+      "matches_current_canonical_mode": true
+    },
+    {
+      "id": "record_review_guide",
+      "path": "docs/record-reviews.md",
+      "present": true,
+      "observed_git_blob": "f86815ac5d84eecbd59c006f56e1a6f4f75c7c47",
+      "observed_mode": "100644",
+      "current_canonical_sha256": "eaedec5783b40925a3f0e159dfd1202c315a12e98c8859526378ceea5c547822",
+      "matches_current_canonical_content": true,
+      "matches_current_canonical_mode": true
+    },
+    {
+      "id": "record_review_contract",
+      "path": "tests/test_record_review_contract.py",
+      "present": true,
+      "observed_git_blob": "e735ee0c8e71a793364ee10f62b6ec70327b48a3",
+      "observed_mode": "100644",
+      "current_canonical_sha256": "7be08e684dcd235ddeae8f3c6a5d45b0ee74a60d1c1818cc81467e38901e5d56",
+      "matches_current_canonical_content": true,
+      "matches_current_canonical_mode": true
+    }
+  ],
+  "tracked_record_paths": [],
+  "retained_proposal": "1d2b648a3631d4af374bb56c6d8315bf6d2674bf",
+  "limits": [
+    "Git tree includes every committed path, independently of ignore rules.",
+    "Local ignored and uncommitted native files were not inspected.",
+    "Artifact presence or current-byte correspondence does not authorize a governance pin or deployment."
+  ]
+}
