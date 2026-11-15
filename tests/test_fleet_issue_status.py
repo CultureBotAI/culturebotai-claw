@@ -224,9 +224,9 @@ def test_headline_totals_match_the_rows():
     out = render(data, SNAP, 60)
     assert "fleet: 3; open PRs: 3" in out
     claw = next(ln for ln in out.splitlines() if ln.startswith("culturebotai-claw"))
-    assert claw.split()[-3:] == ["2", "1", "0"]   # PRs, CONFLICTS, DRAFTS
+    assert claw.split()[-8:-5] == ["2", "1", "0"]   # PRs, CONFLICTS, DRAFTS
     trait = next(ln for ln in out.splitlines() if ln.startswith("TraitMech"))
-    assert trait.split()[-3:] == ["1", "0", "1"]
+    assert trait.split()[-8:-5] == ["1", "0", "1"]
 
 
 def test_no_prs_mode_drops_the_pr_columns_and_headline():
@@ -507,6 +507,318 @@ def test_snapshot_transition_is_serialized_under_one_persistent_lock(
     assert events == ["lock", "replace", "delete-counterpart", "unlock"]
     assert lock_path.exists()
     assert lock_path.stat().st_mode & 0o777 == 0o600
+
+
+def test_backlog_order_is_descending_with_stable_ties_and_errors_last():
+    data = _data(
+        repos_queried=["unknown", "small", "tie-first", "largest", "tie-last"],
+        repository_identities={name: f"Org/{name}" for name in
+                               ("unknown", "small", "tie-first", "largest", "tie-last")},
+        issues={"small": [], "tie-first": [_issue(1)],
+                "largest": [_issue(2), _issue(1)], "tie-last": [_issue(1)]},
+        errors={"unknown": "issues: unavailable"}, include_prs=False,
+    )
+    expected = ["largest", "tie-first", "tie-last", "small", "unknown"]
+    assert fis.ranked_repositories(data) == expected
+    assert [row["repo"] for row in fis.repository_summary(data, SNAP, 60)] == expected
+    assert [row["repo"] for row in tsv_rows(data, SNAP)] == ["largest", "largest", "tie-first", "tie-last"]
+    text = render(data, SNAP, 60)
+    assert [line.split()[0] for line in text.splitlines() if line.split() and
+            line.split()[0] in expected] == expected
+    assert fis.repository_summary(data, SNAP, 60)[-1]["open"] is None
+
+
+def _annotation(**overrides):
+    return {"updated_at": "2026-09-10T00:00:00Z", "review_priority": "P1",
+            "review_action": "keep", "review_reason": "Failure reproduced",
+            "review_evidence": "src/parser.py at abc123; failing acceptance test", **overrides}
+
+
+def test_review_overlay_is_consistent_in_json_rows_tsv_markdown_and_summary(tmp_path):
+    data = _data(issues={"culturebotai-claw": [_issue(3), _issue(2), _issue(1)], "TraitMech": [_issue(1)]})
+    path = tmp_path / "triage.json"
+    path.write_text(_json.dumps({
+        "CultureBotAI/culturebotai-claw#1": _annotation(),
+        "CultureBotAI/culturebotai-claw#2": _annotation(review_priority="Unranked", review_action="close"),
+        "CultureBotAI/culturebotai-claw#3": _annotation(review_priority="P3", review_action="defer", defer_until="Dependency releases"),
+    }))
+    data["triage"] = fis.load_triage(path, data)
+    rows = fis.issue_rows(data, SNAP)
+    assert [row["review_action"] for row in rows] == ["defer", "close", "keep", "unreviewed"]
+    assert rows[-1]["review_priority"] == "Unranked"
+    assert fis.repository_summary(data, SNAP, 60)[0] == {
+        "repo": "culturebotai-claw", "repository": "CultureBotAI/culturebotai-claw",
+        "open": 3, "unassigned": 3, "stale": 0, "oldest_age_days": 12,
+        "reviewed": 3, "unreviewed": 0, "keep": 1, "close": 1, "defer": 1,
+        "status": "complete", "prs": {"open": 1, "conflicts": 0, "drafts": 0},
+    }
+    saved = _read(write_tsv(data, tmp_path, SNAP))
+    assert saved[0]["defer_until"] == "Dependency releases"
+    assert saved[-1]["issue_key"] == "CultureBotAI/TraitMech#1"
+    markdown = fis.render_markdown(data, SNAP, 60)
+    row = _markdown_summary_row(markdown, "culturebotai-claw")
+    assert {key: row[key] for key in ("Open issues", "Reviewed", "Unreviewed", "Keep", "Close", "Defer", "Coverage")} == {
+        "Open issues": "3", "Reviewed": "3", "Unreviewed": "0", "Keep": "1",
+        "Close": "1", "Defer": "1", "Coverage": "complete",
+    }
+    assert "| P3 | defer |" in markdown
+
+
+@pytest.mark.parametrize("changes,match", [
+    ({"updated_at": "2026-09-09T00:00:00Z"}, "stale triage"),
+    ({"review_priority": "urgent"}, "review_priority"),
+    ({"review_priority": []}, "review_priority"),
+    ({"review_action": "done"}, "review_action"),
+    ({"review_action": "defer"}, "revisit date or trigger"),
+    ({"review_action": "close"}, "no remaining priority"),
+    ({"review_evidence": ""}, "review_evidence required"),
+    ({"defer_until": "tomorrow"}, "only applies to defer"),
+    ({"unknown": "value"}, "invalid triage fields"),
+])
+def test_invalid_or_stale_annotations_are_refused(tmp_path, changes, match):
+    path = tmp_path / "triage.json"
+    path.write_text(_json.dumps({"CultureBotAI/culturebotai-claw#1": _annotation(**changes)}))
+    with pytest.raises(ValueError, match=match):
+        fis.load_triage(path, _data())
+
+
+def test_unknown_and_duplicate_annotations_are_refused(tmp_path):
+    path = tmp_path / "triage.json"
+    path.write_text(_json.dumps({"Other/repo#1": _annotation()}))
+    with pytest.raises(ValueError, match="not in fetched open set"):
+        fis.load_triage(path, _data())
+    path.write_text('{"CultureBotAI/culturebotai-claw#1": {}, "CultureBotAI/culturebotai-claw#1": {}}')
+    with pytest.raises(ValueError, match="duplicate triage key"):
+        fis.load_triage(path, _data())
+
+
+def test_markdown_escapes_untrusted_cells_and_preserves_coverage():
+    data = _data(issues={"culturebotai-claw": [_issue(1, title="a|b\n<script>[click](x)`*_")], "TraitMech": []})
+    out = fis.render_markdown(data, SNAP, 60)
+    row = next(line for line in out.splitlines() if line.startswith("| [CultureBotAI/"))
+    assert row.count("|") == 9
+    assert "a&#124;b &lt;script&gt;&#91;click&#93;(x)&#96;&#42;&#95;" in row
+    assert "https://github.com/CultureBotAI/culturebotai-claw/issues/1" in row
+    assert "issue counts exclude pull requests" in out
+    partial = fis.render_markdown(_data(errors={"TraitMech": "HTTP 502"}), SNAP, 60)
+    summary = _markdown_summary_row(partial, "TraitMech")
+    assert summary["Coverage"] == "error"
+    assert all(value == "?" for key, value in summary.items() if key not in {"Repository", "Coverage"})
+    assert "NOT QUERIED" in partial and "lower bounds" in partial
+
+
+def _markdown_summary_row(markdown, repo):
+    lines = markdown.splitlines()
+    header = next(line for line in lines if line.startswith("| Repository |"))
+    row = next(line for line in lines if line.startswith(f"| {repo} |"))
+    headings = [value.strip() for value in header.strip("|").split("|")]
+    values = [value.strip() for value in row.strip("|").split("|")]
+    assert len(headings) == len(values)
+    return dict(zip(headings, values))
+
+
+def test_markdown_preserves_backlog_and_optional_pr_metrics():
+    """#1198: review columns must add to the existing inventory metrics."""
+    data = _data(
+        issues={"culturebotai-claw": [
+            _issue(1, createdAt="2026-01-01T00:00:00Z", updatedAt="2026-01-02T00:00:00Z"),
+            _issue(2, assignees=[{"login": "assigned"}]), _issue(3),
+        ], "TraitMech": []},
+        prs={"culturebotai-claw": [
+            _pr(1, isDraft=True, mergeable="CONFLICTING"),
+            _pr(2, isDraft=True, mergeable="CONFLICTING"),
+            _pr(3, isDraft=True), _pr(4),
+        ], "TraitMech": []},
+    )
+    markdown = fis.render_markdown(data, SNAP, 60)
+    row = _markdown_summary_row(markdown, "culturebotai-claw")
+    assert {key: row[key] for key in ("Open issues", "Unassigned", "Stale 60d+", "Oldest (days)",
+                                     "PRs", "Conflicts", "Drafts")} == {
+        "Open issues": "3", "Unassigned": "2", "Stale 60d+": "1", "Oldest (days)": "255",
+        "PRs": "4", "Conflicts": "2", "Drafts": "3",
+    }
+    assert row["Unreviewed"] == "3"
+    assert _markdown_summary_row(markdown, "TraitMech")["Oldest (days)"] == ""
+    no_prs = fis.render_markdown({**data, "include_prs": False}, SNAP, 60)
+    no_pr_row = _markdown_summary_row(no_prs, "culturebotai-claw")
+    assert not {"PRs", "Conflicts", "Drafts"} & no_pr_row.keys()
+    assert no_pr_row["Stale 60d+"] == "1"
+
+
+def _rest_issue(number):
+    issue = _issue(number)
+    return {"number": number, "title": issue["title"], "user": issue["author"],
+            "created_at": issue["createdAt"], "updated_at": issue["updatedAt"],
+            "html_url": issue["url"], "labels": [], "assignees": [], "milestone": None}
+
+
+def _paginated_gh(pages, total=2, identity="CultureBotAI/TraitMech", errors=None):
+    def fake(args, timeout=60):
+        if args[1] == "graphql":
+            return _json.dumps({"data": {"repository": {"nameWithOwner": identity,
+                                                       "issues": {"totalCount": total}}}, "errors": errors})
+        assert "--paginate" in args and "--slurp" in args
+        return _json.dumps(pages)
+    return fake
+
+
+def test_all_issues_reads_every_page_excludes_prs_and_checks_independent_count(monkeypatch):
+    pages = [[_rest_issue(1), {**_rest_issue(3), "pull_request": {}}], [_rest_issue(2)]]
+    monkeypatch.setattr(fis, "_gh", _paginated_gh(pages))
+    data = fis.collect(1, 1, False, all_issues=True, selected_repositories=["CultureBotAI/TraitMech"])
+    assert data["repos_queried"] == ["TraitMech"]
+    assert [issue["number"] for issue in data["issues"]["TraitMech"]] == [2, 1]
+    assert snapshot_is_complete(data)
+    assert data["all_issues"] is True
+
+
+@pytest.mark.parametrize("pages,total,identity,errors", [
+    ([[_rest_issue(1)]], 2, "CultureBotAI/TraitMech", None),
+    ([[_rest_issue(1)], [_rest_issue(1)]], 2, "CultureBotAI/TraitMech", None),
+    ([[_rest_issue(1)]], 1, "Other/TraitMech", None),
+    ([[_rest_issue(1)]], 1, "CultureBotAI/TraitMech", [{"message": "access denied"}]),
+])
+def test_all_issue_acquisition_failures_remain_visible(monkeypatch, pages, total, identity, errors):
+    monkeypatch.setattr(fis, "_gh", _paginated_gh(pages, total, identity, errors))
+    data = fis.collect(1, 1, False, all_issues=True, selected_repositories=["CultureBotAI/TraitMech"])
+    assert data["errors"]["TraitMech"].startswith("issues:")
+    assert data["issues"] == {}
+    assert not snapshot_is_complete(data)
+
+
+def test_unknown_repository_is_refused_before_network(monkeypatch):
+    def never(*args, **kwargs):
+        raise AssertionError("network must not be used")
+    monkeypatch.setattr(fis, "_gh", never)
+    with pytest.raises(ValueError, match="outside manifest"):
+        fis.collect(10, 10, selected_repositories=["Other/Unrelated"])
+
+
+def test_json_exposes_ordered_summary_and_raw_review_rows(monkeypatch, capsys):
+    monkeypatch.setattr(fis.shutil, "which", lambda command: "/usr/bin/gh")
+    monkeypatch.setattr(fis, "collect", lambda *args, **kwargs: _data())
+    assert main(["--json", "--no-tsv"]) == 0
+    payload = _json.loads(capsys.readouterr().out)
+    assert payload["repository_summary"][0]["repo"] == "culturebotai-claw"
+    assert payload["issue_rows"][0]["review_action"] == "unreviewed"
+
+
+def test_markdown_file_and_json_share_one_acquisition(monkeypatch, capsys, tmp_path):
+    calls = []
+    def collect(*args, **kwargs):
+        calls.append((args, kwargs))
+        return _data()
+    monkeypatch.setattr(fis.shutil, "which", lambda command: "/usr/bin/gh")
+    monkeypatch.setattr(fis, "collect", collect)
+    path = tmp_path / "report.md"
+    assert main(["--json", "--markdown-file", str(path), "--tsv-dir", str(tmp_path)]) == 0
+    output = capsys.readouterr()
+    data = _json.loads(output.out)
+    assert len(calls) == 1
+    assert path.read_text() == fis.render_markdown(_data(), data["snapshot_utc"], 60) + "\n"
+    assert "Snapshot:" in output.err
+    assert list(tmp_path.glob("*.tsv"))
+
+
+def _closed_issue(number, closed_at, **overrides):
+    return {"number": number, "html_url": f"https://github.com/Org/repo/issues/{number}",
+            "state": "closed", "closed_at": closed_at, **overrides}
+
+
+def test_closed_window_includes_both_boundaries_excludes_prs_and_reopened(monkeypatch):
+    pages = [[
+        _closed_issue(1, "2026-09-06T10:00:00Z"),
+        _closed_issue(2, "2026-09-13T10:00:00Z"),
+        _closed_issue(3, "2026-09-10T12:00:00Z"),
+        _closed_issue(4, "2026-09-06T09:59:59Z"),
+    ], [
+        _closed_issue(5, "2026-09-13T10:00:01Z"),
+        _closed_issue(6, "2026-09-10T12:00:00Z", pull_request={}),
+        _closed_issue(7, None, state="open"),
+    ]]
+    calls = []
+    def fake(args, timeout=60):
+        calls.append(args)
+        return _json.dumps(pages)
+    monkeypatch.setattr(fis, "_gh", fake)
+    data = _data()
+    fis.enrich_closed_issues(data, 7, SNAP)
+    assert data["closed_window"] == {
+        "days": 7, "start_utc": "2026-09-06T10:00:00Z", "end_utc": "2026-09-13T10:00:00Z",
+        "inclusive": True, "semantics": "currently_closed_latest_closure",
+    }
+    assert len(calls) == 2
+    for args in calls:
+        assert "--paginate" in args and "--slurp" in args
+        assert "state=closed" in args[-1] and "since=2026-09-06T09:59:59Z" in args[-1]
+    for repo in data["repos_queried"]:
+        assert [item["number"] for item in data["closed_issues"][repo]] == [3, 2, 1]
+    assert data["closed_errors"] == {}
+    assert snapshot_is_complete(data)
+    summary = fis.repository_summary(data, SNAP, 60)
+    assert all(row["closed_in_window"] == 3 and row["closed_status"] == "complete" for row in summary)
+    markdown = fis.render_markdown(data, SNAP, 60)
+    assert _markdown_summary_row(markdown, "TraitMech")["Closed in last 7 days"] == "3"
+    assert "latest closure" in markdown and "currently closed" in markdown
+    text = render(data, SNAP, 60)
+    assert "CLOSED 7d" in text
+
+
+def test_closed_failure_preserves_open_ranking_and_marks_unknown(monkeypatch):
+    def fake(args, timeout=60):
+        if "TraitMech" in args[-1]:
+            raise fis.GhError("HTTP 503")
+        return "[[]]"
+    monkeypatch.setattr(fis, "_gh", fake)
+    data = _data(issues={"culturebotai-claw": [_issue(1)], "TraitMech": [_issue(2), _issue(1)]})
+    fis.enrich_closed_issues(data, 7, SNAP)
+    summary = fis.repository_summary(data, SNAP, 60)
+    assert summary[0]["repo"] == "TraitMech" and summary[0]["open"] == 2
+    assert summary[0]["closed_in_window"] is None
+    assert summary[0]["closed_status"] == "error" and summary[0]["status"] == "partial"
+    assert summary[1]["closed_in_window"] == 0
+    assert data["errors"] == {} and data["closed_errors"] == {"TraitMech": "HTTP 503"}
+    assert "TraitMech" not in data["closed_issues"]
+    assert not snapshot_is_complete(data)
+    markdown = fis.render_markdown(data, SNAP, 60)
+    row = _markdown_summary_row(markdown, "TraitMech")
+    assert row["Open issues"] == "2" and row["Closed in last 7 days"] == "?"
+    assert "closed count unavailable" in markdown and "HTTP 503" in markdown
+
+
+@pytest.mark.parametrize("pages", [
+    [[_closed_issue(1, "2026-09-10T12:00:00Z")], [_closed_issue(1, "2026-09-10T12:00:00Z")]],
+    [[_closed_issue(1, None)]],
+    [[_closed_issue(1, "2026-09-10T12:00:00")]],
+])
+def test_malformed_or_duplicate_closed_results_are_unknown(monkeypatch, pages):
+    monkeypatch.setattr(fis, "_gh", lambda *args, **kwargs: _json.dumps(pages))
+    data = _data()
+    fis.enrich_closed_issues(data, 7, SNAP)
+    assert set(data["closed_errors"]) == set(data["repos_queried"])
+    assert data["closed_issues"] == {}
+    assert not snapshot_is_complete(data)
+
+
+def test_closed_failures_exit_nonzero_but_retain_json_open_counts(monkeypatch, capsys):
+    monkeypatch.setattr(fis.shutil, "which", lambda command: "/usr/bin/gh")
+    monkeypatch.setattr(fis, "collect", lambda *args, **kwargs: _data())
+    def unavailable(*args, **kwargs):
+        raise fis.GhError("offline")
+    monkeypatch.setattr(fis, "_gh", unavailable)
+    assert main(["--closed-days", "7", "--json", "--no-tsv"]) == 1
+    payload = _json.loads(capsys.readouterr().out)
+    assert payload["repository_summary"][0]["open"] == 1
+    assert payload["repository_summary"][0]["closed_in_window"] is None
+    assert payload["closed_window"]["end_utc"] == payload["snapshot_utc"].replace("+00:00", "Z")
+
+
+def test_nonpositive_closed_days_rejected_before_network(monkeypatch, capsys):
+    def never(*args, **kwargs):
+        raise AssertionError("must reject before network")
+    monkeypatch.setattr(fis, "collect", never)
+    assert main(["--closed-days", "0", "--no-tsv"]) == 2
+    assert main(["--closed-days", "-1", "--no-tsv"]) == 2
 
 
 

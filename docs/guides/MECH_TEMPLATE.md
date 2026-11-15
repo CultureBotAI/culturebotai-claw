@@ -27,6 +27,7 @@ candidate records this difference without changing that admission authority.
 | History, provenance and record review | Existing governed artifacts plus native validation/writer/review commands; retained source pins govern copies |
 | Native checks and CI | Consumer-owned commands and unconditional PR checks; add offline template drift validation using a published implementation revision |
 | Governed infrastructure | Existing governance synchronization and release/admission APIs; baseline adoption cannot authorize a re-pin |
+| Persistent agent sessions | tmux on an explicitly identified host and socket; XMechBay owns host launch/control, CLAW records and verifies observations; Terminal windows are views |
 | Research, runtime and automation | Explicit deferred/adopted state; installing skills or a candidate profile does not start workers, loops, hooks or auto-merge |
 
 The older [Mech standard](MECH_STANDARD.md) records historical measurements. Its
@@ -36,6 +37,55 @@ New repositories can use the [preparation registry](PREPARATION_CANDIDATES.md)
 before fleet admission. Their native paths come from the sealed declaration;
 `native_identity` is refused. Legacy private consumers use their separately declared identity/policy; their inclusion
 in an adoption plan does not add them to the public fleet.
+
+## Persistent agent sessions
+
+Tmux is the default for new persistent Mech agent sessions. In-process subagents
+retain their existing lifecycle. Use the
+[XMechBay fleet control contract](https://github.com/CultureBotAI/XMechBay/blob/main/docs/fleet-control-contract.md)
+and its host launcher for persistent sessions; use the
+[boss skill](../../.claude/skills/boss/SKILL.md) for separately owned task workers.
+Do not create a second launcher or embed machine-specific session names in the
+consumer baseline.
+
+A session binding records the host, explicit tmux socket, session, window and
+pane ID, plus the native agent's thread ID, PID, tty and actual checkout cwd.
+Keep these private. A Terminal window or attached client is a view of that
+binding, not another agent or the durable identity. Verify the native process
+and thread independently: a pane PID can be a launcher shell, and a managed
+agent can own its thread in a background server. See
+[tmux observation](MECH_TMUX_OBSERVATION.md) before admitting a migrated binding
+to monitoring. Old Terminal-only entries remain stale until that check passes.
+
+Launch only on the selected existing server. On macOS, a server that needs
+GUI-login access must originate in that login session; a missing socket is a
+setup problem, not permission to create a replacement over SSH. Specify both
+the server socket and tmux executable in host configuration. The launcher must
+perform an explicit `cd` inside the new pane before starting the agent, then
+verify its actual cwd; the server's inherited environment is not proof of it.
+XMechBay's `mac-term.sh` supports `--tmux-socket`, `--tmux-session` and
+`--tmux-bin`, with `tmux-open DIRECTORY COMMAND` for an owned new session and
+its attached Terminal view, and `tmux-screen`, `tmux-status` and `tmux-paste`
+for the selected existing session. Use the reviewed installed version's help
+and ownership guards before dispatch.
+
+For an authorized migration, stop only a verified idle client and resume its
+saved exact thread in tmux. Preserve account/home, model, effort, sandbox,
+approval policy, worktree, drafts, goals and pending decisions. For a managed
+Codex thread, reconnect through its existing daemon without arbitrary `-c`
+overrides or `--no-daemon`; those options can select embedded execution and
+compete for the same thread. Do not remove a lock, fork the thread or stop a
+shared daemon to bypass a competing-writer screen. A transient unused thread
+must be persisted and verified before closing its client; report any failure
+before choosing a different thread. Migration is not a new goal or permission
+to answer a prompt.
+
+The host controller owns launcher updates and private binding changes; the
+component maintainer owns this onboarding guidance. Validate launcher changes
+with mock transports, then verify one authorized live canary's thread, cwd,
+screen and unchanged checkout before a migration batch. Report code readiness,
+installed runtime and verified monitoring separately. This session standard
+does not add a template component or change a consumer's governed source pin.
 
 ## Refresh and adoption
 
