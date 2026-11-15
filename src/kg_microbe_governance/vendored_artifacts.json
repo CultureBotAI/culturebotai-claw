@@ -78,7 +78,7 @@
       "source": "src/kg_microbe_governance/artifacts/scripts/check_vendored_sync.py",
       "target": "scripts/check_vendored_sync.py",
       "consumers": "all",
-      "sha256": "673ecd7ea0b34a29ebef8d1068d8d8973a460680e956237c8e09d97a8a22deb3",
+      "sha256": "fa527882d9a50ec3f49148afe0032ecc65a2a3c3eb31d62bdfc14fa7104e7bfb",
       "mode": "0644"
     },
     {

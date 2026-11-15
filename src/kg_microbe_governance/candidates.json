@@ -1,0 +1,138 @@
+{
+  "version": 1,
+  "candidates": {
+    "stressresponsemech": {
+      "state": "preparation",
+      "display_name": "StressResponseMech",
+      "github": "CultureBotAI/StressResponseMech",
+      "repository_id": 1458170146,
+      "environment_variable": "STRESSRESPONSEMECH_ROOT",
+      "package_path": "src/stressresponsemech",
+      "schema_paths": [
+        "src/stressresponsemech/schema/stressresponsemech.yaml"
+      ],
+      "record_globs": [
+        "data/response_systems/*.yaml"
+      ],
+      "bootstrap_main_ref": "d40c12971e9649a85c4989eb868b1d89828edffd",
+      "capabilities": {
+        "id_label_validation": {
+          "status": "disabled",
+          "reason": "Initial main d40c12971e9649a85c4989eb868b1d89828edffd contains only README.md. Native implementation and shared-command compatibility require separate reviewed admission; candidate preparation does not enable this capability."
+        },
+        "curation_history": {
+          "status": "disabled",
+          "reason": "Initial main d40c12971e9649a85c4989eb868b1d89828edffd contains only README.md. Native implementation and shared-command compatibility require separate reviewed admission; candidate preparation does not enable this capability."
+        },
+        "record_review": {
+          "status": "disabled",
+          "reason": "Initial main d40c12971e9649a85c4989eb868b1d89828edffd contains only README.md. Native implementation and shared-command compatibility require separate reviewed admission; candidate preparation does not enable this capability."
+        },
+        "strict_validation": {
+          "status": "disabled",
+          "reason": "Initial main d40c12971e9649a85c4989eb868b1d89828edffd contains only README.md. Native implementation and shared-command compatibility require separate reviewed admission; candidate preparation does not enable this capability."
+        },
+        "schema_sync": {
+          "status": "disabled",
+          "reason": "Initial main d40c12971e9649a85c4989eb868b1d89828edffd contains only README.md. Native implementation and shared-command compatibility require separate reviewed admission; candidate preparation does not enable this capability."
+        },
+        "release_management": {
+          "status": "disabled",
+          "reason": "Initial main d40c12971e9649a85c4989eb868b1d89828edffd contains only README.md. Native implementation and shared-command compatibility require separate reviewed admission; candidate preparation does not enable this capability."
+        },
+        "build_coordination": {
+          "status": "disabled",
+          "reason": "Initial main d40c12971e9649a85c4989eb868b1d89828edffd contains only README.md. Native implementation and shared-command compatibility require separate reviewed admission; candidate preparation does not enable this capability."
+        },
+        "documentation": {
+          "status": "disabled",
+          "reason": "Initial main d40c12971e9649a85c4989eb868b1d89828edffd contains only README.md. Native implementation and shared-command compatibility require separate reviewed admission; candidate preparation does not enable this capability."
+        },
+        "testing": {
+          "status": "disabled",
+          "reason": "Initial main d40c12971e9649a85c4989eb868b1d89828edffd contains only README.md. Native implementation and shared-command compatibility require separate reviewed admission; candidate preparation does not enable this capability."
+        },
+        "refactoring": {
+          "status": "disabled",
+          "reason": "Initial main d40c12971e9649a85c4989eb868b1d89828edffd contains only README.md. Native implementation and shared-command compatibility require separate reviewed admission; candidate preparation does not enable this capability."
+        },
+        "coordination_hooks": {
+          "status": "disabled",
+          "reason": "Initial main d40c12971e9649a85c4989eb868b1d89828edffd contains only README.md. Native implementation and shared-command compatibility require separate reviewed admission; candidate preparation does not enable this capability."
+        },
+        "deep_research": {
+          "status": "disabled",
+          "reason": "Initial main d40c12971e9649a85c4989eb868b1d89828edffd contains only README.md. Native implementation and shared-command compatibility require separate reviewed admission; candidate preparation does not enable this capability."
+        },
+        "edison_key_discovery": {
+          "status": "not_applicable",
+          "reason": "The initial README-only repository has no Edison integration; paid providers remain outside setup."
+        },
+        "environment_coverage": {
+          "status": "not_applicable",
+          "reason": "This response-system corpus is not a culture-medium environment-coverage adapter."
+        },
+        "knowledge_gap_scan": {
+          "status": "disabled",
+          "reason": "Initial main d40c12971e9649a85c4989eb868b1d89828edffd contains only README.md. Native implementation and shared-command compatibility require separate reviewed admission; candidate preparation does not enable this capability."
+        },
+        "vendored_sync": {
+          "status": "disabled",
+          "reason": "Initial main d40c12971e9649a85c4989eb868b1d89828edffd contains only README.md. Native implementation and shared-command compatibility require separate reviewed admission; candidate preparation does not enable this capability."
+        },
+        "unmapped_inventory_input": {
+          "status": "not_applicable",
+          "reason": "The native record unit is a response system, not a shared unmapped chemical inventory."
+        },
+        "source_catalogue": {
+          "status": "disabled",
+          "reason": "Initial main d40c12971e9649a85c4989eb868b1d89828edffd contains only README.md. Native implementation and shared-command compatibility require separate reviewed admission; candidate preparation does not enable this capability."
+        },
+        "evidence_reference_validation": {
+          "status": "disabled",
+          "reason": "Initial main d40c12971e9649a85c4989eb868b1d89828edffd contains only README.md. Native implementation and shared-command compatibility require separate reviewed admission; candidate preparation does not enable this capability."
+        },
+        "taxon_links": {
+          "status": "disabled",
+          "reason": "Initial main d40c12971e9649a85c4989eb868b1d89828edffd contains only README.md. Native implementation and shared-command compatibility require separate reviewed admission; candidate preparation does not enable this capability."
+        },
+        "corpus_statistics": {
+          "status": "disabled",
+          "reason": "Initial main d40c12971e9649a85c4989eb868b1d89828edffd contains only README.md. Native implementation and shared-command compatibility require separate reviewed admission; candidate preparation does not enable this capability."
+        },
+        "causal_graph_coverage": {
+          "status": "disabled",
+          "reason": "Initial main d40c12971e9649a85c4989eb868b1d89828edffd contains only README.md. Native implementation and shared-command compatibility require separate reviewed admission; candidate preparation does not enable this capability."
+        },
+        "page_budgets": {
+          "status": "disabled",
+          "reason": "Initial main d40c12971e9649a85c4989eb868b1d89828edffd contains only README.md. Native implementation and shared-command compatibility require separate reviewed admission; candidate preparation does not enable this capability."
+        },
+        "kgx_export": {
+          "status": "disabled",
+          "reason": "Initial main d40c12971e9649a85c4989eb868b1d89828edffd contains only README.md. Native implementation and shared-command compatibility require separate reviewed admission; candidate preparation does not enable this capability."
+        },
+        "source_queue": {
+          "status": "disabled",
+          "reason": "Initial main d40c12971e9649a85c4989eb868b1d89828edffd contains only README.md. Native implementation and shared-command compatibility require separate reviewed admission; candidate preparation does not enable this capability."
+        },
+        "metpo_proposal": {
+          "status": "disabled",
+          "reason": "No METPO proposal adapter is implemented at the inspected initial main."
+        },
+        "sssom_export": {
+          "status": "disabled",
+          "reason": "Initial main d40c12971e9649a85c4989eb868b1d89828edffd contains only README.md. Native implementation and shared-command compatibility require separate reviewed admission; candidate preparation does not enable this capability."
+        },
+        "writer_audit": {
+          "status": "disabled",
+          "reason": "Initial main d40c12971e9649a85c4989eb868b1d89828edffd contains only README.md. Native implementation and shared-command compatibility require separate reviewed admission; candidate preparation does not enable this capability."
+        },
+        "site_contract": {
+          "status": "disabled",
+          "reason": "Initial main d40c12971e9649a85c4989eb868b1d89828edffd contains only README.md. Native implementation and shared-command compatibility require separate reviewed admission; candidate preparation does not enable this capability."
+        }
+      }
+    }
+  }
+}

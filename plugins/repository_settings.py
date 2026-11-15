@@ -806,6 +806,27 @@ class RepositorySettings:
             if name not in skip
         }
 
+    @classmethod
+    def get_candidate_target(
+        cls, name: str, *, root: str | Path | None = None,
+        environ: Optional[Mapping[str, str]] = None,
+    ) -> RepositoryTarget:
+        """Resolve a sealed preparation identity without adding it to the fleet."""
+        from kg_microbe_governance.candidates import load_candidates
+
+        candidates = load_candidates()
+        if name not in candidates:
+            raise RepositoryConfigurationError(f"Unknown preparation candidate: {name}")
+        candidate = candidates[name]
+        env = os.environ if environ is None else environ
+        target = cls._resolve_target(
+            name=name, raw_path=str(root) if root is not None else env.get(candidate["environment_variable"]),
+            environment_variable=candidate["environment_variable"],
+            expected_repository=candidate["github"], environ=env,
+        )
+        target.open()
+        return target
+
     def get_target(self, name: str) -> RepositoryTarget:
         """Return a trusted target, revalidating it at operation time."""
 
