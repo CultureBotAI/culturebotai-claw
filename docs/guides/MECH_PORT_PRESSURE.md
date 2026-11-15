@@ -152,10 +152,13 @@ This includes a shell whose child is `/usr/bin/pr`: a quoted inline GitHub body
 containing backticks can invoke command substitution and leave that child
 reading the tty for hours. An empty composer or newer completed native step
 does not erase the live process ancestry. The guard reports the authoritative
-age and socket evidence, and leaves the task alone. The separate prevention
-proposal is [#913](https://github.com/CultureBotAI/culturebotai-claw/issues/913):
-prepare PR and issue bodies in a file and pass `--body-file` so prose is not
-interpreted as shell code.
+age and socket evidence, and leaves the task alone. The canonical prevention
+rule ([#913](https://github.com/CultureBotAI/culturebotai-claw/issues/913))
+requires preparing PR and issue bodies in an owned file, passing
+`--body-file <path>` for `gh pr` and `gh issue` create/edit/comment commands,
+retaining the body artifact, and verifying the published text so Markdown prose
+is never interpreted as shell code. Existing running background tasks remain
+operator-owned; the guard reports and holds them, never kills them.
 
 ## Approved canary and subsequent operation
 

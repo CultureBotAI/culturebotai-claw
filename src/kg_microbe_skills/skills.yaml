@@ -123,7 +123,7 @@ skills:
     reason: Controls explicitly configured local approval and goal-monitor processes while preserving their session bindings and progress.
   onboard-mech:
     scope: fleet
-    reason: Registers a verified Mech with complete capability decisions and coordinated governance.
+    reason: Inventories, adopts and maintains the reusable baseline for manifest-resolved Mechs, with explicit capability decisions and separate governance admission.
   fleet-pull:
     scope: fleet
     reason: Previews or fast-forwards current origin-tracking branches in manifest-resolved Mechs.
@@ -154,6 +154,16 @@ skills:
       Combines CBORG MCP servers (valency, tavily, context7), anonymous public
       literature APIs, local Zotero PDFs, and LBNL-licensed databases and TDM
       APIs for evidence-backed curation across manifest-resolved Mechs.
+  lbnl-mech-record-review:
+    scope: fleet
+    reason: >-
+      Performs content-triaged structured record reviews across manifest-resolved
+      Mechs that enable record_review, routing citations by DOI prefix and
+      journal family to LBNL publisher TDM APIs or open ACS Supporting
+      Information and routing chemical, crystallographic, and biological claims
+      to CAS Common Chemistry (with CC BY 4.0 ChEBI crosswalk and polysalt
+      SMILES stoichiometry guards), SciFinder-n, Reaxys, CHEMnetBASE, WebCSD,
+      ICSD, BioCyc, and iModulonDB.
   map-ingredients:
     scope: domain
     reason: Runs the unified ingredient-mapping pipeline over MIM.
@@ -222,6 +232,12 @@ skills:
 # Mechs those are -- from the manifest, so the set cannot drift the way a list
 # written here would the moment a Mech gained or lost the capability.
 canonical:
+  repository-freshness:
+    capability: testing
+    reason: >-
+      Prepares an inert, versioned freshness adapter for every manifest Mech.
+      Testing is the same workflow-participation stand-in as evolve-mech-workflow;
+      candidate rendering grants no runtime adoption or released-pin authority.
   triage-and-resolve-issues:
     capability: testing
     reason: >-
@@ -250,9 +266,13 @@ canonical:
       kgmicrobe.ingredient -- with 270 UNMAPPED_ placeholders. Three schemes,
       each right for its corpus.
 
+      The 2026-11-13 consumer inventory additionally found stable slug identifiers
+      in AssayMech and CofactorMech; #1201 removes the exhaustive taxonomy and
+      adds that shape without changing their native identifiers.
+
       So this template deliberately does NOT unify the policy. What is shared
       is the layer underneath: the invariants that hold whatever the scheme,
-      the three shapes and how to pick one, and the hygiene checks. Each Mech
+      illustrative shapes and how to choose a native policy, and the hygiene checks. Each Mech
       keeps its own scheme, prefixes, minting command and worked example.
 
       It also carries a rule the fleet paid for. Three of the four copies
@@ -455,3 +475,15 @@ canonical:
       counts at run time through kg-microbe-corpus report and pair them with
       native validation and commit provenance, while keeping repository-specific
       recipes and domain strata outside the managed regions.
+  metpo-proposal:
+    capability: metpo_proposal
+    reason: >-
+      TraitMech and CommunityMech both publish METPO proposal cohorts under
+      proposals/<cohort>/ and their local metpo-proposal skills drifted (#385,
+      #386): TraitMech carried four reference documents (including
+      updating-proposals.md) and a prose-only ID reservation that CommunityMech
+      never saw, leading to the eight ID collisions in CommunityMech#756, while
+      the upstream contract lived only in kg-microbe outside the fleet manifest.
+      This canonical template governs the five-file cohort bundle, the 12-column
+      class and 13-column property ROBOT templates, fleet-wide ID coordination
+      via <claw-root>/scripts/fleet_metpo_aggregate.py, and additive cohort update rules.

@@ -37,6 +37,86 @@ DEFAULT_GLOBS = {
 
 PROVENANCE_COLUMNS = ("kind", "proposed_id", "label", "mech", "cohort", "source")
 
+#: Canonical METPO ROBOT template contract governed in claw (#385, #386) and
+#: rendered into proposing Mechs from `src/kg_microbe_skills/canonical/metpo-proposal.md`.
+CANONICAL_SKILL_PATH = (
+    CLAW_ROOT / "src" / "kg_microbe_skills" / "canonical" / "metpo-proposal.md"
+)
+CANONICAL_IRI_NAMESPACE = "https://w3id.org/metpo/"
+
+CANONICAL_CLASS_HEADER = (
+    "proposed_id",
+    "label",
+    "definition",
+    "parent",
+    "exact_synonyms",
+    "examples",
+    "source",
+    "comment",
+    "creator",
+    "date",
+    "subsets",
+    "related_synonyms",
+)
+CANONICAL_CLASS_TEMPLATE = (
+    "ID",
+    "LABEL",
+    "A IAO:0000115",
+    "SC %",
+    "A oboInOwl:hasExactSynonym SPLIT=|",
+    "A IAO:0000112",
+    "A dcterms:source",
+    "A rdfs:comment",
+    "A dcterms:creator",
+    "A dcterms:date",
+    "A oboInOwl:inSubset",
+    "A oboInOwl:hasRelatedSynonym SPLIT=|",
+)
+
+CANONICAL_PROPERTY_HEADER = (
+    "proposed_id",
+    "label",
+    "definition",
+    "parent",
+    "domain",
+    "range",
+    "inverse",
+    "characteristic",
+    "exact_synonyms",
+    "source",
+    "comment",
+    "creator",
+    "related_synonyms",
+)
+CANONICAL_PROPERTY_TEMPLATE = (
+    "ID",
+    "LABEL",
+    "A IAO:0000115",
+    "SP %",
+    "DOMAIN",
+    "RANGE",
+    "I",
+    "CHARACTERISTIC",
+    "A oboInOwl:hasExactSynonym SPLIT=|",
+    "A dcterms:source",
+    "A rdfs:comment",
+    "A dcterms:creator",
+    "A oboInOwl:hasRelatedSynonym SPLIT=|",
+)
+
+CANONICAL_SHAPES = {
+    "classes": (CANONICAL_CLASS_HEADER, CANONICAL_CLASS_TEMPLATE),
+    "properties": (CANONICAL_PROPERTY_HEADER, CANONICAL_PROPERTY_TEMPLATE),
+}
+
+
+def is_canonical_shape(
+    kind: str, header: tuple[str, ...], template: tuple[str, ...]
+) -> bool:
+    """Whether a normalized `(header, template)` pair matches the governed METPO contract (#386)."""
+    expected = CANONICAL_SHAPES.get(kind)
+    return expected == (tuple(header), tuple(template))
+
 
 class AggregateError(RuntimeError):
     pass

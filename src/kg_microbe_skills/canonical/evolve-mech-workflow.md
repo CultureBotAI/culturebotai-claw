@@ -57,6 +57,13 @@ from that status to construct the goal_evidence and closure receipt; replace
 placeholders with observed proof. Bind all output to this goal;
 never infer a fresh goal or cycle from an edited candidate profile.
 
+An independently adopted repository-freshness contract additionally gates both
+agy and Codex execution before any new goal freezes inventory/evidence, including
+no-change goals, and after the verified actual merge before closure. Use the
+same released freshness runner, retain its immutable gate and inventory/closure
+artifacts, and stop on an unverified fetched revision. Candidate proposal files
+do not activate this policy or modify the current cycle's parent/profile.
+
 At each goal preflight, verify the active cycle and profile version, native goal
 identity, prerequisites, corpus scope and maintained input owners. Record any
 new repository requirement in INFRA_TASKS.md as work reveals it. A blocked
@@ -205,7 +212,15 @@ next-cycle profile, and dispatches the next /goal; never start it yourself.
 <!-- canonical:begin closure -->
 Validate and commit only goal-owned changes, push the feature branch and open or
 update its PR, independently review the exact head, file actual deduplicated
-findings as issues, fix them and re-review. Follow current native merge-queue and
+findings as issues, fix them and re-review. Write every PR and issue body to an
+owned file first and pass `--body-file <path>` to `gh pr create`, `gh pr edit`,
+`gh pr comment`, `gh issue create`, `gh issue edit` and `gh issue comment`; do
+not embed Markdown bodies in double-quoted `--body "..."` shell strings where
+backticks, `$`, quotes or newlines invoke command substitution. Retain the body
+artifact and verify the published text with `gh pr view <n> --json body` or
+`gh issue view <n> --json body`. Existing running background tasks remain
+operator-owned; an idle or recycle guard reports and holds them, never kills
+them. Follow current native merge-queue and
 protection rules; verify actual merge, required checks and landed content before
 deleting only the owned feature branch. Retain the PR, issue, reviewed head,
 merge commit and cleanup receipt. A genuine no-diff goal needs an evidence-backed

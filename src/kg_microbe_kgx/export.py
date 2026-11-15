@@ -24,7 +24,7 @@ from typing import Any, Mapping, Sequence
 from kg_microbe_corpus import EMPTY_DOCUMENT, iter_records, list_records
 from kg_microbe_graph.coverage import CoverageConfig, MalformedGraph, graph_parts
 from kg_microbe_kgx import maps
-from kg_microbe_kgx.contract import KgxProfile, check_graph
+from kg_microbe_kgx.contract import KgxProfile, check_graph, write_release_bundle
 
 NODE_COLUMNS = (
     "id", "category", "name", "description", "provided_by", "original_category",
@@ -294,6 +294,7 @@ def write_export(root: Path, globs: Sequence[str], settings: ExportSettings, out
     nodes_path, edges_path = out / "nodes.tsv", out / "edges.tsv"
     _write(nodes_path, NODE_COLUMNS, node_rows)
     _write(edges_path, EDGE_COLUMNS, edge_rows)
+    release_assets = write_release_bundle(out)
     findings = check_graph(nodes_path, edges_path, KgxProfile(extra_prefixes=settings.extra_prefixes))
     manifest = {
         "mech": settings.mech,
@@ -303,6 +304,7 @@ def write_export(root: Path, globs: Sequence[str], settings: ExportSettings, out
         "sampled": sample is not None,
         **dict(provenance or {}),
         "statistics": stats.as_dict(),
+        "release_assets": release_assets,
         "contract_findings": sorted({f.code for f in findings}),
     }
     (out / "manifest.json").write_text(json.dumps(manifest, indent=1, sort_keys=True) + "\n",

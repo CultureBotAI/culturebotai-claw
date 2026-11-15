@@ -1,0 +1,8 @@
+{
+  "repository": "CultureBotAI/MediaIngredientMech",
+  "source_path": "src/mediaingredientmech/additional_mappings.py",
+  "scope": "Pure native MIM assertion contract; no scientific data or approval",
+  "implementation_issue": 1418,
+  "sha256": "767c70e3e8e687dece495593e5ab00e2d14f93b2f452061c13520e40a8eb5f84",
+  "source_revision": "207ec6ab143e3af09fa0b0a57aac11390b608de9"
+}

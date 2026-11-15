@@ -296,6 +296,7 @@ build-sssom:
     uv run python scripts/prune_residual_for_chebi_fixes.py
     @echo "Building MIM→ingredient-ontology SSSOM..."
     uv run python scripts/build_mim_ingredient_sssom.py \
+        --identity-mode legacy \
         --output workspace/reports/mim_ingredient_mappings.sssom.tsv
     @echo "Working copy: workspace/reports/mim_ingredient_mappings.sssom.tsv"
 

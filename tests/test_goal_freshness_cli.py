@@ -1,0 +1,213 @@
+"""Offline executable batch handoff; no live goals or provider gate_requests."""
+from __future__ import annotations
+
+import copy
+import hashlib
+import json
+from pathlib import Path
+
+import pytest
+import yaml
+from test_goal_freshness import REPOSITORY, git, isolated_git  # noqa: F401
+from test_goal_freshness import repo as _repo
+from test_workflow_contract import profile as _profile
+
+from kg_microbe_workflows import PARENT_PATH, load_effective_workflow
+from kg_microbe_workflows import freshness_cli as cli
+from kg_microbe_workflows import freshness_contract as contract
+from kg_microbe_workflows.freshness import FreshnessError
+from scripts.mech_session_supervisor import digest as workflow_digest
+
+repo = _repo
+profile = _profile
+
+
+@pytest.fixture
+def gate_request(repo, profile, monkeypatch):
+    _, model = profile
+    model.update(repository_key='fixturemech', github_repository=REPOSITORY,
+                 profile_id='fixturemech-workflow')
+    repo.publish('workflow/mech-workflow.yaml', yaml.safe_dump(model, sort_keys=False))
+    git(repo.checkout, 'fetch', 'origin')
+    git(repo.checkout, 'merge', '--ff-only', 'origin/main')
+    repo.initial = repo.head()
+    effective = load_effective_workflow(PARENT_PATH, repo.checkout / 'workflow/mech-workflow.yaml')
+    workflow_path = repo.root / 'effective-workflow.json'
+    workflow_path.write_text(json.dumps(effective))
+    workflow_ref = {'path': str(workflow_path), 'sha256': hashlib.sha256(workflow_path.read_bytes()).hexdigest()}
+    workflow_sha = workflow_digest(effective)
+    path = repo.root / 'adoption.json'
+    record = {'schema_version': '1.0.0', 'authority': 'approved_boundary_adoption',
+              'repository_key': 'fixturemech', 'github_repository': REPOSITORY,
+              'repository_root': str(repo.checkout), 'canonical_release_commit': 'a' * 40,
+              'contract_sha256': contract.contract_sha256(),
+              'boundary': {'run_id': 'test', 'cycle': 1, 'stage': 1,
+                           'workflow_sha256': workflow_sha, 'predecessor_receipt_sha256': None},
+              'approval': {'record_id': 'offline-fixture', 'approved_at': '2026-01-01T00:00:00Z',
+                           'approved_by': 'offline fixture'}}
+    path.write_text(json.dumps(record))
+    ref = {'path': str(path), 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
+    monkeypatch.setattr(cli, 'repository_identity', lambda key: REPOSITORY)
+    monkeypatch.setattr(contract, 'repository_identity', lambda key: REPOSITORY)
+    return {'schema_version': '1.0.0', 'repository_key': 'fixturemech',
+            'repository_root': str(repo.checkout), 'lock_directory': str(repo.root / 'locks'),
+            'receipt_directory': str(repo.root / 'portable'), 'protected_roots': [],
+            'adoption': ref, 'boundary_id': 'cycle2-stage1', 'phase': 'pre_goal',
+            'workflow_sha256': workflow_sha, 'effective_workflow': workflow_ref,
+            'prior_inventory': None, 'pull_requests': []}
+
+
+def test_batch_inventory_reads_fetched_tree_after_persisted_head(repo, gate_request):
+    wanted = repo.publish('INFRA_TASKS.md', 'New external backlog\n')
+    result = cli.run_batch([gate_request], apply=True)
+    assert result['status'] == 'verified'
+    row = result['results'][0]
+    artifact = cli.read_artifact(row['artifact'])
+    assert row['head'] == artifact['head'] == repo.head() == wanted
+    infra = next(item for item in artifact['files'] if item['path'] == 'INFRA_TASKS.md')
+    assert infra['object_sha'] == git(repo.writer, 'rev-parse', 'HEAD:INFRA_TASKS.md')
+    assert artifact['completion_authority'] is False
+
+
+def test_held_gate_never_reads_inventory(repo, gate_request, monkeypatch):
+    (repo.checkout / 'tracked.txt').write_text('active work')
+    original = cli.Git.run
+    def run(self, *args, **kwargs):
+        assert args[0] != 'ls-tree'
+        return original(self, *args, **kwargs)
+    monkeypatch.setattr(cli.Git, 'run', run)
+    result = cli.run_batch([gate_request], apply=True)
+    assert result['status'] == 'hold'
+    assert repo.head() == repo.initial
+
+
+def test_post_merge_requires_actual_merge_and_fetches_newer_external_commit(repo, gate_request):
+    initial = cli.execute(gate_request, apply=True)
+    frozen = Path(initial['artifact']['path']).read_bytes()
+    merged = repo.publish('own.txt', 'own merged change')
+    newest = repo.publish('INFRA_TASKS.md', 'newer independent backlog')
+    post = copy.deepcopy(gate_request)
+    post.update(phase='post_merge', prior_inventory=initial['artifact'],
+                pull_requests=[{'number': 42, 'head_sha': 'e' * 40, 'merge_commit_sha': merged}])
+    remote = {'number': 42, 'merged': True, 'merged_at': '2026-01-01T01:00:00Z',
+              'head': {'sha': 'e' * 40}, 'merge_commit_sha': merged,
+              'base': {'repo': {'full_name': REPOSITORY}, 'ref': 'main'}}
+    result = cli.execute(post, apply=True, observe_pr=lambda *args: remote)
+    assert result['head'] == newest == repo.head()
+    artifact = cli.read_artifact(result['artifact'])
+    assert artifact['merges'][0]['merge_commit_sha'] == merged
+    assert artifact['freshness']['fetched'] != merged
+    assert Path(initial['artifact']['path']).read_bytes() == frozen
+
+
+def test_unmerged_pr_cannot_authorize_post_merge(repo, gate_request):
+    initial = cli.execute(gate_request, apply=True)
+    gate_request.update(phase='post_merge', prior_inventory=initial['artifact'],
+                   pull_requests=[{'number': 42, 'head_sha': 'e' * 40, 'merge_commit_sha': 'f' * 40}])
+    with pytest.raises(FreshnessError, match='actual_merge_identity'):
+        cli.execute(gate_request, apply=True, observe_pr=lambda *args: {'number': 42, 'merged': False})
+    assert repo.head() == repo.initial
+
+
+def test_active_goal_cannot_be_replaced_by_new_goal_gate_request(repo, gate_request):
+    initial = cli.execute(gate_request, apply=True)
+    gate_request['prior_inventory'] = initial['artifact']
+    with pytest.raises(FreshnessError, match='cannot_replace'):
+        cli.execute(gate_request, apply=True)
+
+
+def test_no_change_goal_still_runs_pre_goal_fetch(repo, gate_request):
+    calls = []
+    original = cli.Git.run
+    def record(self, *args, **kwargs):
+        calls.append(args[0])
+        return original(self, *args, **kwargs)
+    from unittest.mock import patch
+    with patch.object(cli.Git, 'run', record):
+        result = cli.execute(gate_request, apply=True)
+    assert result['status'] == 'verified'
+    assert 'fetch' in calls and 'ls-tree' in calls
+
+
+def test_batch_reports_partial_failure_nonzero_without_hiding_success(repo, gate_request):
+    bad = copy.deepcopy(gate_request)
+    bad['boundary_id'] = 'different-goal'
+    bad['extra'] = True
+    result = cli.run_batch([gate_request, bad], apply=True)
+    assert result['status'] == 'hold'
+    assert [row['status'] for row in result['results']] == ['verified', 'hold']
+
+
+def test_repeated_boundary_never_refreezes_after_remote_advance(repo, gate_request):
+    first = cli.execute(gate_request, apply=True)
+    raw = Path(first['artifact']['path']).read_bytes()
+    old = repo.head()
+    repo.publish('INFRA_TASKS.md', 'new remote work after freeze')
+    with pytest.raises(FreshnessError, match='remote_moved'):
+        cli.execute(gate_request, apply=True)
+    assert repo.head() == old
+    assert Path(first['artifact']['path']).read_bytes() == raw
+
+
+def test_no_change_closure_keeps_inventory_and_rejects_new_remote(repo, gate_request):
+    first = cli.execute(gate_request, apply=True)
+    gate_request.update(phase='no_change', prior_inventory=first['artifact'])
+    closed = cli.execute(gate_request, apply=True)
+    assert closed['kind'] == 'verified_no_change_freshness'
+    old = repo.head()
+    repo.publish('INFRA_TASKS.md', 'late unrelated change')
+    with pytest.raises(FreshnessError, match='remote_moved'):
+        cli.execute(gate_request, apply=True)
+    assert repo.head() == old
+
+
+def test_frozen_inventory_repeat_is_idempotent(repo, gate_request):
+    first = cli.execute(gate_request, apply=True)
+    second = cli.execute(gate_request, apply=True)
+    assert first['artifact'] == second['artifact']
+    assert second['reused_frozen_inventory'] is True
+
+
+@pytest.mark.parametrize("records", [12000, 170000])
+def test_large_successful_inventory_round_trips_and_remains_usable(repo, gate_request, monkeypatch, records):
+    original = cli.Git.run
+    def large_tree(self, *args, **kwargs):
+        if args[:3] == ('ls-tree', '-r', '-z'):
+            # Valid path components keep the Git listing below its 128 MB
+            # bound while JSON framing exceeds the insufficient 128 MB reader.
+            padding = ("p" * 199 + "/") * 3 if records == 170000 else ""
+            tree = ''.join(f'100644 blob {"a" * 40}\tdata/{padding}record-{i:05d}-long-record-name.yaml\0'
+                           for i in range(records))
+            if records == 170000:
+                assert 32_000_000 < len(tree.encode()) < 128_000_000
+            return tree
+        return original(self, *args, **kwargs)
+    monkeypatch.setattr(cli.Git, 'run', large_tree)
+    first = cli.execute(gate_request, apply=True)
+    assert Path(first['artifact']['path']).stat().st_size > 1_000_000
+    assert len(cli.read_artifact(first['artifact'])['files']) == records
+    if records == 170000:
+        assert 128_000_000 < Path(first['artifact']['path']).stat().st_size < 256_000_000
+    with pytest.raises(cli.FreshnessError, match='request_path_unsafe_or_unbounded'):
+        cli._load(Path(first['artifact']['path']))
+    assert cli.execute(gate_request, apply=True)['artifact'] == first['artifact']
+    gate_request.update(phase='no_change', prior_inventory=first['artifact'])
+    assert cli.execute(gate_request, apply=True)['status'] == 'verified'
+
+
+def test_batch_retains_actionable_remote_after_freeze_hold(repo, gate_request):
+    assert cli.run_batch([gate_request], apply=True)['status'] == 'verified'
+    old = repo.head()
+    repo.publish('late.txt', 'external change after inventory')
+    report = cli.run_batch([gate_request], apply=True)
+    assert report['status'] == 'hold'
+    assert report['results'][0]['reason'] == 'remote_moved_since_inventory_freshness'
+    assert repo.head() == old
+
+
+def test_inventory_reader_retains_finite_size_limit_before_loading(tmp_path):
+    path = tmp_path / "oversized-artifact.json"
+    with path.open("wb") as stream:
+        stream.truncate(256_000_001)
+    with pytest.raises(cli.FreshnessError, match="request_path_unsafe_or_unbounded"):
+        cli.read_artifact({"path": str(path), "sha256": "a" * 64})

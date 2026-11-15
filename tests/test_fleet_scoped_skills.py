@@ -337,3 +337,22 @@ def test_a_redirected_skill_still_needs_the_redirection(name):
         f"{name} now reads the manifest directly -- remove it from "
         f"RESOLVES_THROUGH_A_SCRIPT"
     )
+
+
+def test_lbnl_mech_record_review_triages_literature_and_chemistry_by_content():
+    text = _skill("lbnl-mech-record-review")
+
+    assert "python -m kg_microbe_fleet list --capability record_review --format tsv" in text
+    assert "python -m kg_microbe_fleet targets --capability record_review" in text
+    assert "CommunityMech/scripts/fulltext_access.py" in text
+    assert "elsevier_tdm" in text and "10.1016/*" in text
+    assert "springer_tdm" in text and "10.1007/*" in text
+    assert "wiley_tdm" in text and "10.1002/*" in text
+    assert "10.1021/<suffix>.s001" in text
+    assert "CAS_COMMON_CHEMISTRY_API" in text
+    assert "CC BY-NC 4.0" in text and "CURATE_ONLY" in text
+    assert "STRUCTURE_COMPOSITION_MISMATCH" in text
+    assert "src/kg_microbe_governance/artifacts/scripts/chem_formula.py" in text
+    assert "src/kg_microbe_governance/artifacts/schema/record_review.yaml" in text
+    assert "record_review.py" in text
+

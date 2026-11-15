@@ -65,12 +65,17 @@ two fields answer different questions, and they are allowed to diverge.
 ## Choosing a scheme
 
 <!-- canonical:begin choosing-a-scheme -->
-The fleet uses **three** legitimate schemes. Which one a corpus uses is a
-property of the corpus, not a fleet convention, and none is more correct:
+Several legitimate schemes are used below. This is an open set of examples,
+not an exhaustive taxonomy. A corpus's scheme is its own policy, not a fleet
+convention:
 
 - **Minted sequential.** `<RepoName>:NNNNNN`, zero-padded, assigned in order and
   never reused. Right when the corpus defines entities nobody else has defined,
   so there is no upstream id to adopt.
+- **Minted stable slug.** `<RepoName>:stable-slug`, assigned once under the
+  native naming/collision rules. A later label or filename change does not
+  rename the identifier. Right when a corpus uses readable local names without
+  a sequential counter.
 - **Upstream-first.** The record carries the ontology's own CURIE as its
   identity, with a minted prefix reserved only for entities the ontology does
   not yet cover. Right when an upstream ontology already enumerates the domain
@@ -152,12 +157,13 @@ that it exists is not.
 ## This repository's scheme
 
 This section is {{ display_name }}'s, and it is the part worth reading. State
-which of the three schemes above this corpus uses and why, the exact identity
+which scheme this corpus uses and why, the exact identity
 slot, the prefixes actually in play with their counts, and the command that
 mints or validates. Give a worked example using a real identifier from this
 corpus.
 
-If this corpus mints, say where the high-water mark is read from. If it adopts
+If this corpus mints sequential ids, say where the high-water mark is read from.
+For stable slugs, state the native collision and retirement rules. If it adopts
 upstream ids, say which ontology and what happens when a term is absent. If it
 uses placeholders, say the format and what promotion looks like.
 

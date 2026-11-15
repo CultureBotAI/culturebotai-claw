@@ -208,8 +208,12 @@ def test_review_eligibility_is_independent_of_scientific_curation():
     assert canonical["curate-yaml-record"].capability == "curation_history"
     eligible = set(manifest.with_capability("record_review"))
     assert set(applicable_mechs(canonical["review-yaml-record"])) == eligible
-    assert not manifest.mechs["edgemech"].supports("record_review")
-    assert "edgemech" not in eligible
+    assert eligible == set(manifest.mechs) - {"edgemech", "cofactormech", "assaymech"}
+    for key in ("edgemech", "cofactormech", "assaymech"):
+        assert not manifest.mechs[key].supports("record_review")
+        assert key not in eligible
+        for name in ("review-yaml-record", "review-yaml-category", "curate-yaml-record"):
+            assert key not in applicable_mechs(canonical[name])
     for key in ("aimech", "cmmmech", "pathwaymech", "naturalproductmech"):
         assert not manifest.mechs[key].supports("curation_history")
         assert key in applicable_mechs(canonical["review-yaml-record"])
@@ -534,6 +538,7 @@ def test_the_catalogue_and_templates_are_declared_as_package_data():
     assert set(package_data["kg_microbe_skills"]) == {
         "skills.yaml",
         "canonical/*.md",
+        "template_baseline.json",
     }
 
 # --------------------------------------------------------------------------
@@ -752,3 +757,22 @@ def test_splicing_updates_the_regions_and_leaves_everything_else(tmp_path):
     assert "a glob over it\nmatches nothing in a fresh checkout (#686)" in out
     assert "## What it does" in out
     assert "{{" not in out
+
+
+def test_metpo_proposal_is_canonical_and_covers_proposing_mechs():
+    """#385, #386: `metpo-proposal` is declared canonical in claw, targets
+    Mechs with `metpo_proposal` enabled (`traitmech`, `communitymech`), and
+    governs the five-file cohort contract, ID coordination, and updating rules."""
+    canonical = load_canonical()
+    assert "metpo-proposal" in canonical
+    skill = canonical["metpo-proposal"]
+    assert skill.capability == "metpo_proposal"
+    assert applicable_mechs(skill) == ["communitymech", "traitmech"]
+    text = canonical_text("metpo-proposal")
+    assert set(canonical_regions(text)) == {
+        "contract",
+        "id-coordination",
+        "updating-proposals",
+    }
+    assert "https://w3id.org/metpo/" in text
+    assert "<claw-root>/scripts/fleet_metpo_aggregate.py" in text

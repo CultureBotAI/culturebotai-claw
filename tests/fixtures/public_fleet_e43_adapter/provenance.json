@@ -1,0 +1,26 @@
+{
+  "source_commit": "e43afbf92e7ae0265943ca8a237efe07ecf074fb",
+  "semantics": "Immutable historical protected adapter bytes; never execute these fixtures.",
+  "files": {
+    "automatic_fleet_component.py": {
+      "fixture": "tests/fixtures/public_fleet_e43_adapter/automatic_fleet_component.py.txt",
+      "git_blob": "7256c8a0d41964570b4421d432ef43d923f20039",
+      "sha256": "a3d06bd57166320e21e60bc76c444bf97d808b3487d53179169695f2f1e001ac"
+    },
+    "automatic_private_audit_cli.py": {
+      "fixture": "tests/fixtures/public_fleet_legacy_adapter/automatic_private_audit_cli.py.txt",
+      "git_blob": "42317ff3a7aded3722353feb82513b8e5b3db557",
+      "sha256": "26376fcb7cac5ec84f40cd9529c53881e9c9a4ea256d57609a27fda858159ab5"
+    },
+    "private_scaleup_audit.py": {
+      "fixture": "tests/fixtures/public_fleet_legacy_adapter/private_scaleup_audit.py.txt",
+      "git_blob": "81cee9a0259ffde0bc4df9a541c70b702a327f9c",
+      "sha256": "bab998c0f194e87cf6b510123c671dc45ccc830ccc5526c05aa636df200bffc7"
+    },
+    "public_repository_metadata.py": {
+      "fixture": "tests/fixtures/public_fleet_e43_adapter/public_repository_metadata.py.txt",
+      "git_blob": "1301e184104928771809fa239226389a4e09a097",
+      "sha256": "def2853ddc83632900032f1953b50532de0001b52637b2db21b901c63116af51"
+    }
+  }
+}

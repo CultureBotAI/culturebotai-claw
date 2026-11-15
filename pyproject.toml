@@ -98,6 +98,8 @@ embeddings = [
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
+    # Exercise governed SupportingReference annotations through the actual CLI.
+    "linkml-reference-validator==0.2.1",
     "black>=23.0.0",
     "mypy>=1.0.0",
 ]
@@ -124,21 +126,24 @@ kg_microbe_progress = ["schema/*.yaml"]
 kg_microbe_workflows = ["schema/*.yaml", "templates/*.yaml", "examples/**/*.yaml", "examples/**/*.md", "examples/**/*.json", "examples/README.md"]
 # The catalogue and its canonical templates are read at runtime, so an
 # installed package without them renders nothing while importing fine.
-kg_microbe_skills = ["skills.yaml", "canonical/*.md"]
+kg_microbe_skills = ["skills.yaml", "canonical/*.md", "template_baseline.json"]
 kg_microbe_governance = [
     "vendored_artifacts.json",
     "workflow_pins.json",
     "releases/*.json",
+    "private_audit/*.json",
     "artifacts/**/*.py",
     "artifacts/**/*.sh",
     "artifacts/**/*.yaml",
     "artifacts/**/*.yml",
     "artifacts/**/*.md",
+    "artifacts/embedding-runtime/pyproject.toml",
+    "artifacts/embedding-runtime/uv.lock",
 ]
 kg_microbe_config = ["openclaw_config.yaml"]
 kg_microbe_agents = ["definitions/**/*.yaml"]
 kg_microbe_qc = ["templates/*.j2"]
-kg_microbe_discussions = ["templates/*.html"]
+kg_microbe_discussions = ["templates/*.html", "public_export.schema.json"]
 # The Biolink snapshot the KGX exporter maps to (scripts/snapshot_biolink.py).
 kg_microbe_kgx = ["data/*.json"]
 

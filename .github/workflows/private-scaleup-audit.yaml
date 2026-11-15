@@ -1,0 +1,69 @@
+name: private-scaleup-governance-receipt
+
+# Dormant prerequisite only. This workflow is not a required fleet gate and
+# grants no candidate admission authority. Its protected environment must allow
+# only the exact main branch before any App secret is configured.
+on:
+  workflow_dispatch:
+    inputs:
+      subject_head:
+        description: Exact public claw candidate commit to bind in the receipt
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  produce:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: scaleup-private-audit
+    env:
+      SCALEUP_AUDIT_APP_ID: ${{ vars.SCALEUP_AUDIT_APP_ID }}
+      SUBJECT_HEAD: ${{ inputs.subject_head }}
+    steps:
+      - name: Checkout protected producer only
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install uv without shared caches
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          python-version: "3.13"
+          enable-cache: false
+      - name: Install protected producer dependencies
+        run: uv sync --locked --no-dev
+      - name: Verify main-only environment before requesting private access
+        env:
+          GH_PUBLIC_READ_TOKEN: ${{ github.token }}
+        run: >-
+          uv run --locked --no-dev python -m kg_microbe_governance.private_scaleup_audit
+          preflight --subject-head "$SUBJECT_HEAD"
+      - name: Mint read-only token for the one allowed private repository
+        id: private-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ vars.SCALEUP_AUDIT_APP_ID }}
+          private-key: ${{ secrets.SCALEUP_AUDIT_APP_PRIVATE_KEY }}
+          owner: CultureBotAI
+          repositories: ScaleupMech
+          permission-contents: read
+      - name: Inspect only public governance obligations in private main
+        env:
+          GH_PUBLIC_READ_TOKEN: ${{ github.token }}
+          SCALEUP_PRIVATE_READ_TOKEN: ${{ steps.private-token.outputs.token }}
+        run: >-
+          uv run --locked --no-dev python -m kg_microbe_governance.private_scaleup_audit
+          produce --subject-head "$SUBJECT_HEAD" --output .audit-public/receipt.json
+      - name: Publish only the closed public receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: scaleup-governance-receipt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .audit-public/receipt.json
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: false

@@ -273,12 +273,17 @@ When asked to file, one issue per finding, in the repo where the finding lives â
 not where it was noticed. Shared-library bugs go to claw even when a Mech is
 where the cost shows up. Include the reproduction, the verification, and the
 options with a recommendation. An issue is the record that the finding existed
-even if the answer turns out to be "won't fix".
+even if the answer turns out to be "won't fix". Always write the Markdown body
+to an owned file and pass `--body-file <path>` (retaining the body artifact and
+verifying the published text with `gh issue view <n> --json body`); never embed
+body text in a double-quoted `--body "..."` shell string.
 
 ## Known traps
 
-- `gh pr edit --body` can fail with a Projects-classic GraphQL error and still
-  exit 0. Verify the edit landed, or use
+- `gh pr edit --body-file <path>` (or `--body`) can fail with a Projects-classic
+  GraphQL error and still exit 0; never pass inline `--body "..."` with
+  Markdown backticks or `$`. Verify the edit landed with
+  `gh pr view <n> --json body`, or use
   `gh api -X PATCH repos/<owner>/<repo>/pulls/<n> --input <json>`.
 - **Repository identity and local checkout spelling can differ.** Preserve the
   exact GitHub identity from the manifest and use only the validated path from
