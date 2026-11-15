@@ -1,0 +1,152 @@
+{
+  "repository": "CultureBotAI/culturebotai-claw",
+  "date": "2026-11-15",
+  "purpose": "Initial frozen maintenance inventory; current remote state must be rechecked",
+  "related_issue": 1230,
+  "initial_prs": [
+    {
+      "number": 560,
+      "headRefOid": "a586bfed5c567f310c72a04b3abd6f6d02c108ee",
+      "headRefName": "feat/admit-dufmech",
+      "isDraft": false,
+      "mergeable": "CONFLICTING",
+      "mergeStateStatus": "DIRTY"
+    },
+    {
+      "number": 1007,
+      "headRefOid": "6ed2ef26c7a0bb6b49e728bc7b554173a0c1851b",
+      "headRefName": "feat/historical-goal-reconciliation-20261107",
+      "isDraft": false,
+      "mergeable": "CONFLICTING",
+      "mergeStateStatus": "DIRTY"
+    },
+    {
+      "number": 1074,
+      "headRefOid": "1d2b648a3631d4af374bb56c6d8315bf6d2674bf",
+      "headRefName": "stream-c/onboard-scaleupmech",
+      "isDraft": true,
+      "mergeable": "CONFLICTING",
+      "mergeStateStatus": "DIRTY"
+    },
+    {
+      "number": 1112,
+      "headRefOid": "812bb455828dd32611da3b603732cd62e16cc37f",
+      "headRefName": "fix/port-pressure-boundary-canary-20261110",
+      "isDraft": false,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "CLEAN"
+    },
+    {
+      "number": 1138,
+      "headRefOid": "d8d3b2ba8f101be2e2bc44aee57ef0525c0b7d53",
+      "headRefName": "prepare/repository-freshness-v1-20261110",
+      "isDraft": true,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "CLEAN"
+    },
+    {
+      "number": 1139,
+      "headRefOid": "c1cbd0f715f2d83d7cb6773797af7651e315454d",
+      "headRefName": "feat/stable-mim-producer-20261110",
+      "isDraft": true,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "CLEAN"
+    },
+    {
+      "number": 1146,
+      "headRefOid": "f3667a24959ae27053b4948a417dbf74d4fbf55a",
+      "headRefName": "feat/fleet-public-membership-20261110",
+      "isDraft": true,
+      "mergeable": "CONFLICTING",
+      "mergeStateStatus": "DIRTY"
+    },
+    {
+      "number": 1191,
+      "headRefOid": "f604127114146320f5a92529cc62f190d0a0c25f",
+      "headRefName": "fix/1189-reviewed-registry-retirement-20261112",
+      "isDraft": true,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "CLEAN"
+    },
+    {
+      "number": 1194,
+      "headRefOid": "4287dce16ee8b5f897bf70f915bdca9aa1484bb6",
+      "headRefName": "fix/1193-reviewed-cas-dispositions-20261112",
+      "isDraft": true,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "CLEAN"
+    },
+    {
+      "number": 1195,
+      "headRefOid": "64db3cc18db68693bb786407692a314fc49b3a24",
+      "headRefName": "fix/mim-data-license-20261113",
+      "isDraft": true,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "CLEAN"
+    },
+    {
+      "number": 1197,
+      "headRefOid": "345a63c31e44cf77e7323d7c2647a4d7d8d61683",
+      "headRefName": "feat/fleet-issue-review-table",
+      "isDraft": false,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "CLEAN"
+    },
+    {
+      "number": 1211,
+      "headRefOid": "a5a98c7018c2216ac814f9ce9e97e13c02b18792",
+      "headRefName": "feat/stress-response-admission-20261114",
+      "isDraft": false,
+      "mergeable": "CONFLICTING",
+      "mergeStateStatus": "DIRTY"
+    },
+    {
+      "number": 1236,
+      "headRefOid": "7070392fcb5e31282499a599f7147b56b96e5aca",
+      "headRefName": "feat/mim-1418-additional-mappings-20261115",
+      "isDraft": true,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "CLEAN"
+    },
+    {
+      "number": 1237,
+      "headRefOid": "c8f350f009b94e52244a8fa23887de2012e2d8c9",
+      "headRefName": "diagnostic/public-metadata-hosted-1223-20261115",
+      "isDraft": true,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BLOCKED"
+    },
+    {
+      "number": 1243,
+      "headRefOid": "04e14f6c0fe4c4e7e4aaa8da0b765546fdc9afa3",
+      "headRefName": "feat/tmux-session-standard-20261114",
+      "isDraft": false,
+      "mergeable": "MERGEABLE",
+      "mergeStateStatus": "BLOCKED"
+    }
+  ],
+  "helpers": [
+    {
+      "path": "capture_pr_audit.py",
+      "original_sha256": "55fd5597a10666531e9a425d9b86bf46c104b701d515ebd8f3ee214d4feabfde",
+      "packaged_sha256": "63d073f24aca0912b42a54fab1df669398bfddb8262fd29b3eb76f5a9435ddfb",
+      "packaging_edits": "Require explicit private durable output directory; preserve read-only API behavior"
+    },
+    {
+      "path": "review_pr1197_mutations.py",
+      "original_sha256": "e06eca553f915f26c201947018858fb70f9847b05a3b093b58d4b863d463bc7d",
+      "packaged_sha256": "e06eca553f915f26c201947018858fb70f9847b05a3b093b58d4b863d463bc7d",
+      "packaging_edits": "None; byte-identical portable helper"
+    }
+  ],
+  "pr1197_review": {
+    "head": "345a63c31e44cf77e7323d7c2647a4d7d8d61683",
+    "verdict": "pass",
+    "new_findings": 0,
+    "tests_passed": 753,
+    "tests_skipped": 1,
+    "downstream_reference_tests_deselected": 176,
+    "mutations_killed": 4,
+    "review_sha256": "a393153a9aeccc138178774d002b7bbf7b81da882d73a83ff408a8e01f6fc976"
+  }
+}

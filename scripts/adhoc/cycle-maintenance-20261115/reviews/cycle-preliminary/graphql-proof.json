@@ -1,0 +1,20 @@
+{
+  "repository": "CultureBotAI/culturebotai-claw",
+  "pr": 1138,
+  "date": "2026-11-15",
+  "mode": "read_only",
+  "original_query_fragment": "nodes { id __typename ... on CheckRun {name status conclusion} ... on StatusContext {context state} }",
+  "original_response": {
+    "code": "selectionMismatch",
+    "nodeName": "StatusCheckRollupContext",
+    "message": "Selections can't be made directly on unions (see selections on StatusCheckRollupContext)"
+  },
+  "repaired_query_fragment": "nodes { __typename ... on CheckRun {id name status conclusion} ... on StatusContext {id context state} }",
+  "repaired_production_observer_result": {
+    "head": "3046fed7f3fda2d24f19c38e6e874fef68a794e4",
+    "check_count": 8,
+    "checks_complete": true,
+    "checks_state": "failing",
+    "failing_checks": ["public-fleet"]
+  }
+}

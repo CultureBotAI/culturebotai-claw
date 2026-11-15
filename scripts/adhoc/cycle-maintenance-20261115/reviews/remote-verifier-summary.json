@@ -1,0 +1,83 @@
+{
+  "repository": "CultureBotAI/culturebotai-claw",
+  "scope": "Offline PR-maintenance remote verifier and cleanup proof validation",
+  "source_module_sha256": "74f495da2de6564e294067a9d9b9dfffd4a9ad93135bd528b8d06c07c43a9f95",
+  "test_file_sha256": "02ccfea4ab687e41b94fe1bf6ad8d29e2ed9e71589e926d30b48c6fdfe4476a7",
+  "baseline_tests_passed": 112,
+  "baseline_tests_skipped": 0,
+  "mutation_controls_killed": 6,
+  "parser_control_cases_passed": 2,
+  "parser_reverted_cases_failed": 2,
+  "lint": "Ruff 0.16.3 passed",
+  "finding": {
+    "issue_url": "https://github.com/CultureBotAI/culturebotai-claw/issues/1253",
+    "description": "Malformed extra worktree-inventory blocks were accepted after a valid block.",
+    "status": "Repaired and independently mutation-checked",
+    "test": "tests/test_pr_maintenance_remote.py::test_partial_or_malformed_extra_worktree_blocks_are_not_silently_discarded"
+  },
+  "receipts": [
+    {
+      "name": "control",
+      "exit_code": 0,
+      "log_sha256": "dbd24afd01aa43766dd70aa0d963d5451d2ee538398a94632a6931891686b793"
+    },
+    {
+      "name": "zero-checks-green",
+      "exit_code": 1,
+      "log_sha256": "7616b1259892760f844ed0202ecafca264c38ce5afd06288ec4ac33a73535b6b"
+    },
+    {
+      "name": "skip-inventory-reread",
+      "exit_code": 1,
+      "log_sha256": "e01333699c331d7a69354373144046ab79d406001a6bcb59ab271a0998441062"
+    },
+    {
+      "name": "wrong-reviewed-head",
+      "exit_code": 1,
+      "log_sha256": "de67577e7512b515fcbcb2053e1f6c9c01bebda6ddad60dc4ff1baca3bb4d57f"
+    },
+    {
+      "name": "registered-path-ignored",
+      "exit_code": 1,
+      "log_sha256": "539239e65c93dfb16e1247194f1ff88535596522d42815fb25133a3b3269fee2"
+    },
+    {
+      "name": "unchecked-preservation-hash",
+      "exit_code": 1,
+      "log_sha256": "979811688682d28ba75b0737893dcd0970316b7a55aa21703e8df6f1e8f86cc6"
+    },
+    {
+      "name": "parser-control",
+      "exit_code": 0,
+      "log_sha256": "d62807e8cf882b3175d29107b27641c8ea8d8af8f9da8e9d2815f2e74c360a97"
+    },
+    {
+      "name": "parser-mutant",
+      "exit_code": 1,
+      "log_sha256": "2d930e39f50394c9b6b36102e07b6b3774532b111ccd86f7b5411856d6b823d7"
+    }
+  ],
+  "original_receipt_sha256": {
+    "counterfactuals.json": "783b6131672fdd2d99d273f6a3019c2343085660472f7086bfa6b8af73991a78",
+    "parser-counterfactual.json": "9051fea7141e942349f2981d6a6bb7d53e2be9ec11488589567b8448331a64db"
+  },
+  "helper_provenance": {
+    "review_remote_verifier_mutations.py": {
+      "executed_sha256": "344547a1a5674eeb99d918963ee566bd15a1dbd535be8db21448a966f222bd07",
+      "packaged_sha256": "29767d955c130a3b3970011c18d85e3526bed8b971745646bf007826fee0f6e7",
+      "packaging_edits": [
+        "Add confirmed issue URL to the docstring; validation logic unchanged."
+      ]
+    },
+    "review_worktree_parser_counterfactual.py": {
+      "executed_sha256": "1d6c66a23b02ac6fe9e6a352efb475199785227375e6a77571395f074709b099",
+      "packaged_sha256": "d2ee17a15d199ba1fd8e82758551c03f7cbb3a8cf8f0033656590967a4dcf356",
+      "packaging_edits": [
+        "Add confirmed issue URL to the docstring; validation logic unchanged."
+      ]
+    }
+  },
+  "source_restored": true,
+  "original_source_untouched": true,
+  "authority": "Test evidence only; no GitHub mutation, runtime action or cleanup performed."
+}

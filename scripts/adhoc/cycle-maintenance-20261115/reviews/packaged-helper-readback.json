@@ -1,0 +1,84 @@
+{
+  "helpers": [
+    {
+      "file": "1112/package_review_pr1112_20261115.py",
+      "sha256": "0f409dfc6059def0e31309c9dfe79c4b1fadd8fb7d907377353a2659218fe6d6",
+      "syntax": true,
+      "help_exit": 0
+    },
+    {
+      "file": "1112/review_pr1112_20261115.py",
+      "sha256": "8548354784f233f1948477a17b70b894ad5f8e2f4413b0e7d5559711eb4fa547",
+      "syntax": true,
+      "help_exit": 0
+    },
+    {
+      "file": "1138/review_closeout.py",
+      "sha256": "f0d820560ac3615299b83c2b8de68bc778b60f3a45fa99e54dc59a2ee7d5ece8",
+      "syntax": true,
+      "help_exit": 0
+    },
+    {
+      "file": "1236/package_review_pr1236_20261115.py",
+      "sha256": "f6508c1be607ed661ffbc05620631b7b8e24cef3280fef97c436f63a0b37f0e9",
+      "syntax": true,
+      "help_exit": 0
+    },
+    {
+      "file": "1236/review_pr1236_20261115.py",
+      "sha256": "efc3534b210713fa2186db7b37ec4a4fc891bd6aa3f587ea6765616345622121",
+      "syntax": true,
+      "help_exit": 0
+    },
+    {
+      "file": "1236/review_pr1236_20261115_initial.py",
+      "sha256": "3f6347fb460a0b7520ae4ace0116ab242a08f2aaa8293d3f5d86203e0d8b3784",
+      "syntax": true,
+      "help_exit": 0
+    },
+    {
+      "file": "1243/counterfactuals.py",
+      "sha256": "0c81a29bd09e15cf81d54a1fe42fa2faa8412f714b2a82f1fa04210e94ff1337",
+      "syntax": true,
+      "help_exit": 0
+    },
+    {
+      "file": "1243/review_source.py",
+      "sha256": "497c569c869734e5797e61c75d1461facdaca705dd2d8aef1a7cc2d92127d982",
+      "syntax": true,
+      "help_exit": 0
+    },
+    {
+      "file": "package_followup_reviews.py",
+      "sha256": "42ad7c3549aaf2428531aa41dcc0d0ca59c35cdfb524911d19093db2cc602615",
+      "syntax": true,
+      "help_exit": 0
+    },
+    {
+      "file": "package_source_reviews.py",
+      "sha256": "8f361c8b49222b363af157a55572e37d503e22ba55fc88fb68bd9c234f4e120a",
+      "syntax": true,
+      "help_exit": 0
+    },
+    {
+      "file": "review_remote_verifier_mutations.py",
+      "sha256": "29767d955c130a3b3970011c18d85e3526bed8b971745646bf007826fee0f6e7",
+      "syntax": true,
+      "help_exit": 0
+    },
+    {
+      "file": "review_worktree_parser_counterfactual.py",
+      "sha256": "d2ee17a15d199ba1fd8e82758551c03f7cbb3a8cf8f0033656590967a4dcf356",
+      "syntax": true,
+      "help_exit": 0
+    },
+    {
+      "file": "verify_packaged_helpers.py",
+      "sha256": "d22887c88402feb216f6025b2e52da93c45b358fbd126b1698c7a596651dea19",
+      "syntax": true,
+      "help_exit": 0
+    }
+  ],
+  "public_path_email_scan_passed": true,
+  "excluded_other_owner_directory": "cycle-preliminary"
+}
