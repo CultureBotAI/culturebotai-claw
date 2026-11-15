@@ -1,0 +1,231 @@
+"""Independent read-only verification of the two owned PR1197 retirements.
+
+2026-11-15. Inputs: explicit task, reader, retirement-helper and second-common-Git
+paths. Output: JSON stdout; --private adds local registrations/recovery paths.
+Uses the exact retained canary evidence/Git reader and a strict directory walk.
+All preserved descendants and source recovery objects are read back. No Git,
+GitHub, runtime, restoration or cleanup mutation; no generic apply capability.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import importlib.util
+import json
+import os
+import stat
+from datetime import datetime, timezone
+from pathlib import Path
+
+LABELS = ('review-1197', 'repair-1197')
+SOURCE = '748cfaf510e96ffa6f8b4b08c877742cf8a492d8'
+MERGE = '9a4b0b22ce6e9bed878d512be4597502e03ed98a'
+MERGE_TREE = 'f8d88d90cc6fb1c63b8adf8696cea978104b6c56'
+PLAN = '7349524b221cc49c4ae65f038fb396168cf7cbafff7e60dfbc7ecef55b2113e5'
+ROOT_HEAD = '720776c99ba456e9c0ba3f2662ca7af162e25bd8'
+RETIREMENT_PIN = '5513d8c984104fe0c0d6da1c8aaa37549e6e3307baa541498a862a185bac1af9'
+MODULE_PIN = 'ac422830ec1719f2acdc6a1a9be52a8428277dc0b8112656bf826856d7bed348'
+EXPECTED = {
+    'review-1197': ('345a63c31e44cf77e7323d7c2647a4d7d8d61683', 14,
+                    '29b6f1a2765539abc474bba0c9cc44d95a581e95c298ee1391fb52327d4d7e58',
+                    'eec51a59b8cf4db7a732f3bef28b24c1', 'reviews/1197/worktree'),
+    'repair-1197': (SOURCE, 469,
+                    '7ac145af1c2b9083a292512c8e1855b15afb235961806d5d7857f491f4330adf',
+                    'e43f154e284c45e7ae8af636e28fc36a', 'repairs/1197/worktree'),
+}
+
+
+def sha(raw):
+    return hashlib.sha256(raw).hexdigest()
+
+
+def require(ok, message):
+    if not ok:
+        raise ValueError(message)
+
+
+def walk(root):
+    """Independent no-follow hashing, with enumeration errors propagated (#1275)."""
+    require(root.is_dir() and not root.is_symlink(), 'Invalid preserved root')
+    result = {}
+    device = root.stat().st_dev
+
+    def failed(error):
+        raise error
+
+    def fingerprint(value):
+        return (value.st_dev, value.st_ino, value.st_mode, value.st_size,
+                value.st_mtime_ns, value.st_ctime_ns)
+
+    for directory, dirs, files in os.walk(root, followlinks=False, onerror=failed):
+        for name in sorted([*dirs, *files]):
+            path = Path(directory) / name
+            before = path.lstat()
+            require(before.st_dev == device, 'Unexpected filesystem boundary')
+            entry = {'mode': stat.S_IMODE(before.st_mode)}
+            if stat.S_ISLNK(before.st_mode):
+                entry.update(kind='symlink', target=os.readlink(path))
+            elif stat.S_ISDIR(before.st_mode):
+                entry['kind'] = 'directory'
+            elif stat.S_ISREG(before.st_mode):
+                digest = hashlib.sha256()
+                blob = hashlib.sha1(b'blob ' + str(before.st_size).encode() + b'\0')
+                with os.fdopen(os.open(path, os.O_RDONLY | os.O_NOFOLLOW), 'rb') as stream:
+                    require(fingerprint(os.fstat(stream.fileno())) == fingerprint(before),
+                            'Opened node identity differs')
+                    for part in iter(lambda: stream.read(1024 * 1024), b''):
+                        digest.update(part)
+                        blob.update(part)
+                entry.update(kind='file', bytes=before.st_size,
+                             sha256=digest.hexdigest(), git_blob=blob.hexdigest())
+            else:
+                raise ValueError('Special preserved node')
+            require(fingerprint(before) == fingerprint(path.lstat()), 'Node changed during readback')
+            result[path.relative_to(root).as_posix()] = entry
+    return result
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--task-root', type=Path, required=True)
+    parser.add_argument('--reader', type=Path, required=True)
+    parser.add_argument('--retirement-helper', type=Path, required=True)
+    parser.add_argument('--other-common-git', type=Path, required=True)
+    parser.add_argument('--private', action='store_true')
+    args = parser.parse_args()
+    task = args.task_root
+    for path in (task, args.reader, args.retirement_helper, args.other_common_git):
+        require(path.is_absolute() and path == path.resolve(), 'Canonical explicit input required')
+    module_path = args.reader
+    require(sha(module_path.read_bytes()) == MODULE_PIN, 'Retained reader changed')
+    require(sha(args.retirement_helper.read_bytes()) == RETIREMENT_PIN, 'Reviewed retirement helper changed')
+    spec = importlib.util.spec_from_file_location('canary_reader', module_path)
+    reader = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(reader)
+    require(sha(reader.regular(task / 'cleanup/ACTION-PLAN.json')) == PLAN, 'Accepted plan changed')
+    quarantine = task / 'cleanup/quarantine-20261115-after-merge'
+    all_before, completed, raws = {}, {}, {}
+    for label in LABELS:
+        q = quarantine / label
+        raw = {name: reader.regular(q / name) for name in ('before.json', 'preserved.json', 'completed.json', 'recovery.json')}
+        raw['proof'] = reader.regular(task / 'cleanup/operator-proofs' / (label + '.json'))
+        raw['apply'] = reader.regular(task / 'cleanup/operator-proofs' / (label + '-apply.json'))
+        raw['dry_run'] = reader.regular(task / 'cleanup/operator-proofs' / (label + '-dry-run.json'))
+        all_before[label] = json.loads(raw['before.json'])
+        completed[label] = json.loads(raw['completed.json'])
+        raws[label] = raw
+    removed_by_common = {}
+    for label, before in all_before.items():
+        removed_by_common.setdefault(before['proof']['common_git'], set()).add(completed[label]['worktree'])
+    require(len(removed_by_common) == 1, 'Unexpected source Git groups')
+    require(args.other_common_git == task / 'reviews/1236/repo/.git'
+            and str(args.other_common_git) not in removed_by_common, 'Other Git group differs')
+    current_by_common = {common: reader.registrations(Path(common)) for common in removed_by_common}
+    other_registrations = reader.registrations(args.other_common_git)
+    rows, private_rows = [], []
+    live = reader.api('repos/CultureBotAI/culturebotai-claw/pulls/1197')
+    require(live['merged'] is True and live['state'] == 'closed' and live['base']['ref'] == 'main', 'PR1197 not merged')
+    require(live['head']['sha'] == SOURCE and live['merge_commit_sha'] == MERGE, 'Published source/merge differs')
+    remote_refs = reader.api('repos/CultureBotAI/culturebotai-claw/git/matching-refs/heads/' + live['head']['ref'])
+    require(not any(row['ref'] == 'refs/heads/' + live['head']['ref'] for row in remote_refs), 'Remote source branch reappeared')
+    for label in LABELS:
+        before, done, raw = all_before[label], completed[label], raws[label]
+        proof = json.loads(raw['proof'])
+        common = Path(proof['common_git'])
+        recovery = json.loads(raw['recovery.json'])
+        expected = json.loads(raw['preserved.json'])
+        head, count, manifest, recovery_id, relative = EXPECTED[label]
+        require(before['proof'] == proof and before['proof_sha256'] == sha(raw['proof']), 'Proof binding differs')
+        require(before['plan_sha256'] == proof['plan_sha256'] == PLAN, 'Plan binding differs')
+        require(proof['repository'] == 'CultureBotAI/culturebotai-claw' and proof['merged_pr']['number'] == 1197, 'Wrong repository or PR')
+        require(proof['merged_pr']['head'] == SOURCE and proof['merged_pr']['merge_commit'] == MERGE, 'Proof merge differs')
+        require(proof['worktree'] == done['worktree'] == str(task / relative) and proof['quarantine'] == str(quarantine / label), 'Target differs')
+        require(proof['owner_complete'] is True and proof['readers_clear'] is True, 'Missing completion/reader attestations')
+        require(done['mode'] == 'applied' and done['head'] == proof['expected_head'] == recovery['head'] == head, 'Completion/head differs')
+        require(done == json.loads(raw['apply']), 'Apply/completion differs')
+        dry = json.loads(raw['dry_run'])
+        require(dry['actions_performed'] == 0 and dry['manifest_sha256'] == done['manifest_sha256'], 'Dry run differs')
+        require(done['manifest_sha256'] == sha(raw['preserved.json']) == manifest, 'Preserved manifest digest differs')
+        require(done['preservation_entries'] == dry['preservation_entries'] == count, 'Preserved count differs')
+        require({p: {k: v for k, v in row.items() if k != 'fingerprint'} for p, row in before['preserved'].items()} == expected, 'Original preserved content differs')
+        observed = walk(quarantine / label / 'preserved')
+        containers = {str(parent) for path in done['preservation_roots'] for parent in Path(path).parents if str(parent) != '.'}
+        for path in containers - set(expected):
+            require(observed[path]['kind'] == 'directory', 'Unexpected containing node')
+            del observed[path]
+        require(observed == expected and len(observed) == done['preservation_entries'], 'Preserved complete bytes/modes/targets differ')
+        require(not os.path.lexists(done['worktree']) and not os.path.lexists(before['gitdir']), 'Target worktree or Git registration remains')
+        require(done['recovery_ref'] == recovery['ref'] == 'refs/cleanup-recovery/' + recovery_id and reader.git(common, 'rev-parse', recovery['ref']).decode().strip() == done['head'], 'Recovery ref differs')
+        reader.git(common, 'merge-base', '--is-ancestor', done['head'], SOURCE)
+        require(reader.git(common, 'rev-parse', MERGE + '^{tree}').decode().strip() == MERGE_TREE, 'Published merge tree differs')
+        tree = {}
+        for row in reader.git(common, 'ls-tree', '-r', '-z', done['head']).split(b'\0'):
+            if row:
+                metadata, path = row.split(b'\t', 1)
+                mode, kind, oid = metadata.decode().split()
+                tree[path.decode()] = (mode, kind, oid)
+        require(set(tree) == set(before['tracked']), 'Source tracked inventory differs')
+        for path, (mode, kind, oid) in tree.items():
+            entry = before['entries'][path]
+            require(kind == 'blob', 'Unexpected submodule')
+            if entry['kind'] == 'symlink':
+                target = entry['target'].encode()
+                blob = hashlib.sha1(b'blob ' + str(len(target)).encode() + b'\0' + target).hexdigest()
+                require(mode == '120000', 'Symlink Git mode differs')
+            else:
+                blob = entry['git_blob']
+                require(bool(entry['mode'] & 0o111) == (mode == '100755'), 'Source executable mode differs')
+            require(blob == oid, 'Recorded source differs from recoverable HEAD')
+        branch = done['branch_deleted']
+        if label == 'repair-1197':
+            require(branch == proof['expected_branch'] == 'refs/heads/repair/pr1197-baseline-20261115', 'Unexpected deleted branch')
+            refs = reader.git(common, 'for-each-ref', '--format=%(refname)', branch).decode().splitlines()
+            require(branch not in refs, 'Retired local branch exists')
+        else:
+            require(branch is None and proof['expected_branch'] is None, 'Detached review deleted a branch')
+        old = {row['worktree']: row for row in before['registrations']}
+        new = {row['worktree']: row for row in current_by_common[str(common)]}
+        require(set(old) - set(new) == removed_by_common[str(common)] & set(old), 'Unaccounted registration removal')
+        require(not (set(new) - set(old)), 'Unaccounted registration addition')
+        require(all(old[path] == new[path] for path in set(old) & set(new)), 'Remaining registration changed')
+        require(new[str(task / 'worktree')]['HEAD'] == ROOT_HEAD, 'Root HEAD changed')
+        rows.append({'label': label, 'source_head': done['head'], 'preserved_entries': len(observed),
+                     'preservation_roots': len(done['preservation_roots']), 'tracked_paths_recoverable': len(tree),
+                     'recovery_ref_verified': True, 'source_ancestor_of_merged_pr': True,
+                     'full_preserved_hash_mode_symlink_readback': True, 'target_and_gitdir_absent': True,
+                     'deleted_branch': branch, 'registration_removals_accounted': True,
+                     'evidence_sha256': {name: sha(value) for name, value in raw.items()}})
+        private_rows.append({'label': label, 'worktree': done['worktree'], 'common_git': str(common), 'recovery_ref': done['recovery_ref']})
+    deletion_raw = reader.regular(task / 'cleanup/operator-proofs/pr1197-tracking-ref-deletion.json')
+    deletion = json.loads(deletion_raw)
+    name = 'refs/remotes/origin/' + live['head']['ref']
+    require(deletion['deleted_local_tracking_ref'] == name and deletion['expected_old'] == SOURCE, 'Tracking deletion source differs')
+    require(deletion['recovery_ref'] == 'refs/cleanup-recovery/' + EXPECTED['repair-1197'][3]
+            and deletion['remote_ref_fresh_http_status'] == 404 and deletion['remote_mutation'] is False,
+            'Tracking deletion proof differs')
+    for common in [*map(Path, current_by_common), args.other_common_git]:
+        refs = reader.git(common, 'for-each-ref', '--format=%(refname)', name).decode().splitlines()
+        require(name not in refs, 'Exact source tracking ref remains')
+    for common in current_by_common:
+        require(reader.registrations(Path(common)) == current_by_common[common], 'Registration changed during readback')
+    require(reader.registrations(args.other_common_git) == other_registrations, 'Other group changed during readback')
+    value = {'reviewed_at': datetime.now(timezone.utc).isoformat(), 'verdict': 'PASS', 'pr': 1197,
+             'merged_source_head': SOURCE, 'merge_sha': MERGE, 'merge_tree': MERGE_TREE,
+             'quarantines': rows, 'total_preserved_entries': sum(row['preserved_entries'] for row in rows),
+             'recorded_local_branch_deletions': 1, 'remote_source_branch_absent': True,
+             'accepted_plan_sha256': PLAN, 'root_head_stable': ROOT_HEAD,
+             'tracking_deletion_receipt_sha256': sha(deletion_raw),
+             'exact_source_tracking_ref_absent_both_groups': True,
+             'branch_census_scope': 'Recorded intended deletion and all remaining registered branches; no historical complete unregistered-ref census was supplied.',
+             'metadata_scope': 'Manifest-recorded bytes, modes and symlink targets; no ACL/xattr claim.',
+             'helper_sha256': sha(Path(__file__).read_bytes()), 'reused_reader_sha256': MODULE_PIN,
+             'reviewed_retirement_helper_sha256': RETIREMENT_PIN,
+             'git_github_source_cleanup_mutations_by_reviewer': False}
+    if args.private:
+        value['private_detail'] = {'quarantines': private_rows, 'current_registrations': current_by_common,
+                                   'other_group_registrations': other_registrations}
+    print(json.dumps(value, indent=2, sort_keys=True))
+
+
+if __name__ == '__main__':
+    main()
