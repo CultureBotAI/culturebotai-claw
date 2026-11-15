@@ -84,3 +84,25 @@ def test_native_construction_exception_is_visible_without_private_text(tmp_path,
     assert "private@example.invalid" not in saved
     assert "/private/source" not in saved
     assert "do-not-publish" not in saved
+
+
+@pytest.mark.parametrize("target", ["Discussion", "Dataset"])
+def test_native_cli_isolates_and_restores_a_damaged_linkml_loader(tmp_path, monkeypatch, target):
+    """#1224: exercise the real CLI despite the default loader's CI failure."""
+    import importlib
+
+    class NullTagLoader(yaml.SafeLoader):
+        def resolve(self, kind, value, implicit):
+            return None
+
+    with pytest.raises(yaml.constructor.ConstructorError, match="tag None"):
+        yaml.load("id: broken", Loader=NullTagLoader)
+    loader = importlib.import_module("linkml_runtime.loaders.yaml_loader")
+    monkeypatch.setattr(loader, "DupCheckYamlLoader", NullTagLoader)
+    report = canary.run_probe(tmp_path / target, target)
+    assert loader.DupCheckYamlLoader is NullTagLoader
+    if not report["passed"]:
+        fail_with_native_diagnostics(report)
+    assert [case["native_exit_code"] for case in report["cases"]] == [0, 1, 0]
+    assert all(case["events"][0]["matcher_calls"] == 1 for case in report["cases"])
+    assert report["inputs_unchanged"] and not report["refused_operations"]

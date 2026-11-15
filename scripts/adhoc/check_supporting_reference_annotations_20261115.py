@@ -31,6 +31,8 @@ from linkml_reference_validator.validation.supporting_text_validator import (
 )
 from typer.testing import CliRunner
 
+from kg_microbe_workflows import _pure_linkml_loader
+
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMA = ROOT / "src/kg_microbe_governance/artifacts/schema/mech_shared.yaml"
 QUOTE = "This synthetic source reports an unchanged cobalt control."
@@ -145,6 +147,9 @@ def run_probe(
             "--no-full-text",
         ]
         with ExitStack() as stack:
+            # Reuse Claw's locked/restored LinkML schema loader (#1224).
+            # Native reference traversal and matching remain unchanged.
+            stack.enter_context(_pure_linkml_loader())
             stack.enter_context(
                 patch.object(ReferenceValidationPlugin, "_validate_excerpt", excerpt)
             )
@@ -212,11 +217,13 @@ def run_probe(
                 Path(__file__).resolve(),
                 ROOT / "pyproject.toml",
                 ROOT / "uv.lock",
+                ROOT / "src/kg_microbe_workflows/__init__.py",
             )
         },
         "started_at": started,
         "finished_at": datetime.now(timezone.utc).isoformat(),
-        "invocation": "Actual native Typer validate data CLI, --no-full-text",
+        "invocation": "Actual native Typer validate data CLI, --no-full-text, existing Claw isolated LinkML schema loader",
+        "schema_loader": "kg_microbe_workflows._pure_linkml_loader; temporary, locked and restored; no matcher substitution",
         "target_class": target_class,
         "schema_sha256": schema_hash,
         "synthetic_cache_sha256": source_hash,
