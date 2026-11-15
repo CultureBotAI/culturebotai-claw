@@ -15,6 +15,7 @@ from typing import Any
 
 DEFAULTS: dict[str, Any] = {
     "mode": "report",
+    "restart_policy": "goal_boundary_or_idle",
     "host_ratio": 0.5,
     "per_pid_limit": 1000,
     "goal_boundary_limit": 500,
@@ -65,6 +66,9 @@ def normalize_config(config: Mapping[str, Any] | None = None) -> dict[str, Any]:
         raise ValueError("unknown port-pressure policy settings")
     if result["mode"] not in {"off", "report", "restart"}:
         raise ValueError("port-pressure mode must be off, report or restart")
+    if (not isinstance(result["restart_policy"], str)
+            or result["restart_policy"] not in {"goal_boundary_only", "goal_boundary_or_idle"}):
+        raise ValueError("restart_policy must be goal_boundary_only or goal_boundary_or_idle")
     ratio = _number(result["host_ratio"], "host_ratio")
     if not 0 < ratio <= 1:
         raise ValueError("host_ratio must be greater than zero and at most one")
@@ -394,6 +398,9 @@ def decide(
             result.update(phase="healthy", healthy=True)
             return result
         result["healthy"] = False
+        if boundary is None and settings["restart_policy"] == "goal_boundary_only":
+            result.update(phase="blocked", policy_hold="goal-boundary-only policy requires a verified goal boundary")
+            return result
         if sum(timestamp - row["completed_at"] < 3600 for row in history) >= settings["hourly_cap"]:
             result["phase"] = "limited"
             result["limit_reason"] = "hourly restart cap"
