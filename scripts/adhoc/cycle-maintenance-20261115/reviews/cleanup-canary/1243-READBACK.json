@@ -1,0 +1,32 @@
+{
+  "all_preserved_bytes_modes_symlink_targets_verified": true,
+  "branch_deletion_actor_verified": false,
+  "environment_preserved": false,
+  "evidence_sha256": {
+    "apply": "796f3b934b274ef8cb9f49fd615685953032c6228735b8f45abe18a793226b3a",
+    "before.json": "88b4f2c74c3b3c51e7875e39030327d4c89b6bf96ed44f5fcc0f6564e4909afa",
+    "completed.json": "f4bcc3428574fcb6ecc3ce412c95061becd860e016d2ec4131efe29480a3aec7",
+    "dry_run": "9a987aecbea4db14898288011bdce9df495d436820339d28ebc8e8af9f5bf725",
+    "plan": "7349524b221cc49c4ae65f038fb396168cf7cbafff7e60dfbc7ecef55b2113e5",
+    "preserved.json": "4fadbbf05c6c257faf9ca652713860948c63159803680afd6c9b85c5438e165f",
+    "proof": "4286aad877f6656a46f898555026ab80e1b68243a4730a5e2122c18b68a9ab9b",
+    "recovery.json": "a306b95d4ec57f7946adce32c60c4268a671e2beab786669c2f2f510fe4f17b9"
+  },
+  "merge_sha": "5de2dfad3e0859acb8f3df4e3da744a49883f9f8",
+  "no_cleanup_by_reviewer": true,
+  "only_target_registration_removed": true,
+  "other_registrations_unchanged": true,
+  "pr": 1243,
+  "preservation_roots": 5,
+  "preserved_entries": 3045,
+  "remote_pr_branch_present": false,
+  "repository": "CultureBotAI/culturebotai-claw",
+  "retained_original_review_helpers": 0,
+  "retirement_helper_sha256": "91c07258e5efdd77d5f4c91b07c1815469bc3cd803db87e5e62e223c27b5de2e",
+  "reviewed_at": "2026-11-15T09:50:18.430038+00:00",
+  "source_head": "04e14f6c0fe4c4e7e4aaa8da0b765546fdc9afa3",
+  "source_recovery_ref_verified": true,
+  "tracked_source_paths": 1697,
+  "verdict": "PASS",
+  "verifier_sha256": "ac422830ec1719f2acdc6a1a9be52a8428277dc0b8112656bf826856d7bed348"
+}
