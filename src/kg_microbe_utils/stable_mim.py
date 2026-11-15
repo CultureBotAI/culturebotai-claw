@@ -73,6 +73,20 @@ def identity_snapshot(root, records, mint, lifecycle, source, source_path, sourc
             sys.modules[name] = previous
 
 
+def additional_mapping_contract(source, source_path):
+    """Execute the pure native assertion contract from the captured input closure.
+
+    Missing source is compatible only with owners that have no new assertions;
+    callers refuse extras without this contract. Never import an installed MIM.
+    """
+    if source is None:
+        return None
+    module = ModuleType("_captured_mim_additional_mappings")
+    module.__file__ = str(source_path)
+    exec(compile(source, str(source_path), "exec", dont_inherit=True), module.__dict__)
+    return module
+
+
 def registry_retirement_inputs(root, path, raw, expected_sha256):
     """Bind an authored diagnostic proposal and all evidence, never approve removal.
 

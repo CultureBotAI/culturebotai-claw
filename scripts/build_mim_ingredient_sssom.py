@@ -5,6 +5,9 @@ Choose --identity-mode legacy for the historical filename subjects described
 below, or stable for captured native registry validation and permanent mim_id
 subjects. Source-to-MIM candidates are a separate native MIM product; no
 ontology target, mapping status or self-loop is invented for a concept-only owner.
+Stable mode also retains each explicit additional_ontology_mappings assertion,
+including its full scoped evidence and SUPPORTED/WITHHOLD review disposition.
+Those rows never inherit the primary's aliases, confidence or review stamps.
 
 This candidate is not canonical promotion or scientific approval. Every
 MediaIngredientMech record whose `ontology_mapping.ontology_id` starts
@@ -808,6 +811,7 @@ def _row_from_yaml(
     suppressions: list[Suppression] | None = None,
     stable_subject: str | None = None,
     registry_objects: tuple[str, ...] = (),
+    additional_contract=None,
 ) -> list[dict]:
     """Returns a list of SSSOM rows for one MIM YAML.
 
@@ -835,6 +839,13 @@ def _row_from_yaml(
             owners = build_owner_index({_mim_curie(p.name): d for p, d in records.items()})
     data = record
     subject = stable_subject or _mim_curie(path.name)
+    additional = []
+    if "additional_ontology_mappings" in data and data["additional_ontology_mappings"] != []:
+        if stable_subject is None or additional_contract is None:
+            raise ValueError("Additional ontology mappings require stable mode and captured native contract")
+        additional = additional_contract.assertions(data)
+        if data.get("mim_id") != stable_subject:
+            raise ValueError("Additional ontology mapping permanent owner differs")
 
     def owned_tokens(text: str, surface: str, reference: str) -> list[AliasCandidate]:
         return [AliasCandidate(token, surface, (reference,), OWNED_NAME_EVIDENCE)
@@ -1216,6 +1227,27 @@ def _row_from_yaml(
                 "comment": f"Preserved registry/identity object {obj}; stable MIM subject.",
                 "validation_method": "",
             })
+    for assertion in additional:
+        target = assertion["ontology_id"]
+        if any(row["object_id"] == target for row in rows):
+            raise ValueError("Additional ontology mapping conflicts with primary or compatibility row")
+        rows.append({
+            "subject_id": subject,
+            "subject_label": preferred,
+            "predicate_id": assertion["predicate_id"],
+            "object_id": target,
+            "object_label": assertion["ontology_label"],
+            "object_source": _OBJECT_SOURCE_BY_PREFIX[target.split(":", 1)[0] + ":"],
+            "mapping_justification": assertion["mapping_justification"],
+            "source": _join_sources([entry["source"] for entry in assertion["evidence"]],
+                                    assertion["reviewed_by"], ""),
+            "mapping_date": assertion["reviewed_at"][:10],
+            "confidence": "",
+            "comment": additional_contract.assertion_comment(assertion),
+            # A relation to a second concept is never authority to rename it.
+            "other": "",
+            "validation_method": "",
+        })
     return rows
 
 
@@ -1451,6 +1483,7 @@ def main():
         return tuple(sorted(p for directory in directories for p in directory.glob("*.yaml")))
 
     yamls = owner_paths()
+    additional_source = MIM_ROOT / "src/mediaingredientmech/additional_mappings.py"
     identity_inputs = ({MIM_ROOT / "data/ids/mim_id_registry.tsv",
                         MIM_ROOT / "data/ids/mim_id_lifecycle.tsv",
                         MIM_ROOT / "src/mediaingredientmech/stable_ids.py"} if stable else set())
@@ -1487,7 +1520,7 @@ def main():
         )
     producers = _producer_paths()
     inputs = cas_inputs | retirement_inputs | set(yamls) | set(producers) | set(stamp_sources) | identity_inputs | source_inputs | {
-        RESIDUAL_JSON, KGM_UNIFIED_TSV, MIM_PUBLISHED_SSSOM,
+        RESIDUAL_JSON, KGM_UNIFIED_TSV, MIM_PUBLISHED_SSSOM, additional_source,
     }
     snapshot = capture_beforeimages(inputs)
     if args.registry_retirement_proposal:
@@ -1510,7 +1543,7 @@ def main():
     working_copy_input = args.output in stamp_sources
     immutable = {p: b for p, b in snapshot.items() if p != args.output}
     protected = {checked_path(p) for p in (set(yamls) | set(producers) | identity_inputs | source_inputs | retirement_inputs | cas_inputs | {
-        RESIDUAL_JSON, KGM_UNIFIED_TSV, MIM_PUBLISHED_SSSOM,
+        RESIDUAL_JSON, KGM_UNIFIED_TSV, MIM_PUBLISHED_SSSOM, additional_source,
     })}
     if args.output in protected:
         raise ValueError("Candidate output overlaps a protected source input")
@@ -1518,6 +1551,8 @@ def main():
         raise ValueError("Working-copy stamp beforeimage changed during capture")
     records = {p: record for directory in directories
                for p, record in _read_mapped_records(directory, snapshot, strict_identity=stable).items()}
+    args.additional_contract = _STABLE_PRODUCER.additional_mapping_contract(
+        snapshot[additional_source], additional_source) if stable else None
     args.stable_subjects, args.registry_objects, args.mim_prefix = {}, {}, None
     if stable:
         if any(snapshot[checked_path(p)] is None for p in identity_inputs):
@@ -1645,7 +1680,8 @@ def _build_candidate(args, paths, before, stamp_sources, snapshot, frozen_paths,
             p, residual, kgm_sources, kgm_labels, canonical_labels,
             record=records[p], owners=owners, suppressions=suppressions,
             stable_subject=args.stable_subjects.get(p),
-            registry_objects=compatibility_objects)
+            registry_objects=compatibility_objects,
+            additional_contract=args.additional_contract)
         if not record_rows:
             if any(obj.startswith("cas:") for obj in compatibility_objects):
                 raise ValueError(f"Canonical CAS identity has no eligible current mapping: {p}")
