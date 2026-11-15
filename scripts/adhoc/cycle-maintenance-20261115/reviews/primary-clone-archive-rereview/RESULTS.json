@@ -1,0 +1,24 @@
+{
+  "date": "2026-11-15",
+  "verdict": "pass",
+  "resolved_findings": [1272,1273,1274,1275],
+  "archive_sha256": "5ce40d5164a70a3ceb6084b6ea2a9d0e99452ec11479693e67ff0e4242d1a835",
+  "shared_sha256": "5513d8c984104fe0c0d6da1c8aaa37549e6e3307baa541498a862a185bac1af9",
+  "archive_tests_sha256": "0086e8a39cad780b420dec89826e4b3facd8a8ba62d1772a999a34710be8e1e1",
+  "retirement_tests_sha256": "79b4a121927ad4bd043bd6372103a43cd2b2855c8d8ca240fd63d2b5692dc82d",
+  "independent_pytest": {
+    "tests":55,"passed":55,"failures":0,"errors":0,"skipped":0,"seconds":15.30,
+    "archive_tests":29,"retirement_tests":20,"unchanged_independent_probes":6,
+    "log_sha256":"2b6cae40b7bf84dac2ddd94fc4f74a131ca1b78915c06dfa4689f7120053b08c",
+    "junit_sha256":"ddf1a3787fe9e0fa4c1fce985c62374a1312a4f1e61336af3387667419f4495a"
+  },
+  "author_paired_receipts_read_back": {
+    "cases":9,"original_intended_assertion_failures":9,"fixed_passes":9,
+    "setup_errors":0,"skipped":0,
+    "receipt_sha256":"4410c9f82bda2df877112dc92fa5f9ea36134ffac94635c3522f1cc2a4ec5a11"
+  },
+  "original_archive_sha256":"417893f1064336d04c90e41cffebc1675c538ab16064ce28373bc498def107d9",
+  "original_shared_sha256":"91c07258e5efdd77d5f4c91b07c1815469bc3cd803db87e5e62e223c27b5de2e",
+  "real_clone_operations":false,
+  "fresh_operator_gates_required":true
+}

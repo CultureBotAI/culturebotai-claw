@@ -1,0 +1,40 @@
+{
+  "issue": 1268,
+  "fixture_scope": "synthetic inputs only",
+  "source_sha256": {
+    "scripts/adhoc/cycle-maintenance-20261115/provenance-v3/package_review_provenance_v3.py": "902a8400b8e244b01a70c4536698914bec8981625c8ab12021d69a2ab85293cd",
+    "tests/test_cycle_cleanup_plan_packaging.py": "f00ef125ce5a9e734e5f1dde0d2e9058f624f98bf59492f9dd6ce55b66b16213"
+  },
+  "helper_sha256": "89be95f32b26c955f098ff16d7f67790a046357c5ca58057d701ff03e56bf0ea",
+  "controls_passed": 4,
+  "paired_mutations_detected": 2,
+  "observations": [
+    {
+      "case": "control",
+      "mutation": false,
+      "expected_exit": 0,
+      "exit_code": 0,
+      "summary": "4 passed in 0.01s",
+      "log_sha256": "4250d1f2029068ddc50a143f438d48c0e151e05c734fe713ffea94436ecf9381"
+    },
+    {
+      "case": "inventory",
+      "mutation": true,
+      "expected_exit": 1,
+      "exit_code": 1,
+      "summary": "1 failed, 3 deselected in 0.02s",
+      "log_sha256": "f342e44eb9bd153976c68b8d0c79358e3e00a78637352ab1981d0a7861735219"
+    },
+    {
+      "case": "drift",
+      "mutation": true,
+      "expected_exit": 1,
+      "exit_code": 1,
+      "summary": "1 failed, 3 deselected in 0.02s",
+      "log_sha256": "4c15e1fc61a00a1b8844b2f60da17fad468132a46c1d34736ca055027b2a1aa7"
+    }
+  ],
+  "originals_unchanged": true,
+  "historical_generation_rerun": false,
+  "actual_cleanup_performed": false
+}

@@ -1,0 +1,36 @@
+{
+  "authoritative_packaging_amendment": true,
+  "date": "2026-11-15",
+  "issues": [
+    1272,
+    1273,
+    1274,
+    1275
+  ],
+  "maintained_tests": [
+    "test_archive_primary_clone.py",
+    "test_retire_owned_worktree.py"
+  ],
+  "one_time_helpers": [
+    {
+      "operational_entrypoint": false,
+      "original_kept": true,
+      "original_private_name": "verify_archival_mutations.py",
+      "public_inert_archive": "verify_archival_mutations.executed.py.txt",
+      "sha256": "b15798b93efb0fe3615028ec4c31ff641e9efbf82023b87bcb44dcb6b011c873"
+    },
+    {
+      "operational_entrypoint": false,
+      "original_kept": true,
+      "original_private_name": "verify_archival_repairs.py",
+      "public_inert_archive": "verify_archival_repairs.executed.py.txt",
+      "sha256": "d8f9d297de6150e6c44b5bdbd9645fb84b4d6dc4e9b13272cf2e76f2379e1725"
+    }
+  ],
+  "operational_reviewed_helpers": [
+    "archive_primary_clone.py",
+    "retire_owned_worktree.py"
+  ],
+  "previous_ledgers_and_receipts_unchanged": true,
+  "previous_proposal": "README.md packaging section is superseded only for one-time verification generators"
+}

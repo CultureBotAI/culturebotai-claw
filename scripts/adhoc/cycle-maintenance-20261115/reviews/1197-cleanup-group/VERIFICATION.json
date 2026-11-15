@@ -1,0 +1,67 @@
+{
+  "accepted_plan_sha256": "7349524b221cc49c4ae65f038fb396168cf7cbafff7e60dfbc7ecef55b2113e5",
+  "branch_census_scope": "Recorded intended deletion and all remaining registered branches; no historical complete unregistered-ref census was supplied.",
+  "exact_source_tracking_ref_absent_both_groups": true,
+  "git_github_source_cleanup_mutations_by_reviewer": false,
+  "helper_sha256": "73666d8597569218bdccf56cbfa07820a23ca2c23447d39246a88b9b0bf09fe6",
+  "merge_sha": "9a4b0b22ce6e9bed878d512be4597502e03ed98a",
+  "merge_tree": "f8d88d90cc6fb1c63b8adf8696cea978104b6c56",
+  "merged_source_head": "748cfaf510e96ffa6f8b4b08c877742cf8a492d8",
+  "metadata_scope": "Manifest-recorded bytes, modes and symlink targets; no ACL/xattr claim.",
+  "pr": 1197,
+  "quarantines": [
+    {
+      "deleted_branch": null,
+      "evidence_sha256": {
+        "apply": "62a28d98a64f4c5009bedefbaf8e5a9583d77869190c86ca1de355f95a69f07e",
+        "before.json": "8219bbe1e4e325ad455b6368ac664fc60ddbd8e197efc460b4939248d585c4c1",
+        "completed.json": "1676b7d2a4c55a5565336f93ed4139a8a824160a75f89794e9f8d1df6775024e",
+        "dry_run": "cad90580c9dd1151a8bd43031a1c1ffbeb148657741496e14e66f3f17d0d6f9e",
+        "preserved.json": "29b6f1a2765539abc474bba0c9cc44d95a581e95c298ee1391fb52327d4d7e58",
+        "proof": "2583d1498554239ad81b78eacc47943087ee6e681e9eb5030dbcb8cb542bd881",
+        "recovery.json": "f162c39ee5158ca0f537b9acedc347c85da6d303a418ee6a336a9ab32cbe9b51"
+      },
+      "full_preserved_hash_mode_symlink_readback": true,
+      "label": "review-1197",
+      "preservation_roots": 2,
+      "preserved_entries": 14,
+      "recovery_ref_verified": true,
+      "registration_removals_accounted": true,
+      "source_ancestor_of_merged_pr": true,
+      "source_head": "345a63c31e44cf77e7323d7c2647a4d7d8d61683",
+      "target_and_gitdir_absent": true,
+      "tracked_paths_recoverable": 1660
+    },
+    {
+      "deleted_branch": "refs/heads/repair/pr1197-baseline-20261115",
+      "evidence_sha256": {
+        "apply": "db8ef17e715fb51f465bcb6eefc8da45972ebe2d81de60d338fe78fbd6ea405a",
+        "before.json": "c1df393634369ab5f0d835831845609a3cd9488fcdb6adf294b3fae2973646c0",
+        "completed.json": "aaf79116592f960076ef58bcb8f1c8b78487bb242430da9aef86680eab392323",
+        "dry_run": "bc0585bc0e0a453fd91866de5668c9364118e83dc3d259928d2312eecd415036",
+        "preserved.json": "7ac145af1c2b9083a292512c8e1855b15afb235961806d5d7857f491f4330adf",
+        "proof": "118335164c9815e33c9ee0e7299cecc2d80e4d605ed193267936f764b169b26d",
+        "recovery.json": "7006864186215442cbaaa10e1564680eccf77c19aa2de7bcb515c853175d5854"
+      },
+      "full_preserved_hash_mode_symlink_readback": true,
+      "label": "repair-1197",
+      "preservation_roots": 8,
+      "preserved_entries": 469,
+      "recovery_ref_verified": true,
+      "registration_removals_accounted": true,
+      "source_ancestor_of_merged_pr": true,
+      "source_head": "748cfaf510e96ffa6f8b4b08c877742cf8a492d8",
+      "target_and_gitdir_absent": true,
+      "tracked_paths_recoverable": 1744
+    }
+  ],
+  "recorded_local_branch_deletions": 1,
+  "remote_source_branch_absent": true,
+  "reused_reader_sha256": "ac422830ec1719f2acdc6a1a9be52a8428277dc0b8112656bf826856d7bed348",
+  "reviewed_at": "2026-11-15T12:00:37.230521+00:00",
+  "reviewed_retirement_helper_sha256": "5513d8c984104fe0c0d6da1c8aaa37549e6e3307baa541498a862a185bac1af9",
+  "root_head_stable": "720776c99ba456e9c0ba3f2662ca7af162e25bd8",
+  "total_preserved_entries": 483,
+  "tracking_deletion_receipt_sha256": "2f94817e14b695e667b31707172907b8b46f5aca2e2e8fda710948217c2537e4",
+  "verdict": "PASS"
+}

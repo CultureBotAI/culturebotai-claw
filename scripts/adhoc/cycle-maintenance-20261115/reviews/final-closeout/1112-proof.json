@@ -1,0 +1,36 @@
+{
+  "pr": 1112,
+  "reviewed_original_head": "812bb455828dd32611da3b603732cd62e16cc37f",
+  "refreshed_head": "3da76c840590b8f579535aacd853b65ebf4f0009",
+  "merge_parents": [
+    "812bb455828dd32611da3b603732cd62e16cc37f",
+    "99fb0ac11e2e6aeabedc8d08f29a5f08aac0892d"
+  ],
+  "refreshed_tree": "6fefde5f7fcdaeeddf90d8357e3aab881928a7f5",
+  "independently_computed_tree": "6fefde5f7fcdaeeddf90d8357e3aab881928a7f5",
+  "actual_main": "99fb0ac11e2e6aeabedc8d08f29a5f08aac0892d",
+  "prospective_current_main_tree": "6fefde5f7fcdaeeddf90d8357e3aab881928a7f5",
+  "reviewed_paths_preserved_exactly": [
+    "scripts/mech_approval_bindings.py",
+    "scripts/mech_monitor_control.py",
+    "scripts/mech_session_port_pressure.py",
+    "scripts/prepare_mech_approval_binding_reload.py",
+    "src/kg_microbe_workflows/port_pressure.py",
+    "src/kg_microbe_workflows/port_pressure_identity.py",
+    "tests/test_mech_approval_bindings.py",
+    "tests/test_mech_monitor_control.py",
+    "tests/test_mech_port_pressure_native_transport.py",
+    "tests/test_mech_session_port_pressure.py",
+    "tests/test_port_pressure_boundary_only.py",
+    "tests/test_port_pressure_identity.py",
+    "tests/test_port_pressure_restart_registration_transport.py"
+  ],
+  "reviewed_paths_integrating_main": [
+    "docs/guides/MECH_PORT_PRESSURE.md",
+    "scripts/mech_session_supervisor.py"
+  ],
+  "helper_sha256": "a120fe5b5a4afadec3c5f3cec8b61706b779aa8cd4be408ee48fb059ce315e2e",
+  "test_log_sha256": "75a24738a354d832d760bba96ad2d3265ed8205406f374f4ab429d80158098e3",
+  "tracked_source_unchanged": true,
+  "runtime_operations": false
+}

@@ -1,0 +1,36 @@
+"""Independent synthetic boundary probes, 2026-11-15; no real clone selected.
+Historical review fixture, not a maintained production test installation.
+"""
+import os
+import pytest
+from test_archive_primary_clone import archive, fixture, durable_fixture, probe
+
+
+def test_unreadable_descendant_refuses_complete_inventory(fixture):
+    protected=fixture.source/'.git/protected-dir'
+    protected.mkdir()
+    (protected/'valuable').write_bytes(b'must-be-inventoried')
+    mode=protected.stat().st_mode
+    protected.chmod(0)
+    try:
+        with pytest.raises((ValueError,OSError)):
+            archive.inventory(fixture.source)
+    finally:
+        protected.chmod(mode)
+
+
+def test_absolute_internal_symlink_refuses_before_relocation(fixture):
+    (fixture.source/'.git/absolute-internal').symlink_to(fixture.source/'.git/HEAD')
+    fixture.apply=True
+    with pytest.raises((ValueError,OSError)):
+        archive.archive(fixture,probe=probe)
+    assert fixture.source.is_dir(), 'Predictably invalid relocated symlink must be rejected before source moves'
+    assert not (fixture.archive_parent/'repo').exists()
+
+
+def test_identical_evidence_and_archive_parent_refused_before_output(fixture):
+    fixture.evidence=fixture.archive_parent
+    with pytest.raises(ValueError):
+        archive.archive(fixture,probe=probe)
+    assert not fixture.evidence.exists()
+    assert fixture.source.is_dir()

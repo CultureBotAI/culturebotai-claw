@@ -1,0 +1,25 @@
+{
+  "packager_sha256": "902a8400b8e244b01a70c4536698914bec8981625c8ab12021d69a2ab85293cd",
+  "manifest_sha256": "fac861a12685b2859879dbb973dce85ae712634e34fbd9317e2061b4ccb8d7de",
+  "staged_inventory_sha256": "a843411987f8b14bd8ac57cb6811f9b29303e5ab836781b71f9a8a04f9e1af19",
+  "staged_files": 38,
+  "expected_payload_files": 27,
+  "expected_payload_byte_identical": true,
+  "additional_validation_files": [
+    "scripts/adhoc/cycle-maintenance-20261115/provenance-v3/ARCHIVAL-META-HELPERS.json",
+    "scripts/adhoc/cycle-maintenance-20261115/provenance-v3/ARCHIVAL-META-HELPERS.md",
+    "scripts/adhoc/cycle-maintenance-20261115/provenance-v3/PLAN-BINDING-VALIDATION.json",
+    "scripts/adhoc/cycle-maintenance-20261115/provenance-v3/V2-TO-V3.json",
+    "scripts/adhoc/cycle-maintenance-20261115/provenance-v3/VALIDATION-PROVENANCE.json",
+    "scripts/adhoc/cycle-maintenance-20261115/provenance-v3/VALIDATION.json",
+    "scripts/adhoc/cycle-maintenance-20261115/provenance-v3/finalize_v3_bundle.py.txt",
+    "scripts/adhoc/cycle-maintenance-20261115/provenance-v3/prepare_v3_packager.py.txt",
+    "scripts/adhoc/cycle-maintenance-20261115/provenance-v3/verify_plan_binding_controls.py.txt",
+    "scripts/adhoc/cycle-maintenance-20261115/provenance-v3/verify_provenance_packaging.py.txt",
+    "tests/test_cycle_cleanup_plan_packaging.py"
+  ],
+  "all_original_inputs_unchanged": true,
+  "public_path_email_process_identifier_scan_passed": true,
+  "issue1268_cached_input_binding_reviewed": true,
+  "four_meta_helpers_archived_byte_identically": true
+}

@@ -1,0 +1,25 @@
+{
+  "source": "2597b50f1cf9ee630316c880b43030e04cfac664",
+  "production_verdict": "pass_bounded_source_review",
+  "retained_helper_finding_issue": 1270,
+  "composition_sha256": "1de35b5e9742bb4cd5fce8e784250b010f1dc45513c8ffc2ffbabcc8f12a9ce9",
+  "focused_tests": {
+    "passed": 317,
+    "skipped": 0,
+    "log_sha256": "f78ed353ed500d97e41f7eab2b5a7449e5250bca7026baa65a1b41b5899ee5ab",
+    "files": [
+      "tests/test_pr_maintenance.py",
+      "tests/test_pr_maintenance_remote.py",
+      "tests/test_mech_pr_maintenance_supervisor.py",
+      "tests/test_port_pressure_supervisor_integration.py",
+      "tests/test_port_pressure_boundary_only.py",
+      "tests/test_workflow_closure_shape.py",
+      "tests/test_issue_triage_contract.py"
+    ]
+  },
+  "report_sha256": "2708d62a7ea31c6e1a80b1bbc8c7b3fc242a6871df3a0c592d64df05a679a329",
+  "git_writes": false,
+  "source_edits": false,
+  "runtime_actions": false,
+  "reviewer_authored_prior_remote_test_subset": true
+}

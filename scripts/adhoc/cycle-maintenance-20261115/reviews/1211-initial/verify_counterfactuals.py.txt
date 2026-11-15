@@ -1,0 +1,83 @@
+"""Read-only fresh-process PR1211 counterfactuals, 2026-11-15.
+Inputs: reviewed checkout sources/tests; output JSON on stdout. Issues1213,
+1214,1217,1255. Compiles in-memory variants; never edits tracked source.
+"""
+import hashlib
+import json
+import os
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+ROOT = Path.cwd()
+CASES = [
+    {'name':'reserved_control_identity', 'issue':1213,
+     'module':'kg_microbe_governance.artifacts.scripts.check_vendored_sync',
+     'source':'src/kg_microbe_governance/artifacts/scripts/check_vendored_sync.py',
+     'old':'{manifest.canonical_repository.casefold(), *(c.github.casefold() for c in manifest.consumers.values())}',
+     'new':'{c.github.casefold() for c in manifest.consumers.values()}',
+     'test':'tests/test_preparation_candidates.py::test_control_plane_cannot_be_prepared_as_downstream_candidate[github]'},
+    {'name':'explicit_candidate_only', 'issue':None,
+     'module':'kg_microbe_governance', 'source':'src/kg_microbe_governance/__init__.py',
+     'old':'    if candidate:\n', 'new':'    if True:\n',
+     'test':'tests/test_preparation_candidates.py::test_sync_and_standalone_check_require_explicit_candidate_and_exact_bytes'},
+    {'name':'canonical_registry_equality', 'issue':None,
+     'module':'kg_microbe_governance', 'source':'src/kg_microbe_governance/__init__.py',
+     'old':'if fetch_url(raw_url(canonical_ref, CANDIDATE_REGISTRY_PATH)) != registry:', 'new':'if False:',
+     'test':'tests/test_preparation_candidates.py::test_sync_and_standalone_check_require_explicit_candidate_and_exact_bytes'},
+    {'name':'ambient_ci_identity', 'issue':1217,
+     'module':'kg_microbe_governance.artifacts.scripts.check_vendored_sync',
+     'source':'src/kg_microbe_governance/artifacts/scripts/check_vendored_sync.py',
+     'old':'asserted_identity = repository or os.environ.get("GITHUB_REPOSITORY")',
+     'new':'asserted_identity = repository',
+     'test':'tests/test_preparation_candidates.py::test_sync_and_standalone_check_require_explicit_candidate_and_exact_bytes'},
+    {'name':'fixture_union_count', 'issue':1255,
+     'module':'test_governance_admitted_sync', 'source':'tests/test_governance_admitted_sync.py',
+     'old':'assert len(records) == 13', 'new':'assert len(records) == 10',
+     'test':'tests/test_governance_admitted_sync.py::test_retained_fixture_provenance_matches_every_sealed_source'},
+    {'name':'historical_digest', 'issue':1214,
+     'module':'test_governance_admitted_sync', 'source':'tests/test_governance_admitted_sync.py',
+     'old':'assert hashlib.sha256(content).hexdigest() == artifact.sha256\n    return content',
+     'new':'assert True\n    return content',
+     'test':'tests/test_governance_admitted_sync.py::test_frozen_payload_rejects_missing_or_corrupt_retained_bytes'},
+]
+CHILD = '''import importlib,json,pathlib,sys,pytest
+case=json.loads(sys.argv[1]);root=pathlib.Path.cwd()
+for sub in ('tests','src','.'):
+    sys.path.insert(0,str(root/sub))
+if case.get('mutation'):
+    module=importlib.import_module(case['module'])
+    source=(root/case['source']).read_text()
+    assert source.count(case['old']) == 1
+    exec(compile(source.replace(case['old'],case['new']),module.__file__,'exec'),module.__dict__)
+sys.exit(pytest.main(['-q',case['test']]))
+'''
+
+def digest(raw):
+    return hashlib.sha256(raw).hexdigest()
+
+def main():
+    sources={c['source']:digest((ROOT/c['source']).read_bytes()) for c in CASES}
+    results=[]
+    for case in CASES:
+        for mutation in (False,True):
+            with tempfile.TemporaryDirectory(prefix='pr1211-review-cache-') as cache:
+                env=dict(os.environ,PYTHONPYCACHEPREFIX=cache)
+                proc=subprocess.run([sys.executable,'-c',CHILD,json.dumps(dict(case,mutation=mutation))],
+                    cwd=ROOT,env=env,text=True,capture_output=True,timeout=90)
+            expected=1 if mutation else 0
+            passed=proc.returncode==expected and ('1 failed' if mutation else '1 passed') in proc.stdout
+            results.append({'name':case['name'],'issue':case['issue'],'mutation':mutation,
+                'exit_code':proc.returncode,'expected_exit':expected,'passed':passed,
+                'stdout_sha256':digest(proc.stdout.encode()),'stderr_sha256':digest(proc.stderr.encode())})
+            if not passed:
+                print(proc.stdout,file=sys.stderr);print(proc.stderr,file=sys.stderr)
+    unchanged=sources=={p:digest((ROOT/p).read_bytes()) for p in sources}
+    print(json.dumps({'sources':sources,'results':results,'sources_unchanged':unchanged,
+        'passed':unchanged and all(r['passed'] for r in results),
+        'helper_sha256':digest(Path(__file__).read_bytes())},indent=2))
+    return 0 if unchanged and all(r['passed'] for r in results) else 1
+
+if __name__=='__main__':
+    sys.exit(main())

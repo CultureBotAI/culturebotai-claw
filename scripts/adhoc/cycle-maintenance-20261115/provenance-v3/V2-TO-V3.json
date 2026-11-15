@@ -1,0 +1,11 @@
+{
+  "issue": 1268,
+  "original_v2_sha256": "f554cd8120ce2dfd3dffc298ca28ec605c4cf41d975a4b02b0ed6c3a1bdd8250",
+  "v3_sha256": "902a8400b8e244b01a70c4536698914bec8981625c8ab12021d69a2ab85293cd",
+  "edits": [
+    "Cache each authenticated inventory/drift byte stream and parse only that cache.",
+    "Refuse every symlink ancestor in retained input paths.",
+    "Preserve v1/v2 helper and stages; use new provenance-v3 namespace."
+  ],
+  "historical_inputs_or_results_modified": false
+}

@@ -1,0 +1,15 @@
+{
+  "issue": 1269,
+  "verdict": "approved_with_documented_operator_boundaries",
+  "helper_sha256": "91c07258e5efdd77d5f4c91b07c1815469bc3cd803db87e5e62e223c27b5de2e",
+  "maintained_tests_sha256": "b42ef00128ac07538a6f6fd8d88a3f87df259578caa39be5a831b1c867533d71",
+  "maintained_tests_passed": 18,
+  "maintained_log_sha256": "3207b09a3fa03a5c42c8b5f7787efd54561aefd459652b842313cf89b5a3ba9f",
+  "original_suite_passed": 15,
+  "independent_revocation_and_partial_failure_cases_passed": 2,
+  "overlapping_suite_counts_not_additive": true,
+  "initial_finding_fixed": true,
+  "new_findings": [],
+  "task_cleanup_performed": false,
+  "report_sha256": "98ee10b647f9cc01da0419b38f091ab76e6b3bc37a4976fe9a9d111af99c611c"
+}

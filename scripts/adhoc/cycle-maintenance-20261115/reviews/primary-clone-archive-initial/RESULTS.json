@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-15",
+  "scope": "independent synthetic-only initial archival review",
+  "verdict": "changes_required",
+  "issues": [1272, 1273, 1274, 1275],
+  "source_sha256": "417893f1064336d04c90e41cffebc1675c538ab16064ce28373bc498def107d9",
+  "tests_sha256": "0f24c3e1450f90132810e3e564b7cc6fe2e0c5e94ea9ca3887e2826dd9a444a2",
+  "shared_helper_sha256": "91c07258e5efdd77d5f4c91b07c1815469bc3cd803db87e5e62e223c27b5de2e",
+  "real_cleanup_performed": false,
+  "runs": [
+    {"name":"baseline","tests":22,"passed":22,"failures":0,"errors":0,"skipped":0,"seconds":7.25,"log_sha256":"d1a57444a10d18e5c5cb19ab78a36ed59a7d31c24b709a444e8d1763da05483d","junit_sha256":"466ac62b683e57826204ac93dea7e80ddbf1304511f22d876c1cbb94ce74ed0d"},
+    {"name":"boundaries","tests":3,"passed":1,"failures":2,"errors":0,"skipped":0,"seconds":1.44,"log_sha256":"234e41185a234c7d94406f40933d7cdcfaa5a2a39ae94ab9b2a17e39408bf239","junit_sha256":"ee26755b8662b85cb3d3fb272d21cf3a223f41a87312c52695e65a8b32272c84"},
+    {"name":"relative_symlink","tests":1,"passed":0,"failures":1,"errors":0,"skipped":0,"seconds":0.85,"log_sha256":"7778c1e3409a96a0aa3310ad671eb71683db89007201b90ce42334f2913a836d","junit_sha256":"f7cd23d4d50adc725a2373ba97cf2af024079b5d5a7f457a2443a08383d69eb8"},
+    {"name":"acl_inventory","tests":1,"passed":0,"failures":1,"errors":0,"skipped":0,"seconds":0.35,"log_sha256":"cde76be66e7fb32bedd0353c68083c44229b2f8859cf4ba6be7150bebe41f379","junit_sha256":"bf40897392a731b0e511bebca2618fa46e3887949e6f6026a9bf02f3fbac2a19"},
+    {"name":"shared_acl_walk","tests":1,"passed":0,"failures":1,"errors":0,"skipped":0,"seconds":0.20,"log_sha256":"da63fd00f4d7539f09663e1f1518e33af1d51f03aa83e6861cfb8710cbf82f84","junit_sha256":"4965fb8f8ef2ce9efc088af3d70f2e57baa81e4043f647d1caab64dd4cc7c984"}
+  ],
+  "helper_archives": [
+    {"original_basename":"test_review_boundaries.py","archived_basename":"verify_review_boundaries.executed.py.txt","original_and_packaged_sha256":"b1a1011a88c3c78c6b7b506b9938d373f2572633710a0e9dd6d3fcaa0e2f98e0","content_edits":false},
+    {"original_basename":"test_relative_symlink_boundary.py","archived_basename":"verify_relative_symlink_boundary.executed.py.txt","original_and_packaged_sha256":"4424f1f8f5b3b1319aa58e930bdb9f44430fc8cd26a006e7b095de1a3572c3d0","content_edits":false},
+    {"original_basename":"test_acl_traversal_boundary.py","archived_basename":"verify_acl_traversal_boundary.executed.py.txt","original_and_packaged_sha256":"12b023d1f6354bfd238e3595ecc2b8995a03d1aed04ac53e9871418c2d260439","content_edits":false},
+    {"original_basename":"test_shared_acl_boundary.py","archived_basename":"verify_shared_acl_boundary.executed.py.txt","original_and_packaged_sha256":"716082a1fb277babb8e21cdce59262c90201d4d587c25b75e1b872d6f4016b43","content_edits":false}
+  ]
+}

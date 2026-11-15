@@ -1,0 +1,116 @@
+{
+  "actual_main": "99fb0ac11e2e6aeabedc8d08f29a5f08aac0892d",
+  "checks": [
+    {
+      "conclusion": "SUCCESS",
+      "name": "isolated-contracts",
+      "status": "COMPLETED",
+      "url": "https://github.com/CultureBotAI/culturebotai-claw/actions/runs/43694905283/job/132753179248"
+    },
+    {
+      "conclusion": "SUCCESS",
+      "name": "candidate-contracts",
+      "status": "COMPLETED",
+      "url": "https://github.com/CultureBotAI/culturebotai-claw/actions/runs/43694905213/job/132753179588"
+    },
+    {
+      "conclusion": "SUCCESS",
+      "name": "id-label-contract",
+      "status": "COMPLETED",
+      "url": "https://github.com/CultureBotAI/culturebotai-claw/actions/runs/43694905279/job/132753179294"
+    },
+    {
+      "conclusion": "SUCCESS",
+      "name": "pytest",
+      "status": "COMPLETED",
+      "url": "https://github.com/CultureBotAI/culturebotai-claw/actions/runs/43694905249/job/132753241830"
+    },
+    {
+      "conclusion": "SUCCESS",
+      "name": "public-fleet",
+      "status": "COMPLETED",
+      "url": "https://github.com/CultureBotAI/culturebotai-claw/actions/runs/43694905213/job/132753611668"
+    },
+    {
+      "conclusion": "SUCCESS",
+      "name": "embedding-projection",
+      "status": "COMPLETED",
+      "url": "https://github.com/CultureBotAI/culturebotai-claw/actions/runs/43694905249/job/132753242036"
+    },
+    {
+      "conclusion": "SUCCESS",
+      "name": "fleet-audit",
+      "status": "COMPLETED",
+      "url": "https://github.com/CultureBotAI/culturebotai-claw/actions/runs/43694905213/job/132754629384"
+    },
+    {
+      "conclusion": "SUCCESS",
+      "name": "history-round-trip",
+      "status": "COMPLETED",
+      "url": "https://github.com/CultureBotAI/culturebotai-claw/actions/runs/43694905249/job/132753241614"
+    }
+  ],
+  "findings": [],
+  "helpers": [
+    {
+      "original_sha256": "497c569c869734e5797e61c75d1461facdaca705dd2d8aef1a7cc2d92127d982",
+      "packaged_sha256": "497c569c869734e5797e61c75d1461facdaca705dd2d8aef1a7cc2d92127d982",
+      "packaging_edits": [],
+      "path": "1243/review_source.py"
+    },
+    {
+      "original_sha256": "0c81a29bd09e15cf81d54a1fe42fa2faa8412f714b2a82f1fa04210e94ff1337",
+      "packaged_sha256": "0c81a29bd09e15cf81d54a1fe42fa2faa8412f714b2a82f1fa04210e94ff1337",
+      "packaging_edits": [],
+      "path": "1243/counterfactuals.py"
+    }
+  ],
+  "hosted": {
+    "coverage_percent": 87.33,
+    "embedding_tests_passed": 51,
+    "run": 43694905249,
+    "skipped": 544,
+    "subtests_passed": 4,
+    "tests_passed": 10726
+  },
+  "issues": [
+    1238,
+    1239,
+    1240,
+    1241,
+    1242,
+    1244,
+    1245,
+    1249
+  ],
+  "mutation_probes": 11,
+  "mutation_receipt_sha256": "e7e544abf0f9bdf75d66996d4b2da6c67b4c6c77b57d6b984ddddfc0b21a6cc4",
+  "notes": [
+    "Six observer, two integration, and three independent count/duplicate/retention mutations were killed; tracked source remained unchanged.",
+    "Pinned Ruff passed explicitly for changed scripts and tests; scripts are outside the generic CI lint target.",
+    "No changed-path overlap with actual main since merge base; prospective merge is clean.",
+    "Eight linked issues were read live and their source acceptance criteria checked.",
+    "Private saved observations and claimed live deployments/canaries were not reverified; no runtime inspection or interaction was performed.",
+    "The 544 aggregate hosted skips are not all individually classified. The one skip in the relevant local suite is optional private evidence, not a missing offline invariant.",
+    "Host launcher companion and actual adoption/deployment remain separately owned and authorized."
+  ],
+  "private_review_sha256": "6acaacd6f025233318327a5b96259ffea8c05695578dd0c0b689585823c10cf7",
+  "prospective_merge_tree": "a760dd3c4710b4a7d3d2845be8350ac4bbc172dd",
+  "pull_request": 1243,
+  "repository": "CultureBotAI/culturebotai-claw",
+  "reviewed_head": "04e14f6c0fe4c4e7e4aaa8da0b765546fdc9afa3",
+  "runtime_authority_granted": false,
+  "runtime_operations_performed": false,
+  "source_proof_sha256": "958ae2f85c197f090309c3855cab4e3f0b23838bcce28dbb841da9b51d3d4dcd",
+  "source_verdict": "no_verified_blocking_source_finding",
+  "tests": {
+    "passed": 227,
+    "skip_reason": "Explicit private evidence not selected",
+    "skipped": 1,
+    "subtests_passed": 4
+  },
+  "validation_artifacts": {
+    "pr-final.json": "0cefcc0567f72ded07ef1cdeb7f61eb47c6d2da92c8fd3b5dece24c06e8f02f1",
+    "pytest.log": "68b1c4724a758ac4aeb7614f6c262790c128e8af37e3941fd405403beeb12390"
+  }
+}

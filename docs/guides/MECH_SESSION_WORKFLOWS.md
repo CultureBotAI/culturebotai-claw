@@ -128,7 +128,7 @@ objective, its appropriate local review skill, and an evidence-backed no-change
 result. Do not invent graph fields
 or UniProt annotations to satisfy a generic sequence.
 
-## Migrating a six-goal cycle to seven goals
+## Migrating a cycle at its verified boundary
 
 An active v1 cycle stays on its saved effective workflow while a v2 profile is
 prepared and reviewed. Do not edit its snapshot, shift its stage, replace its
@@ -152,14 +152,20 @@ and candidate effective workflow hashes and its review artifact:
 }
 ```
 
+The same migration record supports parent 2.0.0 → 2.1.0. This upgrade retains
+seven stages and extends stage-one PR maintenance and cleanup proof. Parent
+2.1.0 still uses additive schema version 2.0.0, so the schema version alone
+does not establish adoption. An active parent-2.0 cycle keeps its saved inputs,
+issue-only evidence requirements and closure shape until the boundary.
+
 The review artifact must be inside the Mech repository and committed at the
 verified final closure head. Set `workflow_next_parent_path` and
 `workflow_next_schema_path` when the candidate parent/schema inputs differ
 from the active ones; these are target settings, with configuration defaults.
 The supervisor
 validates that candidate against the verified infrastructure closure commit.
-Only after the current v1 infrastructure goal closes can it increment the
-cycle, pin v2 and dispatch stage 1 `open_issue_triage`. Missing, changed or
+Only after the current infrastructure goal closes can it increment the
+cycle, pin the reviewed candidate and dispatch stage 1 `open_issue_triage`. Missing, changed or
 invalid migration evidence blocks activation; it never replaces the active
 goal as a recovery action. Keep the ordinary cycle-boundary review and all
 existing closure gates effective.
@@ -168,6 +174,47 @@ Release and deployment are separate from preparing this code. DUFMech is the
 chosen test Mech after a reviewed release and explicit adoption, followed by
 the remaining fleet only after a complete stage-1 test closure. No downstream
 pin is changed by the phase-1 Claw PR.
+
+## Frozen PR maintenance and closure proof
+
+With parent 2.1, stage-one status includes a separate `pr_scope` alongside
+`issue_scope`. Its content/hash/cutoff binds the complete PR inventory and the
+resolved non-draft limit: optional manifest `open_pr_limit` (1–1000), default
+25. Claw uses 25. The capture fails on partial pagination or inventory changes;
+the active cycle never refreezes its membership or rereads a changed limit.
+Keep the runtime snapshot untouched and copy its content into the committed
+`pr_inventory` JSON artifact. Write `pr_dispositions` as exactly
+`{"pr_maintenance": <the structured result>}`; see the
+[contract's status and artifact definitions](MECH_WORKFLOW_CONTRACT.md#pr-maintenance-under-parent-21).
+
+The completion path checks these artifacts against frozen bytes, validates all
+dispositions, and reads actual GitHub states. Each merged maintenance PR must
+match a member of the existing independently verified closure receipt; an
+ordinary evidence row does not prove review or grant action authority. Retained
+or refreshed PRs that became green or conflicting still require action or a
+blocked goal. The complete current non-draft list, including later arrivals,
+must match the result and fit the frozen limit.
+
+Exact frozen backlog members retain their prior-goal ownership associations.
+Their maintenance receipt proves frozen-to-final head ancestry and merges
+within the current goal, without pretending the PR or its old commits were
+created in that goal. New integration PRs retain ordinary current-goal
+registration and closure requirements.
+
+Parent 2.1 completed receipts add `cleanup.worktree_paths` and a hashed
+`cleanup.worktree_cleanup` audit. Preserve valuable files and evidence outside
+the owned feature worktree before removal. The audit identifies the repository,
+head, branch, paths and preservation manifest. Retain the manifest artifact
+with an ignored-inclusive inventory and retained-item hashes and locations,
+not only a free-standing digest. The verifier checks those bytes
+and confirms no path or Git worktree registration remains. It never removes a
+path. A retained checkout, unavailable ownership/preservation proof, approval
+refusal or other prerequisite holds closure without relaxing existing rules.
+Use the supplied receipt template; do not retrofit older active cycles.
+
+No documentation, generated adapter or candidate profile activates this policy
+in a live session. Preserve existing goal identity and per-PR permissions;
+runtime installation, adoption and restart require their own authority.
 
 ## Migrating an existing four-stage run to pinned v1
 

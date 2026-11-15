@@ -1,0 +1,154 @@
+{
+  "repository": "CultureBotAI/culturebotai-claw",
+  "pr": 1112,
+  "head": "812bb455828dd32611da3b603732cd62e16cc37f",
+  "actual_main": "68d8b2b6e02c1ca4fda2524f348460ecfa566402",
+  "merge_base": "7380fe17cf4980f3b23579891fb880aa7311f526",
+  "head_tree": "f52f3bc1e723b3af0b9ff9b278a7006b540f6ee9",
+  "prospective_merge_tree": "687f22bc25003c664701793dceb6d63de05c0c61",
+  "verdict": "No verified blocking code finding; runtime and consumer adoption remain separate.",
+  "findings": [],
+  "validation": {
+    "exact_head_focused_passed": 261,
+    "exact_head_focused_skipped": 0,
+    "merged_supervisor_pressure_passed": 463,
+    "merged_freshness_boundary_passed": 221,
+    "merged_tests_skipped": 0,
+    "mutation_control_passed": 11,
+    "meaningful_counterfactuals_killed": 8,
+    "restored_final_passed": 155,
+    "restored_final_skipped": 0,
+    "hosted_passed": 9153,
+    "hosted_skipped": 461,
+    "hosted_run": 42727461310,
+    "resident_adapter_and_preparer_python39_syntax": "passed"
+  },
+  "checks": [
+    {
+      "name": "isolated-contracts",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "details_url": "https://github.com/CultureBotAI/culturebotai-claw/actions/runs/42727461343/job/129536657474"
+    },
+    {
+      "name": "fleet-audit",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "details_url": "https://github.com/CultureBotAI/culturebotai-claw/actions/runs/42727461743/job/129536663466"
+    },
+    {
+      "name": "id-label-contract",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "details_url": "https://github.com/CultureBotAI/culturebotai-claw/actions/runs/42727461411/job/129536657750"
+    },
+    {
+      "name": "pytest",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "details_url": "https://github.com/CultureBotAI/culturebotai-claw/actions/runs/42727461310/job/129536658034"
+    },
+    {
+      "name": "embedding-projection",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "details_url": "https://github.com/CultureBotAI/culturebotai-claw/actions/runs/42727461310/job/129536658339"
+    },
+    {
+      "name": "history-round-trip",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "details_url": "https://github.com/CultureBotAI/culturebotai-claw/actions/runs/42727461310/job/129536658408"
+    }
+  ],
+  "counterfactuals": [
+    {
+      "name": "mutation-control",
+      "exit_code": 0,
+      "log_sha256": "d83a1cae73cabc700360fee84aa3f61936594f67573c486f5c8b30ac1e943571"
+    },
+    {
+      "name": "idle-fallback",
+      "exit_code": 1,
+      "log_sha256": "719a4dc9935c5ddf6f13bd363b4fed39f8f16ef813ce78983226a036ed5723ef"
+    },
+    {
+      "name": "direct-transport-bypass",
+      "exit_code": 1,
+      "log_sha256": "b35682cf8cf8884d0ee92f74914e2aa036fbe2b3105a507770fb2ed4457416c2"
+    },
+    {
+      "name": "changed-executable",
+      "exit_code": 1,
+      "log_sha256": "fa00fd36b3228cfe293d799b0793064b08afc3ebe3ab0eacb6db5c2541c1a1f6"
+    },
+    {
+      "name": "effective-map-ack",
+      "exit_code": 1,
+      "log_sha256": "17a4fe6cf8d7d6010dac63d2a6d55ad49c1437922c31d02791bc65a223bead93"
+    },
+    {
+      "name": "wrong-lock-root",
+      "exit_code": 1,
+      "log_sha256": "1643877af9375585d17818cbfbafb9ef8f7a215281f6ac71b97d516dd58700e4"
+    },
+    {
+      "name": "missing-prequit-evidence",
+      "exit_code": 1,
+      "log_sha256": "4fe072e861d9623afa5fdce2f2b87621400f53966578d8756420e6251d161c87"
+    },
+    {
+      "name": "stale-source-pins",
+      "exit_code": 1,
+      "log_sha256": "112308a492f4f9b7d076f6e504dec903f8751a03ea085502001068b9d02d4d35"
+    },
+    {
+      "name": "pretend-code-reload",
+      "exit_code": 1,
+      "log_sha256": "300824e834199666959c06fba1d2a59f9f4de85824d10e7be52656a1b8d2e5f4"
+    }
+  ],
+  "original_receipt_sha256": {
+    "REVIEW.md": "58c45911bb7b065bbaf0b91327eb66d979fec520b521a1c4f1ba681802fad998",
+    "review.json": "31772340a74fce172c87361a9070decaf7abc67838934df259e911ad4a02ac14",
+    "source-head-proof.json": "31d685ba9eb2fb988679b141eae9323c082d030119294fe44311957987adad37",
+    "counterfactuals.json": "01074468a776636247cdcf5ecbe9b9ec5ff74a60bddcb4c2cccae595ca4cf9a6"
+  },
+  "validation_log_sha256": {
+    "hosted-test-run.log": "a340554061597499be8b5a7ba7589adfb2f7222d57d8fd97f86c64defd84edad",
+    "pytest-focused.log": "33508470f59a6068376ea37b002d7e0fa3dc9aa879d0e7d63eda28aa4a679bd8",
+    "pytest-integration.log": "5e6a68cb724fca46707bd6979241fc2299e8f81f4ae219913c5f2faa9de4f258",
+    "pytest-integration-boundaries.log": "fcb92d2a99e74a5f9ec717ed8aec8e8d88f555d5235789a3b84d3e12e7c9a0b0",
+    "pytest-final.log": "469b84eb57949137d44f0bfc87b4b4bd4c134bb1cf2dee24972b67682aa083ab"
+  },
+  "helpers": [
+    {
+      "file": "package_review_pr1112_20261115.py",
+      "original_sha256": "af8b451813f0b760cdf970f7f1841d411ba6e43a0335fa92f1e2471d3dfe227d",
+      "packaged_sha256": "0f409dfc6059def0e31309c9dfe79c4b1fadd8fb7d907377353a2659218fe6d6",
+      "packaging_edits": [
+        "Replace private absolute-root guard with explicit --review-tree parameter.",
+        "Require an actual detached worktree with clean tracked source; preserve exact reviewed-head checks.",
+        "Replace private reviewer/workspace labels with generic review terminology.",
+        "Preserve original validation logic; no expensive validation rerun for packaging."
+      ]
+    },
+    {
+      "file": "review_pr1112_20261115.py",
+      "original_sha256": "c25954ba96cdd57bdba5418d8ce0cd8d490d535071dcf7d40040798fbce4e648",
+      "packaged_sha256": "8548354784f233f1948477a17b70b894ad5f8e2f4413b0e7d5559711eb4fa547",
+      "packaging_edits": [
+        "Replace private absolute-root guard with explicit --review-tree parameter.",
+        "Require an actual detached worktree with clean tracked source; preserve exact reviewed-head checks.",
+        "Replace private reviewer/workspace labels with generic review terminology.",
+        "Preserve original validation logic; no expensive validation rerun for packaging."
+      ]
+    }
+  ],
+  "packaging_validation": "Python AST parse and private-path/email scan; original review results unchanged.",
+  "limitations": [
+    "The full private receipts/logs are retained separately; this is a public summary.",
+    "Historical hosted aggregate skips were not individually classified; selected local review tests had no skips.",
+    "Code-only review supplies no live runtime, restart, deployment or consumer-adoption authority."
+  ]
+}

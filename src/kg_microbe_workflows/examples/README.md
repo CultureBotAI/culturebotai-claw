@@ -15,7 +15,8 @@ actual machine-readable `INFRA_TASKS.md` snapshot. Under parent v2 these keys
 are stages 5, 6 and 7. Historical evidence is never renumbered. Nonempty resolution examples
 and rejection cases are maintained in `tests/test_workflow_contract.py`.
 
-The v2 `open_issue_triage` example is an explicit empty frozen inventory:
+The retained parent-2.0 `open_issue_triage` example is an explicit empty frozen
+issue inventory:
 
 ```bash
 uv run python -m kg_microbe_workflows validate-evidence \
@@ -31,6 +32,24 @@ issue produces `outcome: blocked` with its prerequisite and holds closure.
 The shared budget records one start/end window and both actors' work intervals;
 parallel time is not added together or granted separately to each actor.
 Nonempty and failing cases are in `tests/test_issue_triage_contract.py`.
+
+The separate parent-2.1 example adds an explicit empty PR inventory without
+rewriting the v1 or parent-2.0 examples:
+
+```bash
+uv run python -m kg_microbe_workflows validate-evidence \
+  src/kg_microbe_workflows/examples/reviews/workflow/example-maintenance-run/cycle-000001/stage-01/revision-0001/evidence.yaml \
+  --root src/kg_microbe_workflows/examples
+```
+
+Its `schema_version` remains 2.0.0; `parent_version: 2.1.0` requires the new
+policy and outputs. `pr_inventory.json` represents the exact frozen `pr_scope`
+content, with a separate PR cutoff, complete inventory and resolved limit.
+`pr_dispositions.json` is exactly `{"pr_maintenance": <structured result>}`,
+matching the evidence manifest's value. Nonempty inventories need one
+exact-head disposition per PR. Green, stale, conflicting, shared-check and
+limit cases are exercised in `tests/test_pr_maintenance.py`; the example does
+not claim any real PR review, merge, worktree deletion or runtime adoption.
 
 Copy the structure, replace identity and source revision, create actual evidence,
 then calculate exact SHA-256 values. Never reuse example claims or checksums.

@@ -1,0 +1,98 @@
+{
+  "actual_main": "99fb0ac11e2e6aeabedc8d08f29a5f08aac0892d",
+  "candidate_sha256": {
+    "workflow/candidates/repository-freshness-v1/SKILL.md": "6e95e8bf4bae81cb6cab8b8df5bdedfa1c1ea25aad558535e7be8502f9dec1a2",
+    "workflow/candidates/repository-freshness-v1/contract.yaml": "1066a37a7d6cb3511ebe24403b61478f55c03a33f3a1d83b9131b0d20f11c54c",
+    "workflow/candidates/repository-freshness-v1/proposal.json": "3cff8b87ba811b7641928e9b6906faae3f54d72c7fe2b1a7afd791df61364cbf",
+    "workflow/candidates/repository-freshness-v1/schema.yaml": "19f3bd1c4bf051e7a6564bd9ecdfb82ebac7b1f357c9640b958f9575d0e9974d"
+  },
+  "checks": [
+    {
+      "conclusion": "",
+      "name": "pytest",
+      "status": "IN_PROGRESS",
+      "url": "https://github.com/CultureBotAI/culturebotai-claw/actions/runs/43697163700/job/132760166475"
+    },
+    {
+      "conclusion": "SUCCESS",
+      "name": "isolated-contracts",
+      "status": "COMPLETED",
+      "url": "https://github.com/CultureBotAI/culturebotai-claw/actions/runs/43697163642/job/132760165802"
+    },
+    {
+      "conclusion": "SUCCESS",
+      "name": "candidate-contracts",
+      "status": "COMPLETED",
+      "url": "https://github.com/CultureBotAI/culturebotai-claw/actions/runs/43697163655/job/132760165607"
+    },
+    {
+      "conclusion": "SUCCESS",
+      "name": "id-label-contract",
+      "status": "COMPLETED",
+      "url": "https://github.com/CultureBotAI/culturebotai-claw/actions/runs/43697163738/job/132760165899"
+    },
+    {
+      "conclusion": "FAILURE",
+      "name": "public-fleet",
+      "status": "COMPLETED",
+      "url": "https://github.com/CultureBotAI/culturebotai-claw/actions/runs/43697163655/job/132760464634"
+    },
+    {
+      "conclusion": "SUCCESS",
+      "name": "embedding-projection",
+      "status": "COMPLETED",
+      "url": "https://github.com/CultureBotAI/culturebotai-claw/actions/runs/43697163700/job/132760166538"
+    },
+    {
+      "conclusion": "FAILURE",
+      "name": "fleet-audit",
+      "status": "COMPLETED",
+      "url": "https://github.com/CultureBotAI/culturebotai-claw/actions/runs/43697163655/job/132760785570"
+    },
+    {
+      "conclusion": "SUCCESS",
+      "name": "history-round-trip",
+      "status": "COMPLETED",
+      "url": "https://github.com/CultureBotAI/culturebotai-claw/actions/runs/43697163700/job/132760166290"
+    }
+  ],
+  "findings": [],
+  "helpers": [
+    {
+      "original_sha256": "f0d820560ac3615299b83c2b8de68bc778b60f3a45fa99e54dc59a2ee7d5ece8",
+      "packaged_sha256": "f0d820560ac3615299b83c2b8de68bc778b60f3a45fa99e54dc59a2ee7d5ece8",
+      "packaging_edits": [],
+      "path": "1138/review_closeout.py"
+    }
+  ],
+  "issue": 1252,
+  "live_verification_sha256": "b339dda5f8d45892dfe0d0192b717a61a58e05f817601620113a9f7660740f7b",
+  "notes": [
+    "All four historical candidate files preserved byte-for-byte; five additions only.",
+    "All 1560 original tracked file bytes and modes preserved; all 18 release payloads independently verified.",
+    "Public immutable Assay helper reference matched its declared SHA256.",
+    "Historical and release fleet manifest hashes differ; loader and candidate payload sources match.",
+    "Missing local current-main and historical objects caused initial fail-closed attempts; objects were fetched and fresh verification passed. Earlier evidence retained.",
+    "Current hosted public-fleet failure is four obsolete Assay/Cofactor INCOMPLETE_CONSUMERS assertions on the old base; 45 tests passed. Final green gate still required.",
+    "No active pin, hook, runtime or candidate-payload change; installed/adopted remain false."
+  ],
+  "private_review_sha256": "6d30c3601a5c6fe889a76bdc212854bde3e8d3ba4f1cf56c0ffe6f8ce0625789",
+  "prospective_merge_tree": "d6c5a8820d3dc7d00b06d40e98c6b23b6d1f5eff",
+  "pull_request": 1138,
+  "release_source": "e43afbf92e7ae0265943ca8a237efe07ecf074fb",
+  "repository": "CultureBotAI/culturebotai-claw",
+  "reviewed_head": "3046fed7f3fda2d24f19c38e6e874fef68a794e4",
+  "runtime_authority_granted": false,
+  "runtime_operations_performed": false,
+  "source_proof_sha256": "f6d5ffe7814449c6e2ceaffadf579cc644c5019258e5473dbf3667af92aab95f",
+  "source_verdict": "no_verified_blocking_source_finding",
+  "tests": {
+    "included_mutations": 2,
+    "passed": 14,
+    "skipped": 0
+  },
+  "validation_artifacts": {
+    "pr-final.json": "ef01cfdb098f183570da24fe7b0514fb62d3197554c0f773b9d7eea6d5eb6758",
+    "pytest.log": "5ede6a96c1fd18f0b18ae53156906c4854c8bf4937f14f41f56a6d662892d824"
+  }
+}

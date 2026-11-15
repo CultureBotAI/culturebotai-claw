@@ -1,0 +1,28 @@
+{
+  "baseline_refresh_noop": true,
+  "baseline_sha256": "67b52e3880438c827458241c366bdf8005efacbbdaec8664180b9bb7d746c424",
+  "baseline_source": "66e6c6a15ff05a098bcb275686bcc6d74b20eaeb",
+  "baseline_source_count": 60,
+  "baseline_version": "1.0.0",
+  "full_tree_exact_union": true,
+  "head": "748cfaf510e96ffa6f8b4b08c877742cf8a492d8",
+  "helper_sha256": "1751e0d78018219681aee7e6bc7ab60729d63c61dd08c1ff6d238e8ffbce58cd",
+  "incoming_path_count": 31,
+  "original_paths_preserved": [
+    ".claude/skills/fleet-issue-review/SKILL.md",
+    ".claude/skills/fleet-issue-status/SKILL.md",
+    ".claude/skills/fleet-issue-status/references/review-table.md",
+    ".claude/skills/review-open-issues/SKILL.md",
+    "AGENTS.md",
+    "scripts/fleet_issue_status.py",
+    "src/kg_microbe_skills/skills.yaml",
+    "src/kg_microbe_skills/template_baseline.json",
+    "tests/test_fleet_issue_status.py"
+  ],
+  "parents": [
+    "98345116994d17eaee050efb13f5414f5faaf3d4",
+    "bd2b07480afd3b3984491a7fc729c64220d4dd81"
+  ],
+  "tracked_status_clean": true,
+  "tree": "f8d88d90cc6fb1c63b8adf8696cea978104b6c56"
+}

@@ -1,0 +1,24 @@
+{
+  "date": "2026-11-15",
+  "repository": "CultureBotAI/culturebotai-claw",
+  "issues": [1265, 1266],
+  "kind": "observed_offline_retirement_validation",
+  "test_command": "python -m pytest -q tests/test_cycle_maintenance_inventory_helpers.py",
+  "tests_passed": 41,
+  "tests_skipped": 0,
+  "elapsed_seconds": 2.32,
+  "retirement_cases": 6,
+  "fresh_process_guard_mutations_killed": 4,
+  "test_source_sha256": "3edb1f3b72827663603adb43ec0ff666f826dafc2bdf18d999099d714aa33ce9",
+  "original_and_archive_sha256": {
+    "package_source_reviews": "8f361c8b49222b363af157a55572e37d503e22ba55fc88fb68bd9c234f4e120a",
+    "package_followup_reviews": "42ad7c3549aaf2428531aa41dcc0d0ca59c35cdfb524911d19093db2cc602615"
+  },
+  "retired_entry_point_sha256": {
+    "package_source_reviews": "b2b62873e9a05bc21defce9277a2699670038709ea93f518f1e1898bb1792d75",
+    "package_followup_reviews": "bbee1aa7de9d317003979ae6083946049be86437bac62b35ea96ca2a18fd83ae"
+  },
+  "existing_outputs_modified": false,
+  "expensive_review_rerun": false,
+  "publication_authority": false
+}

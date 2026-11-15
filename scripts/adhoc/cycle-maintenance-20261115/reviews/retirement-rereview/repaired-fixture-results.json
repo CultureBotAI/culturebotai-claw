@@ -1,0 +1,29 @@
+{
+  "source_sha256": {
+    "retire_owned_worktree.py": "91c07258e5efdd77d5f4c91b07c1815469bc3cd803db87e5e62e223c27b5de2e",
+    "test_retire_owned_worktree.py": "55df5fa942732167cbaad664cff22ca174dded74f58531bc58a9af8c7419cbb9"
+  },
+  "helper_sha256": "d19bbd6c08f69c2ea622ed1541a70f0e989301a67d6b9dc776ef8f1f1e4d1f8e",
+  "observations": [
+    {
+      "case": "control",
+      "exit_code": 0,
+      "summary": "15 passed in 3.71s",
+      "log_sha256": "741dcf0ebbe0727cce4e5cc7e00dd72895e428ab34016612d2814d6eb33a6cd5"
+    },
+    {
+      "case": "reader-failure",
+      "exit_code": 0,
+      "summary": "1 passed, 16 deselected in 0.45s",
+      "log_sha256": "2547d9d6053ac258202caba54dcc38ceccf89fedc4ef7f088fad737dcbd8590c"
+    },
+    {
+      "case": "proof-binding",
+      "exit_code": 0,
+      "summary": "1 passed, 16 deselected in 0.27s",
+      "log_sha256": "4ff8f7b498b63c4526ffa29416c5cd15fb2c91d952739877da49701b872554e3"
+    }
+  ],
+  "actual_cleanup_performed": false,
+  "sources_unchanged": true
+}

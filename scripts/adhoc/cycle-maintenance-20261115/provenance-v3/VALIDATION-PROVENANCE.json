@@ -1,0 +1,49 @@
+{
+  "issue": 1268,
+  "files": [
+    {
+      "original_relative_path": "prepare_v3_packager.py",
+      "original_sha256": "f17007bba821fa036f8c3bce1a1da68fa0bc06ac29ca4f289e69237326a7aff0",
+      "packaged_path": "scripts/adhoc/cycle-maintenance-20261115/provenance-v3/prepare_v3_packager.py",
+      "packaged_sha256": "f17007bba821fa036f8c3bce1a1da68fa0bc06ac29ca4f289e69237326a7aff0",
+      "packaging_edits": []
+    },
+    {
+      "original_relative_path": "v2-to-v3-edit-provenance.json",
+      "original_sha256": "a66da1e8f2124e55fe3405a8ec67180462a2bf1b5b988fdb27d6210d73f9aa07",
+      "packaged_path": "scripts/adhoc/cycle-maintenance-20261115/provenance-v3/V2-TO-V3.json",
+      "packaged_sha256": "a66da1e8f2124e55fe3405a8ec67180462a2bf1b5b988fdb27d6210d73f9aa07",
+      "packaging_edits": []
+    },
+    {
+      "original_relative_path": "verify_plan_binding_controls.py",
+      "original_sha256": "89be95f32b26c955f098ff16d7f67790a046357c5ca58057d701ff03e56bf0ea",
+      "packaged_path": "scripts/adhoc/cycle-maintenance-20261115/provenance-v3/verify_plan_binding_controls.py",
+      "packaged_sha256": "89be95f32b26c955f098ff16d7f67790a046357c5ca58057d701ff03e56bf0ea",
+      "packaging_edits": []
+    },
+    {
+      "original_relative_path": "paired-controls-public-final/results.json",
+      "original_sha256": "b50f39a9b4ffb9b1f05b00dd7b5e5d13d58668e12d3564e7a9f9ea626310c66d",
+      "packaged_path": "scripts/adhoc/cycle-maintenance-20261115/provenance-v3/PLAN-BINDING-VALIDATION.json",
+      "packaged_sha256": "b50f39a9b4ffb9b1f05b00dd7b5e5d13d58668e12d3564e7a9f9ea626310c66d",
+      "packaging_edits": []
+    },
+    {
+      "original_relative_path": "verify_provenance_packaging.py",
+      "original_sha256": "5f3ffe35aa6f7fe1905ec13ed43872a01e8c73c02e8b1c2ef02090532ef16202",
+      "packaged_path": "scripts/adhoc/cycle-maintenance-20261115/provenance-v3/verify_provenance_packaging.py",
+      "packaged_sha256": "5f3ffe35aa6f7fe1905ec13ed43872a01e8c73c02e8b1c2ef02090532ef16202",
+      "packaging_edits": []
+    },
+    {
+      "original_relative_path": "verification/results.json",
+      "original_sha256": "d59b822174a340acd029200a5faf4ab7f38909a2540bfff23669b37813762e88",
+      "packaged_path": "scripts/adhoc/cycle-maintenance-20261115/provenance-v3/VALIDATION.json",
+      "packaged_sha256": "d59b822174a340acd029200a5faf4ab7f38909a2540bfff23669b37813762e88",
+      "packaging_edits": []
+    }
+  ],
+  "historical_generation_rerun": false,
+  "original_v1_v2_stages_preserved": true
+}

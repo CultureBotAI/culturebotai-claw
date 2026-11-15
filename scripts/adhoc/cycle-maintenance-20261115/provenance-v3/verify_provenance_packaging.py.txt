@@ -1,0 +1,54 @@
+"""Offline issues1266/1268 packaging controls; no heavy validation rerun.
+
+2026-11-15. Inputs: exact retained task originals and v3 packager. Output: exclusive
+private case receipts. Known-history copies authenticate against fixed hashes;
+tampered/missing inputs, manifests and aliasing outputs must leave no output.
+Original helpers/stages are never edited. No GitHub/runtime or cleanup action.
+"""
+import argparse,hashlib,json,os,shutil,subprocess,sys
+from pathlib import Path
+
+def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
+def main():
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--task-root',type=Path,required=True);p.add_argument('--packager',type=Path,required=True);p.add_argument('--output',type=Path,required=True)
+    a=p.parse_args();task=a.task_root.resolve();tool=a.packager.resolve();out=a.output.resolve();out.mkdir(parents=True,exist_ok=False)
+    manifest=tool.with_name('expected-original-inputs.json');pins=json.loads(manifest.read_text())['inputs']
+    original={name:sha(task/name) for name in pins};assert all(original[n]==pins[n]['sha256'] for n in pins)
+    cases=[]
+    def case(name,mutate=None,expected=1):
+        directory=out/name;directory.mkdir();inputs=directory/'inputs';inputs.mkdir()
+        for source in pins:
+            target=inputs/source;target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(task/source,target)
+        selected_tool=tool;destination=directory/'published'
+        if name=='tampered-manifest':
+            isolated=directory/'tool';isolated.mkdir();selected_tool=isolated/tool.name;shutil.copyfile(tool,selected_tool)
+            (isolated/manifest.name).write_bytes(manifest.read_bytes()+b'\n')
+        elif name=='inside-input':destination=inputs/'published'
+        elif name=='alias-output':
+            alias=directory/'alias';alias.symlink_to(inputs,target_is_directory=True);destination=alias/'published'
+        elif name=='input-symlink':
+            target=inputs/'reviews/1112/final-integration/review.json';raw=target.read_bytes();target.unlink();(directory/'same-bytes.json').write_bytes(raw);target.symlink_to(directory/'same-bytes.json')
+        elif name=='existing-output':destination.mkdir();(destination/'sentinel').write_text('preserve\n')
+        if mutate:mutate(inputs)
+        before={str(p.relative_to(destination)):sha(p) for p in destination.rglob('*') if p.is_file()} if destination.exists() else None
+        r=subprocess.run([sys.executable,'-B',str(selected_tool),'--task-root',str(inputs),'--output',str(destination)],capture_output=True,text=True,timeout=60)
+        (directory/'process.log').write_text(r.stdout+r.stderr)
+        assert r.returncode==expected,(name,r.returncode,r.stdout,r.stderr)
+        if expected:
+            if before is None:assert not os.path.lexists(destination),name
+            else:assert before=={str(p.relative_to(destination)):sha(p) for p in destination.rglob('*') if p.is_file()},name
+        else:
+            parsed=json.loads(r.stdout);assert parsed['files']==27
+            assert len([p for p in destination.rglob('*') if p.is_file()])==27
+        cases.append({'name':name,'exit':r.returncode,'expected_exit':expected,'no_partial_output_on_refusal':bool(expected),'log_sha256':sha(directory/'process.log')})
+    case('known-historical-positive',expected=0)
+    def changed_result(inputs):
+        path=inputs/'reviews/1112/final-integration/review.json';value=json.loads(path.read_text());value['independent_tests']['passed']=999;path.write_text(json.dumps(value))
+    case('fake-historical-count',changed_result)
+    case('late-missing-input',lambda root:(root/'reviews/review_final_integrations.py').unlink())
+    case('tampered-helper',lambda root:(root/'reviews/review_final_integrations.py').write_text('not valid Python !\n'))
+    case('tampered-manifest');case('inside-input');case('alias-output');case('input-symlink');case('existing-output')
+    assert original=={name:sha(task/name) for name in pins}
+    result={'issue':1268,'related_issue':1266,'known_history_positive_passed':True,'negative_cases_passed':8,'cases':cases,'all_30_originals_unchanged':True,'packager_sha256':sha(tool),'fixed_manifest_sha256':sha(manifest),'test_helper_sha256':sha(Path(__file__)),'expensive_validation_rerun':False,'runtime_actions':False}
+    (out/'results.json').write_text(json.dumps(result,indent=2,sort_keys=True)+'\n');print(json.dumps(result,indent=2))
+if __name__=='__main__':main()

@@ -1,0 +1,93 @@
+"""Historical read-only root integration review, 2026-11-15.
+Inputs: --repository object store and --output new evidence directory.
+Outputs: exact tree composition and offline command-recorder findings. This
+archived one-time source performs no Git writes, remote calls or runtime actions.
+"""
+import argparse,contextlib,hashlib,io,json,subprocess,sys,types
+from pathlib import Path
+FINAL='2597b50f1cf9ee630316c880b43030e04cfac664'
+MERGE='8db30dad3d818d166b5ee23d64e1bcb22605fd94'
+PRIOR='4970c9c83a8cb1cc2ee06a85ccdbad08589c55e5'
+MAIN='bd2b07480afd3b3984491a7fc729c64220d4dd81'
+SUPERVISOR='scripts/mech_session_supervisor.py'
+INTEGRATOR='scripts/adhoc/cycle-maintenance-20261115/repairs/1197-refresh/integrate_current_main.py'
+p=argparse.ArgumentParser(description=__doc__);p.add_argument('--repository',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
+def git(*args):return subprocess.check_output(['git','-C',str(a.repository),*args])
+def tree(revision):
+ result={}
+ for item in git('ls-tree','-rz',revision).split(b'\0'):
+  if item:
+   meta,path=item.split(b'\t',1);mode,kind,oid=meta.decode().split();result[path.decode()]=(mode,kind,oid)
+ return result
+def blob(raw):return hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()
+base=git('merge-base',PRIOR,MAIN).decode().strip();trees={r:tree(r) for r in (base,PRIOR,MAIN,MERGE,FINAL)}
+all_paths=set().union(*(set(t) for t in trees.values()))
+feature={p for p in all_paths if trees[PRIOR].get(p)!=trees[base].get(p)}
+incoming={p for p in all_paths if trees[MAIN].get(p)!=trees[base].get(p)}
+overlap=feature&incoming;assert overlap=={SUPERVISOR},overlap
+expected=dict(trees[PRIOR])
+for path in incoming-overlap:
+ if path in trees[MAIN]:expected[path]=trees[MAIN][path]
+ else:expected.pop(path,None)
+raw=git('show',f'{PRIOR}:{SUPERVISOR}').decode()
+pairs=[('''config["port_pressure"] = normalize_config({key: value for key, value in pressure.items() if key != "binding_files"})
+        if "binding_files" in pressure:
+            config["port_pressure"]["binding_files"] = pressure["binding_files"]''','''config["port_pressure"] = normalize_config({key: value for key, value in pressure.items() if key not in {"binding_files", "controller_config_path"}})
+        for key in ("binding_files", "controller_config_path"):
+            if key in pressure:
+                config["port_pressure"][key] = pressure[key]'''),('normalized = normalize_config({key: value for key, value in raw.items() if key != "binding_files"})','normalized = normalize_config({key: value for key, value in raw.items() if key not in {"binding_files", "controller_config_path"}})')]
+for old,new in pairs:
+ assert raw.count(old)==1
+ raw=raw.replace(old,new)
+expected[SUPERVISOR]=('100644','blob',blob(raw.encode()))
+assert expected==trees[MERGE]
+added={p for p in all_paths if trees[FINAL].get(p)!=trees[MERGE].get(p)}
+assert len(added)==31
+assert all(p.startswith('scripts/adhoc/cycle-maintenance-20261115/') and p not in trees[MERGE] for p in added)
+expected.update({p:trees[FINAL][p] for p in added});assert expected==trees[FINAL]
+assert git('show','-s','--format=%P',MERGE).decode().strip().split()==[PRIOR,MAIN]
+# Execute only with an injected command recorder: no subprocess or lock touches
+# the real object store/refs/network during this reproduction.
+source=git('show',f'{FINAL}:{INTEGRATOR}')
+assert hashlib.sha256(source).hexdigest()=='fcb8613130d42921f38ae6d74a0073d7375abdbe4c9c7bf36af511fe8cbc97ea'
+module=types.ModuleType('historical1197');exec(compile(source,INTEGRATOR,'exec'),module.__dict__)
+state={'lease':False,'merged':False};calls=[]
+root=(a.output/'synthetic-root').resolve();common=(a.output/'synthetic-common').resolve();locks=(a.output/'synthetic-locks').resolve()
+oldhead='98345116994d17eaee050efb13f5414f5faaf3d4';newhead='748cfaf510e96ffa6f8b4b08c877742cf8a492d8'
+class FakeLock:
+ def __init__(self,*args,**kwargs):pass
+ @contextlib.contextmanager
+ def lock(self,*args,**kwargs):
+  assert not state['lease'];state['lease']=True
+  try:yield
+  finally:state['lease']=False
+module.LockManager=FakeLock
+original=subprocess.check_output
+oldargv=sys.argv
+response=io.StringIO()
+def record(command,**kwargs):
+ if command[0]=='gh':return (MAIN+'\n').encode()
+ words=command[command.index('-C')+2:]
+ if words==['rev-parse','HEAD']:return ((newhead if state['merged'] else oldhead)+'\n').encode()
+ if words[:1]==['status']:return b''
+ if words==['rev-parse','--git-common-dir']:return str(common).encode()
+ if words==['branch','--show-current']:return b'repair/pr1197-baseline-20261115'
+ if words==['remote','get-url','origin']:return b'https://github.com/CultureBotAI/culturebotai-claw.git'
+ if words==['rev-parse','--absolute-git-dir']:return str(common/'worktrees/owned').encode()
+ if words[0]=='fetch':return b''
+ if words[0]=='merge':
+  calls.append({'subcommand':'merge','arguments':words[1:],'lease_active':state['lease'],'hooks_disabled':'core.hooksPath='+module.os.devnull in command,'signing_disabled':'commit.gpgsign=false' in command,'no_commit_requested':'--no-commit' in words})
+  state['merged']=True;return b''
+ if words[:1]==['rev-list']:return f'{newhead} {oldhead} {MAIN}'.encode()
+ if words==['rev-parse','HEAD^{tree}']:return b'f8d88d90cc6fb1c63b8adf8696cea978104b6c56'
+ raise AssertionError(words)
+try:
+ subprocess.check_output=record
+ sys.argv=['historical1197','--root',str(root),'--common-git',str(common),'--locks',str(locks),'--expected-head',oldhead,'--expected-main',MAIN,'--apply']
+ with contextlib.redirect_stdout(response):module.main()
+finally:
+ subprocess.check_output=original;sys.argv=oldargv
+assert len(calls)==1 and calls[0]['lease_active'] and calls[0]['hooks_disabled'] and calls[0]['signing_disabled'] and not calls[0]['no_commit_requested']
+a.output.mkdir(parents=False,exist_ok=False)
+result={'reviewed_head':FINAL,'merge_commit':MERGE,'prior':PRIOR,'main':MAIN,'common_base':base,'incoming_paths':len(incoming),'overlap':sorted(overlap),'entire_merge_tree_verified':True,'post_merge_paths':sorted(added),'post_merge_changes_are_additions_only':True,'final_tree_verified':True,'integrator_sha256':hashlib.sha256(source).hexdigest(),'offline_command_record':calls,'offline_integrator_result':json.loads(response.getvalue()),'review_helper_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'real_git_writes':False,'remote_or_runtime_actions':False}
+(a.output/'verification.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result,indent=2))

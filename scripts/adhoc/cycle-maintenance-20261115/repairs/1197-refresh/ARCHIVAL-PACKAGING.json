@@ -1,0 +1,31 @@
+{
+  "recorded_at": "2026-11-15T10:33:58.084593+00:00",
+  "issue": "https://github.com/CultureBotAI/culturebotai-claw/issues/1270",
+  "source_commit_before_packaging": "2597b50f1cf9ee630316c880b43030e04cfac664",
+  "original_path": "scripts/adhoc/cycle-maintenance-20261115/repairs/1197-refresh/integrate_current_main.py",
+  "archive_path": "scripts/adhoc/cycle-maintenance-20261115/repairs/1197-refresh/integrate_current_main.executed.py.txt",
+  "original_and_archive_sha256": "fcb8613130d42921f38ae6d74a0073d7375abdbe4c9c7bf36af511fe8cbc97ea",
+  "helper_byte_edits": false,
+  "executed_behavior": {
+    "commit_inside_metadata_lease": true,
+    "hook_override": "core.hooksPath=/dev/null",
+    "signing_override": "commit.gpgsign=false"
+  },
+  "original_ledgers_unchanged": {
+    "PROVENANCE.json": "7f829503f1c98fa9e0dd3300e1b8de2f3895677cbfdfaa287ccaf390968e557d",
+    "VALIDATION.json": "38a1cc5f0f5e75432cd32818e4d9ba243046d28d9590933ad1861b1e22988c40",
+    "integration.json": "87b41804876c562f6c84c54fca9aa2585d6ce3fc06f623f34436e8cafbace009",
+    "verification.json": "16420c65ddc99b13023ab42bcb83148db5fbaec2d975b5b6a9d9518bbf3399f4"
+  },
+  "merge_recreated": false,
+  "operational_entrypoint_retained": false,
+  "live_integration_reexecuted_for_correction": false,
+  "documentation_edits": {
+    "README.md": {
+      "before_sha256": "6bedab1b4b2733721b251d931b44b53876a219d0bb1319a11f76153e63aa3ea1",
+      "after_sha256": "81a13f9f8ef400f5956b2ce463b7ed562a8653d5bfb527ee48149b0784cb2261"
+    },
+    "public_readback_original_review_preserved_sha256": "eb9dd9f4116f4d0a00f399fab1184a03dc47644cae17a72c10d8d9a482163084",
+    "separate_packaging_note": "scripts/adhoc/cycle-maintenance-20261115/reviews/public-provenance-readback/PACKAGING-NOTE-1270.md"
+  }
+}

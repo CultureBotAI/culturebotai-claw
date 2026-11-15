@@ -5,7 +5,7 @@ metadata:
   category: workflow
   requires_database: false
   requires_internet: true
-  version: 2.0.0
+  version: 2.1.0
 ---
 
 # Evolve the {{ display_name }} workflow
@@ -81,6 +81,26 @@ stable group IDs and severity reasons, and share one four-hour wall-clock
 window across the Codex primary and agy secondary only after critical/high work
 is resolved. A critical/high prerequisite blocker holds the goal. Keep this
 queue separate from current-cycle review findings and infrastructure intake.
+
+Parent 2.1.0 extends that same first goal with PR maintenance; it does not add
+an eighth stage. It retains additive schema_version 2.0.0. Read the exact active
+parent_version to determine requirements: pinned 2.0 cycles keep their old
+issue-only outputs and closure contract, while 2.1 requires pr_maintenance_policy,
+pr_inventory, pr_dispositions and owned-worktree cleanup. Never strip the policy
+to opt out or reinterpret old evidence as a 2.1 completion.
+Consume the separate supervisor-frozen pr_scope bytes, cutoff and hash alongside
+issue_scope. Account for all frozen draft and ready PRs at their exact heads:
+close stale fourteen-day drafts, superseded or duplicate work with reasons;
+refresh or close conflicts without force-push; fix checks failing on a strict
+majority once at their shared source. Take each green PR through the full
+independent exact-head closure sequence or record a genuine prerequisite hold.
+Preserve the frozen manifest open_pr_limit (default 25), count later non-draft
+arrivals in the live remaining queue, and never convert ready work to draft to
+evade that limit. The triage skill defines statuses and JSON artifact shapes.
+Existing authorization remains effective; missing authority or an approval-review
+refusal holds closure with evidence rather than waiving a gate or prompting
+again for authority already granted. This contract does not activate runtime
+changes, deploy releases, or authorize another repository's work.
 <!-- canonical:end authority -->
 
 ## Local evolution
@@ -108,11 +128,15 @@ snapshot; consult its status and pinned profile, and never edit that snapshot.
 The candidate activates only after reviewed closure at the cycle boundary. Keep
 older profile versions and evidence interpretable. If no supported activation
 path exists, record the blocker instead of switching an active cycle manually.
-For v1 to v2, the reviewed workflow_parent_migration binds the old and candidate
+For v1 to v2 or parent 2.0.0 to 2.1.0, the reviewed workflow_parent_migration binds the old and candidate
 effective workflow hashes and its review evidence. Activation follows the old
 infrastructure goal's verified closure; retain the native goal, archived
 receipts and all original evidence paths and history numbers. Record each
 cycle's parent version. Do not re-pin another repository as part of local work.
+Preserve prior parent/schema bytes and their hashes, archived release evidence
+and all running-cycle pins. An additive schema shape is not permission to
+rewrite an older hash-pinned schema in place. Preparation, release, adoption
+and runtime activation are separate decisions.
 <!-- canonical:end adaptation -->
 
 ## Review output and grouped remediation
@@ -222,7 +246,12 @@ artifact and verify the published text with `gh pr view <n> --json body` or
 operator-owned; an idle or recycle guard reports and holds them, never kills
 them. Follow current native merge-queue and
 protection rules; verify actual merge, required checks and landed content before
-deleting only the owned feature branch. Retain the PR, issue, reviewed head,
+deleting only the owned feature branch. Under parent 2.1, preserve valuable
+worktree state and audit evidence outside each owned feature worktree before
+removing it; verify both the path and Git registration are gone. Do not force
+cleanup or remove configured checkouts, runtime roots or another owner's work.
+Bind the cleanup audit path/hash and owned worktree_paths in the supplied
+receipt template. Retain the PR, issue, reviewed head,
 merge commit and cleanup receipt. A genuine no-diff goal needs an evidence-backed
 no-op receipt. Passing tests, enabled auto-merge, or a completion sentence is not
 proof of closure. Build the structured receipt from receipt_template and write it to

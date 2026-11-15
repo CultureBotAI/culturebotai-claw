@@ -1,0 +1,42 @@
+{
+  "date": "2026-11-15",
+  "status": "PREPARATION_ONLY_NO_RESTORATION",
+  "helper_sha256": "9c793f327c0bb21f9607ac80d257506295c202a3cdcebf05c8a16ea94b40405c",
+  "snapshots": [
+    {
+      "label": "review-1112",
+      "associated_pr": 1112,
+      "observed_pr_state": "open",
+      "source_head": "68d8b2b6e02c1ca4fda2524f348460ecfa566402",
+      "capture_sha256": "1292a57e13adcda388b0d8309bd47eba9158e5a0db962a15885cfbb344c146f4",
+      "original_index_sha256": "f7b0deaf9d707fa96f8c62029b8374f22ebbe6bb535bc1fc485ab53a952b9d17",
+      "staged_paths": 15,
+      "unstaged_paths": 0,
+      "untracked_source_files": 0,
+      "ignored_roots_retained": 6,
+      "staged_patch_sha256": "86431cdbcca1c7b4c9a9da5eeef7070d2ef646849df5c8b9b35cd96cf27b82f1",
+      "unstaged_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "remote-verifier",
+      "associated_pr": 1261,
+      "observed_pr_state": "open",
+      "source_head": "68d8b2b6e02c1ca4fda2524f348460ecfa566402",
+      "capture_sha256": "d28b0bc6bb39f090c0652a4f8daf78a6be88be386958203f97573954cf062ec8",
+      "original_index_sha256": "88bd0778687c8f69d88b073a635d61a5be9a0514b0fe897c1ac276eec1ac7a30",
+      "staged_paths": 0,
+      "unstaged_paths": 7,
+      "untracked_source_files": 12,
+      "ignored_roots_retained": 1,
+      "staged_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "unstaged_patch_sha256": "0704ab62d2cd0cbdf63ebad5ceab3939ec13845a4806b06524c8dc09a2efa234"
+    }
+  ],
+  "all_capture_payloads_read_back": true,
+  "original_index_and_selected_source_bytes_unchanged_on_final_readback": true,
+  "private_restoration_plan_sha256": "e85417c9e7ddc907ab40453df3c941f1d22d2ee747d13abd0fa849c875976400",
+  "initial_refusal_sha256": "562acd1ab4562fb4bafcffdcfe1939cdcf0689d7d21aabd0a187e1963788f947",
+  "restoration_performed": false,
+  "cleanup_performed": false,
+  "github_mutations": false
+}

@@ -99,7 +99,13 @@ def test_symlink_and_duplicate_json_refuse(tmp_path):
 def test_original_v1_v2_parent_bytes_remain_available():
     from kg_microbe_workflows import LEGACY_PARENT_PATH, PARENT_PATH, load_document
     assert load_document(LEGACY_PARENT_PATH.read_bytes())['version'].startswith('1.')
-    assert load_document(PARENT_PATH.read_bytes())['version'] == '2.0.0'
+    historical_v2 = PARENT_PATH.with_name('mech-cycle-v2.0.yaml').read_bytes()
+    assert hashlib.sha256(historical_v2).hexdigest() == (
+        '0d3e218c22c4ffe4e6dcddce8287d0177aaa52f637e156df1c737e4e7d84f913'
+    )
+    assert load_document(historical_v2)['version'] == '2.0.0'
+    assert 'repository_freshness' not in load_document(historical_v2)
+    assert load_document(PARENT_PATH.read_bytes())['version'] == '2.1.0'
     assert 'repository_freshness' not in load_document(PARENT_PATH.read_bytes())
 
 

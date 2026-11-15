@@ -463,3 +463,48 @@ def test_fifo_is_rejected_without_blocking(session):
     os.mkfifo(session.root / prs.REGISTRY_NAME)
     with pytest.raises(prs.AssociationError, match="regular"):
         prs.gather_associations([session.runtime])
+
+
+@pytest.mark.parametrize("damage", [None, "missing_scope", "bad_hash"])
+def test_maintenance_receipt_preserves_backlog_goal_ownership(session, damage):
+    import hashlib
+
+    from test_pr_maintenance import row, snapshot
+
+    prs.register_pr(session.root, 42)
+    original_registry = (session.root / prs.REGISTRY_NAME).read_bytes()
+    old = prs._context(session.ledger)
+    frozen = snapshot([row(42)])
+    frozen["repository"] = "CultureBotAI/TraitMech"
+    content = json.dumps(frozen)
+    scope = {"content": content, "sha256": hashlib.sha256(content.encode()).hexdigest(),
+             **{key: frozen[key] for key in ("prs", "frozen_at", "open_non_draft_limit", "limit_source")}}
+    session.ledger.update(cycle=2, parent_version="2.1.0",
+        adopted_goal={**session.ledger["adopted_goal"], "start_step_index": 99},
+        completed_stages=[{key: old[key] for key in ("cycle", "stage", "goal_identity", "workflow_sha256")}],
+        pr_scope=scope)
+    if damage == "missing_scope":
+        session.ledger.pop("pr_scope")
+    elif damage == "bad_hash":
+        session.ledger["pr_scope"]["sha256"] = "f" * 64
+    write(session.root / "ledger.json", session.ledger)
+    write(session.root / "status.json", prs._context(session.ledger))
+    def member(number):
+        head = ("a" if number == 42 else "b") * 40
+        return {"number": number, "head_sha": head,
+            "merge_commit_sha": ("d" if number == 42 else "e") * 40,
+            "branch": f"topic/{number}", "base": "main",
+            "review": {"status": "complete", "remaining_findings": 0, "head_sha": head},
+            "validation": [{"command": "pytest", "status": "passed", "head_sha": head}],
+            "cleanup": {"checkout_ready": True, "local_branch_deleted": True, "remote_branch_deleted": True}}
+    members = [member(42), member(43)]
+    final = members[-1]
+    candidate = {**prs._context(session.ledger), "schema_version": 2, "status": "completed", "prs": members,
+        "pr": {key: final[key] for key in ("number", "head_sha", "branch", "base")},
+        **{key: final[key] for key in ("review", "validation", "cleanup")},
+        "issues": [], "evidence_attributions": []}
+    write(session.root / "completion.json", candidate)
+    result = prs.collect_associations([session.runtime])
+    assert [(r["cycle"], r["stage"]) for r in result.records if r["pr_number"] == 42] == [(1, 1)]
+    assert [r["pr_number"] for r in result.records if r["cycle"] == 2] == ([] if damage else [43])
+    assert (session.root / prs.REGISTRY_NAME).read_bytes() == original_registry

@@ -379,7 +379,15 @@ def collect_associations(runtime_dirs: Iterable[Path], *, fleet: FleetManifest |
                     candidate = _json(candidate_raw)
                     if isinstance(candidate, dict) and candidate.get("schema_version") == 2:
                         from kg_microbe_workflows.closure import multi_pr_members
-                        members = multi_pr_members(candidate) or [candidate.get("pr", {})]
+                        maintenance = _cycle_version(ledger) == "2.1.0" and ledger.get("stage") == 1
+                        members = multi_pr_members(candidate, max_members=10001 if maintenance else 16) or [candidate.get("pr", {})]
+                        if maintenance:
+                            from kg_microbe_workflows.pr_maintenance_remote import (
+                                validate_frozen_pr_scope,
+                            )
+                            snapshot = validate_frozen_pr_scope(ledger.get("pr_scope", {}), fleet.get(key).github)
+                            backlog = {item["number"] for item in snapshot["prs"]}
+                            members = [member for member in members if member.get("number") not in backlog]
                         candidates = []
                         for member in members:
                             record = {key: candidate.get(key) for key in CONTEXT_FIELDS}

@@ -1,0 +1,16 @@
+{
+  "date": "2026-11-15",
+  "repository": "CultureBotAI/culturebotai-claw",
+  "pr": 1243,
+  "purpose": "Independently verify the completed second cleanup canary without mutating Git, GitHub, worktrees or quarantine.",
+  "helper": "verify_cleanup_canary.py",
+  "helper_commit": "59bce0f5f785936bd0552841e56d77beced52c02",
+  "helper_sha256": "ac422830ec1719f2acdc6a1a9be52a8428277dc0b8112656bf826856d7bed348",
+  "helper_edits": [],
+  "inputs": "Explicit quarantine before/preserved/completed/recovery JSON, operator proof/dry/apply receipts, recorded action plan, common Git directory, retirement helper, live public PR and branch-reference API.",
+  "outputs": "Full detailed JSON stdout retained privately; public result removes only private_detail.",
+  "private_receipt_sha256": "7b812e6d0d92ad736416aa245009a167a795b92987a511fcd9522cbe4400372a",
+  "public_result_sha256": "05c6dcaf48dec9caf5d65b6abfc8eb3355a076ac248dd1e15a0373cc267a8e08",
+  "original_helpers_and_previous_results_preserved": true,
+  "mutation_performed_by_reviewer": false
+}

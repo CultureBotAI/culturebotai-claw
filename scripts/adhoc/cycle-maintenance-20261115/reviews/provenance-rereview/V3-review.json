@@ -1,0 +1,40 @@
+{
+  "verdict": "PASS after issue1268 repair and archival retirement under1263/1265",
+  "scope": "independent read-only final 38-file v3 stage, not whole PR readiness",
+  "staged_inventory_sha256": "a843411987f8b14bd8ac57cb6811f9b29303e5ab836781b71f9a8a04f9e1af19",
+  "packager_sha256": "902a8400b8e244b01a70c4536698914bec8981625c8ab12021d69a2ab85293cd",
+  "fixed_original_manifest_sha256": "fac861a12685b2859879dbb973dce85ae712634e34fbd9317e2061b4ccb8d7de",
+  "independent_tests": {
+    "passed": 4,
+    "skipped": 0,
+    "log_sha256": "4250d1f2029068ddc50a143f438d48c0e151e05c734fe713ffea94436ecf9381"
+  },
+  "historical_mutation_logs_read_back": {
+    "control": "4250d1f2029068ddc50a143f438d48c0e151e05c734fe713ffea94436ecf9381",
+    "inventory": "f342e44eb9bd153976c68b8d0c79358e3e00a78637352ab1981d0a7861735219",
+    "drift": "4c15e1fc61a00a1b8844b2f60da17fad468132a46c1d34736ca055027b2a1aa7"
+  },
+  "historical_mutations_are_intended_assertion_failures": true,
+  "expected_payload_files": 27,
+  "all_30_original_inputs_unchanged": true,
+  "archived_meta_helper_count": 4,
+  "public_path_email_process_identifier_scan_passed": true,
+  "confirmed_adjacent_findings": {
+    "1265": "One-time preparation helper overwrote two existing metadata sentinels; executable withdrawn and exact bytes archived.",
+    "1263": "One-time mutation runner accepted unrelated setup ERRORs as detections; executable withdrawn and exact bytes archived. Actual historical mutations separately proved intended assertion failures."
+  },
+  "helper_artifacts": {
+    "probe_plan_bound_inputs.py": "6e6cf4130ee38c0e1a3b5272db02801361d4f8a25c7b04a5b7bdc30d5658ddee",
+    "verify_staged_bytes.py": "4217a2338ecaa3f0b8104cab9d63973da35c44126d8a9e5c7908b88f548a9cdf",
+    "probe_v3_auxiliary_helpers.py": "2a03ef21f161a832857c88aa3f053775eaa9454b812aaad8c82ecba3f57a60f1",
+    "verify_v3_staged_bytes.py": "94359f15b23f508ea5614f37b2e61f8c77abf309235144655937ccb01d9488b8"
+  },
+  "evidence": {
+    "plan-binding-probe.json": "41673fd080466b9b72c4afde4ee06cc1bc58ce10eac1c59f2050b07c36a55519",
+    "staged-byte-verification.json": "e852b5789cd35ecf3cf284de3541bb90b9f1439cfccca2be64fd4a6ddf7287cc",
+    "v3-auxiliary-probes/probes.json": "983259b9afe693ae6f880f2ca6d70cbea149a20513ae7e222e81c5e923fd04ae",
+    "v3-staged-byte-verification.json": "8e6894df57886e0910eb6cc547cff8553ed06bcfd4770fb68eb1e863cf3bc6d8"
+  },
+  "source_changes_by_reviewer": false,
+  "github_mutations_by_reviewer": false
+}

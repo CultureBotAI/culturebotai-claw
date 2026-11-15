@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-15",
+  "files": {
+    "README.md": "3ce37f6724c42f77d65e6fd8e00e4fd7b4d3e2b0133f0c777073b1bd299d2304",
+    "archive_primary_clone.py": "417893f1064336d04c90e41cffebc1675c538ab16064ce28373bc498def107d9",
+    "test_archive_primary_clone.py": "0f24c3e1450f90132810e3e564b7cc6fe2e0c5e94ea9ca3887e2826dd9a444a2",
+    "verify_archival_mutations.py": "b15798b93efb0fe3615028ec4c31ff641e9efbf82023b87bcb44dcb6b011c873"
+  },
+  "initial_failure_logs_retained": true,
+  "paired_control_count": 3,
+  "paired_controls_sha256": "13843ca53d4757e9d464851eb7f5eb0215f94b0d35e5eec6a6aa511b4aae9d8b",
+  "pytest": {
+    "errors": 0,
+    "failures": 0,
+    "skipped": 0,
+    "tests": 22
+  },
+  "pytest_junit_sha256": "eec859c623494cd882c752f079dbf8a6be0e8dd8abd4aece0e756425cc95b32c",
+  "pytest_log_sha256": "c12554de1016fcc49e867af2e88dc190a6a0f53672f39747bdc2ab391f8fcd92",
+  "pytest_seconds": 7.77,
+  "real_clone_moves": 0,
+  "related_issue": 1269,
+  "root_source_changes": false,
+  "ruff_log_sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+  "status": "implementation_only_pending_independent_review",
+  "unversioned_development_sources_not_claimed_as_final": true
+}

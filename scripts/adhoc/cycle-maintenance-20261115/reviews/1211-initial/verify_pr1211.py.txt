@@ -1,0 +1,81 @@
+"""Read-only PR1211 review: validate immutable source/fixture provenance (2026-11-15).
+Inputs: reviewed local repository; no network or private repository queries.
+Output: JSON on stdout. Issues1213/1214/1217/1255; never edits source/Git state.
+"""
+from __future__ import annotations
+import argparse
+import hashlib
+import json
+import subprocess
+from pathlib import Path
+
+HEAD = '553a6103c2275ce7f020f6c6519465323240aaa8'
+BASE = '99fb0ac11e2e6aeabedc8d08f29a5f08aac0892d'
+ORIGINAL = 'a5a98c7018c2216ac814f9ce9e97e13c02b18792'
+PROVENANCE = 'tests/fixtures/admitted-source-provenance.json'
+
+def digest(raw):
+    return hashlib.sha256(raw).hexdigest()
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--root', required=True, type=Path)
+    root = parser.parse_args().root
+    def git(*args):
+        return subprocess.check_output(['git', '-C', str(root), *args])
+    assert git('rev-parse', 'HEAD').decode().strip() == HEAD
+    rows = json.loads((root / PROVENANCE).read_bytes())['records']
+    assert len(rows) == 13
+    union = {}
+    for ref in (ORIGINAL, BASE):
+        for row in json.loads(git('show', f'{ref}:{PROVENANCE}'))['records']:
+            key = (row['consumer'], row['source_path'])
+            if key in union:
+                assert union[key] == row
+            union[key] = row
+    assert rows == list(union.values())
+    provenance = []
+    for row in rows:
+        raw = (root / row['fixture']).read_bytes()
+        tree_path = Path(__file__).parent / f"source-tree-{row['source_ref']}.json"
+        tree = json.loads(tree_path.read_bytes())
+        assert tree['truncated'] is False
+        entry = next(item for item in tree['tree'] if item['path'] == row['source_path'])
+        assert entry['sha'] == row['source_blob'] and entry['type'] == 'blob'
+        assert hashlib.sha1(b'blob ' + str(len(raw)).encode() + b'\0' + raw).hexdigest() == row['source_blob']
+        assert digest(raw) == row['sha256'] and len(raw) == row['bytes']
+        snapshot = (root / row['snapshot']).read_bytes()
+        assert digest(snapshot) == row['snapshot_sha256']
+        artifact = next(a for a in json.loads(snapshot)['artifacts'] if a['source'] == row['source_path'])
+        assert artifact['sha256'] == digest(raw)
+        provenance.append({'consumer': row['consumer'], 'source_path': row['source_path'],
+            'source_ref': row['source_ref'], 'source_blob': row['source_blob'], 'sha256': digest(raw)})
+    baseline_path = root / 'src/kg_microbe_skills/template_baseline.json'
+    baseline = json.loads(baseline_path.read_bytes())
+    assert baseline['baseline_version'] == '1.1.0'
+    assert baseline['source_ref'] == '1b419415a738c4d68c79c0dba6c838db77acc98d'
+    assert len(baseline['sources']) == 62
+    for path, expected in baseline['sources'].items():
+        assert digest((root / path).read_bytes()) == expected
+        assert digest(git('show', f"{baseline['source_ref']}:{path}")) == expected
+    helper = root / 'scripts/adhoc/merge_fixture_provenance_1211_20261115.py'
+    output = subprocess.check_output(['python', str(helper), '--root', str(root), '--ours', ORIGINAL, '--incoming', BASE])
+    assert output == (root / PROVENANCE).read_bytes()
+    core = ['plugins/repository_settings.py', 'src/kg_microbe_governance/candidates.json',
+        'src/kg_microbe_governance/candidates.py', 'src/kg_microbe_governance/artifacts/scripts/check_vendored_sync.py',
+        'tests/test_preparation_candidates.py']
+    for path in core:
+        assert (root / path).read_bytes() == git('show', f'{ORIGINAL}:{path}')
+    unchanged = ['src/kg_microbe_fleet/fleet.yaml', 'src/kg_microbe_governance/releases',
+        'src/kg_microbe_governance/private_audit', '.github', 'config', 'workflow', 'src/kg_microbe_research']
+    for path in unchanged:
+        assert not git('diff', BASE, HEAD, '--', path)
+    print(json.dumps({'head': HEAD, 'base': BASE, 'original': ORIGINAL,
+        'provenance_rows': provenance, 'provenance_sha256': digest((root / PROVENANCE).read_bytes()),
+        'baseline_sha256': digest(baseline_path.read_bytes()), 'baseline_source': baseline['source_ref'],
+        'baseline_authority_count': len(baseline['sources']), 'helper_sha256': digest(helper.read_bytes()),
+        'helper_output_sha256': digest(output), 'original_core_identical': core,
+        'base_surfaces_unchanged': unchanged, 'review_helper_sha256': digest(Path(__file__).read_bytes())}, indent=2))
+
+if __name__ == '__main__':
+    main()

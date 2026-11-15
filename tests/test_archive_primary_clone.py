@@ -1,0 +1,427 @@
+"""Meaningful offline archival guards; only synthetic durable fixture clones."""
+
+from __future__ import annotations
+
+import argparse
+import ctypes
+import hashlib
+import importlib.util
+import json
+import os
+import subprocess
+import sys
+import tempfile
+from datetime import datetime, timezone
+from pathlib import Path
+
+import pytest
+
+ROOT = Path(__file__).resolve().parent
+REPO = ROOT.parent
+DEFAULT_HELPER = (
+    ROOT / "archive_primary_clone.py"
+    if (ROOT / "archive_primary_clone.py").is_file()
+    else REPO
+    / "scripts/adhoc/cycle-maintenance-20261115/cleanup-inventory/archive_primary_clone.py"
+)
+HELPER = Path(os.environ.get("ARCHIVAL_TEST_HELPER", str(DEFAULT_HELPER)))
+SPEC = importlib.util.spec_from_file_location("archive_primary_clone_under_test", HELPER)
+archive = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(archive)
+SHARED = Path(
+    os.environ.get("ARCHIVAL_SHARED_HELPER", str(HELPER.parent / "retire_owned_worktree.py"))
+)
+pytestmark = pytest.mark.skipif(
+    sys.platform != "darwin", reason="Reviewed archival API is Darwin-only"
+)
+
+
+@pytest.fixture
+def durable_fixture():
+    configured = os.environ.get("ARCHIVAL_FIXTURE_ROOT")
+    base = Path(configured) if configured else REPO / ".temp"
+    assert base.is_absolute() and not base.is_symlink()
+    if not configured:
+        subprocess.run(
+            ["git", "-C", str(REPO), "check-ignore", "--quiet", ".temp/archival-fixture"],
+            check=True,
+        )
+    base.mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="archival-fixture-", dir=base) as directory:
+        yield Path(directory)
+
+
+def git(root, *args):
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    env.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull)
+    return (
+        subprocess.check_output(
+            ["git", "-c", "core.hooksPath=/dev/null", "-C", str(root), *args],
+            env=env,
+            stderr=subprocess.PIPE,
+        )
+        .decode()
+        .strip()
+    )
+
+
+def write(path, doc):
+    path.write_text(json.dumps(doc))
+
+
+def probe(_):
+    return {"exit": 1, "checked_at": datetime.now(timezone.utc).isoformat(), "fixture": True}
+
+
+@pytest.fixture
+def fixture(durable_fixture, monkeypatch):
+    tmp_path = durable_fixture
+    upstream = tmp_path / "upstream"
+    upstream.mkdir()
+    git(upstream, "init", "-q")
+    for text in ("first", "second"):
+        (upstream / "record").write_text(text)
+        git(upstream, "add", "record")
+        git(
+            upstream,
+            "-c",
+            "user.name=Offline fixture",
+            "-c",
+            "user.email=offline-fixture.invalid",
+            "commit",
+            "-qm",
+            text,
+        )
+    task = tmp_path / "task"
+    source = task / "reviews/1236/repo"
+    source.parent.mkdir(parents=True)
+    git(tmp_path, "clone", "--depth=1", "--no-checkout", upstream.as_uri(), str(source))
+    head = git(source, "rev-parse", "HEAD")
+    git(source, "update-ref", "--no-deref", "HEAD", head)
+    git(
+        source,
+        "remote",
+        "set-url",
+        "origin",
+        "https://github.com/CultureBotAI/culturebotai-claw.git",
+    )
+    dependencies = []
+    for index, name in enumerate(archive.REQUIRED_RETIREMENTS):
+        ref = "refs/cleanup-recovery/fixture-" + str(index)
+        git(source, "update-ref", ref, head)
+        receipt = task / ("retirement-" + str(index) + ".json")
+        write(receipt, {"mode": "applied", "worktree": str(task / name), "recovery_ref": ref})
+        dependencies.append(
+            {
+                "relative_root": name,
+                "receipt": str(receipt),
+                "sha256": hashlib.sha256(receipt.read_bytes()).hexdigest(),
+            }
+        )
+    plan, review = task / "plan.md", task / "review.md"
+    plan.write_text("Synthetic bounded archival plan\n")
+    review.write_text("Synthetic independent approval\n")
+    monkeypatch.setattr(archive, "PLAN_SHA256", hashlib.sha256(plan.read_bytes()).hexdigest())
+    monkeypatch.setattr(archive, "REVIEW_SHA256", hashlib.sha256(review.read_bytes()).hexdigest())
+    locks = task / "locks"
+    locks.mkdir()
+    quarantine = task / "quarantine"
+    quarantine.mkdir()
+    proof = task / "proof.json"
+    args = argparse.Namespace(
+        task_scope=task,
+        source=source,
+        archive_parent=quarantine / "primary",
+        evidence=task / "evidence",
+        proof=proof,
+        plan=plan,
+        review=review,
+        locks_dir=locks,
+        shared_helper=SHARED,
+        expected_head=head,
+        apply=False,
+    )
+    refs = subprocess.check_output(
+        [
+            "git",
+            "-C",
+            str(source),
+            "for-each-ref",
+            "--format=%(refname)%09%(objectname)%09%(symref)",
+        ]
+    )
+    doc = {
+        "schema_version": 1,
+        "repository": archive.REPOSITORY,
+        "task_scope": str(task),
+        "source": str(source),
+        "destination": str(args.archive_parent / "repo"),
+        "expected_head": head,
+        "plan_sha256": hashlib.sha256(plan.read_bytes()).hexdigest(),
+        "review_sha256": hashlib.sha256(review.read_bytes()).hexdigest(),
+        "owner_complete": True,
+        "owner_evidence": "offline fixture owner finished",
+        "dependencies_reviewed": True,
+        "unknown_dependencies": [],
+        "borrower_review": {"bounded_scope": "isolated fixture", "known_borrowers": []},
+        "observed_at": datetime.now(timezone.utc).isoformat(),
+        "refs_sha256": hashlib.sha256(refs).hexdigest(),
+        "retirements": dependencies,
+    }
+    write(proof, doc)
+    return args
+
+
+def test_dry_run_keeps_absent_index_and_all_objects(fixture):
+    before = archive.inventory(fixture.source)
+    result = archive.archive(fixture, probe=probe)
+    assert result["mode"] == "dry-run" and not fixture.archive_parent.exists()
+    assert archive.inventory(fixture.source) == before
+    assert not (fixture.source / ".git/index").exists()
+
+
+def test_apply_preserves_every_byte_xattr_empty_dir_refs_and_shallow(fixture):
+    empty = fixture.source / ".git/retained-empty"
+    empty.mkdir()
+    (fixture.source / ".git/retained-link").symlink_to("HEAD")
+    (fixture.source / ".git/retained-chain").symlink_to("retained-link")
+    marked = fixture.source / ".git/description"
+    lib = ctypes.CDLL(None, use_errno=True)
+    lib.setxattr.argtypes = [
+        ctypes.c_char_p,
+        ctypes.c_char_p,
+        ctypes.c_void_p,
+        ctypes.c_size_t,
+        ctypes.c_uint32,
+        ctypes.c_int,
+    ]
+    value = b"retained\x00value"
+    assert (
+        lib.setxattr(os.fsencode(marked), b"com.example.archival-fixture", value, len(value), 0, 1)
+        == 0
+    )
+    subprocess.run(["/bin/chmod", "+a", "everyone allow readattr", str(marked)], check=True)
+    assert archive.acl(marked) != {"absent": True} and archive.xattrs(marked)
+    before = archive.inventory(fixture.source)
+    fixture.apply = True
+    result = archive.archive(fixture, probe=probe)
+    target = fixture.archive_parent / "repo"
+    assert not fixture.source.exists() and result["source_moved"]
+    assert archive.preserved(archive.inventory(target)) == archive.preserved(before)
+    assert not (target / ".git/index").exists() and (target / ".git/shallow").exists()
+    assert (target / ".git/retained-empty").is_dir()
+    assert (fixture.evidence / "relocation.json").exists()
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "index",
+        "linked",
+        "metadata",
+        "owner",
+        "unknown",
+        "config",
+        "hardlink",
+        "lock",
+        "head",
+        "receipt",
+    ],
+)
+def test_guard_distinctions(fixture, mutation):
+    if mutation == "index":
+        git(fixture.source, "read-tree", "HEAD")
+    elif mutation == "linked":
+        git(
+            fixture.source,
+            "worktree",
+            "add",
+            "--detach",
+            str(fixture.task_scope / "linked"),
+            fixture.expected_head,
+        )
+    elif mutation == "metadata":
+        (fixture.source / ".git/worktrees/orphan").mkdir(parents=True)
+    elif mutation in ("owner", "unknown"):
+        doc = json.loads(fixture.proof.read_bytes())
+        if mutation == "owner":
+            doc["owner_complete"] = False
+        else:
+            doc["unknown_dependencies"] = ["borrower not cleared"]
+        write(fixture.proof, doc)
+    elif mutation == "config":
+        git(fixture.source, "config", "core.worktree", str(fixture.task_scope / "outside"))
+    elif mutation == "hardlink":
+        os.link(fixture.source / ".git/description", fixture.task_scope / "external-hardlink")
+    elif mutation == "lock":
+        (fixture.source / ".git/index.lock").write_bytes(b"lock")
+    elif mutation == "head":
+        fixture.expected_head = "0" * 40
+    else:
+        doc = json.loads(fixture.proof.read_bytes())
+        Path(doc["retirements"][0]["receipt"]).write_text("changed")
+    with pytest.raises((ValueError, OSError)):
+        archive.archive(fixture, probe=probe)
+    assert fixture.source.is_dir() and not fixture.archive_parent.exists()
+
+
+def test_reader_refusal_is_not_empty_success(fixture):
+    def blocked(_):
+        raise ValueError("active fixture reader")
+
+    with pytest.raises(ValueError, match="reader"):
+        archive.archive(fixture, probe=blocked)
+    assert fixture.source.is_dir() and not fixture.evidence.exists()
+
+
+@pytest.mark.parametrize("changed", ["proof", "plan", "refs", "file"])
+def test_final_readback_revocation_refuses_before_move(fixture, changed):
+    fixture.apply = True
+    calls = 0
+
+    def late(root):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            if changed == "proof":
+                doc = json.loads(fixture.proof.read_bytes())
+                doc["owner_complete"] = False
+                write(fixture.proof, doc)
+            elif changed == "plan":
+                fixture.plan.write_text("changed reviewed plan")
+            elif changed == "refs":
+                git(root, "update-ref", "refs/cleanup-recovery/late", fixture.expected_head)
+            else:
+                (root / ".git/description").write_text("late mutation")
+        return probe(root)
+
+    with pytest.raises((ValueError, OSError)):
+        archive.archive(fixture, probe=late)
+    assert fixture.source.is_dir() and not (fixture.archive_parent / "repo").exists()
+    assert not (fixture.evidence / "relocation.json").exists()
+
+
+def test_exclusive_platform_rename_refuses_collision_without_overwrite(durable_fixture):
+    tmp_path = durable_fixture
+    source, parent = tmp_path / "source", tmp_path / "archive"
+    source.mkdir()
+    parent.mkdir()
+    target = parent / "repo"
+    target.mkdir()
+    (source / "keep").write_text("source")
+    (target / "keep").write_text("destination")
+    with pytest.raises(OSError):
+        archive.exclusive_rename(
+            source,
+            target,
+            [archive.fingerprint(source.parent)[:2], archive.fingerprint(parent)[:2]],
+            archive.fingerprint(source)[:2],
+        )
+    assert (source / "keep").read_text() == "source"
+    assert (target / "keep").read_text() == "destination"
+
+
+def test_exclusive_platform_rename_preserves_existing_empty_destination(durable_fixture):
+    tmp_path = durable_fixture
+    source, parent = tmp_path / "source", tmp_path / "archive"
+    source.mkdir()
+    parent.mkdir()
+    target = parent / "repo"
+    target.mkdir()
+    identity = archive.fingerprint(target)[:2]
+    (source / "keep").write_text("source")
+    with pytest.raises(OSError):
+        archive.exclusive_rename(
+            source,
+            target,
+            [archive.fingerprint(source.parent)[:2], archive.fingerprint(parent)[:2]],
+            archive.fingerprint(source)[:2],
+        )
+    assert (source / "keep").read_text() == "source"
+    assert archive.fingerprint(target)[:2] == identity and not list(target.iterdir())
+
+
+def test_platform_rename_refuses_replaced_source_identity(durable_fixture):
+    tmp_path = durable_fixture
+    source, parent = tmp_path / "source", tmp_path / "archive"
+    source.mkdir()
+    parent.mkdir()
+    with pytest.raises(ValueError, match="Source identity"):
+        archive.exclusive_rename(
+            source,
+            parent / "repo",
+            [archive.fingerprint(source.parent)[:2], archive.fingerprint(parent)[:2]],
+            [0, 0],
+        )
+    assert source.is_dir() and not (parent / "repo").exists()
+
+
+def test_real_lsof_on_closed_synthetic_clone(fixture):
+    assert archive.readers(fixture.source)["exit"] == 1
+
+
+def test_postmove_metadata_drift_retains_archive_and_intent(fixture, monkeypatch):
+    original = archive.exclusive_rename
+
+    def changed(source, destination, parents, source_id):
+        original(source, destination, parents, source_id)
+        path = destination / ".git/description"
+        info = path.stat()
+        os.utime(path, ns=(info.st_atime_ns, info.st_mtime_ns + 1))
+
+    monkeypatch.setattr(archive, "exclusive_rename", changed)
+    fixture.apply = True
+    with pytest.raises(ValueError, match="Preserved bytes/metadata mismatch"):
+        archive.archive(fixture, probe=probe)
+    assert not fixture.source.exists() and (fixture.archive_parent / "repo").is_dir()
+    assert (fixture.evidence / "intent.json").exists()
+    assert not (fixture.evidence / "relocation.json").exists()
+
+
+@pytest.mark.parametrize("target_kind", ["absolute", "relative_escape", "chained_relative_escape"])
+def test_relocation_unstable_symlink_refused_before_output(fixture, target_kind):
+    target = (
+        fixture.source / ".git/HEAD"
+        if target_kind == "absolute"
+        else Path("../../../1236/repo/.git/HEAD")
+    )
+    if target_kind == "chained_relative_escape":
+        (fixture.source / ".git/alias-root").symlink_to("..")
+        target = Path("alias-root/../../1236/repo/.git/HEAD")
+    (fixture.source / ".git/unstable-link").symlink_to(target)
+    fixture.apply = True
+    with pytest.raises((ValueError, OSError)):
+        archive.archive(fixture, probe=probe)
+    assert fixture.source.is_dir(), "Unstable symlink must be refused before relocation"
+    assert not fixture.evidence.exists() and not fixture.archive_parent.exists()
+
+
+def test_identical_evidence_archive_outputs_refused_before_creation(fixture):
+    fixture.evidence = fixture.archive_parent
+    with pytest.raises(ValueError):
+        archive.archive(fixture, probe=probe)
+    assert fixture.source.is_dir() and not fixture.evidence.exists()
+
+
+@pytest.mark.parametrize("operation", ["inventory", "quick", "snapshot"])
+def test_acl_list_denial_refuses_complete_traversal(fixture, operation):
+    protected = fixture.source / ".git/protected-dir"
+    protected.mkdir()
+    (protected / "valuable").write_bytes(b"must-be-inventoried")
+    subprocess.run(["/bin/chmod", "+a", "everyone deny list", str(protected)], check=True)
+    try:
+        assert protected.lstat() and archive.acl(protected)
+        with pytest.raises(PermissionError):
+            list(protected.iterdir())
+        with pytest.raises((ValueError, OSError)):
+            if operation == "inventory":
+                archive.inventory(fixture.source)
+            elif operation == "quick":
+                archive.quick(fixture.source, archive.load_shared(SHARED))
+            else:
+                archive.snapshot(
+                    fixture.source, fixture.expected_head, archive.load_shared(SHARED), full=False
+                )
+    finally:
+        subprocess.run(["/bin/chmod", "-a", "everyone deny list", str(protected)], check=True)
+    assert fixture.source.is_dir() and not fixture.evidence.exists()

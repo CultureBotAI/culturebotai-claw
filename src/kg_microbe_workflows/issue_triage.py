@@ -175,6 +175,9 @@ def validate_issue_triage(
             or set(triage["carry_forward_group_ids"]) != carry):
         raise WorkflowError("carry-forward groups must exactly retain deferred and blocked scope")
     blocked = issue_triage_blockers(data)
+    if data.get("parent_version") == "2.1.0":
+        from .pr_maintenance import pr_maintenance_blockers
+        blocked = sorted(set(blocked) | set(pr_maintenance_blockers(data)))
     if bool(blocked) != (data["outcome"] == "blocked"):
         raise WorkflowError("blocked critical/high issues must hold the goal with outcome blocked")
     budget = triage["budget"]

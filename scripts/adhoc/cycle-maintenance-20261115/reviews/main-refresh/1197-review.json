@@ -1,0 +1,53 @@
+{
+  "pr": 1197,
+  "head": "748cfaf510e96ffa6f8b4b08c877742cf8a492d8",
+  "previous": "98345116994d17eaee050efb13f5414f5faaf3d4",
+  "base": "bd2b07480afd3b3984491a7fc729c64220d4dd81",
+  "original": "345a63c31e44cf77e7323d7c2647a4d7d8d61683",
+  "integration_commit": "748cfaf510e96ffa6f8b4b08c877742cf8a492d8",
+  "ordinary_integration_parents": [
+    "98345116994d17eaee050efb13f5414f5faaf3d4",
+    "bd2b07480afd3b3984491a7fc729c64220d4dd81"
+  ],
+  "tree": "f8d88d90cc6fb1c63b8adf8696cea978104b6c56",
+  "full_tree_exactly_matches_independent_composition": true,
+  "reviewed_paths_preserved": [
+    ".claude/skills/fleet-issue-review/SKILL.md",
+    ".claude/skills/fleet-issue-status/SKILL.md",
+    ".claude/skills/fleet-issue-status/references/review-table.md",
+    ".claude/skills/review-open-issues/SKILL.md",
+    "AGENTS.md",
+    "scripts/fleet_issue_status.py",
+    "src/kg_microbe_skills/skills.yaml",
+    "tests/test_fleet_issue_status.py"
+  ],
+  "baseline": {
+    "source_ref": "66e6c6a15ff05a098bcb275686bcc6d74b20eaeb",
+    "version": "1.0.0",
+    "authority_sources": 60,
+    "sha256": "67b52e3880438c827458241c366bdf8005efacbbdaec8664180b9bb7d746c424",
+    "unchanged_from_previous": true,
+    "canonical_check_and_refresh_equal": true
+  },
+  "tests": {
+    "tests": 215,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "focused_test_files": [
+    "tests/test_fleet_issue_status.py",
+    "tests/test_fleet_pr_status.py",
+    "tests/test_mech_template.py",
+    "tests/test_mech_template_maintenance.py",
+    "tests/test_mech_template_source_fetch.py",
+    "tests/test_fleet_scoped_skills.py",
+    "tests/test_fleet_maintenance_skills.py"
+  ],
+  "test_log_sha256": "44d62d6246f14aaeaf6b1bef6e5304cc1bc6a932d5e311823d15ef024c9126ba",
+  "helper_sha256": "c220e06bc566c4195743ac3f8495c14803ea48f07d87dd09476b82c8c5127322",
+  "tracked_source_unchanged": true,
+  "git_object_or_ref_writes": false,
+  "runtime_or_adoption": false,
+  "review_scope": "local exact integration; hosted gates require owner readback after publication"
+}

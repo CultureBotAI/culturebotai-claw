@@ -1,0 +1,45 @@
+{
+  "issues": [
+    1263,
+    1265,
+    1268
+  ],
+  "archive_records": [
+    {
+      "original_filename": "prepare_v3_packager.py",
+      "archival_filename": "prepare_v3_packager.py.txt",
+      "sha256": "f17007bba821fa036f8c3bce1a1da68fa0bc06ac29ca4f289e69237326a7aff0",
+      "bytes_changed": false,
+      "status": "historical_source_archive_not_supported_executable"
+    },
+    {
+      "original_filename": "finalize_v3_bundle.py",
+      "archival_filename": "finalize_v3_bundle.py.txt",
+      "sha256": "60f48a5e44e95355d4f2bcbd3a7fc1aefdfce525a53f4501ad85f9ddcc825306",
+      "bytes_changed": false,
+      "status": "historical_source_archive_not_supported_executable"
+    },
+    {
+      "original_filename": "verify_plan_binding_controls.py",
+      "archival_filename": "verify_plan_binding_controls.py.txt",
+      "sha256": "89be95f32b26c955f098ff16d7f67790a046357c5ca58057d701ff03e56bf0ea",
+      "bytes_changed": false,
+      "status": "historical_source_archive_not_supported_executable"
+    },
+    {
+      "original_filename": "verify_provenance_packaging.py",
+      "archival_filename": "verify_provenance_packaging.py.txt",
+      "sha256": "5f3ffe35aa6f7fe1905ec13ed43872a01e8c73c02e8b1c2ef02090532ef16202",
+      "bytes_changed": false,
+      "status": "historical_source_archive_not_supported_executable"
+    }
+  ],
+  "operational_packager_and_ongoing_tests_unchanged": true,
+  "original_private_helpers_and_prior_manifests_preserved": true,
+  "mutation_log_readback": {
+    "inventory": "Intended items assertion failed: forged [] differs from original one-item fixture.",
+    "drift": "Intended drift assertion failed: forged {} differs from original evidence entry.",
+    "setup_or_import_failure_credited": false
+  },
+  "expensive_generation_rerun": false
+}

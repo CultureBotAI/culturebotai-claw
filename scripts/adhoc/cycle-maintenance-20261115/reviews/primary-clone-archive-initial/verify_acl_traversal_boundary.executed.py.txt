@@ -1,0 +1,17 @@
+"""Independent complete-traversal boundary; synthetic fixture only, 2026-11-15."""
+import subprocess
+import pytest
+from test_archive_primary_clone import archive, fixture, durable_fixture
+
+def test_acl_denied_list_refuses_complete_inventory(fixture):
+    protected=fixture.source/'.git/protected-dir'
+    protected.mkdir()
+    (protected/'valuable').write_bytes(b'must-be-inventoried')
+    subprocess.run(['chmod','+a','everyone deny list',str(protected)],check=True)
+    try:
+        with pytest.raises(PermissionError):
+            list(protected.iterdir())
+        with pytest.raises((ValueError,OSError)):
+            archive.inventory(fixture.source)
+    finally:
+        subprocess.run(['chmod','-a','everyone deny list',str(protected)],check=True)

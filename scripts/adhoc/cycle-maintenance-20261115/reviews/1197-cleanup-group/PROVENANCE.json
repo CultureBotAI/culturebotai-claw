@@ -1,0 +1,20 @@
+{
+  "date": "2026-11-15",
+  "purpose": "Independent read-only verification of the two completed PR1197 retirements",
+  "related_issue": 1275,
+  "helper": "verify_cleanup_group.py",
+  "helper_sha256": "73666d8597569218bdccf56cbfa07820a23ca2c23447d39246a88b9b0bf09fe6",
+  "retained_original_helper": "reviews/1112-cleanup-group/verify_cleanup_group.py",
+  "retained_original_sha256": "34d2ff30571e5a54a5c5c493a0418980de9bc154825194b1a65a459f55f4e33f",
+  "retained_reader_sha256": "ac422830ec1719f2acdc6a1a9be52a8428277dc0b8112656bf826856d7bed348",
+  "reviewed_retirement_helper_sha256": "5513d8c984104fe0c0d6da1c8aaa37549e6e3307baa541498a862a185bac1af9",
+  "private_result_sha256": "5c557f596cdcc4d802e09ecd7a3279d717ab661aebd486d25cc3efb14564c71c",
+  "public_result": "VERIFICATION.json",
+  "public_result_sha256": "ad635ed22ad66e605c0b46ce708770a2a9b1084bf556fb2e12ecde35bd042154",
+  "projection": "jq 'del(.private_detail)' on the retained private result",
+  "preserved_entry_count": 483,
+  "verification_time_utc": "2026-11-15T12:00:37.230521+00:00",
+  "git_github_source_cleanup_mutations_by_reviewer": false,
+  "historical_helper_results_overwritten": false,
+  "tests_rerun": false
+}

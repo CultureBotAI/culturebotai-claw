@@ -1,0 +1,169 @@
+{
+  "kind": "historical_pr1211_initial_review_inputs",
+  "date": "2026-11-15",
+  "historical_local_head": "553a6103c2275ce7f020f6c6519465323240aaa8",
+  "historical_base": "99fb0ac11e2e6aeabedc8d08f29a5f08aac0892d",
+  "copied_originals": {
+    "verify_pr1211.py.txt": {
+      "original_filename": "verify_pr1211.py",
+      "bytes": 4496,
+      "sha256": "994cb1a7f8140f1e3e00ddc40f7209e5198a71a3504314f6b32b7ac97de0dba2",
+      "packaging_edit": "filename only; inert archive"
+    },
+    "verify_counterfactuals.py.txt": {
+      "original_filename": "verify_counterfactuals.py",
+      "bytes": 4817,
+      "sha256": "963da0e04a35fb6b3405afeceedfdeee397b22474d73942615abf6dbfbd00f4e",
+      "packaging_edit": "filename only; inert archive"
+    },
+    "REVIEW.md": {
+      "original_filename": "REVIEW.md",
+      "bytes": 5485,
+      "sha256": "fd2b7d841a59bc671be988f9295e89de2ce118340d90052e335f600f7d4403d3",
+      "packaging_edit": "none; byte-identical"
+    },
+    "provenance-verification.json": {
+      "original_filename": "provenance-verification.json",
+      "bytes": 5762,
+      "sha256": "cb91eab25449bb356e82eac17445bba687608fb846f0e4fd853bb9b0f0620e7f",
+      "packaging_edit": "none; byte-identical"
+    },
+    "counterfactuals.json": {
+      "original_filename": "counterfactuals.json",
+      "bytes": 4734,
+      "sha256": "94b5a019c442763ab1c978eb980f8c88c2009dead13e7956de43cd0b11ba5215",
+      "packaging_edit": "none; byte-identical"
+    },
+    "review-manifest.json": {
+      "original_filename": "review-manifest.json",
+      "bytes": 3715,
+      "sha256": "7e0bc44f6d3ac57c7bd1a074b992310010dbb071f4bc4f63479b4285c650166b",
+      "packaging_edit": "none; byte-identical"
+    },
+    "focused-pytest.log": {
+      "original_filename": "focused-pytest.log",
+      "bytes": 180,
+      "sha256": "63b7934479d93660bd365132b801db94e3af90e24a64d1d0e597be294196ef37",
+      "packaging_edit": "none; byte-identical"
+    },
+    "counterfactual-errors.log": {
+      "original_filename": "counterfactual-errors.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "packaging_edit": "none; byte-identical"
+    }
+  },
+  "privately_retained_source_tree_snapshots": [
+    {
+      "original_filename": "source-tree-5790569efd881bd8bca82a04ea278cc462c0c2c8.json",
+      "repository": "CultureBotAI/culturebotai-claw",
+      "requested_commit": "5790569efd881bd8bca82a04ea278cc462c0c2c8",
+      "returned_tree_sha": "5790569efd881bd8bca82a04ea278cc462c0c2c8",
+      "api_request": "https://api.github.com/repos/CultureBotAI/culturebotai-claw/git/trees/5790569efd881bd8bca82a04ea278cc462c0c2c8?recursive=1",
+      "bytes": 501410,
+      "sha256": "ac2c430ac6e62d424f71632598de86ee5ffec6a7e2f025c6894f2cfd43dce3fd",
+      "truncated": false,
+      "entry_count": 1746,
+      "publication": "not copied; exact original retained in owner private evidence",
+      "blob_bindings": [
+        {
+          "source_path": "src/kg_microbe_governance/artifacts/prompts/backlog-loop-goal.md",
+          "git_blob": "4a44c05730ce8fc76e294cc857c8d0622eb47b35",
+          "fixture_sha256": "0b75a1976f71ad8595ec9d1f293afcddafed4287ae0e67fc8bb348a6467df610"
+        },
+        {
+          "source_path": "src/kg_microbe_governance/artifacts/scripts/auto_merge_ready_prs.py",
+          "git_blob": "17d154e735b7132677779637c3faa7b527a966f0",
+          "fixture_sha256": "b8d77dc73422c3fa84b6636d32533d21d5ed11aa3e9bcc42d1c9aa6cf60f49f1"
+        },
+        {
+          "source_path": "src/kg_microbe_governance/artifacts/scripts/check_vendored_sync.py",
+          "git_blob": "fe1cbde95e6c91e462908726e621a82513a36772",
+          "fixture_sha256": "673ecd7ea0b34a29ebef8d1068d8d8973a460680e956237c8e09d97a8a22deb3"
+        },
+        {
+          "source_path": "src/kg_microbe_governance/artifacts/schema/mech_shared.yaml",
+          "git_blob": "fa1f7956c6a83e04ffa96d02bdf911461d09705a",
+          "fixture_sha256": "c2e7054fd32635e380c698282bd886a9105861009b9f0474f02bb1b80865e895"
+        }
+      ]
+    },
+    {
+      "original_filename": "source-tree-7e672227fb246a8359ad57b6d3975ce5ed329007.json",
+      "repository": "CultureBotAI/culturebotai-claw",
+      "requested_commit": "7e672227fb246a8359ad57b6d3975ce5ed329007",
+      "returned_tree_sha": "7e672227fb246a8359ad57b6d3975ce5ed329007",
+      "api_request": "https://api.github.com/repos/CultureBotAI/culturebotai-claw/git/trees/7e672227fb246a8359ad57b6d3975ce5ed329007?recursive=1",
+      "bytes": 486629,
+      "sha256": "a7ce86113175f4119bf430dfad5a8aa9cc54a4fa31ca46b08b9c1e72edb9091c",
+      "truncated": false,
+      "entry_count": 1690,
+      "publication": "not copied; exact original retained in owner private evidence",
+      "blob_bindings": [
+        {
+          "source_path": "src/kg_microbe_governance/artifacts/prompts/backlog-loop-goal.md",
+          "git_blob": "e43e5c9a69844fe8de14abe4e322fe5142b8a1d0",
+          "fixture_sha256": "0babff88b826007cba9f6e1d83f761cc3a951e19d0c37da072a9c39a8781ff88"
+        },
+        {
+          "source_path": "src/kg_microbe_governance/artifacts/scripts/auto_merge_ready_prs.py",
+          "git_blob": "17d154e735b7132677779637c3faa7b527a966f0",
+          "fixture_sha256": "b8d77dc73422c3fa84b6636d32533d21d5ed11aa3e9bcc42d1c9aa6cf60f49f1"
+        },
+        {
+          "source_path": "src/kg_microbe_governance/artifacts/docs/record-reviews.md",
+          "git_blob": "326f100021054061ca323054a8f20b5228ce3a92",
+          "fixture_sha256": "452a19ab688276747b7c4308523a14d4d99c1c39ef6909ae8a90b85b7a9b3e9b"
+        },
+        {
+          "source_path": "src/kg_microbe_governance/artifacts/scripts/check_vendored_sync.py",
+          "git_blob": "fe1cbde95e6c91e462908726e621a82513a36772",
+          "fixture_sha256": "673ecd7ea0b34a29ebef8d1068d8d8973a460680e956237c8e09d97a8a22deb3"
+        },
+        {
+          "source_path": "src/kg_microbe_governance/artifacts/schema/mech_shared.yaml",
+          "git_blob": "fa1f7956c6a83e04ffa96d02bdf911461d09705a",
+          "fixture_sha256": "c2e7054fd32635e380c698282bd886a9105861009b9f0474f02bb1b80865e895"
+        }
+      ]
+    },
+    {
+      "original_filename": "source-tree-89bfcebaee8a0fcf99055b2acd1709abb64f8666.json",
+      "repository": "CultureBotAI/culturebotai-claw",
+      "requested_commit": "89bfcebaee8a0fcf99055b2acd1709abb64f8666",
+      "returned_tree_sha": "89bfcebaee8a0fcf99055b2acd1709abb64f8666",
+      "api_request": "https://api.github.com/repos/CultureBotAI/culturebotai-claw/git/trees/89bfcebaee8a0fcf99055b2acd1709abb64f8666?recursive=1",
+      "bytes": 516308,
+      "sha256": "ef7e63a27089e7ceec7246232ab01025199d725fcd707cd93a70c3a6d25531f5",
+      "truncated": false,
+      "entry_count": 1799,
+      "publication": "not copied; exact original retained in owner private evidence",
+      "blob_bindings": [
+        {
+          "source_path": "src/kg_microbe_governance/artifacts/prompts/backlog-loop-goal.md",
+          "git_blob": "4a44c05730ce8fc76e294cc857c8d0622eb47b35",
+          "fixture_sha256": "0b75a1976f71ad8595ec9d1f293afcddafed4287ae0e67fc8bb348a6467df610"
+        },
+        {
+          "source_path": "src/kg_microbe_governance/artifacts/scripts/auto_merge_ready_prs.py",
+          "git_blob": "17d154e735b7132677779637c3faa7b527a966f0",
+          "fixture_sha256": "b8d77dc73422c3fa84b6636d32533d21d5ed11aa3e9bcc42d1c9aa6cf60f49f1"
+        },
+        {
+          "source_path": "src/kg_microbe_governance/artifacts/scripts/check_vendored_sync.py",
+          "git_blob": "fe1cbde95e6c91e462908726e621a82513a36772",
+          "fixture_sha256": "673ecd7ea0b34a29ebef8d1068d8d8973a460680e956237c8e09d97a8a22deb3"
+        },
+        {
+          "source_path": "src/kg_microbe_governance/artifacts/schema/mech_shared.yaml",
+          "git_blob": "fa1f7956c6a83e04ffa96d02bdf911461d09705a",
+          "fixture_sha256": "c2e7054fd32635e380c698282bd886a9105861009b9f0474f02bb1b80865e895"
+        }
+      ]
+    }
+  ],
+  "omitted_snapshot_total_bytes": 1504347,
+  "original_inputs_unchanged": true,
+  "new_review_execution": false,
+  "merge_release_runtime_authority": false
+}

@@ -1,0 +1,17 @@
+{
+  "date": "2026-11-15",
+  "repository": "CultureBotAI/culturebotai-claw",
+  "pr": 1236,
+  "executed_helper": "verify_cleanup_canary.executed.py.txt",
+  "executed_helper_sha256": "b32fdedfb2e54a8eb86b5bdd6d59a3df22c41026186f48db26689ea4deb9e0b2",
+  "maintained_helper": "verify_cleanup_canary.py",
+  "maintained_helper_sha256": "ac422830ec1719f2acdc6a1a9be52a8428277dc0b8112656bf826856d7bed348",
+  "packaging_edits": [
+    "Sort only standard-library imports for pinned Ruff; logic unchanged. Exact executed source retained."
+  ],
+  "private_receipt_sha256": "6bf41a465d9a700ddb8b36970a0910e9b83400c7f2ab582219647cee56fbd703",
+  "public_result_sha256": "bdc23930d79eeb68c528fa4e97e1225927894fa6825dbb04ada3ff6d5c297401",
+  "public_projection": "Remove only private_detail (absolute local paths, recovery ref name, registrations and remote branch name). All verification results and source/evidence hashes retained.",
+  "full_readback_rerun_after_import_sort": false,
+  "reason_not_rerun": "Only import ordering changed; subsequent authorized cleanup may change registration census. Original executed source and actual historical result are retained."
+}

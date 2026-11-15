@@ -1,0 +1,95 @@
+{
+  "date": "2026-11-15",
+  "repository": "CultureBotAI/culturebotai-claw",
+  "repair_issues": [
+    1263,
+    1264,
+    1265,
+    1266
+  ],
+  "passed": true,
+  "historical_summary_preserved_sha256": "b6b63834eb203eef395ad73e7c6af376fe821a278c4cac21f2d2f449ecaaea83",
+  "historical_input_sha256": {
+    "audit/capture_pr_audit.py": "55fd5597a10666531e9a425d9b86bf46c104b701d515ebd8f3ee214d4feabfde",
+    "audit/pr-checks-before.json": "1d2b4fe1e254aa83f011fc1fa8c17812cd876b2e41d2b28d9a6e52c897378c3f",
+    "audit/open-pulls-before-pages.json": "19f9b55469063fc54e0dec7b723abfad60d8f49e2cdf4661396c55ae527ec89d",
+    "audit/open-pulls-after-pages.json": "19f9b55469063fc54e0dec7b723abfad60d8f49e2cdf4661396c55ae527ec89d",
+    "audit/independent-open-count-and-queue.json": "87cec1b1534010d23a484484175115d7a04c8bd356ff10121c68b524e4ea0e3b",
+    "review/review_mutations.py": "e06eca553f915f26c201947018858fb70f9847b05a3b093b58d4b863d463bc7d",
+    "review/REVIEW.md": "a393153a9aeccc138178774d002b7bbf7b81da882d73a83ff408a8e01f6fc976"
+  },
+  "repaired_helpers": [
+    {
+      "path": "capture_pr_audit.py",
+      "packaged_sha256": "93ca9dd66afdd0bf5741ee06c5f8abccbefdb3f8af4559a628c2209343dfae94",
+      "packaging_edits": "Import-safe capture; exact collection agreement; new directory and explicit drift receipt (1264)"
+    },
+    {
+      "path": "review_pr1197_mutations.py",
+      "packaged_sha256": "f308de9ddc316be26d4d04fadbbb7c2e57cbfeda3b7b6cbda5828696fea5f8eb",
+      "packaging_edits": "Paired passing controls and structured selected-test failures; setup errors rejected (1263)"
+    },
+    {
+      "path": "package_inventory.py",
+      "packaged_sha256": "3d083fcfed6bcd06a330eb5acc7ea71cdebe7aba40fa8b18f1f4c6ccc4632d29",
+      "packaging_edits": "Bind exact historical inputs; refuse aliases/collisions; validate before publication (1265/1266)"
+    }
+  ],
+  "verified_source_sha256": {
+    "capture_pr_audit.py": "93ca9dd66afdd0bf5741ee06c5f8abccbefdb3f8af4559a628c2209343dfae94",
+    "package_inventory.py": "3d083fcfed6bcd06a330eb5acc7ea71cdebe7aba40fa8b18f1f4c6ccc4632d29",
+    "review_pr1197_mutations.py": "f308de9ddc316be26d4d04fadbbb7c2e57cbfeda3b7b6cbda5828696fea5f8eb",
+    "verify_helper_repairs.py": "06b177387063793b09555fbe16ac5831d7713b80555b20c899cbcf1042d50e3a",
+    "tests/test_cycle_maintenance_inventory_helpers.py": "9f6c55be94f75539c176f3242339e73f0f3ad5df5f16ff7c016563e788f797df"
+  },
+  "observations": [
+    {
+      "operation": "regressions",
+      "exit_code": 0,
+      "log_sha256": "8f30910f55a1e367dfa040202c24c1ff5982fa444b3174a29dfc338d3a73a6bb"
+    },
+    {
+      "operation": "historical-packaging",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "operation": "paired-mutations",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "pytest_summary": [
+    "35 passed in 2.05s"
+  ],
+  "paired_mutations": [
+    {
+      "case": "descending-order",
+      "killed": true,
+      "baseline_tests": 1,
+      "mutant_tests": 1
+    },
+    {
+      "case": "stale-overlay",
+      "killed": true,
+      "baseline_tests": 9,
+      "mutant_tests": 9
+    },
+    {
+      "case": "closed-window",
+      "killed": true,
+      "baseline_tests": 1,
+      "mutant_tests": 1
+    },
+    {
+      "case": "markdown-metrics",
+      "killed": true,
+      "baseline_tests": 1,
+      "mutant_tests": 1
+    }
+  ],
+  "review_source_sha256": "4ea644df9befd5e9fd13fdb64df4f5ce3b58f8def08a2a794c33ba7731ec7800",
+  "full_historical_review_rerun": false,
+  "original_evidence_modified": false,
+  "live_api_calls": false
+}

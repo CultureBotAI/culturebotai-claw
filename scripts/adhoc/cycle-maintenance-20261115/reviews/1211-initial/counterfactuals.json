@@ -1,0 +1,132 @@
+{
+  "sources": {
+    "src/kg_microbe_governance/artifacts/scripts/check_vendored_sync.py": "fa527882d9a50ec3f49148afe0032ecc65a2a3c3eb31d62bdfc14fa7104e7bfb",
+    "src/kg_microbe_governance/__init__.py": "69be964b3a65cc7e61d309f3c7e7a2c2f17a0e0fe4de75b5cf5659b053f5bbce",
+    "tests/test_governance_admitted_sync.py": "45b047ab838b33f801c8c538eadbcadab90adbb260b8b6d4407effe489312b23"
+  },
+  "results": [
+    {
+      "name": "reserved_control_identity",
+      "issue": 1213,
+      "mutation": false,
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "stdout_sha256": "3a6504404ab639ac8fe2940ac1654603c072a999c0ae65ca7ef9701ab97a0954",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "reserved_control_identity",
+      "issue": 1213,
+      "mutation": true,
+      "exit_code": 1,
+      "expected_exit": 1,
+      "passed": true,
+      "stdout_sha256": "fd01fb9d958cbe22ef317e010960bd425f0c381c7ddcc68e48df646ab7177efe",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "explicit_candidate_only",
+      "issue": null,
+      "mutation": false,
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "stdout_sha256": "9ca0431a9d28c4a8e4298778c5611e8efe69e04e22f6175b3f20383a2bf45704",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "explicit_candidate_only",
+      "issue": null,
+      "mutation": true,
+      "exit_code": 1,
+      "expected_exit": 1,
+      "passed": true,
+      "stdout_sha256": "b4c2ffd74aff8e6842672dd8925265e4daaa841e33a497715288556f457d5d48",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "canonical_registry_equality",
+      "issue": null,
+      "mutation": false,
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "stdout_sha256": "32397ceb739e04bbfcda77323a43691e4a7bae6f7f08881f0c8c4ce30f21b5ac",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "canonical_registry_equality",
+      "issue": null,
+      "mutation": true,
+      "exit_code": 1,
+      "expected_exit": 1,
+      "passed": true,
+      "stdout_sha256": "65a7e9ef89491615b69645c4c41bfb9fc6722cee58edcdc1c576ce7f201ac171",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "ambient_ci_identity",
+      "issue": 1217,
+      "mutation": false,
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "stdout_sha256": "18f46c04e14671be81e081e7cd3910b913bc643549561cc325d37b98e03206e1",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "ambient_ci_identity",
+      "issue": 1217,
+      "mutation": true,
+      "exit_code": 1,
+      "expected_exit": 1,
+      "passed": true,
+      "stdout_sha256": "862cd48e2b026aa3fa0cfd00bd20a38c23aa4585166401ecc1354ba7051f9e7a",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "fixture_union_count",
+      "issue": 1255,
+      "mutation": false,
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "stdout_sha256": "4e8b6c5a89da44bf05d17100903172be04033067c113a6831bdfafbd42b7da52",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "fixture_union_count",
+      "issue": 1255,
+      "mutation": true,
+      "exit_code": 1,
+      "expected_exit": 1,
+      "passed": true,
+      "stdout_sha256": "2abd8b1c42f7829a512505b2ea67e15d3e9d426ddaa832408bd88a8d93d0f07d",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "historical_digest",
+      "issue": 1214,
+      "mutation": false,
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "stdout_sha256": "4e8b6c5a89da44bf05d17100903172be04033067c113a6831bdfafbd42b7da52",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "historical_digest",
+      "issue": 1214,
+      "mutation": true,
+      "exit_code": 1,
+      "expected_exit": 1,
+      "passed": true,
+      "stdout_sha256": "b264d4570e657b7ce8c97f260bb28c3d9ade4e04435ff83506056ad1bf318f96",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "sources_unchanged": true,
+  "passed": true,
+  "helper_sha256": "963da0e04a35fb6b3405afeceedfdeee397b22474d73942615abf6dbfbd00f4e"
+}

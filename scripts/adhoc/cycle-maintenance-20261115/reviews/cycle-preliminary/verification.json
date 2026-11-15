@@ -1,0 +1,108 @@
+{
+  "authority": "review_only",
+  "excluded_from_independent_review": [
+    "pure PR maintenance validator",
+    "LinkML schema",
+    "skill and guide changes"
+  ],
+  "helper_path": "scripts/adhoc/cycle-maintenance-20261115/reviews/cycle-preliminary/verify_review.py",
+  "helper_sha256": "6027252340a63b965d6c1e56fa1b58611d5429fe91b286be9b5216b8012eb338",
+  "kind": "independent_root_integration_rereview",
+  "observations": [
+    {
+      "expectation_met": true,
+      "expected_failure_marker": null,
+      "expected_returncode": 0,
+      "issue": null,
+      "mode": "baseline",
+      "pytest_summary": "4 passed in 1.79s",
+      "returncode": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "1dde2ec73bb2d1eac48a0b7a1add920157c690038c32f874102b48b2b20484f8",
+      "tests": [
+        "tests/test_pr_maintenance_remote.py::test_check_rollup_union_selects_ids_only_on_concrete_types",
+        "tests/test_pr_maintenance_remote.py::test_terminal_draft_reopened_at_final_inventory_cannot_claim_closure",
+        "tests/test_progress_prs.py::test_maintenance_receipt_preserves_backlog_goal_ownership[None]",
+        "tests/test_mech_pr_maintenance_supervisor.py::test_transient_pr_capture_failure_leaves_no_partial_freshness_archive"
+      ]
+    },
+    {
+      "expectation_met": true,
+      "expected_failure_marker": "AssertionError",
+      "expected_returncode": 1,
+      "issue": 1257,
+      "mode": "counterfactual",
+      "pytest_summary": "1 failed in 0.06s",
+      "returncode": 1,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "0606a0cdd4a6b911cac11335ef7ac1567a2353a3173543cfd66e5a51a6222d32",
+      "tests": [
+        "tests/test_pr_maintenance_remote.py::test_check_rollup_union_selects_ids_only_on_concrete_types"
+      ]
+    },
+    {
+      "expectation_met": true,
+      "expected_failure_marker": "DID NOT RAISE",
+      "expected_returncode": 1,
+      "issue": 1258,
+      "mode": "counterfactual",
+      "pytest_summary": "1 failed in 0.06s",
+      "returncode": 1,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "37197e2b4bdca9fab3c7e35bd33f6b9a99665348f8c1baf3aa37903bb463089a",
+      "tests": [
+        "tests/test_pr_maintenance_remote.py::test_terminal_draft_reopened_at_final_inventory_cannot_claim_closure"
+      ]
+    },
+    {
+      "expectation_met": true,
+      "expected_failure_marker": "AssertionError",
+      "expected_returncode": 1,
+      "issue": 1259,
+      "mode": "counterfactual",
+      "pytest_summary": "1 failed in 0.14s",
+      "returncode": 1,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "314ef8a894279498c34b8280cba6eb1b314a49aeb9395653c31e2f6aa857bc1e",
+      "tests": [
+        "tests/test_progress_prs.py::test_maintenance_receipt_preserves_backlog_goal_ownership[None]"
+      ]
+    },
+    {
+      "expectation_met": true,
+      "expected_failure_marker": "AssertionError",
+      "expected_returncode": 1,
+      "issue": 1260,
+      "mode": "counterfactual",
+      "pytest_summary": "1 failed in 1.70s",
+      "returncode": 1,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "da6d94bea3e692b2b8ed90de819a0d285554786143e59c24b36e132a4c2cfa72",
+      "tests": [
+        "tests/test_mech_pr_maintenance_supervisor.py::test_transient_pr_capture_failure_leaves_no_partial_freshness_archive"
+      ]
+    }
+  ],
+  "observed_at": "2026-11-15T09:08:04.898167+00:00",
+  "original_evidence_sha256": {
+    "REVIEW.md": "ba31173d54bc4ddbdbed8f5ef5cb0850c0b40fa47252cf13d6df489aa1b29fb4",
+    "graphql-proof.json": "a6b1c36b1439c46a2f29be73db863965acf0afd1da1b00b0880e57dfc7b0f877",
+    "test_review_reproductions.py": "f30cc66fc0a89f412eb97acd9cc49357b6601b6f60a55680b9f8bad7bd5e22a8"
+  },
+  "passed": true,
+  "repository": "CultureBotAI/culturebotai-claw",
+  "runtime_or_adoption_authority": false,
+  "schema_version": "1.0.0",
+  "source_sha256": {
+    "scripts/mech_session_supervisor.py": "449198a2f6bea035da9cdf7e07d0582510fdabc45df08e82b5a7b4669bf0c27b",
+    "src/kg_microbe_fleet/__init__.py": "3be77f7d58f0ca266b5f82a8dedd800eb5da81eef5bf0149ceefa68be11cd328",
+    "src/kg_microbe_progress/prs.py": "4e7b658411b14830a13ccfa6daa444e7de8d4050a292e9c00f0c75130bad59b4",
+    "src/kg_microbe_workflows/closure.py": "1be9479c33807dcd383934548cd0a337a8d2ae80e0ec90bb5c6dc0f117aae6c9",
+    "src/kg_microbe_workflows/pr_maintenance_remote.py": "b7ea12aa0b2c6ecd0f0d0876965905b5e08e02734a6333a0465cd1a954e9b356",
+    "tests/test_fleet_manifest.py": "669b75fe54f5c4a447818642e4329333a6a7e9d29f330c9cceff2308855065bb",
+    "tests/test_mech_pr_maintenance_supervisor.py": "7f1dbdd24191bd84d8b3d8ae6dfa80c6e81f47aa100f4ac2e8a3f9726383c2f1",
+    "tests/test_pr_maintenance_remote.py": "300d2ed3298bbae47f598b2f9039bc2473386409ae120ca1dd30f76be9791e7c",
+    "tests/test_progress_prs.py": "61aaa5adf164bf89ef0c8de8e9cd3de3b7e66931a27d246149bcdfe5ed80281b"
+  },
+  "sources_unchanged": true
+}

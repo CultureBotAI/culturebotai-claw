@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-15",
+  "purpose": "Prepare recoverable exact-path restoration of two owned completed dirty review snapshots after their associated reviewed merges.",
+  "inputs": "Explicit source roots, expected immutable HEAD, GitHub identity, original index and raw blob observations; remote-verifier observations use an authenticated private index copy.",
+  "outputs": "Private original index, index-entry stream, HEAD/index/worktree blob copies, nonignored untracked bytes, binary patches, NUL-delimited changed-path lists, capture manifest and exact restoration plan. Public summary contains hashes/counts only.",
+  "helpers": {
+    "capture_dirty_snapshot.executed.py.txt": "c4473009f4095dc2a71237c69717597dfc608e5bc9a7c76be0b14439910eda2c",
+    "capture_dirty_snapshot.py": "9c793f327c0bb21f9607ac80d257506295c202a3cdcebf05c8a16ea94b40405c",
+    "probe_index_stability.py": "a65c199c8674e2d8a2ed857479d261d94506d944917b1017e3e35892525d8d90"
+  },
+  "helper_evolution": [
+    "Original executed capture source retained exactly; it produced1112 capture and refused the initial remote-verifier capture before output.",
+    "Maintained capture now requires a matching private index copy for all subsequent index-aware Git observations, removing source-index updates from that path.",
+    "The simple probe runs Git observations against a private copied index; all observed source/copy bytes remained stable."
+  ],
+  "historical_refusal_retained": true,
+  "private_capture_sha256": {
+    "review-1112": "1292a57e13adcda388b0d8309bd47eba9158e5a0db962a15885cfbb344c146f4",
+    "remote-verifier": "d28b0bc6bb39f090c0652a4f8daf78a6be88be386958203f97573954cf062ec8"
+  },
+  "private_plan_sha256": "e85417c9e7ddc907ab40453df3c941f1d22d2ee747d13abd0fa849c875976400",
+  "public_preparation_sha256": "d7d6d065701ae7f61152a2e66675f526641658d2eb9b6b736782837df1049118",
+  "ignored_contents_not_copied_at_this_step": true,
+  "originals_preserved": true,
+  "restoration_or_cleanup": false
+}

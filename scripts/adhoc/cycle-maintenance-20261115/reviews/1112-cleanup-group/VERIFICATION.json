@@ -1,0 +1,129 @@
+{
+  "accepted_restoration_plan_sha256": "e85417c9e7ddc907ab40453df3c941f1d22d2ee747d13abd0fa849c875976400",
+  "all_original_snapshot_payloads_retained": 85,
+  "branch_census_scope": "Recorded intended deletion and all remaining registered branches; no historical complete unregistered-ref census was supplied.",
+  "git_github_source_cleanup_mutations_by_reviewer": false,
+  "helper_sha256": "34d2ff30571e5a54a5c5c493a0418980de9bc154825194b1a65a459f55f4e33f",
+  "legitimate_root_advances": [
+    {
+      "after": "2597b50f1cf9ee630316c880b43030e04cfac664",
+      "before": "4970c9c83a8cb1cc2ee06a85ccdbad08589c55e5",
+      "chain": [
+        "4970c9c83a8cb1cc2ee06a85ccdbad08589c55e5",
+        "8db30dad3d818d166b5ee23d64e1bcb22605fd94",
+        "2597b50f1cf9ee630316c880b43030e04cfac664"
+      ]
+    }
+  ],
+  "merge_sha": "bd2b07480afd3b3984491a7fc729c64220d4dd81",
+  "merge_tree": "fbc3e1cd1b4a2290fca56d93be78e87a6a96a9b7",
+  "merged_source_head": "3da76c840590b8f579535aacd853b65ebf4f0009",
+  "pr": 1112,
+  "pre_restoration_readback_sha256": "a40914ab0655620354b496b0e50aca6094f4222ee677719a2b12f0b4b529b33f",
+  "quarantines": [
+    {
+      "deleted_branch": null,
+      "evidence_sha256": {
+        "apply": "adcf307f67f2524d0d2d081d3c3aa4b1bd864d255b582021f4ffc0cc00add596",
+        "before.json": "f7a8c281d31e8b06bf7ada4ffa58562ce41938d6276fcaab032788e6a32ce2c2",
+        "completed.json": "7f528f97b0803284c301142757a8882b4316f2e6518d01b4bf99579e9bc9a395",
+        "dry_run": "e6902d4e7862c3bf452462bccdb971e04bd7f1640252fed5e9c8efd4c76e5038",
+        "preserved.json": "eb1ce9334a691426e490e0ebed4b342f9930ed104a7f0ee305f8dd30d2dbea74",
+        "proof": "40ac803e63583a5824c6a8570f31150d8056919a67e903b329964222b4a01f7a",
+        "recovery.json": "8ac0e1fa92b4dc2b74fc79e387b3cba2f2d9c18883aeda1ec075a5f042586a1f"
+      },
+      "full_preserved_hash_mode_symlink_readback": true,
+      "label": "review-1112-final",
+      "preservation_roots": 3,
+      "preserved_entries": 18,
+      "recovery_ref_verified": true,
+      "registration_removals_accounted": true,
+      "source_ancestor_of_merged_pr": true,
+      "source_head": "3da76c840590b8f579535aacd853b65ebf4f0009",
+      "target_and_gitdir_absent": true,
+      "tracked_paths_recoverable": 1732
+    },
+    {
+      "deleted_branch": null,
+      "evidence_sha256": {
+        "apply": "eacdb1a98f1034125e8e96f7ea486cb9a266409adc257cf8bea4fb230e21d881",
+        "before.json": "74b225f19adef303b89b07846d466d5bbf2ed34fef3e15936081cb601eeee010",
+        "completed.json": "428692aff0cf5f725aeed451dcb9e6197b6f2f79ec85dcb5d74a8f76d0c08a0a",
+        "dry_run": "1ec1885eba6f4a55f33a01cc3fedbe580cd2a0197434485185a01f3d0c7ab16f",
+        "preserved.json": "c180967df02d86689f60c10536cb2d12925d3f0241c55b0f2b1096b3efa653db",
+        "proof": "d4679b1fc1418c44d0c9f023aede60a22ab55691599c02cb0cd76bf2d107e2b7",
+        "recovery.json": "c5c6e2806a6585098b21a6171b8007e9e5ad6de51689bae438d72375d26509f4"
+      },
+      "full_preserved_hash_mode_symlink_readback": true,
+      "label": "review-1112-original",
+      "preservation_roots": 6,
+      "preserved_entries": 20576,
+      "recovery_ref_verified": true,
+      "registration_removals_accounted": true,
+      "source_ancestor_of_merged_pr": true,
+      "source_head": "812bb455828dd32611da3b603732cd62e16cc37f",
+      "target_and_gitdir_absent": true,
+      "tracked_paths_recoverable": 1562
+    },
+    {
+      "deleted_branch": "refs/heads/repair/pr1112-refresh-20261115",
+      "evidence_sha256": {
+        "apply": "6aa361b9f993658a6013861fade4aa7335ac1930c6586a60a74b98db0f81a4ab",
+        "before.json": "78469515d03aaf3c3435736a4eb2517e9292eb3dd4875770511283d50e73c5e3",
+        "completed.json": "f75c39b1731bf7d4f12348e91d56b033e6e6c007bcc08cf7ecb33180430cfc21",
+        "dry_run": "1c6c1c81d56e64e292096aa72866cd4f4550fa622383e8e310538f3be6460b61",
+        "preserved.json": "dbab2b748bcc9ad53cdcfec5b2ebad0711761c5b8b53c3391b7eefef04d14f50",
+        "proof": "8e0e8b033caf11ea178cfa6cf64893104d4bf4b9869c791efd7bab3bb25df58d",
+        "recovery.json": "a9f6ba8e90f6932ef60384d14272e359fa27f8ad3520c9aa4aae34b9ed8a3ec8"
+      },
+      "full_preserved_hash_mode_symlink_readback": true,
+      "label": "repair-1112",
+      "preservation_roots": 6,
+      "preserved_entries": 21772,
+      "recovery_ref_verified": true,
+      "registration_removals_accounted": true,
+      "source_ancestor_of_merged_pr": true,
+      "source_head": "3da76c840590b8f579535aacd853b65ebf4f0009",
+      "target_and_gitdir_absent": true,
+      "tracked_paths_recoverable": 1732
+    },
+    {
+      "deleted_branch": null,
+      "evidence_sha256": {
+        "apply": "5aab5c452207990e86a495dc13fb3c283bfcfeba8b95d27e10515316ac5932db",
+        "before.json": "bfe4ecaee6fa8389d56cecac5e46709e9858a40612526ecb99e13febc75318b6",
+        "completed.json": "3bf6f69771d8d729d76fab6f7965633357c687131bd827271be382806ab98c63",
+        "dry_run": "ab533f8352a08df88fa0d7f0944b211cc71f0170821530f62d3b150b095b054b",
+        "preserved.json": "4cd47dcf4d2b8020ec813fa9ee9a7b23a28c0dd5e0b02f8472c6df5dc73ca814",
+        "proof": "51012e2b9feebf9aabc9b6323954b55ff4fb33763d7ccc24ebf588a7117299db",
+        "recovery.json": "0d6a7ffb5ef148ea1330554fb4d874f003c63dd76ff81dc6668351af22742b1b"
+      },
+      "full_preserved_hash_mode_symlink_readback": true,
+      "label": "review-1112-integration",
+      "preservation_roots": 6,
+      "preserved_entries": 21772,
+      "recovery_ref_verified": true,
+      "registration_removals_accounted": true,
+      "source_ancestor_of_merged_pr": true,
+      "source_head": "68d8b2b6e02c1ca4fda2524f348460ecfa566402",
+      "target_and_gitdir_absent": true,
+      "tracked_paths_recoverable": 1686
+    }
+  ],
+  "recorded_local_branch_deletions": 1,
+  "remote_source_branch_absent": true,
+  "restoration_receipt_sha256": "45f709d7450bb31c4ed75c4695ee33f8ed0ed3e6d32a07cff1589b58272be6dd",
+  "reused_reader_sha256": "ac422830ec1719f2acdc6a1a9be52a8428277dc0b8112656bf826856d7bed348",
+  "reviewed_at": "2026-11-15T10:35:32.224630+00:00",
+  "stale_exact_origin_tracking_refs": [
+    {
+      "deleted_by_reviewer": false,
+      "git_group": 2,
+      "object": "3da76c840590b8f579535aacd853b65ebf4f0009",
+      "ref": "refs/remotes/origin/fix/port-pressure-boundary-canary-20261110",
+      "remote_branch_absent": true
+    }
+  ],
+  "total_preserved_entries": 64138,
+  "verdict": "PASS"
+}

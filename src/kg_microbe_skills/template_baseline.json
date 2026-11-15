@@ -1,7 +1,7 @@
 {
   "baseline_version": "1.1.0",
   "schema_version": 1,
-  "source_ref": "9e76780d97082737b1e00c5ef57d52a792237675",
+  "source_ref": "cc274d10670816384e57240f1d26124201fbc4f3",
   "sources": {
     "src/kg_microbe_fleet/fleet.yaml": "1cf926eb16d70bfc81e120eb622b16063c4511e9c3d9cb534765a1f67621a91f",
     "src/kg_microbe_governance/artifacts/__init__.py": "4e47389554e9e8d6e05a90ecf7dc6ad5708f08e56d012d9129970d58b9c6d069",
@@ -42,7 +42,7 @@
     "src/kg_microbe_governance/private_audit/scaleup-v1.json": "372d0b12ad54dab4ac4616b6c35acedb5231246a0d90e5a59decdf4f3ed25529",
     "src/kg_microbe_governance/vendored_artifacts.json": "2c5999efb159707a046ff0f482322f84d65c115b1516f61a7bd64e5b92b5d5f9",
     "src/kg_microbe_skills/canonical/curate-yaml-record.md": "156d1794af0e7a1775d68e5321874f9fab4fef3be5dc6fadd46a8db7bc7053d5",
-    "src/kg_microbe_skills/canonical/evolve-mech-workflow.md": "223e7799763859d28b7c1d16f92c2da63e1f300b57e6f17c9d458478e061490d",
+    "src/kg_microbe_skills/canonical/evolve-mech-workflow.md": "76ebee25884d365f533d2f5f444d55d2e293f62dc53a6948ad6ecff15efda7f3",
     "src/kg_microbe_skills/canonical/fetch-source.md": "8955d52c2a6bf16d6eaa28dabe27af29af7c16a3073d17a8363acc4458f9f01e",
     "src/kg_microbe_skills/canonical/id-label-correspondence.md": "99042fe245b7c1d08564d71abe77c92c112c2beb9733144afd236d0375d61848",
     "src/kg_microbe_skills/canonical/manage-identifiers.md": "9f0211b0c61c9b4115be63d94d10621459b83f2eab945ad5f5e8ed2428c1a4c9",
@@ -55,14 +55,15 @@
     "src/kg_microbe_skills/canonical/scalability-and-health.md": "7e0d3e23ddfb11da2e2ab9a0d515e5b36516518d7670a1bde55348bddebd702a",
     "src/kg_microbe_skills/canonical/schema-gap-analysis.md": "7ff3071ac2e99ba6667950ad33aa4629d937d8a09586f20894734cf0b0700b8c",
     "src/kg_microbe_skills/canonical/stats-report.md": "213077fa5d5740184400e3032b95dc545833181a856e57505d0cf524a54182b0",
-    "src/kg_microbe_skills/canonical/triage-and-resolve-issues.md": "f1cadd8c5c46b112ec6e8ad4c6f4e8f6cd84588c03dd0956e7eb1a87e4542caf",
+    "src/kg_microbe_skills/canonical/triage-and-resolve-issues.md": "3138ce41255f0d2bb64543d37c1e6e9ee7fcd2897a06f8ef2a0729bee03a3a0a",
     "src/kg_microbe_skills/skills.yaml": "05669853d850c1ddd134411ff5b26c8c083257fb5e22e2baf346336e28f3d6b1",
     "src/kg_microbe_workflows/schema/native-repository-freshness-v1.yaml": "f70764bce9d19facf35c797df32c120842ec1d0ac66d75d30f6b2ad90c819b30",
     "src/kg_microbe_workflows/schema/repository-freshness-v1.yaml": "19f3bd1c4bf051e7a6564bd9ecdfb82ebac7b1f357c9640b958f9575d0e9974d",
     "src/kg_microbe_workflows/schema/workflow-v1.yaml": "66194b3aba4540e9ee7adf91bc1fd7fb597aede130ef1603031a92002152e1d8",
-    "src/kg_microbe_workflows/schema/workflow.yaml": "d09655a47773f78379aeaced45af01a7659987046d32e258f3d74f20fea2b281",
+    "src/kg_microbe_workflows/schema/workflow.yaml": "78988446a039daeeff1ae54304fcb6ec2ac7cc23f0cc15c14dd69cb5f3b3f1b6",
     "src/kg_microbe_workflows/templates/mech-cycle-v1.yaml": "32d499de747333e42ed45d40940bfa06c60f85710814155e0fad5f7c4d2fee82",
-    "src/kg_microbe_workflows/templates/mech-cycle.yaml": "0d3e218c22c4ffe4e6dcddce8287d0177aaa52f637e156df1c737e4e7d84f913",
+    "src/kg_microbe_workflows/templates/mech-cycle-v2.0.yaml": "0d3e218c22c4ffe4e6dcddce8287d0177aaa52f637e156df1c737e4e7d84f913",
+    "src/kg_microbe_workflows/templates/mech-cycle.yaml": "d945f3d7d7532eae23f4b24996fab32bd62109d172dd7edc338620b3a6bf792a",
     "src/kg_microbe_workflows/templates/native-repository-freshness-v1.yaml": "898c44e118969451e3a73b8d16631afdd1f01530d4cb71ef04b8d41931db7f5e",
     "src/kg_microbe_workflows/templates/repository-freshness-v1.yaml": "1066a37a7d6cb3511ebe24403b61478f55c03a33f3a1d83b9131b0d20f11c54c"
   }

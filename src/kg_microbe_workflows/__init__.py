@@ -29,7 +29,9 @@ from linkml_runtime.linkml_model.meta import SchemaDefinition
 
 SCHEMA_PATH = Path(__file__).parent / "schema/workflow.yaml"
 PARENT_PATH = Path(__file__).parent / "templates/mech-cycle.yaml"
-VERSION = "2.0.0"
+VERSION = "2.0.0"  # Backward-compatible LinkML vocabulary; parent 2.1 adds required semantics.
+MAINTENANCE_PARENT_VERSION = "2.1.0"
+V2_PARENT_VERSIONS = {"2.0.0", MAINTENANCE_PARENT_VERSION}
 LEGACY_SCHEMA_PATH = SCHEMA_PATH.with_name("workflow-v1.yaml")
 LEGACY_PARENT_PATH = PARENT_PATH.with_name("mech-cycle-v1.yaml")
 LEGACY_STAGE_KEYS = (
@@ -37,10 +39,12 @@ LEGACY_STAGE_KEYS = (
     "resolve_review_findings", "infrastructure",
 )
 STAGE_KEYS = ("open_issue_triage", *LEGACY_STAGE_KEYS)
-CLOSURE_STEPS = (
+LEGACY_CLOSURE_STEPS = (
     "commit_and_push_pr", "independent_adversarial_review", "make_issues", "address_issues",
     "independent_rereview", "verify_checks", "merge", "delete_branch",
 )
+CLOSURE_STEPS = (*LEGACY_CLOSURE_STEPS, "delete_worktree")
+PR_OUTPUTS = {"pr_inventory", "pr_dispositions"}
 REQUIRED_OUTPUTS = {
     "open_issue_triage": {"issue_inventory", "issue_groups", "group_plans", "dispositions", "validation"},
     "record_review": {"review_report", "review_findings"},
@@ -191,7 +195,7 @@ def _shape(data: dict, class_name: str, schema_path: Path = SCHEMA_PATH) -> None
 def stage_keys_for_version(version: str) -> tuple[str, ...]:
     if isinstance(version, str) and re.fullmatch(r"1\.\d+\.\d+", version):
         return LEGACY_STAGE_KEYS
-    if version == "2.0.0":
+    if version in V2_PARENT_VERSIONS:
         return STAGE_KEYS
     raise WorkflowError(f"unsupported parent version: {version!r}")
 
@@ -210,7 +214,7 @@ def stage_key(workflow: dict, stage: int) -> str:
 def evidence_stage_key(data: dict) -> str:
     version = data.get("parent_version", "1.0.0")
     if data.get("schema_version") == "2.0.0":
-        if version != "2.0.0" or "stage_key" not in data:
+        if version not in V2_PARENT_VERSIONS or "stage_key" not in data:
             raise WorkflowError("v2 evidence requires explicit parent_version and stage_key")
     number = data.get("stage")
     if not isinstance(number, int) or isinstance(number, bool):
@@ -241,14 +245,21 @@ def validate_parent(parent: dict, schema_path: Path = SCHEMA_PATH) -> None:
     }:
         raise WorkflowError("session state must retain the canonical durable-root and publication policy")
     _ordered_stages(parent["stages"], parent["version"])
-    if (parent["version"].startswith("1.") and parent["schema_version"] != "1.0.0") or (parent["version"] == "2.0.0" and parent["schema_version"] != VERSION):
+    if (parent["version"].startswith("1.") and parent["schema_version"] != "1.0.0") or (parent["version"] in V2_PARENT_VERSIONS and parent["schema_version"] != VERSION):
         raise WorkflowError("parent and schema versions disagree")
-    if parent["version"] == "2.0.0":
+    if parent["version"] in V2_PARENT_VERSIONS:
         from .issue_triage import validate_triage_policy
         validate_triage_policy(parent.get("issue_triage_policy"))
     if parent["id"] != "mech-goal-cycle":
         raise WorkflowError("unrecognized parent identity")
-    if parent["closure_policy"]["steps"] != list(CLOSURE_STEPS):
+    maintenance = parent["version"] == MAINTENANCE_PARENT_VERSION
+    if maintenance:
+        from .pr_maintenance import validate_pr_maintenance_policy
+        validate_pr_maintenance_policy(parent.get("pr_maintenance_policy"))
+    elif "pr_maintenance_policy" in parent:
+        raise WorkflowError("PR maintenance requires parent 2.1.0")
+    expected_closure = CLOSURE_STEPS if maintenance else LEGACY_CLOSURE_STEPS
+    if parent["closure_policy"]["steps"] != list(expected_closure):
         raise WorkflowError("parent must retain the ordered full closure sequence")
     for name in ("closure_policy", "review_policy", "infrastructure_policy", "cycle_policy"):
         for key, value in parent[name].items():
@@ -265,12 +276,15 @@ def validate_parent(parent: dict, schema_path: Path = SCHEMA_PATH) -> None:
         raise WorkflowError("the next cycle must restart at stage 1")
     allowed_outputs = {"review_report", "review_findings", "issue_map", "infra_snapshot",
                        "implementation_plan", "validation", "supporting", "issue_inventory",
-                       "issue_groups", "group_plans", "dispositions"}
+                       "issue_groups", "group_plans", "dispositions", "pr_inventory", "pr_dispositions"}
     for stage in parent["stages"]:
         outputs = stage["required_outputs"]
         if len(outputs) != len(set(outputs)) or not set(outputs) <= allowed_outputs:
             raise WorkflowError("parent outputs must name unique supported artifact kinds")
-        if not REQUIRED_OUTPUTS.get(stage["key"], set()) <= set(stage["required_outputs"]):
+        required = REQUIRED_OUTPUTS.get(stage["key"], set())
+        if maintenance and stage["key"] == "open_issue_triage":
+            required = required | PR_OUTPUTS
+        if not required <= set(stage["required_outputs"]):
             raise WorkflowError("parent cannot remove required review/infrastructure outputs")
 
 
@@ -320,6 +334,8 @@ def load_effective_workflow(
     }
     for name in ("closure_policy", "review_policy", "infrastructure_policy", "cycle_policy"):
         result[name] = copy.deepcopy(parent[name])
+    if "pr_maintenance_policy" in parent:
+        result["pr_maintenance_policy"] = copy.deepcopy(parent["pr_maintenance_policy"])
     if "issue_triage_policy" in parent:
         result["issue_triage_policy"] = copy.deepcopy(parent["issue_triage_policy"])
     if "session_state_policy" in parent:
@@ -414,6 +430,8 @@ def _validate_evidence_record(
                 raise WorkflowError(f"artifact checksum mismatch: {path}")
     kinds = {item["kind"] for item in artifacts.values()}
     required = REQUIRED_OUTPUTS.get(current_stage_key, set()) | set(required_outputs or [])
+    if current_stage_key == "open_issue_triage" and data.get("parent_version") == MAINTENANCE_PARENT_VERSION:
+        required = required | PR_OUTPUTS
     if not required <= kinds:
         raise WorkflowError("required goal output artifacts are missing")
     findings, groups = _unique(data["findings"], "finding_id"), _unique(data["groups"], "group_id")
@@ -542,6 +560,13 @@ def _validate_evidence_record(
     if current_stage_key == "open_issue_triage":
         from .issue_triage import validate_issue_triage
         validate_issue_triage(data, repository_root=repository_root, previous=previous, supersedes=supersedes)
+        if data.get("parent_version") == MAINTENANCE_PARENT_VERSION:
+            from .pr_maintenance import validate_pr_maintenance
+            validate_pr_maintenance(data, repository_root=repository_root, previous=previous, supersedes=supersedes)
+        elif "pr_maintenance" in data:
+            raise WorkflowError("PR maintenance evidence requires parent 2.1.0")
+    elif "pr_maintenance" in data:
+        raise WorkflowError("PR maintenance belongs to open_issue_triage")
     elif "issue_triage" in data:
         raise WorkflowError("issue triage data belongs to open_issue_triage")
 

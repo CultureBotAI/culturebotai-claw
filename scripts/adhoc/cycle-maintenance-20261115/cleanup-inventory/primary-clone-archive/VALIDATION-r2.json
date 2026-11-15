@@ -1,0 +1,49 @@
+{
+  "actual_clone_moves": 0,
+  "archival_seconds": 10.37,
+  "archival_tests": {
+    "errors": 0,
+    "failures": 0,
+    "skipped": 0,
+    "tests": 29
+  },
+  "date": "2026-11-15",
+  "files": {
+    "README.md": "b3e5943a75dc477b17a5717794a0c4a934aff1bcb13fa234c78c0743e9b06012",
+    "archive_primary_clone.py": "5ce40d5164a70a3ceb6084b6ea2a9d0e99452ec11479693e67ff0e4242d1a835",
+    "retire_owned_worktree.py": "5513d8c984104fe0c0d6da1c8aaa37549e6e3307baa541498a862a185bac1af9",
+    "test_archive_primary_clone.py": "0086e8a39cad780b420dec89826e4b3facd8a8ba62d1772a999a34710be8e1e1",
+    "test_retire_owned_worktree.py": "79b4a121927ad4bd043bd6372103a43cd2b2855c8d8ca240fd63d2b5692dc82d",
+    "verify_archival_mutations.py": "b15798b93efb0fe3615028ec4c31ff641e9efbf82023b87bcb44dcb6b011c873",
+    "verify_archival_repairs.py": "d8f9d297de6150e6c44b5bdbd9645fb84b4d6dc4e9b13272cf2e76f2379e1725"
+  },
+  "issues": [
+    1272,
+    1273,
+    1274,
+    1275
+  ],
+  "logs": {
+    "pytest-repaired.log": "2fc17494becd149e35c260a22045cbb599d490059e1065fcfdc62b11cc3b06f1",
+    "pytest-repaired.xml": "f050a0e58e2a8760847135723755c361c93d3eaeaef49ce35c98a139e589291f",
+    "pytest-retirement-repaired.log": "a5cc583606fcbac8a90fef4758633ee58af64c86971d04a764a3f98083e6e274",
+    "pytest-retirement-repaired.xml": "0be906a5b04cb140612c19fe4ac532a13fd58f685fd8421fadeb98c1cc638ba7",
+    "ruff-1272-1275.log": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+  },
+  "paired_original_fixed_cases": 9,
+  "prior_cleanup_rerun": false,
+  "prior_guard_mutations": 3,
+  "public_receipts": {
+    "issue-paired-controls-public.json": "4410c9f82bda2df877112dc92fa5f9ea36134ffac94635c3522f1cc2a4ec5a11",
+    "paired-controls-r2-public.json": "5c1f00bf319bd87ad2cf0472f34a6a0100424ceb3db3b5dccf73a76f06e54c4b"
+  },
+  "retirement_seconds": 4.5,
+  "retirement_tests": {
+    "errors": 0,
+    "failures": 0,
+    "skipped": 0,
+    "tests": 20
+  },
+  "root_source_writes": false,
+  "status": "repaired_candidate_pending_independent_rereview"
+}

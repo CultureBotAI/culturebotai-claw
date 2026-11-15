@@ -1,0 +1,39 @@
+{
+  "observed_at": "2026-11-15T09:36:19.590667+00:00",
+  "authority": "offline_fixture_validation_only",
+  "issues": [
+    1230,
+    1269
+  ],
+  "source_sha256": {
+    "scripts/adhoc/cycle-maintenance-20261115/cleanup-inventory/retire_owned_worktree.py": "91c07258e5efdd77d5f4c91b07c1815469bc3cd803db87e5e62e223c27b5de2e",
+    "scripts/adhoc/cycle-maintenance-20261115/cleanup-inventory/verify_retirement_controls.py": "0ca1ad7d6ec61f901ad26cd455847d324336fe8b06da0204665b7e300ae59485",
+    "scripts/adhoc/cycle-maintenance-20261115/cleanup-inventory/RETIREMENT.md": "b994d29e21276d092d4416f1a58f09ac823bca25b69d96f7dd55fef6f8183f1a",
+    "scripts/adhoc/cycle-maintenance-20261115/cleanup-inventory/retirement-controls-r2.json": "742933b4fff85a6e2dbbf443fd370e58362a68b4d9d29473bf1e770ff11e9c60",
+    "scripts/adhoc/cycle-maintenance-20261115/cleanup-inventory/retire_owned_worktree.initial.py.txt": "b1819e118861c2ba019406b711fbb342e11769662f07dc232173a2d2b61eb3d5",
+    "scripts/adhoc/cycle-maintenance-20261115/cleanup-inventory/test_retire_owned_worktree.initial.py.txt": "55df5fa942732167cbaad664cff22ca174dded74f58531bc58a9af8c7419cbb9",
+    "scripts/adhoc/cycle-maintenance-20261115/cleanup-inventory/verify_retirement_controls.initial.py.txt": "d0f4a4ecc71fd1e20aa8eaf0ae7e3e46053542a0092969d3c4f12f5c8f3e363f",
+    "scripts/adhoc/cycle-maintenance-20261115/cleanup-inventory/RETIREMENT.initial.md": "39b790a9d5c1f7e0258c4e126b6a761dd91c4e1cf154dd2304cea26f8f546bea",
+    "scripts/adhoc/cycle-maintenance-20261115/cleanup-inventory/RETIREMENT-VALIDATION.json": "d6b7186a71a0a1ddd6a2432d7bec177c4671aee2de1e7fea40374cc8a299dcdf",
+    "scripts/adhoc/cycle-maintenance-20261115/cleanup-inventory/retirement-controls.json": "e925c2e3aeca4eff0ae3eb903e4636c8561caa4d33b75a8eed80c48e44eba6be",
+    "tests/test_retire_owned_worktree.py": "b42ef00128ac07538a6f6fd8d88a3f87df259578caa39be5a831b1c867533d71"
+  },
+  "fixture_suite": {
+    "passed": 18,
+    "log_sha256": "d39223693503e24b386f23df0dd7baf0e1eb7e3092c548c11a8bae8dc83dc460",
+    "summary": "18 passed in 4.51s",
+    "command": "uv run --no-sync python -m pytest -q tests/test_retire_owned_worktree.py"
+  },
+  "mutation_pairs": 3,
+  "paired_controls_passed": true,
+  "mutations_detected": 3,
+  "ruff": "passed",
+  "live_cleanup_performed": false,
+  "initial_receipts_preserved": true,
+  "notes": [
+    "Issue1269: parsed proof/plan and their digests now derive from the same captured bytes, with final readback before any output.",
+    "Maintained tests use disposable owned .temp fixture directories and work in normal CI without basetemp.",
+    "Initial source/test archives preserve exact observed bytes. Initial control helper/docs were reconstructed from the local edit delta and verified byte-exact against their previously recorded hashes.",
+    "The withdrawn-proof mutation runs the original b1819e11 source with the new regression and fails; the repaired control passes."
+  ]
+}

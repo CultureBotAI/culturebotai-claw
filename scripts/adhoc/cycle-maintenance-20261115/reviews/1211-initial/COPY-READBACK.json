@@ -1,0 +1,22 @@
+{
+  "observed_at": "2026-11-15T09:43:08.620864+00:00",
+  "operation": "exclusive_byte_identical_archival_copy",
+  "copied_originals": 8,
+  "files_sha256": {
+    "INPUT-SHA-LEDGER.json": "9216c1e8cf39215490250197e6e7f374b20702980ed06a2830721fa9879dbe4a",
+    "README.md": "03ad7fda721754ff273ce9a946153e606b8f5c579a664c683a3b9d91142a0c44",
+    "REVIEW.md": "fd2b7d841a59bc671be988f9295e89de2ce118340d90052e335f600f7d4403d3",
+    "counterfactual-errors.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "counterfactuals.json": "94b5a019c442763ab1c978eb980f8c88c2009dead13e7956de43cd0b11ba5215",
+    "focused-pytest.log": "63b7934479d93660bd365132b801db94e3af90e24a64d1d0e597be294196ef37",
+    "provenance-verification.json": "cb91eab25449bb356e82eac17445bba687608fb846f0e4fd853bb9b0f0620e7f",
+    "review-manifest.json": "7e0bc44f6d3ac57c7bd1a074b992310010dbb071f4bc4f63479b4285c650166b",
+    "verify_counterfactuals.py.txt": "963da0e04a35fb6b3405afeceedfdeee397b22474d73942615abf6dbfbd00f4e",
+    "verify_pr1211.py.txt": "994cb1a7f8140f1e3e00ddc40f7209e5198a71a3504314f6b32b7ac97de0dba2"
+  },
+  "all_original_bytes_unchanged": true,
+  "source_tree_payloads_copied": 0,
+  "new_executable_helpers": 0,
+  "new_review_execution": false,
+  "private_path_email_or_session_identity_scan": "pass; ignored-inclusive exact package files inspected"
+}

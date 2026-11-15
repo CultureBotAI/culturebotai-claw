@@ -1,0 +1,21 @@
+"""Historical read-only issue1271 staged-blob check, 2026-11-15.
+Inputs: explicit repository and new output path. No Git writes or test rerun.
+This one-time review source is retained as an archive, not a reusable command.
+"""
+import hashlib,json,subprocess,sys
+from pathlib import Path
+root=Path(sys.argv[1]);output=Path(sys.argv[2]);folder='scripts/adhoc/cycle-maintenance-20261115/repairs/1197-refresh/'
+def git(*args):return subprocess.check_output(['git','-C',str(root),*args])
+def sha(raw):return hashlib.sha256(raw).hexdigest()
+log_path=folder+'focused-pytest.log';expected='d35a1ba33a5e6872d4fb0060dc2e16b8ef9375e51ead894a4bda8c9246c25dcd'
+raw=git('show',':'+log_path);assert sha(raw)==expected and raw==(root/log_path).read_bytes()
+assert len(raw.decode().splitlines())==4 and raw.decode().splitlines()[-1]=='215 passed in 12.68s'
+ledger=json.loads((root/(folder+'PROVENANCE.json')).read_bytes());assert ledger['files']['focused-pytest.log']==expected
+validation=json.loads((root/(folder+'VALIDATION.json')).read_bytes());assert validation['pytest']['log_sha256']==expected
+original='2597b50f1cf9ee630316c880b43030e04cfac664'
+for name in ('PROVENANCE.json','VALIDATION.json','integration.json','verification.json'):
+ assert git('show',original+':'+folder+name)==(root/folder/name).read_bytes()
+assert git('show',original+':.gitignore')==(root/'.gitignore').read_bytes()
+value={'issues':[1270,1271],'verdict':'pass_bounded_archival_and_publication_correction','source_before_packaging':original,'staged_log_path':log_path,'staged_blob_sha256':sha(raw),'staged_blob_identical_to_original_recorded_log':True,'original_ledgers_and_global_ignore_unchanged':True,'log_lines':4,'test_or_integration_rerun':False,'helper_sha256':sha(Path(__file__).read_bytes()),'git_writes':False}
+with output.open('x') as stream:json.dump(value,stream,indent=2);stream.write('\n')
+print(json.dumps(value,indent=2))

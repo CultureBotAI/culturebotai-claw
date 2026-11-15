@@ -1,0 +1,42 @@
+{
+  "authority": "independent_read_only_rereview",
+  "evidence_sha256": {
+    "REVIEW.md": "1db055391bfcdcca91dedef157d07bdd7222e683a5dd27cf37ac7a04ae05996a",
+    "pytest.log": "fe32d3cc7eba3756501b0166efcd6d93e0bafeed8c67e7d2d743dfbb1c0dc276",
+    "verification.json": "e58ea13b5edcc34e3effd311e1c9496f338716d882ce17ad6d50d68fe41be360",
+    "verify_rereview.py": "4b1d08fabe7339884dd147696bcf20c6ff785dddb4e67e3838816a7611f6561b"
+  },
+  "issues": [
+    1263,
+    1264,
+    1265,
+    1266
+  ],
+  "new_findings": 0,
+  "observed_at": "2026-11-15T09:32:45.882328+00:00",
+  "source_sha256": {
+    "scripts/adhoc/cycle-maintenance-20261115/inventory/README.md": "793ac1806ab88e0c8a83d30cf4d268067ece70c425b3aae36126db1cbe3b7e4a",
+    "scripts/adhoc/cycle-maintenance-20261115/inventory/archive/README.md": "dc736fe77852e0112eff189395d44c23666980104adc98486f1e7a9a9fe91079",
+    "scripts/adhoc/cycle-maintenance-20261115/inventory/archive/four-wrapper-verification.json": "7a6595af469c2a7aca0ea5557960ba223f87b0ec6fbc8014acbd0541538700e3",
+    "scripts/adhoc/cycle-maintenance-20261115/inventory/archive/package_followup_reviews.executed.py.txt": "42ad7c3549aaf2428531aa41dcc0d0ca59c35cdfb524911d19093db2cc602615",
+    "scripts/adhoc/cycle-maintenance-20261115/inventory/archive/package_review_pr1112_20261115.executed.py.txt": "0f409dfc6059def0e31309c9dfe79c4b1fadd8fb7d907377353a2659218fe6d6",
+    "scripts/adhoc/cycle-maintenance-20261115/inventory/archive/package_review_pr1236_20261115.executed.py.txt": "f6508c1be607ed661ffbc05620631b7b8e24cef3280fef97c436f63a0b37f0e9",
+    "scripts/adhoc/cycle-maintenance-20261115/inventory/archive/package_source_reviews.executed.py.txt": "8f361c8b49222b363af157a55572e37d503e22ba55fc88fb68bd9c234f4e120a",
+    "scripts/adhoc/cycle-maintenance-20261115/inventory/archive/retirement-verification.json": "c19d13404325c9fc7be874cac6643037d617a133d272a44ce1900463ca93a167",
+    "scripts/adhoc/cycle-maintenance-20261115/inventory/capture_pr_audit.py": "93ca9dd66afdd0bf5741ee06c5f8abccbefdb3f8af4559a628c2209343dfae94",
+    "scripts/adhoc/cycle-maintenance-20261115/inventory/helper-repair-provenance.json": "7417d2f2af90419032e3e1807e6850480eaf38b7fe3f67077d228538a5013cb3",
+    "scripts/adhoc/cycle-maintenance-20261115/inventory/inventory-and-review.json": "b6b63834eb203eef395ad73e7c6af376fe821a278c4cac21f2d2f449ecaaea83",
+    "scripts/adhoc/cycle-maintenance-20261115/inventory/package_inventory.py": "3d083fcfed6bcd06a330eb5acc7ea71cdebe7aba40fa8b18f1f4c6ccc4632d29",
+    "scripts/adhoc/cycle-maintenance-20261115/inventory/review_pr1197_mutations.py": "f308de9ddc316be26d4d04fadbbb7c2e57cbfeda3b7b6cbda5828696fea5f8eb",
+    "scripts/adhoc/cycle-maintenance-20261115/inventory/verify_helper_repairs.py": "06b177387063793b09555fbe16ac5831d7713b80555b20c899cbcf1042d50e3a",
+    "scripts/adhoc/cycle-maintenance-20261115/reviews/1112/package_review_pr1112_20261115.py": "1e1bb96ed7b1587b2865a3259fc5b9f70b2c80582cb24dfac8c80de64d82a920",
+    "scripts/adhoc/cycle-maintenance-20261115/reviews/1236/package_review_pr1236_20261115.py": "587006120a343a9dba8cfa5a292ec33ded8b0b0e3531bbd8f23c2ccb032b9f86",
+    "scripts/adhoc/cycle-maintenance-20261115/reviews/README.md": "4b815e7d2a527b09b1439ffab0572f0a1a2debe144c185f798e0bef743737fab",
+    "scripts/adhoc/cycle-maintenance-20261115/reviews/package_followup_reviews.py": "bbee1aa7de9d317003979ae6083946049be86437bac62b35ea96ca2a18fd83ae",
+    "scripts/adhoc/cycle-maintenance-20261115/reviews/package_source_reviews.py": "b2b62873e9a05bc21defce9277a2699670038709ea93f518f1e1898bb1792d75",
+    "tests/test_cycle_maintenance_inventory_helpers.py": "dbbbf14630656eecaecb5ef4eabb187d89dbe2488f37f75a6766793288e95bd6"
+  },
+  "tests_passed": 51,
+  "tests_skipped": 0,
+  "verdict": "pass"
+}

@@ -1,0 +1,11 @@
+{
+  "pr_maintenance": {
+    "frozen_at": "2026-11-15T10:00:01Z",
+    "inventory": [],
+    "dispositions": [],
+    "shared_check_fixes": [],
+    "open_non_draft_limit": 25,
+    "limit_source": "default",
+    "remaining_open_non_draft": []
+  }
+}
