@@ -1,0 +1,43 @@
+"""Independent v2 staging byte/provenance verification; 2026-11-15.
+Inputs: retained task, reviewed staging tree and exact staged-file manifest.
+Output: new JSON receipt. Build runs in memory; no publication or originals
+change. Harmless --help probes are the packager's only child calls.
+"""
+import argparse,hashlib,importlib.util,json,re
+from pathlib import Path
+
+
+def digest(raw):return hashlib.sha256(raw).hexdigest()
+def main():
+    p=argparse.ArgumentParser(description=__doc__)
+    for name in ('task-root','staging','file-manifest','receipt'):p.add_argument('--'+name,type=Path,required=True)
+    a=p.parse_args();prefix=Path('scripts/adhoc/cycle-maintenance-20261115')
+    helper=a.staging/prefix/'provenance-v2/package_review_provenance_v2.py'
+    assert digest(helper.read_bytes())=='f554cd8120ce2dfd3dffc298ca28ec605c4cf41d975a4b02b0ed6c3a1bdd8250'
+    manifest_raw=helper.with_name('expected-original-inputs.json').read_bytes()
+    assert digest(manifest_raw)=='fac861a12685b2859879dbb973dce85ae712634e34fbd9317e2061b4ccb8d7de'
+    manifest=json.loads(manifest_raw)
+    expected=json.loads(a.file_manifest.read_text())
+    assert digest(a.file_manifest.read_bytes())=='97fd87bfc5fe3501c393453b0fb06321c5190c2fcf93bd49d537297b466d2ac3'
+    actual={str(path.relative_to(a.staging)):digest(path.read_bytes()) for path in a.staging.rglob('*') if path.is_file()}
+    assert actual==expected['files'] and len(actual)==expected['count']==30
+    spec=importlib.util.spec_from_file_location('reviewed_v2_packager',helper)
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    payload,provenance=module.build(a.task_root,manifest,manifest_raw)
+    for path,raw in payload.items():assert raw==(a.staging/path).read_bytes(),str(path)
+    expected_extras={str(prefix/'provenance-v2'/name) for name in ('test_provenance_packaging.py','VALIDATION.json','VALIDATION-PROVENANCE.json')}
+    assert set(actual)-{str(path) for path in payload}==expected_extras
+    for name,pin in manifest['inputs'].items():assert digest((a.task_root/name).read_bytes())==pin['sha256'],name
+    for relative in actual:
+        text=(a.staging/relative).read_text()
+        assert not re.search(r'/(?:Users|home)/[A-Za-z0-9]',text),relative
+        assert not re.search(r'[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}',text),relative
+        assert not re.search(r'PID\d+|ttys\d+',text),relative
+    result={'packager_sha256':digest(helper.read_bytes()),'manifest_sha256':digest(manifest_raw),
+        'staged_inventory_sha256':digest(a.file_manifest.read_bytes()),'staged_files':len(actual),
+        'expected_payload_files':len(payload),'expected_payload_byte_identical':True,
+        'additional_validation_files':sorted(expected_extras),'all_original_inputs_unchanged':True,
+        'public_path_email_process_identifier_scan_passed':True,'independent_review_blocker':'renderer_check_then_reparse_separately_reproduced'}
+    with a.receipt.open('x') as stream:json.dump(result,stream,indent=2);stream.write('\n')
+    print(json.dumps(result,indent=2))
+if __name__=='__main__':main()

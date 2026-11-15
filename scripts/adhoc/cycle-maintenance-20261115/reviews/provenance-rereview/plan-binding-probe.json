@@ -1,0 +1,15 @@
+{
+  "renderer_sha256": "fe9abb13dd060a2be74a5e8147d5faa80a94a36f3099a4a17992b15a0b382df2",
+  "original_input_sha256": "e9679aab3114cea7e4ae089fdf868dbb5a276609f45768b376c853568b722db5",
+  "original_count": 18,
+  "injected_count": 0,
+  "original_input_unchanged": true,
+  "interceptions": [
+    "inventory reparsed after original byte hash passed"
+  ],
+  "outcome": "accepted",
+  "output_created": true,
+  "stdout": "{\"items\": 0, \"preservation_mappings\": 0, \"plan_sha256\": \"c7f1fed912e6dc5527ca7fe3da85ca551f283d7955964ef5ee5ed90a6b4d1dc8\"}\n",
+  "emitted_items": 0,
+  "narrative_still_claims_18": true
+}

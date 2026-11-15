@@ -1,0 +1,42 @@
+{
+  "reviewed_at": "2026-11-15T09:15:15.475398+00:00",
+  "head": "553a6103c2275ce7f020f6c6519465323240aaa8",
+  "base": "99fb0ac11e2e6aeabedc8d08f29a5f08aac0892d",
+  "files": {
+    ".claude/skills/evolve-mech-workflow/SKILL.md": "a7e501b798e866d1a34fe2c54e363b1921a7292579ae9f66e8cb752b41d609cd",
+    ".claude/skills/onboard-mech/SKILL.md": "f5b8bea6cf4d23f235b6c2865dd5ac6dd978c70c98f6cb1327e19b6f0bf6dcce",
+    ".claude/skills/unify-skills/SKILL.md": "ff05cfeeb9d5c11f8f66a7a6c9cf2d98681e81e2d45e5674a611ec5dd1b31f99",
+    "docs/guides/MECH_TEMPLATE.md": "7b1a448654b156137d122726fb7e3c0879dbe2d0c1cad56397eb7fe904c4040e",
+    "docs/guides/PREPARATION_CANDIDATES.md": "55103380372441d007c0bd644697625832f1e4f0608303e1030ba35433fa3453",
+    "plugins/repository_settings.py": "bc305a8b2d1f8f57d2d6ba15bde9b28c679caadff24974512b7a698671586359",
+    "pyproject.toml": "7c5c8b3a1d5eea99778b642ae75cfa67a6a75973c98038a2495f6db3446206d8",
+    "scripts/adhoc/merge_fixture_provenance_1211_20261115.py": "367961dfcb47180d01974f6aa893a14c6b654044a8f0b4ac1fc34e9835475376",
+    "src/kg_microbe_governance/__init__.py": "69be964b3a65cc7e61d309f3c7e7a2c2f17a0e0fe4de75b5cf5659b053f5bbce",
+    "src/kg_microbe_governance/__main__.py": "f9e69b650c7dbde0bd1c552efe6111f5862c83ce83fd432044d9bc9218512893",
+    "src/kg_microbe_governance/artifacts/scripts/check_vendored_sync.py": "fa527882d9a50ec3f49148afe0032ecc65a2a3c3eb31d62bdfc14fa7104e7bfb",
+    "src/kg_microbe_governance/candidates.json": "cdda071dad55aed5c86d3fd7365b80945e27f0ed5e689c360d0375c53037cd03",
+    "src/kg_microbe_governance/candidates.py": "f7a5e79f7f754cded6cf7f604a88ff8b703aaa313e6c759d60341b0a62d57b32",
+    "src/kg_microbe_governance/vendored_artifacts.json": "2c5999efb159707a046ff0f482322f84d65c115b1516f61a7bd64e5b92b5d5f9",
+    "src/kg_microbe_skills/template.py": "f7b13500cc71c863deced58473db2a9f54440fa0a76be898060586413fb4ecf5",
+    "src/kg_microbe_skills/template_baseline.json": "0239fb68573e8d9f4970c6aab76f5440aa88df501fd3df250bf7f77583227c31",
+    "tests/fixtures/admitted-source-provenance.json": "e25d489133fc0ce6b2a53c5ce8f00f0f07d3fab3528a314f28d962a56c9952d8",
+    "tests/fixtures/edgemech-admitted-source/check_vendored_sync.py": "673ecd7ea0b34a29ebef8d1068d8d8973a460680e956237c8e09d97a8a22deb3",
+    "tests/test_governance_admitted_sync.py": "45b047ab838b33f801c8c538eadbcadab90adbb260b8b6d4407effe489312b23",
+    "tests/test_mech_template.py": "f8c8a8140338a43ec78a41c985c7d0de20210daecc99302d39eb3c3a5cfaf419",
+    "tests/test_preparation_candidates.py": "72f693777db5b565d02e3554bbcf20be0b3cb785789d55dc29e1ab87b3f068fc"
+  },
+  "evidence": {
+    "counterfactual-errors.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "counterfactuals.json": "94b5a019c442763ab1c978eb980f8c88c2009dead13e7956de43cd0b11ba5215",
+    "focused-pytest.log": "63b7934479d93660bd365132b801db94e3af90e24a64d1d0e597be294196ef37",
+    "provenance-verification.json": "cb91eab25449bb356e82eac17445bba687608fb846f0e4fd853bb9b0f0620e7f",
+    "source-tree-5790569efd881bd8bca82a04ea278cc462c0c2c8.json": "ac2c430ac6e62d424f71632598de86ee5ffec6a7e2f025c6894f2cfd43dce3fd",
+    "source-tree-7e672227fb246a8359ad57b6d3975ce5ed329007.json": "a7ce86113175f4119bf430dfad5a8aa9cc54a4fa31ca46b08b9c1e72edb9091c",
+    "source-tree-89bfcebaee8a0fcf99055b2acd1709abb64f8666.json": "ef7e63a27089e7ceec7246232ab01025199d725fcd707cd93a70c3a6d25531f5",
+    "verify_counterfactuals.py": "963da0e04a35fb6b3405afeceedfdeee397b22474d73942615abf6dbfbd00f4e",
+    "verify_pr1211.py": "994cb1a7f8140f1e3e00ddc40f7209e5198a71a3504314f6b32b7ac97de0dba2"
+  },
+  "git_status": "",
+  "authority": "read_only_independent_review",
+  "runtime_adoption": false
+}

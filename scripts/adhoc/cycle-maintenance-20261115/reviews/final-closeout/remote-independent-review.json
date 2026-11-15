@@ -1,0 +1,58 @@
+{
+  "head": "1d0034ebe4fea0f4371e82e211db13d1b5ec2253",
+  "source_sha256": "b7ea12aa0b2c6ecd0f0d0876965905b5e08e02734a6333a0465cd1a954e9b356",
+  "test_sha256": "300d2ed3298bbae47f598b2f9039bc2473386409ae120ca1dd30f76be9791e7c",
+  "helper_sha256": "52676636d0006c9e8330dc16ff2aaf65d7850bad777cefe0a78088cb7f6279d0",
+  "mutations": [
+    {
+      "name": "1257_union_id",
+      "killed": true,
+      "source_sha256": "46b86c82aa157ba42ffa03f199b273785b622ba42ef4ad5a7b7b925c72130972"
+    },
+    {
+      "name": "1258_reopened_terminal",
+      "killed": true,
+      "source_sha256": "79ec921e875a51a1af47b7e81f5efd36612dffd3f56581c940920503bdcd3170"
+    },
+    {
+      "name": "foreign_closure_status",
+      "killed": true,
+      "source_sha256": "15d8b18b6021ed525ca748fa66c87d7171d81d57e048c436c77cb505af1e9ed3"
+    }
+  ],
+  "source_unchanged": true,
+  "runtime_operations": false,
+  "reviewer_authored_initial_tests": true,
+  "reviewer_authored_production_module": false,
+  "verdict": "no_verified_blocking_source_finding",
+  "findings": [],
+  "tests": {
+    "passed": 118,
+    "skipped": 0
+  },
+  "rechecked_issues": [
+    1257,
+    1258
+  ],
+  "companion_integration_review_issues": [
+    1259,
+    1260
+  ],
+  "live_query": {
+    "checks": {
+      "check_count": 6,
+      "checks_complete": true,
+      "checks_state": "pending",
+      "failing_checks": []
+    },
+    "head": "6aeeb55105659cb740a0e7410eeb03a67855569d",
+    "pr": 1138,
+    "repository": "CultureBotAI/culturebotai-claw"
+  },
+  "report_sha256": "df941c88230be40ae5bc60aec905ba2b0d3ea0ef1a48862742aad50a3365351b",
+  "artifact_sha256": {
+    "pytest.log": "c896fd4fb93e655524b50188bc06618070267016144f34fa07a794ab44d95c52",
+    "proof.json": "6b9573c04c19b91a47870080008d991d110ff279c8bc8921171151b03c65c14a",
+    "live-query.json": "cd263c2ee0a9b9ec7d040eab6fec468b4938c2e4b4d542ca5676c06e40a85899"
+  }
+}

@@ -6,7 +6,7 @@ comparison, test results, counterfactual results and original receipt hashes.
 The original detailed evidence remains retained separately; no private workspace
 paths, email addresses or session history are included here.
 
-The PR 1112/1236 helper copies use an explicit `--review-tree` argument and require a detached
+The active PR 1112/1236 review helpers use an explicit `--review-tree` argument and require a detached
 Git worktree at the original reviewed head. The original helpers used private
 absolute-root guards. Each summary records the original and packaged SHA256 and
 these packaging edits. The initial PR 1236 helper is retained deliberately: its
@@ -18,16 +18,21 @@ To reproduce a review, use an owned disposable detached worktree with the
 repository's development environment. Pass that worktree to the relevant
 `review_pr*.py` helper. The helper runs offline tests, temporarily changes only
 that worktree and restores source in `finally`. It writes receipts beside the
-worktree. The `package_review_pr*.py` helpers assemble the detailed review from
-existing receipt files; their generated reports are working evidence and must be
-inspected before any public publication.
+worktree. This command applies to the `review_pr*.py` validation helpers, not the
+retired narrative packagers described below.
 
-`package_source_reviews.py --evidence-root "$OWNED_EVIDENCE_ROOT"` recreates these
-public copies and summaries from the retained originals. It verifies original
-helper hashes, parses the packaged Python and checks for private paths and email
-addresses. Packaging does not rerun expensive validation or change an original
-review receipt. The packaged helpers were syntax-checked and their `--help`
-paths exercised after the edit.
+Four narrative packagers are now **archival-only** under issues #1265/#1266:
+`package_source_reviews.py`, `package_followup_reviews.py`,
+`1112/package_review_pr1112_20261115.py` and
+`1236/package_review_pr1236_20261115.py`. Their active entry points support
+`--help` and refuse execution before reading evidence, running Git or writing
+reports. They encoded specific historical conclusions and could overwrite
+existing results, so they cannot safely serve as generic generators. Exact former
+public helper bytes, original hashes and retirement details are retained in
+[the inventory archive](../inventory/archive/README.md). Original private
+predecessors, packaging edits, public summaries and review reports remain
+unchanged. The hashes in those dated summaries describe their executed versions;
+retirement is recorded separately and does not relabel earlier evidence.
 
 These are code-only reviews. They grant no runtime installation, restart,
 deployment, scientific publication or consumer-adoption authority.
@@ -36,8 +41,8 @@ The remote-verifier helpers copy the in-progress source packages and the test
 file into a separate clean detached worktree, then run offline mutation controls.
 They never edit the implementation worktree. `remote-verifier-summary.json`
 records the tested source/test hashes, six killed mutations and the repaired
-porcelain-completeness finding. Pass `--finding-issue-url` to the packager to bind
-that finding's own-repository issue without rerunning the tests.
+porcelain-completeness finding. Its original issue binding and hashes are
+retained; the retired narrative packager must not rewrite that historical result.
 
 The PR 1138 rereview addresses issue 1252 without regenerating its archived
 candidate. `1138/review_closeout.py` takes `--root`, `--python` and a new
@@ -52,10 +57,8 @@ uses test-source overrides for count, duplicate-target and startup-retention
 guards. They never inspect a live tmux endpoint or native session. Issues
 1238–1242, 1244–1245 and 1249 define the reviewed source requirements.
 
-`package_followup_reviews.py --reviews-root "$OWNED_REVIEWS_ROOT"` packages these
-three helpers byte-for-byte and summarizes retained results. It records original
-and copied hashes, checks public text for actual home paths and email addresses,
-and does not rerun tests or live verification. The summaries distinguish source
+The retained historical summaries record original and copied helper hashes and
+the public-hygiene checks performed at packaging time. They distinguish source
 acceptance from current CI/adoption readiness and classify the optional private
 evidence skip. Original private evidence and earlier review worktrees remain
 retained for evidence-preserving cleanup by their owner.

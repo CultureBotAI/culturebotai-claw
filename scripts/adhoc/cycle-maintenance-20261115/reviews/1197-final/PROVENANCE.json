@@ -1,0 +1,28 @@
+{
+  "date": "2026-11-15",
+  "files": [
+    {
+      "original_sha256": "2273eef93d10c4ad0728fc7be1df296fee04e202120a401f5a1d36d3a50a0266",
+      "packaged_file": "verify_integration.py",
+      "packaged_sha256": "2273eef93d10c4ad0728fc7be1df296fee04e202120a401f5a1d36d3a50a0266",
+      "packaging_edits": [],
+      "source_relative_path": "reviews/1197/final-integration/verify_integration.py"
+    },
+    {
+      "original_sha256": "f488ead365681e4235bc193289a8e669cd891da4acf61eebe0b9f14621b82163",
+      "packaged_file": "verification.json",
+      "packaged_sha256": "f488ead365681e4235bc193289a8e669cd891da4acf61eebe0b9f14621b82163",
+      "packaging_edits": [],
+      "source_relative_path": "reviews/1197/final-integration/verification.json"
+    },
+    {
+      "original_sha256": "386d33bee098bd7b38a7314fcf8ae0f4e16ec5f1f94df2eddacaa5e09d70ae7a",
+      "packaged_file": "REVIEW.md",
+      "packaged_sha256": "386d33bee098bd7b38a7314fcf8ae0f4e16ec5f1f94df2eddacaa5e09d70ae7a",
+      "packaging_edits": [],
+      "source_relative_path": "reviews/1197/final-integration/REVIEW.md"
+    }
+  ],
+  "issue": 1262,
+  "scope": "Historical exact-head review receipt; no runtime or merge authority"
+}

@@ -1,0 +1,38 @@
+"""Issue1268 paired offline input-binding mutation checks, 2026-11-15.
+Inputs: --package-root staged source/tests; --python interpreter.
+Output: --output new durable miniature fixtures, logs and public hash receipt.
+Only disposable copies are mutated; no historical generation or cleanup runs.
+"""
+from __future__ import annotations
+import argparse,hashlib,json,os,subprocess
+from pathlib import Path
+
+HELPER=Path('scripts/adhoc/cycle-maintenance-20261115/provenance-v3/package_review_provenance_v3.py')
+TEST=Path('tests/test_cycle_cleanup_plan_packaging.py')
+
+def sha(raw):return hashlib.sha256(raw).hexdigest()
+def main():
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--package-root',type=Path,required=True);p.add_argument('--python',required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
+    originals={name:(a.package_root/name).read_bytes() for name in (HELPER,TEST)}
+    a.output.mkdir(parents=False,exist_ok=False);rows=[]
+    mutations={
+        'inventory':("data=json.loads(authenticated['cleanup/inventory-20261115/summary.json'])", "data=json.loads((audit/'inventory-20261115/summary.json').read_text())"),
+        'drift':('text=text.replace(old_drift,"json.loads(authenticated[\'cleanup/owned-review-content-drift.json\'])")', 'text=text.replace(old_drift,"json.loads((audit/\'owned-review-content-drift.json\').read_text())")'),
+    }
+    for name in ('control','inventory','drift'):
+        case=a.output/name;case.mkdir();source=case/'source';source.mkdir()
+        for relative,raw in originals.items():
+            dest=source/relative;dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(raw)
+        if name!='control':
+            raw=(source/HELPER).read_text();old,new=mutations[name];assert raw.count(old)==1; (source/HELPER).write_text(raw.replace(old,new))
+        env=os.environ.copy();env['PYTHONPYCACHEPREFIX']=str(case/'fresh-bytecode')
+        cmd=[a.python,'-m','pytest','-q',str(source/TEST),'--basetemp',str(case/'fixtures')]
+        if name!='control':cmd+=['-k','second_read and '+name]
+        r=subprocess.run(cmd,cwd=source,env=env,text=True,capture_output=True,timeout=60)
+        log=r.stdout+r.stderr;(case/'pytest.log').write_text(log)
+        assert r.returncode==(0 if name=='control' else 1),(name,log)
+        rows.append({'case':name,'mutation':name!='control','expected_exit':0 if name=='control' else 1,'exit_code':r.returncode,'summary':r.stdout.strip().splitlines()[-1],'log_sha256':sha(log.encode())})
+    assert all((a.package_root/name).read_bytes()==raw for name,raw in originals.items())
+    result={'issue':1268,'fixture_scope':'synthetic inputs only','source_sha256':{str(n):sha(raw) for n,raw in originals.items()},'helper_sha256':sha(Path(__file__).read_bytes()),'controls_passed':4,'paired_mutations_detected':2,'observations':rows,'originals_unchanged':True,'historical_generation_rerun':False,'actual_cleanup_performed':False}
+    (a.output/'results.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result,indent=2))
+if __name__=='__main__':main()

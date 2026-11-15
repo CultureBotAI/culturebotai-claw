@@ -1,0 +1,41 @@
+"""Read-only independent plan-input binding probe; 2026-11-15, issue1266.
+Input: staged renderer and retained historical task inputs. Output: new private
+plan directory plus JSON receipt. Only Path.read_text is mocked; original bytes,
+source, Git and remote state are unchanged. The mock models change after hashing.
+"""
+import argparse,contextlib,hashlib,io,json,runpy,sys
+from pathlib import Path
+from unittest.mock import patch
+
+
+def main():
+    p=argparse.ArgumentParser(description=__doc__)
+    for name in ('renderer','task-root','output','receipt'):p.add_argument('--'+name,type=Path,required=True)
+    a=p.parse_args();source=a.task_root/'cleanup/inventory-20261115/summary.json'
+    original=source.read_bytes();value=json.loads(original)
+    original_count=len(value['repositories']);value['repositories']=[];value['groups']={}
+    actual_read_text=Path.read_text;interceptions=[]
+    def replacement(path,*args,**kwargs):
+        if path==source:
+            interceptions.append('inventory reparsed after original byte hash passed')
+            return json.dumps(value)
+        return actual_read_text(path,*args,**kwargs)
+    stdout=io.StringIO()
+    try:
+        with patch.object(sys,'argv',[str(a.renderer),'--task-root',str(a.task_root),'--output',str(a.output)]),patch.object(Path,'read_text',replacement),contextlib.redirect_stdout(stdout):
+            runpy.run_path(str(a.renderer),run_name='__main__')
+        outcome='accepted'
+    except Exception as error:
+        outcome=type(error).__name__+': '+str(error)
+    result={'renderer_sha256':hashlib.sha256(a.renderer.read_bytes()).hexdigest(),
+        'original_input_sha256':hashlib.sha256(original).hexdigest(),
+        'original_count':original_count,'injected_count':len(value['repositories']),
+        'original_input_unchanged':source.read_bytes()==original,'interceptions':interceptions,
+        'outcome':outcome,'output_created':a.output.exists(),'stdout':stdout.getvalue()}
+    if a.output.exists():
+        plan=json.loads((a.output/'ACTION-PLAN.json').read_text())
+        result['emitted_items']=len(plan['items'])
+        result['narrative_still_claims_18']='covered 18 registered task checkouts' in (a.output/'PLAN.md').read_text()
+    with a.receipt.open('x') as stream:json.dump(result,stream,indent=2);stream.write('\n')
+    print(json.dumps(result,indent=2))
+if __name__=='__main__':main()

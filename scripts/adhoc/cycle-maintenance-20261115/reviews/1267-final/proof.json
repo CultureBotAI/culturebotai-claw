@@ -1,0 +1,25 @@
+{
+  "issue": 1267,
+  "base_commit": "1f8e0a0db3a83ddd70723a6cdf8f1d579b3da099",
+  "original_parent_source_commit": "99fb0ac11e2e6aeabedc8d08f29a5f08aac0892d",
+  "original_parent_path": "src/kg_microbe_workflows/templates/mech-cycle.yaml",
+  "historical_parent_path": "src/kg_microbe_workflows/templates/mech-cycle-v2.0.yaml",
+  "historical_parent_sha256": "0d3e218c22c4ffe4e6dcddce8287d0177aaa52f637e156df1c737e4e7d84f913",
+  "historical_parent_equals_original_git_blob": true,
+  "reviewed_test_sha256": "dad6cc46a80ada374efee1ebf26f43f225a12083c8ead128da9224728b9a3839",
+  "previous_test_sha256": "d35fb4da246b25e2c5344e35a29c29edc6f17a02265f0a4370f42381e220cf06",
+  "source_archive_sha256": "1b7343a50abf77be6d64486c3ca9ec8827beee976ec05e98a4ae3f98c219d0e7",
+  "control_tests_passed": 17,
+  "mutations": [
+    {
+      "name": "valid_yaml_historical_byte",
+      "sha256": "a2979d7cc48320d224375b4590c7a0eb42147fa6b7f22ebde75ee171c3c9ada4",
+      "killed": true,
+      "fresh_interpreter": true
+    }
+  ],
+  "restored_test_passed": true,
+  "original_source_unchanged": true,
+  "runtime_operations": false,
+  "helper_sha256": "a13aab648c9818a8b7f24ef3d5864d5add25ffd3fb70ebb60c84e28920285257"
+}

@@ -1,0 +1,185 @@
+{
+  "all_inputs_validated_before_output_creation": true,
+  "files": [
+    {
+      "original_relative_path": "cleanup/helpers/audit_index_worktree_drift.py",
+      "original_sha256": "71e2ab228625df75ab6d5502974332afe39db630e89b15347fcf43bdc0f3c337",
+      "packaged_path": "cleanup-inventory/audit_index_worktree_drift.py",
+      "packaged_sha256": "71e2ab228625df75ab6d5502974332afe39db630e89b15347fcf43bdc0f3c337",
+      "packaging_edits": []
+    },
+    {
+      "original_relative_path": "cleanup/helpers/audit_index_worktree_drift_initial.py",
+      "original_sha256": "ef150125fcb393549af3be47c5b1ea6b610805a39fa1eaed278a7b022e85b9fb",
+      "packaged_path": "cleanup-inventory/audit_index_worktree_drift_initial.py",
+      "packaged_sha256": "ef150125fcb393549af3be47c5b1ea6b610805a39fa1eaed278a7b022e85b9fb",
+      "packaging_edits": []
+    },
+    {
+      "original_relative_path": "cleanup/helpers/inventory_task_worktrees.py",
+      "original_sha256": "430aa334e6c07f31f186205921ae70962f0ed8459e5a545b7ab1aa4b4ed77241",
+      "packaged_path": "cleanup-inventory/inventory_task_worktrees.py",
+      "packaged_sha256": "b62ba79ee5bb8d4d2f2bc0066dc5f4140f54a1c43e6b5e48dd40b2641bc6384f",
+      "packaging_edits": [
+        "Use explicit --inventory-helper instead of a private sibling lookup; inventory logic unchanged."
+      ]
+    },
+    {
+      "original_relative_path": "cleanup/helpers/prepare_cleanup_plan.py",
+      "original_sha256": "a573667c5cc8c81a180cb671aadc3eb89dfd2e1fc1ac81ef17b15af0b4d09388",
+      "packaged_path": "cleanup-inventory/prepare_cleanup_plan.py",
+      "packaged_sha256": "c424345a7e5a1aa5f95c38205ae167ea3244d3dc6239812cbaf317a04a2c9500",
+      "packaging_edits": [
+        "Replace private process/session labels with neutral evidence pointers.",
+        "Parse inventory/drift from the same cached bytes authenticated against fixed historical hashes; refuse ancestor aliases; write only to a new explicit output outside retained inputs."
+      ]
+    },
+    {
+      "original_relative_path": "reviews/1112/final-integration/REVIEW.md",
+      "original_sha256": "197c278d77f8106c7a03adfca37d65d9a2ff2ecfc85f14b795b159d5eab214ae",
+      "packaged_path": "reviews/final-closeout/1112-REVIEW.md",
+      "packaged_sha256": "197c278d77f8106c7a03adfca37d65d9a2ff2ecfc85f14b795b159d5eab214ae",
+      "packaging_edits": []
+    },
+    {
+      "original_relative_path": "reviews/1112/final-integration/review.json",
+      "original_sha256": "5c0505dedf73015992e883b4f2740266fc5e3be05fe1f488adbfffeed4f9f9e5",
+      "packaged_path": "reviews/final-closeout/1112-review.json",
+      "packaged_sha256": "5c0505dedf73015992e883b4f2740266fc5e3be05fe1f488adbfffeed4f9f9e5",
+      "packaging_edits": []
+    },
+    {
+      "original_relative_path": "reviews/1112/final-integration/verified/proof.json",
+      "original_sha256": "8685a4c8401d622a7732726f5e764e85f625b3bb5ccf858240b6113fb2f40ff2",
+      "packaged_path": "reviews/final-closeout/1112-proof.json",
+      "packaged_sha256": "8685a4c8401d622a7732726f5e764e85f625b3bb5ccf858240b6113fb2f40ff2",
+      "packaging_edits": []
+    },
+    {
+      "original_relative_path": "reviews/1138/final-integration/REVIEW.md",
+      "original_sha256": "883a8657ae52f50cbe4cf9b3dc1a5c73a2fdd52732846aa0a3d9f2cfaaffa5b3",
+      "packaged_path": "reviews/final-closeout/1138-REVIEW.md",
+      "packaged_sha256": "883a8657ae52f50cbe4cf9b3dc1a5c73a2fdd52732846aa0a3d9f2cfaaffa5b3",
+      "packaging_edits": []
+    },
+    {
+      "original_relative_path": "reviews/1138/final-integration/receipts/proof.json",
+      "original_sha256": "066192c4922e122ae01f644827b46d94cc83086ede7b9ef0c0ca41b7539292a5",
+      "packaged_path": "reviews/final-closeout/1138-proof.json",
+      "packaged_sha256": "066192c4922e122ae01f644827b46d94cc83086ede7b9ef0c0ca41b7539292a5",
+      "packaging_edits": []
+    },
+    {
+      "original_relative_path": "reviews/1138/final-integration/review.json",
+      "original_sha256": "7a7cda340e3bbb15959ddefd94d8911beca443e489102d13ec36373398523908",
+      "packaged_path": "reviews/final-closeout/1138-review.json",
+      "packaged_sha256": "7a7cda340e3bbb15959ddefd94d8911beca443e489102d13ec36373398523908",
+      "packaging_edits": []
+    },
+    {
+      "original_relative_path": "reviews/1267/REVIEW.md",
+      "original_sha256": "ee1127abbf10ca5ba7c418088f99e90d367e8a115c3a34b1499f86e0f8cba4cf",
+      "packaged_path": "reviews/1267-final/REVIEW.md",
+      "packaged_sha256": "ee1127abbf10ca5ba7c418088f99e90d367e8a115c3a34b1499f86e0f8cba4cf",
+      "packaging_edits": []
+    },
+    {
+      "original_relative_path": "reviews/1267/receipts/proof.json",
+      "original_sha256": "10f12cf9deecaca93e176f23ef62e3313961cee036eac450039c2d3fd77eca3e",
+      "packaged_path": "reviews/1267-final/proof.json",
+      "packaged_sha256": "10f12cf9deecaca93e176f23ef62e3313961cee036eac450039c2d3fd77eca3e",
+      "packaging_edits": []
+    },
+    {
+      "original_relative_path": "reviews/1267/review.json",
+      "original_sha256": "39fdd6d17780daf8b0fc50ef1c486075e678ccf38f37f83e60b76ab8f3ee397f",
+      "packaged_path": "reviews/1267-final/review.json",
+      "packaged_sha256": "39fdd6d17780daf8b0fc50ef1c486075e678ccf38f37f83e60b76ab8f3ee397f",
+      "packaging_edits": []
+    },
+    {
+      "original_relative_path": "reviews/1267/review_freshness_parent_test.py",
+      "original_sha256": "a13aab648c9818a8b7f24ef3d5864d5add25ffd3fb70ebb60c84e28920285257",
+      "packaged_path": "reviews/1267-final/review_freshness_parent_test.py",
+      "packaged_sha256": "a13aab648c9818a8b7f24ef3d5864d5add25ffd3fb70ebb60c84e28920285257",
+      "packaging_edits": []
+    },
+    {
+      "original_relative_path": "reviews/permanent-cycle/remote-independent/REVIEW.md",
+      "original_sha256": "df941c88230be40ae5bc60aec905ba2b0d3ea0ef1a48862742aad50a3365351b",
+      "packaged_path": "reviews/final-closeout/remote-independent-REVIEW.md",
+      "packaged_sha256": "df941c88230be40ae5bc60aec905ba2b0d3ea0ef1a48862742aad50a3365351b",
+      "packaging_edits": []
+    },
+    {
+      "original_relative_path": "reviews/permanent-cycle/remote-independent/receipts/proof.json",
+      "original_sha256": "6b9573c04c19b91a47870080008d991d110ff279c8bc8921171151b03c65c14a",
+      "packaged_path": "reviews/final-closeout/remote-independent-proof.json",
+      "packaged_sha256": "6b9573c04c19b91a47870080008d991d110ff279c8bc8921171151b03c65c14a",
+      "packaging_edits": []
+    },
+    {
+      "original_relative_path": "reviews/permanent-cycle/remote-independent/review.json",
+      "original_sha256": "dab800e32cd24bb2afd547a9be15f97bd3248f677af73a1295ebc15aa3113b09",
+      "packaged_path": "reviews/final-closeout/remote-independent-review.json",
+      "packaged_sha256": "dab800e32cd24bb2afd547a9be15f97bd3248f677af73a1295ebc15aa3113b09",
+      "packaging_edits": []
+    },
+    {
+      "original_relative_path": "reviews/permanent-cycle/remote-independent/review_remote_independent.py",
+      "original_sha256": "52676636d0006c9e8330dc16ff2aaf65d7850bad777cefe0a78088cb7f6279d0",
+      "packaged_path": "reviews/final-closeout/review_remote_independent.py",
+      "packaged_sha256": "52676636d0006c9e8330dc16ff2aaf65d7850bad777cefe0a78088cb7f6279d0",
+      "packaging_edits": []
+    },
+    {
+      "original_relative_path": "reviews/review_final_integrations.py",
+      "original_sha256": "a120fe5b5a4afadec3c5f3cec8b61706b779aa8cd4be408ee48fb059ce315e2e",
+      "packaged_path": "reviews/final-closeout/review_final_integrations.py",
+      "packaged_sha256": "a120fe5b5a4afadec3c5f3cec8b61706b779aa8cd4be408ee48fb059ce315e2e",
+      "packaging_edits": []
+    }
+  ],
+  "fixed_manifest_sha256": "fac861a12685b2859879dbb973dce85ae712634e34fbd9317e2061b4ccb8d7de",
+  "historical_validation_rerun": false,
+  "issue": 1268,
+  "original_inputs_verified": {
+    "cleanup/ACTION-PLAN.json": "7349524b221cc49c4ae65f038fb396168cf7cbafff7e60dfbc7ecef55b2113e5",
+    "cleanup/PLAN.md": "1e48294facb0265d60a10e0ad8c56e04c2f006f76ddb95a1ff30d3628520efc4",
+    "cleanup/helpers/audit_index_worktree_drift.py": "71e2ab228625df75ab6d5502974332afe39db630e89b15347fcf43bdc0f3c337",
+    "cleanup/helpers/audit_index_worktree_drift_initial.py": "ef150125fcb393549af3be47c5b1ea6b610805a39fa1eaed278a7b022e85b9fb",
+    "cleanup/helpers/inventory_task_worktrees.py": "430aa334e6c07f31f186205921ae70962f0ed8459e5a545b7ab1aa4b4ed77241",
+    "cleanup/helpers/package_final_review_receipts.py": "79a4d3aadb2e61720e81a4c3676ab6b27d9f445847ac4d99e6c9a551530b3236",
+    "cleanup/helpers/prepare_cleanup_plan.py": "a573667c5cc8c81a180cb671aadc3eb89dfd2e1fc1ac81ef17b15af0b4d09388",
+    "cleanup/helpers/repo_crud_inventory.py": "8ae791d3fd2d1afae06746831d1435d9afb9046e7ae0a4c6385aa55918b5a632",
+    "cleanup/helpers/stage_cleanup_helpers.py": "0b60021e8933d5270e2bc8ca3d0d0d88bea413901ed3752423fde17c649ae8a6",
+    "cleanup/inventory-20261115/summary.json": "e9679aab3114cea7e4ae089fdf868dbb5a276609f45768b376c853568b722db5",
+    "cleanup/owned-review-content-drift.json": "5b862dbba45fd678a3389c1010e1f04cefaa92ccf50f64991f703d507280c004",
+    "cleanup/public-package/scripts/adhoc/cycle-maintenance-20261115/cleanup-inventory/PROVENANCE.json": "521fdad017ae71b8a4eecdd78ce3ab84557430e55b627b6ec0349d901804f230",
+    "cleanup/public-package/scripts/adhoc/cycle-maintenance-20261115/reviews/1267-final/PROVENANCE.json": "e6894de5437925051e8f4aca4b6e8ba0716cecd719f0303440024d46aa92693d",
+    "cleanup/public-package/scripts/adhoc/cycle-maintenance-20261115/reviews/final-closeout/PROVENANCE.json": "32ab05d56601d4900dd82bd955b889c602322a807b1591cc2abc285664c60351",
+    "reviews/1112/final-integration/REVIEW.md": "197c278d77f8106c7a03adfca37d65d9a2ff2ecfc85f14b795b159d5eab214ae",
+    "reviews/1112/final-integration/review.json": "5c0505dedf73015992e883b4f2740266fc5e3be05fe1f488adbfffeed4f9f9e5",
+    "reviews/1112/final-integration/verified/proof.json": "8685a4c8401d622a7732726f5e764e85f625b3bb5ccf858240b6113fb2f40ff2",
+    "reviews/1138/final-integration/REVIEW.md": "883a8657ae52f50cbe4cf9b3dc1a5c73a2fdd52732846aa0a3d9f2cfaaffa5b3",
+    "reviews/1138/final-integration/receipts/proof.json": "066192c4922e122ae01f644827b46d94cc83086ede7b9ef0c0ca41b7539292a5",
+    "reviews/1138/final-integration/review.json": "7a7cda340e3bbb15959ddefd94d8911beca443e489102d13ec36373398523908",
+    "reviews/1267/REVIEW.md": "ee1127abbf10ca5ba7c418088f99e90d367e8a115c3a34b1499f86e0f8cba4cf",
+    "reviews/1267/receipts/proof.json": "10f12cf9deecaca93e176f23ef62e3313961cee036eac450039c2d3fd77eca3e",
+    "reviews/1267/review.json": "39fdd6d17780daf8b0fc50ef1c486075e678ccf38f37f83e60b76ab8f3ee397f",
+    "reviews/1267/review_freshness_parent_test.py": "a13aab648c9818a8b7f24ef3d5864d5add25ffd3fb70ebb60c84e28920285257",
+    "reviews/1267/stage_test_review.py": "5ccbf8bf6ca76f7e8910061196ee261ffb66c41afae71fb8dcd5952c68372b91",
+    "reviews/permanent-cycle/remote-independent/REVIEW.md": "df941c88230be40ae5bc60aec905ba2b0d3ea0ef1a48862742aad50a3365351b",
+    "reviews/permanent-cycle/remote-independent/receipts/proof.json": "6b9573c04c19b91a47870080008d991d110ff279c8bc8921171151b03c65c14a",
+    "reviews/permanent-cycle/remote-independent/review.json": "dab800e32cd24bb2afd547a9be15f97bd3248f677af73a1295ebc15aa3113b09",
+    "reviews/permanent-cycle/remote-independent/review_remote_independent.py": "52676636d0006c9e8330dc16ff2aaf65d7850bad777cefe0a78088cb7f6279d0",
+    "reviews/review_final_integrations.py": "a120fe5b5a4afadec3c5f3cec8b61706b779aa8cd4be408ee48fb059ce315e2e"
+  },
+  "originals_and_v1_stages_preserved": true,
+  "output_inside_or_aliasing_inputs_refused": true,
+  "packager_sha256": "902a8400b8e244b01a70c4536698914bec8981625c8ab12021d69a2ab85293cd",
+  "previous_v2_packager_sha256": "f554cd8120ce2dfd3dffc298ca28ec605c4cf41d975a4b02b0ed6c3a1bdd8250",
+  "related_issue": 1266,
+  "schema_version": 3,
+  "syntax_help_privacy_and_shape_checked_before_output_creation": true
+}

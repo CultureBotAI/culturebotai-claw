@@ -1,0 +1,29 @@
+{
+  "pr": 1138,
+  "reviewed_original_head": "3046fed7f3fda2d24f19c38e6e874fef68a794e4",
+  "refreshed_head": "6aeeb55105659cb740a0e7410eeb03a67855569d",
+  "merge_parents": [
+    "3046fed7f3fda2d24f19c38e6e874fef68a794e4",
+    "99fb0ac11e2e6aeabedc8d08f29a5f08aac0892d"
+  ],
+  "refreshed_tree": "d6c5a8820d3dc7d00b06d40e98c6b23b6d1f5eff",
+  "independently_computed_tree": "d6c5a8820d3dc7d00b06d40e98c6b23b6d1f5eff",
+  "actual_main": "99fb0ac11e2e6aeabedc8d08f29a5f08aac0892d",
+  "prospective_current_main_tree": "d6c5a8820d3dc7d00b06d40e98c6b23b6d1f5eff",
+  "reviewed_paths_preserved_exactly": [
+    "scripts/adhoc/repository-freshness-closeout-20261115/README.md",
+    "scripts/adhoc/repository-freshness-closeout-20261115/verification.json",
+    "scripts/adhoc/repository-freshness-closeout-20261115/verify_release.py",
+    "tests/test_freshness_archive_1138.py",
+    "workflow/candidates/repository-freshness-v1/README.md",
+    "workflow/candidates/repository-freshness-v1/SKILL.md",
+    "workflow/candidates/repository-freshness-v1/contract.yaml",
+    "workflow/candidates/repository-freshness-v1/proposal.json",
+    "workflow/candidates/repository-freshness-v1/schema.yaml"
+  ],
+  "reviewed_paths_integrating_main": [],
+  "helper_sha256": "a120fe5b5a4afadec3c5f3cec8b61706b779aa8cd4be408ee48fb059ce315e2e",
+  "test_log_sha256": "d2287ade7f7f09187b4339a439bd10e735c5571321acedb0d59483f1e6468358",
+  "tracked_source_unchanged": true,
+  "runtime_operations": false
+}

@@ -1,0 +1,40 @@
+{
+  "source_sha256": {
+    "retire_owned_worktree.py": "b1819e118861c2ba019406b711fbb342e11769662f07dc232173a2d2b61eb3d5",
+    "test_retire_owned_worktree.py": "55df5fa942732167cbaad664cff22ca174dded74f58531bc58a9af8c7419cbb9"
+  },
+  "helper_sha256": "d19bbd6c08f69c2ea622ed1541a70f0e989301a67d6b9dc776ef8f1f1e4d1f8e",
+  "observations": [
+    {
+      "case": "control",
+      "exit_code": 0,
+      "summary": "15 passed in 3.82s",
+      "log_sha256": "8ac47df58727bbf4ebe68b3473faf2500cb1f30fac09881fa6290b6ac6ce96c6"
+    },
+    {
+      "case": "reader-failure",
+      "exit_code": 0,
+      "summary": "1 passed, 16 deselected in 0.43s",
+      "log_sha256": "575e19e642d63d22aafe01c5cabc1e181cd8a09665091807af8b1bf25f215c8b"
+    },
+    {
+      "case": "proof-binding",
+      "exit_code": 1,
+      "summary": "1 failed, 16 deselected in 0.50s",
+      "log_sha256": "58d44936ad1bcb9b4bd6a80c4526138d806b0a5711a574339497c218f2e55efb"
+    }
+  ],
+  "actual_cleanup_performed": false,
+  "sources_unchanged": true,
+  "verdict": "changes_required",
+  "findings": [
+    {
+      "id": "proof-readback-byte-binding",
+      "severity": "high",
+      "status": "confirmed",
+      "reproduction": "owner_complete revoked during initial inventory probe; apply unexpectedly removed only the disposable fixture worktree",
+      "root_owns_issue_filing": true
+    }
+  ],
+  "report_sha256": "d941ec5273093108ab7195b53663c6c3d96ff214a782b6dd4f9b4c5c99edfcbb"
+}

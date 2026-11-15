@@ -1,0 +1,138 @@
+{
+  "date": "2026-11-15",
+  "files": [
+    {
+      "byte_edits": false,
+      "original": "reviews/retirement-independent/public-r2/README.md",
+      "packaged": "retirement-rereview/README.md",
+      "sha256": "18afa1ce959904d8d3621e39ee40c3a5181afde6b8a13f349b098b293980cf90"
+    },
+    {
+      "byte_edits": false,
+      "original": "reviews/retirement-independent/public-r2/REVIEW-initial.md",
+      "packaged": "retirement-rereview/REVIEW-initial.md",
+      "sha256": "d941ec5273093108ab7195b53663c6c3d96ff214a782b6dd4f9b4c5c99edfcbb"
+    },
+    {
+      "byte_edits": false,
+      "original": "reviews/retirement-independent/public-r2/REVIEW-r2.md",
+      "packaged": "retirement-rereview/REVIEW-r2.md",
+      "sha256": "98ee10b647f9cc01da0419b38f091ab76e6b3bc37a4976fe9a9d111af99c611c"
+    },
+    {
+      "byte_edits": false,
+      "original": "reviews/retirement-independent/public-r2/initial-fixture-results.json",
+      "packaged": "retirement-rereview/initial-fixture-results.json",
+      "sha256": "1b646d8241f01fedeb118f6bf3d030eb56200ce3895b37cecc3d522715fa2198"
+    },
+    {
+      "byte_edits": false,
+      "original": "reviews/retirement-independent/public-r2/repaired-fixture-results.json",
+      "packaged": "retirement-rereview/repaired-fixture-results.json",
+      "sha256": "1f872403921e92aeb8da61796374daa73d8d5dc5238815013affd054014f5294"
+    },
+    {
+      "byte_edits": false,
+      "original": "reviews/retirement-independent/public-r2/review-initial.json",
+      "packaged": "retirement-rereview/review-initial.json",
+      "sha256": "62ddd4ef892b8d3deb17eaba59f107e6fee4e6b3e9e45d3ca55fce6589e8df14"
+    },
+    {
+      "byte_edits": false,
+      "original": "reviews/retirement-independent/public-r2/review-r2.json",
+      "packaged": "retirement-rereview/review-r2.json",
+      "sha256": "f0248c7a44085929d2f41d9ec7c0f1033f97deef66da95f3f58d670d4f5882a0"
+    },
+    {
+      "byte_edits": false,
+      "original": "reviews/retirement-independent/public-r2/verify_retirement_review.py.txt",
+      "packaged": "retirement-rereview/verify_retirement_review.py.txt",
+      "sha256": "d19bbd6c08f69c2ea622ed1541a70f0e989301a67d6b9dc776ef8f1f1e4d1f8e"
+    },
+    {
+      "byte_edits": false,
+      "original": "reviews/inventory-helpers/rereview/REVIEW.md",
+      "packaged": "inventory-rereview/REVIEW.md",
+      "sha256": "1db055391bfcdcca91dedef157d07bdd7222e683a5dd27cf37ac7a04ae05996a"
+    },
+    {
+      "byte_edits": false,
+      "original": "reviews/inventory-helpers/rereview/verification.json",
+      "packaged": "inventory-rereview/verification.json",
+      "sha256": "e58ea13b5edcc34e3effd311e1c9496f338716d882ce17ad6d50d68fe41be360"
+    },
+    {
+      "byte_edits": false,
+      "original": "reviews/inventory-helpers/rereview/verify_rereview.py",
+      "packaged": "inventory-rereview/verify_rereview.py",
+      "sha256": "4b1d08fabe7339884dd147696bcf20c6ff785dddb4e67e3838816a7611f6561b"
+    },
+    {
+      "byte_edits": false,
+      "original": "reviews/inventory-helpers/rereview/review-manifest.json",
+      "packaged": "inventory-rereview/review-manifest.json",
+      "sha256": "f3513a56602135ba1828d29735d87a303365a3ec21db0844e914be0664c9377f"
+    },
+    {
+      "byte_edits": false,
+      "original": "reviews/provenance-v2-independent/probe_plan_bound_inputs.py",
+      "packaged": "provenance-rereview/probe_plan_bound_inputs.py.txt",
+      "sha256": "6e6cf4130ee38c0e1a3b5272db02801361d4f8a25c7b04a5b7bdc30d5658ddee"
+    },
+    {
+      "byte_edits": false,
+      "original": "reviews/provenance-v2-independent/verify_staged_bytes.py",
+      "packaged": "provenance-rereview/verify_staged_bytes.py.txt",
+      "sha256": "4217a2338ecaa3f0b8104cab9d63973da35c44126d8a9e5c7908b88f548a9cdf"
+    },
+    {
+      "byte_edits": false,
+      "original": "reviews/provenance-v2-independent/probe_v3_auxiliary_helpers.py",
+      "packaged": "provenance-rereview/probe_v3_auxiliary_helpers.py.txt",
+      "sha256": "2a03ef21f161a832857c88aa3f053775eaa9454b812aaad8c82ecba3f57a60f1"
+    },
+    {
+      "byte_edits": false,
+      "original": "reviews/provenance-v2-independent/verify_v3_staged_bytes.py",
+      "packaged": "provenance-rereview/verify_v3_staged_bytes.py.txt",
+      "sha256": "94359f15b23f508ea5614f37b2e61f8c77abf309235144655937ccb01d9488b8"
+    },
+    {
+      "byte_edits": false,
+      "original": "reviews/provenance-v2-independent/plan-binding-probe.json",
+      "packaged": "provenance-rereview/plan-binding-probe.json",
+      "sha256": "41673fd080466b9b72c4afde4ee06cc1bc58ce10eac1c59f2050b07c36a55519"
+    },
+    {
+      "byte_edits": false,
+      "original": "reviews/provenance-v2-independent/staged-byte-verification.json",
+      "packaged": "provenance-rereview/staged-byte-verification.json",
+      "sha256": "e852b5789cd35ecf3cf284de3541bb90b9f1439cfccca2be64fd4a6ddf7287cc"
+    },
+    {
+      "byte_edits": false,
+      "original": "reviews/provenance-v2-independent/v3-auxiliary-probes/probes.json",
+      "packaged": "provenance-rereview/v3-auxiliary-probes/probes.json",
+      "sha256": "983259b9afe693ae6f880f2ca6d70cbea149a20513ae7e222e81c5e923fd04ae"
+    },
+    {
+      "byte_edits": false,
+      "original": "reviews/provenance-v2-independent/v3-staged-byte-verification.json",
+      "packaged": "provenance-rereview/v3-staged-byte-verification.json",
+      "sha256": "8e6894df57886e0910eb6cc547cff8553ed06bcfd4770fb68eb1e863cf3bc6d8"
+    },
+    {
+      "byte_edits": false,
+      "original": "reviews/provenance-v2-independent/V3-REVIEW.md",
+      "packaged": "provenance-rereview/V3-REVIEW.md",
+      "sha256": "dd69d9e4346758fb306850b9022f4cc5dcd656c0365a1267601d25e17a356ced"
+    },
+    {
+      "byte_edits": false,
+      "original": "reviews/provenance-v2-independent/V3-review.json",
+      "packaged": "provenance-rereview/V3-review.json",
+      "sha256": "caf52ad7e98ad37dcebfb9c1eb39aa67a9e26084c6b0bdc1521eb1d41caeae2f"
+    }
+  ],
+  "purpose": "Exact independent review evidence and original helper archives"
+}

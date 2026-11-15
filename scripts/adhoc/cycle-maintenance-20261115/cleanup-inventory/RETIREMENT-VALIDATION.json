@@ -1,0 +1,27 @@
+{
+  "observed_at": "2026-11-15T09:30:41.930724+00:00",
+  "authority": "offline_fixture_validation_only",
+  "related_issue": 1230,
+  "source_sha256": {
+    "retire_owned_worktree.py": "b1819e118861c2ba019406b711fbb342e11769662f07dc232173a2d2b61eb3d5",
+    "test_retire_owned_worktree.py": "55df5fa942732167cbaad664cff22ca174dded74f58531bc58a9af8c7419cbb9",
+    "verify_retirement_controls.py": "d0f4a4ecc71fd1e20aa8eaf0ae7e3e46053542a0092969d3c4f12f5c8f3e363f",
+    "RETIREMENT.md": "39b790a9d5c1f7e0258c4e126b6a761dd91c4e1cf154dd2304cea26f8f546bea",
+    "retirement-controls.json": "e925c2e3aeca4eff0ae3eb903e4636c8561caa4d33b75a8eed80c48e44eba6be"
+  },
+  "fixture_suite": {
+    "passed": 15,
+    "log_sha256": "02be3b60b172725f9c1e9d83b901f2fa767fd97c9d82b499730a534df7d0d807",
+    "summary": "15 passed in 3.76s"
+  },
+  "mutation_pairs": 2,
+  "paired_controls_passed": true,
+  "mutations_detected": 2,
+  "ruff": "passed",
+  "live_cleanup_performed": false,
+  "notes": [
+    "Initial fixture invocation lacked its durable parent and produced15 setup errors; not credited.",
+    "Corrected fresh durable fixtures passed; original setup log retained privately.",
+    "No task worktree or branch has been retired. Root review and exact proof are still required."
+  ]
+}

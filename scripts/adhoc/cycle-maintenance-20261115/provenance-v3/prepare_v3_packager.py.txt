@@ -1,0 +1,33 @@
+"""Issue1268 packaging edit, preserving original v2 bytes, 2026-11-15.
+Inputs: --v2 exact prior packager; output: --output new v3 source directory.
+Only packaging source is transformed; historical results are not regenerated.
+"""
+import argparse,hashlib,json
+from pathlib import Path
+
+def main():
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--v2',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
+    original=a.v2.read_bytes();assert hashlib.sha256(original).hexdigest()=='f554cd8120ce2dfd3dffc298ca28ec605c4cf41d975a4b02b0ed6c3a1bdd8250'
+    text=original.decode().replace('issue1266','issues1266/1268').replace('provenance-v2','provenance-v3').replace('package_review_provenance_v2.py','package_review_provenance_v3.py').replace('PROVENANCE-V2.json','PROVENANCE-V3.json')
+    text=text.replace("'schema_version':2,'issue':1266,'fixed_manifest_sha256'", "'schema_version':3,'issue':1268,'related_issue':1266,'previous_v2_packager_sha256':'f554cd8120ce2dfd3dffc298ca28ec605c4cf41d975a4b02b0ed6c3a1bdd8250','fixed_manifest_sha256'")
+    old="\\n    for relative,expected in ";new="\\n    authenticated={}\\n    for relative,expected in "
+    assert text.count(old)==1;text=text.replace(old,new)
+    old="\\n        if source.is_symlink() or hashlib.sha256(source.read_bytes()).hexdigest()!=expected:\\n            raise ValueError('Historical plan inputs differ from independently recorded bytes')\\n    data=json.loads((audit/'inventory-20261115/summary.json').read_text())"
+    new="\\n        for ancestor in (source,*source.parents):\\n            if ancestor.is_symlink():\\n                raise ValueError('Historical plan input aliases are refused')\\n        raw=source.read_bytes()\\n        if hashlib.sha256(raw).hexdigest()!=expected:\\n            raise ValueError('Historical plan inputs differ from independently recorded bytes')\\n        authenticated[relative]=raw\\n    data=json.loads(authenticated['cleanup/inventory-20261115/summary.json'])"
+    assert text.count(old)==1;text=text.replace(old,new)
+    old='    text=text.replace(old,new)\n    text=text.replace("    (audit/\'PLAN.md\').write_text"'
+    new='''    text=text.replace(old,new)
+    old_drift="json.loads((audit/'owned-review-content-drift.json').read_text())"
+    if text.count(old_drift)!=1:raise ValueError('Unexpected plan drift loader')
+    text=text.replace(old_drift,"json.loads(authenticated['cleanup/owned-review-content-drift.json'])")
+    text=text.replace("    (audit/'PLAN.md').write_text"'''
+    assert text.count(old)==1;text=text.replace(old,new)
+    text=text.replace('Require fixed historical inventory/drift hashes before rendering; write only', 'Parse inventory/drift from the same cached bytes authenticated against fixed historical hashes; refuse ancestor aliases; write only')
+    text=text.replace('The original v1 packagers and stages remain retained privately.', 'The original v1 and v2 packagers and stages remain retained privately.')
+    text=text.replace('pinned historical input bytes and a new --output', 'pinned historical input bytes, parsing those exact cached bytes without rereading, and a new --output')
+    assert not (a.output/'package_review_provenance_v3.py').exists()
+    (a.output/'package_review_provenance_v3.py').write_text(text)
+    (a.output/'expected-original-inputs.json').write_bytes(a.v2.with_name('expected-original-inputs.json').read_bytes())
+    value={'issue':1268,'original_v2_sha256':hashlib.sha256(original).hexdigest(),'v3_sha256':hashlib.sha256(text.encode()).hexdigest(),'edits':['Cache each authenticated inventory/drift byte stream and parse only that cache.','Refuse every symlink ancestor in retained input paths.','Preserve v1/v2 helper and stages; use new provenance-v3 namespace.'],'historical_inputs_or_results_modified':False}
+    (a.output/'v2-to-v3-edit-provenance.json').write_text(json.dumps(value,indent=2)+'\n');print(json.dumps(value))
+if __name__=='__main__':main()

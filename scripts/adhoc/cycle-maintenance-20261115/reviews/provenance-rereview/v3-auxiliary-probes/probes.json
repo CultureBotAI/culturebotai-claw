@@ -1,0 +1,53 @@
+{
+  "prepare_helper_sha256": "f17007bba821fa036f8c3bce1a1da68fa0bc06ac29ca4f289e69237326a7aff0",
+  "prepare": {
+    "exit": 0,
+    "overwritten_sentinels": [
+      "expected-original-inputs.json",
+      "v2-to-v3-edit-provenance.json"
+    ]
+  },
+  "mutation_helper_sha256": "89be95f32b26c955f098ff16d7f67790a046357c5ca58057d701ff03e56bf0ea",
+  "mutation_process_exit": 0,
+  "mutation_receipt": {
+    "issue": 1268,
+    "fixture_scope": "synthetic inputs only",
+    "source_sha256": {
+      "scripts/adhoc/cycle-maintenance-20261115/provenance-v3/package_review_provenance_v3.py": "902a8400b8e244b01a70c4536698914bec8981625c8ab12021d69a2ab85293cd",
+      "tests/test_cycle_cleanup_plan_packaging.py": "f3ba00243905e10fb3d8c07551fdb6d209ff1f74a609de3e540d5749d5318db0"
+    },
+    "helper_sha256": "89be95f32b26c955f098ff16d7f67790a046357c5ca58057d701ff03e56bf0ea",
+    "controls_passed": 4,
+    "paired_mutations_detected": 2,
+    "observations": [
+      {
+        "case": "control",
+        "mutation": false,
+        "expected_exit": 0,
+        "exit_code": 0,
+        "summary": "4 passed in 0.00s",
+        "log_sha256": "c4a9d6df9a4b4bb3d77bb4705551886b7a0446ab2005e2c6b734c882b5a3a812"
+      },
+      {
+        "case": "inventory",
+        "mutation": true,
+        "expected_exit": 1,
+        "exit_code": 1,
+        "summary": "3 deselected, 1 error in 0.01s",
+        "log_sha256": "17923a0e29070f1c457d6e6f8ce290f6a07c1ebdae4db74d0b6c07a57e403ef8"
+      },
+      {
+        "case": "drift",
+        "mutation": true,
+        "expected_exit": 1,
+        "exit_code": 1,
+        "summary": "3 deselected, 1 error in 0.01s",
+        "log_sha256": "b37dc68fcf0653c7a1dd56ea438410cc44d3a0ac272f141eb9b0521b3b08d4e7"
+      }
+    ],
+    "originals_unchanged": true,
+    "historical_generation_rerun": false,
+    "actual_cleanup_performed": false
+  },
+  "source_and_stage_writes": false
+}

@@ -1,0 +1,45 @@
+"""Independent offline probes of v3 auxiliary helpers, 2026-11-15.
+Inputs: immutable v2/v3 stages. Outputs: exclusive synthetic private fixtures and
+receipts. No original/staged file is edited. Tests deliberately distinguish
+setup failure from an intended assertion kill and existing output from new output.
+"""
+import argparse,hashlib,json,subprocess,sys
+from pathlib import Path
+
+
+def main():
+ p=argparse.ArgumentParser(description=__doc__)
+ for n in ('v2','v3','output'):p.add_argument('--'+n,type=Path,required=True)
+ a=p.parse_args();a.output.mkdir(parents=True,exist_ok=False)
+ prefix=Path('scripts/adhoc/cycle-maintenance-20261115/provenance-v3')
+ prep=a.v3/prefix/'prepare_v3_packager.py'
+ dest=a.output/'existing-output';dest.mkdir()
+ sentinels=('expected-original-inputs.json','v2-to-v3-edit-provenance.json')
+ for name in sentinels:(dest/name).write_text('ORIGINAL SENTINEL\n')
+ result=subprocess.run([sys.executable,str(prep),'--v2',str(a.v2/'scripts/adhoc/cycle-maintenance-20261115/provenance-v2/package_review_provenance_v2.py'),'--output',str(dest)],text=True,capture_output=True)
+ (a.output/'prepare.log').write_text(result.stdout+result.stderr)
+ overwrite={'exit':result.returncode,'overwritten_sentinels':[name for name in sentinels if (dest/name).read_text()!='ORIGINAL SENTINEL\n']}
+ fake=a.output/'synthetic-package';(fake/prefix).mkdir(parents=True);(fake/'tests').mkdir()
+ (fake/prefix/'package_review_provenance_v3.py').write_bytes((a.v3/prefix/'package_review_provenance_v3.py').read_bytes())
+ (fake/'tests/test_cycle_cleanup_plan_packaging.py').write_text('''import sys
+import pytest
+@pytest.fixture(autouse=True)
+def unrelated_setup_failure():
+    if '-k' in sys.argv:
+        raise RuntimeError('synthetic unrelated setup failure')
+def test_second_read_inventory(): pass
+def test_second_read_drift(): pass
+def test_control_three(): pass
+def test_control_four(): pass
+''')
+ verifier=a.v3/prefix/'verify_plan_binding_controls.py'
+ run=subprocess.run([sys.executable,str(verifier),'--package-root',str(fake),'--python',sys.executable,'--output',str(a.output/'mutation-results')],text=True,capture_output=True)
+ (a.output/'mutations.log').write_text(run.stdout+run.stderr)
+ receipt=json.loads((a.output/'mutation-results/results.json').read_text()) if (a.output/'mutation-results/results.json').exists() else None
+ value={'prepare_helper_sha256':hashlib.sha256(prep.read_bytes()).hexdigest(),'prepare':overwrite,
+        'mutation_helper_sha256':hashlib.sha256(verifier.read_bytes()).hexdigest(),
+        'mutation_process_exit':run.returncode,'mutation_receipt':receipt,
+        'source_and_stage_writes':False}
+ with (a.output/'probes.json').open('x') as stream:json.dump(value,stream,indent=2);stream.write('\n')
+ print(json.dumps(value,indent=2))
+if __name__=='__main__':main()

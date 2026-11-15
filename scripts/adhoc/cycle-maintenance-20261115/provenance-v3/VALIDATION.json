@@ -1,0 +1,77 @@
+{
+  "all_30_originals_unchanged": true,
+  "cases": [
+    {
+      "exit": 0,
+      "expected_exit": 0,
+      "log_sha256": "27f6f7491fd2a90a1f743976c5e202d3a1d31632664f5fb043e66642750a9323",
+      "name": "known-historical-positive",
+      "no_partial_output_on_refusal": false
+    },
+    {
+      "exit": 1,
+      "expected_exit": 1,
+      "log_sha256": "d5afffc9322500b2f522219af3eaf2ada70c3c470f865abdf92c8bd82f2039ca",
+      "name": "fake-historical-count",
+      "no_partial_output_on_refusal": true
+    },
+    {
+      "exit": 1,
+      "expected_exit": 1,
+      "log_sha256": "8f48e861a0f4ccf83efe4344009187bc09ef417e599c3c21f740d28f3140b2ea",
+      "name": "late-missing-input",
+      "no_partial_output_on_refusal": true
+    },
+    {
+      "exit": 1,
+      "expected_exit": 1,
+      "log_sha256": "01844e2056b190f171800557cf3746aaa46529db2317bc93d8aaeee46ceac884",
+      "name": "tampered-helper",
+      "no_partial_output_on_refusal": true
+    },
+    {
+      "exit": 1,
+      "expected_exit": 1,
+      "log_sha256": "62a219eb9104c29cf0aafecd57dffb7a60ec14ed582d16e6c3fd73c5dfd3c79c",
+      "name": "tampered-manifest",
+      "no_partial_output_on_refusal": true
+    },
+    {
+      "exit": 1,
+      "expected_exit": 1,
+      "log_sha256": "e8a8831bd4871011d37dbf022f13498eea0bb15eb64e3f3e9835e7eb53e14c3b",
+      "name": "inside-input",
+      "no_partial_output_on_refusal": true
+    },
+    {
+      "exit": 1,
+      "expected_exit": 1,
+      "log_sha256": "4001a4fc2460cfca4dfa9b46b59a32b1b598cc371b00f4cf88b5ffcc393fe71b",
+      "name": "alias-output",
+      "no_partial_output_on_refusal": true
+    },
+    {
+      "exit": 1,
+      "expected_exit": 1,
+      "log_sha256": "ec6529f2a2d9ce2f664cdda549aacc40a06efe636352653121aae4c9473f09d1",
+      "name": "input-symlink",
+      "no_partial_output_on_refusal": true
+    },
+    {
+      "exit": 1,
+      "expected_exit": 1,
+      "log_sha256": "e8a8831bd4871011d37dbf022f13498eea0bb15eb64e3f3e9835e7eb53e14c3b",
+      "name": "existing-output",
+      "no_partial_output_on_refusal": true
+    }
+  ],
+  "expensive_validation_rerun": false,
+  "fixed_manifest_sha256": "fac861a12685b2859879dbb973dce85ae712634e34fbd9317e2061b4ccb8d7de",
+  "issue": 1268,
+  "known_history_positive_passed": true,
+  "negative_cases_passed": 8,
+  "packager_sha256": "902a8400b8e244b01a70c4536698914bec8981625c8ab12021d69a2ab85293cd",
+  "related_issue": 1266,
+  "runtime_actions": false,
+  "test_helper_sha256": "5f3ffe35aa6f7fe1905ec13ed43872a01e8c73c02e8b1c2ef02090532ef16202"
+}

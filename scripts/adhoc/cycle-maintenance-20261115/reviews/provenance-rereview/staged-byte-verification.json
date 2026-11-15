@@ -1,0 +1,16 @@
+{
+  "packager_sha256": "f554cd8120ce2dfd3dffc298ca28ec605c4cf41d975a4b02b0ed6c3a1bdd8250",
+  "manifest_sha256": "fac861a12685b2859879dbb973dce85ae712634e34fbd9317e2061b4ccb8d7de",
+  "staged_inventory_sha256": "97fd87bfc5fe3501c393453b0fb06321c5190c2fcf93bd49d537297b466d2ac3",
+  "staged_files": 30,
+  "expected_payload_files": 27,
+  "expected_payload_byte_identical": true,
+  "additional_validation_files": [
+    "scripts/adhoc/cycle-maintenance-20261115/provenance-v2/VALIDATION-PROVENANCE.json",
+    "scripts/adhoc/cycle-maintenance-20261115/provenance-v2/VALIDATION.json",
+    "scripts/adhoc/cycle-maintenance-20261115/provenance-v2/test_provenance_packaging.py"
+  ],
+  "all_original_inputs_unchanged": true,
+  "public_path_email_process_identifier_scan_passed": true,
+  "independent_review_blocker": "renderer_check_then_reparse_separately_reproduced"
+}

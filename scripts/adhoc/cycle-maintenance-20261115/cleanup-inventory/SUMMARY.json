@@ -1,0 +1,16 @@
+{
+  "actual_modified_snapshot_paths": 7,
+  "bounded_candidate_scans_complete": true,
+  "cleanup_actions_performed": 0,
+  "common_git_groups": 2,
+  "kind": "authenticated_historical_read_only_cleanup_preparation",
+  "nested_fixture_git_boundaries_retained": 151,
+  "observed_at": "2026-11-15T09:18:01.103055+00:00",
+  "private_action_ledger_sha256": "7349524b221cc49c4ae65f038fb396168cf7cbafff7e60dfbc7ecef55b2113e5",
+  "private_inventory_sha256": "e9679aab3114cea7e4ae089fdf868dbb5a276609f45768b376c853568b722db5",
+  "private_paths_processes_operations_history_included": false,
+  "private_plan_sha256": "1e48294facb0265d60a10e0ad8c56e04c2f006f76ddb95a1ff30d3628520efc4",
+  "protected_subtree_contents_and_sizes_unmeasured": true,
+  "registered_checkouts": 18,
+  "remote_ref_changes": false
+}

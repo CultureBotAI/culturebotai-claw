@@ -1,0 +1,30 @@
+{
+  "date": "2026-11-15",
+  "repository": "CultureBotAI/culturebotai-claw",
+  "issues": [1265, 1266],
+  "kind": "subsequent_four_wrapper_offline_validation",
+  "test_command": "python -m pytest -q tests/test_cycle_maintenance_inventory_helpers.py",
+  "tests_passed": 51,
+  "tests_skipped": 0,
+  "elapsed_seconds": 2.60,
+  "retirement_input_cases": 12,
+  "no_read_or_subprocess_cases": 4,
+  "fresh_process_guard_mutations_killed": 4,
+  "test_source_sha256": "dbbbf14630656eecaecb5ef4eabb187d89dbe2488f37f75a6766793288e95bd6",
+  "test_log_sha256": "320dc9ec104639f2c5d47cc8a3c6fce64a93bf3bc82206779fcd184dae0b65bd",
+  "original_and_archive_sha256": {
+    "package_source_reviews": "8f361c8b49222b363af157a55572e37d503e22ba55fc88fb68bd9c234f4e120a",
+    "package_followup_reviews": "42ad7c3549aaf2428531aa41dcc0d0ca59c35cdfb524911d19093db2cc602615",
+    "package_review_pr1112_20261115": "0f409dfc6059def0e31309c9dfe79c4b1fadd8fb7d907377353a2659218fe6d6",
+    "package_review_pr1236_20261115": "f6508c1be607ed661ffbc05620631b7b8e24cef3280fef97c436f63a0b37f0e9"
+  },
+  "retired_entry_point_sha256": {
+    "package_source_reviews": "b2b62873e9a05bc21defce9277a2699670038709ea93f518f1e1898bb1792d75",
+    "package_followup_reviews": "bbee1aa7de9d317003979ae6083946049be86437bac62b35ea96ca2a18fd83ae",
+    "package_review_pr1112_20261115": "1e1bb96ed7b1587b2865a3259fc5b9f70b2c80582cb24dfac8c80de64d82a920",
+    "package_review_pr1236_20261115": "587006120a343a9dba8cfa5a292ec33ded8b0b0e3531bbd8f23c2ccb032b9f86"
+  },
+  "previous_receipts_and_outputs_preserved": true,
+  "expensive_review_rerun": false,
+  "publication_authority": false
+}

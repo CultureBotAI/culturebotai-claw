@@ -1,0 +1,66 @@
+{
+  "authority": "independent_offline_rereview",
+  "issues": [
+    1263,
+    1264,
+    1265,
+    1266
+  ],
+  "source_sha256": {
+    "inventory/capture_pr_audit.py": "93ca9dd66afdd0bf5741ee06c5f8abccbefdb3f8af4559a628c2209343dfae94",
+    "inventory/review_pr1197_mutations.py": "f308de9ddc316be26d4d04fadbbb7c2e57cbfeda3b7b6cbda5828696fea5f8eb",
+    "inventory/package_inventory.py": "3d083fcfed6bcd06a330eb5acc7ea71cdebe7aba40fa8b18f1f4c6ccc4632d29",
+    "inventory/README.md": "793ac1806ab88e0c8a83d30cf4d268067ece70c425b3aae36126db1cbe3b7e4a",
+    "inventory/inventory-and-review.json": "b6b63834eb203eef395ad73e7c6af376fe821a278c4cac21f2d2f449ecaaea83",
+    "inventory/helper-repair-provenance.json": "7417d2f2af90419032e3e1807e6850480eaf38b7fe3f67077d228538a5013cb3",
+    "reviews/package_source_reviews.py": "b2b62873e9a05bc21defce9277a2699670038709ea93f518f1e1898bb1792d75",
+    "reviews/package_followup_reviews.py": "bbee1aa7de9d317003979ae6083946049be86437bac62b35ea96ca2a18fd83ae",
+    "reviews/1112/package_review_pr1112_20261115.py": "1e1bb96ed7b1587b2865a3259fc5b9f70b2c80582cb24dfac8c80de64d82a920",
+    "reviews/1236/package_review_pr1236_20261115.py": "587006120a343a9dba8cfa5a292ec33ded8b0b0e3531bbd8f23c2ccb032b9f86"
+  },
+  "missing_anchor_false_kills": 0,
+  "matching_capture_passes": true,
+  "empty_checks_refused": true,
+  "exact_archival_package_passes": true,
+  "aliases_and_collisions_refused": true,
+  "unknown_report_refused": true,
+  "original_hashes_preserved": {
+    "audit/capture_pr_audit.py": "55fd5597a10666531e9a425d9b86bf46c104b701d515ebd8f3ee214d4feabfde",
+    "audit/pr-checks-before.json": "1d2b4fe1e254aa83f011fc1fa8c17812cd876b2e41d2b28d9a6e52c897378c3f",
+    "audit/open-pulls-before-pages.json": "19f9b55469063fc54e0dec7b723abfad60d8f49e2cdf4661396c55ae527ec89d",
+    "audit/open-pulls-after-pages.json": "19f9b55469063fc54e0dec7b723abfad60d8f49e2cdf4661396c55ae527ec89d",
+    "audit/independent-open-count-and-queue.json": "87cec1b1534010d23a484484175115d7a04c8bd356ff10121c68b524e4ea0e3b",
+    "review/review_mutations.py": "e06eca553f915f26c201947018858fb70f9847b05a3b093b58d4b863d463bc7d",
+    "review/REVIEW.md": "a393153a9aeccc138178774d002b7bbf7b81da882d73a83ff408a8e01f6fc976"
+  },
+  "wrappers": {
+    "reviews/package_source_reviews.py": {
+      "refusal_exit": 2,
+      "help_exit": 0,
+      "original_archive_sha256": "8f361c8b49222b363af157a55572e37d503e22ba55fc88fb68bd9c234f4e120a",
+      "wrapper_sha256": "b2b62873e9a05bc21defce9277a2699670038709ea93f518f1e1898bb1792d75"
+    },
+    "reviews/package_followup_reviews.py": {
+      "refusal_exit": 2,
+      "help_exit": 0,
+      "original_archive_sha256": "42ad7c3549aaf2428531aa41dcc0d0ca59c35cdfb524911d19093db2cc602615",
+      "wrapper_sha256": "bbee1aa7de9d317003979ae6083946049be86437bac62b35ea96ca2a18fd83ae"
+    },
+    "reviews/1112/package_review_pr1112_20261115.py": {
+      "refusal_exit": 2,
+      "help_exit": 0,
+      "original_archive_sha256": "0f409dfc6059def0e31309c9dfe79c4b1fadd8fb7d907377353a2659218fe6d6",
+      "wrapper_sha256": "1e1bb96ed7b1587b2865a3259fc5b9f70b2c80582cb24dfac8c80de64d82a920"
+    },
+    "reviews/1236/package_review_pr1236_20261115.py": {
+      "refusal_exit": 2,
+      "help_exit": 0,
+      "original_archive_sha256": "f6508c1be607ed661ffbc05620631b7b8e24cef3280fef97c436f63a0b37f0e9",
+      "wrapper_sha256": "587006120a343a9dba8cfa5a292ec33ded8b0b0e3531bbd8f23c2ccb032b9f86"
+    }
+  },
+  "source_unchanged": true,
+  "expensive_review_rerun": false,
+  "new_findings": 0,
+  "helper_sha256": "4b1d08fabe7339884dd147696bcf20c6ff785dddb4e67e3838816a7611f6561b"
+}

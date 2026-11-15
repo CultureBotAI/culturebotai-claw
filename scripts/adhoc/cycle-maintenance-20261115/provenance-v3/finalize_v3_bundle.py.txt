@@ -1,0 +1,39 @@
+"""Append authenticated issue1268 validation receipts to a new v3 stage.
+2026-11-15. Inputs: --work-area retained v3 evidence and --staging prepared v3
+public tree. Output: exclusive supplementary public files and hash manifest.
+No historical source, existing output, Git metadata or runtime is modified.
+"""
+import argparse,ast,hashlib,json,re
+from pathlib import Path
+PINS={
+ 'prepare_v3_packager.py':('prepare_v3_packager.py','f17007bba821fa036f8c3bce1a1da68fa0bc06ac29ca4f289e69237326a7aff0'),
+ 'v2-to-v3-edit-provenance.json':('V2-TO-V3.json','a66da1e8f2124e55fe3405a8ec67180462a2bf1b5b988fdb27d6210d73f9aa07'),
+ 'verify_plan_binding_controls.py':('verify_plan_binding_controls.py','89be95f32b26c955f098ff16d7f67790a046357c5ca58057d701ff03e56bf0ea'),
+ 'paired-controls-public-final/results.json':('PLAN-BINDING-VALIDATION.json','b50f39a9b4ffb9b1f05b00dd7b5e5d13d58668e12d3564e7a9f9ea626310c66d'),
+ 'verify_provenance_packaging.py':('verify_provenance_packaging.py','5f3ffe35aa6f7fe1905ec13ed43872a01e8c73c02e8b1c2ef02090532ef16202'),
+ 'verification/results.json':('VALIDATION.json','d59b822174a340acd029200a5faf4ab7f38909a2540bfff23669b37813762e88'),
+}
+PREFIX=Path('scripts/adhoc/cycle-maintenance-20261115/provenance-v3')
+def sha(raw):return hashlib.sha256(raw).hexdigest()
+def main():
+ p=argparse.ArgumentParser(description=__doc__);p.add_argument('--work-area',type=Path,required=True);p.add_argument('--staging',type=Path,required=True);a=p.parse_args()
+ payload={};provenance=[]
+ for source,(dest,expected) in PINS.items():
+  path=a.work_area/source
+  assert path.is_file() and not path.is_symlink()
+  raw=path.read_bytes();assert sha(raw)==expected
+  payload[PREFIX/dest]=raw
+  provenance.append({'original_relative_path':source,'original_sha256':expected,'packaged_path':str(PREFIX/dest),'packaged_sha256':sha(raw),'packaging_edits':[]})
+ payload[PREFIX/Path(__file__).name]=Path(__file__).read_bytes()
+ payload[PREFIX/'VALIDATION-PROVENANCE.json']=(json.dumps({'issue':1268,'files':provenance,'historical_generation_rerun':False,'original_v1_v2_stages_preserved':True},indent=2)+'\n').encode()
+ for path,raw in payload.items():
+  text=raw.decode();assert not re.search(r'/(?:Users|home)/[A-Za-z0-9]|[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}|PID\d+',text)
+  if path.suffix=='.py':ast.parse(text)
+  elif path.suffix=='.json':json.loads(raw)
+  assert not (a.staging/path).exists()
+ for path,raw in payload.items():
+  with (a.staging/path).open('xb') as stream:stream.write(raw)
+ inventory={str(p.relative_to(a.staging)):sha(p.read_bytes()) for p in sorted(a.staging.rglob('*')) if p.is_file() and '__pycache__' not in p.parts and '.pytest_cache' not in p.parts}
+ with (a.work_area/'staged-file-manifest.json').open('x') as stream:json.dump(inventory,stream,indent=2);stream.write('\n')
+ print(json.dumps({'published_file_count':len(inventory),'inventory_sha256':sha((a.work_area/'staged-file-manifest.json').read_bytes()),'supplementary_files':len(payload)}))
+if __name__=='__main__':main()

@@ -1,0 +1,62 @@
+"""Offline independent retirement review, 2026-11-15. No task checkout is retired.
+Inputs: --source helper directory, --python test interpreter, --output new evidence.
+Outputs: copied fixture sources, logs and hash-bound JSON receipts.
+"""
+from __future__ import annotations
+import argparse,hashlib,json,os,subprocess
+from pathlib import Path
+
+EXTRA='''
+
+def test_proof_revocation_during_inventory_must_block_retirement(prepared):
+    args, anchor = prepared
+    args.apply = True
+    calls = []
+    def revoke_once(_):
+        calls.append(True)
+        if len(calls) == 1:
+            proof = json.loads(args.proof.read_text())
+            proof["owner_complete"] = False
+            args.proof.write_text(json.dumps(proof))
+    with pytest.raises(mod.Refusal):
+        mod.retire(args, probe=revoke_once)
+    assert args.worktree.exists()
+
+
+def test_second_reader_probe_failure_retains_preserved_bytes_and_ref(prepared):
+    args, anchor = prepared
+    args.apply = True
+    (args.worktree / "valuable.bin").write_bytes(b"keep-me")
+    calls = []
+    def fail_second(_):
+        calls.append(True)
+        if len(calls) == 2:
+            raise mod.Refusal("late reader")
+    with pytest.raises(mod.Refusal, match="late reader"):
+        mod.retire(args, probe=fail_second)
+    assert args.worktree.exists()
+    assert (args.quarantine / "preserved/valuable.bin").read_bytes() == b"keep-me"
+    assert (args.quarantine / "failure.json").exists()
+    recovery = json.loads((args.quarantine / "recovery.json").read_text())
+    assert git(anchor, "rev-parse", recovery["ref"]) == args.expected_head
+    assert git(anchor, "rev-parse", "owned-fixture") == args.expected_head
+'''
+
+def main():
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--source',type=Path,required=True);p.add_argument('--python',required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
+    a.output.mkdir(parents=False,exist_ok=False);copy=a.output/'source';copy.mkdir();hashes={}
+    for name in ('retire_owned_worktree.py','test_retire_owned_worktree.py'):
+        raw=(a.source/name).read_bytes();hashes[name]=hashlib.sha256(raw).hexdigest();(copy/name).write_bytes(raw)
+    env=os.environ.copy();env['PYTHONDONTWRITEBYTECODE']='1'
+    # Only private fixture Git repositories beneath the explicit durable basetemp.
+    receipts=[]
+    for name,extra,selector in [('control','',None),('reader-failure',EXTRA,'second_reader'),('proof-binding',EXTRA,'proof_revocation')]:
+        (copy/'test_retire_owned_worktree.py').write_bytes((a.source/'test_retire_owned_worktree.py').read_bytes()+extra.encode())
+        cmd=[a.python,'-m','pytest','-q',str(copy/'test_retire_owned_worktree.py'),'--basetemp',str(a.output/('fixtures-'+name))]
+        if selector:cmd+=['-k',selector]
+        result=subprocess.run(cmd,cwd=a.source.parents[4],env=env,text=True,capture_output=True)
+        (a.output/(name+'.log')).write_text(result.stdout+result.stderr)
+        receipts.append({'case':name,'exit_code':result.returncode,'summary':result.stdout.strip().splitlines()[-1],'log_sha256':hashlib.sha256((result.stdout+result.stderr).encode()).hexdigest()})
+    value={'source_sha256':hashes,'helper_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'observations':receipts,'actual_cleanup_performed':False,'sources_unchanged':all(hashlib.sha256((a.source/n).read_bytes()).hexdigest()==s for n,s in hashes.items())}
+    (a.output/'results.json').write_text(json.dumps(value,indent=2)+'\n');print(json.dumps(value,indent=2))
+if __name__=='__main__':main()

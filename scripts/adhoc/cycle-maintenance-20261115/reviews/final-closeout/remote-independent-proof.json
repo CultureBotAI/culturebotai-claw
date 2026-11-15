@@ -1,0 +1,27 @@
+{
+  "head": "1d0034ebe4fea0f4371e82e211db13d1b5ec2253",
+  "source_sha256": "b7ea12aa0b2c6ecd0f0d0876965905b5e08e02734a6333a0465cd1a954e9b356",
+  "test_sha256": "300d2ed3298bbae47f598b2f9039bc2473386409ae120ca1dd30f76be9791e7c",
+  "helper_sha256": "52676636d0006c9e8330dc16ff2aaf65d7850bad777cefe0a78088cb7f6279d0",
+  "mutations": [
+    {
+      "name": "1257_union_id",
+      "killed": true,
+      "source_sha256": "46b86c82aa157ba42ffa03f199b273785b622ba42ef4ad5a7b7b925c72130972"
+    },
+    {
+      "name": "1258_reopened_terminal",
+      "killed": true,
+      "source_sha256": "79ec921e875a51a1af47b7e81f5efd36612dffd3f56581c940920503bdcd3170"
+    },
+    {
+      "name": "foreign_closure_status",
+      "killed": true,
+      "source_sha256": "15d8b18b6021ed525ca748fa66c87d7171d81d57e048c436c77cb505af1e9ed3"
+    }
+  ],
+  "source_unchanged": true,
+  "runtime_operations": false,
+  "reviewer_authored_initial_tests": true,
+  "reviewer_authored_production_module": false
+}
