@@ -42,6 +42,15 @@ the four annotation tests also passed under CI-style `--cov=src` discovery.
 That last check tests loader compatibility, not source coverage of Claw's other
 packages. Focused Ruff and Black checks and `git diff --check` passed.
 
+Hosted CI then correctly rejected a missing canonical composition refresh
+([#1220](https://github.com/CultureBotAI/culturebotai-claw/issues/1220)). The
+maintained `kg_microbe_skills.template_cli refresh` dry run and `--apply` updated
+the baseline to published source commit `85b4d693002387b855ece75282fad7a324b761cc`
+and exactly the two changed schema/manifest digests. `check-baseline` now passes;
+66 focused template, governance and annotation regressions passed. The schema,
+matcher canary and consumer pins were not changed by this refresh. The original
+failed hosted run remains retained; no baseline check was bypassed.
+
 Private raw inputs/logs/exits remain in this checkout under
 `.temp/supporting-reference-annotations-20261115/{before-001,discussion-002,dataset-001}/`.
 The public receipts retain their input/log hashes and measured counts. Raw native
