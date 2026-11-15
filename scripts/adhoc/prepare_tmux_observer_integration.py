@@ -15,22 +15,33 @@ HELPERS = '''
 # Optional read-only tmux transport; the dependency is pinned independently.
 TMUX_ADAPTER = None
 
+def tmux_adapter_bytes(path):
+    fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+    with os.fdopen(fd,'rb') as handle:
+        item=os.fstat(handle.fileno())
+        require(stat.S_ISREG(item.st_mode) and item.st_size<=1024*1024, 'Tmux adapter must be bounded regular source')
+        raw=handle.read(1024*1024+1)
+    require(len(raw)<=1024*1024, 'Tmux adapter source exceeds bound')
+    return raw
+
 def load_tmux_adapter(path, expected_sha256):
     global TMUX_ADAPTER
     require(path is not None and path.is_absolute() and not path.is_symlink(), 'Explicit tmux adapter path required')
     require(isinstance(expected_sha256,str) and re.fullmatch(r'[0-9a-f]{64}',expected_sha256), 'Explicit tmux source digest required')
-    require(file_digest(path)==expected_sha256, 'Tmux adapter source digest differs')
+    raw=tmux_adapter_bytes(path)
+    require(digest(raw)==expected_sha256, 'Tmux adapter source digest differs')
     spec=importlib.util.spec_from_file_location('pinned_mech_session_tmux',path)
     require(spec is not None and spec.loader is not None, 'Tmux adapter cannot be loaded')
     module=importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    require(file_digest(path)==expected_sha256, 'Tmux adapter changed while loading')
+    # Execute exactly the verified source bytes, never a timestamp-valid pyc.
+    exec(compile(raw,str(path),'exec'),module.__dict__)
+    require(digest(tmux_adapter_bytes(path))==expected_sha256, 'Tmux adapter changed while loading')
     TMUX_ADAPTER=(module,path,expected_sha256)
 
 def checked_tmux_adapter():
     require(TMUX_ADAPTER is not None, 'Tmux targets need a reviewed adapter')
     module,path,expected_sha256=TMUX_ADAPTER
-    require(file_digest(path)==expected_sha256, 'Tmux adapter changed; observation held')
+    require(digest(tmux_adapter_bytes(path))==expected_sha256, 'Tmux adapter changed; observation held')
     return module
 
 '''
@@ -61,6 +72,16 @@ def replace_once(source, old, new):
     return source.replace(old, new)
 
 
+def add_tmux_cli_guards(source):
+    source = replace_once(source, "    args=p.parse_args(argv);state=safe_state(args.state_dir)",
+                          "    p.add_argument('--tmux-adapter',type=Path);p.add_argument('--tmux-reviewed-sha256')\n"
+                          "    args=p.parse_args(argv);state=safe_state(args.state_dir)")
+    return replace_once(source, "    require(args.registry is not None and args.registry.is_absolute(),'Absolute registry required')",
+                        "    require(bool(args.tmux_adapter)==bool(args.tmux_reviewed_sha256), 'Tmux adapter and digest must be supplied together')\n"
+                        "    if args.tmux_adapter:load_tmux_adapter(args.tmux_adapter,args.tmux_reviewed_sha256)\n"
+                        "    require(args.registry is not None and args.registry.is_absolute(),'Absolute registry required')")
+
+
 def proposed_source(source):
     source = replace_once(source, "import hashlib\n", "import hashlib\nimport importlib.util\n")
     source = replace_once(source, "def validate_registry(data):\n", HELPERS + "def validate_registry(data):\n")
@@ -70,11 +91,7 @@ def proposed_source(source):
                           VALIDATE + "        require(t.get('binding_status') == 'pinned', 'Explicit binding status required')")
     source = replace_once(source, "    row={'key':target['key'],'observed_at':now(),'publication_scope':target['publication_scope'],",
                           OBSERVE + "    row={'key':target['key'],'observed_at':now(),'publication_scope':target['publication_scope'],")
-    source = replace_once(source, "    args=p.parse_args(argv);state=safe_state(args.state_dir)",
-                          "    p.add_argument('--tmux-adapter',type=Path);p.add_argument('--tmux-reviewed-sha256')\n"
-                          "    args=p.parse_args(argv);state=safe_state(args.state_dir)\n"
-                          "    require(bool(args.tmux_adapter)==bool(args.tmux_reviewed_sha256), 'Tmux adapter and digest must be supplied together')\n"
-                          "    if args.tmux_adapter:load_tmux_adapter(args.tmux_adapter,args.tmux_reviewed_sha256)")
+    source = add_tmux_cli_guards(source)
     source = replace_once(source, "'registry_path':str(args.registry),'registry_sha256':registry_sha,'interval':args.interval})",
                           "'registry_path':str(args.registry),'registry_sha256':registry_sha,'interval':args.interval,\n"
                           "                                     'tmux_adapter':str(args.tmux_adapter) if args.tmux_adapter else None,\n"
