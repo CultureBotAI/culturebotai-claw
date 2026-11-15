@@ -395,9 +395,10 @@ def validate_config(config: dict, *, resolve_repositories: bool = True) -> dict:
     if not isinstance(pressure, dict):
         raise SupervisorError("port_pressure must be an object")
     try:
-        config["port_pressure"] = normalize_config({key: value for key, value in pressure.items() if key != "binding_files"})
-        if "binding_files" in pressure:
-            config["port_pressure"]["binding_files"] = pressure["binding_files"]
+        config["port_pressure"] = normalize_config({key: value for key, value in pressure.items() if key not in {"binding_files", "controller_config_path"}})
+        for key in ("binding_files", "controller_config_path"):
+            if key in pressure:
+                config["port_pressure"][key] = pressure[key]
     except ValueError as error:
         raise SupervisorError(str(error)) from error
     config.setdefault("native_reader_path", str(ROOT / "scripts/mech_session_native.py"))
@@ -1977,7 +1978,7 @@ class Supervisor:
         if report_only:
             self.config["port_pressure"] = {**self.config.get("port_pressure", {}), "mode": "report"}
         raw = self.config.get("port_pressure", {"mode": "off"})
-        normalized = normalize_config({key: value for key, value in raw.items() if key != "binding_files"})
+        normalized = normalize_config({key: value for key, value in raw.items() if key not in {"binding_files", "controller_config_path"}})
         allowed = normalized["restart_repository_keys"]
         if allowed is not None and not set(allowed) <= {target["repository_key"] for target in self.config["targets"]}:
             raise SupervisorError("restart_repository_keys contains an unconfigured target")

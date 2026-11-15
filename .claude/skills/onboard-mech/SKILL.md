@@ -5,7 +5,7 @@ metadata:
   category: cross-repo
   requires_database: false
   requires_internet: true
-  version: 2.0.0
+  version: 2.1.0
   tags: [fleet, onboarding, governance, cross-repo]
 ---
 
@@ -47,6 +47,17 @@ checks drive subsequent update PRs through `cross-mech-sync`. This process does
 not install a scheduler or grant merge/release permission. Registration below
 is needed only when the reviewed scope changes fleet membership; ordinary
 baseline adoption must not re-register an existing or private consumer.
+
+## Session infrastructure
+
+Use tmux for new persistent Mech agent sessions. Follow the baseline guide's
+[session standard](../../../docs/guides/MECH_TEMPLATE.md#persistent-agent-sessions)
+and the XMechBay host launcher; a Terminal window is an optional attached view.
+Record the host, explicit socket, session, window and pane together with the
+native thread, process and checkout identity in private deployment state.
+Installing this baseline does not launch an agent or migrate an active session.
+Preserve existing thread settings, drafted input, pending decisions and goals
+when an authorized idle-session migration is part of onboarding.
 
 ## Establish the candidate
 
