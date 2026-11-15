@@ -1,0 +1,150 @@
+"""Fresh-process original/fixed regressions for issues1272–1274, 2026-11-15.
+
+Inputs: exact inert original, repaired source/tests, reviewed shared helper,
+development Python and exclusive new private output. Runs only synthetic
+fixtures. Public-safe receipt derives counts from JUnit; setup errors never
+count as original failures. Original source/evidence are never overwritten.
+"""
+
+import argparse
+import hashlib
+import json
+import os
+import subprocess
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+ORIGINAL_SHA = "417893f1064336d04c90e41cffebc1675c538ab16064ce28373bc498def107d9"
+
+
+def digest(raw):
+    return hashlib.sha256(raw).hexdigest()
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    for name in (
+        "original",
+        "fixed",
+        "tests",
+        "shared-helper",
+        "original-shared-helper",
+        "retire-tests",
+        "output",
+    ):
+        parser.add_argument("--" + name, type=Path, required=True)
+    parser.add_argument("--python", required=True)
+    args = parser.parse_args()
+    assert (
+        args.output.is_absolute()
+        and args.output == args.output.resolve()
+        and not args.output.exists()
+    )
+    original = args.original.read_bytes()
+    assert digest(original) == ORIGINAL_SHA
+    args.output.mkdir()
+    original_copy = args.output / "original_archive_primary_clone.py"
+    with original_copy.open("xb") as stream:
+        stream.write(original)
+    assert original_copy.read_bytes() == original
+    original_shared = args.original_shared_helper.read_bytes()
+    assert (
+        digest(original_shared)
+        == "91c07258e5efdd77d5f4c91b07c1815469bc3cd803db87e5e62e223c27b5de2e"
+    )
+    original_shared_copy = args.output / "original_retire_owned_worktree.py"
+    original_shared_copy.write_bytes(original_shared)
+    test_scope = args.output / "retirement-synthetic-scope"
+    test_scope.mkdir()
+    subprocess.run(
+        ["git", "-c", "core.hooksPath=/dev/null", "init", "-q", str(test_scope)], check=True
+    )
+    (test_scope / ".gitignore").write_text(".temp/\n")
+    cases = [
+        (1272, "test_relocation_unstable_symlink_refused_before_output[absolute]"),
+        (1272, "test_relocation_unstable_symlink_refused_before_output[relative_escape]"),
+        (1272, "test_relocation_unstable_symlink_refused_before_output[chained_relative_escape]"),
+        (1273, "test_identical_evidence_archive_outputs_refused_before_creation"),
+        (1274, "test_acl_list_denial_refuses_complete_traversal[inventory]"),
+        (1274, "test_acl_list_denial_refuses_complete_traversal[quick]"),
+        (1274, "test_acl_list_denial_refuses_complete_traversal[snapshot]"),
+        (1275, "test_acl_denied_list_refuses_ignored_descendant_inventory"),
+        (1275, "test_walk_propagates_injected_enumeration_failure"),
+    ]
+    results = []
+    for number, (issue, selection) in enumerate(cases):
+        directory = args.output / str(number)
+        directory.mkdir()
+        runs = {}
+        selected_tests = args.retire_tests if issue == 1275 else args.tests
+        for label in ("original", "fixed"):
+            helper = (
+                (original_shared_copy if label == "original" else args.shared_helper)
+                if issue == 1275
+                else (original_copy if label == "original" else args.fixed)
+            )
+            shared = original_shared_copy if label == "original" else args.shared_helper
+            env = dict(
+                os.environ,
+                ARCHIVAL_TEST_HELPER=str(helper),
+                ARCHIVAL_SHARED_HELPER=str(shared),
+                CLAW_RETIREMENT_TEST_HELPER=str(helper),
+                CLAW_RETIREMENT_TEST_SCOPE=str(test_scope),
+                ARCHIVAL_FIXTURE_ROOT=str(directory / (label + "-fixtures")),
+                PYTHONPYCACHEPREFIX=str(directory / (label + "-bytecode")),
+            )
+            xml = directory / (label + ".xml")
+            process = subprocess.run(
+                [
+                    args.python,
+                    "-m",
+                    "pytest",
+                    "-q",
+                    "-p",
+                    "no:cacheprovider",
+                    str(selected_tests) + "::" + selection,
+                    "--junitxml",
+                    str(xml),
+                ],
+                env=env,
+                capture_output=True,
+                timeout=90,
+            )
+            log = process.stdout + process.stderr
+            with (directory / (label + ".log")).open("xb") as stream:
+                stream.write(log)
+            suites = list(ET.fromstring(xml.read_bytes()).iter("testsuite"))
+            counts = {
+                key: sum(int(s.attrib.get(key, 0)) for s in suites)
+                for key in ("tests", "failures", "errors", "skipped")
+            }
+            expected_exit = int(label == "original")
+            assert counts == {"tests": 1, "failures": expected_exit, "errors": 0, "skipped": 0}
+            assert process.returncode == expected_exit
+            runs[label] = {
+                "exit": process.returncode,
+                "junit": counts,
+                "log_sha256": digest(log),
+                "junit_sha256": digest(xml.read_bytes()),
+            }
+        results.append({"issue": issue, "test": selection, "runs": runs})
+    receipt = {
+        "date": "2026-11-15",
+        "original_sha256": ORIGINAL_SHA,
+        "fixed_sha256": digest(args.fixed.read_bytes()),
+        "tests_sha256": digest(args.tests.read_bytes()),
+        "shared_fixed_sha256": digest(args.shared_helper.read_bytes()),
+        "shared_original_sha256": digest(original_shared),
+        "shared_tests_sha256": digest(args.retire_tests.read_bytes()),
+        "helper_sha256": digest(Path(__file__).read_bytes()),
+        "paired_cases": results,
+        "real_clone_operations": False,
+    }
+    with (args.output / "receipt.json").open("x") as stream:
+        json.dump(receipt, stream, indent=2)
+        stream.write("\n")
+    print(json.dumps(receipt, indent=2))
+
+
+if __name__ == "__main__":
+    main()

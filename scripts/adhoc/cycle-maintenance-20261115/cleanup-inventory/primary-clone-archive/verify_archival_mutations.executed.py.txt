@@ -1,0 +1,138 @@
+"""Paired fresh-process archival guard controls; synthetic fixtures only (2026-11-15).
+
+Inputs: exact helper, maintained tests, shared helper, Python and new private output.
+Outputs: private mutant source/log/JUnit plus public-safe derived receipt. No actual
+clone is selected. Exit1 alone never counts as a killed mutation: pytest must
+collect one test with one assertion failure and zero errors, after a passing control.
+"""
+
+import argparse
+import ast
+import hashlib
+import json
+import os
+import subprocess
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+
+def digest(raw):
+    return hashlib.sha256(raw).hexdigest()
+
+
+class Mutation(ast.NodeTransformer):
+    def __init__(self, kind):
+        self.kind = kind
+        self.changed = 0
+
+    def visit_Call(self, node):
+        self.generic_visit(node)
+        if isinstance(node.func, ast.Name) and node.func.id == "require" and len(node.args) == 2:
+            message = node.args[1]
+            if isinstance(message, ast.Constant) and isinstance(message.value, str):
+                selected = (
+                    self.kind == "proof"
+                    and message.value.startswith("Bound proof/plan/receipt changed")
+                ) or (self.kind == "index" and message.value == "Absent index must stay absent")
+                if selected:
+                    self.changed += 1
+                    return ast.copy_location(ast.Constant(None), node)
+        if self.kind == "rename" and isinstance(node.func, ast.Name) and node.func.id == "rename":
+            assert isinstance(node.args[-1], ast.Constant) and node.args[-1].value == 4
+            node.args[-1] = ast.Constant(0)
+            self.changed += 1
+        return node
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    for name in ("source", "tests", "shared-helper", "output"):
+        parser.add_argument("--" + name, type=Path, required=True)
+    parser.add_argument("--python", required=True)
+    args = parser.parse_args()
+    assert (
+        args.output.is_absolute()
+        and args.output == args.output.resolve()
+        and not args.output.exists()
+    )
+    assert args.source not in args.output.parents and args.tests not in args.output.parents
+    args.output.mkdir()
+    original = args.source.read_bytes()
+    cases = {
+        "proof": "test_final_readback_revocation_refuses_before_move[proof]",
+        "index": "test_guard_distinctions[index]",
+        "rename": "test_exclusive_platform_rename_preserves_existing_empty_destination",
+    }
+    results = []
+    for kind, selection in cases.items():
+        directory = args.output / kind
+        directory.mkdir()
+        transform = Mutation(kind)
+        tree = transform.visit(ast.parse(original))
+        assert transform.changed > 0
+        mutant = directory / "archive_primary_clone.py"
+        mutant.write_text(ast.unparse(ast.fix_missing_locations(tree)) + "\n")
+        runs = {}
+        for label, helper in (("control", args.source), ("mutant", mutant)):
+            env = dict(
+                os.environ,
+                ARCHIVAL_TEST_HELPER=str(helper),
+                ARCHIVAL_SHARED_HELPER=str(args.shared_helper),
+                ARCHIVAL_FIXTURE_ROOT=str(directory / (label + "-fixtures")),
+                PYTHONPYCACHEPREFIX=str(directory / (label + "-bytecode")),
+            )
+            xml = directory / (label + ".xml")
+            command = [
+                args.python,
+                "-m",
+                "pytest",
+                "-q",
+                "-p",
+                "no:cacheprovider",
+                str(args.tests) + "::" + selection,
+                "--junitxml",
+                str(xml),
+            ]
+            process = subprocess.run(command, env=env, capture_output=True, timeout=90)
+            log = process.stdout + process.stderr
+            (directory / (label + ".log")).write_bytes(log)
+            suites = list(ET.fromstring(xml.read_bytes()).iter("testsuite"))
+            counts = {
+                key: sum(int(s.attrib.get(key, 0)) for s in suites)
+                for key in ("tests", "failures", "errors", "skipped")
+            }
+            expected = {"tests": 1, "failures": int(label == "mutant"), "errors": 0, "skipped": 0}
+            assert counts == expected and process.returncode == int(label == "mutant"), (
+                kind,
+                label,
+                counts,
+            )
+            runs[label] = {
+                "exit": process.returncode,
+                "junit": counts,
+                "log_sha256": digest(log),
+                "junit_sha256": digest(xml.read_bytes()),
+            }
+        results.append(
+            {
+                "guard": kind,
+                "test": selection,
+                "mutated_nodes": transform.changed,
+                "mutant_source_sha256": digest(mutant.read_bytes()),
+                "runs": runs,
+            }
+        )
+    receipt = {
+        "date": "2026-11-15",
+        "source_sha256": digest(original),
+        "tests_sha256": digest(args.tests.read_bytes()),
+        "helper_sha256": digest(Path(__file__).read_bytes()),
+        "paired_fresh_process_cases": results,
+        "real_clone_operations": False,
+    }
+    (args.output / "receipt.json").write_text(json.dumps(receipt, indent=2) + "\n")
+    print(json.dumps(receipt, indent=2))
+
+
+if __name__ == "__main__":
+    main()

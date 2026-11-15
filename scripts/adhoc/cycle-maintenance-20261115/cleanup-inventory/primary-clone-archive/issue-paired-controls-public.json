@@ -1,0 +1,265 @@
+{
+  "date": "2026-11-15",
+  "original_sha256": "417893f1064336d04c90e41cffebc1675c538ab16064ce28373bc498def107d9",
+  "fixed_sha256": "5ce40d5164a70a3ceb6084b6ea2a9d0e99452ec11479693e67ff0e4242d1a835",
+  "tests_sha256": "0086e8a39cad780b420dec89826e4b3facd8a8ba62d1772a999a34710be8e1e1",
+  "shared_fixed_sha256": "5513d8c984104fe0c0d6da1c8aaa37549e6e3307baa541498a862a185bac1af9",
+  "shared_original_sha256": "91c07258e5efdd77d5f4c91b07c1815469bc3cd803db87e5e62e223c27b5de2e",
+  "shared_tests_sha256": "79b4a121927ad4bd043bd6372103a43cd2b2855c8d8ca240fd63d2b5692dc82d",
+  "helper_sha256": "d8f9d297de6150e6c44b5bdbd9645fb84b4d6dc4e9b13272cf2e76f2379e1725",
+  "paired_cases": [
+    {
+      "issue": 1272,
+      "test": "test_relocation_unstable_symlink_refused_before_output[absolute]",
+      "runs": {
+        "original": {
+          "exit": 1,
+          "junit": {
+            "tests": 1,
+            "failures": 1,
+            "errors": 0,
+            "skipped": 0
+          },
+          "log_sha256": "7c3179a7f6ce385bb4ef58f4008e37cc04af52c1ea19f1a9d687183c06572172",
+          "junit_sha256": "c1f66f8bb0b645bc96c4c370615a2cc2c6885b29ac6e9143457f3d1b85466dc7"
+        },
+        "fixed": {
+          "exit": 0,
+          "junit": {
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          "log_sha256": "0dff5a7b4f7b627aa5d5ba9609862b0c83a9c34efeac8569b0ff66edb0c0e2d9",
+          "junit_sha256": "778632702ec0e3bfa8a5d8e1bc297ef6c8c7eb7ab591b8a3500291058a775826"
+        }
+      }
+    },
+    {
+      "issue": 1272,
+      "test": "test_relocation_unstable_symlink_refused_before_output[relative_escape]",
+      "runs": {
+        "original": {
+          "exit": 1,
+          "junit": {
+            "tests": 1,
+            "failures": 1,
+            "errors": 0,
+            "skipped": 0
+          },
+          "log_sha256": "8d934bd50322ae7762ac844da3c95c71306f7bc865d092e477d148e5bc69ef28",
+          "junit_sha256": "14216b95a3a2d992c259a80b94c45a5d3386ca37978bb512e0ce75526135880e"
+        },
+        "fixed": {
+          "exit": 0,
+          "junit": {
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          "log_sha256": "ac03dc55bdc1ce87ab5a711fdf5a7d72d345e62c471c4cb4e9de283e03475f14",
+          "junit_sha256": "3d5d643ea4e7ccea321d0e60fd1e43ba2574db4f7f3328c5dca24adfb52415a8"
+        }
+      }
+    },
+    {
+      "issue": 1272,
+      "test": "test_relocation_unstable_symlink_refused_before_output[chained_relative_escape]",
+      "runs": {
+        "original": {
+          "exit": 1,
+          "junit": {
+            "tests": 1,
+            "failures": 1,
+            "errors": 0,
+            "skipped": 0
+          },
+          "log_sha256": "97d4c7ee01b2c87cdbcb642a1425ac0020265994e5a8160c0fd44cd37d9af8e2",
+          "junit_sha256": "a5bca3112bb1c84a82a3a76bbc995dbd8e08612a38cd901b06cc4eb24343dd9f"
+        },
+        "fixed": {
+          "exit": 0,
+          "junit": {
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          "log_sha256": "71cecd4a03d26fc192e472bf26020cdc2172e564ac64a719b16960d8dffd73a1",
+          "junit_sha256": "6164fe885f3c842734062ee6db96676fc5652e6575cb61461f6c4df8d7ecbc28"
+        }
+      }
+    },
+    {
+      "issue": 1273,
+      "test": "test_identical_evidence_archive_outputs_refused_before_creation",
+      "runs": {
+        "original": {
+          "exit": 1,
+          "junit": {
+            "tests": 1,
+            "failures": 1,
+            "errors": 0,
+            "skipped": 0
+          },
+          "log_sha256": "33bc48723a9ebdeb09af8692b705863882ea46dd16197c3f97b735c521cb77f2",
+          "junit_sha256": "385a55a4742fcc1a617ec6e6122a519037955321b152ad9e4cb5f153ea79c12d"
+        },
+        "fixed": {
+          "exit": 0,
+          "junit": {
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          "log_sha256": "93c97c10af4fc8b54296201243c032c5e8295479ca6b4adc06019033d6f9e282",
+          "junit_sha256": "d5e16298b524808b9adcb5a172be3fd2b0e4e39b5b519a5aee33e0468cdb9bba"
+        }
+      }
+    },
+    {
+      "issue": 1274,
+      "test": "test_acl_list_denial_refuses_complete_traversal[inventory]",
+      "runs": {
+        "original": {
+          "exit": 1,
+          "junit": {
+            "tests": 1,
+            "failures": 1,
+            "errors": 0,
+            "skipped": 0
+          },
+          "log_sha256": "a948473137986af4076fe1c945fb7c83f5602f62f292a4b608f275180f3607fc",
+          "junit_sha256": "28e3e2a881b8681159eba97be527ac3d3d70ab77555ac4de43df9da3f8bdb71a"
+        },
+        "fixed": {
+          "exit": 0,
+          "junit": {
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          "log_sha256": "d907fec0e0445cfe67a7272e864304e81194b234052d6bdfcb6ec87c0b123e62",
+          "junit_sha256": "d2c2abc821d9fca53f67f425458c5199408ae98f5e1d9b01bc5d4865cdfefed8"
+        }
+      }
+    },
+    {
+      "issue": 1274,
+      "test": "test_acl_list_denial_refuses_complete_traversal[quick]",
+      "runs": {
+        "original": {
+          "exit": 1,
+          "junit": {
+            "tests": 1,
+            "failures": 1,
+            "errors": 0,
+            "skipped": 0
+          },
+          "log_sha256": "73a6df4543abe2414e73fad73f795fd8e6edc9ff547902f30beed0d017ae28c7",
+          "junit_sha256": "1649230621b0be71b7381cb4da66e962f4b72f97911c5b614912f14bb0d3c0e3"
+        },
+        "fixed": {
+          "exit": 0,
+          "junit": {
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          "log_sha256": "8989a153a4f265bdf8bf8abfcbf7ce96cf91c69ee66d543244ebf0fc2c9d041d",
+          "junit_sha256": "88d319b2a09096d1afedce477efbe021c51b1a4808ab269495969c92b70bb5da"
+        }
+      }
+    },
+    {
+      "issue": 1274,
+      "test": "test_acl_list_denial_refuses_complete_traversal[snapshot]",
+      "runs": {
+        "original": {
+          "exit": 1,
+          "junit": {
+            "tests": 1,
+            "failures": 1,
+            "errors": 0,
+            "skipped": 0
+          },
+          "log_sha256": "45cb5cda396f96786535273885dd849698dd7762e0eea1182420d5d1e3cf0ff8",
+          "junit_sha256": "acc2b6886cab429ef7abfb36ac085304e52f5c78b2c85239c2e00601be55e71a"
+        },
+        "fixed": {
+          "exit": 0,
+          "junit": {
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          "log_sha256": "016a4093788648644b08006f7d1d171ca7639313677f5aa929f004d4a3e52465",
+          "junit_sha256": "4d92ad553d76aace05c31be29277fc4bc9fa788611b037d1aec5e6606959c722"
+        }
+      }
+    },
+    {
+      "issue": 1275,
+      "test": "test_acl_denied_list_refuses_ignored_descendant_inventory",
+      "runs": {
+        "original": {
+          "exit": 1,
+          "junit": {
+            "tests": 1,
+            "failures": 1,
+            "errors": 0,
+            "skipped": 0
+          },
+          "log_sha256": "15ded30f7618064b098b844865d51d2473ce337a83236b9a2ecd37d390ff4df8",
+          "junit_sha256": "fcec69d42701977583399c99dab0420109f207176b5d039c947282394b9f1900"
+        },
+        "fixed": {
+          "exit": 0,
+          "junit": {
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          "log_sha256": "35d86279d96ed65491ba8ff0748e1c8e7891711531404dc5d4b9cd6ae33de3ec",
+          "junit_sha256": "72fe118e5785482bda5e8a62ee0e0b1fe74568abd852840571ec8e502fd46861"
+        }
+      }
+    },
+    {
+      "issue": 1275,
+      "test": "test_walk_propagates_injected_enumeration_failure",
+      "runs": {
+        "original": {
+          "exit": 1,
+          "junit": {
+            "tests": 1,
+            "failures": 1,
+            "errors": 0,
+            "skipped": 0
+          },
+          "log_sha256": "96b8b0eec0975a7c0a81e21d2bbee0a092a3148fae9cb7461b98f03542d93f09",
+          "junit_sha256": "3e3e712b6ce1914dc52dd841ee17ce3b0ce9f4d85e1d7d9c00d372e7a9cdfb16"
+        },
+        "fixed": {
+          "exit": 0,
+          "junit": {
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          "log_sha256": "35d86279d96ed65491ba8ff0748e1c8e7891711531404dc5d4b9cd6ae33de3ec",
+          "junit_sha256": "bba2592509c8ee9cd5719896220f2906c097f548c74ed158b61baf9785f509ac"
+        }
+      }
+    }
+  ],
+  "real_clone_operations": false
+}

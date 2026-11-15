@@ -1,0 +1,11 @@
+"""Independent relocation-invariance probe; synthetic fixture only, 2026-11-15."""
+import pytest
+from test_archive_primary_clone import archive, fixture, durable_fixture, probe
+
+def test_relative_escape_and_reenter_refused_before_relocation(fixture):
+    (fixture.source/'.git/relative-reenter').symlink_to('../../../1236/repo/.git/HEAD')
+    fixture.apply=True
+    with pytest.raises((ValueError,OSError)):
+        archive.archive(fixture,probe=probe)
+    assert fixture.source.is_dir(), 'Relative escape-and-reenter target must be rejected before moving'
+    assert not (fixture.archive_parent/'repo').exists()

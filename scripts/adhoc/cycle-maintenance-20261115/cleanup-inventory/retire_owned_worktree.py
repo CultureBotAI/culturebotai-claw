@@ -158,7 +158,10 @@ def node(path: Path, device: int) -> dict:
 def walk(root: Path) -> dict[str, dict]:
     device = root.stat().st_dev
     result = {}
-    for directory, dirs, files in os.walk(root, followlinks=False):
+    def failed_enumeration(error: OSError) -> None:
+        raise error
+
+    for directory, dirs, files in os.walk(root, followlinks=False, onerror=failed_enumeration):
         parent = Path(directory)
         for name in sorted([*dirs, *files]):
             path = parent / name

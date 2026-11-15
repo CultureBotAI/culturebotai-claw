@@ -1,0 +1,99 @@
+{
+  "date": "2026-11-15",
+  "source_sha256": "417893f1064336d04c90e41cffebc1675c538ab16064ce28373bc498def107d9",
+  "tests_sha256": "0f24c3e1450f90132810e3e564b7cc6fe2e0c5e94ea9ca3887e2826dd9a444a2",
+  "helper_sha256": "b15798b93efb0fe3615028ec4c31ff641e9efbf82023b87bcb44dcb6b011c873",
+  "paired_fresh_process_cases": [
+    {
+      "guard": "proof",
+      "test": "test_final_readback_revocation_refuses_before_move[proof]",
+      "mutated_nodes": 3,
+      "mutant_source_sha256": "a6bf35b0abd09784f9bad3ef6b558b6c3f1699b6ac2424b5530fad8eec7d94d6",
+      "runs": {
+        "control": {
+          "exit": 0,
+          "junit": {
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          "log_sha256": "82c201bb904df7561785e93b567cf9f67336470fb20ba42c9846547bf1029aea",
+          "junit_sha256": "48ac49df68a77d8d9186560183b566fac916f16dd8a8ec43ede9863f3c9e189a"
+        },
+        "mutant": {
+          "exit": 1,
+          "junit": {
+            "tests": 1,
+            "failures": 1,
+            "errors": 0,
+            "skipped": 0
+          },
+          "log_sha256": "8728f192792f56f1784d3ebc9e986a0a15b56c887c706c458ac0716c62f7ad05",
+          "junit_sha256": "0860e52b0f2b8d4448f7d23e428dcf9cb4a7e1b3a130b47767046cf2524327b5"
+        }
+      }
+    },
+    {
+      "guard": "index",
+      "test": "test_guard_distinctions[index]",
+      "mutated_nodes": 1,
+      "mutant_source_sha256": "183d3f82b3d74860f6d9144878e3abffe5085ffbcac0e9baff2fa66e62756db9",
+      "runs": {
+        "control": {
+          "exit": 0,
+          "junit": {
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          "log_sha256": "93c97c10af4fc8b54296201243c032c5e8295479ca6b4adc06019033d6f9e282",
+          "junit_sha256": "ff9f7e1ca7ceb9c1261c83922febb032d714048f4a58a374d9ede41aa2b17fc0"
+        },
+        "mutant": {
+          "exit": 1,
+          "junit": {
+            "tests": 1,
+            "failures": 1,
+            "errors": 0,
+            "skipped": 0
+          },
+          "log_sha256": "a027a49fbe8c597ae8feb1f9bbd782b578a084f411de546e1b5136086626e759",
+          "junit_sha256": "dac98d3e4b1453bcb54629db5b1ba3c2c2eb930f6beae65f322051ef84421d23"
+        }
+      }
+    },
+    {
+      "guard": "rename",
+      "test": "test_exclusive_platform_rename_preserves_existing_empty_destination",
+      "mutated_nodes": 1,
+      "mutant_source_sha256": "f2015d22ba39edcd5ec1c5e797f41be118e454f27228456f69d3ba30f98ae471",
+      "runs": {
+        "control": {
+          "exit": 0,
+          "junit": {
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          "log_sha256": "a71df3ef716cabe43ead70bd8311cda3aeadcb986bea501da0ea9262f31c3925",
+          "junit_sha256": "83756f6719045827b27b9ad4bada8ee67715cfb23e68f8738007e47664568d94"
+        },
+        "mutant": {
+          "exit": 1,
+          "junit": {
+            "tests": 1,
+            "failures": 1,
+            "errors": 0,
+            "skipped": 0
+          },
+          "log_sha256": "cb30d352c812f50ee9f57e672047d7cfaac6a5fa72c9191784aeda94a905ae03",
+          "junit_sha256": "eb8a27aa9be881969574588ffcffe8d02bdd98a4c0429000feabe99219b0e180"
+        }
+      }
+    }
+  ],
+  "real_clone_operations": false
+}

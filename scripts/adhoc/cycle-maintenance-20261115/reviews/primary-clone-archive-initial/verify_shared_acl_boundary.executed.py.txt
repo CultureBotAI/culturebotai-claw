@@ -1,0 +1,21 @@
+"""Independent shared-walk probe; synthetic linked shape only, 2026-11-15."""
+import subprocess
+import pytest
+from test_archive_primary_clone import archive, fixture, durable_fixture
+
+def test_shared_walk_refuses_acl_unlistable_ignored_shape(fixture):
+    shared=archive.load_shared(fixture.shared_helper)
+    root=fixture.task_scope/'synthetic-linked-shape'
+    root.mkdir()
+    (root/'.git').write_text('gitdir: unused-fixture-only\n')
+    protected=root/'ignored-local-results'
+    protected.mkdir()
+    (protected/'valuable').write_bytes(b'unique-untracked-result')
+    subprocess.run(['chmod','+a','everyone deny list',str(protected)],check=True)
+    try:
+        with pytest.raises(PermissionError):
+            list(protected.iterdir())
+        with pytest.raises((ValueError,OSError)):
+            shared.walk(root)
+    finally:
+        subprocess.run(['chmod','-a','everyone deny list',str(protected)],check=True)

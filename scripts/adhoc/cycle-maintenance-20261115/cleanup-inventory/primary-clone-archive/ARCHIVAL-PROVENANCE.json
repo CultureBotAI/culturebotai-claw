@@ -1,0 +1,48 @@
+{
+  "date": "2026-11-15",
+  "historical_receipts_unchanged": {
+    "VALIDATION.json": "22b97605939de2224308901e4146faaa5de9f324918b8f5e2b671a34ee648199",
+    "paired-controls-public.json": "13843ca53d4757e9d464851eb7f5eb0215f94b0d35e5eec6a6aa511b4aae9d8b"
+  },
+  "independent_findings_retained_privately": true,
+  "issues": [
+    1272,
+    1273,
+    1274,
+    1275
+  ],
+  "original_bytes_preserved": [
+    {
+      "archive": "archive_primary_clone.reviewed-417893f1.py.txt",
+      "archive_inert": true,
+      "original_name": "archive_primary_clone.py",
+      "sha256": "417893f1064336d04c90e41cffebc1675c538ab16064ce28373bc498def107d9"
+    },
+    {
+      "archive": "test_archive_primary_clone.reviewed-0f24c3e1.py.txt",
+      "archive_inert": true,
+      "original_name": "test_archive_primary_clone.py",
+      "sha256": "0f24c3e1450f90132810e3e564b7cc6fe2e0c5e94ea9ca3887e2826dd9a444a2"
+    },
+    {
+      "archive": "README.pre-1272-1273.md",
+      "archive_inert": false,
+      "original_name": "README.md",
+      "sha256": "3ce37f6724c42f77d65e6fd8e00e4fd7b4d3e2b0133f0c777073b1bd299d2304"
+    },
+    {
+      "archive": "retire_owned_worktree.reviewed-91c07258.py.txt",
+      "archive_inert": true,
+      "original_name": "retire_owned_worktree.py",
+      "sha256": "91c07258e5efdd77d5f4c91b07c1815469bc3cd803db87e5e62e223c27b5de2e"
+    },
+    {
+      "archive": "test_retire_owned_worktree.reviewed-b42ef001.py.txt",
+      "archive_inert": true,
+      "original_name": "test_retire_owned_worktree.py",
+      "sha256": "b42ef00128ac07538a6f6fd8d88a3f87df259578caa39be5a831b1c867533d71"
+    }
+  ],
+  "repaired_validation_sha256": "4ddc9b26dd70c1758cdf361fe50342032ddd29bb23de4900d88fc64b86b21a90",
+  "source_edit_scope": "Primary symlink/output/traversal guards; shared retirement traversal callback only; ongoing regressions; shared pin; docs. No root or actual clone mutation."
+}

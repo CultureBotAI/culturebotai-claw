@@ -9,6 +9,7 @@ import importlib.util
 import json
 import os
 import subprocess
+import sys
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -16,6 +17,10 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
+# Isolated paired controls may supply a synthetic repository that ignores .temp.
+# Normal maintained pytest keeps the actual repository root above.
+if os.environ.get("CLAW_RETIREMENT_TEST_SCOPE"):
+    ROOT = Path(os.environ["CLAW_RETIREMENT_TEST_SCOPE"]).resolve()
 DEFAULT_HELPER = ROOT / "scripts/adhoc/cycle-maintenance-20261115/cleanup-inventory/retire_owned_worktree.py"
 # Only the offline paired-control runner sets this to its private source copy.
 HELPER = Path(os.environ.get("CLAW_RETIREMENT_TEST_HELPER", str(DEFAULT_HELPER)))
@@ -218,3 +223,33 @@ def test_second_reader_failure_preserves_moved_bytes_and_recovery(prepared):
     assert git(anchor, "rev-parse", recovery["ref"]) == args.expected_head
     assert git(anchor, "rev-parse", "owned-fixture") == args.expected_head
     assert (args.quarantine / "failure.json").is_file()
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="Darwin ACL distinction")
+def test_acl_denied_list_refuses_ignored_descendant_inventory(durable_fixture):
+    root = durable_fixture / "source"
+    root.mkdir()
+    (root / ".git").write_text("gitdir: synthetic-pointer")
+    protected = root / "ignored-local-results"
+    protected.mkdir()
+    (protected / "valuable").write_bytes(b"retained local result")
+    subprocess.run(["/bin/chmod", "+a", "everyone deny list", str(protected)], check=True)
+    try:
+        assert protected.lstat()
+        with pytest.raises(PermissionError):
+            list(protected.iterdir())
+        with pytest.raises(PermissionError):
+            mod.walk(root)
+    finally:
+        subprocess.run(["/bin/chmod", "-a", "everyone deny list", str(protected)], check=True)
+
+
+def test_walk_propagates_injected_enumeration_failure(durable_fixture, monkeypatch):
+    def failed_walk(root, *, followlinks=False, onerror=None):
+        if onerror is not None:
+            onerror(PermissionError("synthetic enumeration refusal"))
+        return iter(())
+
+    monkeypatch.setattr(mod.os, "walk", failed_walk)
+    with pytest.raises(PermissionError, match="synthetic enumeration"):
+        mod.walk(durable_fixture)
