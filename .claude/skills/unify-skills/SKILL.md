@@ -189,3 +189,8 @@ an unrelated capability merely to select a skill.
   `catalogue` lists what is already managed.
 - `cross-mech-sync` is the procedure for landing a change across Mechs once
   there is something to land.
+
+Preparation candidates follow [staged onboarding](../../../docs/guides/PREPARATION_CANDIDATES.md):
+render shared skills from their sealed identity and explicit component decisions,
+without treating disabled deployed capabilities as active. Publish the refreshed
+canonical template before preparing a consumer update.

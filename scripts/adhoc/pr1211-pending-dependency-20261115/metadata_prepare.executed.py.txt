@@ -1,0 +1,82 @@
+"""Dated PR1211 metadata preparation, 2026-11-15; issues1255/1277.
+
+Inputs: explicit owned worktree, shared lock directory, expected HEAD and action.
+Output: JSON stdout describing the actual no-commit merge or explicit staging.
+Only the named repair worktree is changed. No commit, push, fetch, queue, hook
+override or runtime action. Pending1138 is a dependency, not published main.
+The executed source is retained as an inert archive with its results.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import subprocess
+from pathlib import Path
+
+from plugins.lock_manager import LockManager
+
+DEPENDENCY = "40788fd77a428d4226c2047c1a1d18661bdfef71"
+DEPENDENCY_TREE = "51a37b10664f1e842f4866c7af10516890132066"
+OBSERVED_MAIN = "9a4b0b22ce6e9bed878d512be4597502e03ed98a"
+ORIGINAL = "553a6103c2275ce7f020f6c6519465323240aaa8"
+BRANCH = "refs/heads/repair/pr1211-refresh-20261115"
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--root", type=Path, required=True)
+    parser.add_argument("--locks-dir", type=Path, required=True)
+    parser.add_argument("--expected-head", required=True)
+    parser.add_argument("--action", choices=("prepare", "stage"), required=True)
+    parser.add_argument("--path", action="append", default=[])
+    args = parser.parse_args()
+    for path in (args.root, args.locks_dir):
+        if not path.is_absolute() or path != path.resolve():
+            raise ValueError("Explicit canonical path required")
+
+    def git(*argv, allowed=(0,)):
+        result = subprocess.run(["git", "-C", str(args.root), *argv],
+                                text=True, capture_output=True, timeout=40)
+        if result.returncode not in allowed:
+            raise RuntimeError(result.stderr or result.stdout)
+        return result
+
+    with LockManager({"locks_dir": str(args.locks_dir),
+                      "my_id": "cycle-pr1211-pending-refresh"}).lock("claw", "pr1211-metadata-" + args.action, timeout=60):
+        if git("rev-parse", "HEAD").stdout.strip() != args.expected_head:
+            raise ValueError("Owned HEAD changed")
+        if git("symbolic-ref", "HEAD").stdout.strip() != BRANCH:
+            raise ValueError("Owned branch changed")
+        if git("remote", "get-url", "origin").stdout.strip() != "https://github.com/CultureBotAI/culturebotai-claw.git":
+            raise ValueError("Origin differs")
+        if args.action == "prepare":
+            if args.expected_head != ORIGINAL or args.path or git("status", "--porcelain", "--untracked-files=all").stdout:
+                raise ValueError("Original clean snapshot required")
+            if git("rev-parse", DEPENDENCY + "^{tree}").stdout.strip() != DEPENDENCY_TREE:
+                raise ValueError("Reviewed dependency tree differs")
+            git("merge-base", "--is-ancestor", OBSERVED_MAIN, DEPENDENCY)
+            result = git("merge", "--no-ff", "--no-commit", DEPENDENCY, allowed=(0, 1))
+            conflicts = git("diff", "--name-only", "--diff-filter=U").stdout.splitlines()
+            if result.returncode and not conflicts:
+                raise RuntimeError(result.stderr or result.stdout)
+            if git("rev-parse", "MERGE_HEAD").stdout.strip() != DEPENDENCY:
+                raise ValueError("Prepared merge dependency differs")
+        else:
+            if not args.path or any(Path(path).is_absolute() or ".." in Path(path).parts for path in args.path):
+                raise ValueError("Explicit repository-relative stage paths required")
+            result = git("add", "--", *args.path)
+            conflicts = git("diff", "--name-only", "--diff-filter=U").stdout.splitlines()
+        head = git("rev-parse", "HEAD").stdout.strip()
+    print(json.dumps({"action": args.action, "head_unchanged": head == args.expected_head,
+                      "head": head, "pending_dependency": DEPENDENCY,
+                      "pending_dependency_tree": DEPENDENCY_TREE,
+                      "observed_actual_main": OBSERVED_MAIN, "dependency_merged_claim": False,
+                      "conflicts": conflicts, "stage_paths": args.path,
+                      "returncode": result.returncode,
+                      "commit_or_push_performed": False, "hooks_overridden": False,
+                      "helper_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest()}, indent=2, sort_keys=True))
+
+
+if __name__ == "__main__":
+    main()

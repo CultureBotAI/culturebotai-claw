@@ -77,6 +77,7 @@ def _parser() -> argparse.ArgumentParser:
         command_parser.add_argument(
             "--repository", required=True, help="Mech key or owner/repository identity"
         )
+        command_parser.add_argument("--candidate", action="store_true", help="Use an explicitly registered preparation identity")
         command_parser.add_argument("--target-root", required=True, type=Path)
         command_parser.add_argument("--ref", required=True, help="Full claw commit SHA")
         command_parser.add_argument("--json", action="store_true", dest="as_json")
@@ -131,9 +132,10 @@ def _changes(args: argparse.Namespace) -> int:
             args.target_root,
             args.ref,
             apply=args.apply,
+            candidate=args.candidate,
         )
     else:
-        changes = plan_sync(args.repository, args.target_root, args.ref)
+        changes = plan_sync(args.repository, args.target_root, args.ref, candidate=args.candidate)
     rows = [
         {"artifact": change.artifact_id, "path": change.path, "reason": change.reason}
         for change in changes

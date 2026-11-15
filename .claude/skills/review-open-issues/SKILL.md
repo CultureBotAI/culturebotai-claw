@@ -20,6 +20,14 @@ This skill reviews this repository's issues. Use the fleet manifest to identify
 affected consumers; it does not expand the review into every Mech's queue.
 For open PRs across the fleet, use `fleet-pr-status` or `fleet-pr-review`.
 
+For a count-ranked inventory and portable review columns, reuse
+[fleet-issue-status](../fleet-issue-status/SKILL.md) with
+`--repo CultureBotAI/culturebotai-claw --all-issues`. Populate its
+[shared report fields](../fleet-issue-status/references/review-table.md) only
+after the evidence checks below: priority, keep/close/defer recommendation,
+reason, evidence, and deferral trigger. Preserve this review's richer readiness,
+dependency, and acceptance-criteria ledger alongside the generated intake table.
+
 ## Boundaries
 
 - Read GitHub and repository evidence; write review snapshots or drafts locally.

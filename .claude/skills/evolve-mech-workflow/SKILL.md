@@ -198,3 +198,8 @@ CLAUDE.md. Acquire the owned repository lock, compare captured hashes again,
 stage and validate the complete file set, then replace atomically. Report local
 installation separately from committed or published adoption. Do not claim
 successful activation merely because a profile validates or files were copied.
+
+For a new preparation candidate, follow [staged onboarding](../../../docs/guides/PREPARATION_CANDIDATES.md).
+Bind the reviewed native profile to its sealed identity and preserve explicit
+release/runtime holds; candidate template adoption does not admit it to the
+public fleet or activate the recurring cycle.

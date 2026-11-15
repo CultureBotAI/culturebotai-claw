@@ -20,6 +20,7 @@ except ImportError:  # pragma: no cover - exercised by capability checks off Uni
     fcntl = None  # type: ignore[assignment]
 
 from .artifacts.scripts.check_vendored_sync import (
+    CANDIDATE_REGISTRY_PATH,
     CANONICAL_MANIFEST_PATH,
     MAX_DOWNLOAD_BYTES,
     Artifact,
@@ -30,6 +31,7 @@ from .artifacts.scripts.check_vendored_sync import (
     _git_environment,
     _safe_local_file,
     _validate_git_repository,
+    candidate_manifest,
     expand_target,
     fetch_url,
     parse_manifest,
@@ -288,7 +290,7 @@ def _desired_files(
 
 
 def _sync_inputs(
-    repository: str, canonical_ref: str,
+    repository: str, canonical_ref: str, *, candidate: bool = False,
 ) -> tuple[GovernanceManifest, Consumer, tuple[tuple[str, str, bytes, int], ...]]:
     """Bind one immutable source bundle before planning or opening a transaction."""
     from .infrastructure_admission import (
@@ -298,6 +300,17 @@ def _sync_inputs(
     )
 
     manifest = load_governance_manifest()  # Current package/fleet/checksums remain mandatory.
+    if candidate:
+        from .candidates import load_candidates, registry_bytes
+
+        load_candidates()  # Catalogue and reserved identity checks.
+        _verify_canonical_ref(canonical_ref, manifest)
+        registry = registry_bytes()
+        if fetch_url(raw_url(canonical_ref, CANDIDATE_REGISTRY_PATH)) != registry:
+            raise GovernanceError("Pinned candidate registry differs from installed declaration")
+        prepared = candidate_manifest(registry, manifest, repository)
+        consumer = prepared.consumer_for(repository)
+        return prepared, consumer, _desired_files(prepared, consumer, canonical_ref)
     consumer = manifest.consumer_for(repository)
     package = files(PACKAGE_NAME)
 
@@ -514,11 +527,12 @@ def plan_sync(
     repository: str,
     root: Path,
     canonical_ref: str,
+    *, candidate: bool = False,
 ) -> tuple[SyncChange, ...]:
     """Return a provenance-verified plan; never mutate the target repository."""
 
     canonical_ref = _validate_ref(canonical_ref)
-    manifest, consumer, desired = _sync_inputs(repository, canonical_ref)
+    manifest, consumer, desired = _sync_inputs(repository, canonical_ref, candidate=candidate)
     root = _validate_target_repository(root, consumer)
     return _plan_sync(manifest, consumer, root, canonical_ref, desired=desired)
 
@@ -1116,11 +1130,12 @@ def sync_repository(
     canonical_ref: str,
     *,
     apply: bool = False,
+    candidate: bool = False,
 ) -> tuple[SyncChange, ...]:
     """Plan or safely apply provenance-bound bytes; dry-run is the default."""
 
     canonical_ref = _validate_ref(canonical_ref)
-    manifest, consumer, desired = _sync_inputs(repository, canonical_ref)
+    manifest, consumer, desired = _sync_inputs(repository, canonical_ref, candidate=candidate)
     root = _validate_target_repository(root, consumer)
     if not apply:
         return _plan_sync(manifest, consumer, root, canonical_ref, desired=desired)

@@ -318,3 +318,18 @@ def test_check_cli_reports_drift_then_current_and_apply_requires_flag(fixture, c
     assert main(["apply", *args, "--apply"]) == 0
     assert main(["check", *args]) == 0
     assert '"runtime_activation": false' in capsys.readouterr().out
+
+
+def test_preparation_identity_uses_declaration_and_refuses_native_override(fixture):
+    source, target, config = fixture
+    git(target, "remote", "set-url", "origin", "https://github.com/CultureBotAI/StressResponseMech.git")
+    config["repository"] = "stressresponsemech"
+    (target / mod.CONFIG_PATH).write_text(mod.encode(config))
+    prepared = mod.plan_repository(target, source_root=source)
+    assert prepared.identity["candidate"] is True
+    assert prepared.report["governance"]["preparation_candidate"] is True
+    assert any("StressResponseMech" in value for value in prepared.outputs.values())
+    config["native_identity"] = {"schema_paths": ["foreign/schema.yaml"], "record_globs": ["foreign/*.yaml"]}
+    (target / mod.CONFIG_PATH).write_text(mod.encode(config))
+    with pytest.raises(mod.TemplateError, match="registered identity"):
+        mod.plan_repository(target, source_root=source)

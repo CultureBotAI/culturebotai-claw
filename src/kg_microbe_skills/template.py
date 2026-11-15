@@ -29,7 +29,7 @@ RECEIPT_PATH = "workflow/mech-template-lock.json"
 AUTHORITY_GROUPS = {
     "kg_microbe_skills": ("skills.yaml", "canonical/*.md"),
     "kg_microbe_workflows": ("templates/*.yaml", "schema/*.yaml"),
-    "kg_microbe_governance": ("vendored_artifacts.json", "artifacts/**/*", "private_audit/scaleup-v1.json"),
+    "kg_microbe_governance": ("vendored_artifacts.json", "candidates.json", "candidates.py", "artifacts/**/*", "private_audit/scaleup-v1.json"),
     "kg_microbe_fleet": ("fleet.yaml",),
 }
 PARENT_SOURCES = {
@@ -233,6 +233,18 @@ def _identity(key: str) -> dict[str, Any]:
             "environment_variable": "SCALEUPMECH_ROOT", "package_path": package,
             "schema_paths": "consumer configuration required", "record_globs": "consumer configuration required",
         }}
+    from kg_microbe_governance.candidates import load_candidates
+
+    candidates = load_candidates()
+    if key in candidates:
+        candidate = candidates[key]
+        values = {name: candidate[name] for name in ("display_name", "github", "environment_variable", "package_path")}
+        values.update(mech_key=key, **{
+            name: ", ".join(f"`{path}`" for path in candidate[name])
+            for name in ("schema_paths", "record_globs")
+        })
+        return {"key": key, "github": candidate["github"], "private": False,
+                "candidate": True, "values": values}
     raise TemplateError(f"unknown repository: {key}")
 
 
@@ -382,7 +394,7 @@ def plan_repository(target_root: Path, *, config_path: Path | None = None,
                     raise TemplateError(f"private native schema absent: {value}")
             identity["values"][key] = ", ".join(f"`{value}`" for value in values)
     elif native is not None:
-        raise TemplateError("public identity must come from fleet manifest")
+        raise TemplateError("registered identity must come from the canonical declaration")
     for extension in config["extensions"]:
         if not _safe_path(root, extension).exists():
             raise TemplateError(f"declared consumer extension is absent: {extension}")
@@ -405,7 +417,7 @@ def plan_repository(target_root: Path, *, config_path: Path | None = None,
             name = component[6:]
             target = decision.get("target", f".claude/skills/{name}/SKILL.md")
             template = _source_text(f"src/kg_microbe_skills/canonical/{name}.md", source_root)
-            rendered = (render_identity_adapter(template, identity["values"]) if identity["private"]
+            rendered = (render_identity_adapter(template, identity["values"]) if identity["private"] or identity.get("candidate")
                         else render_adapter(template, identity["key"]))
             desired = {target: rendered}
         for target, rendered in desired.items():
@@ -442,7 +454,7 @@ def plan_repository(target_root: Path, *, config_path: Path | None = None,
         "source_ref": config["source_ref"], "baseline_sha256": receipt["baseline_sha256"],
         "native_checks": config["native_checks"], "extensions": config["extensions"],
         "governance": {"status": "separate_validation_required", "observed_pin": pin.strip() if pin else None,
-                       "private_policy": identity["private"], "writes": False},
+                       "private_policy": identity["private"], "preparation_candidate": identity.get("candidate", False), "writes": False},
         "runtime_activation": False,
     }
     return TemplatePlan(root, identity, report, outputs, expected)

@@ -1,0 +1,17 @@
+{
+  "action": "prepare",
+  "commit_or_push_performed": false,
+  "conflicts": [
+    "src/kg_microbe_skills/template_baseline.json"
+  ],
+  "dependency_merged_claim": false,
+  "head": "553a6103c2275ce7f020f6c6519465323240aaa8",
+  "head_unchanged": true,
+  "helper_sha256": "3cefe501b5f31ca9f2471596966970dc046ba11cd23fb4aa0e546e86ea700b56",
+  "hooks_overridden": false,
+  "observed_actual_main": "9a4b0b22ce6e9bed878d512be4597502e03ed98a",
+  "pending_dependency": "40788fd77a428d4226c2047c1a1d18661bdfef71",
+  "pending_dependency_tree": "51a37b10664f1e842f4866c7af10516890132066",
+  "returncode": 1,
+  "stage_paths": []
+}
