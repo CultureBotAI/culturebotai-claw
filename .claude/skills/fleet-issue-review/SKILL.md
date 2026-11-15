@@ -1,11 +1,11 @@
 ---
 name: fleet-issue-review
-description: Review and prioritize open issues across the manifest-defined Mech fleet, group related work by shared feature or cause, and plan parallel work by theme across repositories. Use for fleet backlog triage, coordinated feature planning, or choosing the next cross-Mech work. Produces an evidence-backed issue ledger and dependency-ordered assignments; implementation follows only when requested.
+description: Inventory and review open issues across the manifest-defined Mech fleet, rank repositories by open-issue count, and record per-issue priority and keep/close/defer recommendations in Markdown and structured tables. Use for fleet backlog triage, shared-feature planning, or choosing the next cross-Mech work. Implementation follows only when requested.
 metadata:
   category: cross-repo
   requires_database: false
   requires_internet: true
-  version: 1.0.0
+  version: 1.1.0
   tags: [issues, triage, priority, fleet, cross-repo, parallel, reporting]
 ---
 
@@ -14,6 +14,14 @@ metadata:
 Produce one prioritized view of the fleet's backlog, with enough evidence to
 choose work and enough coordination detail to assign a shared feature across
 Mechs. Keep a disposition for every issue even when several become one theme.
+
+For counts or a table awaiting review, use the existing
+[fleet-issue-status](../fleet-issue-status/SKILL.md) inventory script. Do not
+start a full evidence review merely to fill an intake table. For review requests,
+use that same table as intake and enrich it through the workflow below; do not
+maintain a second inventory implementation. The shared
+[report contract](../fleet-issue-status/references/review-table.md) defines the
+Markdown, TSV, JSON, and review-decision fields.
 
 Review requests authorize reading GitHub and repository evidence and writing
 local reports. They do not themselves authorize implementation or GitHub
@@ -60,6 +68,12 @@ requested. Repositories discovered in links or organization listings do not
 silently join the fleet. A missing local checkout does not remove a GitHub queue
 from coverage.
 
+The status script includes Claw alongside the Mechs by default. Preserve that
+scope for an inventory-only request such as "each repo, most issues first".
+For a Mech-only evidence review, use repeated `--repo` arguments containing the
+identities from the pinned manifest. Name Claw separately when it is included;
+do not silently change the denominator between inventory and review.
+
 For local evidence, use identity-validated paths:
 
 ```bash
@@ -75,6 +89,12 @@ other sessions; do not switch branches, stash, reset, or acquire write locks
 just to review. Record local changes separately from published behavior.
 
 ## Inventory every issue and its corrections
+
+Start with `uv run python scripts/fleet_issue_status.py --all-issues --no-prs --markdown`
+from the pinned checkout, saving stdout into a fresh review directory. This
+produces the descending-count repository table and a full issue ledger with
+unreviewed priority/action columns. It fetches issue metadata, not the evidence
+needed to recommend closure. Leave those fields unreviewed until assessed.
 
 Use [queue-snapshot.md](references/queue-snapshot.md) for paginated issue,
 comment, and open-PR acquisition with independent count checks. Record each
@@ -165,6 +185,16 @@ reuse can make a theme valuable, but does not itself make it P0. A blocked
 high-impact issue remains high-impact even when a ready lower-priority task is
 the next useful action.
 
+Record the proposed action separately from the evidence disposition: `keep`,
+`close`, or `defer`. A close recommendation needs acceptance-criteria evidence
+and has `Unranked` remaining implementation priority. Deferral needs a reason
+and a concrete revisit date or trigger; blocked work is not automatically
+deferred. Keep source labels separate from review priority. Save decisions in
+the report contract's JSON overlay and render it with `--triage-file`; changed
+issues must be rechecked before their decisions are carried forward. The overlay
+timestamp check does not detect changes to code or linked PRs: refresh those
+evidence sources as required below.
+
 ## Plan parallel work by theme
 
 Assign one owner per theme, with all of its affected repositories and issue
@@ -218,6 +248,10 @@ Include:
    readiness, and shared prerequisites.
 3. The full issue ledger, including fixed, duplicate, blocked, and unranked
    items; retain distinct residual work when suggesting duplicates or closure.
+   Include priority, proposed action, reason, evidence, and defer-until columns
+   in both Markdown and structured output. Retain the inventory's repository
+   summary ordered from most to least open issues, with review progress counts;
+   consequence-ranked themes are a separate view, not a substitute for it.
 4. Parallel waves and owner/task packets with conflict and dependency decisions.
 5. Evidence-backed close/update candidates, unfiled findings, and external or
    human decisions. Separate recommendations from changes actually performed.
