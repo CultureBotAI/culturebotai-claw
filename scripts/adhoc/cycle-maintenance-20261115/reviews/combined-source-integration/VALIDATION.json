@@ -1,0 +1,31 @@
+{
+  "files": {
+    "REVIEW.md": "d662379ca0e1e0796e600ad8b924e211c096f47af13146d86c4dac8e08072aa5",
+    "boundary.json": "8fc9ea6fe1b87eae7b11a7c9639ce776b6369b6287d6fdbf2da8daa277796eec",
+    "verify_combined_boundary.executed.py.txt": "76c5912dc2216e67cc9231f4d13bc689cdfa2ce979a35681faac646868cc96b2"
+  },
+  "head": "a30bb9b3681508d6b09830c53191b4c17cb69371",
+  "helper_packaging": {
+    "archived_filename": "verify_combined_boundary.executed.py.txt",
+    "edits": "Filename and inert suffix only; source bytes unchanged",
+    "original_and_archived_sha256": "76c5912dc2216e67cc9231f4d13bc689cdfa2ce979a35681faac646868cc96b2",
+    "original_filename": "verify_combined_boundary.py",
+    "original_retained": true,
+    "probe_rerun_for_packaging": false
+  },
+  "independent_pytest": {
+    "controller_identity": "CultureBotAI/culturebotai-claw",
+    "errors": 0,
+    "failures": 0,
+    "junit_sha256": "512c1c245c7998ca6e42f0d60d56e8d3c5761a5450f9162a548feb6bf3af8437",
+    "log_sha256": "18678ccd02cd869801c7780ac8aae30bcc5ca1c302f230644e31682db4856bd4",
+    "passed": 352,
+    "seconds": 37.28,
+    "skipped": 0
+  },
+  "reviewed_at": "2026-11-15T12:49:56.002059+00:00",
+  "runtime_authority": false,
+  "source_commit": "cc274d10670816384e57240f1d26124201fbc4f3",
+  "tree": "5794575b2a0c652b49682aa460150dd5af0774d2",
+  "verdict": "PASS_SOURCE_WITH_PENDING_DEPENDENCY_AND_HOSTED_GATES"
+}

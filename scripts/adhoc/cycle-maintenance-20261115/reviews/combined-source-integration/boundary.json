@@ -1,0 +1,12 @@
+{
+  "baseline_authorities": 63,
+  "baseline_check": "PASS",
+  "candidate_scope_refusals": 1,
+  "controller_identity_refusal": true,
+  "fleet_limit_checks": 17,
+  "head": "a30bb9b3681508d6b09830c53191b4c17cb69371",
+  "helper_sha256": "76c5912dc2216e67cc9231f4d13bc689cdfa2ce979a35681faac646868cc96b2",
+  "runtime_authority": false,
+  "source_commit": "cc274d10670816384e57240f1d26124201fbc4f3",
+  "source_unchanged": true
+}

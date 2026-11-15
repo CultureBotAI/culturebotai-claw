@@ -1,0 +1,65 @@
+"""Read-only exact-head composition boundary probe, 2026-11-15.
+
+Input: explicit source checkout root at the reviewed commit. Output: JSON on
+stdout after all assertions pass. Related PRs: 1261, 1211, 1138. No Git writes,
+network, provider calls, runtime actions or source/environment changes.
+"""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+sys.dont_write_bytecode = True
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--root", type=Path, required=True)
+args = parser.parse_args()
+root = args.root.resolve(strict=True)
+head = "a30bb9b3681508d6b09830c53191b4c17cb69371"
+source = "cc274d10670816384e57240f1d26124201fbc4f3"
+env = {**os.environ, "GIT_OPTIONAL_LOCKS": "0"}
+def git(*argv):
+    return subprocess.check_output(["git", "-C", str(root), *argv], env=env)
+assert git("rev-parse", "HEAD").decode().strip() == head
+assert not git("status", "--porcelain=v1", "--untracked-files=all")
+assert os.environ.get("GITHUB_REPOSITORY") == "CultureBotAI/culturebotai-claw"
+sys.path[:0] = [str(root / "src"), str(root)]
+from kg_microbe_fleet import FleetManifestError, load_fleet_manifest
+from kg_microbe_governance.candidates import load_candidates
+from kg_microbe_skills.template import check_baseline
+from kg_microbe_workflows import WorkflowError
+from kg_microbe_workflows.pr_maintenance_remote import resolve_limit
+baseline = check_baseline(root)
+assert baseline["source_ref"] == source
+assert baseline["baseline_version"] == "1.1.0"
+assert len(baseline["sources"]) == 63
+fleet, candidates = load_fleet_manifest(), load_candidates()
+assert candidates and not set(candidates).intersection(fleet.mechs)
+assert resolve_limit("claw", "CultureBotAI/culturebotai-claw") == (25, "default")
+try:
+    resolve_limit("claw", "Other/Repository")
+except WorkflowError:
+    pass
+else:
+    raise AssertionError("Wrong control-plane identity was admitted")
+for key, candidate in candidates.items():
+    try:
+        resolve_limit(key, candidate["github"])
+    except FleetManifestError:
+        pass
+    else:
+        raise AssertionError("Preparation candidate entered fleet PR-maintenance scope")
+for key, mech in fleet.mechs.items():
+    limit, origin = resolve_limit(key, mech.github)
+    assert limit == (25 if mech.open_pr_limit is None else mech.open_pr_limit)
+    assert origin == ("default" if mech.open_pr_limit is None else "manifest")
+assert git("rev-parse", "HEAD").decode().strip() == head
+assert not git("status", "--porcelain=v1", "--untracked-files=all")
+print(json.dumps({"head": head, "source_commit": source, "baseline_authorities": 63,
+                  "candidate_scope_refusals": len(candidates),
+                  "fleet_limit_checks": len(fleet.mechs),
+                  "controller_identity_refusal": True, "baseline_check": "PASS",
+                  "helper_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+                  "runtime_authority": False, "source_unchanged": True}, indent=2, sort_keys=True))
