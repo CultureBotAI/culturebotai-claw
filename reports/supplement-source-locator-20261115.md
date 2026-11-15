@@ -63,6 +63,20 @@ tests use the closed generated schema and its declared JSON Schema dialect.
 Immutable command receipts are under `.temp/supplement-schema-20261115/`,
 produced by `scripts/adhoc/run_supplement_schema_checks_20261115.py`.
 
+The initial hosted run stopped before pytest because the reusable Mech baseline
+still named the old schema and manifest hashes. The finding is retained under
+[issue 1220](https://github.com/CultureBotAI/culturebotai-claw/issues/1220#issuecomment-6903236255),
+with failed CI log SHA256
+`436188e66a00ef71774bade9be1677654f0cd3ad11d31aec598d3487b94d954c`.
+Native `template_cli refresh` planning, application and `check-baseline` all
+produced the same verified document, SHA256
+`8c45a124efbd11c4b84873d763a66f9fdbc2490da2d74fb35c04631c2f531526`.
+Only its source commit and the two changed authority hashes differ. The source
+is the independently reviewed schema commit `75ce01bdd326ce74278bc2bbcde7f78f002eb803`.
+The initial gate was not waived; the final hosted run remains required.
+All 33 focused baseline/template/source-fetch regressions passed in 40.25 seconds,
+raw log SHA256 `da2afe09358fef40141f28354bb7d6cc5c1c9336dec61587c5e8f7802e3cef51`.
+
 No consumer pin or deployed environment changes in this branch. CommunityMech
 adoption must synchronize the governed artifact and exact Claw pin, add its
 EvidenceItem slot, pin the reviewed validator, retain the private catalog and
