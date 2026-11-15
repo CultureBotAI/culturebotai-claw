@@ -8,13 +8,15 @@ without a live Terminal, agent, provider, or network service.
 """
 from __future__ import annotations
 
-import copy
 import hashlib
+import importlib.util
 import json
 import os
 import re
 import shlex
 import time
+import uuid
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
@@ -26,7 +28,16 @@ from kg_microbe_workflows.port_pressure import (
     parse_lsof,
     record_restart,
 )
+from kg_microbe_workflows.port_pressure_identity import (
+    validate_live_identity,
+    validate_registration,
+)
 from kg_microbe_workflows.port_pressure_tasks import blocked_tasks
+
+_BINDINGS_SPEC = importlib.util.spec_from_file_location(
+    "port_pressure_approval_bindings", Path(__file__).with_name("mech_approval_bindings.py"))
+bindings = importlib.util.module_from_spec(_BINDINGS_SPEC)
+_BINDINGS_SPEC.loader.exec_module(bindings)
 
 UUID = r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}"
 # Same prompt vocabulary as XMechBay's mac-orchestration guard, with native agy
@@ -69,6 +80,13 @@ def log_conversation(text):
     ids = set(re.findall(
         r'(?:conversation_id|conversationId|Conversation ID)["\s]*[=:]\s*["\']?(' + UUID + ')',
         text,
+    ))
+    # A current owned native server uses this complete structured line. Do not
+    # accept tool text/quoted examples, partial IDs, or choose among identities.
+    ids.update(re.findall(
+        r'^I[0-9]{4} [0-9:.]+\s+[0-9]+ server\.go:[0-9]+\] '
+        r'GetConversationDetail: found conversation (' + UUID + r') \(active=(?:true|false)\)\s*$',
+        text, re.M,
     ))
     require(len(ids) == 1, "PID-owned log conversation ID missing or ambiguous")
     return ids.pop().lower()
@@ -119,14 +137,20 @@ def process_table(text):
 
 
 class NativeTransport:
-    def __init__(self, supervisor, *, clock=time.time, sleep=time.sleep):
+    def __init__(self, supervisor, *, clock=time.time, sleep=time.sleep, binding_adapter=None):
         self.s = supervisor
+        self.binding_adapter = binding_adapter or bindings
         self.clock = clock
         self.sleep = sleep
         self.helpers = supervisor._port_pressure_helpers
         self.before_quit = None
         self.binding_plan = None
         self.boundary = None
+        self.registration = None
+        self.identity_before = None
+        self.identity_after = None
+        self.binding_lease_held = False
+        self.attempt_dir = None
         self.excluded_repository_keys = ()
 
     def run(self, args, **kwargs):
@@ -239,6 +263,107 @@ class NativeTransport:
                                            int(limits[0]), int(limits[1]))
         return measurement, [self.observe(t, processes) for t in self.s.config["targets"]]
 
+    def registered_identity(self, target):
+        """Read a reviewed registration, never infer launch selectors from labels."""
+        value = target.get("port_pressure_identity")
+        require(isinstance(value, dict), "restart registration is unconfigured")
+        evidence = value.get("evidence", {})
+        path = Path(evidence.get("path", ""))
+        require(path.is_absolute() and path.resolve() == path and not path.is_symlink()
+                and path.is_file() and path.stat().st_size <= 1024 * 1024,
+                "restart registration evidence path is unsafe or unavailable")
+        try:
+            return validate_registration(value, target=target, evidence_bytes=path.read_bytes())
+        except ValueError as error:
+            raise GuardError(str(error)) from error
+
+    def executable_digest(self, registration):
+        executable = Path(registration["agy_executable"])
+        require(executable.is_absolute() and executable.resolve() == executable
+                and not executable.is_symlink() and executable.is_file()
+                and os.access(executable, os.X_OK), "registered agy executable is unavailable")
+        before = executable.stat()
+        digest = raw_hash(executable)
+        after = executable.stat()
+        require((before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns)
+                == (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns),
+                "executable changed while hashing")
+        require(digest == registration["executable_sha256"], "registered executable bytes changed")
+        return digest
+
+    def verify_restart_identity(self, target, screen):
+        registration = self.registered_identity(target)
+        if self.registration is not None:
+            require(registration == self.registration, "restart registration changed during transaction")
+        digest = self.executable_digest(registration)
+        text = self.run(["/usr/sbin/lsof", "-a", "-p", str(target["pid"]), "-d", "txt", "-Fn"]).stdout
+        require(any(line == "n" + registration["agy_executable"] for line in text.splitlines()),
+                "registered executable differs from running agy")
+        command = self.run(["/bin/ps", "-ww", "-p", str(target["pid"]), "-o", "command="]).stdout.strip()
+        # macOS ps has no argument boundaries. Restrict this supported form to
+        # four whitespace-free tokens; do not guess quoting or hidden defaults.
+        argv = command.split()
+        require(len(argv) == 4 and argv[2].startswith("--model=") and argv[3].startswith("--effort="),
+                "current exact CLI model/effort arguments are unproven")
+        model = model_evidence(screen, registration)
+        live = {"pid": target["pid"], "process_identity": target["process_identity"],
+                "native_session_id": target["native_session_id"], "tty": target["tty"],
+                "cwd": str(self.s.notifier.process_cwd(target["pid"])),
+                "agy_executable": registration["agy_executable"], "executable_sha256": digest,
+                "argv": argv, "model": argv[2].partition("=")[2], "effort": argv[3].partition("=")[2],
+                "model_label": model["model_label"], "effort_label": model["effort_label"]}
+        try:
+            validate_live_identity(registration, target=target, observation=live)
+        except ValueError as error:
+            raise GuardError(str(error)) from error
+        require(self.s.notifier.live_process(target["pid"])["identity"] == target["process_identity"],
+                "process identity changed during registration check")
+        self.registration = registration
+        return live
+
+    def attempt_event(self, name, data):
+        if self.attempt_dir is not None:
+            bindings.create(self.attempt_dir / (name + ".json"), bindings.encoded(data))
+
+    def preserve_attempt(self):
+        """Durably retain exact pre-state before /quit can reach Terminal."""
+        root = bindings.safe(self.s.runtime / "port-pressure-attempts", directory=True)
+        root.mkdir(mode=0o700, exist_ok=True)
+        bindings.sync_dir(root.parent)
+        directory = root / uuid.uuid4().hex
+        directory.mkdir(mode=0o700)
+        bindings.sync_dir(root)
+        manifest = {"version": 1, "created_at": self.clock(), "state": "prepared",
+                    "identity": self.identity_before, "registration": self.registration,
+                    "boundary": self.boundary, "before_observation": self.before_quit,
+                    "bindings": {}}
+        for index, (path, raw) in enumerate(self.binding_plan["before"].items()):
+            name = "%02d-before" % index
+            bindings.create(directory / name, raw)
+            manifest["bindings"][path] = {"file": name, "sha256": hashlib.sha256(raw).hexdigest()}
+        evidence = self.registration["evidence"]
+        raw = Path(evidence["path"]).read_bytes()
+        require(hashlib.sha256(raw).hexdigest() == evidence["sha256"], "registration evidence changed before quit")
+        bindings.create(directory / "registration-evidence.json", raw)
+        bindings.create(directory / "prepared.json", bindings.encoded(manifest))
+        self.attempt_dir = directory
+
+    @contextmanager
+    def transaction_lease(self):
+        require(self.binding_plan is not None, "binding preflight missing")
+        with self.binding_adapter.rebind_lease(self.binding_plan):
+            self.binding_lease_held = True
+            try:
+                self.preserve_attempt()
+                yield
+            except BaseException as error:
+                self.attempt_event("failed", {"at": self.clock(), "error": str(error)[:500]})
+                raise
+            else:
+                self.attempt_event("finished", {"at": self.clock()})
+            finally:
+                self.binding_lease_held = False
+
     def preflight(self, target):
         current = self.observe(target)
         require(current["idle"] and current["verified_identity"], "session no longer verified idle")
@@ -254,14 +379,18 @@ class NativeTransport:
             if self.boundary.get("completion_authority") == "verified_receipt_override":
                 allowed.add("active")
             require(observed.get("goal_state") in allowed, "completed goal state changed before boundary recycle")
-        identity = target["port_pressure_identity"]
-        executable = Path(identity["agy_executable"])
-        require(executable.is_absolute() and executable.is_file() and os.access(executable, os.X_OK),
-                "agy executable is unavailable")
-        text = self.run(["/usr/sbin/lsof", "-a", "-p", str(target["pid"]), "-d", "txt", "-Fn"]).stdout
-        require(any(Path(line[1:]).resolve() == executable.resolve() for line in text.splitlines()
-                    if line.startswith("n")), "configured executable differs from running agy")
-        self.binding_plan = binding_plan(self.s, target, self.helpers["read_json"])
+        policy = self.s.config.get("port_pressure", {}).get("restart_policy", "goal_boundary_or_idle")
+        require(policy != "goal_boundary_only" or self.boundary is not None,
+                "goal-boundary-only restart requires a verified boundary")
+        self.identity_before = self.verify_restart_identity(target, current["observation"]["tab"]["screen"])
+        if self.binding_lease_held:
+            self.binding_adapter.check_before(self.binding_plan)
+        else:
+            old_plan = binding_plan(self.s, target, self.helpers["read_json"])
+            controller = self.s.config.get("port_pressure", {}).get("controller_config_path")
+            require(isinstance(controller, str), "resident binding reload controller is unconfigured")
+            self.binding_plan = self.binding_adapter.prepare_rebind(controller, [str(i["path"]) for i in old_plan], target,
+                                                        now=self.clock, input_lock_dir=self.s.config["input_lock_dir"])
         self.before_quit = current
         return current
 
@@ -269,12 +398,16 @@ class NativeTransport:
         # Last acquisition of all three IDs is the penultimate operation. The
         # final interaction is /quit; there is no status message or goal replay.
         current = self.preflight(target)
+        require(self.binding_lease_held, "binding lifecycle lease is required before quit")
         tab = current["observation"]["tab"]
+        self.attempt_event("quit-authorized", {"at": self.clock(), "identity": self.identity_before,
+                                               "observation": current})
         result = self.s.notifier.jxa(self.helpers["send_js"], {
             **tab, "pid": target["pid"], "identity": target["process_identity"],
             "cwd": target["root"], "message": "/quit",
         })
         require(result == "sent", "guarded /quit was not confirmed")
+        self.attempt_event("quit-confirmed", {"at": self.clock()})
 
     def wait_exit(self, target, timeout):
         deadline = self.clock() + timeout
@@ -300,6 +433,7 @@ class NativeTransport:
                         "returned shell cwd changed")
                 shell["identity"] = self.run(["/bin/ps", "-p", str(shell["pid"]), "-o",
                                               "pid=,tty=,lstart=,comm="]).stdout.strip()
+                self.attempt_event("exit-verified", {"at": self.clock(), "tab": tab, "shell": shell})
                 return {"tab": tab, "shell": shell}
             if result.stdout.strip():
                 require(result.stdout.strip() == target["process_identity"], "old PID reused or identity changed")
@@ -326,13 +460,19 @@ class NativeTransport:
         ]).stdout.splitlines() if re.search(r"(?:^|\s)agy$", line.strip()))
         require({int(line.split()[0]) for line in inventory} == {p["pid"] for p in peers},
                 "agy process inventory changed during resume checks")
+        registration = self.registered_identity(target)
+        require(self.registration is not None and registration == self.registration,
+                "restart registration changed before resume")
+        self.executable_digest(registration)
         args = [identity["agy_executable"], "--conversation=" + target["native_session_id"],
                 "--model=" + identity["model"], "--effort=" + identity["effort"]]
+        self.attempt_event("resume-authorized", {"at": self.clock(), "argv": args, "registration": registration})
         result = self.s.notifier.jxa(self.helpers["send_js"], {
             **tab, "pid": shell["pid"], "identity": shell["identity"],
             "cwd": target["root"], "message": shlex.join(args), "agy_inventory": inventory,
         })
         require(result == "sent", "guarded explicit-ID resume was not confirmed")
+        self.attempt_event("resume-confirmed", {"at": self.clock()})
 
     def wait_resumed(self, target, timeout):
         deadline = self.clock() + timeout
@@ -376,11 +516,14 @@ class NativeTransport:
                     resumed_model = model_evidence(
                         observed["observation"]["tab"]["screen"], target.get("port_pressure_identity"))
                     require(resumed_model == self.before_quit["model_evidence"], "model or effort changed")
+                    self.identity_after = self.verify_restart_identity(
+                        updated, observed["observation"]["tab"]["screen"])
                     result = self.sockets(pid, listen=True)
                     sockets = parse_lsof(result["stdout"], returncode=result["returncode"], stderr=result["stderr"])
                     require(sum(s["state"] == "LISTEN" and s["loopback"] for s in sockets) == 2,
                             "resumed listener count is not exactly 2")
                     require(self.s.notifier.live_process(pid) == live, "resumed process changed after listener check")
+                    self.attempt_event("resumed-verified", {"at": self.clock(), "identity": self.identity_after})
                     return {"pid": pid, "tty": live["tty"], "process_identity": live["identity"],
                             "started": live["started"], "listeners": 2}
             self.sleep(0.25)
@@ -395,7 +538,13 @@ class NativeTransport:
         tab = current["observation"]["tab"]
         require(all(tab[key] == original[key] for key in ("window", "tab", "tty")),
                 "owned Terminal binding changed before rebind")
-        apply_bindings(self.s, target, new, self.binding_plan, self.helpers)
+        require(self.binding_lease_held, "binding lifecycle lease is required for rebind")
+        self.identity_after = self.verify_restart_identity(updated, tab["screen"])
+        receipt = apply_bindings(self.s, target, new, self.binding_plan, self.helpers,
+                       evidence={"before_identity": self.identity_before, "after_identity": self.identity_after,
+                                 "boundary": self.boundary, "attempt_directory": str(self.attempt_dir)},
+                       sleep=self.sleep, binding_adapter=self.binding_adapter)
+        self.attempt_event("rebind-acknowledged", {"at": self.clock(), "receipt": receipt})
 
 
 def binding_plan(supervisor, target, read_json):
@@ -427,26 +576,11 @@ def binding_plan(supervisor, target, read_json):
     return list(plan.values())
 
 
-def apply_bindings(supervisor, target, new, plan, helpers):
-    require(bool(plan), "binding preflight missing")
-    for item in plan:
-        require(raw_hash(item["path"]) == item["hash"], "binding changed during restart")
-    journal = {"state": "prepared", "old_pid": target["pid"], "new_pid": new["pid"],
-               "files": [{"path": str(i["path"]), "before_sha256": i["hash"], "roles": i["roles"]} for i in plan]}
-    supervisor.write(supervisor.runtime / "port-pressure-rebind.json", journal)
-    for item in plan:
-        require(raw_hash(item["path"]) == item["hash"], "binding changed before replacement")
-        data = copy.deepcopy(item["data"])
-        rows = data.get("targets") if isinstance(data, dict) else data
-        row = rows[item["index"]]
-        row.update(pid=new["pid"], tty=new["tty"])
-        for field in ("identity", "process_identity"):
-            if field in row:
-                row[field] = new["process_identity"]
-        if "started" in row:
-            row["started"] = new["started"]
-        helpers["atomic_json"](item["path"], data)
-        require(helpers["read_json"](item["path"]) == data, "binding replacement read-back failed")
+def apply_bindings(supervisor, target, new, plan, helpers, *, evidence=None, sleep=time.sleep, binding_adapter=None):
+    """Complete only after the existing resident controller adopts exact bytes."""
+    adapter = binding_adapter or bindings
+    receipt = adapter.install_rebind(plan, new, evidence=evidence)
+    completed = adapter.await_rebind(plan, receipt, sleep=sleep)
     old_pid = target["pid"]
     target.update(pid=new["pid"], tty=new["tty"], process_identity=new["process_identity"])
     supervisor.native_cache.pop(target["repository_key"], None)
@@ -456,8 +590,7 @@ def apply_bindings(supervisor, target, new, plan, helpers):
                                       "tty": new["tty"], "listeners": new["listeners"],
                                       "conversation_id": target["native_session_id"]}
     supervisor.write(status_path, status)
-    journal["state"] = "complete"
-    supervisor.write(supervisor.runtime / "port-pressure-rebind.json", journal)
+    return completed
 
 
 class PortPressureGuard:
@@ -465,7 +598,7 @@ class PortPressureGuard:
         self.s = supervisor
         self.clock = clock
         raw = supervisor.config.get("port_pressure", {"mode": "off"})
-        self.config = normalize_config({k: v for k, v in raw.items() if k != "binding_files"})
+        self.config = normalize_config({k: v for k, v in raw.items() if k not in {"binding_files", "controller_config_path"}})
         allowed = self.config["restart_repository_keys"]
         require(allowed is None or set(allowed) <= {target["repository_key"] for target in supervisor.config["targets"]},
                 "restart_repository_keys contains an unconfigured target")
@@ -512,20 +645,21 @@ class PortPressureGuard:
                 old_pid = target["pid"]
                 with helpers["file_lock"](Path(self.s.config["input_lock_dir"]) / (Path(target["tty"]).name + ".lock")):
                     self.transport.preflight(target)
-                    require(not self.s.stopping(), "supervisor stop requested")
-                    state["inflight"] = {"repository_key": target["repository_key"], "pid": old_pid,
-                                         "conversation_id": target["native_session_id"], "started_at": self.clock()}
-                    self.s.write(self.state_path, state)
-                    self.transport.quit(target)
-                    returned = self.transport.wait_exit(target, 30)
-                    require(not self.s.stopping(), "supervisor stop requested after exit")
-                    self.transport.resume(target, returned)
-                    new = self.transport.wait_resumed(target, 45)
-                    self.transport.rebind(target, new)
-                    state.pop("inflight", None)
-                    state = record_restart(state, target["repository_key"], old_pid, new["pid"], now=self.clock())
-                    self.s.write(self.state_path, state)
-                    report.update(phase="restarted", old_pid=old_pid, new_pid=new["pid"], listeners=new["listeners"])
+                    with self.transport.transaction_lease():
+                        require(not self.s.stopping(), "supervisor stop requested")
+                        state["inflight"] = {"repository_key": target["repository_key"], "pid": old_pid,
+                                             "conversation_id": target["native_session_id"], "started_at": self.clock()}
+                        self.s.write(self.state_path, state)
+                        self.transport.quit(target)
+                        returned = self.transport.wait_exit(target, 30)
+                        require(not self.s.stopping(), "supervisor stop requested after exit")
+                        self.transport.resume(target, returned)
+                        new = self.transport.wait_resumed(target, 45)
+                        self.transport.rebind(target, new)
+                        state.pop("inflight", None)
+                        state = record_restart(state, target["repository_key"], old_pid, new["pid"], now=self.clock())
+                        self.s.write(self.state_path, state)
+                        report.update(phase="restarted", old_pid=old_pid, new_pid=new["pid"], listeners=new["listeners"])
             except Exception as error:
                 reason = str(error)[:500]
                 if not self.disable_path.exists() and not self.disable_path.is_symlink():

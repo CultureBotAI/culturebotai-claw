@@ -5,7 +5,7 @@ argument-hint: '[ "curate" | "enrich" | "sync" | "status" | "kill" | <QUESTION> 
 category: orchestration
 requires_database: false
 requires_internet: true
-version: 1.0.0
+version: 1.1.0
 tags: [orchestration, parallel, worktree, tmux, multi-repo, agents, boss, fleet]
 ---
 
@@ -26,7 +26,7 @@ worktree. Repository locks protect only short shared metadata transitions.
 - Workers inherit CLAUDE.md and all skills — one-line prompts suffice
 - Workers edit only their isolated branch and do not hold a repo lock while
   running commands that may invoke repository hooks
-- Boss does not merge PRs without human confirmation (@marcin reviews)
+- Boss does not merge PRs without human confirmation
 
 ---
 
@@ -69,8 +69,14 @@ session observability, or manual worktree lifecycle is required.
 
 ## Mode B — External tmux Agents
 
-For long-running or observable tasks. Each agent runs in its own tmux session
-with its own worktree under the durable `FLEET_WORKTREE_ROOT`.
+Tmux is the default for persistent external Mech sessions. Each task worker runs
+in its own session and worktree under the durable `FLEET_WORKTREE_ROOT`.
+In-process agents retain Mode A's lifecycle. Follow the
+[session standard](../../../docs/guides/MECH_TEMPLATE.md#persistent-agent-sessions)
+for host/socket identity, GUI-origin servers and exact-thread migrations.
+The dispatcher owns these workers; a host controller may observe them without
+acquiring permission to send input or terminate them. Terminal windows are
+optional attached views, not additional workers.
 Verify the orchestration repository ignores `.temp/` before creating state.
 For an authorized separate clone, use `~/agent-work/<repo>/`. Never use
 `/tmp/`, `/private/tmp/` or `$TMPDIR` for campaigns, worktrees or handoffs.
@@ -124,13 +130,13 @@ test -s "$PROMPT_FILE" || { echo "Prompt file is empty" >&2; exit 2; }
 PROMPT_FILES=("$PROMPT_FILE")
 
 paste_prompt_file() {
-  session=$1
+  pane=$1
   prompt_file=$2
   test -s "$prompt_file" || { echo "Prompt file is empty" >&2; return 2; }
-  buffer_name="boss-${session}-$$"
-  tmux load-buffer -b "$buffer_name" "$prompt_file"
-  tmux paste-buffer -b "$buffer_name" -d -t "$session"
-  tmux send-keys -t "$session" Enter
+  buffer_name="boss-${pane#%}-$$"
+  fleet_tmux load-buffer -b "$buffer_name" "$prompt_file"
+  fleet_tmux paste-buffer -b "$buffer_name" -d -t "$pane"
+  fleet_tmux send-keys -t "$pane" Enter
 }
 ```
 
@@ -241,26 +247,29 @@ have an owner-token bypass. Isolation—not a long lease—protects worker edits
 
 ### Dispatch a worker
 
-Inventory the existing server before creating a worktree. A missing local server
-means there are no sessions to inspect; other inventory errors stop dispatch.
-On the M5, run boss inside its existing GUI-origin `mechs` server as the contract
-requires; a missing `mechs` server is a setup error there, not permission to start
-one over ssh. The inventory commands below do not start a tmux server or GUI app.
+Set `BOSS_TMUX_BIN` to the selected host's tmux executable and `BOSS_TMUX_SOCKET`
+to its existing server's absolute socket path. Run on that host. Inventory that
+server before creating a worktree; every inventory error stops dispatch. A
+missing server must be provisioned in the appropriate login context separately.
+Do not silently use the default socket or start a new server over SSH. The
+commands below do not create a server or a GUI application.
 
 ```bash
+test -n "${BOSS_TMUX_BIN:-}" || { echo "Set BOSS_TMUX_BIN" >&2; exit 2; }
+case "${BOSS_TMUX_SOCKET:-}" in
+  /*) ;;
+  *) echo "Set an absolute BOSS_TMUX_SOCKET" >&2; exit 2 ;;
+esac
+fleet_tmux() { "$BOSS_TMUX_BIN" -N -S "$BOSS_TMUX_SOCKET" "$@"; }
+
 # 1. Inventory the existing server before creating a task directory or worktree
-if SESSION_NAMES="$(tmux list-sessions -F '#S' 2>&1)"; then
+if SESSION_NAMES="$(fleet_tmux list-sessions -F '#S' 2>&1)"; then
   printf '%s\n' "$SESSION_NAMES"
 else
-  case "$SESSION_NAMES" in
-    'no server running on '*|'error connecting to '*' (No such file or directory)')
-      SESSION_NAMES="" ;;
-    *) printf 'Cannot inventory tmux sessions: %s\n' "$SESSION_NAMES" >&2; exit 1 ;;
-  esac
+  printf 'Cannot inventory selected tmux server: %s\n' "$SESSION_NAMES" >&2
+  exit 1
 fi
-if printf '%s\n' "$SESSION_NAMES" | grep -Fxq -- mechs; then
-  tmux list-windows -t '=mechs' -F '#I #W'
-fi
+fleet_tmux list-panes -a -F '#{session_name}|#{window_id}|#{pane_id}|#{pane_pid}|#{pane_tty}|#{pane_current_path}'
 TASK_DIR="$(mktemp -d "$FLEET_WORKTREE_ROOT/${SLUG}.XXXXXX")"
 WORKTREE="$TASK_DIR/worktree"
 TASK_ID="$(printf '%s' "${TASK_DIR##*.}" | LC_ALL=C tr '[:upper:]' '[:lower:]')"
@@ -279,18 +288,34 @@ run_locked_command "create-$SLUG" 300 \
 BASE_SHA="$(git -C "$WORKTREE" rev-parse HEAD)"
 test "$BASE_SHA" = "$(git -C "$REPO" rev-parse origin/main)"
 
-# 2. Start a new session; no -A flag, so a concurrent name collision still fails
-tmux new-session -d -s "$SESSION" -c "$WORKTREE"
+# 2. Launch plain Claude with normal permissions and no active repo lock.
+# -N prevents a replacement server if the inventoried server disappears.
+# No -A flag: a concurrent session-name collision must fail. The bootstrap
+# retains failed panes before entering the worktree or starting the agent.
+PANE="$(fleet_tmux new-session -d -s "$SESSION" -n primary -c "$WORKTREE" \
+  -P -F '#{pane_id}' /bin/sh -c \
+  '"$1" -N -S "$2" set-option -p -t "$TMUX_PANE" remain-on-exit on && cd -- "$3" && exec claude' \
+  sh "$BOSS_TMUX_BIN" "$BOSS_TMUX_SOCKET" "$WORKTREE")"
 
-# 3. Launch plain Claude with its normal permissions and no active repo lock.
-# The command is fixed and contains no task text.
-tmux send-keys -t "$SESSION" -l -- "claude"
-tmux send-keys -t "$SESSION" Enter
-
-# 4. Wait for prompt to appear (~3-5s), then deliver task
+# 3. Inspect the exact pane before delivering task input.
 sleep 4
-tmux capture-pane -t "$SESSION" -p | tail -5
-paste_prompt_file "$SESSION" "$PROMPT_FILE"
+fleet_tmux capture-pane -t "$PANE" -p | tail -5
+```
+
+Before the task paste, verify the native process's actual cwd and the agent's
+thread identity, then retain the host/socket/session/window/pane binding in
+private task records. A pane PID may identify the launcher rather than the
+native agent. Stop on a draft, permission question, trust/sign-in screen or
+unrecognized input state. The new-session command starts a fresh task worker;
+it is not an exact-thread migration command. A failed startup leaves its pane
+for inspection; inspect that failure instead of sending a task to it. The
+noninteractive `/bin/sh` bootstrap sets retention before any fallible agent
+startup, and receives executable, socket and cwd as literal arguments.
+
+Only after the native identity and ready input have been verified:
+
+```bash
+paste_prompt_file "$PANE" "$PROMPT_FILE"
 ```
 
 ---
@@ -342,21 +367,21 @@ tmux session with its normal permission model and no active repository lease.
 #### Verify the prompt window appeared
 
 ```bash
-tmux capture-pane -t "$SESSION" -p | tail -5
+fleet_tmux capture-pane -t "$PANE" -p | tail -5
 # Should show claude TUI with input prompt, not a shell prompt
 ```
 
 #### Deliver the task prompt
 
 ```bash
-paste_prompt_file "$SESSION" "$PROMPT_FILE"
+paste_prompt_file "$PANE" "$PROMPT_FILE"
 ```
 
 #### Verify the task landed
 
 ```bash
 sleep 3
-tmux capture-pane -t "$SESSION" -p | tail -10
+fleet_tmux capture-pane -t "$PANE" -p | tail -10
 # Should show the agent processing the task, not waiting at input
 ```
 
@@ -364,7 +389,7 @@ If the prompt did not land, confirm the TUI is at its input first, then paste
 the same file again:
 
 ```bash
-paste_prompt_file "$SESSION" "$PROMPT_FILE"
+paste_prompt_file "$PANE" "$PROMPT_FILE"
 ```
 
 ---
@@ -373,13 +398,13 @@ paste_prompt_file "$SESSION" "$PROMPT_FILE"
 
 ```bash
 # List all sessions
-tmux list-sessions
+fleet_tmux list-sessions
 
 # Watch a specific session (exit with q)
-tmux capture-pane -t "$SESSION" -p -S -50 | tail -30
+fleet_tmux capture-pane -t "$PANE" -p -S -50 | tail -30
 
 # Attach briefly to observe (detach with Ctrl-B D)
-tmux attach -t "$SESSION"
+fleet_tmux attach -t "=$SESSION"
 ```
 
 ---
@@ -395,7 +420,7 @@ chmod 600 "$FOLLOWUP_FILE"
 test -s "$FOLLOWUP_FILE" || { echo "Follow-up file is empty" >&2; exit 2; }
 PROMPT_FILES+=("$FOLLOWUP_FILE")
 # Capture the pane and confirm the Claude input is active before pasting.
-paste_prompt_file "$SESSION" "$FOLLOWUP_FILE"
+paste_prompt_file "$PANE" "$FOLLOWUP_FILE"
 ```
 
 ---
@@ -404,9 +429,9 @@ paste_prompt_file "$SESSION" "$FOLLOWUP_FILE"
 
 Symptoms: session shows repeated failures, confusion, or no output for > 10 min.
 
-1. Capture and read recent output: `tmux capture-pane -t "$SESSION" -p -S -100 | tail -50`
+1. Capture and read recent output: `fleet_tmux capture-pane -t "$PANE" -p -S -100 | tail -50`
 2. **Nudge once**: create another private file, append it to `PROMPT_FILES`,
-   and use `paste_prompt_file "$SESSION" "$NUDGE_FILE"` after confirming the
+   and use `paste_prompt_file "$PANE" "$NUDGE_FILE"` after confirming the
    input is active:
 
    ```bash
@@ -415,7 +440,7 @@ Symptoms: session shows repeated failures, confusion, or no output for > 10 min.
    "${EDITOR:?Set EDITOR to create the nudge}" "$NUDGE_FILE"
    test -s "$NUDGE_FILE" || { echo "Nudge file is empty" >&2; exit 2; }
    PROMPT_FILES+=("$NUDGE_FILE")
-   paste_prompt_file "$SESSION" "$NUDGE_FILE"
+   paste_prompt_file "$PANE" "$NUDGE_FILE"
    ```
 
 3. If still stuck after one nudge: flag to user with session name, symptom, proposed fix
@@ -425,7 +450,7 @@ Symptoms: session shows repeated failures, confusion, or no output for > 10 min.
 
 ## PR Follow-Through
 
-**A PR opened is NOT completion.** PRs are reviewed by @marcin (human review — no automated
+**A PR opened is NOT completion.** PRs receive human review (no automated
 claude-review bot in CultureBotAI repos). A task is done when:
 - PR is opened with passing validation
 - Human has reviewed and approved
@@ -535,8 +560,8 @@ else
   test "$remote_status" -eq 2 || exit "$remote_status"
 fi
 
-if tmux has-session -t "$SESSION" 2>/dev/null; then
-  tmux kill-session -t "$SESSION"
+if fleet_tmux has-session -t "=$SESSION" 2>/dev/null; then
+  fleet_tmux kill-session -t "=$SESSION"
 fi
 run_locked_command "remove-$SLUG" 300 \
   git -C "$REPO" worktree remove "$WORKTREE"
@@ -610,13 +635,12 @@ apply_pmc_conversions; validate with review-communities; open a PR"
 | Intent | Command |
 |--------|---------|
 | Create worktree | use a unique `TASK_DIR="$(mktemp -d ...)"`, then run `git worktree add` through `run_locked_command` |
-| Start session | `tmux new-session -d -s "$SESSION" -c "$WORKTREE"` |
-| Launch agent | send the fixed literal `claude` command with normal permissions and no active lease |
-| Send task | `paste_prompt_file "$SESSION" "$PROMPT_FILE"` after verifying the TUI |
-| Read output | `tmux capture-pane -t "$SESSION" -p -S -50 \| tail -30` |
-| Attach | `tmux attach -t "$SESSION"` (Ctrl-B D to detach) |
-| List sessions | `tmux list-sessions` |
-| Kill session | `tmux kill-session -t "$SESSION"` after the worker is idle |
+| Start session and agent | Use the dispatch block's explicit server, inner cwd and returned pane ID |
+| Send task | `paste_prompt_file "$PANE" "$PROMPT_FILE"` after verifying the TUI |
+| Read output | `fleet_tmux capture-pane -t "$PANE" -p -S -50 \| tail -30` |
+| Attach | `fleet_tmux attach -t "=$SESSION"` (Ctrl-B D to detach) |
+| List sessions | `fleet_tmux list-sessions` |
+| Kill session | `fleet_tmux kill-session -t "=$SESSION"` after the owned worker is idle |
 | Remove worktree | run `git worktree remove "$WORKTREE"` through `run_locked_command` after merge and clean-state checks |
 | Check locks | use the claw lock-manager status command/API |
 | Release stale lock | use the reviewed lock-manager release path after ownership verification |
@@ -630,7 +654,7 @@ apply_pmc_conversions; validate with review-communities; open a PR"
 | "I'll skip the worktree, just use the repo directly" | No. Multiple agents on the same checkout corrupt each other's state. |
 | "Two agents can share a branch or worktree" | No. Give each a collision-resistant branch and worktree; lock only short shared metadata transitions. |
 | "The prompt says 'in parallel' so I'll use boss" | Only if the user explicitly named boss / tmux / external agents. Otherwise use the Agent tool with `isolation: "worktree"`. |
-| "PR opened = done, tear down now" | No. Wait for human review (@marcin) and merge before cleaning up. |
+| "PR opened = done, tear down now" | No. Wait for human review and merge before cleaning up. |
 | "I'll send follow-ups without checking the agent is at input" | The agent may be mid-execution. Capture the pane first; only send when you see the input prompt. |
 | "I'll modify two repos at once from the same worktree" | No. One worktree = one target repo. Cross-repo tasks get separate isolated branches. |
 | "The worker needs to know about CLAUDE.md rules / validation steps / skill names" | No. Workers inherit CLAUDE.md and all skills automatically. One-line prompts only. |
