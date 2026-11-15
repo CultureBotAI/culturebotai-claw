@@ -1,0 +1,23 @@
+{
+  "scope": "Exact current adopted owner bytes and extracted complete canonical rows; regression evidence only, not scientific approval",
+  "source_MIM_head": "6677f1e1679bec82f5af5e125454d4b7852780e9",
+  "application_sha256": "51fdaa147297eb3df8b1a217b5c956619dc6a160be749b9bd3998555bd4f5465",
+  "owner": {
+    "path": "data/ingredients/mapped/Sodium_Nitrate_070_M_Stock.yaml",
+    "sha256": "0558076ce9eaf3fc1a4b87756bf51018be3e952ed560e21a52bea81aa6ebb111"
+  },
+  "canonical": {
+    "path": "mappings/ingredient_mappings.sssom.tsv",
+    "complete_sha256": "3d9f1ac412209266034319542f225918b78b4e6a8e0658b53ee0689b4fb4dafe",
+    "extracted_data_positions": [
+      2602,
+      2603,
+      2604
+    ],
+    "extracted_sha256": "4e8a3b398d812d14d7b7daf8c62ec0f10a7d069cb0ba4b2e1e9749c4140a00e8"
+  },
+  "issues": [
+    "https://github.com/CultureBotAI/culturebotai-claw/issues/1189",
+    "https://github.com/CultureBotAI/culturebotai-claw/issues/684"
+  ]
+}

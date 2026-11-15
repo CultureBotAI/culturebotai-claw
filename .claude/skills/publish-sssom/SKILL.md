@@ -42,7 +42,7 @@ leaves the previously-published copy untouched.
 ```bash
 just build-sssom
 # or:
-python scripts/build_mim_ingredient_sssom.py --output workspace/reports/mim_ingredient_mappings.sssom.tsv
+python scripts/build_mim_ingredient_sssom.py --identity-mode legacy --output workspace/reports/mim_ingredient_mappings.sssom.tsv
 ```
 
 Scans all MIM ingredient YAMLs with a CHEBI `ontology_id`, emits one
