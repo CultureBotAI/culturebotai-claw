@@ -1,0 +1,89 @@
+{
+  "checkout_head": "e70a97d9cadd4ad5f6924b088aa0d30c95952af9",
+  "source_hashes": {
+    "scripts/adhoc/check_supporting_reference_annotations_20261115.py": "9e5cec9a22ba638e8afc0a2e8cf25498b62661777d03bc0fd199e6bb1dbcf6a6",
+    "pyproject.toml": "51f2423fc9782bd4e41d62c96d053e40d6217885c603e7b19bcb873e010354a7",
+    "uv.lock": "552d42540bce7d9acac0e5391e44e83e70e05586d602952b124a3c856639ab1b",
+    "src/kg_microbe_workflows/__init__.py": "a0a538004a09bc3b386e259de23cfb784742bff0cddfcbea9709b0333f3e18a7"
+  },
+  "started_at": "2026-11-15T03:34:09.204391+00:00",
+  "finished_at": "2026-11-15T03:34:09.750968+00:00",
+  "invocation": "Actual native Typer validate data CLI, --no-full-text, existing Claw isolated LinkML schema loader",
+  "schema_loader": "kg_microbe_workflows._pure_linkml_loader; temporary, locked and restored; no matcher substitution",
+  "target_class": "Dataset",
+  "schema_sha256": "cf32864df1626201128e9311054b075bfc4ad3d8345491ac144122a5d5e67d11",
+  "synthetic_cache_sha256": "4b7568a46016f3d8bc4fb7c375571800d43a13fed332059cca45a04328e6f5c8",
+  "dependencies": {
+    "linkml": "1.11.1",
+    "linkml-reference-validator": "0.2.1"
+  },
+  "cases": [
+    {
+      "case": "control",
+      "native_exit_code": 0,
+      "expected_exit_code": 0,
+      "exception": null,
+      "events": [
+        {
+          "path": "evidence[0].snippet",
+          "reference": "PMID:1",
+          "text": "This synthetic source reports an unchanged cobalt control.",
+          "matcher_calls": 1,
+          "substring_calls": 1,
+          "loaded_reference_id": "PMID:1",
+          "matched": true
+        }
+      ],
+      "record_sha256": "d046e362c0eb9201669854580fdc0363711f445c5a389c9489dfc1900630637b",
+      "log_sha256": "6bf5d8c3ed095e60e0ff8f8c06ac6fdb5c760f7194a913e2f38c49edc0920980",
+      "log_bytes": 299,
+      "passed": true
+    },
+    {
+      "case": "mutation",
+      "native_exit_code": 1,
+      "expected_exit_code": 1,
+      "exception": null,
+      "events": [
+        {
+          "path": "evidence[0].snippet",
+          "reference": "PMID:1",
+          "text": "ZZQQ_UNSUPPORTED_SUPPORTING_REFERENCE_CANARY_XYZ",
+          "matcher_calls": 1,
+          "substring_calls": 1,
+          "loaded_reference_id": "PMID:1",
+          "matched": false
+        }
+      ],
+      "record_sha256": "54bd467e6a8ac2e8751754b8be789e795d8242fd1a3c3a028c18fc8cfab16a9f",
+      "log_sha256": "399f21aa343e2c05d1d3e1c5b58f7ef6b0a557daf35a5d2963cece52be6d295f",
+      "log_bytes": 508,
+      "passed": true
+    },
+    {
+      "case": "restoration",
+      "native_exit_code": 0,
+      "expected_exit_code": 0,
+      "exception": null,
+      "events": [
+        {
+          "path": "evidence[0].snippet",
+          "reference": "PMID:1",
+          "text": "This synthetic source reports an unchanged cobalt control.",
+          "matcher_calls": 1,
+          "substring_calls": 1,
+          "loaded_reference_id": "PMID:1",
+          "matched": true
+        }
+      ],
+      "record_sha256": "d046e362c0eb9201669854580fdc0363711f445c5a389c9489dfc1900630637b",
+      "log_sha256": "dc3e6a450aecf286d618387671257fcf2d33e248c3f0ff4ad68dec721b603445",
+      "log_bytes": 303,
+      "passed": true
+    }
+  ],
+  "refused_operations": [],
+  "inputs_unchanged": true,
+  "passed": true,
+  "limit": "Synthetic lexical coverage control; no scientific support or downstream rollout claim."
+}
