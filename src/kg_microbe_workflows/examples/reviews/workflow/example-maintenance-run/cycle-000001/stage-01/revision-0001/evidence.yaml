@@ -1,0 +1,58 @@
+schema_version: 2.0.0
+parent_version: 2.1.0
+stage_key: open_issue_triage
+repository_key: traitmech
+github_repository: CultureBotAI/TraitMech
+run_id: example-maintenance-run
+cycle: 1
+stage: 1
+revision: 1
+outcome: no_findings
+summary: Illustrative empty outcome, not a live completed goal.
+source_revision: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+scope_frozen_at: '2026-11-15T10:00:00Z'
+artifacts:
+- path: reviews/workflow/example-maintenance-run/cycle-000001/stage-01/revision-0001/issue_inventory.json
+  sha256: 43d019948b179f8df1f46c9c1d3bf55423ecb4044c58c15ba9850a891084d974
+  kind: issue_inventory
+- path: reviews/workflow/example-maintenance-run/cycle-000001/stage-01/revision-0001/pr_inventory.json
+  sha256: c05793477d4f71c7cde376066cbee1e98ca511689e3e9d69897588a27d47922d
+  kind: pr_inventory
+- path: reviews/workflow/example-maintenance-run/cycle-000001/stage-01/revision-0001/pr_dispositions.json
+  sha256: 4e2278fbbd5986be550957184d0f26569eeeba33fc8f819df247e65136ece37a
+  kind: pr_dispositions
+- path: reviews/workflow/example-maintenance-run/cycle-000001/stage-01/revision-0001/issue_groups.json
+  sha256: 4ea5e45828cc630698c2b6dd78dec2319daead3354f31c205ee1912a8652faf2
+  kind: issue_groups
+- path: reviews/workflow/example-maintenance-run/cycle-000001/stage-01/revision-0001/group_plans.json
+  sha256: b64c0e49d0efd3c2fcaaa3ee263b0ec157ae142658b437686885d95bc90e3f09
+  kind: group_plans
+- path: reviews/workflow/example-maintenance-run/cycle-000001/stage-01/revision-0001/dispositions.json
+  sha256: 10825bbad6beb4ffd80d07f8aa6d6b21a0024905da069d2cada279b2065cbec3
+  kind: dispositions
+- path: reviews/workflow/example-maintenance-run/cycle-000001/stage-01/revision-0001/validation.json
+  sha256: c9fcef0283be5b402687c51a1e75159a3191524b559457c2e35c0f2ec9bc62e7
+  kind: validation
+findings: []
+groups: []
+carry_forward_ids: []
+infra_tasks: []
+issue_triage:
+  inventory: []
+  groups: []
+  group_plans: []
+  dispositions: []
+  carry_forward_group_ids: []
+  budget:
+    limit_seconds: 14400
+    selected_group_ids: []
+    work_intervals: []
+    unused_reason: Illustrative empty frozen inventory; no live triage occurred.
+pr_maintenance:
+  frozen_at: '2026-11-15T10:00:01Z'
+  inventory: []
+  dispositions: []
+  shared_check_fixes: []
+  open_non_draft_limit: 25
+  limit_source: default
+  remaining_open_non_draft: []

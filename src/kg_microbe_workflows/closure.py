@@ -18,20 +18,22 @@ def receipt_path(value: Any) -> bool:
             and not any(part in {"", ".", ".."} for part in value.split("/")))
 
 
-def multi_pr_members(receipt: dict[str, Any]) -> list[dict[str, Any]]:
+def multi_pr_members(receipt: dict[str, Any], *, max_members: int = 16) -> list[dict[str, Any]]:
     """Return checked members, or [] for an unchanged single-PR receipt.
 
     The top-level PR and proofs continue to identify the final integration head.
     Shape validation never proves membership, authorship, review or merge facts.
     """
+    if type(max_members) is not int or not 16 <= max_members <= 10001:
+        raise ValueError("invalid ordered PR member limit")
     if "prs" not in receipt:
         if "evidence_attributions" in receipt:
             raise ValueError("evidence attributions require ordered PRs")
         return []
     members = receipt["prs"]
     if (receipt.get("schema_version") != 2 or receipt.get("status") != "completed"
-            or not isinstance(members, list) or not 2 <= len(members) <= 16):
-        raise ValueError("ordered PRs require a completed v2 receipt and 2..16 members")
+            or not isinstance(members, list) or not 2 <= len(members) <= max_members):
+        raise ValueError(f"ordered PRs require a completed v2 receipt and 2..{max_members} members")
     numbers: set[int] = set()
     heads: set[str] = set()
     merges: set[str] = set()

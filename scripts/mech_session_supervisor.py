@@ -505,6 +505,22 @@ def durability_repository_roots(target: dict) -> list[Path]:
     return roots
 
 
+
+def pr_maintenance_enabled(ledger: dict) -> bool:
+    return ledger.get("workflow", {}).get("effective", {}).get("parent_version") == "2.1.0"
+
+
+def freeze_open_prs(target: dict, *, runner=command, manifest_path=None) -> dict:
+    from kg_microbe_workflows.pr_maintenance_remote import capture_pr_scope, resolve_limit
+    limit, source = resolve_limit(target["repository_key"], target["github_repository"],
+                                  Path(manifest_path) if manifest_path else None)
+    return capture_pr_scope(target, runner, limit=limit, limit_source=source)
+
+
+def validate_pr_scope(scope: dict, target: dict) -> None:
+    from kg_microbe_workflows.pr_maintenance_remote import validate_frozen_pr_scope
+    validate_frozen_pr_scope(scope, target["github_repository"])
+
 def new_ledger(config: dict, target: dict, *, runner=command) -> dict:
     ledger = {"schema_version": 1, "run_id": config["run_id"],
             "repository_key": target["repository_key"], "stage": target["initial_stage"],
@@ -522,6 +538,8 @@ def new_ledger(config: dict, target: dict, *, runner=command) -> dict:
             ledger["infra_scope"] = freeze_infrastructure(target)
         elif workflow_stage_key(ledger) == "open_issue_triage":
             ledger["issue_scope"] = freeze_open_issues(target, runner=runner)
+            if pr_maintenance_enabled(ledger):
+                ledger["pr_scope"] = freeze_open_prs(target, runner=runner, manifest_path=config.get("manifest_path"))
     return ledger
 
 
@@ -671,6 +689,11 @@ def message_for(target: dict, ledger: dict, decision: dict, repository_runtime: 
                "For infrastructure, use the exact supervisor-frozen infra_scope content/hash/time in status.json. "
                "For open_issue_triage, use the exact supervisor-frozen issue_scope and its prior-cycle carry-forward evidence; "
                "new issues outside that inventory belong to the next cycle. "
+               "Under parent 2.1, also consume the exact supervisor-frozen pr_scope and preserve pr_inventory/pr_dispositions. "
+               "Maintain stale/superseded/conflicting PRs, repair majority check failures at source and finish every green PR's "
+               "exact-head closure_policy. Read the manifest open_pr_limit before opening or readying another PR (default25). "
+               "Use existing scoped authority without asking for it again; an actual approval-review refusal remains a blocker. "
+               "Retain owned-worktree cleanup evidence; never remove unrelated worktrees or rewrite live cycles. "
                f"As soon as each goal PR is opened, including follow-up PRs, register it with {register}, "
                "replacing NUMBER with its PR number. Registration only records the PR-to-goal association; "
                "it does not complete a goal or replace the verified closure receipt. "
@@ -714,6 +737,8 @@ def receipt_template(ledger: dict, target: dict) -> dict:
             template["goal_outputs"]["goal_evidence"] = {
                 "path": evidence_directory(ledger["run_id"], ledger["cycle"], ledger["stage"], 1) + "/evidence.yaml",
                 "sha256": ""}
+    if pr_maintenance_enabled(ledger):
+        template["cleanup"].update(worktree_paths=[], worktree_cleanup={"artifact": "", "sha256": ""})
     return template
 
 
@@ -1082,6 +1107,16 @@ def goal_output_data(receipt: dict, ledger: dict, target: dict) -> dict | None:
         blockers = issue_triage_blockers(data)
         if blockers:
             raise SupervisorError("critical/high issue prerequisites hold this goal: " + ", ".join(map(str, blockers)))
+        if pr_maintenance_enabled(ledger):
+            from kg_microbe_workflows.pr_maintenance import pr_maintenance_blockers
+            scope = ledger.get("pr_scope") or {}
+            validate_pr_scope(scope, target)
+            snapshots = [a for a in data["artifacts"] if a["kind"] == "pr_inventory"]
+            if (len(snapshots) != 1 or snapshots[0]["sha256"] != scope["sha256"]
+                    or data["pr_maintenance"]["frozen_at"] != scope["frozen_at"]):
+                raise SupervisorError("PR maintenance must consume the supervisor-frozen inventory")
+            if pr_maintenance_blockers(data):
+                raise SupervisorError("PR maintenance closure prerequisites hold this goal")
     if stage_key == "resolve_review_findings":
         expected_ids = {item["finding_id"] for item in previous_data.get("findings", [])}
         actual_ids = [finding for group in data.get("groups", []) for finding in group["finding_ids"]]
@@ -1269,6 +1304,14 @@ def validate_receipt(receipt: dict, ledger: dict, target: dict, runtime: Path,
     if status == "completed" and (cleanup.get("remote_branch_deleted") is not True
                                   or cleanup.get("local_branch_deleted") is not True):
         errors.append("branch cleanup not attested")
+    if pr_maintenance_enabled(ledger) and status == "completed":
+        paths = cleanup.get("worktree_paths")
+        if (not isinstance(paths, list) or not paths
+                or any(not isinstance(path, str) or not Path(path).is_absolute()
+                       or Path(path).resolve() == Path(target["root"]).resolve() for path in paths)
+                or len(paths) != len(set(paths))):
+            errors.append("owned feature-worktree cleanup paths required")
+        errors += artifact_errors(cleanup.get("worktree_cleanup", {}), roots, "worktree cleanup")
     if ledger.get("schema_version") == 2 and not legacy_receipt:
         outputs = receipt.get("goal_outputs") or {}
         infra = outputs.get("infra_tasks") or {}
@@ -1290,7 +1333,7 @@ def validate_receipt(receipt: dict, ledger: dict, target: dict, runtime: Path,
             errors.append("goal outputs: " + str(error))
     try:
         from kg_microbe_workflows.closure import multi_pr_members
-        members = multi_pr_members(receipt)
+        members = multi_pr_members(receipt, max_members=10001 if pr_maintenance_enabled(ledger) and workflow_stage_key(ledger) == "open_issue_triage" else 16)
         for member in members:
             if member["base"] != target["default_branch"]:
                 errors.append("ordered PR base differs from configured default branch")
@@ -1538,7 +1581,11 @@ def verify_remote_receipt(receipt: dict, ledger: dict, target: dict, runner=comm
         prs = gh_json("pr", "list", "-R", github, "--state", "open", "--limit", "1000", "--json", "number")
         if prs:
             raise SupervisorError("open PR exists for no-change branch")
-        return {"verified_at": now(), "status": "no_changes", "head_sha": head,
+        maintenance = {}
+        if pr_maintenance_enabled(ledger) and evidence and evidence.get("stage_key") == "open_issue_triage":
+            from kg_microbe_workflows.pr_maintenance_remote import verify_dispositions_live
+            maintenance["pr_maintenance"] = verify_dispositions_live(evidence, target, receipt, {}, runner)
+        return {"verified_at": now(), "status": "no_changes", "head_sha": head, **maintenance,
                 **({"issue_triage": triage_verification} if triage_verification is not None else {})}
     if "prs" in receipt:
         proof = verify_ordered_prs(receipt, ledger, target, runtime, evidence, runner,
@@ -1551,6 +1598,14 @@ def verify_remote_receipt(receipt: dict, ledger: dict, target: dict, runner=comm
             proof["historical_issue_resolutions"] = historical
         proof["commit_publication"] = verify_receipt_publication(
             receipt, target, {item["sha"] for item in commits}, runner)
+    if pr_maintenance_enabled(ledger):
+        from kg_microbe_workflows.pr_maintenance_remote import (
+            verify_dispositions_live,
+            verify_worktree_cleanup,
+        )
+        proof["worktree_cleanup"] = verify_worktree_cleanup(receipt, target, runner, runtime)
+        if evidence and evidence.get("stage_key") == "open_issue_triage":
+            proof["pr_maintenance"] = verify_dispositions_live(evidence, target, receipt, proof, runner)
     return {**proof, **({"issue_triage": triage_verification} if triage_verification is not None else {})}
 
 
@@ -1711,14 +1766,23 @@ def verify_ordered_prs(receipt: dict, ledger: dict, target: dict, runtime: Path 
     from kg_microbe_progress.prs import AssociationError, require_current_pr_associations
     from kg_microbe_workflows.closure import multi_pr_members
     try:
-        members = multi_pr_members(receipt)
+        members = multi_pr_members(receipt, max_members=10001 if pr_maintenance_enabled(ledger) and workflow_stage_key(ledger) == "open_issue_triage" else 16)
         if runtime is None:
             raise ValueError("ordered closure requires the supervisor's session directory")
         errors = validate_receipt(receipt, ledger, target, runtime,
                                   historical_infra_notebook=historical_infra_notebook)
         if errors:
             raise ValueError("; ".join(errors))
-        require_current_pr_associations(runtime, ledger, {item["number"] for item in members})
+        maintenance = {}
+        if pr_maintenance_enabled(ledger) and workflow_stage_key(ledger) == "open_issue_triage":
+            # Backlog membership is proven by the frozen scope, preserving prior
+            # goal associations rather than rewriting them as current-goal work.
+            validate_pr_scope(ledger.get("pr_scope", {}), target)
+            frozen = {p["number"]: p for p in ledger["pr_scope"]["prs"]}
+            for disposition in (evidence or {}).get("pr_maintenance", {}).get("dispositions", []):
+                if disposition["status"] == "merged" and disposition["number"] in frozen:
+                    maintenance[disposition["number"]] = frozen[disposition["number"]]
+        require_current_pr_associations(runtime, ledger, {item["number"] for item in members} - maintenance.keys())
     except (AssociationError, ValueError) as error:
         raise SupervisorError(str(error)) from error
     root = target["root"]
@@ -1753,19 +1817,28 @@ def verify_ordered_prs(receipt: dict, ledger: dict, target: dict, runtime: Path 
         if member["merge_commit_sha"] != proof["merge_commit_sha"]:
             raise SupervisorError("ordered PR merge commit differs from independently verified merge")
         created, merged = closure_time(live.get("created_at"), "PR creation"), closure_time(live.get("merged_at"), "PR merge")
-        if not start <= created <= merged <= cutoff:
+        archived = maintenance.get(member["number"])
+        if archived:
+            if (not created <= closure_time(ledger["pr_scope"]["frozen_at"], "PR scope") <= merged <= cutoff
+                    or merged < start
+                    or read(["git", "-C", root, "merge-base", "--is-ancestor", archived["head_sha"],
+                             member["head_sha"]], check=False).returncode):
+                raise SupervisorError("maintenance PR is outside its frozen ancestry or closure window")
+        elif not start <= created <= merged <= cutoff:
             raise SupervisorError("ordered PR lies outside the adopted-goal closure window")
         for sha in (member["head_sha"], member["merge_commit_sha"]):
             if read(["git", "-C", root, "cat-file", "-t", sha]).stdout.strip() != "commit":
                 raise SupervisorError("ordered PR identity is not a commit")
         if previous and (closure_time(previous["merged_at"], "previous merge") > merged
                 or read(["git", "-C", root, "merge-base", "--is-ancestor", previous["merge_commit_sha"],
-                         member["head_sha"]], check=False).returncode != 0):
+                         member["merge_commit_sha"] if archived else member["head_sha"]], check=False).returncode != 0):
             raise SupervisorError("ordered PRs are unordered or final integration omits an earlier merge")
         commit_shas = set()
         for item in commits:
             when = closure_time((item.get("commit") or {}).get("committer", {}).get("date"), "PR commit")
-            if not start <= when <= merged:
+            inherited = (archived is not None and read(["git", "-C", root, "merge-base", "--is-ancestor",
+                         item["sha"], archived["head_sha"]], check=False).returncode == 0)
+            if not (when <= merged and (start <= when or inherited)):
                 raise SupervisorError("ordered PR commit lies outside the adopted-goal closure window")
             if read(["git", "-C", root, "merge-base", "--is-ancestor", item["sha"], member["head_sha"]], check=False).returncode:
                 raise SupervisorError("PR commit is not in its reviewed head")
@@ -2161,7 +2234,7 @@ class Supervisor:
         if not ledger.get("freshness_initial_pending"):
             return ledger
         if (ledger.get("stage") != 1 or ledger.get("adopted_goal") or ledger.get("actions")
-                or ledger.get("completed_stages") or any(key in ledger for key in ("infra_scope", "issue_scope", "baseline_head"))
+                or ledger.get("completed_stages") or any(key in ledger for key in ("infra_scope", "issue_scope", "pr_scope", "baseline_head"))
                 or not observation.get("ready") or observation.get("goal_state") != "completed"
                 or observation.get("goal_identity") != target["initial_goal_identity"]):
             raise FreshnessHold("initial freshness adoption requires a pristine assessed completed native boundary")
@@ -2194,16 +2267,31 @@ class Supervisor:
             path = self.directory(target) / "cycles" / f"cycle-{ledger['cycle']:06d}" / "issue-scope.json"
             if ledger.get("repository_freshness") and path.exists():
                 raise FreshnessHold("fresh stage already has an archived inventory; approved reconciliation required")
-            ledger["issue_scope"] = read_json(path) if path.exists() else freeze_open_issues(target, runner=self.runner)
-            validate_frozen_issue_scope(ledger["issue_scope"], target)
-            self.write(path, ledger["issue_scope"])
+            pr_path = path.with_name("pr-scope.json")
+            if pr_maintenance_enabled(ledger) and ledger.get("repository_freshness") and pr_path.exists():
+                raise FreshnessHold("fresh stage already has an archived PR inventory")
+            # Complete all fallible remote capture and validation before either
+            # archive or ledger scope changes. A transient API failure can retry.
+            issue_scope = read_json(path) if path.exists() else freeze_open_issues(target, runner=self.runner)
+            validate_frozen_issue_scope(issue_scope, target)
+            pr_scope = None
+            if pr_maintenance_enabled(ledger):
+                pr_scope = read_json(pr_path) if pr_path.exists() else freeze_open_prs(
+                    target, runner=self.runner, manifest_path=self.config.get("manifest_path"))
+                validate_pr_scope(pr_scope, target)
+            self.write(path, issue_scope)
+            if pr_scope is not None:
+                self.write(pr_path, pr_scope)
+                ledger["pr_scope"] = pr_scope
+            ledger["issue_scope"] = issue_scope
         else:
             ledger.pop("issue_scope", None)
+            ledger.pop("pr_scope", None)
 
     def freshness_merged_commits(self, target: dict, receipt: dict) -> tuple[str, ...]:
         """Verify actual merge identity before any synchronization; full gates follow."""
         from kg_microbe_workflows.closure import multi_pr_members
-        members = multi_pr_members(receipt) if "prs" in receipt else [receipt["pr"]]
+        members = multi_pr_members(receipt, max_members=10001) if "prs" in receipt else [receipt["pr"]]
         merged = []
         for member in members:
             live = json.loads(self.runner(["gh", "api", f"repos/{target['github_repository']}/pulls/{member['number']}"]).stdout)
@@ -2609,6 +2697,13 @@ class Supervisor:
             if scope_path.exists() and read_json(scope_path) != scope:
                 raise SupervisorError("archived issue inventory changed")
             self.write(scope_path, scope)
+            if pr_maintenance_enabled(ledger):
+                pr_scope = ledger.get("pr_scope") or {}
+                validate_pr_scope(pr_scope, target)
+                pr_path = archive.parent / "pr-scope.json"
+                if pr_path.exists() and read_json(pr_path) != pr_scope:
+                    raise SupervisorError("archived PR inventory changed")
+                self.write(pr_path, pr_scope)
 
     def advance(self, target: dict, ledger: dict, receipt: dict, verification: dict, authority: str, *, apply: bool = False) -> dict:
         closed_stage = ledger["stage"]
@@ -2662,11 +2757,13 @@ class Supervisor:
         current = ledger["workflow"]["effective"]
         migration = target.get("workflow_parent_migration") or {}
         if (workflow_stage_key(ledger) != "infrastructure"
-                or current["parent_version"].split(".")[0] != "1"
-                or effective["parent_version"] != "2.0.0"
+                or not ((current["parent_version"].split(".")[0] == "1"
+                         and effective["parent_version"] in {"2.0.0", "2.1.0"})
+                        or (current["parent_version"] == "2.0.0"
+                            and effective["parent_version"] == "2.1.0"))
                 or effective["parent_id"] != current["parent_id"]
                 or effective["parent_repository"] != current["parent_repository"]):
-            raise SupervisorError("next-cycle parent provenance changed outside the supported six-to-seven boundary migration")
+            raise SupervisorError("next-cycle parent provenance changed outside a supported reviewed cycle-boundary migration")
         if (migration.get("from_sha256") != ledger["workflow"]["sha256"]
                 or migration.get("to_sha256") != digest(effective)
                 or not isinstance(migration.get("reviewed_by"), str) or not migration["reviewed_by"].strip()
@@ -2836,7 +2933,7 @@ class Supervisor:
                       "active_profile_path": ledger.get("active_profile_path"),
                       "next_profile_path": target.get("workflow_next_profile_path"),
                       "infra_scope": ledger.get("infra_scope"),
-                      "issue_scope": ledger.get("issue_scope"), "cycle_versions": ledger.get("cycle_versions", {}),
+                      "issue_scope": ledger.get("issue_scope"), "pr_scope": ledger.get("pr_scope"), "cycle_versions": ledger.get("cycle_versions", {}),
                       "completed_stages": ledger["completed_stages"], "updated_at": now()}
             status["session_durability"] = self.durability(target)
             status["updated_at"] = now()

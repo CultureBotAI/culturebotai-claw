@@ -48,17 +48,19 @@ class IssuePages:
         return SimpleNamespace(stdout=json.dumps(result), returncode=0, stderr="")
 
 
-def candidate(setup):
+def candidate(setup, *, version="2.0.0"):
     from kg_microbe_workflows import PARENT_PATH, SCHEMA_PATH, stage_keys_for_version
 
     directory = setup.repo / "workflow/next"
     directory.mkdir(parents=True, exist_ok=True)
     parent_path, schema_path = directory / "mech-cycle.yaml", directory / "workflow.yaml"
-    parent_path.write_bytes(PARENT_PATH.read_bytes())
+    # Keep this compatibility fixture pinned to its historical 2.0 parent.
+    source_parent = PARENT_PATH if version == "2.1.0" else PARENT_PATH.with_name("mech-cycle-v2.0.yaml")
+    parent_path.write_bytes(source_parent.read_bytes())
     schema_path.write_bytes(SCHEMA_PATH.read_bytes())
     profile = json.loads(Path(setup.target["workflow_profile_path"]).read_text())
     profile.update(schema_version="2.0.0", profile_version="2.0.0")
-    profile["parent"].update(version="2.0.0", revision="d" * 40,
+    profile["parent"].update(version=version, revision="d" * 40,
                              sha256=hashlib.sha256(parent_path.read_bytes()).hexdigest(),
                              schema_sha256=hashlib.sha256(schema_path.read_bytes()).hexdigest())
     profile["stages"] = [{"stage": stage, "key": key, "goal_text": f"Use the native skill for {key}",

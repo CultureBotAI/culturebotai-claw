@@ -5,7 +5,7 @@ metadata:
   category: cross-repo
   requires_database: false
   requires_internet: true
-  version: 2.0.0
+  version: 2.1.0
   tags: [fleet, workflow, governance]
 ---
 
@@ -70,6 +70,32 @@ resolved may the primary and secondary spend their shared four-hour wall-clock
 window on one or two largest remaining groups. Preserve stable group IDs and
 explicit carry-forward dispositions. This queue is separate from the current
 cycle's record-review findings and the infrastructure intake.
+
+Parent 2.1.0 extends that same stage 1 with PR maintenance and keeps all seven
+stage keys and numbers. The LinkML schema remains additive schema_version
+2.0.0; the active parent_version determines which outputs and gates apply.
+Pinned parent 2.0 and v1 cycles keep their original contracts and evidence.
+Parent 2.1 requires the complete pr_maintenance_policy, pr_inventory and
+pr_dispositions artifacts, and verified cleanup of owned feature worktrees.
+Do not remove a policy field to opt out or rewrite old evidence as 2.1.
+
+Read the supervisor's separate pr_scope content/hash/cutoff and preserve its
+exact JSON bytes. Account for every draft and ready PR at its frozen head:
+close superseded, duplicate or fourteen-day stale drafts with reasons; refresh
+or close conflicting work without force-push; repair checks failing on a strict
+majority once at their shared source. Take each green PR through the full
+exact-head closure policy or hold on a genuine evidenced prerequisite. Existing
+per-PR authority remains effective; a missing approval or approval-review refusal
+is a blocker, not permission to bypass it or repeatedly request authority
+already granted. Use the triage skill's structured statuses and source links.
+
+The manifest's optional open_pr_limit sets each Mech's non-draft limit (1–1000,
+default 25); Claw uses 25. Freeze the resolved limit with pr_scope. Check the
+complete live queue before opening or readying more PRs, count later arrivals,
+and never convert ready work to draft to evade the limit. Preserve valuable
+state and audit bytes outside an owned feature worktree before deleting it;
+verify filesystem absence and removal from Git's worktree registrations.
+Other owners' work, configured checkouts and runtime roots remain protected.
 
 The record_review goal (v2 stage 5; v1 stage 4) must retain actual review reports, structured findings, corpus coverage,
 reviewer provenance, limitations, input hashes, and disposition accounting.
@@ -156,13 +182,16 @@ Do not silently rewrite a running goal or its receipt contract. Activate only
 at the coordinator's verified cycle boundary after the change's closure; a
 coordinator without next-profile support remains blocked on activation.
 
-For v1 to v2 adoption, retain the active goal, old stage numbers, archived
+For v1 to v2 or parent 2.0.0 to 2.1.0 adoption, retain the active goal, old stage numbers, archived
 receipts and immutable evidence paths. A reviewed migration binds the old and
 candidate effective workflow hashes; only verified closure of the old
 infrastructure goal permits the new cycle's seven-goal contract. Keep each
 cycle's parent version explicit. Stage 0 remains not started, not issue triage.
 Release, DUFMech's test adoption, and later fleet rollout are separate phases;
 rendering a skill or preparing a profile does not authorize those mutations.
+Keep historical release artifacts and hash-pinned parent/schema copies
+unchanged. Preparing this contract does not activate a session or install a
+runtime policy; those remain separately authorized boundary operations.
 
 Use existing authorization and the cross-repository mutation checklist in
 CLAUDE.md. Acquire the owned repository lock, compare captured hashes again,

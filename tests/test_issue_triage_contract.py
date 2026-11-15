@@ -207,7 +207,10 @@ def test_v2_parent_preserves_infrastructure_and_closure_policy():
     assert len(old["stages"]) == 6 and len(new["stages"]) == 7
     assert new["stages"][0]["key"] == "open_issue_triage"
     assert new["infrastructure_policy"] == old["infrastructure_policy"]
-    assert new["closure_policy"] == old["closure_policy"]
+    assert new["closure_policy"]["steps"] == old["closure_policy"]["steps"] + ["delete_worktree"]
+    assert {k: v for k, v in new["closure_policy"].items() if k != "steps"} == {
+        k: v for k, v in old["closure_policy"].items() if k != "steps"}
+    assert new["version"] == "2.1.0"
     assert {key: value for key, value in new["stages"][-1].items() if key != "stage"} == {
         key: value for key, value in old["stages"][-1].items() if key != "stage"
     }

@@ -656,3 +656,18 @@ def test_manifest_ships_inside_the_package():
     assert MANIFEST_PATH.name in package_data.get("kg_microbe_fleet", []), (
         "kg_microbe_fleet package-data must ship the manifest"
     )
+
+
+@pytest.mark.parametrize("value", [True, False, 0, -1, 1001, 2.5, "25", None])
+def test_pr_limit_rejects_invalid_explicit_overrides(value):
+    document = _shipped_document()
+    document["mechs"]["traitmech"]["open_pr_limit"] = value
+    with pytest.raises(FleetManifestError, match="open_pr_limit"):
+        parse_fleet_manifest(document, MANIFEST_PATH)
+
+
+def test_pr_limit_defaults_and_valid_override_are_manifest_owned():
+    document = _shipped_document()
+    assert parse_fleet_manifest(document, MANIFEST_PATH).get("traitmech").open_pr_limit is None
+    document["mechs"]["traitmech"]["open_pr_limit"] = 7
+    assert parse_fleet_manifest(document, MANIFEST_PATH).get("traitmech").open_pr_limit == 7

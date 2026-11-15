@@ -206,6 +206,7 @@ class MechDefinition:
     vendored_role: str
     capabilities: Mapping[str, Capability]
     serialization: Optional["Serialization"] = None
+    open_pr_limit: int | None = None
 
     def capability(self, name: str) -> Optional[Capability]:
         return self.capabilities.get(name)
@@ -788,12 +789,16 @@ def _parse_mech(
         "vendored_role",
         "capabilities",
         "serialization",
+        "open_pr_limit",
     }
     unknown_keys = set(mapping) - allowed_keys
     if unknown_keys:
         unknown = ", ".join(sorted(str(item) for item in unknown_keys))
         raise FleetManifestError(f"{label} has unknown keys: {unknown}")
 
+    open_pr_limit = mapping.get("open_pr_limit")
+    if "open_pr_limit" in mapping and (type(open_pr_limit) is not int or not 1 <= open_pr_limit <= 1000):
+        raise FleetManifestError(f"{label}.open_pr_limit must be an integer in 1..1000")
     identity = _parse_mech_identity(key, mapping)
     serialization = (
         _parse_serialization(mapping["serialization"], f"{label}.serialization")
@@ -849,6 +854,7 @@ def _parse_mech(
         vendored_role=identity.vendored_role,
         capabilities=MappingProxyType(capabilities),
         serialization=serialization,
+        open_pr_limit=open_pr_limit,
     )
 
 

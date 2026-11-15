@@ -38,6 +38,9 @@ types:
   IssueURL:
     typeof: string
     pattern: ^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/issues/[1-9][0-9]*(?![\s\S])
+  PullRequestURL:
+    typeof: string
+    pattern: ^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/[1-9][0-9]*(?![\s\S])
   Repository:
     typeof: string
     pattern: ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?![\s\S])
@@ -71,6 +74,8 @@ enums:
       issue_groups: {}
       group_plans: {}
       dispositions: {}
+      pr_inventory: {}
+      pr_dispositions: {}
   StageKey:
     permissible_values:
       open_issue_triage: {}
@@ -98,6 +103,35 @@ enums:
       deferred: {}
       duplicate: {}
       wont_fix: {}
+      blocked: {}
+  PRDispositionStatus:
+    permissible_values:
+      merged: {}
+      closed_superseded: {}
+      closed_duplicate: {}
+      closed_stale: {}
+      closed_conflicting: {}
+      refreshed: {}
+      retained: {}
+      blocked: {}
+  PRChecksState:
+    permissible_values:
+      green: {}
+      failing: {}
+      pending: {}
+      unknown: {}
+  PRMergeability:
+    permissible_values:
+      mergeable: {}
+      conflicting: {}
+      unknown: {}
+  PRLimitSource:
+    permissible_values:
+      default: {}
+      manifest: {}
+  SharedCheckFixStatus:
+    permissible_values:
+      fixed: {}
       blocked: {}
   TriageRole:
     permissible_values:
@@ -142,6 +176,9 @@ classes:
       cycle_policy:
         range: CyclePolicy
         required: true
+        inlined: true
+      pr_maintenance_policy:
+        range: PRMaintenancePolicy
         inlined: true
       issue_triage_policy:
         range: IssueTriagePolicy
@@ -805,5 +842,182 @@ classes:
         range: IssueTriageResult
         required: true
         inlined: true
+      pr_maintenance:
+        range: PRMaintenanceResult
+        inlined: true
     description: The frozen open-issue inventory, stable plans and dispositions with
       a shared elapsed budget.
+
+  PRMaintenancePolicy:
+    description: Mandatory in parent 2.1; absent on retained 2.0 and v1 parents.
+    attributes:
+      stale_draft_days:
+        range: integer
+        required: true
+      default_open_pr_limit:
+        range: integer
+        required: true
+      count_non_draft_only:
+        range: boolean
+        required: true
+      freeze_scope_at_stage_start:
+        range: boolean
+        required: true
+      complete_inventory_required:
+        range: boolean
+        required: true
+      close_superseded_and_duplicate_with_reason:
+        range: boolean
+        required: true
+      refresh_or_close_conflicts_without_force:
+        range: boolean
+        required: true
+      fix_majority_check_failures_at_source:
+        range: boolean
+        required: true
+      green_prs_require_closure_policy:
+        range: boolean
+        required: true
+      delete_only_owned_worktrees:
+        range: boolean
+        required: true
+      explicit_authority_required:
+        range: boolean
+        required: true
+      blocked_closure_holds_goal:
+        range: boolean
+        required: true
+  PRInventoryEntry:
+    attributes:
+      number:
+        range: integer
+        minimum_value: 1
+        required: true
+      title:
+        range: NonBlank
+        required: true
+      updatedAt:
+        range: NonBlank
+        required: true
+      is_draft:
+        range: boolean
+        required: true
+      head_sha:
+        range: GitRevision
+        required: true
+      base_sha:
+        range: GitRevision
+        required: true
+      head_branch:
+        range: NonBlank
+        required: true
+      base_branch:
+        range: NonBlank
+        required: true
+      checks_state:
+        range: PRChecksState
+        required: true
+      mergeability:
+        range: PRMergeability
+        required: true
+      failing_checks:
+        range: NonBlank
+        multivalued: true
+        required: true
+      checks_complete:
+        range: boolean
+        required: true
+      check_count:
+        range: integer
+        minimum_value: 0
+        required: true
+  PRDisposition:
+    attributes:
+      number:
+        range: integer
+        minimum_value: 1
+        required: true
+      head_sha:
+        range: GitRevision
+        required: true
+      status:
+        range: PRDispositionStatus
+        required: true
+      reason:
+        range: NonBlank
+        required: true
+      resolution_evidence:
+        range: NonBlank
+        multivalued: true
+        required: true
+      final_head_sha:
+        range: GitRevision
+      merge_sha:
+        range: GitRevision
+      replacement_pr_url:
+        range: PullRequestURL
+      prerequisite:
+        range: NonBlank
+  SharedCheckFix:
+    attributes:
+      check_name:
+        range: NonBlank
+        required: true
+      affected_pr_numbers:
+        range: integer
+        minimum_value: 1
+        required: true
+        multivalued: true
+      status:
+        range: SharedCheckFixStatus
+        required: true
+      reason:
+        range: NonBlank
+        required: true
+      source_repository:
+        range: Repository
+        required: true
+      source_issue_url:
+        range: IssueURL
+        required: true
+      source_fix_pr_url:
+        range: PullRequestURL
+      resolution_evidence:
+        range: NonBlank
+        required: true
+        multivalued: true
+      prerequisite:
+        range: NonBlank
+  PRMaintenanceResult:
+    attributes:
+      frozen_at:
+        range: NonBlank
+        required: true
+      inventory:
+        range: PRInventoryEntry
+        multivalued: true
+        inlined_as_list: true
+        required: true
+      dispositions:
+        range: PRDisposition
+        multivalued: true
+        inlined_as_list: true
+        required: true
+      shared_check_fixes:
+        range: SharedCheckFix
+        multivalued: true
+        inlined_as_list: true
+        required: true
+      open_non_draft_limit:
+        range: integer
+        minimum_value: 1
+        maximum_value: 1000
+        required: true
+      limit_source:
+        range: PRLimitSource
+        required: true
+      remaining_open_non_draft:
+        range: integer
+        minimum_value: 1
+        multivalued: true
+        required: true
