@@ -216,14 +216,14 @@ def test_boss_uses_safe_prompt_delivery_and_bounded_owned_lock():
     assert "--dangerously-skip-permissions" not in text
     assert "tmux load-buffer" in text
     assert "tmux paste-buffer" in text
-    assert 'paste_prompt_file "$SESSION" "$PROMPT_FILE"' in text
+    assert 'paste_prompt_file "$PANE" "$PROMPT_FILE"' in text
     assert 'acquired = manager.acquire_lock(' in text
     assert 'if not acquired:' in text
     assert 'timeout=task_limit + 300' in text
     assert 'finally:' in text
     assert 'manager.release_lock(resource)' in text
     assert 'subprocess.Popen(command)' in text
-    assert 'tmux send-keys -t "$SESSION" -l -- "claude"' in text
+    assert 'remain-on-exit on && cd -- "$3" && exec claude' in text
     assert 'run_locked_command "claude"' not in text
     assert "It must release before Claude starts" in text
     assert 'run_locked_command "create-$SLUG"' in text
