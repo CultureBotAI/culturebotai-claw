@@ -1,7 +1,7 @@
 {
   "baseline_version": "1.1.0",
   "schema_version": 1,
-  "source_ref": "1b419415a738c4d68c79c0dba6c838db77acc98d",
+  "source_ref": "9e76780d97082737b1e00c5ef57d52a792237675",
   "sources": {
     "src/kg_microbe_fleet/fleet.yaml": "1cf926eb16d70bfc81e120eb622b16063c4511e9c3d9cb534765a1f67621a91f",
     "src/kg_microbe_governance/artifacts/__init__.py": "4e47389554e9e8d6e05a90ecf7dc6ad5708f08e56d012d9129970d58b9c6d069",
