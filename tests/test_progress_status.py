@@ -20,6 +20,57 @@ NOW = datetime(2026, 10, 20, 10, tzinfo=timezone.utc)
 STAMP = NOW.isoformat()
 
 
+def test_published_status_excludes_nonzero_internal_member(status, bundle, monkeypatch, capsys):
+    from dataclasses import replace
+
+    from kg_microbe_fleet import FleetManifest
+
+    full = load_fleet_manifest()
+    excluded_key = full.keys[0]
+    fleet = FleetManifest(
+        {key: replace(mech, tags=("exclude-from-public",) if key == excluded_key else ())
+         for key, mech in full.mechs.items()},
+        full.capability_catalogue, full.vendored_governance, full.source,
+    )
+    assert bundle["snapshot"]["totals"]["completed_goals"] == 1
+    monkeypatch.setattr(status, "load_fleet_manifest", lambda *args: fleet)
+    monkeypatch.setattr(status, "read_remote", lambda **kwargs: ("a" * 40, bundle))
+    assert status.main(["--published"], now=NOW) == 0
+    output = capsys.readouterr()
+    expected = progress.public_bundle(**bundle, manifest=fleet)
+    assert expected["snapshot"]["totals"]["completed_goals"] == 0
+    assert output.out == status.format_summary(expected["snapshot"]) + "\n"
+
+
+def test_published_durability_validates_internal_targets_then_filters(status, bundle, monkeypatch, capsys, tmp_path):
+    from dataclasses import replace
+
+    from kg_microbe_fleet import FleetManifest
+
+    full = load_fleet_manifest()
+    excluded_key, public_key = full.keys[:2]
+    fleet = FleetManifest(
+        {key: replace(mech, tags=("exclude-from-public",) if key == excluded_key else ())
+         for key, mech in full.mechs.items()},
+        full.capability_catalogue, full.vendored_governance, full.source,
+    )
+    runtime = tmp_path.resolve() / "mixed-durability"
+    runtime.mkdir()
+    (runtime / "config.json").write_text(json.dumps({
+        "run_id": "mixed-durability", "targets": [
+            {"repository_key": key, "github_repository": fleet.get(key).github}
+            for key in (excluded_key, public_key)
+        ],
+    }))
+    monkeypatch.setattr(status, "load_fleet_manifest", lambda *args: fleet)
+    monkeypatch.setattr(status, "read_remote", lambda **kwargs: ("a" * 40, bundle))
+    assert status.main(["--published", "--durability-runtime", str(runtime)], now=NOW) == 3
+    output = capsys.readouterr()
+    assert f"Local durability {public_key}: unknown" in output.out
+    assert excluded_key not in output.out
+    assert output.err == ""
+
+
 @pytest.fixture
 def status(monkeypatch, tmp_path):
     # Default-source tests must not read the operator's live publisher pin.
@@ -213,7 +264,7 @@ def test_published_bundle_is_validated_and_network_failure_has_no_zero_fallback(
 ):
     monkeypatch.setattr(status, "read_remote", lambda **kwargs: ("a" * 40, bundle))
     assert status.main(["--published"], now=NOW) == 0
-    assert capsys.readouterr().out == status.format_summary(bundle["snapshot"]) + "\n"
+    assert capsys.readouterr().out == status.format_summary(progress.public_bundle(**bundle)["snapshot"]) + "\n"
     bundle["history"]["closures"] = []
     assert status.main(["--published"], now=NOW) == 1
     assert capsys.readouterr().out == ""
@@ -321,7 +372,9 @@ def test_published_read_and_bundle_validation_use_pinned_manifest(
         arguments.extend(["--manifest", str(pin)])
     assert status.main(arguments, now=NOW) == 0
     output = capsys.readouterr()
-    assert output.out == status.format_summary(bundle["snapshot"]) + "\n"
+    assert output.out == status.format_summary(
+        progress.public_bundle(**bundle, manifest=load_fleet_manifest(pin))["snapshot"]
+    ) + "\n"
     assert output.err == ""
     assert len(seen) == 1
     assert seen[0].source == pin
@@ -352,4 +405,4 @@ def test_remote_reader_validates_with_the_selected_manifest(status, tmp_path, bu
         status.read_remote(api=responses.__getitem__)
     assert status.read_remote(
         api=responses.__getitem__, manifest=load_fleet_manifest(pin)
-    ) == ("a" * 40, bundle)
+    ) == ("a" * 40, progress.public_bundle(**bundle, manifest=load_fleet_manifest(pin)))

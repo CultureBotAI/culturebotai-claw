@@ -660,6 +660,46 @@ def validate_extension(previous: dict[str, Any], new: dict[str, Any],
             raise ProgressError("parent version changed inside an active cycle")
 
 
+def public_history(history: dict[str, Any], manifest: FleetManifest | None = None) -> dict[str, Any]:
+    """Project validated internal history without changing retained local evidence."""
+    fleet = manifest or load_fleet_manifest()
+    validate_history(history, fleet)
+    keys = set(fleet.public().keys)
+    result = copy.deepcopy(history)
+    for field in ("closures", "pr_events", "associations", "cursors"):
+        result[field] = [item for item in result[field] if item["repository_key"] in keys]
+    validate_history(result, fleet.public())
+    return result
+
+
+def public_bundle(
+    history: dict[str, Any], snapshot: dict[str, Any],
+    manifest: FleetManifest | None = None, *, expand: bool = True,
+) -> dict[str, Any]:
+    """Validate a full or already public bundle, then filter before aggregation.
+
+    The full fleet remains the collector's contract. A public reader accepts
+    older full-fleet documents and prefix expansion, but never serializes an
+    excluded member, including its history or contribution to totals.
+    """
+    fleet = manifest or load_fleet_manifest()
+    public = fleet.public()
+    try:
+        project_bundle_to_manifest(history, snapshot, fleet)
+    except ProgressError:
+        project_bundle_to_manifest(history, snapshot, public)
+    filtered = public_history(history, fleet)
+    if not expand:
+        original_keys = {row["key"] for row in snapshot["repositories"]}
+        public = FleetManifest(
+            {key: mech for key, mech in public.mechs.items() if key in original_keys},
+            fleet.capability_catalogue, fleet.vendored_governance, fleet.source,
+        )
+    projected = snapshot_from_history(filtered, generated_at=snapshot["generated_at"], manifest=public)
+    validate_bundle(filtered, projected, public)
+    return {"history": filtered, "snapshot": projected}
+
+
 def collect_progress(
     runtime_dirs: list[Path], previous_history: dict[str, Any] | None = None, *,
     generated_at: str | None = None, manifest: FleetManifest | None = None,

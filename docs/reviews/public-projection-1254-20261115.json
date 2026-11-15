@@ -1,0 +1,79 @@
+{
+  "issue": 1254,
+  "checked_at": "2026-11-15T23:12:23.035376+00:00",
+  "fresh_pytest_processes": true,
+  "cases": [
+    {
+      "case": "membership",
+      "source": "src/kg_microbe_fleet/__init__.py",
+      "selector": "tests/test_fleet_public.py",
+      "source_sha256": "e9e9a2d41d7b07b6df94c72e6448b75d29d01d946a5a04f366ec306a8227ea23",
+      "baseline_exit": 0,
+      "mutant_exit": 1,
+      "restored_exit": 0
+    },
+    {
+      "case": "aggregation",
+      "source": "src/kg_microbe_progress/__init__.py",
+      "selector": "tests/test_progress_public_membership.py::test_public_projection_removes_history_and_nonzero_contributions",
+      "source_sha256": "1d7b041d5669eaf2020112ad03e22d5b2ee20f60d424a06890dbb36dd4e0247e",
+      "baseline_exit": 0,
+      "mutant_exit": 1,
+      "restored_exit": 0
+    },
+    {
+      "case": "publisher",
+      "source": "scripts/mech_progress_publish.py",
+      "selector": "tests/test_progress_public_membership.py::test_transport_and_site_never_serialize_excluded_member",
+      "source_sha256": "b3266f0e8994e7f757a9d7d041a8e6142353545d34997d67adbbcdef07d22110",
+      "baseline_exit": 0,
+      "mutant_exit": 1,
+      "restored_exit": 0
+    },
+    {
+      "case": "pages",
+      "source": "scripts/build_mech_progress_site.py",
+      "selector": "tests/test_progress_public_membership.py::test_transport_and_site_never_serialize_excluded_member",
+      "source_sha256": "dfc8ec741218734716926ae9aad6d3ffc7cc25e3aeaa6af33c77742132b86aaf",
+      "baseline_exit": 0,
+      "mutant_exit": 1,
+      "restored_exit": 0
+    },
+    {
+      "case": "local-history",
+      "source": "scripts/mech_progress_publish.py",
+      "selector": "tests/test_progress_public_membership.py::test_remote_public_updates_preserve_excluded_local_history",
+      "source_sha256": "b3266f0e8994e7f757a9d7d041a8e6142353545d34997d67adbbcdef07d22110",
+      "baseline_exit": 0,
+      "mutant_exit": 1,
+      "restored_exit": 0
+    },
+    {
+      "case": "status",
+      "source": "scripts/mech_progress_status.py",
+      "selector": "tests/test_progress_status.py::test_published_status_excludes_nonzero_internal_member",
+      "source_sha256": "1b97b2ab65dee69f8b5624a2cc79d698ca965db6ed7614931722a42ce95220a6",
+      "baseline_exit": 0,
+      "mutant_exit": 1,
+      "restored_exit": 0
+    },
+    {
+      "case": "sealed-cohort",
+      "source": "tests/test_governance_infrastructure_admission.py",
+      "selector": "tests/test_governance_infrastructure_admission.py::test_post_admission_catalogue_addition_permits_withheld_capability_and_rejects_drift",
+      "source_sha256": "1c1e28ff21fb29d2bd17af211090726489fcbd7e7203d788963614410644cc67",
+      "baseline_exit": 0,
+      "mutant_exit": 1,
+      "restored_exit": 0
+    },
+    {
+      "case": "durability",
+      "source": "scripts/mech_progress_status.py",
+      "selector": "tests/test_progress_status.py::test_published_durability_validates_internal_targets_then_filters",
+      "source_sha256": "1b97b2ab65dee69f8b5624a2cc79d698ca965db6ed7614931722a42ce95220a6",
+      "baseline_exit": 0,
+      "mutant_exit": 1,
+      "restored_exit": 0
+    }
+  ]
+}

@@ -43,6 +43,7 @@ __all__ = [
     "VENDORED_ROLES",
     "VENDORED_GOVERNANCE_STATES",
     "UniqueKeySafeLoader",
+    "EXCLUDE_FROM_PUBLIC",
 ]
 
 # The manifest ships *inside* this package rather than at the repository root.
@@ -64,6 +65,8 @@ SETTING_TYPES = frozenset(
 )
 
 SUPPORTED_VERSIONS = frozenset({1})
+EXCLUDE_FROM_PUBLIC = "exclude-from-public"
+_TAG_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
 
 _IDENTIFIER_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 _ENVIRONMENT_VARIABLE_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]*$")
@@ -207,6 +210,12 @@ class MechDefinition:
     capabilities: Mapping[str, Capability]
     serialization: Optional["Serialization"] = None
     open_pr_limit: int | None = None
+    tags: tuple[str, ...] = ()
+
+    @property
+    def is_public(self) -> bool:
+        """Whether this member may contribute to public fleet output."""
+        return EXCLUDE_FROM_PUBLIC not in self.tags
 
     def capability(self, name: str) -> Optional[Capability]:
         return self.capabilities.get(name)
@@ -304,6 +313,19 @@ class FleetManifest:
         """Return ``{key: environment variable}`` for every Mech."""
 
         return {key: mech.environment_variable for key, mech in self._mechs.items()}
+
+    def public(self) -> FleetManifest:
+        """Project membership before public serialization or aggregation.
+
+        The original manifest remains the complete internal inventory. An empty
+        public projection is valid; it must never fall back to the full fleet.
+        """
+        return FleetManifest(
+            mechs={key: mech for key, mech in self._mechs.items() if mech.is_public},
+            capability_catalogue=self._capability_catalogue,
+            vendored_governance=self._vendored_governance,
+            source=self._source,
+        )
 
     def with_capability(self, name: str) -> tuple[str, ...]:
         """Return the keys of Mechs declaring ``name`` enabled."""
@@ -790,6 +812,7 @@ def _parse_mech(
         "capabilities",
         "serialization",
         "open_pr_limit",
+        "tags",
     }
     unknown_keys = set(mapping) - allowed_keys
     if unknown_keys:
@@ -800,6 +823,15 @@ def _parse_mech(
     if "open_pr_limit" in mapping and (type(open_pr_limit) is not int or not 1 <= open_pr_limit <= 1000):
         raise FleetManifestError(f"{label}.open_pr_limit must be an integer in 1..1000")
     identity = _parse_mech_identity(key, mapping)
+    tags = mapping.get("tags", [])
+    if not isinstance(tags, list) or any(
+        not isinstance(tag, str) or not _TAG_PATTERN.fullmatch(tag) for tag in tags
+    ):
+        raise FleetManifestError(
+            f"{label}.tags must be a list of lowercase hyphen-separated tags"
+        )
+    if len(set(tags)) != len(tags):
+        raise FleetManifestError(f"{label}.tags must not contain duplicates")
     serialization = (
         _parse_serialization(mapping["serialization"], f"{label}.serialization")
         if "serialization" in mapping
@@ -855,6 +887,7 @@ def _parse_mech(
         capabilities=MappingProxyType(capabilities),
         serialization=serialization,
         open_pr_limit=open_pr_limit,
+        tags=tuple(tags),
     )
 
 

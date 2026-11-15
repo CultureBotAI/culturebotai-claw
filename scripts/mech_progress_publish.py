@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import copy
 import fcntl
 import json
 import os
@@ -19,9 +20,11 @@ import time
 from pathlib import Path
 from typing import Any
 
+from kg_microbe_fleet import load_fleet_manifest
 from kg_microbe_progress import (
     collect_progress,
-    project_bundle_to_manifest,
+    public_bundle,
+    public_history,
     run_key,
     validate_bundle,
     validate_extension,
@@ -109,33 +112,49 @@ def read_remote(api=gh, *, manifest=None, project_expanded=True) -> tuple[str | 
             raise PublishError("Public data blob is too large")
         documents[name] = json.loads(raw)
     history, snapshot = documents["history.json"], documents["progress.json"]
-    projected = project_bundle_to_manifest(history, snapshot, manifest)
-    return head, {"history": history, "snapshot": projected if project_expanded else snapshot}
+    return head, public_bundle(history, snapshot, manifest, expand=project_expanded)
 
 
-def newest_history(local: dict | None, remote: dict | None) -> dict | None:
+def newest_history(local: dict | None, remote: dict | None, *, manifest=None) -> dict | None:
+    fleet = manifest or load_fleet_manifest()
     if local is None:
+        if remote is not None:
+            validate_history(remote, fleet.public())
         return remote
-    validate_history(local)
+    validate_history(local, fleet)
     if remote is None:
         return local
-    validate_history(remote)
+    validate_history(remote, fleet.public())
+    projected_local = public_history(local, fleet)
     try:
-        validate_extension(remote, local)
+        validate_extension(remote, projected_local, fleet.public())
         return local
     except ValueError:
         try:
-            validate_extension(local, remote)
-            return remote
+            validate_extension(projected_local, remote, fleet.public())
+            # Keep internal evidence and its ordering; append only new public
+            # events. Remote publication cannot erase excluded local records.
+            merged = copy.deepcopy(local)
+            for field in ("closures", "pr_events", "associations"):
+                merged[field].extend(copy.deepcopy(remote[field][len(projected_local[field]):]))
+            cursors = {(item["repository_key"], item["run_key"]): item for item in merged["cursors"]}
+            for item in remote["cursors"]:
+                cursors[(item["repository_key"], item["run_key"])] = copy.deepcopy(item)
+            merged["cursors"] = list(cursors.values())
+            validate_extension(local, merged, fleet)
+            return merged
         except ValueError as error:
             raise PublishError("Local and remote histories diverged; reconcile explicitly") from error
 
 
-def publish(bundle: dict, previous_head: str | None, previous: dict | None, *, initialize=False, api=gh) -> str:
+def publish(bundle: dict, previous_head: str | None, previous: dict | None, *, initialize=False, api=gh, manifest=None) -> str:
+    fleet = manifest or load_fleet_manifest()
+    bundle = public_bundle(bundle["history"], bundle["snapshot"], fleet)
     history, snapshot = bundle["history"], bundle["snapshot"]
-    validate_bundle(history, snapshot)
+    validate_bundle(history, snapshot, fleet.public())
     if previous:
-        validate_extension(previous["history"], history)
+        previous = public_bundle(previous["history"], previous["snapshot"], fleet, expand=False)
+        validate_extension(previous["history"], history, fleet.public())
     if previous_head is None and not initialize:
         raise PublishError("Data branch is absent; initial publication requires --initialize")
     if previous == bundle and previous_head:
