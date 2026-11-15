@@ -42,22 +42,34 @@ disagreement between readers is the one that corrupts quietly.
 from __future__ import annotations
 
 import csv
+import gzip
+import hashlib
+import io
+import json
 import re
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Any, Iterable, Sequence
 
 __all__ = [
     "EDGE_REQUIRED",
     "Finding",
     "KgxProfile",
     "NODE_REQUIRED",
+    "RELEASE_ASSETS",
     "Table",
     "check_edges",
     "check_graph",
     "check_nodes",
+    "check_release_bundle",
+    "fetch_release_bundle",
     "read_table",
+    "summarise",
+    "write_release_bundle",
 ]
+
+RELEASE_ASSETS = ("nodes.tsv.gz", "edges.tsv.gz", "manifest.json")
 
 #: KGX requires an identifier and a category on a node, and a triple on an edge.
 #: A subset rather than an exact list: CommunityMech writes five node columns and
@@ -109,6 +121,8 @@ def read_table(path: Path) -> Table:
     file means two different things and one of the readers is silently wrong.
     """
     raw = Path(path).read_bytes()
+    if Path(path).suffix == ".gz" or raw.startswith(b"\x1f\x8b"):
+        raw = gzip.decompress(raw)
     # CRLF is a line ending, not a defect. Stripping it before looking for a
     # stray CR is the whole distinction: CommunityMech's exports are CRLF
     # throughout -- 999 CR, 999 CRLF, none bare -- and treating those as
@@ -133,11 +147,11 @@ def read_table(path: Path) -> Table:
     # Anything left is a CR that was not a line ending.
 
     csv_rows = 0
-    with Path(path).open(encoding="utf-8", errors="replace", newline="") as handle:
-        reader = csv.reader(handle, delimiter="\t")
-        for index, _ in enumerate(reader):
-            if index:
-                csv_rows += 1
+    handle = io.StringIO(raw.decode("utf-8", errors="replace"), newline="")
+    reader = csv.reader(handle, delimiter="\t")
+    for index, _ in enumerate(reader):
+        if index:
+            csv_rows += 1
 
     return Table(
         columns=columns,
@@ -318,3 +332,149 @@ def summarise(findings: Sequence[Finding]) -> dict[str, int]:
     for finding in findings:
         counts[finding.code] = counts.get(finding.code, 0) + 1
     return counts
+
+
+def write_release_bundle(out: Path) -> dict[str, dict[str, Any]]:
+    """Compress ``nodes.tsv`` and ``edges.tsv`` into ``.tsv.gz`` release assets (#540)."""
+    assets: dict[str, dict[str, Any]] = {}
+    for stem in ("nodes.tsv", "edges.tsv"):
+        source = Path(out) / stem
+        raw = source.read_bytes()
+        gz_name = f"{stem}.gz"
+        gz_path = Path(out) / gz_name
+        compressed = gzip.compress(raw, mtime=0)
+        gz_path.write_bytes(compressed)
+        assets[gz_name] = {
+            "sha256": hashlib.sha256(compressed).hexdigest(),
+            "bytes": len(compressed),
+            "uncompressed_sha256": hashlib.sha256(raw).hexdigest(),
+            "uncompressed_bytes": len(raw),
+        }
+    return assets
+
+
+def check_release_bundle(
+    bundle_dir: Path, profile: KgxProfile | None = None
+) -> list[Finding]:
+    """Validate a KGX release bundle (``nodes.tsv.gz``, ``edges.tsv.gz``, ``manifest.json``) (#540)."""
+    root = Path(bundle_dir)
+    missing = [name for name in RELEASE_ASSETS if not (root / name).is_file()]
+    if missing:
+        return [
+            Finding(
+                "MISSING_RELEASE_ASSET",
+                f"release bundle at {root} lacks {', '.join(missing)}",
+            )
+        ]
+
+    manifest_path = root / "manifest.json"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        return [Finding("INVALID_MANIFEST", f"cannot parse {manifest_path}: {exc}")]
+    if not isinstance(manifest, dict):
+        return [Finding("INVALID_MANIFEST", f"{manifest_path} is not a JSON object")]
+
+    findings: list[Finding] = []
+    declared_assets = manifest.get("release_assets")
+    if not isinstance(declared_assets, dict):
+        findings.append(
+            Finding(
+                "MISSING_MANIFEST_CHECKSUMS",
+                "manifest.json has no release_assets mapping for nodes.tsv.gz and edges.tsv.gz",
+            )
+        )
+    else:
+        for asset_name in ("nodes.tsv.gz", "edges.tsv.gz"):
+            entry = declared_assets.get(asset_name)
+            expected_sha = entry.get("sha256") if isinstance(entry, dict) else None
+            actual_bytes = (root / asset_name).read_bytes()
+            actual_sha = hashlib.sha256(actual_bytes).hexdigest()
+            if not isinstance(expected_sha, str) or expected_sha.lower() != actual_sha:
+                findings.append(
+                    Finding(
+                        "MANIFEST_CHECKSUM_MISMATCH",
+                        f"{asset_name} sha256 {actual_sha} != manifest {expected_sha!r}",
+                    )
+                )
+
+    nodes_path = root / "nodes.tsv.gz"
+    edges_path = root / "edges.tsv.gz"
+    try:
+        nodes = read_table(nodes_path)
+        edges = read_table(edges_path)
+    except (OSError, gzip.BadGzipFile) as exc:
+        findings.append(Finding("CORRUPT_GZIP_ASSET", str(exc)))
+        return findings
+
+    findings.extend(check_nodes(nodes, profile))
+    identifiers = {
+        _column(nodes, "id", row) for row in nodes.rows if _column(nodes, "id", row)
+    }
+    findings.extend(check_edges(edges, identifiers, profile))
+
+    stats = manifest.get("statistics")
+    if not isinstance(stats, dict):
+        findings.append(
+            Finding(
+                "MISSING_MANIFEST_STATISTICS",
+                "manifest.json has no statistics object with nodes and edges counts",
+            )
+        )
+    else:
+        expected_nodes = stats.get("nodes")
+        expected_edges = stats.get("edges")
+        if (
+            type(expected_nodes) is not int
+            or expected_nodes < 0
+            or type(expected_edges) is not int
+            or expected_edges < 0
+        ):
+            findings.append(
+                Finding(
+                    "MISSING_MANIFEST_STATISTICS",
+                    "manifest.json statistics.nodes and statistics.edges must be non-negative integers",
+                )
+            )
+        else:
+            if expected_nodes != len(nodes.rows):
+                findings.append(
+                    Finding(
+                        "MANIFEST_ROW_COUNT_MISMATCH",
+                        f"nodes.tsv.gz has {len(nodes.rows)} row(s), manifest says {expected_nodes}",
+                    )
+                )
+            if expected_edges != len(edges.rows):
+                findings.append(
+                    Finding(
+                        "MANIFEST_ROW_COUNT_MISMATCH",
+                        f"edges.tsv.gz has {len(edges.rows)} row(s), manifest says {expected_edges}",
+                    )
+                )
+    return findings
+
+
+def fetch_release_bundle(
+    github_repo: str,
+    dest_dir: Path,
+    *,
+    tag: str | None = None,
+    runner=subprocess.run,
+) -> Path:
+    """Download ``nodes.tsv.gz``, ``edges.tsv.gz``, and ``manifest.json`` from a GitHub Release (#540)."""
+    dest = Path(dest_dir)
+    dest.mkdir(parents=True, exist_ok=True)
+    cmd = ["gh", "release", "download"]
+    if tag and tag != "latest":
+        cmd.append(tag)
+    cmd.extend(["-R", github_repo, "--dir", str(dest), "--clobber"])
+    for asset in RELEASE_ASSETS:
+        cmd.extend(["--pattern", asset])
+    result = runner(cmd, capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "").strip()
+        raise RuntimeError(
+            f"could not download KGX release assets from {github_repo}: {detail}"
+        )
+    return dest
+

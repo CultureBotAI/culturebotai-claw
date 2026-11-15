@@ -489,6 +489,59 @@ def test_the_tsv_columns_are_fixed_and_the_writer_agrees(tmp_path):
     assert tuple(header) == fbs.TSV_COLUMNS
 
 
+def test_branch_snapshot_transition_is_serialized_and_cleans_counterpart(
+    tmp_path, monkeypatch
+):
+    """#416, #417: `fleet_branch_status.write_tsv` writes atomically via
+    `os.replace`, removes the stale `.partial.tsv` counterpart on a clean
+    re-run, and serializes both under a persistent per-date lock."""
+    snap = "2026-09-09T00:00:00+00:00"
+    names = _manifest_repo_names()
+    complete = fbs.tsv_path(tmp_path, snap, complete=True)
+    partial = fbs.tsv_path(tmp_path, snap, complete=False)
+    partial.write_text("stale partial snapshot", encoding="utf-8")
+    lock_path = fbs._snapshot_lock_path(tmp_path, snap)
+    events = []
+    lock_held = False
+    real_flock = fbs.fcntl.flock
+    real_replace = fbs.os.replace
+    real_unlink = fbs.Path.unlink
+
+    def tracking_flock(fd, operation):
+        nonlocal lock_held
+        if operation == fbs.fcntl.LOCK_EX:
+            assert not lock_held
+            lock_held = True
+            events.append("lock")
+        elif operation == fbs.fcntl.LOCK_UN:
+            assert lock_held
+            events.append("unlock")
+            lock_held = False
+        return real_flock(fd, operation)
+
+    def tracking_replace(source, destination):
+        assert lock_held
+        events.append("replace")
+        return real_replace(source, destination)
+
+    def tracking_unlink(path, *args, **kwargs):
+        assert path != lock_path, "the stable lock file must never be unlinked"
+        if path in {complete, partial}:
+            assert lock_held
+            events.append("delete-counterpart")
+        return real_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(fbs.fcntl, "flock", tracking_flock)
+    monkeypatch.setattr(fbs.os, "replace", tracking_replace)
+    monkeypatch.setattr(fbs.Path, "unlink", tracking_unlink)
+
+    assert fbs.write_tsv(_data({names[0]: [_row("a")]}), tmp_path, snap) == complete
+    assert events == ["lock", "replace", "delete-counterpart", "unlock"]
+    assert complete.exists() and not partial.exists()
+    assert lock_path.exists()
+
+
+
 # --------------------------------------------------------------------------
 # exit codes
 # --------------------------------------------------------------------------

@@ -121,8 +121,24 @@ a local commit or remote-tracking ref alone is not publication proof. Inspect
 the repository's current workflow triggers before claiming a branch push runs
 no CI. A goal delivering commits cannot close while recorded commits exist only
 locally. Publication failure is a retained blocker, never permission to discard
-the branch. This rule grants no Git mutation, merge, cleanup or provider
+the branch. When creating, editing or commenting on PRs and issues with `gh`,
+write the Markdown body to an owned file first and pass `--body-file <path>`;
+never interpolate body text into a shell `--body "..."` string where backticks,
+`$`, quotes or newlines invoke command substitution. Retain the body artifact
+and verify the published text (`gh pr view <n> --json body` or
+`gh issue view <n> --json body`). Existing running background tasks remain
+operator-owned; an idle or recycle guard reports and holds them, never kills
+them. This rule grants no Git mutation, merge, cleanup or provider
 authorization beyond the task and the skill's existing boundaries.
+
+## Reusable baseline integration
+
+The [baseline guide](../../../docs/guides/MECH_TEMPLATE.md) binds parent, schema
+and skill source hashes and records consumer adoption decisions. Refresh it when
+these sources change. Baseline installation is a candidate infrastructure update;
+it never activates a profile, rewrites running-cycle state or releases a pin.
+Use `onboard-mech` for compare/plan/adopt/drift and this skill for native workflow
+bindings, applicability and boundary migration.
 
 ## Prepare and activate a change
 

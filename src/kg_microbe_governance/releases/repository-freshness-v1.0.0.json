@@ -1,0 +1,11 @@
+{
+  "schema_version": "1.0.0",
+  "id": "repository-freshness",
+  "version": "1.0.0",
+  "tag": "repository-freshness-v1.0.0",
+  "repository": "CultureBotAI/culturebotai-claw",
+  "source_pr": 1128,
+  "default_branch": "main",
+  "source_rule": "actual_protected_squash_merge",
+  "adoption_authority": false
+}

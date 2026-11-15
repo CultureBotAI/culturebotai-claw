@@ -27,9 +27,17 @@ def _load(monkeypatch, mim_root: Path):
     """Import a fresh copy of the module bound to `mim_root`.
 
     MIM_ROOT is resolved at import time, so each case needs its own module
-    object rather than a reload of a shared one.
+    object rather than a reload of a shared one. Directs OPENCLAW_WORKSPACE to
+    an isolated directory so `main()` never writes reports or journals into the
+    checkout's `workspace/` (#864).
     """
+    workspace = (
+        mim_root / ".test-workspace"
+        if mim_root.is_dir()
+        else mim_root.parent / ".test-workspace"
+    )
     monkeypatch.setenv("MEDIAINGREDIENTMECH_ROOT", str(mim_root))
+    monkeypatch.setenv("OPENCLAW_WORKSPACE", str(workspace))
     spec = importlib.util.spec_from_file_location("_classify_under_test", SCRIPT)
     mod = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = mod
@@ -430,3 +438,22 @@ def test_an_empty_corpus_with_a_broken_schema_now_fails_rather_than_passing(
 
     with pytest.raises(mod.VocabularyError):
         mod.main()
+
+
+def test_main_writes_reports_and_journals_to_openclaw_workspace_not_checkout(
+    monkeypatch, tmp_path
+):
+    """#864: `main()` must direct reports and write journals to the configured
+    `OPENCLAW_WORKSPACE` rather than polluting the checkout's `workspace/`."""
+    _corpus(tmp_path)
+    _write_schema(tmp_path, "NAMED_MEDIUM")
+    mod = _load(monkeypatch, tmp_path)
+    monkeypatch.setattr(sys, "argv", ["classify_ingredient_type.py", "--apply"])
+
+    assert mod.OUT_DIR == tmp_path / ".test-workspace" / "reports"
+    assert not mod.OUT_DIR.is_relative_to(REPO_ROOT / "workspace")
+    assert mod.main() == 0
+    assert mod.OUT_TSV.is_file()
+    assert mod.OUT_MD.is_file()
+    assert list((mod.OUT_DIR / "write_journal").glob("*.json"))
+

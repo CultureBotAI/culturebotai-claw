@@ -3,13 +3,32 @@
 from __future__ import annotations
 
 import argparse
+import json
+import os
+import re
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 from typing import Protocol
 
 from kg_microbe_fleet import load_fleet_manifest
 from kg_microbe_fleet.roots import MechRootError, claw_root, resolve_mech_root
+from kg_microbe_sources.acs_figshare import (
+    AcsFigshareClient,
+    AcsFigshareError,
+    AcsSupportingInformation,
+    stage_acs_supporting_file,
+)
 from kg_microbe_sources.catalogue import CatalogueError, load_blocks, validate
+from kg_microbe_sources.fetch import FetchError
+from kg_microbe_sources.fulltext_access import (
+    FulltextResolution,
+    access_ladder,
+    author_request_draft,
+    crossref_meta,
+    epmc_core,
+    fetch_to_staging,
+)
 from kg_microbe_sources.imodulondb import (
     DEFAULT_BASE_URL,
     ImodulonDBClient,
@@ -21,6 +40,10 @@ from kg_microbe_sources.imodulondb import (
     dataset_key,
     gene_key,
     imodulon_key,
+)
+from kg_microbe_sources.local_provenance import (
+    extract_citations_from_text,
+    search_local_provenance,
 )
 
 CLAW_ROOT = claw_root()
@@ -36,10 +59,17 @@ class ImodulonDB(Protocol):
     ) -> ImodulonGeneTable: ...
 
 
+class AcsFigshare(Protocol):
+    def probe_supporting_info(
+        self, raw_doi: str, *, index: int = 1
+    ) -> AcsSupportingInformation | None: ...
+
+
 def main(
     argv: list[str] | None = None,
     *,
     imodulondb_client: ImodulonDB | None = None,
+    acs_figshare_client: AcsFigshare | None = None,
 ) -> int:
     args = _parser().parse_args(argv)
     if args.command == "imodulondb":
@@ -70,6 +100,31 @@ def main(
         except ImodulonDBError as exc:
             print(str(exc), file=sys.stderr)
             return 2
+
+    if args.command == "acs-si":
+        acs_client = acs_figshare_client or AcsFigshareClient(timeout=args.timeout)
+        try:
+            info = acs_client.probe_supporting_info(args.doi, index=args.index)
+            if info is None:
+                print(f"No ACS Figshare Supporting Information found for {args.doi}")
+                return 1
+            if args.dest_dir is not None:
+                for si_file in info.files:
+                    stage_acs_supporting_file(si_file, args.dest_dir)
+        except (AcsFigshareError, FetchError) as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+        if args.json:
+            print(json.dumps(info.to_dict(), indent=2))
+        else:
+            _print_acs_si(info)
+        return 0
+
+    if args.command == "local-provenance":
+        return _run_local_provenance(args)
+
+    if args.command == "fulltext":
+        return _run_fulltext(args, acs_figshare_client=acs_figshare_client)
 
     return _check_catalogue(args)
 
@@ -155,6 +210,115 @@ def _parser() -> argparse.ArgumentParser:
         type=_positive_int,
         default=20,
         help="maximum in-iModulon genes to list by absolute weight",
+    )
+
+    acs_si = subparsers.add_parser(
+        "acs-si",
+        help="probe ACS Publications Figshare API v2 for <doi>.s001 Supporting Information",
+        description=(
+            "Query the public Figshare API v2 for an ACS article's child "
+            "Supporting Information DOI (<doi>.s001) and optionally stage its "
+            "files with SHA-256 provenance sidecars."
+        ),
+    )
+    acs_si.add_argument(
+        "--doi",
+        required=True,
+        help="ACS article DOI (e.g. 10.1021/acschembio.8b00793)",
+    )
+    acs_si.add_argument(
+        "--index",
+        type=_positive_int,
+        default=1,
+        help="SI suffix index (.s001 -> 1, default: %(default)s)",
+    )
+    acs_si.add_argument(
+        "--timeout",
+        type=_positive_int,
+        default=30,
+        help="HTTP timeout in seconds (default: %(default)s)",
+    )
+    acs_si.add_argument(
+        "--dest-dir",
+        type=Path,
+        default=None,
+        help="optional gitignored directory (e.g. .temp/acs-si/) to download SI files into",
+    )
+    acs_si.add_argument(
+        "--json",
+        action="store_true",
+        help="emit JSON instead of Markdown",
+    )
+
+    local_prov = subparsers.add_parser(
+        "local-provenance",
+        help="search gitignore-independently across local Mech caches/raw tables for citations",
+        description=(
+            "Extract DOIs, PMIDs, CAS-RNs, ChEBI IDs, and Standard InChIKeys "
+            "from a record file or explicit tokens and search local Mech "
+            "research_notes/, references_cache/, data/raw/, and harvest TSVs."
+        ),
+    )
+    local_prov.add_argument(
+        "--record",
+        type=Path,
+        default=None,
+        help="path to a Mech YAML/Markdown record to extract citations and chemical IDs from",
+    )
+    local_prov.add_argument(
+        "--token",
+        action="append",
+        default=[],
+        help="explicit DOI, PMID, CAS-RN, CHEBI ID, or InChIKey to search (repeatable)",
+    )
+    local_prov.add_argument(
+        "--root",
+        type=Path,
+        action="append",
+        default=[],
+        help="directory or TSV file to search (repeatable; defaults to record repo root if omitted)",
+    )
+    local_prov.add_argument(
+        "--max-hits-per-root",
+        type=_positive_int,
+        default=200,
+        help="maximum hits to collect per root (default: %(default)s)",
+    )
+    local_prov.add_argument(
+        "--json",
+        action="store_true",
+        help="emit JSON instead of Markdown",
+    )
+
+    fulltext = subparsers.add_parser(
+        "fulltext",
+        help="run the legal full-text discovery ladder for a DOI or PMID",
+        description=(
+            "Check local Zotero PDFs, Europe PMC OA, OpenAlex OA, bioRxiv/medRxiv, "
+            "DOE OSTI.gov, LBNL publisher TDM APIs (Elsevier, Springer Nature, Wiley), "
+            "CORE, and ACS Figshare Supporting Information (.s001) without disclosing "
+            "personal email addresses."
+        ),
+    )
+    ft_group = fulltext.add_mutually_exclusive_group(required=True)
+    ft_group.add_argument("--pmid", help="PubMed ID to resolve")
+    ft_group.add_argument("--doi", help="Article DOI to resolve")
+    fulltext.add_argument("--title", default=None, help="fallback title for CORE search")
+    fulltext.add_argument(
+        "--fetch-to",
+        type=Path,
+        default=None,
+        help="stage the resolved payload to this path (outside references_cache/)",
+    )
+    fulltext.add_argument(
+        "--no-acs-si",
+        action="store_true",
+        help="skip ACS Figshare (.s001) Supporting Information fallback",
+    )
+    fulltext.add_argument(
+        "--json",
+        action="store_true",
+        help="emit JSON instead of tab-delimited output",
     )
 
     return parser
@@ -355,6 +519,159 @@ def _md(value: object) -> str:
     if value is None or value == "":
         return ""
     return str(value).replace("\n", " ").replace("|", r"\|")
+
+
+def _print_acs_si(info: AcsSupportingInformation) -> None:
+    print(f"# ACS Supporting Information: `{info.si_doi}`")
+    print()
+    print(f"- parent DOI: `{info.parent_doi}`")
+    print(f"- Figshare article ID: `{info.article_id}`")
+    print(f"- title: {_md(info.title)}")
+    print(f"- public URL: {info.url_public_html}")
+    print(f"- files: {len(info.files)}")
+    print()
+    print("| file_id | name | size (bytes) | md5 | download_url |")
+    print("|---:|---|---:|---|---|")
+    for f in info.files:
+        print(
+            f"| `{f.file_id}` | `{_md(f.name)}` | {f.size} | "
+            f"`{_md(f.supplied_md5)}` | {f.download_url} |"
+        )
+
+
+def _run_local_provenance(args: argparse.Namespace) -> int:
+    tokens: list[str] = list(args.token or [])
+    if args.record is not None:
+        if not args.record.is_file():
+            print(f"record file does not exist: {args.record}", file=sys.stderr)
+            return 2
+        text = args.record.read_text(encoding="utf-8", errors="replace")
+        tokens.extend(extract_citations_from_text(text))
+
+    if not tokens:
+        print("provide at least one --token or a --record with citations", file=sys.stderr)
+        return 2
+
+    roots: list[Path] = list(args.root or [])
+    if not roots:
+        if args.record is not None:
+            roots.append(args.record.resolve().parent)
+        else:
+            roots.append(Path.cwd())
+
+    report = search_local_provenance(
+        tokens,
+        roots,
+        max_hits_per_root=args.max_hits_per_root,
+    )
+    if args.json:
+        print(json.dumps(report.to_dict(), indent=2))
+        return 0
+
+    print("# Local Provenance Lookup")
+    print()
+    print(f"- tokens queried: {len(report.tokens)} ({', '.join(f'`{t}`' for t in report.tokens)})")
+    print(f"- ACS DOIs eligible for `.s001` Figshare SI probe: {len(report.acs_dois)}")
+    for acs_doi in report.acs_dois:
+        print(f"  - `{acs_doi}` -> `kg-microbe-sources acs-si --doi {acs_doi}`")
+    print(f"- total hits: {len(report.hits)}")
+    print()
+    if report.hits:
+        print("| root | category | path:line | token | snippet |")
+        print("|---|---|---|---|---|")
+        for hit in report.hits:
+            print(
+                f"| `{_md(hit.root)}` | `{hit.category}` | "
+                f"`{_md(hit.relative_path)}:{hit.line_number}` | "
+                f"`{_md(hit.matched_token)}` | {_md(hit.snippet)} |"
+            )
+    return 0
+
+
+def _run_fulltext(
+    args: argparse.Namespace,
+    *,
+    acs_figshare_client: AcsFigshare | None = None,
+) -> int:
+    rec = epmc_core(args.pmid, args.doi)
+    doi = args.doi or rec.get("doi")
+    if not rec.get("title"):
+        rec = {**crossref_meta(doi), **rec}
+    title = args.title or re.sub(r"<[^>]+>", "", str(rec.get("title", "") or ""))
+
+    acs_client = (
+        acs_figshare_client
+        if isinstance(acs_figshare_client, AcsFigshareClient)
+        else None
+    )
+    method, url = access_ladder(
+        rec,
+        doi,
+        title,
+        pmid=args.pmid,
+        include_acs_si=not args.no_acs_si,
+        acs_client=acs_client,
+    )
+    staged_str: str | None = None
+    if url:
+        if args.fetch_to is not None:
+            try:
+                saved = fetch_to_staging(method, url, args.fetch_to)
+                staged_str = str(saved)
+            except Exception as exc:
+                print(str(exc), file=sys.stderr)
+                return 2
+        if args.json:
+            res = FulltextResolution(
+                method=method,
+                url=url,
+                doi=doi,
+                pmid=args.pmid or rec.get("pmid"),
+                title=title,
+                staged_path=staged_str,
+            )
+            print(json.dumps(res.to_dict(), indent=2))
+        else:
+            print(f"ACCESS\t{method}\t{url}")
+            if staged_str:
+                print(f"SAVED\t{method}\t{staged_str}")
+        return 0
+
+    if args.json:
+        res = FulltextResolution(
+            method="none",
+            url=None,
+            doi=doi,
+            pmid=args.pmid or rec.get("pmid"),
+            title=title,
+            staged_path=None,
+        )
+        print(json.dumps(res.to_dict(), indent=2))
+        return 2
+
+    print(
+        "NO_LEGAL_OA\t(paywalled; no full text via Zotero / Europe PMC / OpenAlex / OSTI / TDM / CORE / ACS SI)",
+        file=sys.stderr,
+    )
+    missing_keys = [
+        k
+        for k in (
+            "ZOTERO_DATA_DIR",
+            "ELSEVIER_API_KEY",
+            "SPRINGER_API_KEY",
+            "WILEY_TDM_TOKEN",
+            "CORE_API_KEY",
+        )
+        if not os.environ.get(k)
+    ]
+    if missing_keys:
+        print(
+            f"  (optional API keys not set: {', '.join(missing_keys)})",
+            file=sys.stderr,
+        )
+    print("\n--- author-request draft ---")
+    print(author_request_draft(rec, doi))
+    return 2
 
 
 if __name__ == "__main__":  # pragma: no cover - console entry point

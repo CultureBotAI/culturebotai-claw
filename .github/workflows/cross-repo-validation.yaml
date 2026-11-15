@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: "27 7 * * *"   # daily at 07:27 UTC
   workflow_dispatch:
+    inputs:
+      rehearse_alarm:
+        description: "Intentionally fail and rehearse the alarm step without waiting for the nightly schedule"
+        required: false
+        default: false
+        type: boolean
   push:
     branches: [main]
     paths:
@@ -122,6 +128,12 @@ jobs:
         run: |
           uv run --frozen python -m kg_microbe_skills check
 
+      - name: Rehearse alarm failure
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.rehearse_alarm }}
+        run: |
+          echo "Rehearsing cross-repo-validation alarm path (rehearse_alarm=true)." >&2
+          exit 1
+
       - name: Upload inventory + validation reports
         # The job stops at the first failed step, so without this the reports
         # are uploaded only on the runs nobody needs them for. Every failing
@@ -143,7 +155,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Open issue on validation failure
-        if: failure() && github.event_name == 'schedule'
+        if: ${{ failure() && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.rehearse_alarm)) }}
         uses: actions/github-script@v7
         with:
           script: |
@@ -158,12 +170,16 @@ jobs:
             let where =
               "No step reported a failure conclusion; read the run log directly.";
             try {
-              const { data: listing } = await github.rest.actions.listJobsForWorkflowRun({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                run_id: context.runId,
-              });
-              const failed = listing.jobs
+              const jobs = await github.paginate(
+                github.rest.actions.listJobsForWorkflowRun,
+                {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  run_id: context.runId,
+                  per_page: 100,
+                },
+              );
+              const failed = jobs
                 .flatMap((job) => (job.steps || []).map((step) => ({ job, step })))
                 .filter(({ step }) => step.conclusion === "failure")
                 .map(({ job, step }) => `\`${job.name}\` -> \`${step.name}\``);
@@ -191,6 +207,19 @@ jobs:
               labels: "cross-repo-validation",
               state: "open",
             });
+            const rehearse =
+              context.eventName === "workflow_dispatch" &&
+              context.payload.inputs &&
+              (context.payload.inputs.rehearse_alarm === true ||
+                context.payload.inputs.rehearse_alarm === "true");
+            if (rehearse) {
+              await core.summary
+                .addHeading(title, 2)
+                .addRaw(body, true)
+                .addRaw(`\nOpen cross-repo-validation issues found: ${issues.length}`, true)
+                .write();
+              return;
+            }
             if (issues.length === 0) {
               await github.rest.issues.create({
                 owner: context.repo.owner,

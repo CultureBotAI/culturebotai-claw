@@ -1,0 +1,96 @@
+identifier: mesh:C559991
+preferred_term: 3,4'-Dihydroxyflavone
+ontology_mapping:
+  ontology_id: mesh:C559991
+  ontology_label: 3,4'-dihydroxyflavone
+  ontology_source: MESH
+  mapping_quality: EXACT_MATCH
+  evidence:
+  - evidence_type: DATABASE_MATCH
+    source: CultureBotHT
+    notes: Imported from CultureBotHT. CAS-RN 14919-49-4 present, but no CHEBI entry
+      exists (checked OAK CHEBI sqlite + PubChem CID synonyms). Curator can promote
+      to a CHEBI primary if/when CHEBI adds the term.
+  - evidence_type: DATABASE_MATCH
+    source: MESH via OLS (label-exact)
+    notes: Parent class identified via label-exact; matched_via="3,4'-Dihydroxyflavone"
+  - evidence_type: MANUAL_CURATION
+    source: MIM curation (#312); chebi.db
+    notes: 'identifier cas:14919-49-4 -> mesh:C559991; ontology mesh:C559991 (''3,4''-dihydroxyflavone'')
+      -> mesh:C559991 (''3,4''-dihydroxyflavone''); mapping_quality NARROW_MATCH ->
+      EXACT_MATCH. mesh.db gives MESH:C559991 the label "3,4''-dihydroxyflavone",
+      identical to the record''s label and distinct from MESH:C028288 "3'',4''-dihydroxyflavone".
+      chebi.db has no term for this compound (CAS 14919-49-4 and the name resolve
+      to nothing). A broadMatch from a record to the same compound is false; Section
+      3 step 1 makes the MeSH term the identifier (68 records already carry mesh:
+      primaries) with EXACT_MATCH. The CAS stays in chemical_properties and on its
+      registry row; the kgmicrobe.compound row is dropped as #326 did for 72-Dihydroxyflavone.'
+synonyms: []
+mapping_status: MAPPED
+occurrence_statistics:
+  total_occurrences: 0
+  media_count: 0
+curation_history:
+- timestamp: '2026-04-29T06:51:33.117170+00:00'
+  curator: audit_add_remaining_culturebotht
+  action: CREATED_FROM_CAS_FALLBACK
+  changes: Created with cas:14919-49-4 as primary identifier; no CHEBI entry exists
+    for this compound.
+  new_status: MAPPED
+  llm_assisted: false
+- timestamp: '2026-05-01T07:35:31.863369+00:00'
+  curator: auto_classify_ingredient_type
+  action: AUTO_CLASSIFY_INGREDIENT_TYPE
+  changes: 'set ingredient_type=SINGLE_INGREDIENT (cas: primary (defined chemical))'
+  llm_assisted: false
+- timestamp: '2026-05-02T02:51:22.040524+00:00'
+  curator: auto_classify_ingredient_type
+  action: AUTO_BACKFILL_PUBCHEM_CHEMISTRY
+  changes: molecular_formula=C15H10O4; smiles=C1=CC=C2C(=C1)C(=O)C(=C(O2)C3=CC=C(C=C3)O)O;
+    inchi=InChI=1S/C15H10O4/c16-10-7-5-9(6-8-10)15-14(18)13(
+  llm_assisted: false
+- timestamp: '2026-05-02T03:12:12.033855+00:00'
+  curator: auto_classify_ingredient_type
+  action: AUTO_CLASSIFY_INGREDIENT_TYPE
+  changes: set ingredient_type=SINGLE_INGREDIENT (chemical structure populated (molecular_formula))
+  llm_assisted: false
+- timestamp: '2026-05-02T04:38:02.386202+00:00'
+  curator: backfill_parent_terms
+  action: BACKFILL_PARENT_MESH
+  changes: set ontology_mapping parent=mesh:C559991 (label-exact)
+  llm_assisted: false
+- timestamp: '2026-09-23T00:44:54.166138+00:00'
+  curator: claude
+  action: REGRADED_PARENT_TO_IDENTITY
+  changes: 'identifier cas:14919-49-4 -> mesh:C559991; ontology mesh:C559991 (''3,4''-dihydroxyflavone'')
+    -> mesh:C559991 (''3,4''-dihydroxyflavone''); mapping_quality NARROW_MATCH ->
+    EXACT_MATCH. mesh.db gives MESH:C559991 the label "3,4''-dihydroxyflavone", identical
+    to the record''s label and distinct from MESH:C028288 "3'',4''-dihydroxyflavone".
+    chebi.db has no term for this compound (CAS 14919-49-4 and the name resolve to
+    nothing). A broadMatch from a record to the same compound is false; Section 3
+    step 1 makes the MeSH term the identifier (68 records already carry mesh: primaries)
+    with EXACT_MATCH. The CAS stays in chemical_properties and on its registry row;
+    the kgmicrobe.compound row is dropped as #326 did for 72-Dihydroxyflavone. (#312)'
+  previous_status: MAPPED
+  new_status: MAPPED
+  llm_assisted: true
+  llm_model: claude-fable-5-1
+- timestamp: '2026-11-08T22:01:42+00:00'
+  curator: codex
+  action: ASSIGNED_MIM_ID
+  changes: '#1265: assigned permanent MIM:0000146; retained mapping identifier and
+    legacy aliases.'
+  llm_assisted: true
+chemical_properties:
+  cas_rn: 14919-49-4
+  data_source: CultureBotHT compounds_to_cas.csv
+  retrieval_date: '2026-04-29T06:51:33.117170+00:00'
+  molecular_formula: C15H10O4
+  smiles: C1=CC=C2C(=C1)C(=O)C(=C(O2)C3=CC=C(C=C3)O)O
+  inchi: InChI=1S/C15H10O4/c16-10-7-5-9(6-8-10)15-14(18)13(17)11-3-1-2-4-12(11)19-15/h1-8,16,18H
+  pubchem_cid: 688715
+ingredient_type: SINGLE_INGREDIENT
+mim_id: MIM:0000146
+legacy_identifiers:
+- MIM:34-Dihydroxyflavone
+- mesh:C559991

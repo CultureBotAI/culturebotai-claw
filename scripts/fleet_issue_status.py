@@ -29,20 +29,32 @@ be queried or a listing reached its limit, and 2 bad usage or `gh` unavailable.
 from __future__ import annotations
 
 import argparse
-import csv
 import datetime as _dt
+import fcntl  # noqa: F401 - re-exported for lock-contract tests
 import json
-import os
+import os  # noqa: F401 - re-exported for lock-contract tests
 import shutil
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
+from typing import Iterator
 
-from kg_microbe_fleet import FleetManifest, FleetManifestError, load_fleet_manifest
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _fleet_common import (  # noqa: E402
+    CONTROL_PLANE_REPOSITORY,  # noqa: F401
+    DEFAULT_TSV_DIR,
+    GhError,
+    _cell,
+    _gh,
+    _listing,
+    fleet_repository_identities,
+    snapshot_lock_for,
+    snapshot_lock_path_for,
+    tsv_path_for,
+    write_snapshot_tsv,
+)
 
-#: The control plane is reported beside the Mechs but is not itself a Mech.
-CONTROL_PLANE_REPOSITORY = "CultureBotAI/culturebotai-claw"
+from kg_microbe_fleet import FleetManifest, FleetManifestError  # noqa: E402
 
 ISSUE_FIELDS = "number,title,labels,assignees,author,milestone,createdAt,updatedAt,url"
 PR_FIELDS = "number,isDraft,mergeable"
@@ -55,57 +67,13 @@ TSV_COLUMNS = (
     "days_since_update",
 )
 
-DEFAULT_TSV_DIR = Path(__file__).resolve().parents[1] / "workspace" / "reports"
-
-
-class GhError(RuntimeError):
-    pass
-
-
-def _gh(args: list[str], timeout: int = 60) -> str:
-    proc = subprocess.run(
-        ["gh", *args], capture_output=True, text=True, timeout=timeout
-    )
-    if proc.returncode != 0:
-        raise GhError((proc.stderr or proc.stdout).strip() or "gh failed")
-    return proc.stdout
-
-
-def fleet_repository_identities(
-    manifest: FleetManifest | None = None,
-) -> tuple[str, ...]:
-    """Return claw plus the exact manifest-defined Mech fleet, in stable order."""
-
-    manifest = manifest or load_fleet_manifest()
-    return (CONTROL_PLANE_REPOSITORY,) + tuple(
-        mech.github for mech in manifest.mechs.values()
-    )
-
-
-def _listing(kind: str, repository: str, fields: str, limit: int) -> tuple[list[dict], bool]:
-    """Open issues or PRs, capped at `limit`, and whether more were left behind.
-
-    Asks for one more than the cap: `gh ... list` returns a plain list with no
-    more-pages indicator, so a listing that lands exactly on the limit is
-    indistinguishable from one cut short by it unless the probe row is
-    requested. It comes back only if something would have been dropped.
-    Sorted newest-first before the slice, so the row dropped is the oldest.
-    """
-    raw = _gh([
-        kind, "list", "--repo", repository, "--state", "open",
-        "--limit", str(limit + 1), "--json", fields,
-    ])
-    items = json.loads(raw)
-    truncated = len(items) > limit
-    return sorted(items, key=lambda item: -item["number"])[:limit], truncated
-
 
 def open_issues(repository: str, issue_limit: int) -> tuple[list[dict], bool]:
-    return _listing("issue", repository, ISSUE_FIELDS, issue_limit)
+    return _listing("issue", repository, ISSUE_FIELDS, issue_limit, gh=_gh)
 
 
 def open_prs(repository: str, pr_limit: int) -> tuple[list[dict], bool]:
-    return _listing("pr", repository, PR_FIELDS, pr_limit)
+    return _listing("pr", repository, PR_FIELDS, pr_limit, gh=_gh)
 
 
 def collect(
@@ -212,21 +180,6 @@ def _pr_summary(prs: list[dict]) -> dict:
     }
 
 
-def _cell(value: object) -> object:
-    """Flatten strings and keep spreadsheet software from executing them.
-
-    No delimiter can survive in the data, so the file is written unquoted and
-    `cut -f5` works. Cells beginning with ``=``, ``+``, ``-`` or ``@`` are
-    prefixed with an apostrophe after flattening, as in the PR snapshot.
-    """
-    if not isinstance(value, str):
-        return value
-    flattened = " ".join(value.split())
-    if flattened.startswith(("=", "+", "-", "@")):
-        return "'" + flattened
-    return flattened
-
-
 def tsv_rows(data: dict, snapshot_utc: str) -> list[dict]:
     """One row per open issue, in fixed repository order."""
 
@@ -259,39 +212,28 @@ def tsv_rows(data: dict, snapshot_utc: str) -> list[dict]:
 def tsv_path(out_dir: Path, snapshot_utc: str, complete: bool) -> Path:
     """Datestamped, and marked `.partial` when coverage was incomplete, so the
     fact travels with the file after the console warning is gone."""
-    stem = f"fleet_issue_status_{snapshot_utc[:10]}"
-    if not complete:
-        stem += ".partial"
-    return out_dir / f"{stem}.tsv"
+    return tsv_path_for("fleet_issue_status", out_dir, snapshot_utc, complete)
+
+
+def _snapshot_lock_path(out_dir: Path, snapshot_utc: str) -> Path:
+    """One persistent lock inode shared by both completeness variants."""
+    return snapshot_lock_path_for("fleet_issue_status", out_dir, snapshot_utc)
+
+
+def _snapshot_lock(out_dir: Path, snapshot_utc: str) -> Iterator[None]:
+    """Lock one date without following or replacing the stable lock inode."""
+    return snapshot_lock_for("fleet_issue_status", out_dir, snapshot_utc)
 
 
 def write_tsv(data: dict, out_dir: Path, snapshot_utc: str) -> Path:
-    complete = snapshot_is_complete(data)
-    path = tsv_path(out_dir, snapshot_utc, complete)
-    counterpart = tsv_path(out_dir, snapshot_utc, not complete)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary: Path | None = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            mode="w", dir=path.parent, prefix=f".{path.name}.",
-            newline="", delete=False,
-        ) as handle:
-            temporary = Path(handle.name)
-            writer = csv.DictWriter(
-                handle, fieldnames=list(TSV_COLUMNS), delimiter="\t",
-                lineterminator="\n", extrasaction="raise",
-                quoting=csv.QUOTE_NONE, quotechar=None,
-            )
-            writer.writeheader()
-            writer.writerows(tsv_rows(data, snapshot_utc))
-        os.replace(temporary, path)
-        temporary = None
-        counterpart.unlink(missing_ok=True)
-    except BaseException:
-        if temporary is not None:
-            temporary.unlink(missing_ok=True)
-        raise
-    return path
+    return write_snapshot_tsv(
+        "fleet_issue_status",
+        TSV_COLUMNS,
+        tsv_rows(data, snapshot_utc),
+        out_dir,
+        snapshot_utc,
+        snapshot_is_complete(data),
+    )
 
 
 def render(data: dict, snapshot_utc: str, stale_days: int) -> str:

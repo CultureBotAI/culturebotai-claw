@@ -218,8 +218,9 @@ def check_stylesheet(
     # silence reads exactly like a pass. The table is hand-written, so it can
     # only be as complete as whoever last edited it -- this reports the gap
     # rather than leaving it to be noticed (#288).
+    examined_foregrounds = {fg for fg, _bg, _why in pairings}
     unexamined = sorted(
-        set(_COLOUR_DECLARATION.findall(css)) - _EXAMINED_FOREGROUNDS
+        set(_COLOUR_DECLARATION.findall(css)) - examined_foregrounds
     )
     findings.extend(
         ContrastFinding(

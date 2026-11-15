@@ -37,7 +37,18 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"
 
 # Scripts that still embed a home-directory path. Shrink this; never grow it.
-HARDCODED_PATHS: set[str] = set()
+# The eight adhoc entries below are committed historical reviewer probes from
+# PR #851 (round 10) and PR #897 (round 9), disclosed in their file headers (#1064).
+HARDCODED_PATHS: set[str] = {
+    "adhoc/review_cleanup_851_r10_own_mutants.py",
+    "adhoc/review_cleanup_851_r10_probe_git_semantics.sh",
+    "adhoc/review_cleanup_851_r10_probe_readback.py",
+    "adhoc/review_taxon_links_897_r9_probe1_read_tsv.py",
+    "adhoc/review_taxon_links_897_r9_probe2_compression.py",
+    "adhoc/review_taxon_links_897_r9_probe3_timing.py",
+    "adhoc/review_taxon_links_897_r9_probe4_own_mutants.py",
+    "adhoc/review_taxon_links_897_r9_probe5_gap_tests_vs_mutants.py",
+}
 
 # Scripts whose shebang names an interpreter by absolute path. Same ledger,
 # different symptom: `#!/usr/bin/env /opt/homebrew/bin/python3.13` is a Mac
@@ -52,8 +63,16 @@ _HOME_JOINED_TO_LITERAL = re.compile(
 )
 
 
-def _scripts():
-    return sorted(SCRIPTS.glob("*.py"))
+def _rel(path: Path) -> str:
+    return path.relative_to(SCRIPTS).as_posix()
+
+
+def _scripts() -> list[Path]:
+    return sorted([*SCRIPTS.rglob("*.py"), *SCRIPTS.rglob("*.sh")])
+
+
+def _python_scripts() -> list[Path]:
+    return sorted(SCRIPTS.rglob("*.py"))
 
 
 def _has_home_path(path: Path) -> bool:
@@ -68,15 +87,19 @@ def _has_home_path(path: Path) -> bool:
 
 def test_there_are_scripts_to_check():
     """Guards the parametrization: an empty glob would pass everything."""
-    assert len(_scripts()) >= 100, f"only {len(_scripts())} scripts found"
+    scripts = _scripts()
+    assert len(scripts) >= 100, f"only {len(scripts)} scripts found"
+    assert any(p.parent == SCRIPTS / "adhoc" and p.suffix == ".py" for p in scripts)
+    assert any(p.parent == SCRIPTS / "adhoc" and p.suffix == ".sh" for p in scripts)
 
 
-@pytest.mark.parametrize("path", _scripts(), ids=lambda p: p.name)
+@pytest.mark.parametrize("path", _scripts(), ids=_rel)
 def test_no_new_script_hardcodes_a_home_directory_path(path):
-    if path.name in HARDCODED_PATHS:
-        pytest.skip("known offender; tracked in #198")
+    rel = _rel(path)
+    if rel in HARDCODED_PATHS:
+        pytest.skip("known offender; tracked in #198 / #1064")
     assert not _has_home_path(path), (
-        f"{path.name} embeds a home-directory path, so it runs on one machine "
+        f"{rel} embeds a home-directory path, so it runs on one machine "
         f"and writes wherever that literal points rather than into the "
         f"checkout it was invoked from. Derive paths from "
         f"Path(__file__).resolve().parent.parent and resolve Mech roots with "
@@ -84,13 +107,14 @@ def test_no_new_script_hardcodes_a_home_directory_path(path):
     )
 
 
-@pytest.mark.parametrize("path", _scripts(), ids=lambda p: p.name)
+@pytest.mark.parametrize("path", _scripts(), ids=_rel)
 def test_no_new_script_pins_an_absolute_interpreter(path):
-    if path.name in ABSOLUTE_INTERPRETER:
+    rel = _rel(path)
+    if rel in ABSOLUTE_INTERPRETER:
         pytest.skip("known offender; tracked in #198")
     first = path.read_text(encoding="utf-8").split("\n", 1)[0]
     assert not first.startswith("#!/usr/bin/env /"), (
-        f"{path.name} pins {first[len('#!/usr/bin/env '):]}; use "
+        f"{rel} pins {first[len('#!/usr/bin/env '):]}; use "
         f"#!/usr/bin/env python3 so the active environment decides"
     )
 
@@ -162,7 +186,7 @@ def _imports_from_a_downstream_path(path: Path) -> bool:
     return False
 
 
-@pytest.mark.parametrize("path", _scripts(), ids=lambda p: p.name)
+@pytest.mark.parametrize("path", _python_scripts(), ids=_rel)
 def test_help_does_not_require_a_downstream_checkout(path):
     """#179 again, through a door the AST guard could not see.
 
@@ -171,10 +195,11 @@ def test_help_does_not_require_a_downstream_checkout(path):
     reached -- and `--help` is how a reader discovers which variable to set, so
     needing the checkout to print it is circular.
     """
-    if path.name in DOWNSTREAM_IMPORT_AT_MODULE_LEVEL:
+    rel = _rel(path)
+    if rel in DOWNSTREAM_IMPORT_AT_MODULE_LEVEL:
         pytest.skip("known offender; tracked in #205")
     assert not _imports_from_a_downstream_path(path), (
-        f"{path.name} imports from a downstream checkout at module level, so "
+        f"{rel} imports from a downstream checkout at module level, so "
         f"--help fails without it; import inside the function that uses it"
     )
 
@@ -194,7 +219,7 @@ def test_a_fixed_script_leaves_the_downstream_import_ledger(name):
 # --------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("path", _scripts(), ids=lambda p: p.name)
+@pytest.mark.parametrize("path", _python_scripts(), ids=_rel)
 def test_a_script_that_reads_argv_declares_what_it_reads(path):
     """#198 gave twenty scripts an argument parser so `--help` would work.
     A bare parser rejects every positional -- and `chebi_semantic_audit` had
@@ -222,7 +247,7 @@ def test_a_script_that_reads_argv_declares_what_it_reads(path):
         and getattr(node.func, "attr", "") == "add_argument"
     ]
     assert declared, (
-        f"{path.name} indexes sys.argv and also parses arguments, but declares "
+        f"{_rel(path)} indexes sys.argv and also parses arguments, but declares "
         f"none; the parser will reject what the indexing expects"
     )
 
@@ -264,11 +289,11 @@ def _bare_output_constants(path: Path) -> list[str]:
     return found
 
 
-@pytest.mark.parametrize("path", _scripts(), ids=lambda p: p.name)
+@pytest.mark.parametrize("path", _python_scripts(), ids=_rel)
 def test_a_generated_report_does_not_default_to_the_working_directory(path):
     bare = _bare_output_constants(path)
     assert not bare, (
-        f"{path.name} defaults {', '.join(bare)} to a bare filename, so the "
+        f"{_rel(path)} defaults {', '.join(bare)} to a bare filename, so the "
         f"output lands wherever the script was invoked from; derive it from "
         f"REPO_ROOT / 'workspace'"
     )

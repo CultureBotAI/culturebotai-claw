@@ -1,0 +1,48 @@
+[
+  {
+    "mutation": "original-producer-empty-tree404",
+    "selectors": [
+      "tests/test_private_scaleup_audit.py::test_exact_empty_tip_is_pending_bootstrap_not_installed",
+      "tests/test_private_scaleup_audit.py::test_installed_private_audit_reads_no_records_and_serializes_only_closed_status"
+    ],
+    "red_exit": 1,
+    "restored_exit": 0,
+    "distinction": true
+  },
+  {
+    "mutation": "bootstrap-tree-binding",
+    "selectors": [
+      "tests/test_private_scaleup_audit.py::test_bootstrap_requires_authenticated_exact_commit_and_canonical_empty_tree[unknown_tree]"
+    ],
+    "red_exit": 1,
+    "restored_exit": 0,
+    "distinction": true
+  },
+  {
+    "mutation": "commit-identity-binding",
+    "selectors": [
+      "tests/test_private_scaleup_audit.py::test_bootstrap_requires_authenticated_exact_commit_and_canonical_empty_tree[wrong_commit]"
+    ],
+    "red_exit": 1,
+    "restored_exit": 0,
+    "distinction": true
+  },
+  {
+    "mutation": "arbitrary-tree-failure-fallback",
+    "selectors": [
+      "tests/test_private_scaleup_audit.py::test_nonempty_tree_api_failure_never_becomes_a_bootstrap_receipt"
+    ],
+    "red_exit": 1,
+    "restored_exit": 0,
+    "distinction": true
+  },
+  {
+    "mutation": "exact-bootstrap-tip",
+    "selectors": [
+      "tests/test_private_scaleup_audit.py::test_changed_empty_tip_does_not_inherit_bootstrap"
+    ],
+    "red_exit": 1,
+    "restored_exit": 0,
+    "distinction": true
+  }
+]

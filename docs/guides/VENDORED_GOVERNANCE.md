@@ -40,6 +40,44 @@ pins itself.
 
 ## Synchronizing a Mech
 
+### Supporting-reference excerpt coverage
+
+The canonical `SupportingReference.reference` and `.snippet` implement
+`linkml:authoritative_reference` and `linkml:excerpt`, respectively
+([Claw #1218](https://github.com/CultureBotAI/culturebotai-claw/issues/1218),
+[CommunityMech #476](https://github.com/CultureBotAI/CommunityMech/issues/476)).
+This makes native reference-validator traversal discover snippets in both
+`Discussion.evidence` and `Dataset.evidence`. The snippet remains optional;
+missing snippets, unsupported references, absent caches and source mismatches
+still require separate coverage and evidence review. A substring match does
+not establish scientific support. No title annotation is added.
+
+The dev extra pins `linkml-reference-validator==0.2.1` for a real native CLI
+regression. The retained helper runs valid, fabricated and restored snippets
+against an explicitly synthetic local source, measuring excerpt dispatch and
+actual substring comparisons separately from emitted issues:
+
+```bash
+uv run --no-sync python scripts/adhoc/check_supporting_reference_annotations_20261115.py \
+  --plan --output-dir .temp/supporting-reference-canary-001
+uv run --no-sync python scripts/adhoc/check_supporting_reference_annotations_20261115.py \
+  --output-dir .temp/supporting-reference-canary-001
+```
+
+Use a fresh directory for each run; `--target-class Dataset` checks the other
+container. The helper retains native logs, inputs, counts, exit codes and hashes.
+It uses `--no-full-text` and refuses acquisition, enrichment and cache saving.
+The corrected three cases must make one actual comparison each and exit 0/1/0.
+Removing the excerpt annotation must fail the measurement even when the native
+CLI reports zero issues.
+
+This canonical change does not update any consumer. Each adoption needs a
+published immutable Claw revision, normal governed synchronization, a reviewed
+pin update and native coverage controls. CommunityMech's measured 522 omitted
+snippets are a downstream baseline, not a count of repaired assertions here.
+The manifest's other consumers require their own adoption decisions and checks;
+this change does not assert fleet-wide rollout or close CommunityMech #476.
+
 ### Cross-corpus record links
 
 The governed `mech_shared.yaml` provides `CrossCorpusLink` with four required
@@ -627,3 +665,28 @@ closing the obsolete PR. A successful vendored-sync run from before the
 workflow became governed does not validate merging that old PR against today's
 main branch. Require checks on the current candidate containing the canonical
 copy and the Mech-owned update.
+
+### CofactorMech pending admission
+
+See [CofactorMech admission](COFACTORMECH_ADMISSION.md) for the empty-main
+inspection, exact artifact ledger, branch-published bootstrap provenance and
+separate immutable infrastructure declaration and release hold. This draft
+requires independent review, re-review, green checks and the user's explicit
+merge decision. Only protected approval can activate its bounded admission;
+the existing DUF/Edge policies and consumer pins remain unchanged. It does not
+claim a completed coordinated fleet release.
+
+### AssayMech pending admission
+
+See [AssayMech admission](ASSAYMECH_ADMISSION.md) for its exact empty-main
+inspection, 22-artifact obligation and published bootstrap procedure. It needs
+its own separately reviewed declaration; existing Edge or Cofactor policy is
+not authority for Assay. Candidate validation is not protected deployment.
+
+The AssayMech proposal adds its own sealed native-consumer admission, using the
+bounded mechanism reviewed for CofactorMech. Its declaration binds the exact
+published source manifest and pin, empty-main tip, conservative fleet entry,
+and all 22 native artifact obligations. It preserves the historical DUF and
+Edge declarations and permissions. A candidate declaration is data until its
+immutable introduction reaches protected first-parent history through a
+user-approved merge. See [AssayMech admission](ASSAYMECH_ADMISSION.md).

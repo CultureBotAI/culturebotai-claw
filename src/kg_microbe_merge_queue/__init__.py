@@ -247,7 +247,23 @@ def workflow_errors(text: str, contexts: list[str] | None = None) -> list[str]:
             errors.append(f"{label}: cancellation must be PR-only or disabled")
         if node is document or label not in required:
             continue
-        if "if" in node or node.get("continue-on-error"):
+        # One explicit aggregate executes even when a component fails, then
+        # refuses every result except success. This is not a general if waiver.
+        aggregate = (
+            document.get("name") == "authoritative governance fleet audit"
+            and label == "verified-fleet" and node.get("name") == "fleet-audit"
+            and node.get("needs") == ["candidate-contracts", "fleet-audit"]
+            and node.get("if") == "always()"
+            and jobs.get("fleet-audit", {}).get("name") == "public-fleet"
+            and bool(node.get("steps"))
+            and node["steps"][0] == {
+                "name": "Require both component jobs to succeed",
+                "env": {"CANDIDATE_RESULT": "${{ needs.candidate-contracts.result }}",
+                        "PUBLIC_RESULT": "${{ needs.fleet-audit.result }}"},
+                "run": 'test "$CANDIDATE_RESULT" = success && test "$PUBLIC_RESULT" = success',
+            }
+        )
+        if ("if" in node and not aggregate) or node.get("continue-on-error"):
             errors.append(f"{label}: required jobs and prerequisites must be unconditional and fail closed")
         checkouts = [step.get("with", {}) for step in node.get("steps", [])
                      if step.get("uses", "").startswith("actions/checkout@")]

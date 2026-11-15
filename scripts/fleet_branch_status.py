@@ -46,18 +46,31 @@ be queried or a ref listing reached its limit, 2 bad usage or `gh` unavailable.
 from __future__ import annotations
 
 import argparse
-import csv
 import datetime as _dt
+import fcntl  # noqa: F401 - re-exported for lock-contract tests
 import json
+import os  # noqa: F401 - re-exported for lock-contract tests
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import Iterator
 
-from kg_microbe_fleet import FleetManifest, FleetManifestError, load_fleet_manifest
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _fleet_common import (  # noqa: E402
+    CONTROL_PLANE_REPOSITORY,  # noqa: F401
+    DEFAULT_TSV_DIR,
+    GhError,
+    _cell,
+    _gh,
+    fleet_repository_identities,
+    snapshot_lock_for,
+    snapshot_lock_path_for,
+    tsv_path_for,
+    write_snapshot_tsv,
+)
 
-#: The control plane is catalogued beside the Mechs but is not itself a Mech.
-CONTROL_PLANE_REPOSITORY = "CultureBotAI/culturebotai-claw"
+from kg_microbe_fleet import FleetManifest, FleetManifestError  # noqa: E402
 
 #: Fixed and ordered, so snapshots from different days diff and concatenate
 #: cleanly; append new columns at the end rather than inserting.
@@ -84,30 +97,6 @@ query($owner:String!,$name:String!,$cursor:String){
   }
 }
 """
-
-
-class GhError(RuntimeError):
-    pass
-
-
-def _gh(args: list[str], timeout: int = 60) -> str:
-    proc = subprocess.run(
-        ["gh", *args], capture_output=True, text=True, timeout=timeout
-    )
-    if proc.returncode != 0:
-        raise GhError((proc.stderr or proc.stdout).strip() or "gh failed")
-    return proc.stdout
-
-
-def fleet_repository_identities(
-    manifest: FleetManifest | None = None,
-) -> tuple[str, ...]:
-    """Return claw plus the exact manifest-defined Mech fleet, in stable order."""
-
-    manifest = manifest or load_fleet_manifest()
-    return (CONTROL_PLANE_REPOSITORY,) + tuple(
-        mech.github for mech in manifest.mechs.values()
-    )
 
 
 def _graphql(query: str, **variables: str) -> dict:
@@ -310,23 +299,6 @@ def snapshot_is_complete(data: dict) -> bool:
     )
 
 
-def _cell(value: object) -> object:
-    """Flatten strings and keep spreadsheet software from executing them.
-
-    Same reasoning as `fleet_pr_status`: guaranteeing no tab or newline in a
-    field is what lets the file be written unquoted, which is TSV's whole
-    appeal. A branch name cannot contain whitespace, but an author name can.
-    """
-    if value is None:
-        return ""
-    if not isinstance(value, str):
-        return value
-    flattened = " ".join(value.split())
-    if flattened.startswith(("=", "+", "-", "@")):
-        return "'" + flattened
-    return flattened
-
-
 def tsv_rows(data: dict, snapshot_utc: str) -> list[dict]:
     """One row per non-default branch, every disposition included.
 
@@ -357,32 +329,30 @@ def tsv_rows(data: dict, snapshot_utc: str) -> list[dict]:
     return rows
 
 
-DEFAULT_TSV_DIR = Path(__file__).resolve().parents[1] / "workspace" / "reports"
-
-
 def tsv_path(out_dir: Path, snapshot_utc: str, complete: bool) -> Path:
-    """Datestamped, and marked `.partial` when coverage was incomplete.
+    """Datestamped, and marked `.partial` when coverage was incomplete."""
+    return tsv_path_for("fleet_branch_status", out_dir, snapshot_utc, complete)
 
-    The filename carries the fact because the console warning does not survive:
-    a month later the file is all anyone has.
-    """
-    stem = f"fleet_branch_status_{snapshot_utc[:10]}"
-    if not complete:
-        stem += ".partial"
-    return out_dir / f"{stem}.tsv"
+
+def _snapshot_lock_path(out_dir: Path, snapshot_utc: str) -> Path:
+    """One persistent lock inode shared by both completeness variants."""
+    return snapshot_lock_path_for("fleet_branch_status", out_dir, snapshot_utc)
+
+
+def _snapshot_lock(out_dir: Path, snapshot_utc: str) -> Iterator[None]:
+    """Lock one date without following or replacing the stable lock inode."""
+    return snapshot_lock_for("fleet_branch_status", out_dir, snapshot_utc)
 
 
 def write_tsv(data: dict, out_dir: Path, snapshot_utc: str) -> Path:
-    out_dir.mkdir(parents=True, exist_ok=True)
-    path = tsv_path(out_dir, snapshot_utc, snapshot_is_complete(data))
-    with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(
-            handle, fieldnames=list(TSV_COLUMNS), delimiter="\t",
-            quoting=csv.QUOTE_NONE, escapechar="\\", lineterminator="\n",
-        )
-        writer.writeheader()
-        writer.writerows(tsv_rows(data, snapshot_utc))
-    return path
+    return write_snapshot_tsv(
+        "fleet_branch_status",
+        TSV_COLUMNS,
+        tsv_rows(data, snapshot_utc),
+        out_dir,
+        snapshot_utc,
+        snapshot_is_complete(data),
+    )
 
 
 BRANCH_WIDTH = 44

@@ -167,7 +167,17 @@ plans, dispositions and validation evidence.
 Implement through the repository's maintained inputs, native validated writers
 and ID reservation when applicable. Validate bounded changes, commit and push
 only owned paths, open a PR, independently review its exact final head, file
-confirmed findings as issues, fix in-scope findings and re-review. Follow the
+confirmed findings as issues, fix in-scope findings and re-review. For every
+GitHub CLI create, edit or comment operation that takes body text (`gh pr create`,
+`gh pr edit`, `gh pr comment`, `gh issue create`, `gh issue edit`,
+`gh issue comment`), write the Markdown body to an owned file first and pass
+`--body-file <path>`; never interpolate Markdown into a shell `--body "..."`
+argument where backticks, `$`, quotes or newlines can trigger command
+substitution (for example turning backticked PR text into `/usr/bin/pr` waiting
+on stdin). Retain the body file artifact and verify the published text with
+`gh pr view <n> --json body` or `gh issue view <n> --json body`. Existing
+running background tasks remain operator-owned; an idle or port-pressure guard
+reports and holds them, never kills them. Follow the
 active closure policy and the user's authorization for merge/cleanup; if the
 authorized scope stops before merge, report that boundary and do not fabricate
 closure. Use the workflow evidence validator and required outputs from the

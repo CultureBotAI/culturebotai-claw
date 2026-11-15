@@ -1,0 +1,16 @@
+{
+  "checked_at": "2026-11-09T03:40:51.118655+00:00",
+  "protected_base": "ee3ae4112834d79c1923a270cb454b87666f62e2",
+  "current_gate_and_authority_unchanged": {
+    ".github/workflows/governance-fleet-audit.yaml": "f0e51a8709bb656fa61693ecebad53a00ec71a9b546f024470b9378750b0b71e",
+    "src/kg_microbe_governance/vendored_artifacts.json": "6f82b0f3b35c4f329a54e7503dee98bc2a4b4b281fc5e4a3c88cd417ab572989",
+    "src/kg_microbe_fleet/fleet.yaml": "cd72d1648bf43a89fa112e6a8c06738af30d3d00d712cfbe3a92c5365420fe57",
+    "src/kg_microbe_merge_queue/policy.json": "f8934805fa022ce139c3e6951c2ae23e3da4d207241c2cdbbe5c9889e39d0b46",
+    "src/kg_microbe_governance/releases/mech-cycle-v2-canary.json": "89a362436eb3df0f3b4bfdb9feeaf9a258b2476291e565a744568b41f9445697",
+    "src/kg_microbe_governance/releases/mech-cycle-v2-governance-manifest.json": "368edbac106cb49c0a4159a87c07eeba4a5ed79c343ff042c0ddbc1b6b990ebb",
+    "src/kg_microbe_governance/releases/edgemech-infrastructure-admission-v1.json": "1d65bcbe0b6697c20cff09af817f2e864e564e8f62303ed76c30383072fc705f",
+    "src/kg_microbe_governance/releases/edgemech-infrastructure-source-manifest.json": "bfd4b703f46ce748487253d6fe093e79fe00ba7a9a88293f5cc6df176f11b519"
+  },
+  "live_private_app_execution": "not_performed; externally configured protected prerequisite only",
+  "issue_fixed": "https://github.com/CultureBotAI/culturebotai-claw/issues/1075"
+}

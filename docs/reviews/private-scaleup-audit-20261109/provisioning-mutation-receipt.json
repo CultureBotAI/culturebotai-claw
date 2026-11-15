@@ -1,0 +1,12 @@
+{
+  "issue": "https://github.com/CultureBotAI/culturebotai-claw/issues/1078",
+  "mutation": "restore both original --no-sync workflow commands",
+  "selectors": [
+    "tests/test_workflow_dependency_provisioning.py::test_every_workflow_step_running_claw_code_has_claws_declared_dependencies",
+    "tests/test_private_scaleup_audit.py::test_producer_workflow_runtime_is_proven_by_dependency_guard"
+  ],
+  "red_exit": 1,
+  "restored_exit": 0,
+  "red_failures": 2,
+  "restored_passes": 2
+}

@@ -21,6 +21,13 @@ permissions:
 
 jobs:
   fleet-audit:
+    name: public-fleet
+    needs: candidate-contracts
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      automatic_available: ${{ steps.automatic.outputs.available }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -47,13 +54,91 @@ jobs:
         uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
         with:
           python-version: "3.13"
-          enable-cache: true
+          enable-cache: false
           working-directory: fleet/trusted-claw
 
       - name: Install trusted governance package
         run: uv sync --project fleet/trusted-claw --locked
 
+      - name: Select installed protected automatic adapter
+        id: automatic
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv run --project fleet/trusted-claw --locked --no-dev python -I - <<'PYCODE'
+          import hashlib
+          import os
+          from pathlib import Path
+
+          from kg_microbe_governance.artifacts.scripts.check_vendored_sync import parse_manifest
+
+          trusted = Path("fleet/trusted-claw")
+          manifest_path = "src/kg_microbe_governance/vendored_artifacts.json"
+          manifests = [parse_manifest((root / manifest_path).read_bytes()) for root in (Path("control"), trusted)]
+          for manifest in manifests:
+              for key, consumer in manifest.consumers.items():
+                  reserved_identity = consumer.github.casefold() == "culturebotai/scaleupmech"
+                  if reserved_identity and key != "scaleupmech":
+                      raise SystemExit("Reserved audit identity has an unsupported declaration")
+                  if key == "scaleupmech" and consumer.github != "CultureBotAI/ScaleupMech":
+                      raise SystemExit("Reserved audit declaration has an unsupported identity")
+          private_required = any("scaleupmech" in manifest.consumers for manifest in manifests)
+          adapter = trusted / "src/kg_microbe_governance/automatic_fleet_component.py"
+          installed = adapter.is_file()
+          # Exact known defective protected adapters: 3cf transport and e43 materialization.
+          # Unknown or repaired tuples use automatic mode; failure never selects fallback.
+          known_adapters = (
+              {
+                  "automatic_fleet_component.py": "93e666029922aa4fa2f902922ae0aa54c28da41c618a2c33af173c65907e0252",
+                  "automatic_private_audit_cli.py": "26376fcb7cac5ec84f40cd9529c53881e9c9a4ea256d57609a27fda858159ab5",
+                  "private_scaleup_audit.py": "bab998c0f194e87cf6b510123c671dc45ccc830ccc5526c05aa636df200bffc7",
+              },
+              {
+                  "automatic_fleet_component.py": "a3d06bd57166320e21e60bc76c444bf97d808b3487d53179169695f2f1e001ac",
+                  "automatic_private_audit_cli.py": "26376fcb7cac5ec84f40cd9529c53881e9c9a4ea256d57609a27fda858159ab5",
+                  "private_scaleup_audit.py": "bab998c0f194e87cf6b510123c671dc45ccc830ccc5526c05aa636df200bffc7",
+                  "public_repository_metadata.py": "def2853ddc83632900032f1953b50532de0001b52637b2db21b901c63116af51",
+              },
+          )
+          known_adapter = any(
+              all(
+                  (trusted / "src/kg_microbe_governance" / name).is_file()
+                  and hashlib.sha256((trusted / "src/kg_microbe_governance" / name).read_bytes()).hexdigest() == digest
+                  for name, digest in known.items()
+              )
+              for known in known_adapters
+          )
+          if private_required and not installed:
+              raise SystemExit("Private obligations require the protected automatic adapter")
+          legacy = not private_required and (not installed or known_adapter)
+          available = not legacy
+          with Path(os.environ["GITHUB_OUTPUT"]).open("a") as output:
+              output.write("available=" + str(available).lower() + "\n")
+          PYCODE
+
+      - name: Audit protected public fleet and candidate completeness
+        if: steps.automatic.outputs.available == 'true'
+        env:
+          GH_PUBLIC_READ_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ github.sha }}
+        run: >-
+          uv run --project fleet/trusted-claw --locked --no-dev python -m kg_microbe_governance.automatic_fleet_component
+          --trusted-root "$GITHUB_WORKSPACE/fleet/trusted-claw"
+          --workspace "$GITHUB_WORKSPACE/fleet/automatic-public"
+          --checkout-sha "$CANDIDATE_SHA" --output "$GITHUB_WORKSPACE/fleet/report/receipt.json"
+
+      - name: Publish bounded public component report
+        if: steps.automatic.outputs.available == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: public-fleet-${{ github.run_id }}-${{ github.run_attempt }}
+          path: fleet/report/receipt.json
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 1
+
       - name: Prepare protected infrastructure data snapshot
+        if: steps.automatic.outputs.available != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -64,21 +149,37 @@ jobs:
           if [ ! -f "$selector" ]; then
             exit 0
           fi
-          source_ref="$(uv run --project "$trusted" python -m kg_microbe_governance.infrastructure_admission \
+          selector_module=kg_microbe_governance.infrastructure_admission
+          if [ -f "$trusted/src/kg_microbe_governance/consumer_admission.py" ]; then
+            selector_module=kg_microbe_governance.consumer_admission
+          fi
+          source_refs="$(uv run --project "$trusted" python -m "$selector_module" \
             --trusted-root "$trusted")"
-          # A protected selector with no active declaration emits no data ref.
-          if [ -z "$source_ref" ]; then
+          # A protected selector with no active declaration emits no data refs.
+          if [ -z "$source_refs" ]; then
             exit 0
           fi
-          if ! [[ "$source_ref" =~ ^[0-9a-f]{40}$ ]]; then
-            printf '%s\n' 'Refusing invalid infrastructure data ref' >&2
+          # Preserve the historical selector's single-ref contract.
+          if [ "$selector_module" = kg_microbe_governance.infrastructure_admission ] && \
+              ! [[ "$source_refs" =~ ^[0-9a-f]{40}$ ]]; then
+            printf '%s\n' 'Refusing invalid legacy infrastructure data ref' >&2
             exit 2
           fi
-          # Fetch only immutable DATA objects, leaving refs, HEAD and FETCH_HEAD alone.
-          git -C "$trusted" -c core.hooksPath=/dev/null fetch \
-            --no-tags --no-prune --no-write-fetch-head origin "$source_ref"
+          # Validate the complete result before any fetch, including later lines.
+          while IFS= read -r source_ref; do
+            if ! [[ "$source_ref" =~ ^[0-9a-f]{40}$ ]]; then
+              printf '%s\n' 'Refusing invalid infrastructure data ref' >&2
+              exit 2
+            fi
+          done <<< "$source_refs"
+          while IFS= read -r source_ref; do
+            # Fetch immutable DATA, leaving refs, HEAD and FETCH_HEAD alone.
+            git -C "$trusted" -c core.hooksPath=/dev/null fetch \
+              --no-tags --no-prune --no-write-fetch-head origin "$source_ref"
+          done <<< "$source_refs"
 
       - name: Export manifest-defined governance consumers
+        if: steps.automatic.outputs.available != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -102,6 +203,7 @@ jobs:
           test -s fleet/governance-consumers.tsv
 
       - name: Check out manifest-defined Mech mains
+        if: steps.automatic.outputs.available != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -126,6 +228,7 @@ jobs:
       # Only trusted base/main can select this lane. A candidate declaration
       # cannot authorize its own downstream rollout before Claw merges it.
       - name: Select trusted release contract
+        if: steps.automatic.outputs.available != 'true'
         id: release-contract
         shell: bash
         run: |
@@ -140,7 +243,7 @@ jobs:
           PY
 
       - name: Read and compare every committed fleet pin
-        if: steps.release-contract.outputs.active != 'true'
+        if: steps.automatic.outputs.available != 'true' && steps.release-contract.outputs.active != 'true'
         id: fleet-pin
         shell: bash
         run: |
@@ -220,7 +323,7 @@ jobs:
           PY
 
       - name: Authenticate pin against trusted claw history
-        if: steps.release-contract.outputs.active != 'true'
+        if: steps.automatic.outputs.available != 'true' && steps.release-contract.outputs.active != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -232,7 +335,7 @@ jobs:
           fi
 
       - name: Audit all governed artifacts at committed main tips
-        if: steps.release-contract.outputs.active != 'true'
+        if: steps.automatic.outputs.available != 'true' && steps.release-contract.outputs.active != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -249,7 +352,7 @@ jobs:
             "${audit_args[@]}"
 
       - name: Audit the trusted bounded canary release
-        if: steps.release-contract.outputs.active == 'true'
+        if: steps.automatic.outputs.available != 'true' && steps.release-contract.outputs.active == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -259,23 +362,6 @@ jobs:
           done < fleet/governance-consumers.tsv
           uv run --project fleet/trusted-claw python -m kg_microbe_governance.cycle_release_audit \
             "${release_args[@]}" --json-output "$GITHUB_WORKSPACE/fleet/release-audit.json"
-
-      # The deployed-fleet audit above deliberately uses trusted base/main code.
-      # This separate lane proves that the proposed/current checkout itself has
-      # the authoritative layout and preserves the workflow's security contract.
-      - name: Validate candidate authority contract
-        shell: bash
-        run: |
-          set -euo pipefail
-          uv sync --project control --locked --extra dev
-          uv run --project control --extra dev python -m pytest -q \
-            control/tests/test_fleet_manifest.py \
-            control/tests/test_kg_microbe_governance.py \
-            control/tests/test_governance_cycle_release_audit.py \
-            control/tests/test_governance_infrastructure_admission.py \
-            control/tests/test_governance_cycle_release_workflow.py \
-            control/tests/test_id_label_workflow.py \
-            control/tests/test_authoritative_governance_layout.py
 
       # The consumer-completeness guard (#259) needs a checkout per consumer, so
       # everywhere without one it skipped every per-consumer case -- which was
@@ -289,6 +375,7 @@ jobs:
       # turns an unresolvable root from a silent skip into a failure, so the
       # step cannot pass by examining nothing.
       - name: Check every declared consumer carries what the manifest says
+        if: steps.automatic.outputs.available != 'true'
         shell: bash
         env:
           FLEET_CONSUMER_ROOTS_REQUIRED: "1"
@@ -316,3 +403,134 @@ jobs:
           done < fleet/candidate-governance-consumers.tsv
           uv run --project control --extra dev python -m pytest -q \
             control/tests/test_vendored_consumer_completeness.py
+
+  candidate-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: control
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          python-version: "3.13"
+          enable-cache: false
+      - name: Validate candidate authority contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv sync --project control --locked --extra dev
+          tests=(
+            control/tests/test_fleet_manifest.py
+            control/tests/test_kg_microbe_governance.py
+            control/tests/test_governance_cycle_release_audit.py
+            control/tests/test_governance_infrastructure_admission.py
+            control/tests/test_governance_cycle_release_workflow.py
+            control/tests/test_id_label_workflow.py
+            control/tests/test_authoritative_governance_layout.py
+          )
+          if [ -f control/tests/test_governance_consumer_admission.py ]; then
+            tests+=(control/tests/test_governance_consumer_admission.py)
+          fi
+          uv run --project control --locked --extra dev python -m pytest -q "${tests[@]}"
+
+  verified-fleet:
+    name: fleet-audit
+    permissions:
+      contents: read
+      actions: read
+    needs: [candidate-contracts, fleet-audit]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Require both component jobs to succeed
+        env:
+          CANDIDATE_RESULT: ${{ needs.candidate-contracts.result }}
+          PUBLIC_RESULT: ${{ needs.fleet-audit.result }}
+        run: test "$CANDIDATE_RESULT" = success && test "$PUBLIC_RESULT" = success
+      # Event checkout is not executed. It retains the queue's explicit subject
+      # checkout contract; all verifier code comes from the protected checkout.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: control
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'merge_group' && github.event.merge_group.base_sha || github.event_name == 'push' && github.sha || 'main' }}
+          path: fleet/trusted-claw
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          python-version: "3.13"
+          enable-cache: false
+      - name: Install protected verifier dependencies
+        run: uv sync --project fleet/trusted-claw --locked --no-dev
+      - name: Verify exact full coverage or public-only bootstrap
+        env:
+          GH_PUBLIC_READ_TOKEN: ${{ github.token }}
+          SCALEUP_AUDIT_EXPECTED_APP_ID: ${{ vars.SCALEUP_AUDIT_EXPECTED_APP_ID }}
+          AUTOMATIC_AVAILABLE: ${{ needs.fleet-audit.outputs.automatic_available }}
+          CANDIDATE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          trusted="$GITHUB_WORKSPACE/fleet/trusted-claw"
+          uv run --project fleet/trusted-claw --locked --no-dev python -I - <<'PYCODE'
+          import hashlib
+          import os
+          from pathlib import Path
+
+          from kg_microbe_governance.artifacts.scripts.check_vendored_sync import parse_manifest
+
+          trusted = Path("fleet/trusted-claw")
+          manifest_path = "src/kg_microbe_governance/vendored_artifacts.json"
+          manifests = [parse_manifest((root / manifest_path).read_bytes()) for root in (Path("control"), trusted)]
+          for manifest in manifests:
+              for key, consumer in manifest.consumers.items():
+                  reserved_identity = consumer.github.casefold() == "culturebotai/scaleupmech"
+                  if reserved_identity and key != "scaleupmech":
+                      raise SystemExit("Reserved audit identity has an unsupported declaration")
+                  if key == "scaleupmech" and consumer.github != "CultureBotAI/ScaleupMech":
+                      raise SystemExit("Reserved audit declaration has an unsupported identity")
+          private_required = any("scaleupmech" in manifest.consumers for manifest in manifests)
+          adapter = trusted / "src/kg_microbe_governance/automatic_fleet_component.py"
+          installed = adapter.is_file()
+          # Exact known defective protected adapters: 3cf transport and e43 materialization.
+          # Unknown or repaired tuples use automatic mode; failure never selects fallback.
+          known_adapters = (
+              {
+                  "automatic_fleet_component.py": "93e666029922aa4fa2f902922ae0aa54c28da41c618a2c33af173c65907e0252",
+                  "automatic_private_audit_cli.py": "26376fcb7cac5ec84f40cd9529c53881e9c9a4ea256d57609a27fda858159ab5",
+                  "private_scaleup_audit.py": "bab998c0f194e87cf6b510123c671dc45ccc830ccc5526c05aa636df200bffc7",
+              },
+              {
+                  "automatic_fleet_component.py": "a3d06bd57166320e21e60bc76c444bf97d808b3487d53179169695f2f1e001ac",
+                  "automatic_private_audit_cli.py": "26376fcb7cac5ec84f40cd9529c53881e9c9a4ea256d57609a27fda858159ab5",
+                  "private_scaleup_audit.py": "bab998c0f194e87cf6b510123c671dc45ccc830ccc5526c05aa636df200bffc7",
+                  "public_repository_metadata.py": "def2853ddc83632900032f1953b50532de0001b52637b2db21b901c63116af51",
+              },
+          )
+          known_adapter = any(
+              all(
+                  (trusted / "src/kg_microbe_governance" / name).is_file()
+                  and hashlib.sha256((trusted / "src/kg_microbe_governance" / name).read_bytes()).hexdigest() == digest
+                  for name, digest in known.items()
+              )
+              for known in known_adapters
+          )
+          if private_required and not installed:
+              raise SystemExit("Private obligations require the protected automatic adapter")
+          legacy = not private_required and (not installed or known_adapter)
+          available = not legacy
+          if os.environ.get("AUTOMATIC_AVAILABLE") != str(available).lower():
+              raise SystemExit("Protected public audit mode differs from selected component mode")
+          if legacy:
+              print("Complete protected public-only audit and candidate completeness passed")
+          PYCODE
+          if [ "$AUTOMATIC_AVAILABLE" = true ]; then
+            test -f "$trusted/src/kg_microbe_governance/automatic_private_audit_cli.py"
+            uv run --project "$trusted" --locked --no-dev python -m kg_microbe_governance.automatic_private_audit_cli \
+              verify --trusted-root "$trusted" --checkout-sha "$CANDIDATE_SHA"
+          fi

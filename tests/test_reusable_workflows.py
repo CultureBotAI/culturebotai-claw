@@ -378,3 +378,54 @@ def test_uv_version_defaults_to_empty_which_is_setup_uvs_own_default():
 
     install = {s.get("name", ""): s for s in _reusable_steps()}["Install uv"]
     assert install["with"]["version"] == "${{ inputs.uv-version }}"
+
+
+# --------------------------------------------------------------------------
+# #540: reusable KGX release and contract check workflow.
+
+KGX_REUSABLE = ROOT / ".github" / "workflows" / "kgx-release-reusable.yaml"
+
+
+def test_kgx_release_reusable_workflow_contract():
+    """#540: `.github/workflows/kgx-release-reusable.yaml` must be callable via
+    `workflow_call`, pin every action to a 40-char SHA, export + check the release
+    bundle, upload the bundle artifact with `always()`, and attach assets on a
+    release tag without shell interpolation of inputs."""
+    text = KGX_REUSABLE.read_text(encoding="utf-8")
+    header = text.split("name:")[0]
+    assert "only exercised by a caller" in header or "proves nothing" in header
+
+    doc = yaml.safe_load(text)
+    on_block = doc[True] if True in doc else doc["on"]
+    assert "workflow_call" in on_block
+    inputs = on_block["workflow_call"]["inputs"]
+    assert set(inputs) >= {
+        "mech",
+        "python-version",
+        "uv-version",
+        "uv-sync-args",
+        "claw-ref",
+        "output-dir",
+        "release-tag",
+    }
+    assert inputs["python-version"]["default"] == (ROOT / ".python-version").read_text().strip()
+    for name, spec in inputs.items():
+        assert spec.get("required") is False, name
+        assert "default" in spec, name
+
+    assert doc["permissions"] == {"contents": "read"}
+    steps = doc["jobs"]["kgx-release"]["steps"]
+    for step in steps:
+        if "uses" in step:
+            _, _, ref = step["uses"].partition("@")
+            assert re.fullmatch(r"[0-9a-f]{40}", ref), step["uses"]
+
+    by_name = {s.get("name", ""): s for s in steps}
+    assert "kg-microbe-kgx export" in by_name["Export KGX graph and release bundle"]["run"]
+    assert "kg-microbe-kgx check" in by_name["Check KGX release bundle against contract"]["run"]
+    assert "--release-dir" in by_name["Check KGX release bundle against contract"]["run"]
+    assert by_name["Upload KGX release bundle artifact"]["if"].startswith("always()")
+    attach = by_name["Attach KGX release assets to GitHub Release"]
+    assert attach["if"] == "inputs.release-tag != ''"
+    assert "${{ inputs.release-tag }}" not in attach["run"]
+
