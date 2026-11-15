@@ -1,0 +1,44 @@
+{
+  "issue": "https://github.com/CultureBotAI/culturebotai-claw/issues/1192",
+  "acquisition": "Exact adopted canary working-tree bytes, not a claim its Git commit contains the adopted records.",
+  "canary_head": "57bbdcf656d7bde80ed0bb8bac1cbd096c7ea915",
+  "canonical_sha256": "3d9f1ac412209266034319542f225918b78b4e6a8e0658b53ee0689b4fb4dafe",
+  "selection_sha256": "d0944072901efe3e1e1fb4abafb53e1609990cf05fd4d31378116a29e6e02bd5",
+  "scientific_approval": false,
+  "original_release_disposition": "WITHHOLD",
+  "owners": [
+    {
+      "path": "data/ingredients/mapped/34-Dihydroxyflavone.yaml",
+      "fixture": "34-Dihydroxyflavone.yaml",
+      "sha256": "227b7f408b03d68f0cd296eb49743c4611b12bb25ca9508c54cbc0bdd0b43f8e",
+      "original_row_position": 164,
+      "mim_id": "MIM:0000146",
+      "object_id": "cas:14919-49-4"
+    },
+    {
+      "path": "data/ingredients/mapped/Ammonium_Molybdate_Tetrahydrate.yaml",
+      "fixture": "Ammonium_Molybdate_Tetrahydrate.yaml",
+      "sha256": "659e004ebf3de093a519357e2cee9e1552e197738cdc5520442867f5ce47ca42",
+      "original_row_position": 365,
+      "mim_id": "MIM:0000327",
+      "object_id": "cas:12054-85-2"
+    },
+    {
+      "path": "data/ingredients/mapped/Anisodamine_Hydrobromide.yaml",
+      "fixture": "Anisodamine_Hydrobromide.yaml",
+      "sha256": "89c1233d70734e376f1fd26a47f757db87aeb2292b6ba2bb10a36dad2266102e",
+      "original_row_position": 392,
+      "mim_id": "MIM:0000349",
+      "object_id": "cas:55449-49-5"
+    },
+    {
+      "path": "data/ingredients/mapped/Apramycin_Sulfate_Salt.yaml",
+      "fixture": "Apramycin_Sulfate_Salt.yaml",
+      "sha256": "5c4ac460c5b0c6ccb30fd50d42b354edd76ee33fa040f83f50369448b91287f8",
+      "original_row_position": 410,
+      "mim_id": "MIM:0000365",
+      "object_id": "cas:65710-07-8"
+    }
+  ],
+  "extracted_canonical_sha256": "1ac78a70302168314bafab3b950b14a01889166f67124946882de674e39fb58f"
+}
