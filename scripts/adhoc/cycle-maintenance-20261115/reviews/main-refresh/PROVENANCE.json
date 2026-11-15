@@ -1,0 +1,36 @@
+{
+  "date": "2026-11-15",
+  "purpose": "Independent exact-head review of the ordinary PR1197 and PR1138 integrations with actual published main after PR1112.",
+  "inputs": "Explicit reviewed previous/original heads, actual main SHA, prepared new head, exact source checkout and development Python; Git objects and tracked bytes are read only.",
+  "outputs": "Independent full-tree proof, baseline authentication where applicable, focused pytest/JUnit results and public-safe exact receipt copies.",
+  "helper": "verify_refreshed_heads.py",
+  "helper_sha256": "c220e06bc566c4195743ac3f8495c14803ea48f07d87dd09476b82c8c5127322",
+  "retained_prior_helpers": [
+    {
+      "path": "../1197-final/verify_integration.py",
+      "sha256": "2273eef93d10c4ad0728fc7be1df296fee04e202120a401f5a1d36d3a50a0266"
+    },
+    {
+      "path": "../final-closeout/review_final_integrations.py",
+      "sha256": "a120fe5b5a4afadec3c5f3cec8b61706b779aa8cd4be408ee48fb059ce315e2e"
+    }
+  ],
+  "adaptation_details": [
+    "Reuses the prior independent tree-composition, preserved-path and baseline-authentication criteria with explicit caller-supplied immutable review inputs.",
+    "Replaces merge-tree --write-tree with an in-memory expected tree map, avoiding Git object writes.",
+    "Checks every tracked working-file blob and executable/symlink mode before and after focused validation.",
+    "Derives passing test totals from JUnit and rejects failures, errors, skips or empty collection.",
+    "Writes only a new private evidence directory outside all registered checkouts. Public proof copies remain byte-identical."
+  ],
+  "public_result_sha256": {
+    "1197-review.json": "dc130437c9d324468c1c64baf5b5f8a03dea890763a3342494f9c4d0f543d082",
+    "1138-review.json": "4f28aa856c0c280140844e269d9953d28962d23d9b33a06e3fc8aed5e19bf599"
+  },
+  "private_test_log_sha256": {
+    "1197": "44d62d6246f14aaeaf6b1bef6e5304cc1bc6a932d5e311823d15ef024c9126ba",
+    "1138": "0a6076d67a98896799a2b8d709aafb62b9efc0d7c405803c23d32ceeba088204"
+  },
+  "original_helpers_and_results_preserved": true,
+  "source_git_github_runtime_or_environment_mutation": false,
+  "hosted_checks_included": false
+}

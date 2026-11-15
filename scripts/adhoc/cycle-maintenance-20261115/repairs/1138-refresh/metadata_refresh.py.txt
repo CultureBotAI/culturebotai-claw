@@ -1,0 +1,30 @@
+"""Historical one-time local PR1138 main integration, 2026-11-15.
+Inputs: explicit owned worktree and shared lock directory. Output: JSON Git proof.
+This retained source archive is not a reusable supported executable. No push,
+queue action, runtime or downstream repository mutation is performed.
+"""
+import json,subprocess,sys
+from pathlib import Path
+from plugins.lock_manager import LockManager
+root=Path(sys.argv[1]).resolve();locks=Path(sys.argv[2]).resolve()
+expected='6aeeb55105659cb740a0e7410eeb03a67855569d'
+main='bd2b07480afd3b3984491a7fc729c64220d4dd81'
+def git(*args,timeout=20):
+ r=subprocess.run(['git','-C',str(root),*args],check=True,text=True,capture_output=True,timeout=timeout)
+ return r.stdout.strip()
+assert git('rev-parse','HEAD')==expected
+assert git('remote','get-url','origin')=='https://github.com/CultureBotAI/culturebotai-claw.git'
+assert git('status','--porcelain','--untracked-files=all')==''
+assert git('branch','--show-current')=='repair/1138-release-context-20261115'
+git('fetch','origin','refs/heads/main:refs/remotes/origin/main',timeout=45)
+assert git('rev-parse','refs/remotes/origin/main')==main
+forecast=git('merge-tree','--write-tree',expected,main)
+assert len(forecast)==40
+config={'locks_dir':str(locks),'my_id':'stream-c-cycle-maintenance-1138','default_timeout':60}
+with LockManager(config).lock('claw','integrate-reviewed-main-into-1138',timeout=60):
+ assert git('rev-parse','HEAD')==expected
+ assert git('status','--porcelain','--untracked-files=all')==''
+ git('merge','--no-commit','--no-ff',main,timeout=30)
+ assert git('rev-parse','MERGE_HEAD')==main
+ assert git('write-tree')==forecast
+print(json.dumps({'prior_head':expected,'integrated_main':main,'forecast_tree':forecast,'merge_prepared':True,'commit_performed':False,'push_performed':False,'runtime_actions':False},indent=2))

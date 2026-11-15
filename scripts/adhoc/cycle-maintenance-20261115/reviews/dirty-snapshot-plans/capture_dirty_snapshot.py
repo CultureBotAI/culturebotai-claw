@@ -1,0 +1,177 @@
+"""Capture owned dirty-review recovery evidence without changing the source.
+
+2026-11-15. Inputs: one explicit owned worktree, its expected immutable HEAD,
+GitHub identity, and a new evidence directory outside every registered checkout.
+An authenticated private index copy is used for every index-aware Git query.
+Outputs: original index, index entries, exact changed/untracked bytes and modes,
+HEAD/index blob copies, binary patches, restoration path lists, and capture.json.
+No Git mutation, restoration, runtime action, external filter or GitHub call.
+Ignored roots are named, retained in place, and require full future quarantine.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import stat
+import subprocess
+from datetime import datetime, timezone
+from pathlib import Path
+
+
+def sha(raw):
+    return hashlib.sha256(raw).hexdigest()
+
+
+def require(ok, message):
+    if not ok:
+        raise ValueError(message)
+
+
+def read_node(path):
+    before = path.lstat()
+    if stat.S_ISLNK(before.st_mode):
+        body = os.readlink(path).encode()
+        value = {"kind": "symlink", "target": body.decode(), "git_mode": "120000"}
+    else:
+        require(stat.S_ISREG(before.st_mode), "Nonregular source requires separate review")
+        with os.fdopen(os.open(path, os.O_RDONLY | os.O_NOFOLLOW), "rb") as stream:
+            body = stream.read()
+        value = {"kind": "file", "git_mode": "100755" if before.st_mode & 0o111 else "100644"}
+    after = path.lstat()
+    fields = ("st_dev", "st_ino", "st_mode", "st_size", "st_mtime_ns", "st_ctime_ns")
+    require(all(getattr(before, key) == getattr(after, key) for key in fields), "Input changed during read")
+    value.update(mode=stat.S_IMODE(before.st_mode), bytes=len(body), sha256=sha(body),
+                 git_blob=hashlib.sha1(b"blob " + str(len(body)).encode() + b"\0" + body).hexdigest())
+    return body, value
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--root", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--expected-head", required=True)
+    parser.add_argument("--repository", required=True)
+    parser.add_argument("--index-copy", type=Path, required=True)
+    args = parser.parse_args()
+    root, output = args.root, args.output
+    for path in (root, output):
+        require(path.is_absolute() and path == path.resolve(), "Explicit canonical paths required")
+        require(not any(part.is_symlink() for part in (path, *path.parents)), "Alias path refused")
+    require(not os.path.lexists(output) and output.parent.is_dir(), "New output with existing parent required")
+    require(root not in output.parents and output not in root.parents, "Output aliases source tree")
+    env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    env.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull, GIT_OPTIONAL_LOCKS="0",
+               GIT_NO_LAZY_FETCH="1", GIT_NO_REPLACE_OBJECTS="1", GIT_GRAFT_FILE=os.devnull)
+    base = ["git", "-c", "core.hooksPath=" + os.devnull, "-c", "core.fsmonitor=false",
+            "-c", "gc.auto=0", "-C", str(root)]
+
+    def git(*arguments):
+        return subprocess.run([*base, *arguments], env=env, capture_output=True, check=True, timeout=60).stdout
+
+    filters = subprocess.run([*base, "config", "--name-only", "--get-regexp", r"^filter\."],
+                             env=env, capture_output=True, timeout=30)
+    require(filters.returncode in (0, 1), "Filter inventory failed")
+    for key in filters.stdout.decode().splitlines():
+        if key.endswith((".clean", ".smudge", ".process", ".required")):
+            base[1:1] = ["-c", key + ("=false" if key.endswith(".required") else "=")]
+    head = git("rev-parse", "HEAD").decode().strip()
+    require(head == args.expected_head, "Unexpected source HEAD")
+    require(not git("branch", "--show-current").strip(), "Only detached owned snapshots admitted")
+    origin = git("remote", "get-url", "origin").decode().strip()
+    require(origin in (f"https://github.com/{args.repository}.git", f"git@github.com:{args.repository}.git"), "Origin mismatch")
+    gitdir = Path(git("rev-parse", "--absolute-git-dir").decode().strip())
+    for marker in ("MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "REBASE_HEAD", "rebase-merge", "rebase-apply", "sequencer", "index.lock", "locked"):
+        require(not (gitdir / marker).exists(), "Active operation requires separate review")
+    registrations = git("worktree", "list", "--porcelain", "-z")
+    for field in registrations.split(b"\0"):
+        if field.startswith(b"worktree "):
+            checkout = Path(field[9:].decode())
+            require(output != checkout and checkout not in output.parents, "Evidence inside registered checkout")
+    index_raw, index_meta = read_node(gitdir / "index")
+    index_copy = args.index_copy
+    require(index_copy.is_absolute() and index_copy == index_copy.resolve(), "Canonical private index copy required")
+    require(root not in index_copy.parents and index_copy != gitdir / "index", "Index copy must be outside source")
+    require(read_node(index_copy)[0] == index_raw, "Private index copy does not match source")
+    env["GIT_INDEX_FILE"] = str(index_copy)
+    index_entries_raw = git("ls-files", "--stage", "-z")
+    index = {}
+    for row in index_entries_raw.split(b"\0"):
+        if row:
+            metadata, path = row.split(b"\t", 1)
+            mode, oid, stage = metadata.decode().split()
+            require(stage == "0", "Unmerged index refused")
+            index[path.decode()] = {"mode": mode, "oid": oid}
+    tree = {}
+    for row in git("ls-tree", "-r", "-z", head).split(b"\0"):
+        if row:
+            metadata, path = row.split(b"\t", 1)
+            mode, kind, oid = metadata.decode().split()
+            require(kind == "blob", "Submodule requires separate review")
+            tree[path.decode()] = {"mode": mode, "oid": oid}
+    staged = sorted(name for name in set(index) | set(tree) if index.get(name) != tree.get(name))
+    unstaged, observations, blobs = [], {}, {}
+    for name, entry in index.items():
+        path = root / name
+        if not os.path.lexists(path):
+            unstaged.append(name)
+            observations[name] = {"kind": "absent"}
+            continue
+        raw, meta = read_node(path)
+        if {"mode": meta["git_mode"], "oid": meta["git_blob"]} != entry:
+            unstaged.append(name)
+        if name in staged or name in unstaged:
+            observations[name] = meta
+            blobs["worktree/" + name] = raw
+    untracked = sorted(name.decode() for name in git("ls-files", "--others", "--exclude-standard", "-z").split(b"\0") if name)
+    ignored = sorted(name.decode() for name in git("ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z").split(b"\0") if name)
+    for name in untracked:
+        raw, meta = read_node(root / name)
+        observations[name] = meta
+        blobs["untracked/" + name] = raw
+    changed = sorted(set(staged) | set(unstaged))
+    for name in changed:
+        for label, entries in (("head", tree), ("index", index)):
+            if name in entries:
+                blobs[label + "/" + name] = git("cat-file", "blob", entries[name]["oid"])
+    staged_patch = git("diff", "--cached", "--binary", "--full-index", "--no-ext-diff", "--no-textconv", "--no-renames", head, "--")
+    unstaged_patch = git("diff", "--binary", "--full-index", "--no-ext-diff", "--no-textconv", "--no-renames", "--")
+    require(read_node(gitdir / "index")[0] == index_raw, "Index changed during capture")
+    require(git("rev-parse", "HEAD").decode().strip() == head, "HEAD changed during capture")
+    require(git("worktree", "list", "--porcelain", "-z") == registrations, "Registration changed during capture")
+    for name, expected in observations.items():
+        if expected["kind"] == "absent":
+            require(not os.path.lexists(root / name), "Absent input appeared")
+        else:
+            require(read_node(root / name)[1] == expected, "Selected source changed during capture")
+    payload = {"original.index": index_raw, "index-entries.z": index_entries_raw,
+               "registrations.z": registrations, "staged.patch": staged_patch, "unstaged.patch": unstaged_patch,
+               "staged-paths.z": b"\0".join(name.encode() for name in staged) + (b"\0" if staged else b""),
+               "unstaged-paths.z": b"\0".join(name.encode() for name in sorted(unstaged)) + (b"\0" if unstaged else b""), **blobs}
+    metadata = {"captured_at": datetime.now(timezone.utc).isoformat(), "root": str(root), "gitdir": str(gitdir),
+                "head": head, "repository": args.repository, "original_index": index_meta,
+                "staged_paths": staged, "unstaged_paths": sorted(unstaged), "untracked_paths": untracked,
+                "ignored_roots_retained_unmeasured": ignored, "head_entries": {name: tree.get(name) for name in changed},
+                "index_entries": {name: index.get(name) for name in changed}, "worktree_entries": observations,
+                "payload_sha256": {name: sha(raw) for name, raw in payload.items()},
+                "helper_sha256": sha(Path(__file__).read_bytes()), "source_mutation": False,
+                "private_index_copy": str(index_copy), "private_index_final_sha256": sha(index_copy.read_bytes()),
+                "restoration_performed": False, "ignored_descendant_preservation_deferred": True}
+    output.mkdir(mode=0o700)
+    for name, raw in payload.items():
+        target = output / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with target.open("xb") as stream:
+            stream.write(raw)
+        require(target.read_bytes() == raw, "Evidence readback differs")
+    with (output / "capture.json").open("x") as stream:
+        json.dump(metadata, stream, indent=2, sort_keys=True)
+        stream.write("\n")
+    print(json.dumps({"staged": len(staged), "unstaged": len(unstaged), "untracked": len(untracked),
+                      "ignored_roots": len(ignored), "capture_sha256": sha((output / "capture.json").read_bytes()),
+                      "helper_sha256": metadata["helper_sha256"]}, indent=2))
+
+
+if __name__ == "__main__":
+    main()

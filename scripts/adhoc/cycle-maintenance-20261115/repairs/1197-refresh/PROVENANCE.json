@@ -1,0 +1,15 @@
+{
+  "date": "2026-11-15",
+  "files": {
+    "README.md": "6bedab1b4b2733721b251d931b44b53876a219d0bb1319a11f76153e63aa3ea1",
+    "VALIDATION.json": "38a1cc5f0f5e75432cd32818e4d9ba243046d28d9590933ad1861b1e22988c40",
+    "focused-pytest.log": "d35a1ba33a5e6872d4fb0060dc2e16b8ef9375e51ead894a4bda8c9246c25dcd",
+    "integrate_current_main.py": "fcb8613130d42921f38ae6d74a0073d7375abdbe4c9c7bf36af511fe8cbc97ea",
+    "integration.json": "87b41804876c562f6c84c54fca9aa2585d6ce3fc06f623f34436e8cafbace009",
+    "verification.json": "16420c65ddc99b13023ab42bcb83148db5fbaec2d975b5b6a9d9518bbf3399f4",
+    "verify_refreshed_tree.py": "1751e0d78018219681aee7e6bc7ab60729d63c61dd08c1ff6d238e8ffbce58cd"
+  },
+  "private_originals_retained": true,
+  "public_head_not_yet_changed": true,
+  "purpose": "PR1197 exact published-main integration and authentic no-op baseline verification"
+}

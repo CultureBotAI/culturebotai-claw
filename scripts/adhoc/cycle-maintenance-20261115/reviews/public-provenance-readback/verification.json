@@ -1,0 +1,72 @@
+{
+  "date": "2026-11-15",
+  "files": {
+    "repairs/1138-refresh": {
+      "README.md": "5d2c4cf14f03678afc2f4666c9d1171f3199a6c622e4adb503e487dffb7cdbf0",
+      "merge-prepared.json": "a45ca18f661ae87dee72dba63802969d09b0bd71c89c9c8812bb689b7f497cee",
+      "metadata_refresh.py.txt": "10ce6b29020347c15e3fe0839af4db9046821ae0027f43594612d0eb4ec51010",
+      "proof.json": "ec7663723ddf6e0529b877801b7c14f056b65768148b3d516efc34a290a227d5"
+    },
+    "repairs/1197-refresh": {
+      "PROVENANCE.json": "7f829503f1c98fa9e0dd3300e1b8de2f3895677cbfdfaa287ccaf390968e557d",
+      "README.md": "6bedab1b4b2733721b251d931b44b53876a219d0bb1319a11f76153e63aa3ea1",
+      "VALIDATION.json": "38a1cc5f0f5e75432cd32818e4d9ba243046d28d9590933ad1861b1e22988c40",
+      "focused-pytest.log": "d35a1ba33a5e6872d4fb0060dc2e16b8ef9375e51ead894a4bda8c9246c25dcd",
+      "integrate_current_main.py": "fcb8613130d42921f38ae6d74a0073d7375abdbe4c9c7bf36af511fe8cbc97ea",
+      "integration.json": "87b41804876c562f6c84c54fca9aa2585d6ce3fc06f623f34436e8cafbace009",
+      "verification.json": "16420c65ddc99b13023ab42bcb83148db5fbaec2d975b5b6a9d9518bbf3399f4",
+      "verify_refreshed_tree.py": "1751e0d78018219681aee7e6bc7ab60729d63c61dd08c1ff6d238e8ffbce58cd"
+    },
+    "reviews/dirty-snapshot-independent": {
+      "MANIFEST.json": "5c4dfc75e91e64142839bf330e796ffc9b6f627a19dbdf9114c3c7262031fe53",
+      "REVIEW.md": "606ed2c9bb6b8eb18193cbdca2b85e74984d470141af99b0de71f104fefd6257",
+      "controls.json": "069c241563a66e6abfd60748f3a1d3a1f0b59ad08ddd01787e023e0181dbae17",
+      "verification.json": "a40914ab0655620354b496b0e50aca6094f4222ee677719a2b12f0b4b529b33f",
+      "verify_capture_boundaries.py": "d18e93d23ad8f51a0c3e0624d867330601b3f175de96377d2c770787aa0f256d",
+      "verify_dirty_snapshots.py": "9743ea908d955cec9562b8a463c8ec68ff1b407b81d2758010bba1fa2c19047a"
+    },
+    "reviews/dirty-snapshot-plans": {
+      "PREPARATION.json": "d7d6d065701ae7f61152a2e66675f526641658d2eb9b6b736782837df1049118",
+      "PROVENANCE.json": "9b13a3a508cde35fba52a53569bd6405fff0d274c71b4bd96f900e9cd2f9b543",
+      "README.md": "1b65296a9e4dea7402b73b0969c3444871984ca9424451665a13f0f87cf96710",
+      "capture_dirty_snapshot.executed.py.txt": "c4473009f4095dc2a71237c69717597dfc608e5bc9a7c76be0b14439910eda2c",
+      "capture_dirty_snapshot.py": "9c793f327c0bb21f9607ac80d257506295c202a3cdcebf05c8a16ea94b40405c",
+      "probe_index_stability.py": "a65c199c8674e2d8a2ed857479d261d94506d944917b1017e3e35892525d8d90"
+    },
+    "reviews/main-refresh": {
+      "1138-review.json": "4f28aa856c0c280140844e269d9953d28962d23d9b33a06e3fc8aed5e19bf599",
+      "1197-review.json": "dc130437c9d324468c1c64baf5b5f8a03dea890763a3342494f9c4d0f543d082",
+      "PROVENANCE.json": "751a5f21c43a9ab102f85d6210fb21df7ac25c2993a9592ed8d4dd3f1e098387",
+      "README.md": "d6566e60211573f3c4c76cb2bb7a8f8d47e5f86ade35c4a7f02df8a77054e9c7",
+      "verify_refreshed_heads.py": "c220e06bc566c4195743ac3f8495c14803ea48f07d87dd09476b82c8c5127322"
+    }
+  },
+  "github_or_git_writes": false,
+  "helper_sha256": "0877e243a6a511032215f6d0fe3e73495aea04124c6a306a52bc1b3a0559788b",
+  "hygiene_only_own_packages": [
+    "reviews/dirty-snapshot-independent",
+    "repairs/1197-refresh"
+  ],
+  "independent_scope": [
+    "dirty capture/probe provenance",
+    "1138 package source/archive/receipt readback",
+    "main-refresh helper/proofs/JUnit readback"
+  ],
+  "input_writes": false,
+  "junit_counts": {
+    "1138": {
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "tests": 53
+    },
+    "1197": {
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "tests": 215
+    }
+  },
+  "ssh_git_url_not_personal_email": true,
+  "verdict": "bounded_pass"
+}

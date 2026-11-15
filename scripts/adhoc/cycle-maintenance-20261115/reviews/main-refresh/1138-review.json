@@ -1,0 +1,43 @@
+{
+  "pr": 1138,
+  "head": "285e2b3fb2810f1ddc0bbafdd6b338fd953b0140",
+  "previous": "6aeeb55105659cb740a0e7410eeb03a67855569d",
+  "base": "bd2b07480afd3b3984491a7fc729c64220d4dd81",
+  "original": "3046fed7f3fda2d24f19c38e6e874fef68a794e4",
+  "integration_commit": "285e2b3fb2810f1ddc0bbafdd6b338fd953b0140",
+  "ordinary_integration_parents": [
+    "6aeeb55105659cb740a0e7410eeb03a67855569d",
+    "bd2b07480afd3b3984491a7fc729c64220d4dd81"
+  ],
+  "tree": "a659ae65c4a6064a03d81a1a9e1fa4614cdc666d",
+  "full_tree_exactly_matches_independent_composition": true,
+  "reviewed_paths_preserved": [
+    "scripts/adhoc/repository-freshness-closeout-20261115/README.md",
+    "scripts/adhoc/repository-freshness-closeout-20261115/verification.json",
+    "scripts/adhoc/repository-freshness-closeout-20261115/verify_release.py",
+    "tests/test_freshness_archive_1138.py",
+    "workflow/candidates/repository-freshness-v1/README.md",
+    "workflow/candidates/repository-freshness-v1/SKILL.md",
+    "workflow/candidates/repository-freshness-v1/contract.yaml",
+    "workflow/candidates/repository-freshness-v1/proposal.json",
+    "workflow/candidates/repository-freshness-v1/schema.yaml"
+  ],
+  "baseline": null,
+  "tests": {
+    "tests": 53,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "focused_test_files": [
+    "tests/test_freshness_archive_1138.py",
+    "tests/test_freshness_candidates.py",
+    "tests/test_freshness_contract.py"
+  ],
+  "test_log_sha256": "0a6076d67a98896799a2b8d709aafb62b9efc0d7c405803c23d32ceeba088204",
+  "helper_sha256": "c220e06bc566c4195743ac3f8495c14803ea48f07d87dd09476b82c8c5127322",
+  "tracked_source_unchanged": true,
+  "git_object_or_ref_writes": false,
+  "runtime_or_adoption": false,
+  "review_scope": "local exact integration; hosted gates require owner readback after publication"
+}

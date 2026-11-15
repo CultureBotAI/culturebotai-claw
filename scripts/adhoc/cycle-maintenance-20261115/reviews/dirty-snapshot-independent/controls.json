@@ -1,0 +1,13 @@
+{
+  "binary_and_symlink_payloads_preserved": true,
+  "capture_helper_sha256": "9c793f327c0bb21f9607ac80d257506295c202a3cdcebf05c8a16ea94b40405c",
+  "positive_capture": true,
+  "production_writes": false,
+  "review_helper_sha256": "d18e93d23ad8f51a0c3e0624d867330601b3f175de96377d2c770787aa0f256d",
+  "source_index_preserved": true,
+  "synthetic_exact_path_restore": true,
+  "unselected_tracked_change_preserved": true,
+  "untracked_and_ignored_preserved": true,
+  "wrong_head_refused_before_output": true,
+  "wrong_index_refused_before_output": true
+}

@@ -1,0 +1,29 @@
+{
+  "baseline_bytes_preserved": true,
+  "date": "2026-11-15",
+  "force_pin_change": false,
+  "git_diff_check_exit": 0,
+  "git_status_clean": true,
+  "head": "748cfaf510e96ffa6f8b4b08c877742cf8a492d8",
+  "hosted_new_head_checks_pending": true,
+  "independent_review_pending": true,
+  "issue": "https://github.com/CultureBotAI/culturebotai-claw/issues/1262",
+  "maintained_baseline_check_exit": 0,
+  "maintained_refresh_preview_exit": 0,
+  "push_performed": false,
+  "pytest": {
+    "exit": 0,
+    "files": [
+      "tests/test_fleet_issue_status.py",
+      "tests/test_fleet_pr_status.py",
+      "tests/test_fleet_scoped_skills.py",
+      "tests/test_fleet_maintenance_skills.py",
+      "tests/test_mech_template.py",
+      "tests/test_mech_template_maintenance.py",
+      "tests/test_mech_template_source_fetch.py"
+    ],
+    "log_sha256": "d35a1ba33a5e6872d4fb0060dc2e16b8ef9375e51ead894a4bda8c9246c25dcd",
+    "passed": 215,
+    "seconds": 12.68
+  }
+}

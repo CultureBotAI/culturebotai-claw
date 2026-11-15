@@ -1,0 +1,9 @@
+{
+  "prior_head": "6aeeb55105659cb740a0e7410eeb03a67855569d",
+  "integrated_main": "bd2b07480afd3b3984491a7fc729c64220d4dd81",
+  "forecast_tree": "a659ae65c4a6064a03d81a1a9e1fa4614cdc666d",
+  "merge_prepared": true,
+  "commit_performed": false,
+  "push_performed": false,
+  "runtime_actions": false
+}

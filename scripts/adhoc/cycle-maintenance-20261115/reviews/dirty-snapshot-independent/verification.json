@@ -1,0 +1,38 @@
+{
+  "helper_sha256": "9743ea908d955cec9562b8a463c8ec68ff1b407b81d2758010bba1fa2c19047a",
+  "live_writes": false,
+  "plan_sha256": "e85417c9e7ddc907ab40453df3c941f1d22d2ee747d13abd0fa849c875976400",
+  "reviewed_sources": {
+    "capture_dirty_snapshot.executed.py.txt": "c4473009f4095dc2a71237c69717597dfc608e5bc9a7c76be0b14439910eda2c",
+    "capture_dirty_snapshot.py": "9c793f327c0bb21f9607ac80d257506295c202a3cdcebf05c8a16ea94b40405c",
+    "probe_index_stability.py": "a65c199c8674e2d8a2ed857479d261d94506d944917b1017e3e35892525d8d90"
+  },
+  "snapshots": [
+    {
+      "all_payloads_exact": true,
+      "capture_sha256": "1292a57e13adcda388b0d8309bd47eba9158e5a0db962a15885cfbb344c146f4",
+      "head": "68d8b2b6e02c1ca4fda2524f348460ecfa566402",
+      "label": "review-1112",
+      "live_selected_state_unchanged": true,
+      "patch_roundtrip_exact": true,
+      "payload_count": 45,
+      "restoration_performed": false,
+      "staged_count": 15,
+      "unstaged_count": 0,
+      "untracked_count": 0
+    },
+    {
+      "all_payloads_exact": true,
+      "capture_sha256": "d28b0bc6bb39f090c0652a4f8daf78a6be88be386958203f97573954cf062ec8",
+      "head": "68d8b2b6e02c1ca4fda2524f348460ecfa566402",
+      "label": "remote-verifier",
+      "live_selected_state_unchanged": true,
+      "patch_roundtrip_exact": true,
+      "payload_count": 40,
+      "restoration_performed": false,
+      "staged_count": 0,
+      "unstaged_count": 7,
+      "untracked_count": 12
+    }
+  ]
+}

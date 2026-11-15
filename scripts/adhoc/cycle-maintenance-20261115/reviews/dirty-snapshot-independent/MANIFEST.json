@@ -1,0 +1,12 @@
+{
+  "files": {
+    "controls.json": "069c241563a66e6abfd60748f3a1d3a1f0b59ad08ddd01787e023e0181dbae17",
+    "verify_capture_boundaries.py": "d18e93d23ad8f51a0c3e0624d867330601b3f175de96377d2c770787aa0f256d",
+    "verification.json": "a40914ab0655620354b496b0e50aca6094f4222ee677719a2b12f0b4b529b33f",
+    "REVIEW.md": "606ed2c9bb6b8eb18193cbdca2b85e74984d470141af99b0de71f104fefd6257",
+    "verify_dirty_snapshots.py": "9743ea908d955cec9562b8a463c8ec68ff1b407b81d2758010bba1fa2c19047a"
+  },
+  "source_helpers_unchanged": true,
+  "private_originals_retained": true,
+  "actual_cleanup_performed": false
+}
