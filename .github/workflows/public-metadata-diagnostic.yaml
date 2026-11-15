@@ -1,0 +1,38 @@
+name: Public metadata diagnostic (not a governance gate)
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/public-metadata-diagnostic.yaml
+      - scripts/adhoc/probe_public_metadata_hosted_20261115.py
+      - tests/test_public_metadata_hosted_probe.py
+
+permissions:
+  contents: read
+
+jobs:
+  one-public-request:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9
+        with:
+          python-version: "3.13"
+          enable-cache: false
+      - run: uv sync --locked
+      - name: Plan one anonymous request without executing it
+        run: uv run --locked --no-dev python scripts/adhoc/probe_public_metadata_hosted_20261115.py --plan --output .temp/public-metadata-hosted-20261115/one-request.json
+      - name: Run one diagnostic request and verify its persisted receipt
+        run: uv run --locked --no-dev python scripts/adhoc/probe_public_metadata_hosted_20261115.py --output .temp/public-metadata-hosted-20261115/one-request.json
+      - name: Preserve diagnostic receipt even when the public request is refused
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: public-metadata-diagnostic-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .temp/public-metadata-hosted-20261115/one-request.json
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 7
