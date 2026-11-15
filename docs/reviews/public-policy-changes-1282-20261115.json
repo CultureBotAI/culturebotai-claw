@@ -1,0 +1,50 @@
+{
+  "issue": 1282,
+  "reviewed_commit": "aed62751030672300f3ee4394c37357c435b0d00",
+  "checked_at": "2026-11-15T23:18:18.609116+00:00",
+  "fresh_pytest_processes": true,
+  "cases": [
+    {
+      "case": "second-exclusion",
+      "selector": "tests/test_progress_public_membership.py::test_policy_change_reads_reconciles_and_republishes_retained_membership[exclude_again]",
+      "source_sha256": {
+        "src/kg_microbe_progress/__init__.py": "ca05b3cafd08a4d54cb3d37e820f2270dea406731e3e0b8aec793f157cd8dad0",
+        "scripts/mech_progress_publish.py": "739bd9d37011f7be69455d4b071bce2bce09cc3d14cdef937176c444c730ea8e"
+      },
+      "baseline_exit": 0,
+      "mutant_exit": 1,
+      "restored_exit": 0
+    },
+    {
+      "case": "reenabled-member",
+      "selector": "tests/test_progress_public_membership.py::test_policy_change_reads_reconciles_and_republishes_retained_membership[reenable]",
+      "source_sha256": {
+        "src/kg_microbe_progress/__init__.py": "ca05b3cafd08a4d54cb3d37e820f2270dea406731e3e0b8aec793f157cd8dad0",
+        "scripts/mech_progress_publish.py": "739bd9d37011f7be69455d4b071bce2bce09cc3d14cdef937176c444c730ea8e"
+      },
+      "baseline_exit": 0,
+      "mutant_exit": 1,
+      "restored_exit": 0
+    },
+    {
+      "case": "retained-history",
+      "selector": "tests/test_progress_public_membership.py::test_policy_change_reads_reconciles_and_republishes_retained_membership[reenable]",
+      "source_sha256": {
+        "scripts/mech_progress_publish.py": "739bd9d37011f7be69455d4b071bce2bce09cc3d14cdef937176c444c730ea8e"
+      },
+      "baseline_exit": 0,
+      "mutant_exit": 1,
+      "restored_exit": 0
+    },
+    {
+      "case": "snapshot-validation",
+      "selector": "tests/test_progress_public_membership.py::test_retained_subset_still_validates_its_exact_membership_and_evidence[omitted]",
+      "source_sha256": {
+        "src/kg_microbe_progress/__init__.py": "ca05b3cafd08a4d54cb3d37e820f2270dea406731e3e0b8aec793f157cd8dad0"
+      },
+      "baseline_exit": 0,
+      "mutant_exit": 1,
+      "restored_exit": 0
+    }
+  ]
+}

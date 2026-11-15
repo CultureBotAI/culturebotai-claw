@@ -20,7 +20,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from kg_microbe_fleet import load_fleet_manifest
+from kg_microbe_fleet import FleetManifest, load_fleet_manifest
 from kg_microbe_progress import (
     collect_progress,
     public_bundle,
@@ -115,23 +115,43 @@ def read_remote(api=gh, *, manifest=None, project_expanded=True) -> tuple[str | 
     return head, public_bundle(history, snapshot, manifest, expand=project_expanded)
 
 
-def newest_history(local: dict | None, remote: dict | None, *, manifest=None) -> dict | None:
+def _retained_manifest(fleet: FleetManifest, membership: list[str] | None) -> FleetManifest:
+    public = fleet.public()
+    keys = list(public.keys) if membership is None else membership
+    if keys != [key for key in public.keys if key in keys]:
+        raise PublishError("Retained public membership is unknown, duplicated or out of order")
+    return FleetManifest(
+        {key: public.get(key) for key in keys},
+        public.capability_catalogue, public.vendored_governance, public.source,
+    )
+
+
+def _member_history(history: dict, membership: tuple[str, ...]) -> dict:
+    """Keep retained-member ordering when comparing an already validated history."""
+    projected = copy.deepcopy(history)
+    for field in ("closures", "pr_events", "associations", "cursors"):
+        projected[field] = [row for row in projected[field] if row["repository_key"] in membership]
+    return projected
+
+
+def newest_history(local: dict | None, remote: dict | None, *, manifest=None,
+                   remote_membership: list[str] | None = None) -> dict | None:
     fleet = manifest or load_fleet_manifest()
+    retained = _retained_manifest(fleet, remote_membership)
+    if remote is not None:
+        validate_history(remote, retained)
     if local is None:
-        if remote is not None:
-            validate_history(remote, fleet.public())
         return remote
     validate_history(local, fleet)
     if remote is None:
         return local
-    validate_history(remote, fleet.public())
-    projected_local = public_history(local, fleet)
+    projected_local = _member_history(public_history(local, fleet), retained.keys)
     try:
-        validate_extension(remote, projected_local, fleet.public())
+        validate_extension(remote, projected_local, retained)
         return local
     except ValueError:
         try:
-            validate_extension(projected_local, remote, fleet.public())
+            validate_extension(projected_local, remote, retained)
             # Keep internal evidence and its ordering; append only new public
             # events. Remote publication cannot erase excluded local records.
             merged = copy.deepcopy(local)
@@ -154,7 +174,8 @@ def publish(bundle: dict, previous_head: str | None, previous: dict | None, *, i
     validate_bundle(history, snapshot, fleet.public())
     if previous:
         previous = public_bundle(previous["history"], previous["snapshot"], fleet, expand=False)
-        validate_extension(previous["history"], history, fleet.public())
+        retained = _retained_manifest(fleet, [row["key"] for row in previous["snapshot"]["repositories"]])
+        validate_extension(previous["history"], _member_history(history, retained.keys), retained)
     if previous_head is None and not initialize:
         raise PublishError("Data branch is absent; initial publication requires --initialize")
     if previous == bundle and previous_head:
@@ -218,7 +239,10 @@ def collect_once(runtime_dirs: list[Path], state_dir: Path, *, apply=False, init
         local_path = state_dir / "bundle.json"
         local = read_json(local_path) if local_path.exists() else None
         head, remote = read_remote(api, project_expanded=False) if apply else (None, None)
-        prior = newest_history(local["history"] if local else None, remote["history"] if remote else None)
+        prior = newest_history(
+            local["history"] if local else None, remote["history"] if remote else None,
+            remote_membership=[row["key"] for row in remote["snapshot"]["repositories"]] if remote else None,
+        )
         associations = collect_associations(runtime_dirs)
         observations = fetch_pr_observations(refresh_associations(associations.records, prior))
         history, snapshot = collect_progress(

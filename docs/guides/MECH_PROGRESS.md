@@ -206,11 +206,22 @@ uses this same public fleet; ordinary local status retains the complete fleet.
 
 Public remote history is reconciled with the public projection of local history.
 A newer remote cursor or event cannot erase excluded local evidence. Existing
-full-fleet bundles remain valid inputs and are projected before serialization;
+full-fleet bundles and older public subsets remain valid inputs. A retained
+bundle is first validated against its own exact recognized membership, in
+canonical order, including its complete evidence and totals. Changes to public
+tags then apply before serialization. When a member becomes public again,
+retained-member history must still extend the previous public history; its
+previously excluded local evidence can rejoin without being mistaken for a
+rewrite of another member's history. Unknown or reordered membership, missing
+evidence, and inconsistent totals are refused;
 malformed excluded evidence still fails validation. This updates code only:
 upgrade the publisher and Pages consumers to the reviewed release before
 publishing a run containing an excluded member. No running service, existing
 data-branch commit or deployed site changes merely by preparing this patch.
+
+Publication reconciliation reads with `read_remote(project_expanded=False)` so
+the retained snapshot's membership remains explicit. Expansion for display adds
+unobserved rows and cannot establish that those rows were previously published.
 
 `kg_microbe_progress.collect_progress` reads explicit supervisor runtime roots.
 The supervisor's archived receipt must match its recorded hash and goal identity

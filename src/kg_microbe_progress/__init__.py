@@ -676,23 +676,31 @@ def public_bundle(
     history: dict[str, Any], snapshot: dict[str, Any],
     manifest: FleetManifest | None = None, *, expand: bool = True,
 ) -> dict[str, Any]:
-    """Validate a full or already public bundle, then filter before aggregation.
+    """Validate retained membership and evidence, then apply current public policy.
 
-    The full fleet remains the collector's contract. A public reader accepts
-    older full-fleet documents and prefix expansion, but never serializes an
-    excluded member, including its history or contribution to totals.
+    A previously public subset can differ from today's projection. Its exact
+    recognized membership must remain in canonical order, and its snapshot must
+    match its own complete history before any excluded evidence is filtered.
     """
     fleet = manifest or load_fleet_manifest()
     public = fleet.public()
-    try:
-        project_bundle_to_manifest(history, snapshot, fleet)
-    except ProgressError:
-        project_bundle_to_manifest(history, snapshot, public)
+    rows = snapshot.get("repositories") if isinstance(snapshot, dict) else None
+    if not isinstance(rows, list) or any(
+        not isinstance(row, dict) or not isinstance(row.get("key"), str) for row in rows
+    ):
+        raise ProgressError("retained public snapshot has malformed repository membership")
+    keys = [row["key"] for row in rows]
+    if keys != [key for key in fleet.keys if key in keys]:
+        raise ProgressError("retained public membership must be recognized, unique and in manifest order")
+    retained = FleetManifest(
+        {key: fleet.get(key) for key in keys},
+        fleet.capability_catalogue, fleet.vendored_governance, fleet.source,
+    )
+    validate_bundle(history, snapshot, retained)
     filtered = public_history(history, fleet)
     if not expand:
-        original_keys = {row["key"] for row in snapshot["repositories"]}
         public = FleetManifest(
-            {key: mech for key, mech in public.mechs.items() if key in original_keys},
+            {key: mech for key, mech in public.mechs.items() if key in keys},
             fleet.capability_catalogue, fleet.vendored_governance, fleet.source,
         )
     projected = snapshot_from_history(filtered, generated_at=snapshot["generated_at"], manifest=public)

@@ -25,7 +25,7 @@ CASES = {
     ),
     "aggregation": (
         "src/kg_microbe_progress/__init__.py",
-        (("    public = fleet.public()\n    try:", "    public = fleet\n    try:"),
+        (("    public = fleet.public()", "    public = fleet"),
          ("    filtered = public_history(history, fleet)", "    filtered = copy.deepcopy(history)")),
         "tests/test_progress_public_membership.py::test_public_projection_removes_history_and_nonzero_contributions",
     ),
