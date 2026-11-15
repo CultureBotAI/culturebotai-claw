@@ -23,7 +23,7 @@ from . import private_audit_coverage as coverage
 from . import private_scaleup_audit as manual
 from .artifacts.scripts.check_vendored_sync import _git_environment, parse_manifest
 from .fleet_audit import _commit_at
-from .public_repository_metadata import PublicRepositoryMetadata
+from .public_repository_metadata import PublicRepositoryMetadata, diagnostic_suffix
 
 LANES = ("protected", "candidate")
 ROW_FIELDS = {
@@ -605,8 +605,9 @@ def main(argv=None) -> int:
         return 0
     except Exception as error:
         stage = failure_stage(error, stage)
+        metadata_diagnostic = diagnostic_suffix(error) if stage == "public_metadata" else ""
         print(
-            f"public_fleet_component_failed stage={stage} code={failure_code(error)}",
+            f"public_fleet_component_failed stage={stage} code={failure_code(error)}{metadata_diagnostic}",
             file=sys.stderr,
         )
         return 2
