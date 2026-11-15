@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://culturebotai.github.io/schemas/public-gap-export-v1.schema.json",
+  "title": "Public Mech discussion projection, version 1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "mech", "record_id", "record_label", "aliases", "discussion_id", "prompt", "rationale", "kind", "status", "storage_mode", "origin", "current_attribution", "origin_basis", "review_state", "lane", "evidence_refs", "attaches_to", "evidence", "proposed_experiments", "posed_date", "resolved_date", "resolution_note", "source", "classification_reason"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^gap-[0-9a-f]{64}$"},
+    "mech": {"$ref": "#/$defs/nonempty"},
+    "record_id": {"$ref": "#/$defs/nonempty"},
+    "record_label": {"$ref": "#/$defs/nonempty"},
+    "aliases": {"$ref": "#/$defs/strings"},
+    "discussion_id": {"$ref": "#/$defs/nonempty"},
+    "prompt": {"$ref": "#/$defs/nonempty"},
+    "rationale": {"type": "string"},
+    "kind": {"enum": ["UNSPECIFIED", "OPEN_QUESTION", "KNOWLEDGE_GAP", "CONTROVERSY", "CURATION_TODO", "EMERGING_HYPOTHESIS", "INTERPRETATION", "HUMAN_MODEL_MISMATCH"]},
+    "status": {"enum": ["UNSPECIFIED", "OPEN", "UNDER_DISCUSSION", "RESOLVED", "ARCHIVED"]},
+    "storage_mode": {"const": "native_record"},
+    "origin": {"enum": ["scanner", "other", "unspecified"]},
+    "current_attribution": {"enum": ["scanner", "other", "unspecified"]},
+    "origin_basis": {"enum": ["current_attribution", "documented_scan_provenance", "unspecified"]},
+    "review_state": {"enum": ["required", "unspecified"]},
+    "lane": {"enum": ["recorded", "candidate"]},
+    "evidence_refs": {"$ref": "#/$defs/strings"},
+    "attaches_to": {"$ref": "#/$defs/strings"},
+    "evidence": {"type": "array", "items": {"$ref": "#/$defs/evidence"}},
+    "proposed_experiments": {"type": "array", "items": {"$ref": "#/$defs/experiment"}},
+    "posed_date": {"$ref": "#/$defs/optionalDate"},
+    "resolved_date": {"$ref": "#/$defs/optionalDate"},
+    "resolution_note": {"type": "string"},
+    "source": {"$ref": "#/$defs/source"},
+    "classification_reason": {"enum": ["explicit_review_requirement", "current_scanner_attribution", "current_other_attribution", "documented_scanner_history_without_current_attribution", "no_review_or_origin_assertion"]}
+  },
+  "$defs": {
+    "nonempty": {"type": "string", "minLength": 1, "pattern": "\\S"},
+    "strings": {"type": "array", "items": {"$ref": "#/$defs/nonempty"}},
+    "optionalDate": {"oneOf": [{"const": ""}, {"type": "string", "format": "date"}]},
+    "evidence": {
+      "type": "object", "additionalProperties": false,
+      "required": ["reference", "supports", "explanation"],
+      "properties": {
+        "reference": {"$ref": "#/$defs/nonempty"},
+        "supports": {"enum": ["UNSPECIFIED", "SUPPORT", "REFUTE", "PARTIAL", "NO_EVIDENCE", "WRONG_STATEMENT"]},
+        "explanation": {"type": "string"}
+      }
+    },
+    "experiment": {
+      "type": "object", "additionalProperties": false, "minProperties": 1,
+      "properties": {
+        "experiment_id": {"type": "string"},
+        "name": {"type": "string"},
+        "description": {"type": "string"},
+        "approach": {"type": "string"},
+        "model_systems": {"$ref": "#/$defs/strings"},
+        "perturbations": {"$ref": "#/$defs/strings"},
+        "readouts": {"$ref": "#/$defs/strings"},
+        "decision_criterion": {"type": "string"},
+        "would_support": {"type": "string"},
+        "would_refute": {"type": "string"}
+      }
+    },
+    "source": {
+      "type": "object", "additionalProperties": false,
+      "required": ["repository", "revision", "path", "locator", "sha256", "url", "record_url", "license"],
+      "properties": {
+        "repository": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"},
+        "revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "path": {"$ref": "#/$defs/nonempty"},
+        "locator": {"$ref": "#/$defs/nonempty"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "url": {"type": "string", "format": "uri"},
+        "record_url": {"type": "string"},
+        "license": {"$ref": "#/$defs/nonempty"}
+      }
+    }
+  }
+}

@@ -144,7 +144,7 @@ def test_retained_fixture_provenance_matches_every_sealed_source():
     assert provenance["version"] == 1
     assert provenance["authority"] == "offline_fixture_provenance_only"
     records = provenance["records"]
-    assert len(records) == 10
+    assert len(records) == 13  # #1255: retain both checker and schema cohorts.
     assert {row["consumer"] for row in records} == {"edgemech", "cofactormech", "assaymech"}
     assert {row["fixture"] for row in records} == {
         path.relative_to(ROOT).as_posix()
@@ -164,6 +164,14 @@ def test_retained_fixture_provenance_matches_every_sealed_source():
         assert hashlib.sha256(content).hexdigest() == artifact["sha256"] == row["sha256"]
         assert len(content) == row["bytes"]
         assert hashlib.sha1(b"blob " + str(len(content)).encode() + b"\0" + content).hexdigest() == row["source_blob"]
+
+
+def test_every_evolved_admitted_payload_has_authentic_retained_bytes():
+    """#1221: canonical evolution must not erase any sealed consumer source."""
+    for consumer in ("edgemech", "cofactormech", "assaymech"):
+        path = ROOT / f"src/kg_microbe_governance/releases/{consumer}-infrastructure-source-manifest.json"
+        for artifact in parse_manifest(path.read_bytes()).artifacts:
+            assert hashlib.sha256(frozen_payload(artifact)).hexdigest() == artifact.sha256
 
 
 def test_frozen_payload_rejects_missing_or_corrupt_retained_bytes(tmp_path, monkeypatch):

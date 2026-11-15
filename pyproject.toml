@@ -98,6 +98,8 @@ embeddings = [
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
+    # Exercise governed SupportingReference annotations through the actual CLI.
+    "linkml-reference-validator==0.2.1",
     "black>=23.0.0",
     "mypy>=1.0.0",
 ]
@@ -142,7 +144,7 @@ kg_microbe_governance = [
 kg_microbe_config = ["openclaw_config.yaml"]
 kg_microbe_agents = ["definitions/**/*.yaml"]
 kg_microbe_qc = ["templates/*.j2"]
-kg_microbe_discussions = ["templates/*.html"]
+kg_microbe_discussions = ["templates/*.html", "public_export.schema.json"]
 # The Biolink snapshot the KGX exporter maps to (scripts/snapshot_biolink.py).
 kg_microbe_kgx = ["data/*.json"]
 
