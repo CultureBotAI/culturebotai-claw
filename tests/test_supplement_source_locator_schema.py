@@ -1,10 +1,14 @@
 """Generated-schema controls for CommunityMech #1996 supplement routing."""
 
+import importlib
 import json
+import subprocess
+import sys
 from copy import deepcopy
 from pathlib import Path
 
 import pytest
+import yaml
 from jsonschema.validators import validator_for
 from linkml.generators.jsonschemagen import JsonSchemaGenerator
 
@@ -24,9 +28,23 @@ LOCATOR = {
 
 @pytest.fixture(scope="module")
 def validator():
-    schema = json.loads(
-        JsonSchemaGenerator(str(SCHEMA), top_class="SupportingReference", not_closed=False).serialize()
+    # As in test_cross_corpus_link_schema, isolate real LinkML generation from
+    # process-global YAML loader damage observed under hosted coverage (#263).
+    generated = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from linkml.generators.jsonschemagen import JsonSchemaGenerator\n"
+            "import sys\n"
+            "print(JsonSchemaGenerator(sys.argv[1], top_class='SupportingReference', "
+            "not_closed=False).serialize())\n",
+            str(SCHEMA),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
     )
+    schema = json.loads(generated.stdout)
     validator_type = validator_for(schema)
     validator_type.check_schema(schema)
     return validator_type(schema)
@@ -66,3 +84,29 @@ def test_generated_schema_requires_complete_locator(validator, missing):
 def test_generated_schema_rejects_invalid_locator_without_coercion(validator, field, value):
     locator = {**LOCATOR, field: value}
     assert list(validator.iter_errors({"reference": "PMID:36472419", "source_locator": locator}))
+
+
+def test_schema_generation_survives_damaged_parent_loader_and_restoration(monkeypatch):
+    """Exercise #263's null-tag failure without relying on the host platform."""
+
+    class NullTagLoader(yaml.SafeLoader):
+        def resolve(self, kind, value, implicit):
+            return None
+
+    loader = importlib.import_module("linkml_runtime.loaders.yaml_loader")
+    original = loader.DupCheckYamlLoader
+    citation = {"reference": "PMID:36472419", "snippet": "OAE516", "source_locator": LOCATOR}
+    with monkeypatch.context() as changed:
+        changed.setattr(loader, "DupCheckYamlLoader", NullTagLoader)
+        with pytest.raises(yaml.constructor.ConstructorError, match="tag None"):
+            JsonSchemaGenerator(
+                str(SCHEMA), top_class="SupportingReference", not_closed=False
+            ).serialize()
+        isolated = validator.__wrapped__()
+        isolated.validate(citation)
+        incomplete = {key: value for key, value in LOCATOR.items() if key != "cell"}
+        assert not isolated.is_valid({**citation, "source_locator": incomplete})
+        assert not isolated.is_valid({**citation, "source_locator": {**LOCATOR, "row": 0}})
+        assert loader.DupCheckYamlLoader is NullTagLoader
+    assert loader.DupCheckYamlLoader is original
+    validator.__wrapped__().validate(citation)
