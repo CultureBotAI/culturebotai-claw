@@ -219,7 +219,7 @@
       "source": "src/kg_microbe_governance/artifacts/schema/mech_shared.yaml",
       "target": "{package_path}/schema/mech_shared.yaml",
       "consumers": "all",
-      "sha256": "cf32864df1626201128e9311054b075bfc4ad3d8345491ac144122a5d5e67d11",
+      "sha256": "01d09b7d91a21235b97cc37d8482518a7b2c36ab63d8898796fede3877061ed9",
       "mode": "0644"
     },
     {
