@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import copy
 import fcntl
 import json
 import os
@@ -19,9 +20,11 @@ import time
 from pathlib import Path
 from typing import Any
 
+from kg_microbe_fleet import FleetManifest, load_fleet_manifest
 from kg_microbe_progress import (
     collect_progress,
-    project_bundle_to_manifest,
+    public_bundle,
+    public_history,
     run_key,
     validate_bundle,
     validate_extension,
@@ -85,7 +88,8 @@ def read_json(path: Path) -> dict:
     return read_progress_json(path)
 
 
-def read_remote(api=gh, *, manifest=None, project_expanded=True) -> tuple[str | None, dict | None]:
+def read_remote_documents(api=gh, *, manifest=None) -> tuple[str | None, dict | None]:
+    """Read validated physical documents, retaining evidence of obsolete membership."""
     ref = api(f"repos/{REPOSITORY}/git/ref/heads/{BRANCH}")
     if ref is None:
         return None, None
@@ -109,36 +113,85 @@ def read_remote(api=gh, *, manifest=None, project_expanded=True) -> tuple[str | 
             raise PublishError("Public data blob is too large")
         documents[name] = json.loads(raw)
     history, snapshot = documents["history.json"], documents["progress.json"]
-    projected = project_bundle_to_manifest(history, snapshot, manifest)
-    return head, {"history": history, "snapshot": projected if project_expanded else snapshot}
+    # Validate before returning even members that the current policy excludes.
+    public_bundle(history, snapshot, manifest, expand=False)
+    return head, {"history": history, "snapshot": snapshot}
 
 
-def newest_history(local: dict | None, remote: dict | None) -> dict | None:
+def read_remote(api=gh, *, manifest=None, project_expanded=True) -> tuple[str | None, dict | None]:
+    head, documents = read_remote_documents(api, manifest=manifest)
+    if documents is None:
+        return head, None
+    return head, public_bundle(**documents, manifest=manifest, expand=project_expanded)
+
+
+def _retained_manifest(fleet: FleetManifest, membership: list[str] | None) -> FleetManifest:
+    public = fleet.public()
+    keys = list(public.keys) if membership is None else membership
+    if keys != [key for key in public.keys if key in keys]:
+        raise PublishError("Retained public membership is unknown, duplicated or out of order")
+    return FleetManifest(
+        {key: public.get(key) for key in keys},
+        public.capability_catalogue, public.vendored_governance, public.source,
+    )
+
+
+def _member_history(history: dict, membership: tuple[str, ...]) -> dict:
+    """Keep retained-member ordering when comparing an already validated history."""
+    projected = copy.deepcopy(history)
+    for field in ("closures", "pr_events", "associations", "cursors"):
+        projected[field] = [row for row in projected[field] if row["repository_key"] in membership]
+    return projected
+
+
+def newest_history(local: dict | None, remote: dict | None, *, manifest=None,
+                   remote_membership: list[str] | None = None) -> dict | None:
+    fleet = manifest or load_fleet_manifest()
+    retained = _retained_manifest(fleet, remote_membership)
+    if remote is not None:
+        validate_history(remote, retained)
     if local is None:
         return remote
-    validate_history(local)
+    validate_history(local, fleet)
     if remote is None:
         return local
-    validate_history(remote)
+    projected_local = _member_history(public_history(local, fleet), retained.keys)
     try:
-        validate_extension(remote, local)
+        validate_extension(remote, projected_local, retained)
         return local
     except ValueError:
         try:
-            validate_extension(local, remote)
-            return remote
+            validate_extension(projected_local, remote, retained)
+            # Keep internal evidence and its ordering; append only new public
+            # events. Remote publication cannot erase excluded local records.
+            merged = copy.deepcopy(local)
+            for field in ("closures", "pr_events", "associations"):
+                merged[field].extend(copy.deepcopy(remote[field][len(projected_local[field]):]))
+            cursors = {(item["repository_key"], item["run_key"]): item for item in merged["cursors"]}
+            for item in remote["cursors"]:
+                cursors[(item["repository_key"], item["run_key"])] = copy.deepcopy(item)
+            merged["cursors"] = list(cursors.values())
+            validate_extension(local, merged, fleet)
+            return merged
         except ValueError as error:
             raise PublishError("Local and remote histories diverged; reconcile explicitly") from error
 
 
-def publish(bundle: dict, previous_head: str | None, previous: dict | None, *, initialize=False, api=gh) -> str:
+def publish(bundle: dict, previous_head: str | None, previous: dict | None, *, initialize=False,
+            api=gh, manifest=None, previous_documents: dict | None = None) -> str:
+    fleet = manifest or load_fleet_manifest()
+    bundle = public_bundle(bundle["history"], bundle["snapshot"], fleet)
     history, snapshot = bundle["history"], bundle["snapshot"]
-    validate_bundle(history, snapshot)
+    validate_bundle(history, snapshot, fleet.public())
     if previous:
-        validate_extension(previous["history"], history)
+        previous = public_bundle(previous["history"], previous["snapshot"], fleet, expand=False)
+        retained = _retained_manifest(fleet, [row["key"] for row in previous["snapshot"]["repositories"]])
+        validate_extension(previous["history"], _member_history(history, retained.keys), retained)
     if previous_head is None and not initialize:
         raise PublishError("Data branch is absent; initial publication requires --initialize")
-    if previous == bundle and previous_head:
+    # A filtered view can match even when the current data branch still carries
+    # excluded members. Only physical-document evidence can justify a no-op.
+    if previous_documents == bundle and previous_head:
         return previous_head
     entries = []
     for name, document in (("history.json", history), ("progress.json", snapshot)):
@@ -198,8 +251,12 @@ def collect_once(runtime_dirs: list[Path], state_dir: Path, *, apply=False, init
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         local_path = state_dir / "bundle.json"
         local = read_json(local_path) if local_path.exists() else None
-        head, remote = read_remote(api, project_expanded=False) if apply else (None, None)
-        prior = newest_history(local["history"] if local else None, remote["history"] if remote else None)
+        head, documents = read_remote_documents(api) if apply else (None, None)
+        remote = public_bundle(**documents, expand=False) if documents is not None else None
+        prior = newest_history(
+            local["history"] if local else None, remote["history"] if remote else None,
+            remote_membership=[row["key"] for row in remote["snapshot"]["repositories"]] if remote else None,
+        )
         associations = collect_associations(runtime_dirs)
         observations = fetch_pr_observations(refresh_associations(associations.records, prior))
         history, snapshot = collect_progress(
@@ -211,7 +268,9 @@ def collect_once(runtime_dirs: list[Path], state_dir: Path, *, apply=False, init
         atomic_json(local_path, bundle)
         result = {"status": "collected", "generated_at": snapshot["generated_at"]}
         if apply:
-            result.update(status="published", data_commit=publish(bundle, head, remote, initialize=initialize, api=api))
+            result.update(status="published", data_commit=publish(
+                bundle, head, remote, initialize=initialize, api=api, previous_documents=documents,
+            ))
         atomic_json(state_dir / "status.json", result)
         return result
 

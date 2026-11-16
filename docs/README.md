@@ -12,6 +12,8 @@ for provenance; they do not describe the supported interface.
 
 Other maintained references:
 
+- [`guides/PUBLIC_FLEET_OUTPUT.md`](guides/PUBLIC_FLEET_OUTPUT.md) — validated
+  fleet tags, public membership selection, and progress publication boundaries.
 - [`proposals/MECH_EMBEDDING_MAP_CONTRACT.md`](proposals/MECH_EMBEDDING_MAP_CONTRACT.md) —
   shared pinned BGE text maps, retained specialty views, cache provenance and PaCMAP rollout.
 - [`guides/EMBEDDING_SETS.md`](guides/EMBEDDING_SETS.md) — PaCMAP projections,

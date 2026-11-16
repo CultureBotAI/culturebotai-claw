@@ -197,6 +197,41 @@ historical association or another valid binding.
 
 ## Durable records and public projection
 
+Fleet members tagged `exclude-from-public` remain in local collection, saved
+history and internal status. The publication boundary filters all four history
+collections before recomputing counters against `FleetManifest.public()`.
+Neither the public data branch nor the Pages build emits an excluded member's
+identity, PRs, cursors, closures or numerical contribution. `--published` status
+uses this same public fleet; ordinary local status retains the complete fleet.
+
+Public remote history is reconciled with the public projection of local history.
+A newer remote cursor or event cannot erase excluded local evidence. Existing
+full-fleet bundles and older public subsets remain valid inputs. A retained
+bundle is first validated against its own exact recognized membership, in
+canonical order, including its complete evidence and totals. Changes to public
+tags then apply before serialization. When a member becomes public again,
+retained-member history must still extend the previous public history; its
+previously excluded local evidence can rejoin without being mistaken for a
+rewrite of another member's history. Unknown or reordered membership, missing
+evidence, and inconsistent totals are refused;
+malformed excluded evidence still fails validation. This updates code only:
+upgrade the publisher and Pages consumers to the reviewed release before
+publishing a run containing an excluded member. No running service, existing
+data-branch commit or deployed site changes merely by preparing this patch.
+
+Publication reconciliation projects the validated `read_remote_documents()`
+result with `expand=False` so the retained snapshot's membership remains
+explicit. `read_remote(project_expanded=False)` exposes the same filtered view
+to other callers. Expansion for display adds unobserved rows and cannot
+establish that those rows were previously published.
+
+The publisher retains the physical documents separately from that view. A no-op
+requires the physical documents to equal the intended public bundle; callers
+without that evidence conservatively write a new commit. Changing exclusion
+policy therefore replaces the current data-branch documents even if the source
+history and timestamp have not changed. Previously published Git history remains
+intact. An immediate repeat with identical physical documents makes no write.
+
 `kg_microbe_progress.collect_progress` reads explicit supervisor runtime roots.
 The supervisor's archived receipt must match its recorded hash and goal identity
 before a closure is exported. The exporter trusts the supervisor's stored

@@ -1,0 +1,17 @@
+{
+  "issue": 1284,
+  "checked_at": "2026-11-16T00:07:42.536332+00:00",
+  "fresh_pytest_processes": true,
+  "cases": [
+    {
+      "case": "physical-comparison",
+      "selector": "tests/test_progress_public_membership.py::test_policy_only_change_rewrites_physical_documents_before_noop[publish]",
+      "source_sha256": {
+        "scripts/mech_progress_publish.py": "e35aa222df84fddcc2caf48223a82ddfdbe4df31cb50ff1615b6e6151409dc7d"
+      },
+      "baseline_exit": 0,
+      "mutant_exit": 1,
+      "restored_exit": 0
+    }
+  ]
+}

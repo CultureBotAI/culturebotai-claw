@@ -660,6 +660,54 @@ def validate_extension(previous: dict[str, Any], new: dict[str, Any],
             raise ProgressError("parent version changed inside an active cycle")
 
 
+def public_history(history: dict[str, Any], manifest: FleetManifest | None = None) -> dict[str, Any]:
+    """Project validated internal history without changing retained local evidence."""
+    fleet = manifest or load_fleet_manifest()
+    validate_history(history, fleet)
+    keys = set(fleet.public().keys)
+    result = copy.deepcopy(history)
+    for field in ("closures", "pr_events", "associations", "cursors"):
+        result[field] = [item for item in result[field] if item["repository_key"] in keys]
+    validate_history(result, fleet.public())
+    return result
+
+
+def public_bundle(
+    history: dict[str, Any], snapshot: dict[str, Any],
+    manifest: FleetManifest | None = None, *, expand: bool = True,
+) -> dict[str, Any]:
+    """Validate retained membership and evidence, then apply current public policy.
+
+    A previously public subset can differ from today's projection. Its exact
+    recognized membership must remain in canonical order, and its snapshot must
+    match its own complete history before any excluded evidence is filtered.
+    """
+    fleet = manifest or load_fleet_manifest()
+    public = fleet.public()
+    rows = snapshot.get("repositories") if isinstance(snapshot, dict) else None
+    if not isinstance(rows, list) or any(
+        not isinstance(row, dict) or not isinstance(row.get("key"), str) for row in rows
+    ):
+        raise ProgressError("retained public snapshot has malformed repository membership")
+    keys = [row["key"] for row in rows]
+    if keys != [key for key in fleet.keys if key in keys]:
+        raise ProgressError("retained public membership must be recognized, unique and in manifest order")
+    retained = FleetManifest(
+        {key: fleet.get(key) for key in keys},
+        fleet.capability_catalogue, fleet.vendored_governance, fleet.source,
+    )
+    validate_bundle(history, snapshot, retained)
+    filtered = public_history(history, fleet)
+    if not expand:
+        public = FleetManifest(
+            {key: mech for key, mech in public.mechs.items() if key in keys},
+            fleet.capability_catalogue, fleet.vendored_governance, fleet.source,
+        )
+    projected = snapshot_from_history(filtered, generated_at=snapshot["generated_at"], manifest=public)
+    validate_bundle(filtered, projected, public)
+    return {"history": filtered, "snapshot": projected}
+
+
 def collect_progress(
     runtime_dirs: list[Path], previous_history: dict[str, Any] | None = None, *,
     generated_at: str | None = None, manifest: FleetManifest | None = None,

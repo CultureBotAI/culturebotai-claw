@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from kg_microbe_progress import collect_progress
+from kg_microbe_progress import collect_progress, public_bundle
 from kg_microbe_progress.prs import AssociationCollection
 
 ROOT = Path(__file__).parents[1]
@@ -26,7 +26,7 @@ BUILD_SPEC.loader.exec_module(builder)
 @pytest.fixture
 def bundle():
     history, snapshot = collect_progress([], generated_at="2026-10-20T10:00:00Z")
-    return {"history": history, "snapshot": snapshot}
+    return public_bundle(history, snapshot)
 
 
 class GitHub:
@@ -75,9 +75,12 @@ def test_initialization_is_explicit_and_atomic(bundle):
     observed, restored = publisher.read_remote(api)
     assert observed == head
     assert restored == bundle
+    physical_head, documents = publisher.read_remote_documents(api)
+    assert physical_head == head
+    assert documents == bundle
     assert set(api.objects[api.objects[head]["tree"]["sha"]]["tree"][i]["path"] for i in range(2)) == {"history.json", "progress.json"}
     before = len(api.calls)
-    assert publisher.publish(bundle, head, restored, api=api) == head
+    assert publisher.publish(bundle, head, restored, api=api, previous_documents=documents) == head
     assert len(api.calls) == before
 
 
@@ -335,7 +338,7 @@ def test_unadopted_target_does_not_block_healthy_fleet_publication(tmp_path, mon
     assert queries == [["gh", "api", f"repos/{GITHUB}/pulls/42"]]
     assert result["status"] == ("published" if apply else "collected")
     if apply:
-        assert publisher.read_remote(api)[1] == bundle
+        assert publisher.read_remote(api)[1] == public_bundle(**bundle)
     else:
         assert api.calls == []
     assert {p: p.read_bytes() for p in root.rglob("*") if p.is_file()} == before
@@ -343,9 +346,9 @@ def test_unadopted_target_does_not_block_healthy_fleet_publication(tmp_path, mon
 
 def test_fleet_expansion_projects_prefix_remote_bundle_and_publishes_full_fleet(tmp_path, monkeypatch):
     from kg_microbe_fleet import FleetManifest, load_fleet_manifest
-    from kg_microbe_progress import ProgressError, project_bundle_to_manifest, validate_bundle
+    from kg_microbe_progress import ProgressError, project_bundle_to_manifest
 
-    fleet = load_fleet_manifest()
+    fleet = load_fleet_manifest().public()
     prefix_keys = list(fleet.keys[:-1])
     added_key = fleet.keys[-1]
     prefix_manifest = FleetManifest(
@@ -360,9 +363,7 @@ def test_fleet_expansion_projects_prefix_remote_bundle_and_publishes_full_fleet(
     prefix_bundle = {"history": prefix_history, "snapshot": prefix_snapshot}
 
     api = GitHub()
-    monkeypatch.setattr(publisher, "validate_bundle", lambda h, s, m=None: validate_bundle(h, s, m or prefix_manifest))
-    initial_head = publisher.publish(prefix_bundle, None, None, initialize=True, api=api)
-    monkeypatch.setattr(publisher, "validate_bundle", validate_bundle)
+    initial_head = publisher.publish(prefix_bundle, None, None, initialize=True, api=api, manifest=prefix_manifest)
 
     observed_head, projected_bundle = publisher.read_remote(api)
     assert observed_head == initial_head

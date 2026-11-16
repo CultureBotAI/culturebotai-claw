@@ -348,9 +348,19 @@ def test_post_admission_catalogue_addition_permits_withheld_capability_and_rejec
     historical = (root / RELEASE_PATH).read_bytes()
     historical_manifest = (root / HISTORICAL_MANIFEST_PATH).read_bytes()
     admitted_manifest = (root / ADMITTED_MANIFEST_PATH).read_bytes()
-    admitted_consumers = set(json.loads(admitted_manifest)["consumers"])
     fleet = yaml.safe_load((root / FLEET_PATH).read_bytes())
-    fleet["mechs"] = {k: v for k, v in fleet["mechs"].items() if k in admitted_consumers}
+
+    # This test exercises the frozen Edge admission, not the later independent
+    # native admissions. The complete current fleet must still be refused here.
+    with pytest.raises(GovernanceError, match="fleet identities differ"):
+        validate_transition(
+            policy, historical, historical_manifest, admitted_manifest,
+            yaml.safe_dump(fleet).encode(),
+        )
+    fleet["mechs"] = {
+        key: fleet["mechs"][key]
+        for key in json.loads(admitted_manifest)["consumers"]
+    }
 
     expanded = deepcopy(fleet)
     expanded["capability_catalogue"]["taxon_links"] = {

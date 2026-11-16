@@ -16,6 +16,7 @@ from kg_microbe_fleet import load_fleet_manifest
 from kg_microbe_progress import (
     ProgressError,
     project_bundle_to_manifest,
+    public_bundle,
     read_json,
 )
 
@@ -109,10 +110,13 @@ def main(argv: list[str] | None = None, *, now: datetime | None = None) -> int:
         if manifest_path is not None and not stat.S_ISREG(manifest_path.lstat().st_mode):
             raise ProgressError("pinned manifest must be a regular file")
         manifest = load_fleet_manifest(manifest_path)
+        internal_manifest = manifest
         if args.published:
             _, bundle = read_remote(manifest=manifest)
             if bundle is None:
                 raise ProgressError("no published progress bundle exists")
+            bundle = public_bundle(bundle["history"], bundle["snapshot"], manifest)
+            manifest = manifest.public()
         else:
             bundle = read_json(args.bundle)
         history, snapshot = bundle["history"], bundle["snapshot"]
@@ -124,7 +128,9 @@ def main(argv: list[str] | None = None, *, now: datetime | None = None) -> int:
         durability = []
         if args.durability_runtime is not None:
             from kg_microbe_progress.durability import read_durability
-            durability = read_durability(args.durability_runtime, manifest, now or datetime.now(timezone.utc))
+            durability = read_durability(args.durability_runtime, internal_manifest, now or datetime.now(timezone.utc))
+            if args.published:
+                durability = [row for row in durability if row["repository_key"] in manifest.mechs]
     except (ValueError, OSError, KeyError, TypeError, subprocess.SubprocessError) as error:
         print(f"Progress unavailable: {error}", file=sys.stderr)
         return 1
