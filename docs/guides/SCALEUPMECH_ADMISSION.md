@@ -71,9 +71,11 @@ The prerequisite regression repair for #1174 keeps deferred private rows
 explicitly unverified, with zero checked artifacts. Protected source binding
 still runs before a deferred row can be reported; unknown admissions, incomplete
 coverage, and public failures still refuse a successful full-fleet verdict.
-The workflow derives its reserved key from its existing repository identity,
-so adding the key to the manifest does not break the manifest-derived checkout
-guard. This does not change private/public routing.
+The workflow reads its reserved repository identity from the installed protected
+policy module and derives its key from that identity. A future-membership fixture
+exercises both identity and key checkout guards (#1285). Neither field is repeated
+as a workflow literal, and the reserved identity checks still fail closed. This
+does not change private/public routing.
 
 ## Membership and installation after the prerequisite
 

@@ -1,0 +1,29 @@
+{
+  "captured_at": "2026-11-16T00:09:14.542937+00:00",
+  "mutations": [
+    {
+      "name": "literal_identity",
+      "path": ".github/workflows/governance-fleet-audit.yaml",
+      "test": "tests/test_id_label_workflow.py::test_reserved_audit_key_will_not_break_a_later_fleet_admission",
+      "original_sha256": "d1c499ed7757afe106146423058a14c472efe55f824633efbc99d0275b195671",
+      "mutated_sha256": "7c0875453c61b5461f7b4f27a65fdd35b528a91c307826a6bddf88224d8cd0dc",
+      "green_exit": 0,
+      "red_exit": 1,
+      "restored_exit": 0,
+      "restored_bytes": true,
+      "failure": "F                                                                        [100%]\n=================================== FAILURES ===================================\n________ test_reserved_audit_key_will_not_break_a_later_fleet_admission ________\n\nmonkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1029e0770>\n\n    def test_reserved_audit_key_will_not_break_a_later_fleet_admission(monkeypatch) -> None:\n        \"\"\"Run the complete guard with both the future identity and key (#1285).\"\"\"\n        from kg_microbe_governance.private_scaleup_audit import PRIVATE\n    \n        reserved_key = PRIVATE.rsplit(\"/\", 1)[-1].casefold()\n        monkeypatch.setitem(globals(), \"FLEET_KEYS\", FLEET_KEYS | {reserved_key})\n        monkeypatch.setitem(globals(), \"FLEET_IDENTITIES\", {**FLEET_IDENTITIES, reserved_key: PRIVATE})\n>       test_runtime_mech_checkouts_and_sparse_paths_come_from_manifest()\n\ntests/test_id_label_workflow.py:50: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\n    def test_runtime_mech_checkouts_and_sparse_paths_come_from_manifest() -> None:\n        runs = _run_steps(FLEET_AUDIT_WORKFLOW, \"fleet-audit\")\n        export = next(run for run in runs if \"load_governance_manifest\" in run)\n        checkout = next(run for run in runs if \"git clone\" in run)\n        workflow_text = FLEET_AUDIT_WORKFLOW.read_text(encoding=\"utf-8\")\n    \n        assert \"manifest.consumers.values()\" in export\n        assert \"manifest.pin_path\" in export\n        assert \"governance-consumers.tsv\" in checkout\n        assert \"kg-microbe-governance list\" in checkout\n        assert \"sparse-checkout set --no-cone\" in checkout\n        assert \"--branch main\" in checkout\n>       assert all(identity not in workflow_text for identity in FLEET_IDENTITIES.values())\nE       assert False\nE        +  where False = all(<generator object test_runtime_mech_checkouts_and_sparse_paths_come_from_manifest.<locals>.<genexpr> at 0x1025c1630>)\n\ntests/test_id_label_workflow.py:216: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_id_label_workflow.py::test_reserved_audit_key_will_not_break_a_later_fleet_admission\n1 failed in 0.44s\n"
+    },
+    {
+      "name": "literal_key",
+      "path": ".github/workflows/governance-fleet-audit.yaml",
+      "test": "tests/test_id_label_workflow.py::test_reserved_audit_key_will_not_break_a_later_fleet_admission",
+      "original_sha256": "d1c499ed7757afe106146423058a14c472efe55f824633efbc99d0275b195671",
+      "mutated_sha256": "04e2be394ef57abc299040961f15808f9a19d3de9f4b58c8556b1d306a77b533",
+      "green_exit": 0,
+      "red_exit": 1,
+      "restored_exit": 0,
+      "restored_bytes": true,
+      "failure": "F                                                                        [100%]\n=================================== FAILURES ===================================\n________ test_reserved_audit_key_will_not_break_a_later_fleet_admission ________\n\nmonkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x104280770>\n\n    def test_reserved_audit_key_will_not_break_a_later_fleet_admission(monkeypatch) -> None:\n        \"\"\"Run the complete guard with both the future identity and key (#1285).\"\"\"\n        from kg_microbe_governance.private_scaleup_audit import PRIVATE\n    \n        reserved_key = PRIVATE.rsplit(\"/\", 1)[-1].casefold()\n        monkeypatch.setitem(globals(), \"FLEET_KEYS\", FLEET_KEYS | {reserved_key})\n        monkeypatch.setitem(globals(), \"FLEET_IDENTITIES\", {**FLEET_IDENTITIES, reserved_key: PRIVATE})\n>       test_runtime_mech_checkouts_and_sparse_paths_come_from_manifest()\n\ntests/test_id_label_workflow.py:50: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\n    def test_runtime_mech_checkouts_and_sparse_paths_come_from_manifest() -> None:\n        runs = _run_steps(FLEET_AUDIT_WORKFLOW, \"fleet-audit\")\n        export = next(run for run in runs if \"load_governance_manifest\" in run)\n        checkout = next(run for run in runs if \"git clone\" in run)\n        workflow_text = FLEET_AUDIT_WORKFLOW.read_text(encoding=\"utf-8\")\n    \n        assert \"manifest.consumers.values()\" in export\n        assert \"manifest.pin_path\" in export\n        assert \"governance-consumers.tsv\" in checkout\n        assert \"kg-microbe-governance list\" in checkout\n        assert \"sparse-checkout set --no-cone\" in checkout\n        assert \"--branch main\" in checkout\n        assert all(identity not in workflow_text for identity in FLEET_IDENTITIES.values())\n>       assert all(key not in workflow_text for key in FLEET_KEYS)\nE       assert False\nE        +  where False = all(<generator object test_runtime_mech_checkouts_and_sparse_paths_come_from_manifest.<locals>.<genexpr> at 0x103ca5a40>)\n\ntests/test_id_label_workflow.py:217: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_id_label_workflow.py::test_reserved_audit_key_will_not_break_a_later_fleet_admission\n1 failed in 0.64s\n"
+    }
+  ]
+}

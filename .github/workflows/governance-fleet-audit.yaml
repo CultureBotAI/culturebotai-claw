@@ -71,11 +71,11 @@ jobs:
           from pathlib import Path
 
           from kg_microbe_governance.artifacts.scripts.check_vendored_sync import parse_manifest
+          from kg_microbe_governance.private_scaleup_audit import PRIVATE as private_repository
 
           trusted = Path("fleet/trusted-claw")
           manifest_path = "src/kg_microbe_governance/vendored_artifacts.json"
           manifests = [parse_manifest((root / manifest_path).read_bytes()) for root in (Path("control"), trusted)]
-          private_repository = "CultureBotAI/ScaleupMech"
           private_key = private_repository.rsplit("/", 1)[-1].casefold()
           for manifest in manifests:
               for key, consumer in manifest.consumers.items():
@@ -485,11 +485,11 @@ jobs:
           from pathlib import Path
 
           from kg_microbe_governance.artifacts.scripts.check_vendored_sync import parse_manifest
+          from kg_microbe_governance.private_scaleup_audit import PRIVATE as private_repository
 
           trusted = Path("fleet/trusted-claw")
           manifest_path = "src/kg_microbe_governance/vendored_artifacts.json"
           manifests = [parse_manifest((root / manifest_path).read_bytes()) for root in (Path("control"), trusted)]
-          private_repository = "CultureBotAI/ScaleupMech"
           private_key = private_repository.rsplit("/", 1)[-1].casefold()
           for manifest in manifests:
               for key, consumer in manifest.consumers.items():
