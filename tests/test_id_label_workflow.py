@@ -40,6 +40,77 @@ CANONICAL_ID_LABEL_TESTS = {
 }
 
 
+def test_reserved_audit_key_will_not_break_a_later_fleet_admission(monkeypatch) -> None:
+    """Run the complete guard with both the future identity and key (#1285)."""
+    from kg_microbe_governance.private_scaleup_audit import PRIVATE
+
+    reserved_key = PRIVATE.rsplit("/", 1)[-1].casefold()
+    monkeypatch.setitem(globals(), "FLEET_KEYS", FLEET_KEYS | {reserved_key})
+    monkeypatch.setitem(globals(), "FLEET_IDENTITIES", {**FLEET_IDENTITIES, reserved_key: PRIVATE})
+    test_runtime_mech_checkouts_and_sparse_paths_come_from_manifest()
+
+
+@pytest.mark.parametrize("selector", ["component", "verifier"])
+@pytest.mark.parametrize("case,expected", [
+    ("absent", None),
+    ("candidate_without_adapter", "require the protected automatic adapter"),
+    ("trusted_without_adapter", "require the protected automatic adapter"),
+    ("candidate_with_adapter", None),
+    ("trusted_with_adapter", None),
+    ("wrong_key", "unsupported declaration"),
+    ("wrong_identity", "unsupported identity"),
+    ("casefold_identity", "unsupported identity"),
+])
+def test_bootstrap_selectors_follow_protected_identity_and_fail_closed(
+    tmp_path, monkeypatch, selector, case, expected,
+) -> None:
+    """Execute both workflow selectors against a distinct protected identity."""
+    from kg_microbe_governance import private_scaleup_audit
+
+    identity = "Example/ReservedLab"
+    key = "reservedlab"
+    monkeypatch.setattr(private_scaleup_audit, "PRIVATE", identity)
+    manifests = {name: json.loads(json.dumps(GOVERNANCE_DOCUMENT))
+                 for name in ("control", "fleet/trusted-claw")}
+    if case != "absent":
+        member_key = "unexpected" if case == "wrong_key" else key
+        member_identity = (
+            "Example/OtherLab" if case == "wrong_identity"
+            else identity.lower() if case == "casefold_identity" else identity
+        )
+        target = "fleet/trusted-claw" if case.startswith("trusted") else "control"
+        manifests[target]["consumers"][member_key] = {
+            "github": member_identity, "package_path": "src/reservedlab",
+        }
+    for name, manifest in manifests.items():
+        path = tmp_path / name / "src/kg_microbe_governance/vendored_artifacts.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(manifest))
+    installed = case.endswith("with_adapter")
+    if installed:
+        (tmp_path / "fleet/trusted-claw/src/kg_microbe_governance/automatic_fleet_component.py").write_text(
+            "Protected repaired adapter fixture; never executed.\n"
+        )
+    name = ("Select installed protected automatic adapter" if selector == "component"
+            else "Verify exact full coverage or public-only bootstrap")
+    workflow = _workflow(FLEET_AUDIT_WORKFLOW)
+    run = next(step["run"] for job in workflow["jobs"].values() for step in job["steps"]
+               if step.get("name") == name)
+    source = run.split("<<'PYCODE'\n", 1)[1].split("\nPYCODE", 1)[0]
+    output = tmp_path / "selector-output"
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+    monkeypatch.setenv("AUTOMATIC_AVAILABLE", str(installed).lower())
+    if expected:
+        with pytest.raises(SystemExit, match=expected):
+            exec(compile(source, str(FLEET_AUDIT_WORKFLOW), "exec"), {})
+        assert not output.exists()
+    else:
+        exec(compile(source, str(FLEET_AUDIT_WORKFLOW), "exec"), {})
+        if selector == "component":
+            assert output.read_text() == f"available={str(installed).lower()}\n"
+
+
 def _workflow(path: Path) -> dict:
     return yaml.safe_load(path.read_text(encoding="utf-8"))
 
