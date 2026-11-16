@@ -88,7 +88,8 @@ def read_json(path: Path) -> dict:
     return read_progress_json(path)
 
 
-def read_remote(api=gh, *, manifest=None, project_expanded=True) -> tuple[str | None, dict | None]:
+def read_remote_documents(api=gh, *, manifest=None) -> tuple[str | None, dict | None]:
+    """Read validated physical documents, retaining evidence of obsolete membership."""
     ref = api(f"repos/{REPOSITORY}/git/ref/heads/{BRANCH}")
     if ref is None:
         return None, None
@@ -112,7 +113,16 @@ def read_remote(api=gh, *, manifest=None, project_expanded=True) -> tuple[str | 
             raise PublishError("Public data blob is too large")
         documents[name] = json.loads(raw)
     history, snapshot = documents["history.json"], documents["progress.json"]
-    return head, public_bundle(history, snapshot, manifest, expand=project_expanded)
+    # Validate before returning even members that the current policy excludes.
+    public_bundle(history, snapshot, manifest, expand=False)
+    return head, {"history": history, "snapshot": snapshot}
+
+
+def read_remote(api=gh, *, manifest=None, project_expanded=True) -> tuple[str | None, dict | None]:
+    head, documents = read_remote_documents(api, manifest=manifest)
+    if documents is None:
+        return head, None
+    return head, public_bundle(**documents, manifest=manifest, expand=project_expanded)
 
 
 def _retained_manifest(fleet: FleetManifest, membership: list[str] | None) -> FleetManifest:
@@ -167,7 +177,8 @@ def newest_history(local: dict | None, remote: dict | None, *, manifest=None,
             raise PublishError("Local and remote histories diverged; reconcile explicitly") from error
 
 
-def publish(bundle: dict, previous_head: str | None, previous: dict | None, *, initialize=False, api=gh, manifest=None) -> str:
+def publish(bundle: dict, previous_head: str | None, previous: dict | None, *, initialize=False,
+            api=gh, manifest=None, previous_documents: dict | None = None) -> str:
     fleet = manifest or load_fleet_manifest()
     bundle = public_bundle(bundle["history"], bundle["snapshot"], fleet)
     history, snapshot = bundle["history"], bundle["snapshot"]
@@ -178,7 +189,9 @@ def publish(bundle: dict, previous_head: str | None, previous: dict | None, *, i
         validate_extension(previous["history"], _member_history(history, retained.keys), retained)
     if previous_head is None and not initialize:
         raise PublishError("Data branch is absent; initial publication requires --initialize")
-    if previous == bundle and previous_head:
+    # A filtered view can match even when the current data branch still carries
+    # excluded members. Only physical-document evidence can justify a no-op.
+    if previous_documents == bundle and previous_head:
         return previous_head
     entries = []
     for name, document in (("history.json", history), ("progress.json", snapshot)):
@@ -238,7 +251,8 @@ def collect_once(runtime_dirs: list[Path], state_dir: Path, *, apply=False, init
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         local_path = state_dir / "bundle.json"
         local = read_json(local_path) if local_path.exists() else None
-        head, remote = read_remote(api, project_expanded=False) if apply else (None, None)
+        head, documents = read_remote_documents(api) if apply else (None, None)
+        remote = public_bundle(**documents, expand=False) if documents is not None else None
         prior = newest_history(
             local["history"] if local else None, remote["history"] if remote else None,
             remote_membership=[row["key"] for row in remote["snapshot"]["repositories"]] if remote else None,
@@ -254,7 +268,9 @@ def collect_once(runtime_dirs: list[Path], state_dir: Path, *, apply=False, init
         atomic_json(local_path, bundle)
         result = {"status": "collected", "generated_at": snapshot["generated_at"]}
         if apply:
-            result.update(status="published", data_commit=publish(bundle, head, remote, initialize=initialize, api=api))
+            result.update(status="published", data_commit=publish(
+                bundle, head, remote, initialize=initialize, api=api, previous_documents=documents,
+            ))
         atomic_json(state_dir / "status.json", result)
         return result
 

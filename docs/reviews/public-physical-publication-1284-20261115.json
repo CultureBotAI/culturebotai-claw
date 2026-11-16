@@ -1,0 +1,47 @@
+{
+  "issue": 1284,
+  "checked_at": "2026-11-16T00:08:27.925011+00:00",
+  "fresh_pytest_processes": true,
+  "cases": [
+    {
+      "case": "physical-comparison",
+      "selector": "tests/test_progress_public_membership.py::test_policy_only_change_rewrites_physical_documents_before_noop[publish]",
+      "source_sha256": {
+        "scripts/mech_progress_publish.py": "e35aa222df84fddcc2caf48223a82ddfdbe4df31cb50ff1615b6e6151409dc7d"
+      },
+      "baseline_exit": 0,
+      "mutant_exit": 1,
+      "restored_exit": 0
+    },
+    {
+      "case": "physical-read",
+      "selector": "tests/test_progress_public_membership.py::test_policy_only_change_rewrites_physical_documents_before_noop[collect_once]",
+      "source_sha256": {
+        "scripts/mech_progress_publish.py": "e35aa222df84fddcc2caf48223a82ddfdbe4df31cb50ff1615b6e6151409dc7d"
+      },
+      "baseline_exit": 0,
+      "mutant_exit": 1,
+      "restored_exit": 0
+    },
+    {
+      "case": "collector-evidence",
+      "selector": "tests/test_progress_public_membership.py::test_policy_only_change_rewrites_physical_documents_before_noop[collect_once]",
+      "source_sha256": {
+        "scripts/mech_progress_publish.py": "e35aa222df84fddcc2caf48223a82ddfdbe4df31cb50ff1615b6e6151409dc7d"
+      },
+      "baseline_exit": 0,
+      "mutant_exit": 1,
+      "restored_exit": 0
+    },
+    {
+      "case": "absent-physical-proof",
+      "selector": "tests/test_progress_public_membership.py::test_projected_previous_without_physical_evidence_cannot_skip_publication",
+      "source_sha256": {
+        "scripts/mech_progress_publish.py": "e35aa222df84fddcc2caf48223a82ddfdbe4df31cb50ff1615b6e6151409dc7d"
+      },
+      "baseline_exit": 0,
+      "mutant_exit": 1,
+      "restored_exit": 0
+    }
+  ]
+}

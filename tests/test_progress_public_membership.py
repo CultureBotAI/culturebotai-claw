@@ -1,6 +1,7 @@
 """Public transport excludes tagged members before aggregation; local evidence survives."""
 from __future__ import annotations
 
+import base64
 import copy
 import json
 from dataclasses import replace
@@ -97,6 +98,62 @@ def test_policy_change_reads_reconciles_and_republishes_retained_membership(
     assert observed["snapshot"]["totals"]["completed_goals"] == (3 if excluded else 6)
     assert [row["key"] for row in observed["snapshot"]["repositories"]] == list(current.public().keys)
     assert observed["history"] == progress.public_history(local["history"], current)
+
+
+@pytest.mark.parametrize("route", ["publish", "collect_once"])
+def test_policy_only_change_rewrites_physical_documents_before_noop(mixed, tmp_path, monkeypatch, route):
+    from kg_microbe_progress.prs import AssociationCollection
+
+    current, local = mixed
+    old_fleet = FleetManifest(
+        {key: replace(mech, tags=()) for key, mech in current.mechs.items()},
+        current.capability_catalogue, current.vendored_governance, current.source,
+    )
+    api = GitHub()
+    old_head = publisher.publish(local, None, None, initialize=True, api=api, manifest=old_fleet)
+    projected = progress.public_bundle(**local, manifest=current)
+    _, previous = publisher.read_remote(api, manifest=current, project_expanded=False)
+    assert previous == projected  # This equality alone hid the stale physical files.
+    state = tmp_path / "policy-only"
+    publisher.atomic_json(state / "bundle.json", local)
+    monkeypatch.setattr(publisher, "collect_associations", lambda _: AssociationCollection([], {}))
+    monkeypatch.setattr(publisher, "fetch_pr_observations", lambda _: [])
+    monkeypatch.setattr(publisher, "collect_progress", lambda *a, **kw: (local["history"], local["snapshot"]))
+
+    def republish():
+        if route == "collect_once":
+            return publisher.collect_once([], state, apply=True, api=api)["data_commit"]
+        head, documents = publisher.read_remote_documents(api, manifest=current)
+        prior = progress.public_bundle(**documents, manifest=current, expand=False)
+        return publisher.publish(local, head, prior, api=api, manifest=current, previous_documents=documents)
+
+    new_head = republish()
+    assert new_head != old_head
+    assert api.head == new_head
+    # Inspect the fake Git object's actual blobs, without any projection reader.
+    tree = api.objects[api.objects[new_head]["tree"]["sha"]]["tree"]
+    raw = {entry["path"]: json.loads(base64.b64decode(api.objects[entry["sha"]]["content"])) for entry in tree}
+    assert raw == {"history.json": projected["history"], "progress.json": projected["snapshot"]}
+    assert "traitmech" not in json.dumps(raw).lower()
+    assert raw["progress.json"]["generated_at"] == local["snapshot"]["generated_at"]
+    assert raw["progress.json"]["totals"]["completed_goals"] == 1
+    assert local["snapshot"]["totals"]["completed_goals"] == 3
+    assert json.loads((state / "bundle.json").read_text()) == local
+    before_writes = [call for call in api.calls if call[1] != "GET"]
+    assert republish() == new_head
+    assert [call for call in api.calls if call[1] != "GET"] == before_writes
+
+
+def test_projected_previous_without_physical_evidence_cannot_skip_publication(mixed):
+    current, local = mixed
+    old_fleet = FleetManifest(
+        {key: replace(mech, tags=()) for key, mech in current.mechs.items()},
+        current.capability_catalogue, current.vendored_governance, current.source,
+    )
+    api = GitHub()
+    old_head = publisher.publish(local, None, None, initialize=True, api=api, manifest=old_fleet)
+    head, previous = publisher.read_remote(api, manifest=current)
+    assert publisher.publish(local, head, previous, api=api, manifest=current) != old_head
 
 
 @pytest.mark.parametrize("damage", ["unknown", "duplicate", "reordered", "omitted", "totals"])

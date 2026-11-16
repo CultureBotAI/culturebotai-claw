@@ -75,9 +75,12 @@ def test_initialization_is_explicit_and_atomic(bundle):
     observed, restored = publisher.read_remote(api)
     assert observed == head
     assert restored == bundle
+    physical_head, documents = publisher.read_remote_documents(api)
+    assert physical_head == head
+    assert documents == bundle
     assert set(api.objects[api.objects[head]["tree"]["sha"]]["tree"][i]["path"] for i in range(2)) == {"history.json", "progress.json"}
     before = len(api.calls)
-    assert publisher.publish(bundle, head, restored, api=api) == head
+    assert publisher.publish(bundle, head, restored, api=api, previous_documents=documents) == head
     assert len(api.calls) == before
 
 

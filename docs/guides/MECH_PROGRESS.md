@@ -219,9 +219,18 @@ upgrade the publisher and Pages consumers to the reviewed release before
 publishing a run containing an excluded member. No running service, existing
 data-branch commit or deployed site changes merely by preparing this patch.
 
-Publication reconciliation reads with `read_remote(project_expanded=False)` so
-the retained snapshot's membership remains explicit. Expansion for display adds
-unobserved rows and cannot establish that those rows were previously published.
+Publication reconciliation projects the validated `read_remote_documents()`
+result with `expand=False` so the retained snapshot's membership remains
+explicit. `read_remote(project_expanded=False)` exposes the same filtered view
+to other callers. Expansion for display adds unobserved rows and cannot
+establish that those rows were previously published.
+
+The publisher retains the physical documents separately from that view. A no-op
+requires the physical documents to equal the intended public bundle; callers
+without that evidence conservatively write a new commit. Changing exclusion
+policy therefore replaces the current data-branch documents even if the source
+history and timestamp have not changed. Previously published Git history remains
+intact. An immediate repeat with identical physical documents makes no write.
 
 `kg_microbe_progress.collect_progress` reads explicit supervisor runtime roots.
 The supervisor's archived receipt must match its recorded hash and goal identity

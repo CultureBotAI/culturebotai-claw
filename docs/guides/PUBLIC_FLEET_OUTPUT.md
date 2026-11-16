@@ -38,6 +38,9 @@ CLAW's progress publisher and Pages builder project their histories and
 recompute snapshots using public membership. Local operational progress remains
 complete. Public history reconciliation cannot replace or erase excluded local
 progress. A public bundle with unapproved members must fail closed.
+Policy-only changes also replace the current published documents: equality of
+their filtered views cannot justify skipping the write while old documents
+still contain an excluded member.
 
 The projection API does not change any member's policy or register new members.
 Tests tag existing members in isolated fixtures and supply distinct nonzero
