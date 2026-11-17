@@ -144,7 +144,8 @@ def test_retained_fixture_provenance_matches_every_sealed_source():
     assert provenance["version"] == 1
     assert provenance["authority"] == "offline_fixture_provenance_only"
     records = provenance["records"]
-    assert len(records) == 13  # #1255: retain both checker and schema cohorts.
+    assert len(records) == 21  # #1291: retain historical review schema/helper and native guide too.
+    assert len({row["fixture"] for row in records}) == 9
     assert {row["consumer"] for row in records} == {"edgemech", "cofactormech", "assaymech"}
     assert {row["fixture"] for row in records} == {
         path.relative_to(ROOT).as_posix()

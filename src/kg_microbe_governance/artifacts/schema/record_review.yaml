@@ -96,6 +96,9 @@ enums:
       other: {}
   AssessmentOutcome:
     permissible_values: {supported: {}, concern: {}, unknown: {}, not_applicable: {}}
+  AssertionBasis:
+    description: Whether an explicitly scoped assertion concerns independent truth or what a source reports.
+    permissible_values: {independent: {}, source_report: {}}
   Severity:
     permissible_values: {blocker: {}, major: {}, minor: {}, informational: {}}
   FindingStatus:
@@ -270,6 +273,30 @@ classes:
       metrics: {range: ReviewMetric, multivalued: true, inlined_as_list: true}
       dimensions: {range: ReviewDimension, multivalued: true, inlined_as_list: true}
       details: {range: NonBlank}
+      assertion_basis: {range: AssertionBasis}
+      report_witnesses: {range: ReportWitnesses, inlined: true}
+  ReportWitnesses:
+    description: >-
+      Explicit support for an original source-report proposition. These witnesses
+      do not establish independent biological truth or experimental literature.
+      Profiles must replay original source instances and versioned authorities.
+    attributes:
+      scope: {range: NonBlank, required: true}
+      source_instance_evidence_ids:
+        range: Token
+        required: true
+        multivalued: true
+        minimum_cardinality: 0
+      identity_evidence_ids:
+        range: Token
+        required: true
+        multivalued: true
+        minimum_cardinality: 0
+      definition_evidence_ids:
+        range: Token
+        required: true
+        multivalued: true
+        minimum_cardinality: 0
   ReviewDimension:
     description: Named, evidence-linked domain context without unconstrained extension keys.
     attributes:

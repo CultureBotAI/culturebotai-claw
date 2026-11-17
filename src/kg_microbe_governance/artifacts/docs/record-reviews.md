@@ -146,6 +146,44 @@ because the review document validates.
 
 ## Triage And Follow-Up
 
+### Explicit source-report assertions
+
+An assessment may declare `assertion_basis: source_report` when the original
+proposition is specifically about what an identified source reports. It must
+include `report_witnesses.scope` and three explicit evidence-ID groups:
+`source_instance_evidence_ids`, `identity_evidence_ids` and
+`definition_evidence_ids`. The first group remains `record_content` or `database`;
+the other two require independent `authority` evidence. Every witness belongs
+to that assessment and carries a source hash and precise locator. Resolved
+assessments require all three groups and supporting identity/definition witnesses.
+Supported outcomes also require at least one supporting source instance and no
+refuting source instance. Supporting authorities cannot supply that direction.
+Concern and unknown outcomes do not require a positive source instance; profiles
+retain their own directional rules for concerning judgments.
+Unknown assessments may retain missing witness groups explicitly; required
+unavailable checks and all aggregate verdict rules still apply.
+
+The scope must preserve the original proposition, source attribution, identities,
+predicate and endpoint definitions. Declaring this basis cannot reinterpret an
+independent biological claim as a report to obtain support, cure ambiguous
+identity, or infer unspecified units or conditions. Source bytes establish the
+particular reported instance; producer code alone does not. Independent versioned
+authorities establish the original identities and meanings; generic categories
+alone do not. A profile must replay those bindings and separately inspect whether
+the evidence entails the declared proposition. Shared structural validation does
+not perform that semantic judgment.
+
+Source-report support is distinct from independent biological truth and from
+literature support. It cannot satisfy a requirement for an independently
+paper-backed directional biological claim. A packet must never be relabeled as
+literature or authority. The Markdown report displays the source-report basis,
+scope and all witness groups; immutable YAML remains authoritative. Existing
+assessments without the optional field keep their prior behavior. Profiles using
+an independent-claim rule must retain it as their default and explicitly forbid
+report-only evidence from entering their literature/modeling axes.
+
+### Follow-up lineage
+
 For authorized Git work, push each committed review batch branch to `origin`
 the same day, whether or not a PR is open. Verify its exact remote head.
 A goal delivering commits cannot close while its recorded commits exist
