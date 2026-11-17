@@ -12,6 +12,11 @@ The header is exactly these four tab-separated fields, in order:
 ingredient_name	rejected_id	mim_id	reason
 ```
 
+Here `mim_id` retains the legacy mapping-identifier meaning. The additive
+[`mim_record_id` owner reference](UNIFIED_OWNER_REFERENCES.md) in the unified
+output is separate comparison provenance and does not change this ledger,
+its keys, or any source-identity approval requirement.
+
 Every row must contain all four cells. The label, rejected CURIE, and reason
 must be nonempty after trimming. Missing cells, extra cells or columns, malformed
 rejected CURIEs, and duplicate rules fail closed. The reason retains the reviewed

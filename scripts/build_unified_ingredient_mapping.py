@@ -6,6 +6,7 @@ and CommunityMech.
 Outputs a TSV where each row is a unique ingredient name observed in CultureMech,
 annotated with all available identifiers from MIM:
   - MIM record ID (identifier field)
+  - permanent MIM owner reference (mim_record_id; comparison provenance only)
   - CHEBI ID
   - CAS-RN
   - KG-Microbe node ID
@@ -40,6 +41,7 @@ MIM_ROOT = Path(
 )
 sys.path.insert(0, str(REPO_ROOT / "src"))
 from kg_microbe_fleet import require_mech_roots  # noqa: E402
+from kg_microbe_utils.unified_owner_references import OwnerInputs  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from plugins.ingredient_name_normalizer import canonicalize_hydrate  # noqa: E402
@@ -191,9 +193,16 @@ class MIMNameIndex(dict):
     def __init__(self):
         super().__init__()
         self.source_records: list[tuple[dict, dict]] = []
+        self.owner_inputs: OwnerInputs | None = None
+
+    def check_owner_inputs(self):
+        if self.owner_inputs is not None:
+            self.owner_inputs.check(_mim_record_files(self.owner_inputs.root / 'data/ingredients'))
 
 
-def load_mim_index(mim_root: Path) -> tuple[dict, dict, dict]:
+def load_mim_index(
+    mim_root: Path, *, native_contract_sha256: str | None = None,
+) -> tuple[dict, dict, dict]:
     """
     Load only direct mapped/unmapped records. Retired labels resolve through
     live representatives; retired IDs and nested backups never supply identities.
@@ -217,11 +226,10 @@ def load_mim_index(mim_root: Path) -> tuple[dict, dict, dict]:
     print("Loading MIM ingredient records...")
     count = 0
     yaml_files = _mim_record_files(ingredients_dir)
-    for yaml_file in yaml_files:
-        try:
-            data = yaml.safe_load(yaml_file.read_text())
-        except Exception:
-            continue
+    inputs = OwnerInputs(mim_root, yaml_files, native_contract_sha256)
+    name_index.owner_inputs = inputs
+    for yaml_file in inputs.paths:
+        data = inputs.records[yaml_file]
         if not data or not isinstance(data, dict):
             continue
 
@@ -261,6 +269,8 @@ def load_mim_index(mim_root: Path) -> tuple[dict, dict, dict]:
             syn_set.add(txt)
 
         record = {
+            # Provenance of this exact owner, not a source-to-MIM assertion.
+            'mim_record_id': inputs.subjects.get(yaml_file, ''),
             # Preserve local UNMAPPED identifiers, but never publish a retained
             # ontology ID as the identity of an explicitly unresolved record.
             'mim_id': identifier if not nonidentity or identifier.startswith('UNMAPPED') else '',
@@ -313,6 +323,7 @@ def load_mim_index(mim_root: Path) -> tuple[dict, dict, dict]:
 
         if resolved is None:
             record = {
+                'mim_record_id': '',
                 'mim_id': '', 'preferred_term': data['preferred_term'],
                 'chebi_id': '', 'cas_rn': '', 'kg_microbe_node_id': '',
                 'mapping_status': 'REJECTED', 'synonyms': [],
@@ -369,6 +380,7 @@ def load_mim_index(mim_root: Path) -> tuple[dict, dict, dict]:
         ]
 
     name_index.source_records = [(data, record) for data, record, _ in name_records]
+    name_index.check_owner_inputs()
     print(f"  {count} MIM records → {len(name_index)} name entries, "
           f"{len(chebi_index)} CHEBI, {len(ontology_index)} ontology IDs\n")
     return name_index, chebi_index, ontology_index
@@ -911,6 +923,8 @@ def build_unified_rows(
     Returns list of row dicts, sorted by occurrence count descending.
     """
     rows = []
+    if isinstance(name_index, MIMNameIndex):
+        name_index.check_owner_inputs()
     matched = unmatched = 0
     live = live_records(name_index, chebi_index, ontology_index)
 
@@ -947,6 +961,7 @@ def build_unified_rows(
             'occurrence_count': info['count'],
             'chebi_id': chebi_id,
             'mim_id': mim['mim_id'] if mim else '',
+            'mim_record_id': mim.get('mim_record_id', '') if mim else '',
             'cas_rn': mim['cas_rn'] if mim else '',
             'kg_microbe_node_id': mim['kg_microbe_node_id'] if mim else '',
             'mapping_status': '',
@@ -973,6 +988,8 @@ def build_unified_rows(
         rows.append(row)
 
     rows.sort(key=lambda r: -r['occurrence_count'])
+    if isinstance(name_index, MIMNameIndex):
+        name_index.check_owner_inputs()
 
     print(f"Resolved: {matched} matched to MIM, {unmatched} not in MIM")
     return rows
@@ -993,6 +1010,7 @@ COLUMNS = [
     'mapping_status',
     'synonyms',       # pipe-separated alternate labels harvested from MIM
     'example_media',
+    'mim_record_id',  # registered selected-owner reference; never a mapping candidate
 ]
 
 
@@ -1075,6 +1093,8 @@ def main():
     )
     parser.add_argument('--culturemech', type=Path, default=CULTUREMECH_ROOT)
     parser.add_argument('--mim', type=Path, default=MIM_ROOT)
+    parser.add_argument('--mim-stable-id-contract-sha256',
+                        help='reviewed native stable_ids.py digest; required for current MIM IDs')
     parser.add_argument('--output', type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument('--format', choices=['tsv', 'yaml', 'both'], default='both',
                         help='Output format (default: both TSV and YAML summary)')
@@ -1095,7 +1115,8 @@ def main():
     print()
 
     # Load MIM index
-    name_index, chebi_index, ontology_index = load_mim_index(args.mim)
+    name_index, chebi_index, ontology_index = load_mim_index(
+        args.mim, native_contract_sha256=args.mim_stable_id_contract_sha256)
     label_index = load_mim_label_index(args.mim)
     if label_index:
         print(f"  {len(label_index)} MIM label-index labels (trusted verdicts outrank recipe term.ids)")
@@ -1118,10 +1139,12 @@ def main():
 
     # Write output
     print()
+    name_index.check_owner_inputs()
     if args.format in ('tsv', 'both'):
         write_tsv(rows, args.output)
     if args.format in ('yaml', 'both'):
         write_yaml_summary(rows, args.output)
+    name_index.check_owner_inputs()
 
 
 if __name__ == '__main__':

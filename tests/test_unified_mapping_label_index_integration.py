@@ -82,11 +82,12 @@ def test_main_exports_label_ruling_through_real_loaders_and_tsv(monkeypatch, tmp
         assert reader.fieldnames == [
             "ingredient_name", "occurrence_count", "chebi_id", "cas_rn",
             "kg_microbe_node_id", "mim_id", "culturemech_term_id", "mapping_status",
-            "synonyms", "example_media",
+            "synonyms", "example_media", "mim_record_id",
         ]
         row, = list(reader)
     assert validated_roots == [("culturemech", "mediaingredientmech")]
     assert row["mim_id"] == row["chebi_id"] == "CHEBI:2"
+    assert row["mim_record_id"] == ""  # wholly pre-ID fixture; no guessed permanent ID
     assert row["culturemech_term_id"] == ""
     assert row["occurrence_count"] == "1"
     assert row["example_media"] == "CM:1"
