@@ -283,7 +283,7 @@
       "source": "src/kg_microbe_governance/artifacts/schema/record_review.yaml",
       "target": "schema/record_review.yaml",
       "consumers": "all",
-      "sha256": "229baf9b69118a1fe318e4c31085c0820e4e3d1365e7b04d6ace451b7c35f9bb",
+      "sha256": "6fd8191b6c039b822b23245a0ab312697df9c2ff1c6c27989ce7b1f62d00e6d3",
       "mode": "0644"
     },
     {
@@ -291,7 +291,7 @@
       "source": "src/kg_microbe_governance/artifacts/scripts/record_review.py",
       "target": "scripts/record_review.py",
       "consumers": "all",
-      "sha256": "95a4ec41e38ec47ba3578e76838c46a0adbf47e49ad3636524735d08cfcb1c4d",
+      "sha256": "292ab82fecd0b01ef2760d0b251f30ae27263aa0e65a789dfd25e4530bed0da0",
       "mode": "0644"
     },
     {
@@ -299,7 +299,7 @@
       "source": "src/kg_microbe_governance/artifacts/docs/record-reviews.md",
       "target": "docs/record-reviews.md",
       "consumers": "all",
-      "sha256": "eaedec5783b40925a3f0e159dfd1202c315a12e98c8859526378ceea5c547822",
+      "sha256": "386a517e75c45b3229217ceed481a7028cdf29de8f927ecb9f06de7b0746a69e",
       "mode": "0644"
     },
     {

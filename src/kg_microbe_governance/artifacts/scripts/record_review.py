@@ -192,6 +192,46 @@ def _acyclic(actions: list[dict]) -> None:
                    if key not in ready}
 
 
+def validate_report_witnesses(assessment: dict, evidence_by_id: dict) -> None:
+    """Check declared report roles; profile replay and semantic inspection remain required."""
+    basis = assessment.get("assertion_basis", "independent")
+    witnesses = assessment.get("report_witnesses")
+    if basis != "source_report":
+        if witnesses is not None:
+            raise ReviewError("report witnesses require explicit source_report assertion basis")
+        return
+    if witnesses is None:
+        raise ReviewError("source_report assertion requires scoped report witnesses")
+    resolved = assessment["outcome"] in {"supported", "concern"}
+    groups = ("source_instance_evidence_ids", "identity_evidence_ids", "definition_evidence_ids")
+    for group in groups:
+        ids = witnesses[group]
+        _unique(ids, "report witness IDs")
+        _references(ids, set(evidence_by_id), "report witness references")
+        if not set(ids) <= set(assessment["evidence_ids"]):
+            raise ReviewError("report witnesses must belong to their assessment")
+        if resolved and not ids:
+            raise ReviewError("resolved source report requires instance, identity and definition witnesses")
+        for eid in ids:
+            item = evidence_by_id[eid]
+            kinds = {"record_content", "database"} if group == groups[0] else {"authority"}
+            if item["kind"] not in kinds:
+                raise ReviewError("report witness kind does not match its declared role")
+            if not item.get("snapshot_sha256") or not item.get("locator"):
+                raise ReviewError("report witnesses require a source hash and precise locator")
+            if resolved and group != groups[0] and item["support"] != "supports":
+                raise ReviewError("resolved source report requires supporting identity and definition authorities")
+    source_hashes = {evidence_by_id[eid]["snapshot_sha256"] for eid in witnesses[groups[0]]}
+    source_roles = {evidence_by_id[eid]["support"] for eid in witnesses[groups[0]]}
+    if assessment["outcome"] == "supported" and (
+        "supports" not in source_roles or "refutes" in source_roles
+    ):
+        raise ReviewError("supported source report requires supporting and no refuting source instances")
+    for group in groups[1:]:
+        if any(evidence_by_id[eid]["snapshot_sha256"] in source_hashes for eid in witnesses[group]):
+            raise ReviewError("source content cannot be relabeled as independent report authority")
+
+
 def validate_review(review: dict, schema_path: Path = SCHEMA_PATH) -> None:
     """Validate shape and semantics only, without reading current target files.
 
@@ -286,6 +326,7 @@ def validate_review(review: dict, schema_path: Path = SCHEMA_PATH) -> None:
         _unique([item["name"] for item in dimensions], "assessment dimension names")
         for dimension in dimensions:
             _references(dimension["evidence_ids"], evidence, "dimension evidence references")
+        validate_report_witnesses(assessment, {item["evidence_id"]: item for item in review["evidence"]})
         for metric in assessment.get("metrics", []):
             value = metric["value"]
             if not math.isfinite(value):
@@ -546,6 +587,16 @@ def render_markdown(review: dict, schema_path: Path = SCHEMA_PATH) -> str:
                   "", _text(item["summary"]), ""]
         if item.get("details"):
             lines += [_text(item["details"]), ""]
+        if item.get("assertion_basis") == "source_report":
+            witnesses = item["report_witnesses"]
+            lines += ["Assertion basis: source report; this does not establish independent biological truth.",
+                      "", "Report scope: " + _text(witnesses["scope"]), ""]
+            lines += _table(["Report witness role", "Evidence IDs"], [
+                [role, ", ".join(witnesses[field])]
+                for role, field in (("Original source instance", "source_instance_evidence_ids"),
+                                    ("Original identity", "identity_evidence_ids"),
+                                    ("Original definition", "definition_evidence_ids"))])
+            lines += [""]
     lines += ["## Findings", ""]
     if not review["findings"]:
         lines += ["No findings recorded within this review's declared scope.", ""]

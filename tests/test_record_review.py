@@ -86,6 +86,121 @@ def test_closed_schema_accepts_explicit_empty_findings(review):
         validate_review(review, SCHEMA)
 
 
+def source_report(review):
+    """Synthetic report attribution, not a claim about fixture biology (#182)."""
+    assessment = review["assessments"][0]
+    assessment.update(assertion_basis="source_report", report_witnesses={
+        "scope": "The identified fixture source reports the literal value X.",
+        "source_instance_evidence_ids": ["record"],
+        "identity_evidence_ids": ["identity-authority"],
+        "definition_evidence_ids": ["definition-authority"],
+    })
+    review["evidence"][0].update(snapshot_sha256="a" * 64, locator="record field X")
+    for index, eid in enumerate(("identity-authority", "definition-authority")):
+        review["evidence"].append({
+            "evidence_id": eid, "kind": "authority", "reference": "https://example.invalid/" + eid,
+            "accessed_at": "2026-10-08T00:59:30Z", "support": "supports",
+            "summary": "Independent synthetic versioned authority witness.",
+            "snapshot_sha256": ("b" if index == 0 else "c") * 64, "locator": "v1; fixture term",
+        })
+        assessment["evidence_ids"].append(eid)
+    return assessment
+
+
+def test_report_witnesses_save_and_render_without_biological_promotion(repository, review):
+    assessment = source_report(review)
+    path = save_review(repository, review, SCHEMA)
+    saved = read_review(repository, str(path.relative_to(repository)), SCHEMA)
+    assert saved["assessments"][0] == assessment
+    rendered = path.with_suffix(".md").read_text()
+    assert "Assertion basis: source report; this does not establish independent biological truth." in rendered
+    assert assessment["report_witnesses"]["scope"] in rendered
+    assert "Original source instance" in rendered
+    assert "identity-authority" in rendered and "definition-authority" in rendered
+
+
+@pytest.mark.parametrize("damage", [
+    "implicit_basis", "independent_basis", "no_witnesses", "empty_identity", "empty_definition",
+    "unknown_id", "outside_assessment", "repeated_id", "paper_instance", "packet_identity",
+    "unhashed_authority", "unlocated_source", "nonsupporting_identity", "copied_authority",
+])
+def test_report_witness_roles_are_explicit_and_closed(review, damage):
+    assessment = source_report(review)
+    witnesses = assessment["report_witnesses"]
+    if damage == "implicit_basis":
+        assessment.pop("assertion_basis")
+    elif damage == "independent_basis":
+        assessment["assertion_basis"] = "independent"
+    elif damage == "no_witnesses":
+        assessment.pop("report_witnesses")
+    elif damage == "empty_identity":
+        witnesses["identity_evidence_ids"] = []
+    elif damage == "empty_definition":
+        witnesses["definition_evidence_ids"] = []
+    elif damage == "unknown_id":
+        witnesses["source_instance_evidence_ids"] = ["missing"]
+    elif damage == "outside_assessment":
+        assessment["evidence_ids"].remove("identity-authority")
+    elif damage == "repeated_id":
+        witnesses["identity_evidence_ids"] *= 2
+    elif damage == "paper_instance":
+        review["evidence"][0]["kind"] = "primary_source"
+    elif damage == "packet_identity":
+        review["evidence"][1]["kind"] = "record_content"
+    elif damage == "unhashed_authority":
+        review["evidence"][1].pop("snapshot_sha256")
+    elif damage == "unlocated_source":
+        review["evidence"][0].pop("locator")
+    elif damage == "nonsupporting_identity":
+        review["evidence"][1]["support"] = "unknown"
+    else:
+        review["evidence"][1]["snapshot_sha256"] = review["evidence"][0]["snapshot_sha256"]
+    with pytest.raises(ReviewError):
+        validate_review(review, SCHEMA)
+
+
+def test_missing_report_witnesses_stay_unknown_and_cannot_pass(review):
+    assessment = source_report(review)
+    assessment["outcome"] = "unknown"
+    assessment["report_witnesses"]["identity_evidence_ids"] = []
+    review.update(completion="partial", verdict="blocked", limitations=["Identity remains unresolved."])
+    validate_review(review, SCHEMA)
+    review.update(completion="completed", verdict="pass")
+    with pytest.raises(ReviewError, match="positive evidence-linked|unknown or concerning"):
+        validate_review(review, SCHEMA)
+
+
+@pytest.mark.parametrize("roles", [
+    ["refutes"], ["unknown"], ["partial"], ["context_only"], ["supports", "refutes"],
+])
+def test_supported_report_requires_supporting_noncontradictory_source_instances(review, roles):
+    assessment = source_report(review)
+    review["evidence"][0]["support"] = roles[0]
+    if len(roles) > 1:
+        contrary = dict(review["evidence"][0], evidence_id="contrary-record", support=roles[1])
+        review["evidence"].append(contrary)
+        assessment["evidence_ids"].append("contrary-record")
+        assessment["report_witnesses"]["source_instance_evidence_ids"].append("contrary-record")
+    with pytest.raises(ReviewError, match="supporting and no refuting source instances"):
+        validate_review(review, SCHEMA)
+
+
+@pytest.mark.parametrize("outcome,role", [("concern", "refutes"), ("unknown", "unknown")])
+def test_unresolved_or_concerning_report_does_not_require_positive_instance(review, outcome, role):
+    assessment = source_report(review)
+    assessment["outcome"] = outcome
+    review["evidence"][0]["support"] = role
+    review.update(completion="partial", verdict="needs_curation", limitations=["Report is not established."])
+    validate_review(review, SCHEMA)
+
+
+def test_report_support_cannot_complete_unavailable_required_check(review):
+    source_report(review)
+    review["checks"][0]["status"] = "unavailable"
+    with pytest.raises(ReviewError, match="unavailable required"):
+        validate_review(review, SCHEMA)
+
+
 def test_linkml_generation_isolated_from_damaged_yaml_loader(review, monkeypatch):
     import importlib
 
