@@ -157,6 +157,102 @@
       "fixture": "tests/fixtures/edgemech-admitted-source/mech_shared.yaml",
       "snapshot": "src/kg_microbe_governance/releases/assaymech-infrastructure-source-manifest.json",
       "snapshot_sha256": "a2d2308fe27c81ac6cf74ca5d456ff9309b4ea18965a8bec750ffa0a5fde8a93"
+    },
+    {
+      "consumer": "edgemech",
+      "source_repository": "CultureBotAI/culturebotai-claw",
+      "source_ref": "7e672227fb246a8359ad57b6d3975ce5ed329007",
+      "source_path": "src/kg_microbe_governance/artifacts/schema/record_review.yaml",
+      "source_blob": "630d95bda4773785a2cdfe42d32561a9f1591c0f",
+      "sha256": "229baf9b69118a1fe318e4c31085c0820e4e3d1365e7b04d6ace451b7c35f9bb",
+      "bytes": 13541,
+      "fixture": "tests/fixtures/edgemech-admitted-source/record_review.yaml",
+      "snapshot": "src/kg_microbe_governance/releases/edgemech-infrastructure-source-manifest.json",
+      "snapshot_sha256": "bfd4b703f46ce748487253d6fe093e79fe00ba7a9a88293f5cc6df176f11b519"
+    },
+    {
+      "consumer": "edgemech",
+      "source_repository": "CultureBotAI/culturebotai-claw",
+      "source_ref": "7e672227fb246a8359ad57b6d3975ce5ed329007",
+      "source_path": "src/kg_microbe_governance/artifacts/scripts/record_review.py",
+      "source_blob": "a7d0c238840d78e3328649819c4e589ff780015e",
+      "sha256": "95a4ec41e38ec47ba3578e76838c46a0adbf47e49ad3636524735d08cfcb1c4d",
+      "bytes": 41900,
+      "fixture": "tests/fixtures/edgemech-admitted-source/record_review.py",
+      "snapshot": "src/kg_microbe_governance/releases/edgemech-infrastructure-source-manifest.json",
+      "snapshot_sha256": "bfd4b703f46ce748487253d6fe093e79fe00ba7a9a88293f5cc6df176f11b519"
+    },
+    {
+      "consumer": "cofactormech",
+      "source_repository": "CultureBotAI/culturebotai-claw",
+      "source_ref": "5790569efd881bd8bca82a04ea278cc462c0c2c8",
+      "source_path": "src/kg_microbe_governance/artifacts/schema/record_review.yaml",
+      "source_blob": "630d95bda4773785a2cdfe42d32561a9f1591c0f",
+      "sha256": "229baf9b69118a1fe318e4c31085c0820e4e3d1365e7b04d6ace451b7c35f9bb",
+      "bytes": 13541,
+      "fixture": "tests/fixtures/edgemech-admitted-source/record_review.yaml",
+      "snapshot": "src/kg_microbe_governance/releases/cofactormech-infrastructure-source-manifest.json",
+      "snapshot_sha256": "ae2cfdc4372e0054bca595281b2b88a10d672b9a70d8664c99c94105ef3b64b1"
+    },
+    {
+      "consumer": "cofactormech",
+      "source_repository": "CultureBotAI/culturebotai-claw",
+      "source_ref": "5790569efd881bd8bca82a04ea278cc462c0c2c8",
+      "source_path": "src/kg_microbe_governance/artifacts/scripts/record_review.py",
+      "source_blob": "a7d0c238840d78e3328649819c4e589ff780015e",
+      "sha256": "95a4ec41e38ec47ba3578e76838c46a0adbf47e49ad3636524735d08cfcb1c4d",
+      "bytes": 41900,
+      "fixture": "tests/fixtures/edgemech-admitted-source/record_review.py",
+      "snapshot": "src/kg_microbe_governance/releases/cofactormech-infrastructure-source-manifest.json",
+      "snapshot_sha256": "ae2cfdc4372e0054bca595281b2b88a10d672b9a70d8664c99c94105ef3b64b1"
+    },
+    {
+      "consumer": "cofactormech",
+      "source_repository": "CultureBotAI/culturebotai-claw",
+      "source_ref": "5790569efd881bd8bca82a04ea278cc462c0c2c8",
+      "source_path": "src/kg_microbe_governance/artifacts/docs/record-reviews.md",
+      "source_blob": "f86815ac5d84eecbd59c006f56e1a6f4f75c7c47",
+      "sha256": "eaedec5783b40925a3f0e159dfd1202c315a12e98c8859526378ceea5c547822",
+      "bytes": 11447,
+      "fixture": "tests/fixtures/native-admitted-source/record-reviews.md",
+      "snapshot": "src/kg_microbe_governance/releases/cofactormech-infrastructure-source-manifest.json",
+      "snapshot_sha256": "ae2cfdc4372e0054bca595281b2b88a10d672b9a70d8664c99c94105ef3b64b1"
+    },
+    {
+      "consumer": "assaymech",
+      "source_repository": "CultureBotAI/culturebotai-claw",
+      "source_ref": "89bfcebaee8a0fcf99055b2acd1709abb64f8666",
+      "source_path": "src/kg_microbe_governance/artifacts/schema/record_review.yaml",
+      "source_blob": "630d95bda4773785a2cdfe42d32561a9f1591c0f",
+      "sha256": "229baf9b69118a1fe318e4c31085c0820e4e3d1365e7b04d6ace451b7c35f9bb",
+      "bytes": 13541,
+      "fixture": "tests/fixtures/edgemech-admitted-source/record_review.yaml",
+      "snapshot": "src/kg_microbe_governance/releases/assaymech-infrastructure-source-manifest.json",
+      "snapshot_sha256": "a2d2308fe27c81ac6cf74ca5d456ff9309b4ea18965a8bec750ffa0a5fde8a93"
+    },
+    {
+      "consumer": "assaymech",
+      "source_repository": "CultureBotAI/culturebotai-claw",
+      "source_ref": "89bfcebaee8a0fcf99055b2acd1709abb64f8666",
+      "source_path": "src/kg_microbe_governance/artifacts/scripts/record_review.py",
+      "source_blob": "a7d0c238840d78e3328649819c4e589ff780015e",
+      "sha256": "95a4ec41e38ec47ba3578e76838c46a0adbf47e49ad3636524735d08cfcb1c4d",
+      "bytes": 41900,
+      "fixture": "tests/fixtures/edgemech-admitted-source/record_review.py",
+      "snapshot": "src/kg_microbe_governance/releases/assaymech-infrastructure-source-manifest.json",
+      "snapshot_sha256": "a2d2308fe27c81ac6cf74ca5d456ff9309b4ea18965a8bec750ffa0a5fde8a93"
+    },
+    {
+      "consumer": "assaymech",
+      "source_repository": "CultureBotAI/culturebotai-claw",
+      "source_ref": "89bfcebaee8a0fcf99055b2acd1709abb64f8666",
+      "source_path": "src/kg_microbe_governance/artifacts/docs/record-reviews.md",
+      "source_blob": "f86815ac5d84eecbd59c006f56e1a6f4f75c7c47",
+      "sha256": "eaedec5783b40925a3f0e159dfd1202c315a12e98c8859526378ceea5c547822",
+      "bytes": 11447,
+      "fixture": "tests/fixtures/native-admitted-source/record-reviews.md",
+      "snapshot": "src/kg_microbe_governance/releases/assaymech-infrastructure-source-manifest.json",
+      "snapshot_sha256": "a2d2308fe27c81ac6cf74ca5d456ff9309b4ea18965a8bec750ffa0a5fde8a93"
     }
   ]
 }
