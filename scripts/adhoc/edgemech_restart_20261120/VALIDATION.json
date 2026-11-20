@@ -1,0 +1,49 @@
+{
+  "recorded_at": "2026-11-20T05:31:35.159303+00:00",
+  "scope": "Focused offline tests only; no live tmux input, helper bootstrap, native coordinator or downstream mutation.",
+  "pytest": {
+    "command": "python -m pytest -q tests/test_edgemech_restart_helpers.py --basetemp=.temp/edgemech228-final-pytest",
+    "returncode": 0,
+    "summary": "32 passed in 0.19s"
+  },
+  "mutations": {
+    "observed_utc": "2026-11-20T05:30:44.576317+00:00",
+    "fresh_pytest_process_per_mutation": true,
+    "restored_source": true,
+    "mutations": [
+      {
+        "guard": "visible_panel",
+        "test": "test_old_trust_panel_followed_by_current_prompt_is_refused",
+        "returncode": 1,
+        "mutation_detected": true
+      },
+      {
+        "guard": "authorization_binding",
+        "test": "test_binding_retarget_cannot_reuse_authorization",
+        "returncode": 1,
+        "mutation_detected": true
+      }
+    ]
+  },
+  "full_suite_run": false,
+  "first_attempt_note": "Initial fixture setup failed because the in-checkout .temp parent was absent; created it and reran successfully.",
+  "input_sources": {
+    "prepare_coordinator.py": {
+      "sha256": "1362dd9503cab472a761bd49e64ef39f41fa6d0ff5e779a9bf6e798b17d3b040",
+      "bytes": 6452
+    },
+    "answer_exact_trust_once.py": {
+      "sha256": "b1163ce31a8860ad182942190423158688d043dfd64ebf083830dd18a72ca03f",
+      "bytes": 8082
+    }
+  },
+  "test_source": {
+    "sha256": "2c3c16e8536a48a612fb996fa5f4fd20662cbf121ac964a929d73e31baf4f3f7",
+    "bytes": 13696
+  },
+  "ruff": {
+    "version": "0.16.3",
+    "returncode": 0,
+    "scope": "Both maintained helper files and focused test module"
+  }
+}
