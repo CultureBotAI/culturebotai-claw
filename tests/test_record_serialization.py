@@ -66,8 +66,11 @@ def test_an_unverified_profile_refuses_rather_than_guessing(key):
 @pytest.mark.parametrize("key", UNVERIFIED)
 def test_an_unverified_refusal_points_to_the_native_path(key):
     """The refusal names the route that is allowed, so an agent is not left with none."""
-    with pytest.raises(SerializationUnavailable, match="own add-record skill or seeder"):
+    with pytest.raises(SerializationUnavailable, match="own documented write path") as caught:
         emit_options(key)
+    message = str(caught.value)
+    assert "if it documents none, do not write" in message
+    assert "culturebotai-claw AGENTS.md" in message
 
 
 @pytest.mark.parametrize("key", UNVERIFIED)

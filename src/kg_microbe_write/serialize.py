@@ -6,9 +6,11 @@ measured it: writing records back at `width=120` re-wrapped every long string,
 turning a two-field edit into 47 added lines, 24 of them pure noise.
 
 The options come from the packaged manifest, and only where they were measured
-to round-trip that Mech's real corpus byte-for-byte. Two Mechs have no such
-option set (#187), so this refuses rather than guessing: reformatting someone
-else's corpus is worse than declining to write it.
+to round-trip that Mech's real corpus byte-for-byte. A Mech whose manifest
+profile says `verified: false` has no such option set (#187), so this refuses
+rather than guessing: reformatting someone else's corpus is worse than
+declining to write it. Such a Mech is written only through its own documented
+write path (claw AGENTS.md).
 """
 
 from __future__ import annotations
@@ -47,9 +49,11 @@ def emit_options(
         raise SerializationUnavailable(
             f"{mech_key} has no verified emit options: {profile.reason} "
             f"Writing a record back would reformat it, so this refuses rather "
-            f"than guessing. Add a new {mech_key} record through that Mech's "
-            f"own add-record skill or seeder and its validation gates "
-            f"(AGENTS.md), not a generic YAML dump."
+            f"than guessing. Add or change {mech_key} records only through "
+            f"that Mech's own documented write path (its seeder or reproduction "
+            f"step for a generated corpus, otherwise its add-record or curation "
+            f"skill) and its validation gates; if it documents none, do not "
+            f"write -- route an issue (culturebotai-claw AGENTS.md)."
         )
     return dict(profile.options)
 

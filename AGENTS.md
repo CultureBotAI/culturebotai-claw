@@ -555,12 +555,16 @@ because they carry literal data the path rules would misread.
   byte-for-byte. Where a Mech's manifest `serialization` profile says
   `verified: false`, the call refuses rather than reformatting its records
   (#187); read that profile's `reason` instead of assuming how many Mechs it
-  covers. For such a Mech, write a new record only through that Mech's own
-  native path -- its add-record skill or seeder, creating the file exclusively
-  and never overwriting -- then run that Mech's own validation and
-  corpus-reproduction gates before publishing. Never substitute a generic YAML
-  dump for either path. A refusal for one Mech holds only that Mech; it is not a
-  reason to stop work on Mechs whose profile is verified.
+  covers. For such a Mech, add or change records only through that Mech's own
+  documented write path, with its own write semantics: for a generated corpus,
+  the seeder or reproduction step it documents (never a direct edit of the
+  generated files); otherwise its add-record skill for new records and its
+  curation or review skill for edits. Then run that Mech's own validation
+  gates, including its corpus-reproduction gate where it has one, before
+  publishing. If the Mech documents no such path, do not write; file or route an
+  issue instead. Never substitute a hand-written or generic YAML dump for any of
+  these paths. A refusal for one Mech holds only that Mech; it is not a reason
+  to stop work on Mechs whose profile is verified.
 - Use atomic creation/replacement for locks and curated data. For a writer that
   touches more than one file, prefer `ValidatedWriteTransaction` over a
   per-record write loop: writing as you go means a failure part-way through
