@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-11-20T05:31:34.717551+00:00",
+  "issue": "https://github.com/CultureBotAI/EdgeMech/issues/228",
+  "owner_repository": "CultureBotAI/culturebotai-claw",
+  "purpose": "Repair tracked bootstrap/control source provenance while preserving private original bytes and receipts.",
+  "association_scope": "Recorded during provenance repair; original receipts were not rewritten and are not claimed to have originally bound these source hashes.",
+  "helpers": [
+    {
+      "name": "prepare_coordinator.py",
+      "original_private": {
+        "sha256": "03fbb3e2eaf51b5a09d4358030b5d30100263af5bbf0ed389772ca8f33a926b4",
+        "bytes": 2412
+      },
+      "maintained": {
+        "path": "prepare_coordinator.py",
+        "sha256": "1362dd9503cab472a761bd49e64ef39f41fa6d0ff5e779a9bf6e798b17d3b040",
+        "bytes": 6452
+      },
+      "relationship": "Parameterized successor; not byte-equivalent and not used for historical startup execution."
+    },
+    {
+      "name": "answer_exact_trust_once.py",
+      "original_private": {
+        "sha256": "df9d1c84d45776fa5bcb69eb0127d32ff68fd5e148bbf451a5b4a08764ec39cb",
+        "bytes": 1827
+      },
+      "maintained": {
+        "path": "answer_exact_trust_once.py",
+        "sha256": "b1163ce31a8860ad182942190423158688d043dfd64ebf083830dd18a72ca03f",
+        "bytes": 8082
+      },
+      "relationship": "Parameterized successor; not byte-equivalent and not used for historical startup execution."
+    }
+  ],
+  "historical_private_artifacts": [
+    {
+      "name": "coordinator-checkout.json",
+      "private_retained": true,
+      "sha256": "f04cb42ca3d04eebd78694ea94c9e6df71b79acbe51d1492a428cc7d8069c381",
+      "bytes": 846
+    },
+    {
+      "name": "coordinator-launch.json",
+      "private_retained": true,
+      "sha256": "148540b83c504dc3e4a1a3722c841696690e2ce29e7688b22a78691f5f900eb7",
+      "bytes": 479
+    },
+    {
+      "name": "coordinator-startup-failure-v1.txt",
+      "private_retained": true,
+      "sha256": "7195c0a1ee3fb5b32fd46b338ec88612f3e5a3266266434c3d59ec63ff0d677a",
+      "bytes": 403
+    },
+    {
+      "name": "coordinator-launch-v2.json",
+      "private_retained": true,
+      "sha256": "6b7f4a44f46583dfff2805212af5691d27bbbd5d46d7b37e01a8b0b12fde70e3",
+      "bytes": 552
+    },
+    {
+      "name": "COORDINATOR-TRUST-INPUT-ONCE.json",
+      "private_retained": true,
+      "sha256": "4871f0032ad65347da99fc815deb476598230014361bae1602d93b8b3b8e61fe",
+      "bytes": 879
+    }
+  ],
+  "maintained_variants_live_executions": 0,
+  "native_scientific_coverage_claimed": false
+}
