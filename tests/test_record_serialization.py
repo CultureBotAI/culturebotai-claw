@@ -64,6 +64,13 @@ def test_an_unverified_profile_refuses_rather_than_guessing(key):
 
 
 @pytest.mark.parametrize("key", UNVERIFIED)
+def test_an_unverified_refusal_points_to_the_native_path(key):
+    """The refusal names the route that is allowed, so an agent is not left with none."""
+    with pytest.raises(SerializationUnavailable, match="own add-record skill or seeder"):
+        emit_options(key)
+
+
+@pytest.mark.parametrize("key", UNVERIFIED)
 def test_an_unverified_profile_records_why(key):
     profile = MANIFEST.mechs[key].serialization
 

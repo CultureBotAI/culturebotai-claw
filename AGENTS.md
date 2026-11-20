@@ -552,8 +552,15 @@ because they carry literal data the path rules would misread.
 - Serialize a downstream record with `kg_microbe_write.dump_record(mech_key, …)`,
   never a local `yaml.safe_dump`. The emit options live in the manifest and are
   declared only where they were measured to round-trip that Mech's corpus
-  byte-for-byte; two Mechs have no such option set and the call refuses rather
-  than reformatting their records (#187).
+  byte-for-byte. Where a Mech's manifest `serialization` profile says
+  `verified: false`, the call refuses rather than reformatting its records
+  (#187); read that profile's `reason` instead of assuming how many Mechs it
+  covers. For such a Mech, write a new record only through that Mech's own
+  native path -- its add-record skill or seeder, creating the file exclusively
+  and never overwriting -- then run that Mech's own validation and
+  corpus-reproduction gates before publishing. Never substitute a generic YAML
+  dump for either path. A refusal for one Mech holds only that Mech; it is not a
+  reason to stop work on Mechs whose profile is verified.
 - Use atomic creation/replacement for locks and curated data. For a writer that
   touches more than one file, prefer `ValidatedWriteTransaction` over a
   per-record write loop: writing as you go means a failure part-way through

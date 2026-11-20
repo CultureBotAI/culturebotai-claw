@@ -47,7 +47,9 @@ def emit_options(
         raise SerializationUnavailable(
             f"{mech_key} has no verified emit options: {profile.reason} "
             f"Writing a record back would reformat it, so this refuses rather "
-            f"than guessing."
+            f"than guessing. Add a new {mech_key} record through that Mech's "
+            f"own add-record skill or seeder and its validation gates "
+            f"(AGENTS.md), not a generic YAML dump."
         )
     return dict(profile.options)
 
