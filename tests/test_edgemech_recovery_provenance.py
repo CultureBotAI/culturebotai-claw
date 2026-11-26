@@ -219,3 +219,60 @@ def test_uuid_attached_to_prose_is_parameterized():
     result = Bindings().transform("workerthread" + identity + "/checkpoint")
     assert identity not in result
     assert "workerthreadPRIVATE_UUID_" in result
+
+
+def test_same_line_changed_source_refuses_reviewed_inventory_before_writes(tmp_path):
+    from scripts.adhoc.edgemech_recovery_20261125.preserve_sources import selection_from_inventory
+
+    spec = selection(tmp_path)
+    path = Path(spec["owners"][0]["rollout"])
+    line = path.read_bytes().splitlines(keepends=True)[0]
+    call = json.loads(line)
+    inventory = {
+        "fixed_execution_cutoff": spec["cutoff"],
+        "source_pins": [{"actor": "root", "path": str(path)}],
+        "counts": {"required_producer_or_runtime_control": 1},
+        "calls": [
+            {
+                "actor": "root",
+                "classification": "required_producer_or_runtime_control",
+                "line": 1,
+                "scope_reason": "fixture",
+                "call_id": call["payload"]["call_id"],
+                "timestamp": call["timestamp"],
+                "event_line_sha256": sha(line),
+                "exact_tool_input_sha256": sha(call["payload"]["input"].encode()),
+                "exact_tool_input_bytes": len(call["payload"]["input"].encode()),
+            }
+        ],
+    }
+    bound = selection_from_inventory(inventory, {})
+    rows = records()
+    rows[0]["payload"]["input"] = "same line, substituted source"
+    path.write_text("".join(json.dumps(x) + "\n" for x in rows))
+    with pytest.raises(ValueError, match="reviewed source pins"):
+        preserve(bound, tmp_path / "private", tmp_path / "public")
+    assert not (tmp_path / "private").exists()
+    assert not (tmp_path / "public").exists()
+
+
+def test_call_id_schema_key_is_not_a_private_binding():
+    assert Bindings().transform("payload['call_id']") == "payload['call_id']"
+
+
+def test_archive_rehydration_checks_logic_even_with_updated_derived_digest(tmp_path):
+    from scripts.adhoc.edgemech_recovery_20261125.validate_archive import validate
+
+    spec = selection(tmp_path)
+    private, public = tmp_path / "private", tmp_path / "public"
+    preserve(spec, private, public)
+    assert validate(private, public)["exact_rehydration"]
+    manifest = json.loads((public / "MANIFEST.json").read_text())
+    item = manifest["entries"][0]["files"][0]
+    replacement = b"substituted logic"
+    (public / item["path"]).write_bytes(replacement)
+    item["public"].update(sha256=sha(replacement), bytes=len(replacement))
+    for root in (private, public):
+        (root / "MANIFEST.json").write_text(json.dumps(manifest))
+    with pytest.raises(ValueError, match="restore exact original"):
+        validate(private, public)

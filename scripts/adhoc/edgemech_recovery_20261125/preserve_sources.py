@@ -59,7 +59,7 @@ class Bindings:
         ("TTY", r"(?:/dev/)?ttys\d+\b"),
         ("SESSION", r"\bedge-(?:restart|prep)-[A-Za-z0-9-]+"),
         ("CLIENT", r"\bclient-\d+\b"),
-        ("CALL", r"\bcall_[A-Za-z0-9]+\b"),
+        ("CALL", r"\bcall_[0-9a-f]{16,}\b"),
         ("IP", r"\b(?:\d{1,3}\.){3}\d{1,3}\b"),
     )
 
@@ -161,6 +161,16 @@ def preserve(spec: dict[str, Any], private: Path, public: Path) -> dict[str, Any
                 raise ValueError("duplicate source selection")
             seen.add(key)
             selected = selected_call(records, item["line"], spec["cutoff"])
+            if "reviewed_pins" in item:
+                actual = {
+                    "call_id": selected["call_id"],
+                    "timestamp": selected["timestamp"],
+                    "event_line_sha256": selected["raw_sha256"],
+                    "exact_tool_input_sha256": sha(selected["source"].encode()),
+                    "exact_tool_input_bytes": len(selected["source"].encode()),
+                }
+                if item["reviewed_pins"] != actual:
+                    raise ValueError("reviewed source pins changed")
             selected["rollout_read_sha256"] = sha(raw)
             selected["rollout_read_bytes"] = len(raw)
             selections.append((item["id"], item["purpose"], path, selected))
@@ -245,6 +255,16 @@ def selection_from_inventory(inventory: dict[str, Any], bindings: dict[str, str]
                 "id": f"{actor.replace('_', '-')}-{c['line']}",
                 "line": c["line"],
                 "purpose": c["scope_reason"],
+                "reviewed_pins": {
+                    key: c[key]
+                    for key in (
+                        "call_id",
+                        "timestamp",
+                        "event_line_sha256",
+                        "exact_tool_input_sha256",
+                        "exact_tool_input_bytes",
+                    )
+                },
             }
             for c in inventory["calls"]
             if c["actor"] == actor and c["classification"] == "required_producer_or_runtime_control"
