@@ -4,11 +4,11 @@ Uses the existing captured PR intake; this is not a second issue inventory.
 Groups describe the actual changed artifact kinds, not approval or shared defects.
 """
 import argparse
+import json
+import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
-import json
 from pathlib import Path
-import subprocess
 
 
 def gh(*args):
@@ -16,8 +16,21 @@ def gh(*args):
     return json.loads(proc.stdout)
 
 
+def refuse_existing(paths):
+    for path in paths:
+        if path.exists() or path.is_symlink():
+            raise FileExistsError(f'evidence output already exists: {path}')
+
+
+def write_new(path, text):
+    with path.open('x') as handle:
+        handle.write(text)
+
+
 def capture(pr, repo, root):
     number = pr['number']
+    output = root / f'pr-files-{number}.json'
+    refuse_existing([output])
     pages = gh('api', '--paginate', '--slurp', f'repos/{repo}/pulls/{number}/files?per_page=100')
     files = [item for page in pages for item in page]
     current = gh('api', f'repos/{repo}/pulls/{number}')
@@ -29,7 +42,7 @@ def capture(pr, repo, root):
                                   and receipt['state'] == 'open'
                                   and len(files) == receipt['changed_files']
                                   and len({f['filename'] for f in files}) == len(files))
-    (root / f'pr-files-{number}.json').write_text(json.dumps(receipt, indent=2) + '\n')
+    write_new(output, json.dumps(receipt, indent=2) + '\n')
     return receipt
 
 
@@ -55,13 +68,15 @@ GATES = {
 }
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('directory', type=Path)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     root = args.directory
     repo = json.loads((root / 'counts.json').read_text())['data']['repository']['nameWithOwner']
     prs = json.loads((root / 'prs.json').read_text())
+    refuse_existing([root / 'review-batches.json', root / 'review-batches.md',
+                     *(root / f"pr-files-{pr['number']}.json" for pr in prs)])
     rows = []
     failures = []
     with ThreadPoolExecutor(max_workers=4) as pool:
@@ -91,12 +106,12 @@ def main():
               'new_prs_and_discovery': 'paused until open PR count below 25 and status checks pass',
               'coverage': {'prs': len(prs), 'stable_complete': sum(r['theme'] != 'unverified-acquisition' for r in rows),
                            'failures': failures}, 'packets': packets, 'prs': rows}
-    (root / 'review-batches.json').write_text(json.dumps(result, indent=2) + '\n')
+    write_new(root / 'review-batches.json', json.dumps(result, indent=2) + '\n')
     lines = ['# Bounded review queue', '',
              'Artifact themes come from complete changed-file lists with unchanged-head checks. This is a work queue, not completed scientific review or merge approval.', '',
              '| Packet | PRs | Acceptance |', '|---|---|---|']
     lines += [f"| {p['id']} | {', '.join('#' + str(n) for n in p['prs'])} | {p['acceptance']} |" for p in packets]
-    (root / 'review-batches.md').write_text('\n'.join(lines) + '\n')
+    write_new(root / 'review-batches.md', '\n'.join(lines) + '\n')
     print(json.dumps({'repository': repo, 'coverage': result['coverage'], 'packets': len(packets)}))
     return 1 if failures or any(r['theme'] == 'unverified-acquisition' for r in rows) else 0
 

@@ -4,7 +4,12 @@ set -euo pipefail
 repo="$1"
 out="$2"
 python_bin="$3"
-mkdir -p "$out"
+if [[ -e "$out" || -L "$out" ]]; then
+  echo "Acquisition output already exists: $out" >&2
+  exit 1
+fi
+mkdir -p "$(dirname "$out")"
+mkdir "$out"
 date -u +%Y-%m-%dT%H:%M:%SZ > "$out/started-utc.txt"
 PYTHONPATH=src "$python_bin" scripts/fleet_issue_status.py --all-issues --no-prs --repo "$repo" --json --markdown-file "$out/intake.md" --tsv-dir "$out" > "$out/intake.json"
 gh repo view "$repo" --json nameWithOwner,url,defaultBranchRef > "$out/repository.json"
