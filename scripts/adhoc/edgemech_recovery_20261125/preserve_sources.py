@@ -171,6 +171,15 @@ def preserve(spec: dict[str, Any], private: Path, public: Path) -> dict[str, Any
                 }
                 if item["reviewed_pins"] != actual:
                     raise ValueError("reviewed source pins changed")
+            if "reviewed_result" in item:
+                result = selected["results"][0]
+                actual_result = {
+                    "line": result["line"],
+                    "event_line_sha256": result["raw_sha256"],
+                    "timestamp": result["record"]["timestamp"],
+                }
+                if item["reviewed_result"] != actual_result:
+                    raise ValueError("reviewed result pins changed")
             selected["rollout_read_sha256"] = sha(raw)
             selected["rollout_read_bytes"] = len(raw)
             selections.append((item["id"], item["purpose"], path, selected))
@@ -255,6 +264,9 @@ def selection_from_inventory(inventory: dict[str, Any], bindings: dict[str, str]
                 "id": f"{actor.replace('_', '-')}-{c['line']}",
                 "line": c["line"],
                 "purpose": c["scope_reason"],
+                "reviewed_result": {
+                    key: c["result"][key] for key in ("line", "event_line_sha256", "timestamp")
+                },
                 "reviewed_pins": {
                     key: c[key]
                     for key in (

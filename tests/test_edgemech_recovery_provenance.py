@@ -238,6 +238,11 @@ def test_same_line_changed_source_refuses_reviewed_inventory_before_writes(tmp_p
                 "classification": "required_producer_or_runtime_control",
                 "line": 1,
                 "scope_reason": "fixture",
+                "result": {
+                    "line": 4,
+                    "event_line_sha256": sha(path.read_bytes().splitlines(keepends=True)[3]),
+                    "timestamp": records()[3]["timestamp"],
+                },
                 "call_id": call["payload"]["call_id"],
                 "timestamp": call["timestamp"],
                 "event_line_sha256": sha(line),
