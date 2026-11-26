@@ -5,14 +5,15 @@ No archived source is imported or executed. Private original bytes and native
 result records stay separate from inert, binding-parameterized public source.
 Created 2026-11-26 for CultureBotAI/EdgeMech issue 228.
 """
+
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
-from pathlib import Path
 import re
 import stat
+from pathlib import Path
 from typing import Any
 
 
@@ -93,14 +94,18 @@ def python_blocks(shell: str) -> list[str]:
     for i, line in enumerate(lines):
         match = re.search(r"\bpython(?:3)?\s+-\s+<<(['\"]?)([A-Za-z_][A-Za-z_0-9]*)\1", line)
         if match:
-            end = next((j for j in range(i + 1, len(lines)) if lines[j].rstrip("\r\n") == match[2]), None)
+            end = next(
+                (j for j in range(i + 1, len(lines)) if lines[j].rstrip("\r\n") == match[2]), None
+            )
             if end is None:
                 raise ValueError("unterminated Python heredoc")
-            blocks.append("".join(lines[i + 1:end]))
+            blocks.append("".join(lines[i + 1 : end]))
     return blocks
 
 
-def selected_call(records: list[tuple[bytes, dict[str, Any]]], line: int, cutoff: str) -> dict[str, Any]:
+def selected_call(
+    records: list[tuple[bytes, dict[str, Any]]], line: int, cutoff: str
+) -> dict[str, Any]:
     if not isinstance(line, int) or not 1 <= line <= len(records):
         raise ValueError("source line outside rollout")
     raw, record = records[line - 1]
@@ -129,8 +134,15 @@ def selected_call(records: list[tuple[bytes, dict[str, Any]]], line: int, cutoff
         item = q.get("item", {})
         if q.get("type") == "item_completed" and item.get("type") == "CommandExecution":
             commands.append({"line": i + 1, "raw_sha256": sha(r), "record": d})
-    return {"line": line, "raw_sha256": sha(raw), "timestamp": record["timestamp"],
-            "call_id": call_id, "source": payload["input"], "results": result, "commands": commands}
+    return {
+        "line": line,
+        "raw_sha256": sha(raw),
+        "timestamp": record["timestamp"],
+        "call_id": call_id,
+        "source": payload["input"],
+        "results": result,
+        "commands": commands,
+    }
 
 
 def preserve(spec: dict[str, Any], private: Path, public: Path) -> dict[str, Any]:
@@ -158,12 +170,19 @@ def preserve(spec: dict[str, Any], private: Path, public: Path) -> dict[str, Any
     # Validate all selection inputs before either destination is created.
     fresh_directory(private)
     fresh_directory(public)
-    manifest: dict[str, Any] = {"schema_version": 1, "issue": "https://github.com/CultureBotAI/EdgeMech/issues/228",
-        "cutoff_utc": spec["cutoff"], "relationship": "Inert sanitized source derived at preservation time; never used for historical execution. Private exact originals remain authoritative.",
-        "archive_executions": 0, "entries": []}
+    manifest: dict[str, Any] = {
+        "schema_version": 1,
+        "issue": "https://github.com/CultureBotAI/EdgeMech/issues/228",
+        "cutoff_utc": spec["cutoff"],
+        "relationship": "Inert sanitized source derived at preservation time; never used for historical execution. Private exact originals remain authoritative.",
+        "archive_executions": 0,
+        "entries": [],
+    }
     for ident, purpose, rollout, selected in selections:
-        private_dir = private / ident; private_dir.mkdir()
-        public_dir = public / ident; public_dir.mkdir()
+        private_dir = private / ident
+        private_dir.mkdir()
+        public_dir = public / ident
+        public_dir.mkdir()
         sources = [("orchestrator.js.txt", selected["source"])]
         for index, command in enumerate(selected["commands"], 1):
             argv = command["record"]["payload"]["item"].get("command", [])
@@ -176,14 +195,36 @@ def preserve(spec: dict[str, Any], private: Path, public: Path) -> dict[str, Any
         for name, source in sources:
             original = save(private_dir / name, source.encode())
             derived = save(public_dir / name, bindings.transform(source).encode())
-            files.append({"path": f"{ident}/{name}", "private_original_sha256": original["sha256"],
-                          "private_original_bytes": original["bytes"], "public": derived})
-        linkage = {"rollout": str(rollout), **{k: v for k, v in selected.items() if k != "source"},
-                   "command_linkage_rule": "Native CommandExecution completions after source call and before next tool request; explicit result call_id equality. Missing status remains unknown."}
+            files.append(
+                {
+                    "path": f"{ident}/{name}",
+                    "private_original_sha256": original["sha256"],
+                    "private_original_bytes": original["bytes"],
+                    "public": derived,
+                }
+            )
+        linkage = {
+            "rollout": str(rollout),
+            **{k: v for k, v in selected.items() if k != "source"},
+            "command_linkage_rule": "Native CommandExecution completions after source call and before next tool request; explicit result call_id equality. Missing status remains unknown.",
+        }
         save(private_dir / "linkage.json", json_bytes(linkage))
-        manifest["entries"].append({"id": ident, "purpose": purpose, "timestamp_utc": selected["timestamp"],
-            "files": files, "result_records": len(selected["results"]),
-            "native_commands": [{"status": c["record"]["payload"]["item"].get("status"), "exit_code": c["record"]["payload"]["item"].get("exit_code")} for c in selected["commands"]]})
+        manifest["entries"].append(
+            {
+                "id": ident,
+                "purpose": purpose,
+                "timestamp_utc": selected["timestamp"],
+                "files": files,
+                "result_records": len(selected["results"]),
+                "native_commands": [
+                    {
+                        "status": c["record"]["payload"]["item"].get("status"),
+                        "exit_code": c["record"]["payload"]["item"].get("exit_code"),
+                    }
+                    for c in selected["commands"]
+                ],
+            }
+        )
     save(private / "binding-map.json", json_bytes(bindings.values))
     save(private / "selection.json", json_bytes(spec))
     save(private / "MANIFEST.json", json_bytes(manifest))
@@ -191,13 +232,48 @@ def preserve(spec: dict[str, Any], private: Path, public: Path) -> dict[str, Any
     return manifest
 
 
+def selection_from_inventory(inventory: dict[str, Any], bindings: dict[str, str]) -> dict[str, Any]:
+    owners = []
+    seen = set()
+    for pin in inventory["source_pins"]:
+        actor = pin["actor"]
+        if actor in seen:
+            raise ValueError("duplicate inventory actor")
+        seen.add(actor)
+        calls = [
+            {
+                "id": f"{actor.replace('_', '-')}-{c['line']}",
+                "line": c["line"],
+                "purpose": c["scope_reason"],
+            }
+            for c in inventory["calls"]
+            if c["actor"] == actor and c["classification"] == "required_producer_or_runtime_control"
+        ]
+        owners.append({"rollout": pin["path"], "calls": calls})
+    expected = inventory["counts"]["required_producer_or_runtime_control"]
+    if sum(len(o["calls"]) for o in owners) != expected:
+        raise ValueError("inventory required-source count mismatch")
+    return {"cutoff": inventory["fixed_execution_cutoff"], "owners": owners, "bindings": bindings}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--selection", type=Path, required=True)
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--selection", type=Path)
+    group.add_argument("--inventory", type=Path)
+    parser.add_argument("--bindings", type=Path)
     parser.add_argument("--private-output", type=Path, required=True)
     parser.add_argument("--public-output", type=Path, required=True)
     args = parser.parse_args()
-    result = preserve(json.loads(regular_bytes(args.selection)), args.private_output, args.public_output)
+    inventory_bytes = regular_bytes(args.inventory) if args.inventory else None
+    if inventory_bytes is not None:
+        bindings = json.loads(regular_bytes(args.bindings)) if args.bindings else {}
+        spec = selection_from_inventory(json.loads(inventory_bytes), bindings)
+    else:
+        spec = json.loads(regular_bytes(args.selection))
+    result = preserve(spec, args.private_output, args.public_output)
+    if inventory_bytes is not None:
+        save(args.private_output / "reviewed-inventory.json", inventory_bytes)
     print(json.dumps({"entries": len(result["entries"]), "archive_executions": 0}))
 
 
