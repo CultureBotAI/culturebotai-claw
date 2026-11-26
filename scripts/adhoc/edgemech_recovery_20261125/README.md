@@ -122,3 +122,13 @@ The focused tests exercise exact source/result linkage, refusal before output,
 privacy substitution and byte rehydration. `VALIDATION.json` records checks and
 fresh-process negative mutations. Successful archival validates provenance only;
 it does not convert a historical failure into success or authorize replay.
+
+## November 26 CI repair
+
+The maintained redactor now recognizes both macOS and Linux home-root patterns.
+The previous macOS-only pattern triggered the script portability guard. The
+parameterized regression verifies redaction and exact restoration on both root
+families. This changes only future redaction support: the archived source,
+manifest and original extraction provenance remain byte-for-byte unchanged.
+`PROVENANCE.json` continues to identify the extractor revision that produced the
+historical archive; it does not claim that this later repair produced it.

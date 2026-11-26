@@ -265,6 +265,19 @@ def test_call_id_schema_key_is_not_a_private_binding():
     assert Bindings().transform("payload['call_id']") == "payload['call_id']"
 
 
+@pytest.mark.parametrize("home", ["/Users/example", "/home/example"])
+def test_home_binding_redaction_is_portable_and_reversible(home):
+    bindings = Bindings()
+    original = f"Path('{home}/private/checkpoint.json')"
+    derived = bindings.transform(original)
+    assert home not in derived
+    assert "PRIVATE_HOME_" in derived
+    restored = derived
+    for value, token in bindings.values.items():
+        restored = restored.replace(token, value)
+    assert restored == original
+
+
 def test_archive_rehydration_checks_logic_even_with_updated_derived_digest(tmp_path):
     from scripts.adhoc.edgemech_recovery_20261125.validate_archive import validate
 

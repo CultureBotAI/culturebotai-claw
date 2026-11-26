@@ -52,7 +52,7 @@ class Bindings:
     """Replace explicit sensitive bindings, retaining the map only privately."""
 
     patterns = (
-        ("HOME", r"/Users/[A-Za-z0-9_.-]+"),
+        ("HOME", r"/(?:Users|home)/[A-Za-z0-9_.-]+"),
         ("UUID", r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"),
         ("SOCKET", r"/(?:private/)?tmp/tmux-\d+/default"),
         ("PANE", r"%\d+\b"),
