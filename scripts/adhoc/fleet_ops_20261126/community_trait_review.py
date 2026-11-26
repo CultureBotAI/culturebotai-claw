@@ -75,7 +75,9 @@ def main() -> None:
         live = json.loads((args.baseline / f"pr-{child['number']}-baseline.json").read_bytes())
         if live['state'] != 'OPEN' or live['headRefOid'] != child['head']:
             raise ValueError(f"child {child['number']} changed state or head")
-        paths = git(root, 'diff', '--name-only', child['base'], child['head']).decode().splitlines()
+        # A stacked base may have advanced independently; only the child's
+        # merge-base delta is its contribution, never reversed base-only work.
+        paths = git(root, 'diff', '--name-only', child['base'] + '...' + child['head']).decode().splitlines()
         child_tree = tree(root, child['head'])
         old_different = [p for p in paths if child_tree.get(p) != previous_tree.get(p)]
         if len(paths) != child['changed_paths'] or set(old_different) != set(child['extended_paths']):
