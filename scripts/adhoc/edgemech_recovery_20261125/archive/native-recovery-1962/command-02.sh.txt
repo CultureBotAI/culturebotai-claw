@@ -1,0 +1,6 @@
+set -e
+cp .temp/restart-20261120/recovery-20261126T042934Z/acceptance-fresh.json ../COORDINATOR-ACCEPTANCE.json
+cp .temp/restart-20261120/recovery-20261126T042934Z/first-worker-fresh.json ../FIRST-WORKER.json
+cp .temp/restart-20261120/recovery-20261126T042934Z/progress-fresh.json ../COORDINATOR-PROGRESS.json
+cp -n .temp/restart-20261120/recovery-20261126T042934Z/progress-fresh.json ../coordinator-checkpoints/20261126T043119Z-recovery.json
+shasum -a 256 ../COORDINATOR-ACCEPTANCE.json ../FIRST-WORKER.json ../COORDINATOR-PROGRESS.json ../coordinator-checkpoints/20261126T043119Z-recovery.json

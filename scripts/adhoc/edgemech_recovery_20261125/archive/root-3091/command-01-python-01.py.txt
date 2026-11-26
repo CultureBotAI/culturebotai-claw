@@ -1,0 +1,9 @@
+from pathlib import Path
+import subprocess
+p=Path('PRIVATE_HOME_021/agent-work/EdgeMech/restart-20261120');r=p/'network-canary-20261125';f=r/'preparation-review-handoff.txt'
+f.write_text('Independent preparation review is saved at '+str(p/'resume-20261125/PREPARATION-97c675ed-REVIEW.json')+'. Actual abstract/engineering canary evidence passes:166 artifact pins,47 command pins,11 canonical input hashes. Preserve completed run; no repeat needed. Three separate helper/publication findings need file/triage BEFORE fixes: output/ledger/cache confinement, strict MCP envelope checks, public operational-path minimization. No credential/fulltext leak alleged. Carry these with PR233 two findings, keep qualifying gates, repair on reviewed branches. Root verified your3fresh commands at04:29:34Z and exact unchanged settings, saved COORDINATOR-RECOVERY-CHECKPOINT-20261126T042934Z.json. Please reconcile stale FIRST-WORKER/COORDINATOR-PROGRESS and persist your continuation checkpoint; root updates ACK/progress.\n')
+t=['tmux','-S','PRIVATE_SOCKET_019'];s=subprocess.check_output(t+['capture-pane','-p','-t','PRIVATE_PANE_022'],text=True)
+if '› Ask Codex to do anything' not in s or 'Pursuing goal' not in s:raise RuntimeError('composer not ready')
+if subprocess.check_output(t+['display-message','-p','-t','PRIVATE_PANE_022','#{pane_pid}'],text=True).strip()!='PRIVATE_PID_G':raise RuntimeError('target changed')
+subprocess.run(t+['load-buffer','-b','PRIVATE_SESSION_031',str(f)],check=True)
+subprocess.run(t+['paste-buffer','-b','PRIVATE_SESSION_031','-d','-t','PRIVATE_PANE_022'],check=True)

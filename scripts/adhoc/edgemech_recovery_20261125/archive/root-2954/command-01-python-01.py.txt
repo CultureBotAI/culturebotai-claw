@@ -1,0 +1,10 @@
+from pathlib import Path
+from datetime import datetime,timezone
+import json,hashlib,subprocess,os
+p=Path('PRIVATE_HOME_021/agent-work/EdgeMech/restart-20261120');r=p/'network-canary-20261125';now=datetime.now(timezone.utc)
+t=['tmux','-S','PRIVATE_SOCKET_019'];s=subprocess.check_output(t+['capture-pane','-p','-t','PRIVATE_PANE_022'],text=True)
+rec={'at_utc':now.isoformat(),'state':'CLAW_FRESH_TOOL_WORK_VERIFIED_BEFORE_COORDINATOR_RECOVERY','fresh_tools':['read recovery-handoff.md','read preparation REPORT.md and completion.json','inspect coordinator/process/client state','openclaw-cli config validate'],'coordinator_thread':'PRIVATE_UUID_029','observed_native_pid':PRIVATE_PID_D,'observed_launcher_pid':PRIVATE_PID_C,'pane':'PRIVATE_PANE_022','screen_sha256':hashlib.sha256(s.encode()).hexdigest(),'screen_state':'Fatal application network permission revoked; stalled goal; empty composer','preserve_model':'GPT-6 Rosalind (Research) xhigh','current_ordinary_control_clients_for_coordinator':0,'other_sessions_untouched':True,'preparation_completion_sha256':hashlib.sha256((p/'preparation-worker-01/.temp/restart-preparation-01/completion.json').read_bytes()).hexdigest(),'scientific_coverage':0,'next_action':'normal quit exact stalled process, verify exit, reopen exact saved UUID without overrides'}
+f=r/('CLAW-FRESH-TOOLS-'+now.strftime('%Y%m%dT%H%M%SZ')+'.json')
+with f.open('x') as out:json.dump(rec,out,indent=2);out.flush();os.fsync(out.fileno())
+print(f)
+(r/('coordinator-before-recovery-'+now.strftime('%Y%m%dT%H%M%SZ')+'.txt')).write_text(s)

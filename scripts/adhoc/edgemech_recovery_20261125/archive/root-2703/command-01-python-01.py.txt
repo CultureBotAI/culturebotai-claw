@@ -1,0 +1,8 @@
+import subprocess,json
+from pathlib import Path
+from datetime import datetime,timezone
+p=Path('PRIVATE_HOME_021/agent-work/EdgeMech/restart-20261120/resume-20261125');t=['tmux','-S','PRIVATE_SOCKET_019'];s=subprocess.check_output(t+['capture-pane','-p','-t','PRIVATE_PANE_022'],text=True)
+if '› Fresh parent evidence:' not in s or 'Pursuing goal' not in s:raise RuntimeError('facts composer changed')
+subprocess.run(t+['send-keys','-c','PRIVATE_TTY_024','-t','PRIVATE_PANE_022','Enter'],check=True)
+(p/'current-facts-submitted.json').write_text(json.dumps({'at':datetime.now(timezone.utc).isoformat(),'action':'submit facts followup','target':'PRIVATE_PANE_022'},indent=2))
+print(s[-1800:])

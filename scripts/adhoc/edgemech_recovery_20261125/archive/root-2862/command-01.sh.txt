@@ -1,0 +1,8 @@
+python - <<'PY'
+import subprocess
+from pathlib import Path
+p=Path('PRIVATE_HOME_021/agent-work/EdgeMech/restart-20261120/resume-20261125');t=['tmux','-S','PRIVATE_SOCKET_019'];s=subprocess.check_output(t+['capture-pane','-p','-t','PRIVATE_PANE_022'],text=True)
+if '› Independent PR233 review at ae065236' not in s or 'Pursuing goal' not in s:raise RuntimeError('composer changed')
+(p/'review-and-priority-before-submit.txt').write_text(s)
+subprocess.run(t+['send-keys','-c','PRIVATE_TTY_024','-t','PRIVATE_PANE_022','Enter'],check=True)
+PY

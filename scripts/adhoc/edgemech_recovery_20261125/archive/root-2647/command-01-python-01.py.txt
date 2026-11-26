@@ -1,0 +1,16 @@
+import subprocess,json,os
+from pathlib import Path
+from datetime import datetime,timezone
+p=Path('PRIVATE_HOME_021/agent-work/EdgeMech/restart-20261120/resume-20261125');t=['tmux','-S','PRIVATE_SOCKET_019']
+def read(*a):return subprocess.check_output(t+list(a),text=True)
+s=read('capture-pane','-p','-t','PRIVATE_PANE_022')
+if '› User-authorized resume with current M5 login:' not in s or 'Pursuing goal' not in s:raise RuntimeError('followup composer changed')
+subprocess.run(t+['send-keys','-c','PRIVATE_TTY_024','-t','PRIVATE_PANE_022','Enter'],check=True)
+(p/'coordinator-followup-submitted.json').write_text(json.dumps({'at':datetime.now(timezone.utc).isoformat(),'action':'submit file-based resume followup','target':'PRIVATE_PANE_022'},indent=2))
+s=read('capture-pane','-p','-t','PRIVATE_PANE_025');b=read('display-message','-p','-t','PRIVATE_PANE_025','#{session_name}|#{pane_pid}|#{pane_tty}|#{pane_current_path}').strip()
+expected='PRIVATE_SESSION_027|PRIVATE_PID_E|PRIVATE_TTY_026|PRIVATE_HOME_021/agent-work/EdgeMech/restart-20261120/preparation-worker-01'
+if b!=expected or '» /restart' not in s or 'Unrecognized command' not in s or 'Working (' in s or 'Trust this folder?' in s:raise RuntimeError('worker draft/state differs; no input')
+(p/'worker-before-draft-preservation.txt').write_text(s)
+with (p/'worker-preserved-draft.txt').open('x') as f:f.write('/restart');f.flush();os.fsync(f.fileno())
+with (p/'worker-clear-draft-intent.json').open('x') as f:json.dump({'at':datetime.now(timezone.utc).isoformat(),'binding':b,'saved_draft':str(p/'worker-preserved-draft.txt'),'action':'C-u to clear exact unsupported draft, no Enter','reason':'resume authorized existing campaign; preserve original draft durably first'},f,indent=2);f.flush();os.fsync(f.fileno())
+subprocess.run(t+['send-keys','-c','PRIVATE_TTY_024','-t','PRIVATE_PANE_025','C-u'],check=True)

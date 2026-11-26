@@ -1,0 +1,7 @@
+import subprocess
+from pathlib import Path
+p=Path('PRIVATE_HOME_021/agent-work/EdgeMech/restart-20261120/resume-20261125');t=['tmux','-S','PRIVATE_SOCKET_019'];r=lambda *a:subprocess.check_output(t+list(a),text=True);s=r('capture-pane','-p','-t','PRIVATE_PANE_022')
+if r('display-message','-p','-t','PRIVATE_PANE_022','#{session_name}|#{pane_pid}').strip()!='PRIVATE_SESSION_020|PRIVATE_PID_C':raise RuntimeError('binding changed')
+if '› fractions truncate on pinned Python3.14' not in s or 'acceptance checkpoint and reconcile FIRST-WORKER; root owns ACK/progress' not in s or 'Working (' not in s:raise RuntimeError('expected scrolled draft differs')
+(p/'review-and-priority-before-submit.txt').write_text(s)
+subprocess.run(t+['send-keys','-c','PRIVATE_TTY_024','-t','PRIVATE_PANE_022','Enter'],check=True)
