@@ -1,0 +1,23 @@
+python - <<'PY'
+import subprocess,json,hashlib,os
+from pathlib import Path
+from datetime import datetime,timezone
+p=Path('PRIVATE_HOME_021/agent-work/EdgeMech/restart-20261120')
+t=['tmux','-S','PRIVATE_SOCKET_019']
+def read(*a):return subprocess.check_output(t+list(a),text=True)
+binding=read('display-message','-p','-t','PRIVATE_PANE_022','#{session_name}|#{pane_pid}|#{pane_tty}|#{pane_current_path}').strip()
+expected='PRIVATE_SESSION_020|PRIVATE_PID_C|PRIVATE_TTY_023|'+str(p/'coordinator-checkout')
+if binding!=expected:raise RuntimeError('coordinator binding changed')
+clients=read('list-clients','-F','#{client_name}|#{client_pid}|#{client_session}|#{client_readonly}')
+if 'PRIVATE_TTY_024|PRIVATE_PID_A|PRIVATE_SESSION_020|0' not in clients:raise RuntimeError('control client differs')
+screen=read('capture-pane','-p','-t','PRIVATE_PANE_022')
+if 'Goal stalled (/goal resume)' not in screen or '› Ask Codex to do anything' not in screen or 'GPT-6 Rosalind (Research) xhigh' not in screen:raise RuntimeError('not expected stalled empty composer')
+for forbidden in ['Trust this folder?','Sign in with ChatGPT','Would you like to','Approval required']:
+ if forbidden in screen:raise RuntimeError('new prompt; no input')
+r=p/'resume-20261125';r.mkdir(mode=0o700,exist_ok=True)
+(r/'coordinator-before.txt').write_text(screen)
+record={'at':datetime.now(timezone.utc).isoformat(),'action':'type /goal resume; separate Enter guarded next','authorization':'User confirms current login and explicitly requests existing campaign resume; no authentication action','binding':binding,'control_client':'PRIVATE_TTY_024','control_pid':PRIVATE_PID_A,'screen_sha256':hashlib.sha256(screen.encode()).hexdigest(),'model_preserved':'GPT-6 Rosalind (Research) xhigh','state':'intent_recorded_before_input'}
+with (r/'resume-command-intent.json').open('x') as f:json.dump(record,f,indent=2);f.flush();os.fsync(f.fileno())
+subprocess.run(t+['send-keys','-c','PRIVATE_TTY_024','-t','PRIVATE_PANE_022','-l','/goal resume'],check=True)
+print(read('capture-pane','-p','-t','PRIVATE_PANE_022'))
+PY

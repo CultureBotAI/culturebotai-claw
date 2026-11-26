@@ -1,0 +1,8 @@
+from pathlib import Path
+import subprocess,json
+from datetime import datetime,timezone
+p=Path('PRIVATE_HOME_021/agent-work/EdgeMech/restart-20261120/network-canary-20261125');t=['tmux','-S','PRIVATE_SOCKET_019'];s=subprocess.check_output(t+['capture-pane','-p','-t','PRIVATE_PANE_022'],text=True)
+if '› Recovered exact saved session with unchanged model/settings.' not in s or 'other prompt answers.' not in s:raise RuntimeError('expected draft differs')
+(p/'coordinator-recovery-followup-before-submit.txt').write_text(s)
+subprocess.run(t+['send-keys','-c','PRIVATE_TTY_030','-t','PRIVATE_PANE_022','Enter'],check=True)
+(p/'coordinator-recovery-followup-submitted.json').write_text(json.dumps({'at':datetime.now(timezone.utc).isoformat(),'native_pid':PRIVATE_PID_G,'thread':'PRIVATE_UUID_029','action':'submit recovery handoff pointer'},indent=2))

@@ -1,0 +1,10 @@
+set -e
+mkdir .temp/restart-20261120/recovery-20261126T042934Z
+cp -p ../COORDINATOR-ACCEPTANCE.json ../COORDINATOR-PROGRESS.json ../FIRST-WORKER.json .temp/restart-20261120/recovery-20261126T042934Z/
+cp -p .temp/restart-20261120/queue.json .temp/restart-20261120/recovery-20261126T042934Z/queue-before.json
+cp -p ../preparation-worker-01/.temp/restart-preparation-01/REPORT.md .temp/restart-20261120/recovery-20261126T042934Z/worker-REPORT.md
+cp -p ../preparation-worker-01/.temp/restart-preparation-01/completion.json .temp/restart-20261120/recovery-20261126T042934Z/worker-completion.json
+cp -p scripts/adhoc/audit_restart_native_reviews_20261120.py .temp/restart-20261120/recovery-20261126T042934Z/native-inventory-executed-e63d43b6.py.txt
+cp -p tests/test_audit_restart_native_reviews_20261120.py .temp/restart-20261120/recovery-20261126T042934Z/native-inventory-tests-before.py.txt
+cp -p ../resume-20261125/PR233-REVIEW.json .temp/restart-20261120/recovery-20261126T042934Z/
+shasum -a 256 .temp/restart-20261120/recovery-20261126T042934Z/* > .temp/restart-20261120/recovery-20261126T042934Z/preserved-sha256.txt

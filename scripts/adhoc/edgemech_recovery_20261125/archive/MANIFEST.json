@@ -1,0 +1,1331 @@
+{
+  "archive_executions": 0,
+  "cutoff_utc": "2026-11-26T04:34:24.017Z",
+  "entries": [
+    {
+      "files": [
+        {
+          "path": "root-2590/orchestrator.js.txt",
+          "private_original_bytes": 403,
+          "private_original_sha256": "6a773b1eaf3ecd503785e849c70b4f2e05b574237c872da7c3a1581d4b8b5833",
+          "public": {
+            "bytes": 387,
+            "name": "orchestrator.js.txt",
+            "sha256": "4a618d44b462f25c49469f21e3f30658909c0f2b81648b9500d47317161ccc15"
+          }
+        }
+      ],
+      "id": "root-2590",
+      "native_commands": [],
+      "purpose": "selected recovery/control/metadata producer",
+      "result_records": 1,
+      "timestamp_utc": "2026-11-26T03:02:40.806Z"
+    },
+    {
+      "files": [
+        {
+          "path": "root-2603/orchestrator.js.txt",
+          "private_original_bytes": 2334,
+          "private_original_sha256": "ee299d713b47e045ba486049d0e4e22771f578ba462d614fde37bd07054bc375",
+          "public": {
+            "bytes": 2404,
+            "name": "orchestrator.js.txt",
+            "sha256": "a3b01bef3c540f960f58bfccd286bd07ed0e8f7468cf20517b47c86fef5dc516"
+          }
+        },
+        {
+          "path": "root-2603/command-01.sh.txt",
+          "private_original_bytes": 2006,
+          "private_original_sha256": "4691b709cf800bd09b715cbc27a89db9025d28f241de2a6d00a790e17cc60ea4",
+          "public": {
+            "bytes": 2076,
+            "name": "command-01.sh.txt",
+            "sha256": "d5284bacfe51e25b0a9ef3df84f2c5fc4b11fe179f3db6fd165f075638516b70"
+          }
+        },
+        {
+          "path": "root-2603/command-01-python-01.py.txt",
+          "private_original_bytes": 1988,
+          "private_original_sha256": "3ab06af116be3672c9969e826e13ea55bf83ae80f00b4ffbfd796cd073b347c3",
+          "public": {
+            "bytes": 2058,
+            "name": "command-01-python-01.py.txt",
+            "sha256": "c4f36e1aeb5d8e486d0af31484ab72329a90d2ec3e811db3083c5bce4c9c48db"
+          }
+        }
+      ],
+      "id": "root-2603",
+      "native_commands": [
+        {
+          "exit_code": 0,
+          "status": "completed"
+        }
+      ],
+      "purpose": "selected recovery/control/metadata producer",
+      "result_records": 1,
+      "timestamp_utc": "2026-11-26T03:03:05.793Z"
+    },
+    {
+      "files": [
+        {
+          "path": "root-2619/orchestrator.js.txt",
+          "private_original_bytes": 1257,
+          "private_original_sha256": "ae41d1496cca8dc7ae9e8798a118f4ac516c2e0066c2cf3d911396da5bc1ce6e",
+          "public": {
+            "bytes": 1291,
+            "name": "orchestrator.js.txt",
+            "sha256": "6db915e98a0ae15f536d375d83bba474ebb52be685d0e6ef2bd1ea8cbef2f862"
+          }
+        },
+        {
+          "path": "root-2619/command-01.sh.txt",
+          "private_original_bytes": 1019,
+          "private_original_sha256": "ac27e6bf7653d2629907a59353cf57d41528dd2aa504da6edfb583dc2b40d51c",
+          "public": {
+            "bytes": 1053,
+            "name": "command-01.sh.txt",
+            "sha256": "6f2e924088af7392a63080af08920b045f340973ba60cf54d99b2dee89506192"
+          }
+        },
+        {
+          "path": "root-2619/command-01-python-01.py.txt",
+          "private_original_bytes": 1001,
+          "private_original_sha256": "b48f1461d4f78f203c71bf8c7d1918bb7d2a1ec57093218d6f89e6679fa37b7f",
+          "public": {
+            "bytes": 1035,
+            "name": "command-01-python-01.py.txt",
+            "sha256": "d5bb460ed3a0fdc0adc619e3d1b36a0fbaeb8c656321228f71db10bf49083d18"
+          }
+        }
+      ],
+      "id": "root-2619",
+      "native_commands": [
+        {
+          "exit_code": 0,
+          "status": "completed"
+        }
+      ],
+      "purpose": "selected recovery/control/metadata producer",
+      "result_records": 1,
+      "timestamp_utc": "2026-11-26T03:03:22.624Z"
+    },
+    {
+      "files": [
+        {
+          "path": "root-2633/orchestrator.js.txt",
+          "private_original_bytes": 2063,
+          "private_original_sha256": "1eb0c04dbcff10d3e2d57fd5efd14626e897fac2b948deeb01951786ba7d1213",
+          "public": {
+            "bytes": 2102,
+            "name": "orchestrator.js.txt",
+            "sha256": "2bf5034a67576e0ef9c7bcc5bb02036ad7be49b2ecd0de78a2144243b3e0dd4a"
+          }
+        },
+        {
+          "path": "root-2633/command-01.sh.txt",
+          "private_original_bytes": 1766,
+          "private_original_sha256": "e18696cbc8db65321a3abf0425469fb2b74403b13c9854070e696b3cedcdfa49",
+          "public": {
+            "bytes": 1805,
+            "name": "command-01.sh.txt",
+            "sha256": "c3c65d9e0fae54b7f85184b14b2d392de4ce476289aba65b8dce16eb8811f835"
+          }
+        },
+        {
+          "path": "root-2633/command-01-python-01.py.txt",
+          "private_original_bytes": 1748,
+          "private_original_sha256": "ec38d01542c8bcd5f5a2334a0229f46a241ccf9c1dd842eebe516a28c9bb2eae",
+          "public": {
+            "bytes": 1787,
+            "name": "command-01-python-01.py.txt",
+            "sha256": "87213bf4bcef6ad7a94f3f786c7447cb2e64c224c9d8f01c757f402322d7e9dc"
+          }
+        }
+      ],
+      "id": "root-2633",
+      "native_commands": [
+        {
+          "exit_code": 0,
+          "status": "completed"
+        }
+      ],
+      "purpose": "selected recovery/control/metadata producer",
+      "result_records": 1,
+      "timestamp_utc": "2026-11-26T03:03:39.531Z"
+    },
+    {
+      "files": [
+        {
+          "path": "root-2647/orchestrator.js.txt",
+          "private_original_bytes": 2123,
+          "private_original_sha256": "c30c758aaac44ca666fe2a808c74dca2b04e5eb36d78bf412009fc7f09f73d56",
+          "public": {
+            "bytes": 2211,
+            "name": "orchestrator.js.txt",
+            "sha256": "97eec4758ec295f85ff4eebd5fb27991fce5fd5e3b1c337f6f10243415c3960f"
+          }
+        },
+        {
+          "path": "root-2647/command-01.sh.txt",
+          "private_original_bytes": 1804,
+          "private_original_sha256": "33b52576c9e6e36936297a251271d62b243473cda25f5c2783ff9a50e7e3cc37",
+          "public": {
+            "bytes": 1892,
+            "name": "command-01.sh.txt",
+            "sha256": "dad69dbdfa6dc1239df4b75b02813d2228295dc17f720e097d3c33f04b0e460a"
+          }
+        },
+        {
+          "path": "root-2647/command-01-python-01.py.txt",
+          "private_original_bytes": 1786,
+          "private_original_sha256": "4e0f4bcf10ce54d022ffd850b745e6d949f7279fd14f413b22069734c80aa3cd",
+          "public": {
+            "bytes": 1874,
+            "name": "command-01-python-01.py.txt",
+            "sha256": "1e9bd909bde51fda60266191aab1367292fcbac068c0ecd0216eec4945f43d58"
+          }
+        }
+      ],
+      "id": "root-2647",
+      "native_commands": [
+        {
+          "exit_code": 0,
+          "status": "completed"
+        }
+      ],
+      "purpose": "selected recovery/control/metadata producer",
+      "result_records": 1,
+      "timestamp_utc": "2026-11-26T03:04:01.789Z"
+    },
+    {
+      "files": [
+        {
+          "path": "root-2661/orchestrator.js.txt",
+          "private_original_bytes": 972,
+          "private_original_sha256": "5158083bf04b4d05c91a3a8537da891f0a3506d339efad8b2e4b036b40cce7c9",
+          "public": {
+            "bytes": 993,
+            "name": "orchestrator.js.txt",
+            "sha256": "827bd79375820ee864cc1515c15d3bcde46bd9bb8c42ebaeedd5b5e63951582a"
+          }
+        },
+        {
+          "path": "root-2661/command-01.sh.txt",
+          "private_original_bytes": 721,
+          "private_original_sha256": "0ae5e8f32c6a4f72bb204ec612f06a23b6ef4849140590254fd4bd8641615487",
+          "public": {
+            "bytes": 742,
+            "name": "command-01.sh.txt",
+            "sha256": "570e763b8f57e3ba887a289af3f23176e5a82db39d1604dcb87e6a0420a1fdbe"
+          }
+        },
+        {
+          "path": "root-2661/command-01-python-01.py.txt",
+          "private_original_bytes": 703,
+          "private_original_sha256": "5421a10c124659e789c938be242c34875883abeaa4ec0022219a679185daac75",
+          "public": {
+            "bytes": 724,
+            "name": "command-01-python-01.py.txt",
+            "sha256": "44704c33755da0df6d3fa8e1b1e98a695e6c26c4d3e6eaeb3912b3119e34a3b8"
+          }
+        }
+      ],
+      "id": "root-2661",
+      "native_commands": [
+        {
+          "exit_code": 0,
+          "status": "completed"
+        }
+      ],
+      "purpose": "selected recovery/control/metadata producer",
+      "result_records": 1,
+      "timestamp_utc": "2026-11-26T03:04:19.401Z"
+    },
+    {
+      "files": [
+        {
+          "path": "root-2675/orchestrator.js.txt",
+          "private_original_bytes": 710,
+          "private_original_sha256": "801d0edb1143e6f4a64a5d9f171967c2c2523d0e36fb8ed561d2a63ae8b25fdb",
+          "public": {
+            "bytes": 731,
+            "name": "orchestrator.js.txt",
+            "sha256": "c5154fdfcf8e0a873668e4982e5204d912ed8ebfd9adc6f09f629f0b0933b266"
+          }
+        },
+        {
+          "path": "root-2675/command-01.sh.txt",
+          "private_original_bytes": 460,
+          "private_original_sha256": "669c628e38fd5f1bb16e65d7cf22e34b1777ea3e590356ef208379db315afe3c",
+          "public": {
+            "bytes": 481,
+            "name": "command-01.sh.txt",
+            "sha256": "e00b737f9e93c522665f5410f6750aac84dfe291e22215751db6735ca7715032"
+          }
+        },
+        {
+          "path": "root-2675/command-01-python-01.py.txt",
+          "private_original_bytes": 442,
+          "private_original_sha256": "a70d0693a211ee47db41a46db96b45cd4c63e0f5de57e3d22d67a4fd9b6c5679",
+          "public": {
+            "bytes": 463,
+            "name": "command-01-python-01.py.txt",
+            "sha256": "695829a75ffb70ea6116a4adf1263a064f6a444153ec60ca4601ef78ab35edad"
+          }
+        }
+      ],
+      "id": "root-2675",
+      "native_commands": [
+        {
+          "exit_code": 0,
+          "status": "completed"
+        }
+      ],
+      "purpose": "selected recovery/control/metadata producer",
+      "result_records": 1,
+      "timestamp_utc": "2026-11-26T03:04:32.074Z"
+    },
+    {
+      "files": [
+        {
+          "path": "root-2691/orchestrator.js.txt",
+          "private_original_bytes": 1978,
+          "private_original_sha256": "10ca94079852e39a9849ebef8e8485dc034a7308057ff6185a2dcdf85b58a6d6",
+          "public": {
+            "bytes": 2008,
+            "name": "orchestrator.js.txt",
+            "sha256": "9dd9939fcfb012092c8fc36e44a2930adf94fd69accca5083eee22cb5aa307e4"
+          }
+        },
+        {
+          "path": "root-2691/command-01.sh.txt",
+          "private_original_bytes": 1696,
+          "private_original_sha256": "ac1ca469dcddcd62146c1aa10a12616cf05a524054fa27e7571c918f0a23891e",
+          "public": {
+            "bytes": 1726,
+            "name": "command-01.sh.txt",
+            "sha256": "27a9e17b14a84d16bdafe0a079a4be12e6d64fca430047f8bd05bb4ab2b5b3e4"
+          }
+        },
+        {
+          "path": "root-2691/command-01-python-01.py.txt",
+          "private_original_bytes": 1678,
+          "private_original_sha256": "1c238a770e6f4f635f73bfb3832c40ec00dc638440efede8cc705f97ea9730ff",
+          "public": {
+            "bytes": 1708,
+            "name": "command-01-python-01.py.txt",
+            "sha256": "9f8376faa3f7168c5b600f53adfa13d2bb73ce62a76907d05f3f69052890ea28"
+          }
+        }
+      ],
+      "id": "root-2691",
+      "native_commands": [
+        {
+          "exit_code": 0,
+          "status": "completed"
+        }
+      ],
+      "purpose": "selected recovery/control/metadata producer",
+      "result_records": 1,
+      "timestamp_utc": "2026-11-26T03:04:51.032Z"
+    },
+    {
+      "files": [
+        {
+          "path": "root-2703/orchestrator.js.txt",
+          "private_original_bytes": 932,
+          "private_original_sha256": "1789bd443ecd32054d6551c2661f7959db02d270494fc56f45670c4045c00f26",
+          "public": {
+            "bytes": 966,
+            "name": "orchestrator.js.txt",
+            "sha256": "9fcdede6200c02ad4816863cf815b0345f704c15e437230018e07cb1e4e1b91c"
+          }
+        },
+        {
+          "path": "root-2703/command-01.sh.txt",
+          "private_original_bytes": 677,
+          "private_original_sha256": "372759912260de07336bafebdb1fe41c7395b0c7c63bfe0c331680c955ede649",
+          "public": {
+            "bytes": 711,
+            "name": "command-01.sh.txt",
+            "sha256": "104280522170550dc1122a4d400bfa3b438ccce643110da7246ac03cf85174d5"
+          }
+        },
+        {
+          "path": "root-2703/command-01-python-01.py.txt",
+          "private_original_bytes": 659,
+          "private_original_sha256": "88c32562bdc48914aacd3c4cf0013215bd1834b1d89a0ddc5049e5abcfe9916a",
+          "public": {
+            "bytes": 693,
+            "name": "command-01-python-01.py.txt",
+            "sha256": "369c9d40c41c8952fe1f49c84a0ab7d7dc53885eb35f515b29db2455a1d26f88"
+          }
+        }
+      ],
+      "id": "root-2703",
+      "native_commands": [
+        {
+          "exit_code": 0,
+          "status": "completed"
+        }
+      ],
+      "purpose": "selected recovery/control/metadata producer",
+      "result_records": 1,
+      "timestamp_utc": "2026-11-26T03:05:03.454Z"
+    },
+    {
+      "files": [
+        {
+          "path": "root-2857/orchestrator.js.txt",
+          "private_original_bytes": 1767,
+          "private_original_sha256": "5f6714238800801276d7bf785bd9063efd70667fd3a24c5523bf82fc41519239",
+          "public": {
+            "bytes": 1765,
+            "name": "orchestrator.js.txt",
+            "sha256": "c4152f438e4b8dff2daddac79a0eb913a2db4c407453b107910022675641bd08"
+          }
+        },
+        {
+          "path": "root-2857/command-01.sh.txt",
+          "private_original_bytes": 1490,
+          "private_original_sha256": "c3535e0b1d1006112ee2df9125f1c8ec000c1bb9cbd149d1bee784f185fde59c",
+          "public": {
+            "bytes": 1488,
+            "name": "command-01.sh.txt",
+            "sha256": "ec3f59461168df31a991e17b28322852ca60f0d0895bfbcb1b27d490d3e4f851"
+          }
+        },
+        {
+          "path": "root-2857/command-01-python-01.py.txt",
+          "private_original_bytes": 1472,
+          "private_original_sha256": "4499a628aac70e9c704e65e7939f95e2b13319c4be67ae2a5b373d3110b4181a",
+          "public": {
+            "bytes": 1470,
+            "name": "command-01-python-01.py.txt",
+            "sha256": "2f5f965681f8c30f4f6cab3f2ba7d0f90987f9481d01ef821f0631850f6606c0"
+          }
+        }
+      ],
+      "id": "root-2857",
+      "native_commands": [
+        {
+          "exit_code": 0,
+          "status": "completed"
+        }
+      ],
+      "purpose": "selected recovery/control/metadata producer",
+      "result_records": 1,
+      "timestamp_utc": "2026-11-26T03:07:40.712Z"
+    },
+    {
+      "files": [
+        {
+          "path": "root-2862/orchestrator.js.txt",
+          "private_original_bytes": 747,
+          "private_original_sha256": "e1e50df6ece14200d50162d9fcf9935f1e66ed4566eab07597ada586c0f209fb",
+          "public": {
+            "bytes": 768,
+            "name": "orchestrator.js.txt",
+            "sha256": "7b48c319ecc65d37ce93b7005183bd2e6311c11d9bc3c6b35db98dfe2f1d023c"
+          }
+        },
+        {
+          "path": "root-2862/command-01.sh.txt",
+          "private_original_bytes": 520,
+          "private_original_sha256": "6bcd570529e4817a28f8567ee6146ce48dee63ee05f1225f73ca41adc6e332fe",
+          "public": {
+            "bytes": 541,
+            "name": "command-01.sh.txt",
+            "sha256": "a5a27154917721b1f66ff19f4a2dae3b857b26ccf5cf83ee06ab964b20ab8f83"
+          }
+        },
+        {
+          "path": "root-2862/command-01-python-01.py.txt",
+          "private_original_bytes": 502,
+          "private_original_sha256": "72758925fd5f80775afde6afc98f584b036386c3063b3e4b32c43bde681e9e5b",
+          "public": {
+            "bytes": 523,
+            "name": "command-01-python-01.py.txt",
+            "sha256": "ebe27d1946632bf186ce7549c10f6b129fb4bf85f3af223e75793457da2546ee"
+          }
+        }
+      ],
+      "id": "root-2862",
+      "native_commands": [
+        {
+          "exit_code": 1,
+          "status": "failed"
+        }
+      ],
+      "purpose": "selected recovery/control/metadata producer",
+      "result_records": 1,
+      "timestamp_utc": "2026-11-26T03:07:47.928Z"
+    },
+    {
+      "files": [
+        {
+          "path": "root-2884/orchestrator.js.txt",
+          "private_original_bytes": 1060,
+          "private_original_sha256": "9baf416ad2ed4bee1815c2808be3f3ece384538e7691f04545219e99716096bd",
+          "public": {
+            "bytes": 1097,
+            "name": "orchestrator.js.txt",
+            "sha256": "1c5f8b6a0f577a61f72562ebb1de4428146f92889068e04d881a4d56b707c638"
+          }
+        },
+        {
+          "path": "root-2884/command-01.sh.txt",
+          "private_original_bytes": 792,
+          "private_original_sha256": "a77473e7ce9990eea6756d98391ce17672bf3912157bb66b133cab1ba49bab88",
+          "public": {
+            "bytes": 829,
+            "name": "command-01.sh.txt",
+            "sha256": "d9985b16638889cf9e622c858ff50cae71a6e31a25314bca0419b9abef95b4d1"
+          }
+        },
+        {
+          "path": "root-2884/command-01-python-01.py.txt",
+          "private_original_bytes": 774,
+          "private_original_sha256": "9436f1b888e68154ca9114ed97030d087054aab5be9ddad81eff330d653b6409",
+          "public": {
+            "bytes": 811,
+            "name": "command-01-python-01.py.txt",
+            "sha256": "9bd97243ad4b6347691d271929f8a4bfebf0d91a4380037f913f4d3e244e0505"
+          }
+        }
+      ],
+      "id": "root-2884",
+      "native_commands": [
+        {
+          "exit_code": 0,
+          "status": "completed"
+        }
+      ],
+      "purpose": "selected recovery/control/metadata producer",
+      "result_records": 1,
+      "timestamp_utc": "2026-11-26T03:08:06.961Z"
+    },
+    {
+      "files": [
+        {
+          "path": "root-2954/orchestrator.js.txt",
+          "private_original_bytes": 1910,
+          "private_original_sha256": "f3dc22f941203e35e5417749766b7bf04c49f92b9f0c674ce4ac2680838a9308",
+          "public": {
+            "bytes": 1924,
+            "name": "orchestrator.js.txt",
+            "sha256": "195e7c43339b95c3822422a67b5cae0bc994807052fd612bc4aa54df1ac7a32b"
+          }
+        },
+        {
+          "path": "root-2954/command-01.sh.txt",
+          "private_original_bytes": 1599,
+          "private_original_sha256": "da5fcccc7ad3963e32e3bc62ddb4cf9f890492f96d93cdebbdf85b19b89f8c5c",
+          "public": {
+            "bytes": 1613,
+            "name": "command-01.sh.txt",
+            "sha256": "a5400ecbc292bf030371b974f636a7bc2329e8f666c8ee971dd9b7c54d766931"
+          }
+        },
+        {
+          "path": "root-2954/command-01-python-01.py.txt",
+          "private_original_bytes": 1545,
+          "private_original_sha256": "d70527eca32787c08ecb6de0c64e98d97b3dda16ae8afae2f7275ef58d9e1a7b",
+          "public": {
+            "bytes": 1559,
+            "name": "command-01-python-01.py.txt",
+            "sha256": "d117df753a3578dbdbea5e25d3d13c46e19c268e4caf81ec76cc2de414245e8e"
+          }
+        }
+      ],
+      "id": "root-2954",
+      "native_commands": [
+        {
+          "exit_code": 0,
+          "status": "completed"
+        }
+      ],
+      "purpose": "selected recovery/control/metadata producer",
+      "result_records": 1,
+      "timestamp_utc": "2026-11-26T04:27:08.470Z"
+    },
+    {
+      "files": [
+        {
+          "path": "root-2963/orchestrator.js.txt",
+          "private_original_bytes": 400,
+          "private_original_sha256": "68bfdd20cce97b3ec5a900baf7debae30f22ba7383666d48d439dd278af9d325",
+          "public": {
+            "bytes": 384,
+            "name": "orchestrator.js.txt",
+            "sha256": "de55ad59d95fdda7d19f126b86dfd184af0937c1025b12af0ffe816291e907e6"
+          }
+        }
+      ],
+      "id": "root-2963",
+      "native_commands": [],
+      "purpose": "selected recovery/control/metadata producer",
+      "result_records": 1,
+      "timestamp_utc": "2026-11-26T04:27:18.097Z"
+    },
+    {
+      "files": [
+        {
+          "path": "root-2975/orchestrator.js.txt",
+          "private_original_bytes": 1766,
+          "private_original_sha256": "58d20e8cfbce0f8f29e60ea6cfcd389a87df926dd70dbaac9c811e65f21899e2",
+          "public": {
+            "bytes": 1834,
+            "name": "orchestrator.js.txt",
+            "sha256": "a31dd7c050912dd795967e43f7670ae690048ed6738c8c08c4739baa17dca5e4"
+          }
+        },
+        {
+          "path": "root-2975/command-01.sh.txt",
+          "private_original_bytes": 1488,
+          "private_original_sha256": "0d02995fb746e8b3ef997586d666ea80ee49b57a328da117916153204b7ee05f",
+          "public": {
+            "bytes": 1556,
+            "name": "command-01.sh.txt",
+            "sha256": "21f341749d70431a49e6786ec33015594e878bc7b765c00f8910e63780a3b8b5"
+          }
+        },
+        {
+          "path": "root-2975/command-01-python-01.py.txt",
+          "private_original_bytes": 1470,
+          "private_original_sha256": "de4bcd5692fe2cc8248c0d4e446891da0d420756581a2ad94470508e6ed56eb9",
+          "public": {
+            "bytes": 1538,
+            "name": "command-01-python-01.py.txt",
+            "sha256": "1eb0d10d27ac97bd03d37ab71ef7422687b1c5271273bf446bb79fbe853e01e5"
+          }
+        }
+      ],
+      "id": "root-2975",
+      "native_commands": [
+        {
+          "exit_code": 0,
+          "status": "completed"
+        }
+      ],
+      "purpose": "selected recovery/control/metadata producer",
+      "result_records": 1,
+      "timestamp_utc": "2026-11-26T04:27:39.425Z"
+    },
+    {
+      "files": [
+        {
+          "path": "root-2980/orchestrator.js.txt",
+          "private_original_bytes": 939,
+          "private_original_sha256": "998523f60bad3339ffeb1c277e982d862adebfb7e383a0c6e53b4e21167b1547",
+          "public": {
+            "bytes": 968,
+            "name": "orchestrator.js.txt",
+            "sha256": "203f2c5f6b53079df384e5fcbf65d0e905231f999b5ced3c7761a9895d28d734"
+          }
+        },
+        {
+          "path": "root-2980/command-01.sh.txt",
+          "private_original_bytes": 724,
+          "private_original_sha256": "c635374c08db9ef66da8b57c916abc359e38bc1e38535346e4006dbba0630ad6",
+          "public": {
+            "bytes": 753,
+            "name": "command-01.sh.txt",
+            "sha256": "cc81d4d9c7341496a627bf620bf76d9d50dec54ced4182d40f8581a94328af9c"
+          }
+        },
+        {
+          "path": "root-2980/command-01-python-01.py.txt",
+          "private_original_bytes": 706,
+          "private_original_sha256": "8decd77d23c8d118549ed8bd67a1c364826065f5d76fb41067e6ceb1b9339ae6",
+          "public": {
+            "bytes": 735,
+            "name": "command-01-python-01.py.txt",
+            "sha256": "addcc509e5e903c48dd28735fa9bff9e29c2391eb2ff13e0b35861cfcafcb1e3"
+          }
+        }
+      ],
+      "id": "root-2980",
+      "native_commands": [
+        {
+          "exit_code": 0,
+          "status": "completed"
+        }
+      ],
+      "purpose": "selected recovery/control/metadata producer",
+      "result_records": 1,
+      "timestamp_utc": "2026-11-26T04:27:46.602Z"
+    },
+    {
+      "files": [
+        {
+          "path": "root-2992/orchestrator.js.txt",
+          "private_original_bytes": 2455,
+          "private_original_sha256": "4377126f8166f86aaa9d21eeb1fa0a27ba862b55693fb396e4824f7131ec7b9f",
+          "public": {
+            "bytes": 2464,
+            "name": "orchestrator.js.txt",
+            "sha256": "9cc2818c89ae6be6e085665e7e51793ffa160557053318c4d6f7383cf80d028d"
+          }
+        },
+        {
+          "path": "root-2992/command-01.sh.txt",
+          "private_original_bytes": 2132,
+          "private_original_sha256": "167204cf3240b02e856ca997c108cf98ec66f5738d60aa42bd52f3534d19f9df",
+          "public": {
+            "bytes": 2141,
+            "name": "command-01.sh.txt",
+            "sha256": "33a158348ed686b040a000e1d59fd10d6320ebb3324d14823dcbf143784c49ab"
+          }
+        },
+        {
+          "path": "root-2992/command-01-python-01.py.txt",
+          "private_original_bytes": 2107,
+          "private_original_sha256": "af869b9448f130b05901c9634425e4b993b209dd2dbea872032ac30e4b1772a9",
+          "public": {
+            "bytes": 2116,
+            "name": "command-01-python-01.py.txt",
+            "sha256": "1a1c33d9140cd86726f3f004afa3b2fd52ab9dc8c59505b54776965433a757b4"
+          }
+        }
+      ],
+      "id": "root-2992",
+      "native_commands": [
+        {
+          "exit_code": 0,
+          "status": "completed"
+        }
+      ],
+      "purpose": "selected recovery/control/metadata producer",
+      "result_records": 1,
+      "timestamp_utc": "2026-11-26T04:28:13.000Z"
+    },
+    {
+      "files": [
+        {
+          "path": "root-3016/orchestrator.js.txt",
+          "private_original_bytes": 1980,
+          "private_original_sha256": "6924924886aba8dc5818fe2d66668fb1daa39da0cfbeaeb0492c9a0e177cf66e",
+          "public": {
+            "bytes": 2003,
+            "name": "orchestrator.js.txt",
+            "sha256": "c90101932c20ded317f65f8c281fe63bd586f6a60e1d3e6b125d1e3ff24b9044"
+          }
+        },
+        {
+          "path": "root-3016/command-01.sh.txt",
+          "private_original_bytes": 1671,
+          "private_original_sha256": "19c034f6403d6f60334473cfa22fb2e7108bcf9be8a78887612320eebe1d2098",
+          "public": {
+            "bytes": 1694,
+            "name": "command-01.sh.txt",
+            "sha256": "363497d400a893df89c7dd15f4589fe554110709373d0dd8d7670690edce71f6"
+          }
+        },
+        {
+          "path": "root-3016/command-01-python-01.py.txt",
+          "private_original_bytes": 1653,
+          "private_original_sha256": "731a6c36d40aa03accb16155955e181a705029abc78e61a951003136c7be4f19",
+          "public": {
+            "bytes": 1676,
+            "name": "command-01-python-01.py.txt",
+            "sha256": "0c2bcb0586c80ccdffdb3265dd97cb5fe014d2c63bc3019dd4ffb31fbb0114ca"
+          }
+        }
+      ],
+      "id": "root-3016",
+      "native_commands": [
+        {
+          "exit_code": 0,
+          "status": "completed"
+        }
+      ],
+      "purpose": "selected recovery/control/metadata producer",
+      "result_records": 1,
+      "timestamp_utc": "2026-11-26T04:28:41.062Z"
+    },
+    {
+      "files": [
+        {
+          "path": "root-3042/orchestrator.js.txt",
+          "private_original_bytes": 1721,
+          "private_original_sha256": "1c52df7b79cb43c5957459b92f009a718f05ec232643c964d7178df7aae8aae6",
+          "public": {
+            "bytes": 1763,
+            "name": "orchestrator.js.txt",
+            "sha256": "a1426925f062fdaf45ab0f93630aaf13314e89e3f32d06aba0291793a79d83f6"
+          }
+        },
+        {
+          "path": "root-3042/command-01.sh.txt",
+          "private_original_bytes": 1437,
+          "private_original_sha256": "75aa800c8d32a500c3aa8bcfb695f5daa41cfdfbfae20053d46e9f379a746d89",
+          "public": {
+            "bytes": 1479,
+            "name": "command-01.sh.txt",
+            "sha256": "b9ed7b0f9384d510f1d76edf93c6d5d5b9f52f933edfa44ec3073a4db372a54c"
+          }
+        },
+        {
+          "path": "root-3042/command-01-python-01.py.txt",
+          "private_original_bytes": 1419,
+          "private_original_sha256": "363a93bab8024df6a920ae0206557128a2409a2fb9c7c46e45fc6c0653373329",
+          "public": {
+            "bytes": 1461,
+            "name": "command-01-python-01.py.txt",
+            "sha256": "fd98cd38c4ee257f272512f3905109eb1daf3de626c308a985d25fe1787304af"
+          }
+        }
+      ],
+      "id": "root-3042",
+      "native_commands": [
+        {
+          "exit_code": 0,
+          "status": "completed"
+        }
+      ],
+      "purpose": "selected recovery/control/metadata producer",
+      "result_records": 1,
+      "timestamp_utc": "2026-11-26T04:29:14.820Z"
+    },
+    {
+      "files": [
+        {
+          "path": "root-3047/orchestrator.js.txt",
+          "private_original_bytes": 1077,
+          "private_original_sha256": "2ce280d2465de58a48fa8b004f4374b7bdfd31d46b754ae19554e1fd1f326059",
+          "public": {
+            "bytes": 1086,
+            "name": "orchestrator.js.txt",
+            "sha256": "26f7e48b67e69ce93c4afcef727ec8b56bea2be31d1a39cd1c81b24143d39845"
+          }
+        },
+        {
+          "path": "root-3047/command-01.sh.txt",
+          "private_original_bytes": 860,
+          "private_original_sha256": "9622f6763b1f55a00abea0c1b7016fd3f694ce02ffb87b84d99dd6981810dba4",
+          "public": {
+            "bytes": 869,
+            "name": "command-01.sh.txt",
+            "sha256": "dea10bc6041146710821d3bf611b0bd3157bbf70876ccc3ac6df31c896e564c0"
+          }
+        },
+        {
+          "path": "root-3047/command-01-python-01.py.txt",
+          "private_original_bytes": 842,
+          "private_original_sha256": "63813691f683e0682d54461a292862c91c249435e512ed047c3e8eaa8ab327e5",
+          "public": {
+            "bytes": 851,
+            "name": "command-01-python-01.py.txt",
+            "sha256": "26f01d0dd7b98c2c8a51449f04c0abf0b81070d95510e2c4c95ae1db3b7d514b"
+          }
+        }
+      ],
+      "id": "root-3047",
+      "native_commands": [
+        {
+          "exit_code": 0,
+          "status": "completed"
+        }
+      ],
+      "purpose": "selected recovery/control/metadata producer",
+      "result_records": 1,
+      "timestamp_utc": "2026-11-26T04:29:22.444Z"
+    },
+    {
+      "files": [
+        {
+          "path": "root-3054/orchestrator.js.txt",
+          "private_original_bytes": 1395,
+          "private_original_sha256": "6005378bc88ea94ee32bcebd3d26b3bd454b3cf53bcaccd30e96f94d2b0892a7",
+          "public": {
+            "bytes": 1381,
+            "name": "orchestrator.js.txt",
+            "sha256": "c0d6525ca45eb9f23d2747b2d7d93771f4fa904107346e0236cbba2166fa05ce"
+          }
+        },
+        {
+          "path": "root-3054/command-01.sh.txt",
+          "private_original_bytes": 1113,
+          "private_original_sha256": "7dfceafb460b04d8df292b8fabe29a2907e21a4407697dedb7cdad563762a77d",
+          "public": {
+            "bytes": 1099,
+            "name": "command-01.sh.txt",
+            "sha256": "85cbf63d2046073ae35a865d01f125d9a5b0063f5036ee954f8c74d165995568"
+          }
+        },
+        {
+          "path": "root-3054/command-01-python-01.py.txt",
+          "private_original_bytes": 1095,
+          "private_original_sha256": "4ad8d27e68c9aad1c0f6c985111a7911fe6e6954dc3763b3e20506e98a2c928e",
+          "public": {
+            "bytes": 1081,
+            "name": "command-01-python-01.py.txt",
+            "sha256": "8c5e2224065e94b8f6d6e4cebebb73aa718cb6f3bc8237f37ad81179030f3f90"
+          }
+        }
+      ],
+      "id": "root-3054",
+      "native_commands": [
+        {
+          "exit_code": 0,
+          "status": "completed"
+        }
+      ],
+      "purpose": "selected recovery/control/metadata producer",
+      "result_records": 1,
+      "timestamp_utc": "2026-11-26T04:29:34.222Z"
+    },
+    {
+      "files": [
+        {
+          "path": "root-3074/orchestrator.js.txt",
+          "private_original_bytes": 2176,
+          "private_original_sha256": "57d2723eccb081e7233284fde8a4c111362bb87fbcae6c89fdb09aa5069f4cf1",
+          "public": {
+            "bytes": 2171,
+            "name": "orchestrator.js.txt",
+            "sha256": "15fa06da1bb3902eaf8b1e4a543970c117de148e95f5e42e44a5089d2b4df79a"
+          }
+        },
+        {
+          "path": "root-3074/command-01.sh.txt",
+          "private_original_bytes": 1883,
+          "private_original_sha256": "b092357b5821c5b160fd212746404719ddb0024c534b789f3f935bd308d75b29",
+          "public": {
+            "bytes": 1878,
+            "name": "command-01.sh.txt",
+            "sha256": "b8795b1e158a64250ff324d26240afb14a3da8f777690d59565dcfd68f192a45"
+          }
+        },
+        {
+          "path": "root-3074/command-01-python-01.py.txt",
+          "private_original_bytes": 1865,
+          "private_original_sha256": "bc19e4c7711cfca38f33b8d25049f4e7928e497abf7edd8a447b956a8ad6264c",
+          "public": {
+            "bytes": 1860,
+            "name": "command-01-python-01.py.txt",
+            "sha256": "4b3b8fb4a9a65f75ec0708d9ee4e98b2bb8e75c45438445b58b32885a4c191b0"
+          }
+        }
+      ],
+      "id": "root-3074",
+      "native_commands": [
+        {
+          "exit_code": 0,
+          "status": "completed"
+        }
+      ],
+      "purpose": "selected recovery/control/metadata producer",
+      "result_records": 1,
+      "timestamp_utc": "2026-11-26T04:29:56.548Z"
+    },
+    {
+      "files": [
+        {
+          "path": "root-3091/orchestrator.js.txt",
+          "private_original_bytes": 1841,
+          "private_original_sha256": "7a726add805ff07ed67d666357c212ef33b4b86f12b75e9911706d7731e9a343",
+          "public": {
+            "bytes": 1870,
+            "name": "orchestrator.js.txt",
+            "sha256": "e6bbc7444e4048b3b398628df1adaf0a862977324f04ab68dffac81c84597b01"
+          }
+        },
+        {
+          "path": "root-3091/command-01.sh.txt",
+          "private_original_bytes": 1583,
+          "private_original_sha256": "3042e01d9ec400f83f013338febad40bb9f680d6d43e607e3ddb2dc239a79455",
+          "public": {
+            "bytes": 1612,
+            "name": "command-01.sh.txt",
+            "sha256": "fc84dcaac3c0f7aa6488e7c89e72832bee3d6e6ee6a5d958c3ed54765cc193a7"
+          }
+        },
+        {
+          "path": "root-3091/command-01-python-01.py.txt",
+          "private_original_bytes": 1565,
+          "private_original_sha256": "50f618e4329c15b5b16e7324637fb724b3d30eb4989a7a0fe3453f0702c12595",
+          "public": {
+            "bytes": 1594,
+            "name": "command-01-python-01.py.txt",
+            "sha256": "18af2438a39d5f3e955eb6c54099a109a0c6fc0e399fe3b34e11ee609a07090e"
+          }
+        }
+      ],
+      "id": "root-3091",
+      "native_commands": [
+        {
+          "exit_code": 0,
+          "status": "completed"
+        }
+      ],
+      "purpose": "selected recovery/control/metadata producer",
+      "result_records": 1,
+      "timestamp_utc": "2026-11-26T04:30:12.560Z"
+    },
+    {
+      "files": [
+        {
+          "path": "root-3101/orchestrator.js.txt",
+          "private_original_bytes": 1127,
+          "private_original_sha256": "305163dc2174b27504e8afc3d3df30dfb1f184ccfc9fd1f6b16523a48d548162",
+          "public": {
+            "bytes": 1169,
+            "name": "orchestrator.js.txt",
+            "sha256": "2d5f341a78accf0a9fb2f0f1004a248a53a00fbce30b8460df83f7efb512372f"
+          }
+        },
+        {
+          "path": "root-3101/command-01.sh.txt",
+          "private_original_bytes": 908,
+          "private_original_sha256": "1d1b6b90b7c502ef8614794635c059cca3b3c7e05c6b991fdddd978db5edebc8",
+          "public": {
+            "bytes": 950,
+            "name": "command-01.sh.txt",
+            "sha256": "075586e06134cec091dd3fd6f8b670072ddf552e3a3b4151cb8f0a16dc4df7b7"
+          }
+        },
+        {
+          "path": "root-3101/command-01-python-01.py.txt",
+          "private_original_bytes": 890,
+          "private_original_sha256": "ca5f83b43572586548795133cbcfaf5427868f0be3496c2c345e35deeb343ef4",
+          "public": {
+            "bytes": 932,
+            "name": "command-01-python-01.py.txt",
+            "sha256": "31156866c4bc35032ba53b5b95a2178e7229ccbacd739fb222394b9c2ffa9b4c"
+          }
+        }
+      ],
+      "id": "root-3101",
+      "native_commands": [
+        {
+          "exit_code": 0,
+          "status": "completed"
+        }
+      ],
+      "purpose": "selected recovery/control/metadata producer",
+      "result_records": 1,
+      "timestamp_utc": "2026-11-26T04:30:23.594Z"
+    },
+    {
+      "files": [
+        {
+          "path": "metadata-1265/orchestrator.js.txt",
+          "private_original_bytes": 9566,
+          "private_original_sha256": "869ba14d997c9bfd927cea07846475281b88c73dc924eb865027eb771142397a",
+          "public": {
+            "bytes": 9546,
+            "name": "orchestrator.js.txt",
+            "sha256": "7f042c8f868448aa0fa471dec30aff37e734953e881d9e6dbd0706c3b0de2d84"
+          }
+        },
+        {
+          "path": "metadata-1265/command-01.sh.txt",
+          "private_original_bytes": 9174,
+          "private_original_sha256": "65954ee78c41a9963d76f032f75ae84846ca44de9bd12f5c26083d99af86c982",
+          "public": {
+            "bytes": 9154,
+            "name": "command-01.sh.txt",
+            "sha256": "396ca9ca52868a16dab851b14d58b7b00d4baffc45d6323808950c79a4f7c3b7"
+          }
+        },
+        {
+          "path": "metadata-1265/command-01-python-01.py.txt",
+          "private_original_bytes": 9155,
+          "private_original_sha256": "e5728d11024ec5427a2ca2d5266fd5fd683ea334009c6eb04ba3dbc81f59a716",
+          "public": {
+            "bytes": 9135,
+            "name": "command-01-python-01.py.txt",
+            "sha256": "2f102324ff26f0fd1c2c715882611421b5c943af76ddd1a02835c40aad450d8f"
+          }
+        }
+      ],
+      "id": "metadata-1265",
+      "native_commands": [
+        {
+          "exit_code": 0,
+          "status": "completed"
+        }
+      ],
+      "purpose": "selected recovery/control/metadata producer",
+      "result_records": 1,
+      "timestamp_utc": "2026-11-26T03:05:38.636Z"
+    },
+    {
+      "files": [
+        {
+          "path": "metadata-1332/orchestrator.js.txt",
+          "private_original_bytes": 19513,
+          "private_original_sha256": "5dc32a4a4c90e7488a6e98db5c111a828f5ce1d2463135efa8617cb57eb76c82",
+          "public": {
+            "bytes": 19700,
+            "name": "orchestrator.js.txt",
+            "sha256": "ed286efcce7cb49e928553c9a4b3962c4c25888cfe80233580da7c7e5fd53e6c"
+          }
+        },
+        {
+          "path": "metadata-1332/command-01.sh.txt",
+          "private_original_bytes": 19085,
+          "private_original_sha256": "6f029987d07efa143542644b83d2b9d1c923b055ae80f77b45c0c3c2aba86172",
+          "public": {
+            "bytes": 19272,
+            "name": "command-01.sh.txt",
+            "sha256": "df71d8c3b332e976b1c81e6932616b46051079a554ba0a5603b548507896f52a"
+          }
+        },
+        {
+          "path": "metadata-1332/command-01-python-01.py.txt",
+          "private_original_bytes": 19022,
+          "private_original_sha256": "ea368f4a29f267478bd030a91e6430318a015377da490a313bce27865fac0336",
+          "public": {
+            "bytes": 19209,
+            "name": "command-01-python-01.py.txt",
+            "sha256": "cb419ddcb2efb276e3ac2c1e9c3db813c6db5e3a9933b8886e9ca810e58979a4"
+          }
+        }
+      ],
+      "id": "metadata-1332",
+      "native_commands": [
+        {
+          "exit_code": 0,
+          "status": "completed"
+        }
+      ],
+      "purpose": "selected recovery/control/metadata producer",
+      "result_records": 1,
+      "timestamp_utc": "2026-11-26T03:08:23.077Z"
+    },
+    {
+      "files": [
+        {
+          "path": "metadata-1426/orchestrator.js.txt",
+          "private_original_bytes": 21284,
+          "private_original_sha256": "60c4f6e0f12f32180e31bdba62e1699f1c62f04e6513286f055191edf288d984",
+          "public": {
+            "bytes": 21353,
+            "name": "orchestrator.js.txt",
+            "sha256": "4e7edfcfbe86d95ab2b59bad7b5a0b11dde4005fa34bd6b989524c5689851641"
+          }
+        },
+        {
+          "path": "metadata-1426/command-01.sh.txt",
+          "private_original_bytes": 20815,
+          "private_original_sha256": "c3fa431a7ac5ccfadbea17f614eadb03aa66316dd12397fbcf089b2f575096d2",
+          "public": {
+            "bytes": 20884,
+            "name": "command-01.sh.txt",
+            "sha256": "c6d569997be86f96f6b083b5a8970960a83775f6daaf47645d80c75e64a6c661"
+          }
+        },
+        {
+          "path": "metadata-1426/command-01-python-01.py.txt",
+          "private_original_bytes": 20752,
+          "private_original_sha256": "09b39575d77cb8ccf2ea2ec9aa51eb718c11b4b1ddf460cd60e24ce13dac82bd",
+          "public": {
+            "bytes": 20821,
+            "name": "command-01-python-01.py.txt",
+            "sha256": "df2190a7af0ac3d31e0acabd6101af95a18521858ba08bf1870fe9d01caf45d5"
+          }
+        }
+      ],
+      "id": "metadata-1426",
+      "native_commands": [
+        {
+          "exit_code": 0,
+          "status": "completed"
+        }
+      ],
+      "purpose": "selected recovery/control/metadata producer",
+      "result_records": 1,
+      "timestamp_utc": "2026-11-26T04:32:36.577Z"
+    },
+    {
+      "files": [
+        {
+          "path": "review-metadata-2053/orchestrator.js.txt",
+          "private_original_bytes": 4771,
+          "private_original_sha256": "a1a7414e8380d37fbf26989dbac1e48205288d2e2ac676098a7810ca5bbdc1d4",
+          "public": {
+            "bytes": 4772,
+            "name": "orchestrator.js.txt",
+            "sha256": "1c651bc782c0918d8d21f5380aef703904dd10442a9ea0dc57a4145cf823f1ce"
+          }
+        },
+        {
+          "path": "review-metadata-2053/command-01.sh.txt",
+          "private_original_bytes": 4474,
+          "private_original_sha256": "ca4d00565548818f5b9bd1577daced54868eab216a59665d01902023ff3e8908",
+          "public": {
+            "bytes": 4475,
+            "name": "command-01.sh.txt",
+            "sha256": "7092ae4990fd183aac48cb382d93057f1cb77416c1d41cd559ab4c73bba6988e"
+          }
+        },
+        {
+          "path": "review-metadata-2053/command-01-python-01.py.txt",
+          "private_original_bytes": 4455,
+          "private_original_sha256": "85104eb494084d0072d67ac7884b4f0056e036e1449f10746bda08f1d17b3de2",
+          "public": {
+            "bytes": 4456,
+            "name": "command-01-python-01.py.txt",
+            "sha256": "3aa017b3899dc9a3bf033f83e25863bb50b40e1064ce379abf5ddb5a960c928f"
+          }
+        }
+      ],
+      "id": "review-metadata-2053",
+      "native_commands": [
+        {
+          "exit_code": 0,
+          "status": "completed"
+        }
+      ],
+      "purpose": "selected recovery/control/metadata producer",
+      "result_records": 1,
+      "timestamp_utc": "2026-11-26T03:07:38.708Z"
+    },
+    {
+      "files": [
+        {
+          "path": "review-metadata-2207/orchestrator.js.txt",
+          "private_original_bytes": 10173,
+          "private_original_sha256": "2415af62bcd395770bdcc431dcb4818ca07407bc4d8949cea1caee0901a3b673",
+          "public": {
+            "bytes": 10133,
+            "name": "orchestrator.js.txt",
+            "sha256": "5008d4b5df20a1bc584721ab466ce9a3dc97054382e8a28eb88cee64b058b59a"
+          }
+        },
+        {
+          "path": "review-metadata-2207/command-01.sh.txt",
+          "private_original_bytes": 9833,
+          "private_original_sha256": "e28275c18a45748ff650c571a339b026b0607922a2b4894436f62f67c392941b",
+          "public": {
+            "bytes": 9793,
+            "name": "command-01.sh.txt",
+            "sha256": "2507c4e042a473ac81436bc738787ad50b01c04716aa71d534e3fb940c9e13b8"
+          }
+        },
+        {
+          "path": "review-metadata-2207/command-01-python-01.py.txt",
+          "private_original_bytes": 9814,
+          "private_original_sha256": "4ff89c1dbc5d953663a498f04c2083fab3e9de09e3b52851b243a7e95a56c724",
+          "public": {
+            "bytes": 9774,
+            "name": "command-01-python-01.py.txt",
+            "sha256": "af87941dc61ff7978157b8ff4d6b4be9350d61a9caa7245ca56e6f424b6b32fb"
+          }
+        }
+      ],
+      "id": "review-metadata-2207",
+      "native_commands": [
+        {
+          "exit_code": 0,
+          "status": "completed"
+        }
+      ],
+      "purpose": "selected recovery/control/metadata producer",
+      "result_records": 1,
+      "timestamp_utc": "2026-11-26T04:29:44.668Z"
+    },
+    {
+      "files": [
+        {
+          "path": "native-recovery-1948/orchestrator.js.txt",
+          "private_original_bytes": 1494,
+          "private_original_sha256": "c33b2d895101bc51c2e06849b00b1bc9035333fa2387647269731ce6fd386f24",
+          "public": {
+            "bytes": 1494,
+            "name": "orchestrator.js.txt",
+            "sha256": "c33b2d895101bc51c2e06849b00b1bc9035333fa2387647269731ce6fd386f24"
+          }
+        },
+        {
+          "path": "native-recovery-1948/command-01.sh.txt",
+          "private_original_bytes": 236,
+          "private_original_sha256": "ba984c04034bfe33ddad02ce740320347f120c2c9c8f98790f442b4bb9673f59",
+          "public": {
+            "bytes": 236,
+            "name": "command-01.sh.txt",
+            "sha256": "ba984c04034bfe33ddad02ce740320347f120c2c9c8f98790f442b4bb9673f59"
+          }
+        },
+        {
+          "path": "native-recovery-1948/command-02.sh.txt",
+          "private_original_bytes": 1115,
+          "private_original_sha256": "adc787bea2e856dbf994fde595ca8dac5fd2d073c39f0e58941d66b73976cc54",
+          "public": {
+            "bytes": 1115,
+            "name": "command-02.sh.txt",
+            "sha256": "adc787bea2e856dbf994fde595ca8dac5fd2d073c39f0e58941d66b73976cc54"
+          }
+        }
+      ],
+      "id": "native-recovery-1948",
+      "native_commands": [
+        {
+          "exit_code": 0,
+          "status": "completed"
+        },
+        {
+          "exit_code": 0,
+          "status": "completed"
+        }
+      ],
+      "purpose": "selected recovery/control/metadata producer",
+      "result_records": 1,
+      "timestamp_utc": "2026-11-26T04:30:09.163Z"
+    },
+    {
+      "files": [
+        {
+          "path": "native-recovery-1962/orchestrator.js.txt",
+          "private_original_bytes": 7330,
+          "private_original_sha256": "85500d9419a18f29727d17899bf935aac38c9c125548028e430e984d03f513e7",
+          "public": {
+            "bytes": 7301,
+            "name": "orchestrator.js.txt",
+            "sha256": "5d99bd35cf6b634abd181288856f4e740fa43797a8ff954f028157002cd6b61a"
+          }
+        },
+        {
+          "path": "native-recovery-1962/command-01.sh.txt",
+          "private_original_bytes": 6226,
+          "private_original_sha256": "33a481707aaa3de4498c230585a76147c9b1f9315620be0b1f9d7b0fa97e0c82",
+          "public": {
+            "bytes": 6197,
+            "name": "command-01.sh.txt",
+            "sha256": "869705bd1e5f9aa80bd745cdb99d42d2ee0ec6fbe5e171a0cc9843bdbe8b695c"
+          }
+        },
+        {
+          "path": "native-recovery-1962/command-02.sh.txt",
+          "private_original_bytes": 595,
+          "private_original_sha256": "75b38bb3ad242ed0328fdf05ffa915d8931f7210c8b4e3e0ee88f0faef4c9dbd",
+          "public": {
+            "bytes": 595,
+            "name": "command-02.sh.txt",
+            "sha256": "75b38bb3ad242ed0328fdf05ffa915d8931f7210c8b4e3e0ee88f0faef4c9dbd"
+          }
+        }
+      ],
+      "id": "native-recovery-1962",
+      "native_commands": [
+        {
+          "exit_code": 0,
+          "status": "completed"
+        },
+        {
+          "exit_code": 0,
+          "status": "completed"
+        }
+      ],
+      "purpose": "selected recovery/control/metadata producer",
+      "result_records": 1,
+      "timestamp_utc": "2026-11-26T04:31:07.508Z"
+    }
+  ],
+  "issue": "https://github.com/CultureBotAI/EdgeMech/issues/228",
+  "relationship": "Inert sanitized source derived at preservation time; never used for historical execution. Private exact originals remain authoritative.",
+  "schema_version": 1
+}

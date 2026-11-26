@@ -1,0 +1,20 @@
+from pathlib import Path
+import subprocess,json,os
+from datetime import datetime,timezone
+from plugins.repository_settings import RepositorySettings,merged_repository_environment
+from plugins.lock_manager import LockManager
+p=Path('PRIVATE_HOME_021/agent-work/EdgeMech/restart-20261120');r=p/'network-canary-20261125';checkout=p/'coordinator-checkout';uuid='PRIVATE_UUID_029';binary='PRIVATE_HOME_021/.nvm/versions/node/v22.16.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex';t=['tmux','-S','PRIVATE_SOCKET_019']
+s=RepositorySettings.from_environment(environ=merged_repository_environment(Path.cwd()/'.env'));s.get_target('edgemech').open()
+origin=subprocess.check_output(['git','-C',str(checkout),'remote','get-url','origin'],text=True).strip()
+if origin!='https://github.com/CultureBotAI/EdgeMech.git':raise RuntimeError('wrong origin')
+state=subprocess.check_output(['git','-C',str(checkout),'status','--short','--branch'],text=True)
+with LockManager().lock('edgemech','recover-native-coordinator'):
+ binding=subprocess.check_output(t+['display-message','-p','-t','PRIVATE_PANE_022','#{session_name}|#{pane_id}|#{pane_dead}'],text=True).strip()
+ if binding!='PRIVATE_SESSION_020|PRIVATE_PANE_022|1':raise RuntimeError('pane is not exact exited target')
+ processes=subprocess.check_output(['ps','-axo','pid,comm,args'],text=True)
+ matches=[line for line in processes.splitlines() if len(line.split())>2 and Path(line.split()[1]).name=='codex' and uuid in line]
+ if matches:raise RuntimeError('duplicate live native client')
+ cmd=t+['respawn-pane','-t','PRIVATE_PANE_022','-c',str(checkout),binary,'--no-daemon','resume',uuid]
+ with (r/'coordinator-reopen-intent.json').open('x') as f:json.dump({'at':datetime.now(timezone.utc).isoformat(),'exact_thread':uuid,'old_process_exited':True,'duplicate_native_matches':0,'argv':cmd,'checkout_origin':origin,'git_status':state,'model_profile_permission_overrides':[]},f,indent=2);f.flush();os.fsync(f.fileno())
+ subprocess.run(cmd,check=True)
+print('Exact saved coordinator reopened; no settings overrides.')

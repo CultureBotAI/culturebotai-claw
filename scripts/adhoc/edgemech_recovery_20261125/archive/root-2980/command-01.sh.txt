@@ -1,0 +1,10 @@
+python - <<'PY'
+import subprocess,json
+from pathlib import Path
+from datetime import datetime,timezone
+p=Path('PRIVATE_HOME_021/agent-work/EdgeMech/restart-20261120/network-canary-20261125');t=['tmux','-S','PRIVATE_SOCKET_019'];s=subprocess.check_output(t+['capture-pane','-p','-t','PRIVATE_PANE_022'],text=True)
+if '› /quit' not in s or 'Goal stalled' not in s:raise RuntimeError('quit draft changed')
+(p/'coordinator-normal-quit-screen.txt').write_text(s)
+subprocess.run(t+['send-keys','-c','PRIVATE_TTY_030','-t','PRIVATE_PANE_022','Enter'],check=True)
+(p/'coordinator-normal-quit-submitted.json').write_text(json.dumps({'at':datetime.now(timezone.utc).isoformat(),'action':'submitted normal quit once','old_native_pid':PRIVATE_PID_D},indent=2))
+PY

@@ -1,0 +1,8 @@
+from pathlib import Path
+import subprocess
+p=Path('PRIVATE_HOME_021/agent-work/EdgeMech/restart-20261120/network-canary-20261125');f=p/'coordinator-recovery-followup.txt'
+f.write_text('Recovered exact saved session with unchanged model/settings. Read PRIVATE_HOME_021/agent-work/EdgeMech/restart-20261120/network-canary-20261125/recovery-handoff.md now. Preparation worker has COMPLETED at97c675ed: preserve its REPORT.md/completion.json and inspect evidence; do not repeat canary or source restoration. File/triage each PR233 finding before fixes, preserve all gates, then continue bounded campaign work. Write a dated native recovery checkpoint and reconcile FIRST-WORKER/COORDINATOR-PROGRESS; root owns ACK/progress rollup. Independent preparation artifact review is arriving from root; qualifying/publication holds remain. No login/trust/permission changes, duplicate clients, merge or other prompt answers.\n')
+t=['tmux','-S','PRIVATE_SOCKET_019'];r=lambda *a:subprocess.check_output(t+list(a),text=True);s=r('capture-pane','-p','-t','PRIVATE_PANE_022')
+if r('display-message','-p','-t','PRIVATE_PANE_022','#{pane_pid}').strip()!='PRIVATE_PID_G' or '› Ask Codex to do anything' not in s or 'Pursuing goal' not in s:raise RuntimeError('not expected resumed composer')
+subprocess.run(t+['load-buffer','-b','edge-recovery-followup',str(f)],check=True)
+subprocess.run(t+['paste-buffer','-b','edge-recovery-followup','-d','-t','PRIVATE_PANE_022'],check=True)

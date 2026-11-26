@@ -1,0 +1,9 @@
+from pathlib import Path
+import subprocess
+p=Path('PRIVATE_HOME_021/agent-work/EdgeMech/restart-20261120/resume-20261125')
+f=p/'coordinator-review-and-canary-priority.txt'
+f.write_text('Independent PR233 review at ae065236 found two blockers: >6-digit timestamp fractions truncate on pinned Python3.14, misclassifying after-cutoff assessments; nested ID/category values can copy prose into structural audit output. Qualifying use is held pending repairs/regressions and separate review; reviewer is saving resume-20261125/PR233-REVIEW.json. Preserve existing bytes/results and fix on owned reviewed branches. In parallel prioritize dispatch of the already-trusted existing worker for one EXCLUDED_PREPARATION_CANARY with actual library retrieval/private persistence and canonical save/readback; no production credit before full A/B and unchanged gates. Worker empty composer verified, threadPRIVATE_UUID_028, gpt-6-astra ultra. Write fresh coordinator/worker acceptance checkpoint and reconcile FIRST-WORKER; root owns ACK/progress rollup.\n')
+t=['tmux','-S','PRIVATE_SOCKET_019'];s=subprocess.check_output(t+['capture-pane','-p','-t','PRIVATE_PANE_022'],text=True)
+if '› Ask Codex to do anything' not in s or 'Pursuing goal' not in s:raise RuntimeError('state changed')
+subprocess.run(t+['load-buffer','-b','edge-review-canary-priority',str(f)],check=True)
+subprocess.run(t+['paste-buffer','-b','edge-review-canary-priority','-d','-t','PRIVATE_PANE_022'],check=True)

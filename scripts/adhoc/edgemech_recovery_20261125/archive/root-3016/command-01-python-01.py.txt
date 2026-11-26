@@ -1,0 +1,11 @@
+from pathlib import Path
+import subprocess,json,hashlib,os
+from datetime import datetime,timezone
+p=Path('PRIVATE_HOME_021/agent-work/EdgeMech/restart-20261120/network-canary-20261125');t=['tmux','-S','PRIVATE_SOCKET_019'];r=lambda *a:subprocess.check_output(t+list(a),text=True)
+s=r('capture-pane','-p','-t','PRIVATE_PANE_022');b=r('display-message','-p','-t','PRIVATE_PANE_022','#{session_name}|#{pane_pid}|#{pane_tty}|#{pane_current_path}').strip()
+if b!='PRIVATE_SESSION_020|PRIVATE_PID_G|PRIVATE_TTY_023|PRIVATE_HOME_021/agent-work/EdgeMech/restart-20261120/coordinator-checkout':raise RuntimeError('wrong reopened process')
+if 'Resume paused goal?' not in s or '› 1. Resume goal' not in s or '4af8b1cc2fe98032d5ff7f1d7ddb659e491310d3dfd0bcb7a370645c97048a4d.' not in s:raise RuntimeError('not exact authorized goal question')
+if any(x in s for x in ['Trust this folder?','Sign in with ChatGPT','Allow network access']):raise RuntimeError('other prompt')
+with (p/'exact-goal-resume-consumed-once.json').open('x') as f:json.dump({'at':datetime.now(timezone.utc).isoformat(),'binding':b,'thread_id':'PRIVATE_UUID_029','action':'Enter on selected Resume goal for exact existing authorized campaign','authority':'User explicitly directs recovery and continuation of this existing campaign in recovery-handoff.md','scope':'This goal-resume selection only; no login/trust/permission/merge answer','screen_sha256':hashlib.sha256(s.encode()).hexdigest(),'state':'consumed_before_input'},f,indent=2);f.flush();os.fsync(f.fileno())
+(p/'exact-goal-resume-screen.txt').write_text(s)
+subprocess.run(t+['send-keys','-c','PRIVATE_TTY_030','-t','PRIVATE_PANE_022','Enter'],check=True)

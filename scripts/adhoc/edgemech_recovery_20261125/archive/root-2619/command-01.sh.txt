@@ -1,0 +1,12 @@
+python - <<'PY'
+import subprocess,json,os
+from pathlib import Path
+from datetime import datetime,timezone
+p=Path('PRIVATE_HOME_021/agent-work/EdgeMech/restart-20261120/resume-20261125');t=['tmux','-S','PRIVATE_SOCKET_019']
+def read(*a):return subprocess.check_output(t+list(a),text=True)
+screen=read('capture-pane','-p','-t','PRIVATE_PANE_022')
+binding=read('display-message','-p','-t','PRIVATE_PANE_022','#{session_name}|#{pane_pid}|#{pane_tty}|#{pane_current_path}').strip()
+if binding!=json.loads((p/'resume-command-intent.json').read_text())['binding'] or '› /goal resume' not in screen or 'Goal stalled (/goal resume)' not in screen:raise RuntimeError('binding/composer changed')
+with (p/'resume-submit-once.json').open('x') as f:json.dump({'at':datetime.now(timezone.utc).isoformat(),'binding':binding,'action':'Enter for exact /goal resume','state':'consumed_before_input','not_a_prompt_answer':True},f,indent=2);f.flush();os.fsync(f.fileno())
+subprocess.run(t+['send-keys','-c','PRIVATE_TTY_024','-t','PRIVATE_PANE_022','Enter'],check=True)
+PY

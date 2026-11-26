@@ -1,0 +1,10 @@
+python - <<'PY'
+import subprocess,json
+from pathlib import Path
+from datetime import datetime,timezone
+p=Path('PRIVATE_HOME_021/agent-work/EdgeMech/restart-20261120/resume-20261125');t=['tmux','-S','PRIVATE_SOCKET_019']
+s=subprocess.check_output(t+['capture-pane','-p','-t','PRIVATE_PANE_025'],text=True)
+if '» /restart' not in s or (p/'worker-preserved-draft.txt').read_text()!='/restart':raise RuntimeError('draft mismatch')
+subprocess.run(t+['send-keys','-c','PRIVATE_TTY_024','-t','PRIVATE_PANE_025','End'],check=True)
+(p/'worker-cursor-adjustment.json').write_text(json.dumps({'at':datetime.now(timezone.utc).isoformat(),'previous_C_u_effect':'draft unchanged; cursor may have been at start','action':'End only; no Enter'},indent=2))
+PY

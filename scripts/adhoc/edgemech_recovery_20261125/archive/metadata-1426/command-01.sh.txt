@@ -1,0 +1,117 @@
+UV_CACHE_DIR=.temp/uv-cache uv run --no-sync python - <<'PY'
+from pathlib import Path
+from datetime import datetime, timezone
+import hashlib, json, os, subprocess
+from plugins.lock_manager import LockManager
+from plugins.repository_settings import RepositorySettings, merged_repository_environment
+
+claw=Path.cwd(); root=Path('PRIVATE_HOME_021/agent-work/EdgeMech/restart-20261120'); net=root/'network-canary-20261125'; prep=root/'preparation-worker-01/.temp/restart-preparation-01'
+settings=RepositorySettings.from_environment(environ=merged_repository_environment(claw/'.env'))
+target=settings.get_target('edgemech'); canonical=target.open()
+canonical_path=Path(canonical.working_tree_dir).resolve()
+if canonical.remotes.origin.url.rstrip('/') not in ['https://github.com/CultureBotAI/EdgeMech.git','https://github.com/CultureBotAI/EdgeMech','git@github.com:CultureBotAI/EdgeMech.git']: raise RuntimeError('Unexpected canonical origin')
+canonical_status=canonical.git.status('--short','--branch','--untracked-files=all')
+checkout=root/'coordinator-checkout'
+origin=subprocess.check_output(['git','-C',str(checkout),'remote','get-url','origin'],text=True).strip()
+if origin!='https://github.com/CultureBotAI/EdgeMech.git': raise RuntimeError('Unexpected isolated origin')
+checkout_state={"path":str(checkout),"branch":subprocess.check_output(['git','-C',str(checkout),'branch','--show-current'],text=True).strip(),"head":subprocess.check_output(['git','-C',str(checkout),'rev-parse','HEAD'],text=True).strip(),"status":subprocess.check_output(['git','-C',str(checkout),'status','--porcelain=v1','--untracked-files=all'],text=True).strip(),"origin":origin}
+now=datetime.now(timezone.utc); stamp=now.strftime('%Y%m%dT%H%M%SZ'); at=now.isoformat()
+paths={'ACK.md':root/'ACK.md','progress.json':root/'progress.json','edgemech_restart_20261120.yaml':claw/'workspace/tasks/edgemech_restart_20261120.yaml'}
+before={k:p.read_bytes() for k,p in paths.items()}; progress=json.loads(before['progress.json']); registry=json.loads(before['edgemech_restart_20261120.yaml'])
+if registry['task_id']!='edgemech_restart_20261120' or registry['target_repo']!='edgemech': raise RuntimeError('Wrong registry')
+def digest(b): return hashlib.sha256(b).hexdigest()
+def ref(p):
+ p=Path(p); b=p.read_bytes(); return {'path':str(p),'sha256':digest(b),'bytes':len(b)}
+def load(p): return json.loads(Path(p).read_text())
+def encoded(d): return (json.dumps(d,indent=2)+'\n').encode()
+recovery_path=net/'COORDINATOR-RECOVERY-CHECKPOINT-20261126T042934Z.json'; recovery=load(recovery_path)
+settings_path=net/'coordinator-restored-settings-readback.json'; saved_settings=load(settings_path)
+completion=load(prep/'completion.json'); review_path=root/'resume-20261125/PREPARATION-97c675ed-REVIEW.json'; review=load(review_path)
+pr233_path=root/'resume-20261125/PR233-REVIEW.json'; pr233=load(pr233_path)
+if recovery['thread_id']!='PRIVATE_UUID_029' or recovery['native_pid']!=PRIVATE_PID_G or not all(x['status']=='fulfilled' and x['exit_code']==0 for x in recovery['commands']): raise RuntimeError('Recovery proof mismatch')
+if not saved_settings['exact_settings_equal'] or saved_settings['before']!=saved_settings['after']: raise RuntimeError('Settings changed')
+if completion['publication']['commit']!=review['head'] or review['independent_evidence']['artifact_pin_mismatches']!=0: raise RuntimeError('Preparation review mismatch')
+if completion['publication']['commit']!='97c675ed3f614995d18dc3f1e8548fb83dc5cfd8' or completion['scientific_review_coverage']!=0: raise RuntimeError('Preparation scope mismatch')
+for file,key in [('library/response-01.json','response_sha256'),('library/readback-01.json','readback_sha256')]:
+ if ref(prep/file)['sha256']!=completion['library'][key]: raise RuntimeError('Library pin mismatch')
+if ref(prep/'canonical-readback-01.json')['sha256']!=completion['canonical']['receipt_sha256']: raise RuntimeError('Canonical readback mismatch')
+# Retain exact fresh owner checkpoint bytes, without writing their live paths.
+native_bytes={n:(root/n).read_bytes() for n in ['COORDINATOR-PROGRESS.json','FIRST-WORKER.json']}
+native=json.loads(native_bytes['COORDINATOR-PROGRESS.json']); first=json.loads(native_bytes['FIRST-WORKER.json'])
+snapshot=net/'metadata-snapshots'/stamp
+native_ref={'artifact':{'path':str(root/'COORDINATOR-PROGRESS.json'),'sha256':digest(native_bytes['COORDINATOR-PROGRESS.json']),'bytes':len(native_bytes['COORDINATOR-PROGRESS.json'])},'checkpoint_utc':native['checkpoint_utc'],'stale_until_coordinator_refreshes':False,'owner':'native coordinator','retained_snapshot':str(snapshot/'native-COORDINATOR-PROGRESS.json'),'edited_by_metadata_refresh':False}
+first_ref={'artifact':{'path':str(root/'FIRST-WORKER.json'),'sha256':digest(native_bytes['FIRST-WORKER.json']),'bytes':len(native_bytes['FIRST-WORKER.json'])},'checkpoint_utc':first['observed_at_utc'],'stale_until_coordinator_reconciles':False,'retained_snapshot':str(snapshot/'native-FIRST-WORKER.json'),'edited_by_metadata_refresh':False}
+evidence={
+ 'recovery':ref(recovery_path),'settings':ref(settings_path),'goal_resume_consumption':ref(net/'exact-goal-resume-consumed-once.json'),
+ 'review_delivery':ref(net/'preparation-review-delivered.json'),'handoff':ref(net/'recovery-handoff.md'),
+ 'preparation_report':ref(prep/'REPORT.md'),'preparation_completion':ref(prep/'completion.json'),'preparation_acceptance':ref(prep/'ACCEPTANCE.json'),
+ 'preparation_review':ref(review_path),'pr233_review':ref(pr233_path),'library_response':ref(prep/'library/response-01.json'),'library_readback':ref(prep/'library/readback-01.json'),
+ 'canonical_readback':ref(prep/'canonical-readback-01.json'),'canonical_yaml':ref(root/'preparation-worker-01/reviews/structured/20261126T031443Z-excluded-preparation-canary/review.yaml'),
+ 'canonical_markdown':ref(root/'preparation-worker-01/reviews/structured/20261126T031443Z-excluded-preparation-canary/review.md'),
+ 'source_restoration':ref(root/'COORDINATOR-SOURCE-RESTORE-ACTUAL.json'), 'census_audit':ref(root/'resume-20261125/AUDIT.json')}
+blockers=[
+ {'scope':'preparation helper/publication review','kind':'Completed bounded evidence verified. Three independent findings require filing/triage before repairs, focused regression and mutation checks, independent repaired-source review and exact reviewed PR publication. Preserve original executed bytes/receipts; do not repeat completed canary.','review':evidence['preparation_review'],'finding_ids':[x['id'] for x in review['findings']]},
+ {'scope':'PR233 baseline qualifying use','kind':'Two independent findings require filing/triage and reviewed repair: timestamp precision and structural projection. Existing baseline observations remain unqualified.','review':evidence['pr233_review'],'finding_ids':[x['id'] for x in pr233['findings']]},
+ {'scope':'census validation disposition','kind':'Complete result JSON coexists with actual outer FAILED exit1; child exit unmeasured. Reviewed retained-evidence reconciliation remains pending; no duplicate restoration or census run.'},
+ {'scope':'scientific expansion','kind':'Supported fulltext/native proof, exact prior-assessment/source-version reconciliation, exhaustive disjoint A/B freeze and cutoff, W5/W6, issue220, correction/runtime/evidence/resource gates remain required. Counts null and scientific coverage0.'}]
+checkpoint_path=net/f'ROOT-RECOVERY-REPORT-{stamp}.json'
+checkpoint={
+ 'at_utc':at,'state':'NETWORK_RECOVERY_VERIFIED_PREPARATION_COMPLETE_SCIENTIFIC_GATES_PENDING',
+ 'fresh_successful_native_call_verified':True,'native_recovery':recovery,'unchanged_settings':saved_settings['after'],
+ 'evidence':evidence,'native_checkpoint':native_ref,'native_worker_record':first_ref,
+ 'preparation':{'head':completion['publication']['commit'],'state':'COMPLETED_EXCLUDED_PREPARATION_EVIDENCE_VERIFIED_HELPER_PUBLICATION_HOLDS','library_extent':'metadata and complete abstract only','canonical_scope':'one scientific_review:false repository engineering pair','scientific_review_coverage':0,'occurrence':None,'fulltext_ready':False,'independently_checked_artifact_pins':166,'independently_checked_command_receipts':47,'command_failures_preserved':True},
+ 'remaining_prerequisites':blockers,'baseline_counts':{'A':None,'B':None,'frozen_target':None,'cutoff':None},
+ 'source_restoration_completed_once':True,'source_restore_rerun':False,'census_outer_exit_code':1,'census_native_child_exit_code':None,
+ 'operation_scope':'Only root-owned ACK.md/progress.json and one task entry plus immutable report/snapshots. No terminal input, source edits, helper/provider reruns, prompt answer, policy/credential change, merge, MIM or other registry edits.',
+ 'config_validation':'passed','repository_identity':{'canonical_path':str(canonical_path),'canonical_origin':canonical.remotes.origin.url,'canonical_status_observed':canonical_status,'coordinator':checkout_state},
+ 'metadata_snapshot':str(snapshot),'latest_work':'Native owner independently reconciled FIRST-WORKER and COORDINATOR-PROGRESS at '+native['checkpoint_utc']+'; next bounded unit is findings intake/triage before repairs.'}
+checkpoint_bytes=encoded(checkpoint); checkpoint_ref={'path':str(checkpoint_path),'sha256':digest(checkpoint_bytes),'bytes':len(checkpoint_bytes)}
+co=progress['coordinator']; co.update({'native_pid':PRIVATE_PID_G,'launcher_pid':None,'launcher_note':'Reopened native binary directly; previous PRIVATE_LAUNCHER_LABEL exited. No current launcher PID asserted.','effective_model':'GPT-6 Rosalind (Research)','model_identifier':saved_settings['after']['model'],'effective_reasoning_effort':saved_settings['after']['effort'],'task_accepted':True,'goal_active':True,'current_checkout':checkout_state,'latest_checkpoint':checkpoint_ref,'live_readback':str(recovery_path),'native_checkpoint':native_ref,'current_bounded_work':checkpoint['latest_work'],'resume_command_receipt':evidence['goal_resume_consumption'],'fresh_resumed_tool_result':{'timestamp':recovery['fresh_tool_timestamp'],'rollout_path':recovery['source_rollout'],'line_sha256':recovery['tool_output_line_sha256'],'commands':recovery['commands'],'checkpoint':evidence['recovery']},'recovery_checkpoint':evidence['recovery'],'settings_readback':evidence['settings'],'prior_processes_exited':{'native_pid':PRIVATE_PID_D,'launcher_pid':PRIVATE_PID_C},'acceptance_sha256':ref(root/'COORDINATOR-ACCEPTANCE.json')['sha256'],'acceptance_scope':'Current coordinator-owned recovery acceptance; original first acceptance remains pinned by first_checkpoint.'})
+w=progress['workers'][0]
+w.update({'observed_at':at,'state':'COMPLETED_EXCLUDED_PREPARATION_REVIEWED_HELPER_PUBLICATION_HOLDS','classification':'EXCLUDED_PREPARATION_CANARY','thread_id':completion['identity']['thread_id'],'head':completion['publication']['commit'],'branch':completion['publication']['branch'],'identity_source':evidence['preparation_acceptance'],'new_canary_acceptance':evidence['preparation_acceptance'],'new_canary_acceptance_verified':True,'library_retrieval_verified':True,'canonical_save_readback_verified':True,'library_evidence_locator':str(prep/'library/readback-01.json'),'canonical_readback_locator':str(prep/'canonical-readback-01.json'),'library_extent':'metadata and complete abstract only','canonical_scope':'one scientific_review:false repository engineering pair','fulltext_readiness':False,'production_readiness':False,'readiness':'COMPLETED_BOUNDED_PREPARATION_HELPER_PUBLICATION_AND_SCIENTIFIC_GATES_PENDING','completion':evidence['preparation_completion'],'report':evidence['preparation_report'],'independent_review':evidence['preparation_review'],'native_owned_record':first_ref,'next_action':blockers[0]['kind'],'actual_running_jobs':completion['actual_running_jobs'],'canary_repeated':False,'publication':completion['publication'],'historical_empty_composer_verified_by_parent':w.pop('empty_composer_verified_by_parent',None)})
+w['publication']['independent_review']='Bounded evidence verified; helper/publication changes required in PREPARATION-97c675ed-REVIEW.json.'
+progress['first_library_canonical_canary']={'state':w['state'],'worker_thread':w['thread_id'],'attempt_locator':str(prep/'ACCEPTANCE.json'),'completion':evidence['preparation_completion'],'independent_review':evidence['preparation_review'],'library_evidence_locator':w['library_evidence_locator'],'canonical_readback_locator':w['canonical_readback_locator'],'library_extent':w['library_extent'],'canonical_scope':w['canonical_scope'],'fulltext_ready':False,'production_coverage':0,'completed_units':[2,3],'unit1_repeated':False}
+progress.update({'updated_at':at,'state':checkpoint['state'],'next_action':checkpoint['latest_work'],'blocker':None,'concrete_blockers':blockers,'root_recovery_checkpoint':checkpoint_ref,'root_resume_checkpoint':checkpoint_ref,'metadata_checkpoint':str(snapshot),'fresh_successful_native_call_verified':True,'scientific_review_coverage':0,'completed_occurrences_this_campaign':0,'review_complete':False})
+progress['baseline']['status']='Source restoration completed once. Complete census JSON matches pinned manifest; original outer command FAILED exit1, child exit unmeasured. Reviewed status disposition, PR233 repairs and exhaustive A/B freeze remain pending.'
+progress['published_prs_observation']='Preserved earlier AUDIT.json GitHub snapshot; live PR/CI status not queried during this metadata refresh. No new hosted-CI claim.'
+progress['published_prs']['233']['independent_review']={'state':'CHANGES_REQUIRED_BEFORE_BASELINE_QUALIFYING_USE','evidence':evidence['pr233_review']}
+registry.update({'updated_at':at,'status':'native_coordinator_recovered_active','current_work':checkpoint['latest_work'],'worker_state':w['state'],'worker_thread_id':w['thread_id'],'worker_head':w['head'],'library_evidence_locator':w['library_evidence_locator'],'canonical_readback_locator':w['canonical_readback_locator'],'library_extent':w['library_extent'],'canonical_scope':w['canonical_scope'],'preparation_completion':evidence['preparation_completion'],'preparation_independent_review':evidence['preparation_review'],'fulltext_ready':False,'scientific_review_coverage':0,'queue_A_count':None,'queue_B_count':None,'blockers':blockers,'root_resume_checkpoint':checkpoint_ref,'root_recovery_checkpoint':checkpoint_ref,'native_checkpoint':native_ref,'metadata_checkpoint':str(snapshot),'fresh_successful_native_call_verified':True})
+registry['coordinator_process'].update({'native_pid':PRIVATE_PID_G,'launcher_pid':None,'goal_active':True,'resume_verified_by_fresh_tool':True,'fresh_tool_timestamp':recovery['fresh_tool_timestamp'],'settings_unchanged':True,'recovery':evidence['recovery'],'model_identifier':saved_settings['after']['model'],'head':checkout_state['head'],'branch':checkout_state['branch']})
+registry['published_prs']['233']['independent_review']='CHANGES_REQUIRED; two findings, see '+str(pr233_path)
+registry['published_prs_observation']=progress['published_prs_observation']
+ack=f'''M5 CLAW network-recovery report — {at} (November 25 Pacific recovery).
+
+Fresh native tool work is verified. Root normally quit the stalled coordinator (PRIVATE_NATIVE_LABEL/PRIVATE_LAUNCHER_LABEL), then reopened the exact existing thread {recovery['thread_id']} in session PRIVATE_SESSION_020, pane PRIVATE_PANE_022, native PRIVATE_PID_G_LABEL. Three fresh native commands completed successfully at {recovery['fresh_tool_timestamp']}; the existing goal is active. GPT-6 Rosalind (Research), xhigh, approval policy and sandbox settings match the prior saved settings exactly. No model, credential or policy change was needed. The original network-permission failure's precise cause is not established. Recovery proof: {recovery_path}. Dated root report: {checkpoint_path}.
+
+The existing preparation worker completed its bounded canary at 2026-11-26T03:20:39Z, head 97c675ed3f614995d18dc3f1e8548fb83dc5cfd8, thread {w['thread_id']}, GPT-6-Astra/ultra. Independent review verified166 retained artifact pins and47 command receipts, preserving recorded failures. One actual Valency call returned metadata and the complete abstract for DOI10.1099/ijs.0.65010-0; no body, table or figure was read. One non-scientific repository engineering review pair passed canonical validate/save/check/readback. Report: {prep/'REPORT.md'}. Completion: {prep/'completion.json'}. Library readback: {prep/'library/readback-01.json'}. Canonical readback: {prep/'canonical-readback-01.json'}. Independent review: {review_path}. The completed canary is preserved and must not be repeated merely to replace receipts.
+
+The independent review accepts the bounded observed evidence and requires changes to the new helpers/publication: confinement, MCP-envelope validation and public operational provenance. File/triage before repairs; preserve original executed helpers and immutable canonical evidence, add meaningful regression/mutation checks, obtain independent final review and publish the exact reviewed PR head. PR233 also has two qualifying-use blockers (timestamp precision and structural projection), recorded at {pr233_path}. These findings are distinct from the verified preparation result. No scientific expansion or full-text readiness follows from the canary.
+
+Source restoration completed once; the original reviewed successful apply receipt remains preserved. Do not restore again. Complete census JSON matches the pinned manifest (17,637,435 rows,882 partitions,10 native exports), while the retained outer command actually FAILED with exit1. The sysctl resource-wrapper warning supports an attribution inference; a separate native child exit was not measured. Preserve both artifacts and terminal failure and resolve status through a reviewed bounded evidence plan, without blindly repeating census verification. Exact rollout and digest evidence: {root/'resume-20261125/AUDIT.json'}.
+
+The native owner independently refreshed COORDINATOR-PROGRESS.json and FIRST-WORKER.json at {native['checkpoint_utc']}; this metadata refresh only read and snapshotted those files. The coordinator is working on findings intake before repairs. Full target/A/B membership and cutoff remain unfrozen, A/B counts null, scientific occurrences attempted/assessed/persisted0, and scientific coverage0. Supported fulltext/native proof, W5/W6, issue220, source/identity/lineage, correction and resource gates remain prerequisites. Existing GitHub state in progress is explicitly an earlier snapshot; this refresh makes no new hosted-CI claim or merge.
+
+Root-owned ACK/progress and only the Edge task entry were refreshed with before snapshots, compare-before-replace and a short shared metadata lease. Native owner files, original receipts, source restoration, MIM and other assignments were not edited. No terminal input, provider/helper rerun, prompt answer, credential/policy change or merge occurred in this metadata refresh.
+'''
+# Keep legible separators in counts and prose.
+ack=ack.replace('verified166','verified 166').replace('and47','and 47').replace('rows,882','rows, 882').replace('partitions,10','partitions, 10').replace('persisted0','persisted 0').replace('coverage0','coverage 0').replace('exit1','exit 1').replace('DOI10.','DOI 10.')
+new={'ACK.md':ack.encode(),'progress.json':encoded(progress),'edgemech_restart_20261120.yaml':encoded(registry)}
+for key in ['progress.json','edgemech_restart_20261120.yaml']: json.loads(new[key])
+report_path=net/f'RECOVERY-REPORT-{stamp}.md'
+def exclusive(path,data):
+ with path.open('xb') as f: f.write(data); f.flush(); os.fsync(f.fileno())
+with LockManager().lock('edgemech','root_network_recovery_metadata_refresh'):
+ for k,p in paths.items():
+  if p.read_bytes()!=before[k]: raise RuntimeError('CAS conflict: '+str(p))
+ snapshot.mkdir(parents=True,exist_ok=False)
+ for k,b in before.items(): exclusive(snapshot/k,b)
+ for n,b in native_bytes.items(): exclusive(snapshot/('native-'+n),b)
+ exclusive(checkpoint_path,checkpoint_bytes); exclusive(report_path,new['ACK.md'])
+ for k,p in paths.items():
+  stage=p.with_name('.'+p.name+'.'+stamp+'.new'); exclusive(stage,new[k]); os.replace(stage,p)
+ for k,p in paths.items():
+  if p.read_bytes()!=new[k]: raise RuntimeError('Readback mismatch: '+str(p))
+ receipt={'at_utc':at,'state':'UPDATED_AND_READ_BACK','before':{k:{'sha256':digest(b),'bytes':len(b)} for k,b in before.items()},'after':{k:ref(p) for k,p in paths.items()},'report':ref(report_path),'checkpoint':ref(checkpoint_path),'native_owner_files_read_only':True,'other_registry_entries_changed':False,'MIM_changed':False,'lock_resource':'edgemech','lock_context_manager':True,'CAS_all_three_passed':True}
+ exclusive(snapshot/'REFRESH.json',encoded(receipt))
+print(json.dumps({'receipt':ref(snapshot/'REFRESH.json'),'after':receipt['after'],'report':receipt['report'],'checkpoint':receipt['checkpoint'],'native_checkpoint_utc':native['checkpoint_utc'],'fresh_successful_native_tools':True,'scientific_coverage':0},indent=2))
+PY

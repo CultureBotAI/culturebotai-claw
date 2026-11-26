@@ -1,0 +1,22 @@
+python - <<'PY'
+from pathlib import Path
+from datetime import datetime,timezone
+import json,hashlib,os
+p=Path('PRIVATE_HOME_021/agent-work/EdgeMech/restart-20261120/network-canary-20261125');roll=Path('PRIVATE_HOME_021/.codex/sessions/2026/11/19/rollout-2026-11-19T21-24-30-PRIVATE_UUID_029.jsonl')
+for raw in roll.read_text().splitlines():
+ d=json.loads(raw)
+ if d.get('timestamp')=='2026-11-26T04:29:34.315Z' and d.get('payload',{}).get('type')=='custom_tool_call_output':break
+else:raise RuntimeError('fresh tool output not found')
+output=d['payload']['output'];output=json.loads(output) if isinstance(output,str) else output
+results=[];goal=None
+for block in output:
+ try:v=json.loads(block.get('text',''))
+ except ValueError:continue
+ if isinstance(v,dict) and 'i' in v:results.append({'index':v['i'],'status':v['status'],'exit_code':v.get('value',{}).get('exit_code'),'chunk_id':v.get('value',{}).get('chunk_id')})
+ elif isinstance(v,dict):goal=v
+if len(results)!=3 or any(x['status']!='fulfilled' or x['exit_code']!=0 for x in results):raise RuntimeError('not three fresh successes')
+record={'at':datetime.now(timezone.utc).isoformat(),'state':'EXACT_COORDINATOR_RECOVERED_FRESH_SUCCESSFUL_TOOLS_VERIFIED','thread_id':'PRIVATE_UUID_029','pane':'PRIVATE_PANE_022','native_pid':PRIVATE_PID_G,'old_native_pid_exited':PRIVATE_PID_D,'fresh_tool_timestamp':d['timestamp'],'commands':results,'source_rollout':str(roll),'tool_output_line_sha256':hashlib.sha256(raw.encode()).hexdigest(),'settings_readback':str(p/'coordinator-restored-settings-readback.json'),'settings_unchanged':True,'preparation_repeated':False,'source_restore_repeated':False,'scientific_coverage':0,'goal_result':goal}
+f=p/'COORDINATOR-RECOVERY-CHECKPOINT-20261126T042934Z.json'
+with f.open('x') as out:json.dump(record,out,indent=2);out.flush();os.fsync(out.fileno())
+print(f);print(json.dumps(results))
+PY

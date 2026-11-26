@@ -1,0 +1,13 @@
+from pathlib import Path
+import subprocess,json,hashlib
+from datetime import datetime,timezone
+p=Path('PRIVATE_HOME_021/agent-work/EdgeMech/restart-20261120');r=p/'resume-20261125'
+body='User-authorized resume with current M5 login: read '+str(p/'LOGIN-RESUME-NOTICE-20261125.txt')+'. Reconcile stale worker/progress against approval receipt and retained census terminal evidence; do not duplicate restore or verification. Existing worker61 is trusted but has a user /restart draft: preserve it and have parent handle any necessary draft resolution before worker input. Continue actual-worker library retrieval and canonical save/readback within unchanged gates; no auth, secrets, merges or other prompt answers. Write fresh acceptance/checkpoint with actual progress. Root owns resume/control and ACK/progress rollup; you own native campaign. Preserve current model and unrelated work.'
+f=r/'coordinator-followup.txt';f.write_text(body+'\n')
+t=['tmux','-S','PRIVATE_SOCKET_019'];read=lambda *a:subprocess.check_output(t+list(a),text=True)
+s=read('capture-pane','-p','-t','PRIVATE_PANE_022')
+if 'Pursuing goal' not in s or '› Ask Codex to do anything' not in s:raise RuntimeError('not safe working/empty composer')
+if read('display-message','-p','-t','PRIVATE_PANE_022','#{pane_pid}').strip()!='PRIVATE_PID_C':raise RuntimeError('binding changed')
+subprocess.run(t+['load-buffer','-b','edge-resume-20261125-notice',str(f)],check=True)
+subprocess.run(t+['paste-buffer','-b','edge-resume-20261125-notice','-d','-t','PRIVATE_PANE_022'],check=True)
+(r/'coordinator-followup-pasted.json').write_text(json.dumps({'at':datetime.now(timezone.utc).isoformat(),'path':str(f),'sha256':hashlib.sha256(f.read_bytes()).hexdigest(),'bytes':f.stat().st_size,'state':'pasted_not_submitted'},indent=2))

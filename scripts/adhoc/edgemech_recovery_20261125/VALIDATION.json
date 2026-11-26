@@ -1,0 +1,18 @@
+{
+  "date_utc": "2026-11-26",
+  "scope": "Offline provenance mechanisms and inert source bytes; no historical recovery replay",
+  "focused_pytest": {"passed": 16, "exit_code": 0},
+  "ruff_version": "0.16.3",
+  "ruff": "passed",
+  "archive_validation": {"entries": 31, "source_files": 89, "python_sources_compiled_without_execution": 27, "exact_rehydration": true, "archive_executions": 0},
+  "fresh_process_negative_checks": [
+    {"distinction": "UUID attached to prose", "original_guard_test_exit": 1, "restored_suite_passed": true, "private_log_sha256": "2d20acb2816cde7208cacb9347a5156527b3647c23849fc99972e2937bebdc98"},
+    {"distinction": "same-line source substitution against reviewed pins", "guard_disabled_test_exit": 1, "restored_suite_passed": true, "private_log_sha256": "3c601a31b8354d52d7941c2da131f36aeea87885b3982503033cce94584024b8"},
+    {"distinction": "altered operative source even when derived digest is updated", "guard_disabled_test_exit": 1, "restored_suite_passed": true, "private_log_sha256": "4e6ae63461a4035734e9d84b25d006645a4f1432c5203b1539ee9238b105e0a3"}
+  ],
+  "retained_failed_setup": "Initial pytest run:4 passed/8 fixture setup errors because owned basetemp parent did not yet exist; parent created and full focused suite rerun. No test failure relabeled.",
+  "candidate_rejections_preserved_privately": ["v1 attached UUID redaction", "v2 schema-key substitution", "v3 attached process labels"],
+  "full_repository_suite": "not run; change is bounded inert archives plus focused offline tooling",
+  "hosted_CI": "not claimed",
+  "independent_review": "required at final exact head before completion"
+}
