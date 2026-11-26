@@ -5,10 +5,13 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 import re
+from pathlib import Path
 
-from preserve_sources import regular_bytes, sha
+try:
+    from .preserve_sources import regular_bytes, sha
+except ImportError:  # Direct script invocation.
+    from preserve_sources import regular_bytes, sha
 
 
 def validate(private: Path, public: Path) -> dict:

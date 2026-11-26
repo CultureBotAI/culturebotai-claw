@@ -212,3 +212,10 @@ def test_duplicate_results_and_bad_source_bounds_refused():
     for line in [0, -1, 100]:
         with pytest.raises(ValueError, match="outside rollout"):
             selected_call(parsed, line, "2026-11-26T02:00:00Z")
+
+
+def test_uuid_attached_to_prose_is_parameterized():
+    identity = "00000000-0000-0000-0000-000000000001"
+    result = Bindings().transform("workerthread" + identity + "/checkpoint")
+    assert identity not in result
+    assert "workerthreadPRIVATE_UUID_" in result

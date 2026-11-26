@@ -53,7 +53,7 @@ class Bindings:
 
     patterns = (
         ("HOME", r"/Users/[A-Za-z0-9_.-]+"),
-        ("UUID", r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b"),
+        ("UUID", r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"),
         ("SOCKET", r"/(?:private/)?tmp/tmux-\d+/default"),
         ("PANE", r"%\d+\b"),
         ("TTY", r"(?:/dev/)?ttys\d+\b"),
