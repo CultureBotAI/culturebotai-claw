@@ -64,11 +64,11 @@ def test_binding_redaction_is_stable_and_does_not_rewrite_digest_substrings():
     assert "PRIVATE_PID" in first and "a12345b" in first
 
 
-def test_missing_result_is_unknown_not_synthetic_success():
+def test_missing_result_refuses_without_inventing_success():
     rows = records()[:1]
     parsed = [(json.dumps(r).encode(), r) for r in rows]
-    value = selected_call(parsed, 1, "2026-11-26T02:00:00Z")
-    assert value["results"] == [] and value["commands"] == []
+    with pytest.raises(ValueError, match="exactly one"):
+        selected_call(parsed, 1, "2026-11-26T02:00:00Z")
 
 
 @pytest.mark.parametrize("bad", ["cutoff", "duplicate", "wrong-line"])
@@ -108,3 +108,14 @@ def test_input_symlink_refused(tmp_path):
 def test_heredoc_content_is_not_evaluated_and_unterminated_refuses():
     assert python_blocks("python3 - <<'CODE'\nprint('$(do-not-run)')\nCODE\n") == ["print('$(do-not-run)')\n"]
     with pytest.raises(ValueError): python_blocks("python - <<'CODE'\nprint(1)\n")
+
+
+def test_duplicate_results_and_bad_source_bounds_refused():
+    rows = records()
+    rows.append(rows[3])
+    parsed = [(json.dumps(r).encode(), r) for r in rows]
+    with pytest.raises(ValueError, match="exactly one"):
+        selected_call(parsed, 1, "2026-11-26T02:00:00Z")
+    for line in [0, -1, 100]:
+        with pytest.raises(ValueError, match="outside rollout"):
+            selected_call(parsed, line, "2026-11-26T02:00:00Z")

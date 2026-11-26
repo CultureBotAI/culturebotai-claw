@@ -101,6 +101,8 @@ def python_blocks(shell: str) -> list[str]:
 
 
 def selected_call(records: list[tuple[bytes, dict[str, Any]]], line: int, cutoff: str) -> dict[str, Any]:
+    if not isinstance(line, int) or not 1 <= line <= len(records):
+        raise ValueError("source line outside rollout")
     raw, record = records[line - 1]
     payload = record.get("payload", {})
     if payload.get("type") != "custom_tool_call" or payload.get("name") != "exec":
@@ -114,6 +116,8 @@ def selected_call(records: list[tuple[bytes, dict[str, Any]]], line: int, cutoff
         if d.get("payload", {}).get("type") == "custom_tool_call_output"
         and d["payload"].get("call_id") == call_id
     ]
+    if len(result) != 1:
+        raise ValueError("source call needs exactly one matching result record")
     # Native command completions before the next tool request belong to this
     # bounded call window. Record the window rule; never invent exit status.
     commands = []
@@ -145,6 +149,8 @@ def preserve(spec: dict[str, Any], private: Path, public: Path) -> dict[str, Any
                 raise ValueError("duplicate source selection")
             seen.add(key)
             selected = selected_call(records, item["line"], spec["cutoff"])
+            selected["rollout_read_sha256"] = sha(raw)
+            selected["rollout_read_bytes"] = len(raw)
             selections.append((item["id"], item["purpose"], path, selected))
     ids = [x[0] for x in selections]
     if len(set(ids)) != len(ids) or any(not re.fullmatch(r"[a-z][a-z0-9-]+", x) for x in ids):
